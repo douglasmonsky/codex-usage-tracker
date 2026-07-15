@@ -246,12 +246,30 @@ def handle_allowance_analysis_job_start_request(
         send_error(HTTPStatus.FORBIDDEN, _AUTH_ERROR)
         return
     try:
-        arguments = _analysis_arguments(params, include_archived_default)
-        with connect(db_path) as connection:
-            request = allowance_analysis_request(connection, **arguments)
+        payload = start_allowance_analysis_job(
+            query,
+            db_path=db_path,
+            registry=registry,
+            include_archived_default=include_archived_default,
+        )
     except ValueError as error:
         send_error(HTTPStatus.BAD_REQUEST, str(error))
         return
+    send_json(HTTPStatus.ACCEPTED, payload)
+
+
+def start_allowance_analysis_job(
+    query: str,
+    *,
+    db_path: Path,
+    registry: AnalysisJobRegistry,
+    include_archived_default: bool,
+) -> dict[str, object]:
+    """Start or reuse analysis work after the caller applies its auth policy."""
+    params = parse_qs(query, keep_blank_values=True)
+    arguments = _analysis_arguments(params, include_archived_default)
+    with connect(db_path) as connection:
+        request = allowance_analysis_request(connection, **arguments)
 
     def work(progress: ProgressReporter) -> dict[str, object]:
         progress(stage="analyzing", completed_units=0, total_units=1)
@@ -264,7 +282,7 @@ def handle_allowance_analysis_job_start_request(
             "status": str(result["status"]),
         }
 
-    payload = registry.start(
+    return registry.start(
         job_kind="allowance-analysis",
         request_key=f"allowance-analysis:{request['snapshot_id']}",
         source_revision=str(request["source_revision"]),
@@ -272,7 +290,6 @@ def handle_allowance_analysis_job_start_request(
         work=work,
         reload_endpoint="/api/allowance/analysis",
     )
-    send_json(HTTPStatus.ACCEPTED, payload)
 
 
 def handle_allowance_analysis_job_status_request(
@@ -291,9 +308,20 @@ def handle_allowance_analysis_job_status_request(
     if not job_id:
         send_error(HTTPStatus.BAD_REQUEST, "job_id is required")
         return
-    payload = registry.status(job_id)
+    payload = allowance_analysis_job_status(job_id, registry=registry)
     status = HTTPStatus.NOT_FOUND if payload["status"] == "missing" else HTTPStatus.OK
     send_json(status, payload)
+
+
+def allowance_analysis_job_status(
+    job_id: str,
+    *,
+    registry: AnalysisJobRegistry,
+) -> dict[str, object]:
+    """Return one read-only allowance analysis job view."""
+    if not job_id:
+        raise ValueError("job_id is required")
+    return registry.status(job_id)
 
 
 def _send_payload(

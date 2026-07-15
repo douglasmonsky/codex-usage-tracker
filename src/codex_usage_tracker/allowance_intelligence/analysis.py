@@ -40,7 +40,7 @@ def build_allowance_analysis(
     )
     cached = _read_snapshot(connection, request["snapshot_id"])
     if cached is not None:
-        return cached
+        return _with_usage_quality(connection, cached)
     source_revision = request["source_revision"]
     data_as_of = request["data_as_of"]
     resolved_rate_revision = request["rate_card_revision"]
@@ -74,6 +74,7 @@ def build_allowance_analysis(
         "cohort_key": cohort_key,
         "forecast_horizon": forecast_horizon,
         "parameters": resolved,
+        "quality": _usage_quality(connection),
         **detected,
     }
     cache_model_version = (
@@ -123,7 +124,8 @@ def read_allowance_analysis(
         forecast_horizon=forecast_horizon,
         parameters=parameters,
     )
-    return _read_snapshot(connection, request["snapshot_id"])
+    payload = _read_snapshot(connection, request["snapshot_id"])
+    return _with_usage_quality(connection, payload) if payload is not None else None
 
 
 def allowance_analysis_request(
@@ -255,3 +257,22 @@ def _rate_card_revision() -> str:
         separators=(",", ":"),
     )
     return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def _with_usage_quality(
+    connection: sqlite3.Connection,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    result = dict(payload)
+    result["quality"] = {**dict(result.get("quality") or {}), **_usage_quality(connection)}
+    return result
+
+
+def _usage_quality(connection: sqlite3.Connection) -> dict[str, Any]:
+    try:
+        copied_rows = int(
+            connection.execute("SELECT count(*) FROM usage_events WHERE is_duplicate=1").fetchone()[0]
+        )
+    except sqlite3.OperationalError:
+        copied_rows = 0
+    return {"canonical": True, "copied_rows_excluded": copied_rows}

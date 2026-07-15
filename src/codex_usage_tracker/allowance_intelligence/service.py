@@ -29,6 +29,10 @@ def build_allowance_status(connection: sqlite3.Connection, *, now: datetime, pri
             "schema": ALLOWANCE_STATUS_SCHEMA,
             "revision": revision,
             "changed": False,
+            "quality": {
+                "canonical": True,
+                "copied_rows_excluded": _copied_excluded(connection),
+            },
             "next": {"action": "poll_status", "poll_after_seconds": 60},
         }
     weekly = query_latest_allowance_state(connection, window_kind="weekly", include_archived=include_archived)
@@ -70,7 +74,7 @@ def build_allowance_series(connection: sqlite3.Connection, *, now: datetime, ran
     start_at, end_at = start.isoformat(), end.isoformat()
     cycles = query_allowance_series(connection, start_at=start_at, end_at=end_at, window_kind=window_kind, cohort_id=cohort_id, include_archived=include_archived)
     points = _series_points(cycles)
-    return {"schema": ALLOWANCE_SERIES_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "revision": _revision(connection), "requested_range": {"preset": range_preset, "start_at": start_at, "end_at": end_at}, "available_range": _available_range(cycles), "granularity": granularity, "truncated": False, "downsampled": False, "quality": {"observed_only": True}, "points": points, "cycles": [_cycle(row) for row in cycles]}
+    return {"schema": ALLOWANCE_SERIES_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "revision": _revision(connection), "requested_range": {"preset": range_preset, "start_at": start_at, "end_at": end_at}, "available_range": _available_range(cycles), "granularity": granularity, "truncated": False, "downsampled": False, "quality": {"observed_only": True, "canonical": True, "copied_rows_excluded": _copied_excluded(connection)}, "points": points, "cycles": [_cycle(row) for row in cycles]}
 
 
 def build_allowance_evidence(connection: sqlite3.Connection, *, now: datetime | None = None, privacy_mode: str = "strict", limit: int = 50, cursor: str | None = None, window_kind: str | None = None, cohort_id: str | None = None, start_at: str | None = None, end_at: str | None = None, order: str = "desc", include_archived: bool = False) -> dict[str, Any]:

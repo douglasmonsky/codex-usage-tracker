@@ -39,6 +39,7 @@ def test_status_schema_freshness_and_matching_revision_are_compact(connection: s
         "schema": payload["schema"],
         "revision": "r1",
         "changed": False,
+        "quality": {"canonical": True, "copied_rows_excluded": 0},
         "next": {"action": "poll_status", "poll_after_seconds": 60},
     }
 

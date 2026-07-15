@@ -27,6 +27,7 @@ def test_status_payload_is_constant_size_and_supports_revision_polling(tmp_path:
         "schema": "codex-usage-tracker-allowance-status-v2",
         "revision": "missing",
         "changed": False,
+        "quality": {"canonical": True, "copied_rows_excluded": 0},
         "next": {"action": "poll_status", "poll_after_seconds": 60},
     }
 

@@ -163,6 +163,11 @@ _REFRESH_JOB_REGISTRY, _REFRESH_JOB_LOCK = RefreshJobRegistry(), threading.Lock(
 usage_allowance_diagnostics = _mcp_allowance.usage_allowance_diagnostics
 usage_allowance_export = _mcp_allowance.usage_allowance_export
 usage_allowance_history = _mcp_allowance.usage_allowance_history
+usage_allowance_status = _mcp_allowance.usage_allowance_status
+usage_allowance_series = _mcp_allowance.usage_allowance_series
+usage_allowance_evidence = _mcp_allowance.usage_allowance_evidence
+usage_allowance_analysis = _mcp_allowance.usage_allowance_analysis
+usage_allowance_analysis_status = _mcp_allowance.usage_allowance_analysis_status
 
 
 @mcp.tool()

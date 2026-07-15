@@ -125,6 +125,11 @@ the highest-token thread summaries instead.
 - `usage_allowance_history`
 - `usage_allowance_diagnostics`
 - `usage_allowance_export`
+- `usage_allowance_status`
+- `usage_allowance_series`
+- `usage_allowance_evidence`
+- `usage_allowance_analysis`
+- `usage_allowance_analysis_status`
 - `usage_compression_start`
 - `usage_compression_status`
 - `usage_compression_profile`
@@ -181,11 +186,33 @@ Dashboard-shaped MCP tools return JSON dictionaries that reuse the same aggregat
 
 ## Allowance Intelligence
 
+- `usage_allowance_status(...)` is the default polling entry point. It reads a
+  constant-size canonical snapshot, reports copied clone rows excluded, and
+  directs stale or empty indexes through `usage_refresh_start` and
+  `usage_refresh_status` without running full diagnostics.
+- `usage_allowance_series(...)` returns a canonical reset-aware timeline for a
+  supported finite preset or bounded custom range. It never accepts an
+  all-history setting.
+- `usage_allowance_evidence(...)` returns latest-first canonical transitions in
+  pages of at most 500 rows. Strict mode omits local identifiers; local mode
+  preserves bounded physical record provenance for debugging.
+- `usage_allowance_analysis(...)` reads the exact persisted result for the
+  current source/model/rate-card key or starts one deduplicated background job.
+  Poll active work with `usage_allowance_analysis_status(job_id)`, then reload
+  `usage_allowance_analysis(...)` after completion.
 - `usage_allowance_history(...)` returns normalized observed weekly and 5-hour allowance snapshots.
 - `usage_allowance_diagnostics(...)` returns evidence grades comparing observed usage movement against estimated local credits. Weekly windows are the primary long-range signal; 5-hour windows are noisy rolling-window context.
 - `usage_allowance_export(...)` returns strict-privacy evidence bundles for manual sharing.
 
-Use allowance tools when users ask whether limits changed, whether weekly allowance behavior shifted, why the 5-hour counter looks noisy, or how to share aggregate allowance evidence safely. The tracker cannot read the user's logged-in Codex account plan, native remaining allowance, or usage from other agentic surfaces. Remaining allowance context is only as accurate as values manually copied into `~/.codex-usage-tracker/allowance.json`.
+The v2 status, series, evidence, and analysis tools are the normal MCP/plugin
+surface. History, diagnostics, and export remain compatibility and explicit
+offline-diagnostic tools. Use allowance tools when users ask whether limits
+changed, whether weekly allowance behavior shifted, why the 5-hour counter
+looks noisy, or how to share aggregate allowance evidence safely. The tracker
+cannot read the user's logged-in Codex account plan, native remaining
+allowance, or usage from other agentic surfaces. Remaining allowance context is
+only as accurate as values manually copied into
+`~/.codex-usage-tracker/allowance.json`.
 
 ## Compression Lab
 
