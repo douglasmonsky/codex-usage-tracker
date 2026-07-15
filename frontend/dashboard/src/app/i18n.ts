@@ -1,5 +1,9 @@
 import type { DashboardBootPayload, DashboardLanguage } from '../api/types';
 import type { ViewId } from './navigation';
+import {
+  translateZhHansUiText,
+  type CatalogTemplateTranslation,
+} from './zh-Hans/translate';
 
 const languageStorageKey = 'codex-usage-dashboard-language';
 
@@ -57,8 +61,19 @@ export type ShellI18n = {
   direction: 'ltr' | 'rtl';
   languages: DashboardLanguage[];
   t: (key: string, fallback?: string) => string;
+  translateText: (value: string) => string;
+  formatText: (template: string, values: Readonly<Record<string, string | number>>) => string;
   navLabel: (view: ViewId, fallback: string) => string;
 };
+
+export type LocalizedText = {
+  template: string;
+  values: Readonly<Record<string, string | number>>;
+};
+
+export function formatLocalizedText(i18n: ShellI18n, value: string | LocalizedText): string {
+  return typeof value === 'string' ? i18n.translateText(value) : i18n.formatText(value.template, value.values);
+}
 
 export function createShellI18n(payload: DashboardBootPayload | null, language: string): ShellI18n {
   const languages = dashboardLanguages(payload);
@@ -72,18 +87,87 @@ export function createShellI18n(payload: DashboardBootPayload | null, language: 
     ...englishTranslations,
     ...selectedTranslations,
   };
+  const catalogLiteralTranslations = buildCatalogLiteralTranslations(
+    englishTranslations,
+    selectedTranslations,
+  );
+  const catalogTemplateTranslations = buildCatalogTemplateTranslations(
+    englishTranslations,
+    selectedTranslations,
+  );
   const languageMeta = languages.find(entry => entry.code === normalized);
   const direction = languageMeta?.dir === 'rtl' || (!languageMeta && payload?.language_direction === 'rtl') ? 'rtl' : 'ltr';
+  const translateText = (value: string) => {
+    if (normalized === 'zh-Hans') {
+      return translateZhHansUiText(
+        value,
+        catalogLiteralTranslations,
+        catalogTemplateTranslations,
+      );
+    }
+    return catalogLiteralTranslations.get(value) ?? value;
+  };
   return {
     language: normalized,
     direction,
     languages,
     t: (key, fallback) => translations[key] ?? fallback ?? key,
+    translateText,
+    formatText: (template, values) => translateText(template).replace(
+      /\{([A-Za-z][A-Za-z0-9_]*)\}/gu,
+      (token, key) => String(values[String(key)] ?? token),
+    ),
     navLabel: (view, fallback) => {
       const key = navTranslationKeys[view];
       return key ? translations[key] ?? fallback : fallback;
     },
   };
+}
+
+function buildCatalogTemplateTranslations(
+  englishTranslations: Record<string, string>,
+  selectedTranslations: Record<string, string>,
+): ReadonlyArray<CatalogTemplateTranslation> {
+  const templates: CatalogTemplateTranslation[] = [];
+  for (const [key, englishValue] of Object.entries(englishTranslations)) {
+    const selectedValue = selectedTranslations[key];
+    if (!selectedValue || selectedValue === englishValue || !englishValue.includes('{')) continue;
+    const placeholders: string[] = [];
+    const patternParts: string[] = [];
+    let cursor = 0;
+    for (const match of englishValue.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/gu)) {
+      const index = match.index ?? cursor;
+      patternParts.push(escapeRegularExpression(englishValue.slice(cursor, index)));
+      patternParts.push('(.+?)');
+      placeholders.push(match[1]);
+      cursor = index + match[0].length;
+    }
+    patternParts.push(escapeRegularExpression(englishValue.slice(cursor)));
+    templates.push({
+      pattern: new RegExp(`^${patternParts.join('')}$`, 'u'),
+      placeholders,
+      translatedTemplate: selectedValue,
+    });
+  }
+  return templates.sort((left, right) => right.translatedTemplate.length - left.translatedTemplate.length);
+}
+
+function escapeRegularExpression(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+}
+
+function buildCatalogLiteralTranslations(
+  englishTranslations: Record<string, string>,
+  selectedTranslations: Record<string, string>,
+): ReadonlyMap<string, string> {
+  const literals = new Map<string, string>();
+  for (const [key, englishValue] of Object.entries(englishTranslations)) {
+    const selectedValue = selectedTranslations[key];
+    if (selectedValue && selectedValue !== englishValue) {
+      literals.set(englishValue, selectedValue);
+    }
+  }
+  return literals;
 }
 
 function dashboardLanguages(payload: DashboardBootPayload | null): DashboardLanguage[] {

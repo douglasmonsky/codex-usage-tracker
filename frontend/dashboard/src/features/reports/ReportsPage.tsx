@@ -3,6 +3,7 @@ import { Download, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import type { CallRow, DashboardModel } from '../../api/types';
+import { useShellI18n } from '../../app/i18nContext';
 import type { LoadWindow } from '../../data/dataScope';
 import {
   dashboardModuleProgress,
@@ -53,6 +54,7 @@ export function ReportsPage({
   onOpenInvestigator,
   onCopyCallLink,
 }: ReportsPageProps) {
+  const i18n = useShellI18n();
   const [selectedKey, setSelectedKey] = useState(() => reportKey(reportFromUrl(model.reports) ?? model.reports[0]));
   const [actionStatus, setActionStatus] = useState('');
   const canUseLive = Boolean(model.contextRuntime.apiToken) && !model.contextRuntime.fileMode;
@@ -201,7 +203,7 @@ export function ReportsPage({
           <Visualization spec={visualizationSpec} height={320} />
           <Panel
             title="Report Evidence Calls"
-            subtitle={`${evidenceCalls.length} aggregate rows · select a row to open Call Investigator`}
+            subtitle={i18n.translateText(`${evidenceCalls.length} aggregate rows · select a row to open Call Investigator`)}
             action={<StatusBadge label="Investigator linked" tone="green" />}
           >
             <ReportEvidenceTable

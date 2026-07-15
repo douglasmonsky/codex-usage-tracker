@@ -30,9 +30,9 @@ export function buildReportVisualizationSpec(
 ): CartesianVisualizationSpecV1 {
   const details = reportDetails(report, calls);
   const unit = visualizationUnit(details.chartLabel);
-  const bars = reportBarData(report, model, calls);
-  const visual = bars
-    ? barVisualization(bars, unit, details.chartLabel)
+  const barData = reportBarData(report, model, calls);
+  const visual = barData
+    ? barVisualization(barData.bars, unit, details.chartLabel, barData.labelsAreUiText)
     : lineVisualization(reportLineSeries(report, model), unit, details.chartLabel);
   const title = report?.title ?? 'Selected report';
   const visualizationTitle = `${details.eyebrow} evidence`;
@@ -69,7 +69,7 @@ export function buildReportVisualizationSpec(
     },
     interactions: {
       selection: { keyField: 'id', labelField: 'label' },
-      ...(bars ? {} : {
+      ...(barData ? {} : {
         zoom: {
           axis: 'x' as const,
           startPercent: visual.rows.length > 12 ? Math.round(100 - (12 / visual.rows.length) * 100) : 0,
@@ -81,14 +81,19 @@ export function buildReportVisualizationSpec(
     kind: 'cartesian',
     data: { rows: visual.rows },
     axes: {
-      x: { field: 'label', label: bars ? 'Category' : 'Observed period', type: 'category' },
+      x: { field: 'label', label: barData ? 'Category' : 'Observed period', type: 'category' },
       y: { field: visual.series[0]?.yField ?? 'value', label: details.chartLabel, type: 'number', unit },
     },
     series: visual.series,
   };
 }
 
-function barVisualization(bars: BarDatum[], unit: VisualizationUnit, label: string) {
+function barVisualization(
+  bars: BarDatum[],
+  unit: VisualizationUnit,
+  label: string,
+  labelsAreUiText: boolean,
+) {
   const rows: VisualizationRecord[] = bars.map((bar, index) => ({
     id: `bar-${index}`,
     label: bar.label,
@@ -97,7 +102,13 @@ function barVisualization(bars: BarDatum[], unit: VisualizationUnit, label: stri
   return {
     rows,
     columns: [
-      { field: 'label', label: 'Category', type: 'category' as const, align: 'left' as const },
+      {
+        field: 'label',
+        label: 'Category',
+        type: 'category' as const,
+        align: 'left' as const,
+        localizeValues: labelsAreUiText,
+      },
       { field: 'value', label, type: 'number' as const, unit, align: 'right' as const },
     ],
     series: [{

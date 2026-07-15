@@ -74,12 +74,12 @@ export function AllowanceIntelligenceEvidenceTable({
                   <td className={styles.numeric}>{row.end_used_percent === null ? '—' : `${format(row.end_used_percent)}%`}</td>
                   <td>{row.window_kind === 'weekly' ? 'Weekly' : '5-hour'}</td>
                   <td><StatusBadge tone={tone(row.point_kind)}>{label(row.point_kind, row.censor_reason)}</StatusBadge></td>
-                  <td>{row.cohort_key || 'Codex'}</td>
+                  <td data-localization-skip="true">{row.cohort_key || 'Codex'}</td>
                   <td>
                     {showPhysicalProvenance && recordId ? (
                       <div className={styles.rowActions}>
-                        <button type="button" title="Open source call" onClick={() => onOpenCall(recordId)}><ExternalLink /><span className="sr-only">Open source call</span></button>
-                        <button type="button" title="Copy source call link" onClick={() => onCopyCallLink(recordId)}><Copy /><span className="sr-only">Copy source call link</span></button>
+                        <button type="button" title="Open source call" data-localization-attributes="title" onClick={() => onOpenCall(recordId)}><ExternalLink /><span className="sr-only">Open source call</span></button>
+                        <button type="button" title="Copy source call link" data-localization-attributes="title" onClick={() => onCopyCallLink(recordId)}><Copy /><span className="sr-only">Copy source call link</span></button>
                       </div>
                     ) : 'Canonical aggregate'}
                   </td>

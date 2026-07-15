@@ -133,10 +133,10 @@ export function buildWasteFingerprintSpec(
       caption: 'Waste fingerprints by thread and diagnostic family',
       columns: [
         { field: 'thread', label: 'Thread', type: 'text' },
-        { field: 'pattern', label: 'Pattern', type: 'category' },
+        { field: 'pattern', label: 'Pattern', type: 'category', localizeValues: true },
         { field: 'score', label: 'Events', type: 'number', unit: 'count', align: 'right' },
         { field: 'tokens', label: 'Tokens', type: 'number', unit: 'tokens', align: 'right' },
-        { field: 'finding', label: 'Finding', type: 'text' },
+        { field: 'finding', label: 'Finding', type: 'text', localizeValues: true },
       ],
       defaultSort: { field: 'score', direction: 'desc' },
     },

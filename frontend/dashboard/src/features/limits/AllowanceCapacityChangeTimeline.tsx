@@ -31,7 +31,11 @@ export function AllowanceCapacityChangeTimeline({
       </div>
 
       {hasSupportedChanges ? (
-        <ol className={styles.capacityChangeList} aria-label="Supported capacity changes">
+        <ol
+          className={styles.capacityChangeList}
+          aria-label="Supported capacity changes"
+          data-localization-attributes="aria-label"
+        >
           {boundaries.map(boundary => <BoundaryItem key={boundary.boundary_id} boundary={boundary} />)}
         </ol>
       ) : (

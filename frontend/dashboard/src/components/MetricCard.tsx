@@ -1,6 +1,7 @@
 import { Activity, CircleDollarSign, Database, Gauge, PhoneCall, type LucideIcon } from 'lucide-react';
 
 import type { MetricCard as MetricCardModel } from '../api/types';
+import { useShellI18n } from '../app/i18nContext';
 
 const iconByLabel: Record<string, LucideIcon> = {
   'Cache Hit Rate': Database,
@@ -13,6 +14,7 @@ const iconByLabel: Record<string, LucideIcon> = {
 };
 
 export function MetricCard({ card }: { card: MetricCardModel }) {
+  const i18n = useShellI18n();
   const Icon = iconByLabel[card.label] ?? Activity;
   const trendTone = card.trend.startsWith('down') || card.trend.includes('risk') ? 'negative' : 'positive';
 
@@ -22,20 +24,20 @@ export function MetricCard({ card }: { card: MetricCardModel }) {
         <Icon size={22} />
       </div>
       <div className="metric-copy">
-        <p>{card.label}</p>
+        <p>{i18n.translateText(card.label)}</p>
         <strong>{card.value}</strong>
         {card.breakdown?.length ? (
-          <dl className="metric-breakdown" aria-label={`${card.label} breakdown`}>
+          <dl className="metric-breakdown" aria-label={i18n.translateText(`${card.label} breakdown`)}>
             {card.breakdown.map(item => (
               <div key={item.label}>
-                <dt>{item.label}</dt>
+                <dt>{i18n.translateText(item.label)}</dt>
                 <dd>{item.value}</dd>
               </div>
             ))}
           </dl>
         ) : null}
-        <span className={`trend ${trendTone}`}>{card.trend}</span>
-        <small>{card.detail}</small>
+        <span className={`trend ${trendTone}`}>{i18n.translateText(card.trend)}</span>
+        <small>{i18n.translateText(card.detail)}</small>
       </div>
     </article>
   );

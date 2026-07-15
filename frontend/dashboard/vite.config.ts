@@ -14,7 +14,11 @@ export default defineConfig({
       output: {
         assetFileNames: 'assets/[name][extname]',
         chunkFileNames: 'assets/[name].js',
-        entryFileNames: 'assets/dashboard-react.js'
+        entryFileNames: 'assets/dashboard-react.js',
+        manualChunks(id) {
+          if (id.includes('/src/app/zh-Hans/')) return 'locale-zh-Hans';
+          return undefined;
+        }
       }
     }
   },

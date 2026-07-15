@@ -64,7 +64,11 @@ export function AllowanceCapacityMethodology({
         </section>
       </div>
 
-      <dl className={styles.methodologyEvidence} aria-label="Current chart evidence">
+      <dl
+        className={styles.methodologyEvidence}
+        aria-label="Current chart evidence"
+        data-localization-attributes="aria-label"
+      >
         <div><dt>Chart range</dt><dd>{chartPoints} reset windows</dd></div>
         <div><dt>Analysis scope</dt><dd>{eligible} eligible</dd></div>
         <div><dt>Eligibility filter</dt><dd>{excluded} excluded</dd></div>

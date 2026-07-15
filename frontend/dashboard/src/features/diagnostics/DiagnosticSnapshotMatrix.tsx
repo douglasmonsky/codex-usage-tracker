@@ -7,6 +7,7 @@ import {
   diagnosticSnapshotDefinitions,
 } from '../../api/diagnostics';
 import type { ContextRuntime, DashboardModel } from '../../api/types';
+import { useShellI18n } from '../../app/i18nContext';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PageLoadProgress } from '../../design';
@@ -187,6 +188,7 @@ function SnapshotCardView({
  onOpenInvestigator: (recordId: string) => void;
  onCopyCallLink: (recordId: string) => void;
 }) {
+ const i18n = useShellI18n();
  const reloading = refreshStatus === 'refreshing';
  const reloadLabel = reloading ? 'Reloading' : refreshStatus === 'error' ? 'Retry' : 'Reload';
  const visibleRows = expanded ? card.rows : card.rows.slice(0, compactSnapshotRowCount);
@@ -196,8 +198,8 @@ function SnapshotCardView({
     <article className="diagnostics-snapshot-card">
       <div className="diagnostics-snapshot-card-head">
         <div>
-          <h3>{card.title}</h3>
-          <p>{card.subtitle}</p>
+          <h3>{i18n.translateText(card.title)}</h3>
+          <p>{i18n.translateText(card.subtitle)}</p>
         </div>
         <div className="diagnostics-snapshot-card-actions">
           <StatusBadge label={card.status} tone={card.status === 'ready' ? 'green' : card.status === 'fallback' ? 'blue' : 'orange'} />
@@ -217,8 +219,8 @@ function SnapshotCardView({
       <div className="diagnostics-snapshot-metrics">
         {card.metrics.map(metric => (
           <span key={`${card.title}-${metric.label}`}>
-            <small>{metric.label}</small>
-            <strong>{metric.value}</strong>
+            <small>{i18n.translateText(metric.label)}</small>
+            <strong>{i18n.translateText(metric.value)}</strong>
           </span>
         ))}
       </div>

@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from codex_usage_tracker import __version__
+from codex_usage_tracker.cli.help_i18n import argument_parser_class, localize_parser_help
 from codex_usage_tracker.cli.parser_data import (
     _add_allowance_intelligence_parsers,
     _add_allowance_parser,
@@ -53,8 +54,9 @@ from codex_usage_tracker.core.paths import (
 from codex_usage_tracker.core.projects import PRIVACY_MODE_CHOICES
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="codex-usage-tracker")
+def build_parser(language: str | None = None) -> argparse.ArgumentParser:
+    parser_class = argument_parser_class(language)
+    parser = parser_class(prog="codex-usage-tracker")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--pricing", type=Path, default=DEFAULT_PRICING_PATH)
@@ -110,4 +112,5 @@ def build_parser() -> argparse.ArgumentParser:
     _add_threshold_parser(subparsers)
     _add_project_parser(subparsers)
     _add_support_bundle_parser(subparsers)
+    localize_parser_help(parser, language)
     return parser

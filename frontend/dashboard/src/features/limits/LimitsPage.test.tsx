@@ -88,6 +88,7 @@ describe('Limits live evidence flow', () => {
     expect(screen.queryByText('Personal model')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /analysis|revision/i })).not.toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Latest-first allowance intelligence evidence' })).toBeInTheDocument();
+    expect(screen.getByText('Overview')).toHaveAttribute('data-localization-skip', 'true');
 
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/history'))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/diagnostics'))).toBe(false);
@@ -325,7 +326,7 @@ function evidencePayload() {
         end_record_id: 'rec-old',
       },
       {
-        interval_id: 'newer', cycle_id: 'cycle-2', window_kind: 'weekly', cohort_key: 'codex',
+        interval_id: 'newer', cycle_id: 'cycle-2', window_kind: 'weekly', cohort_key: 'Overview',
         end_observed_at: '2026-07-15T00:00:00Z', end_used_percent: 40, point_kind: 'positive', censor_reason: null,
         end_record_id: 'rec-new',
       },

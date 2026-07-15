@@ -132,20 +132,27 @@ def serve_dashboard(
     server = ThreadingHTTPServer((host, port), handler)
     legacy_url = f"http://{_url_host(host)}:{port}/{output.name}"
     dashboard_url = f"http://{_url_host(host)}:{port}/react-dashboard.html"
-    print(f"Serving Codex usage dashboard at {dashboard_url}")
-    print(f"Legacy dashboard fallback remains available at {legacy_url}")
-    context_mode = (
-        "enabled for explicit row actions"
-        if context_api_enabled
-        else "disabled until enabled from the dashboard"
-    )
-    print("Aggregate rows refresh through /api/usage with a per-server token.")
-    print(f"Raw context API is {context_mode}; context is never embedded in the dashboard HTML.")
+    if selected_language == "zh-Hans":
+        print(f"Codex 用量仪表盘正在运行：{dashboard_url}")
+        print(f"旧版仪表盘备用入口：{legacy_url}")
+        context_mode = "已启用，可按记录显式加载" if context_api_enabled else "已禁用，可稍后在仪表盘中启用"
+        print("聚合记录通过带服务器专用令牌的 /api/usage 接口刷新。")
+        print(f"原始上下文 API {context_mode}；仪表盘 HTML 中不会嵌入上下文。")
+    else:
+        print(f"Serving Codex usage dashboard at {dashboard_url}")
+        print(f"Legacy dashboard fallback remains available at {legacy_url}")
+        context_mode = (
+            "enabled for explicit row actions"
+            if context_api_enabled
+            else "disabled until enabled from the dashboard"
+        )
+        print("Aggregate rows refresh through /api/usage with a per-server token.")
+        print(f"Raw context API is {context_mode}; context is never embedded in the dashboard HTML.")
     if open_browser:
         webbrowser.open(dashboard_url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopping dashboard server.")
+        print("\n正在停止仪表盘服务器。" if selected_language == "zh-Hans" else "\nStopping dashboard server.")
     finally:
         server.server_close()

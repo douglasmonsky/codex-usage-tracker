@@ -1,18 +1,20 @@
 import { AlertTriangle, Clock3, Database, LoaderCircle } from 'lucide-react';
 
+import { useShellI18n } from '../../app/i18nContext';
 import { stateDescription } from '../spec';
 import type { VisualizationSpecV1 } from '../spec';
 import styles from './Visualization.module.css';
 
 export function VisualizationState({ spec }: { spec: VisualizationSpecV1 }) {
+  const i18n = useShellI18n();
   const state = spec.state;
   const Icon = state.kind === 'loading' ? LoaderCircle : state.kind === 'stale' ? Clock3 : state.kind === 'error' ? AlertTriangle : Database;
   return (
     <div className={styles.state} data-state={state.kind} role={state.kind === 'error' ? 'alert' : 'status'}>
       <Icon aria-hidden="true" className={state.kind === 'loading' ? styles.spinning : undefined} size={20} />
       <div>
-        <strong>{stateTitle(state.kind)}</strong>
-        <span>{stateDescription(spec)}</span>
+        <strong>{i18n.translateText(stateTitle(state.kind))}</strong>
+        <span>{i18n.translateText(stateDescription(spec))}</span>
       </div>
     </div>
   );

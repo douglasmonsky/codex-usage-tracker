@@ -8,7 +8,12 @@ type AllowanceCapacityStatusRowProps = {
 
 export function AllowanceCapacityStatusRow({ readout }: AllowanceCapacityStatusRowProps) {
   return (
-    <section className={styles.capacityStatusRow} role="group" aria-label="Current limit status">
+    <section
+      className={styles.capacityStatusRow}
+      role="group"
+      aria-label="Current limit status"
+      data-localization-attributes="aria-label"
+    >
       <StatusCell readout={readout.weekly} />
       <StatusCell readout={readout.fiveHour} />
       <StatusCell readout={readout.reset} />
