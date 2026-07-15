@@ -231,11 +231,24 @@ evidence about statistically supported capacity regimes.
 - One compact row shows weekly observed use, 5-hour observed context, weekly
   reset, and personal weekly capacity. The five-hour value stays current-status
   context because expiry makes weekly monotonic capacity math invalid for it.
-- The default chart is weekly `credits / 1%` by completed reset cycle. It adds an
-  eight-cycle rolling median and interquartile band, discloses clipped outliers,
-  and preserves exact values in its table view.
+- The default chart is weekly `credits / 1%` by completed reset window. It
+  coalesces interleaved observations sharing a reset identity, colors and connects
+  points by explicitly observed subscription plan, and calculates each plan's
+  eight-window rolling median independently. A one-plan view includes its
+  interquartile band. Clipped outliers are disclosed and exact values remain in
+  the table view.
+- Its two-part legend separates meanings: the plan key assigns the tier hue,
+  while the mark key shows thin, hollow-dot observed capacity versus the darker,
+  thick, marker-free trailing median. Other charts keep their normal legends.
+- An open methodology panel directly below the chart explains the per-window
+  formula, evidence-quality filters, canonical clone deduplication, subscription
+  plan color key, chart marks, and every statistical gate. Its current-evidence
+  row reports eligible and excluded reset windows, candidate boundaries tested,
+  and supported changes.
 - Range controls support 8 weeks, 6 months, all available aggregate cycles, and
-  custom ranges up to 366 days. Granularity is cycle, week, or month.
+  custom ranges up to 366 days. Granularity is reset window, week, or month. The
+  page reports the selected range and says when a wider preset cannot add older
+  history.
 - `Personal calibration` is an empirical local proxy, not an official OpenAI
   rate or a hardcoded conversion. A failed percentage forecast does not make
   descriptive capacity unavailable.
@@ -245,7 +258,9 @@ evidence about statistically supported capacity regimes.
 - Allowance change analysis starts automatically for a new revision. The browser
   polls a pending job every 500 milliseconds, stops at a terminal state, and
   reloads the persisted result. Zero, one, or multiple supported changes appear
-  newest first; rejected split medians and p-values are not shown.
+  newest first; rejected split medians and p-values are not shown. Candidate
+  changes are tested only within continuous observed-plan segments, so a recorded
+  subscription-tier switch is annotated but never treated as a capacity change.
 
 Static generated dashboards retain an aggregate fallback because they cannot poll
 localhost services or persistent analysis jobs. The tracker cannot read OpenAI's

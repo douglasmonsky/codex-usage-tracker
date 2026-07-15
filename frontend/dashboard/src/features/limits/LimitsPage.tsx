@@ -19,9 +19,11 @@ import type { ContextRuntime, DashboardModel } from '../../api/types';
 import { Button, MetricReadout, PageLoadProgress, SegmentedControl, StatusBadge, Surface } from '../../design';
 import { Visualization } from '../../visualization';
 import { csvDateStamp } from '../shared/exportCsv';
-import { AllowanceEvidenceLedger } from './AllowanceEvidenceLedger';
 import { AllowanceCapacityChangeTimeline } from './AllowanceCapacityChangeTimeline';
+import { AllowanceCapacityLegend } from './AllowanceCapacityLegend';
+import { AllowanceCapacityMethodology } from './AllowanceCapacityMethodology';
 import { AllowanceCapacityStatusRow } from './AllowanceCapacityStatusRow';
+import { AllowanceEvidenceLedger } from './AllowanceEvidenceLedger';
 import { AllowanceIntelligenceEvidenceTable } from './AllowanceIntelligenceEvidenceTable';
 import { buildAllowanceReadout } from './allowanceIntelligenceModel';
 import { buildAllowanceIntelligenceVisualization } from './allowanceIntelligenceVisualization';
@@ -190,6 +192,13 @@ function LiveLimitsPage({
   const chartSpec = useMemo(() => seriesQuery.data
     ? buildAllowanceIntelligenceVisualization(seriesQuery.data, statusQuery.data, windowKind, { showFullRange })
     : null, [seriesQuery.data, statusQuery.data, windowKind, showFullRange]);
+  const rangeHasNoOlderData = Boolean(seriesQuery.data && (
+    rangePreset === 'all'
+    || (rangePreset === '6m'
+      && seriesQuery.data.available_range.start_at
+      && seriesQuery.data.requested_range.start_at
+      && Date.parse(seriesQuery.data.available_range.start_at) > Date.parse(seriesQuery.data.requested_range.start_at))
+  ));
   const loading = statusQuery.isFetching || seriesQuery.isFetching || evidenceQuery.isFetching || analysisQuery.isFetching;
   const error = statusQuery.error ?? seriesQuery.error ?? evidenceQuery.error ?? analysisQuery.error;
   const completedModules = Number(Boolean(statusQuery.data)) + Number(Boolean(seriesQuery.data))
@@ -254,7 +263,7 @@ function LiveLimitsPage({
 
       <Surface className={styles.trendPanel}>
         <div className={styles.modeBar}>
-          <div><p className={styles.eyebrow}>Capacity history</p><p>Each point is one quality-approved completed weekly cycle. The line and band summarize recent capacity without letting extreme values flatten the chart.</p></div>
+          <div><p className={styles.eyebrow}>Capacity history</p><p>Each point is one quality-approved completed reset window. The line and band summarize recent capacity without letting extreme values flatten the chart.</p></div>
           {(seriesQuery.data?.capacity_history.clipped_point_count ?? 0) > 0 ? (
             <Button onClick={() => setShowFullRange(current => !current)}>
               {showFullRange ? 'Use robust range' : 'Show full range'}
@@ -270,7 +279,7 @@ function LiveLimitsPage({
           />
           <label className={styles.controlField}>Granularity
             <select value={granularity} onChange={event => selectGranularity(event.target.value as Granularity)}>
-              <option value="cycle">By reset cycle</option><option value="week">Weekly</option><option value="month">Monthly</option>
+              <option value="cycle">By reset window</option><option value="week">Weekly</option><option value="month">Monthly</option>
             </select>
           </label>
         </div>
@@ -281,7 +290,21 @@ function LiveLimitsPage({
             {!customReady ? <span>Choose both dates to load the custom range.</span> : null}
           </div>
         ) : null}
+        {seriesQuery.data ? (
+          <p className={styles.rangeFeedback} role="status" aria-label="History range result">
+            <strong>{rangePreset === 'all' ? 'All history' : rangePreset} selected</strong>
+            {' · '}{seriesQuery.data.capacity_history.eligible_cycle_count} eligible reset windows loaded.
+            {rangeHasNoOlderData ? ' No older capacity history is available.' : ''}
+          </p>
+        ) : null}
+        {seriesQuery.data ? <AllowanceCapacityLegend series={seriesQuery.data} /> : null}
         {chartSpec ? <Visualization spec={chartSpec} height={380} /> : <div className={styles.chartPlaceholder}>{seriesQuery.isFetching ? 'Loading capacity history…' : 'No completed-cycle capacity history for this range.'}</div>}
+        {seriesQuery.data ? (
+          <AllowanceCapacityMethodology
+            series={seriesQuery.data}
+            analysis={analysisQuery.data}
+          />
+        ) : null}
       </Surface>
 
       <AllowanceCapacityChangeTimeline analysis={analysisQuery.data} running={Boolean(analysisJobId)} />
@@ -306,9 +329,9 @@ function LiveLimitsPage({
         <summary><ShieldCheck />Method, confidence, and boundaries</summary>
         <ul>
           <li>Observed percentages are local Codex rate-limit snapshots. They are not reconstructed from token totals.</li>
-          <li>Personal calibration uses completed, quality-approved cycles with strict priced-usage coverage and one vote per cycle.</li>
+          <li>Personal calibration uses completed, quality-approved reset windows with strict priced-usage coverage and one vote per reset identity.</li>
           <li>The weekly percentage forecast remains available through the API only when it beats time-ordered baselines; this page does not treat a failed forecast as missing capacity data.</li>
-          <li>Change claims use a hierarchical cycle-block permutation test, control family-wise false positives, require a strong effect, and exclude low-quality cycles.</li>
+          <li>Change claims use a hierarchical cycle-block permutation test, control family-wise false positives, require a strong effect, and exclude low-quality reset windows.</li>
           <li>Five-hour allowance status is shown as observed context only because expiry makes it a rolling window; weekly monotonic capacity math is not applied to it.</li>
           <li>The tracker cannot read OpenAI's internal allowance or billing ledger.</li>
         </ul>

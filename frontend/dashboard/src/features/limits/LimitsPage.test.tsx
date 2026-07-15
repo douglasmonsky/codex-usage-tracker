@@ -33,7 +33,10 @@ describe('Limits live evidence flow', () => {
         statusCalls += 1;
         return jsonResponse(statusCalls === 1 ? statusPayload() : unchangedStatusPayload());
       }
-      if (path.startsWith('/api/allowance/series')) return jsonResponse(seriesPayload());
+      if (path.startsWith('/api/allowance/series')) {
+        const preset = new URL(path, 'http://localhost').searchParams.get('range_preset') ?? '8w';
+        return jsonResponse(seriesPayload(preset));
+      }
       if (path.startsWith('/api/allowance/evidence')) return jsonResponse(evidencePayload());
       if (path.startsWith('/api/allowance/analysis')) return jsonResponse(analysisPayload());
       if (path.startsWith('/api/allowance/export')) return jsonResponse(exportPayload());
@@ -64,7 +67,23 @@ describe('Limits live evidence flow', () => {
     ).not.toBeInTheDocument());
     expect(screen.getByRole('group', { name: 'Current limit status' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Weekly limit capacity over time' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'How to read and trust this chart' })).toBeInTheDocument();
+    expect(screen.getByText(/Locally priced credits ÷ visible percentage-point movement/)).toBeInTheDocument();
+    expect(screen.getByText(/Copied clone rows are excluded/)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Capacity chart legend' })).toBeVisible();
+    expect(screen.getByRole('list', { name: 'Subscription plan key' })).toHaveTextContent('Pro');
+    expect(screen.getByRole('list', { name: 'Chart mark key' })).toHaveTextContent('Observed reset window');
+    expect(screen.getByRole('list', { name: 'Chart mark key' })).toHaveTextContent('Trailing 8-window median');
+    expect(screen.getByText(/Pro · Fresh · observed/)).toBeInTheDocument();
+    expect(screen.getByText('63 eligible')).toBeInTheDocument();
+    expect(screen.getByText('12 excluded')).toBeInTheDocument();
+    expect(screen.getByText('6 candidates tested')).toBeInTheDocument();
+    expect(screen.getByText('0 supported changes')).toBeInTheDocument();
+    expect(screen.getByText(/4 reset windows on each side/)).toBeInTheDocument();
+    expect(screen.getByText(/1,999 cycle-block permutations/)).toBeInTheDocument();
+    expect(screen.getByText(/5% family-wise false-positive limit/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'No reliable capacity change detected' })).toBeInTheDocument();
+    expect(screen.getByText('No supported change')).toBeInTheDocument();
     expect(screen.queryByText('Usage percentage over time')).not.toBeInTheDocument();
     expect(screen.queryByText('Personal model')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /analysis|revision/i })).not.toBeInTheDocument();
@@ -89,6 +108,9 @@ describe('Limits live evidence flow', () => {
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (
       String(input).includes('/api/allowance/series?range_preset=6m')
     ))).toBe(true));
+    const rangeResult = await screen.findByRole('status', { name: 'History range result' });
+    expect(rangeResult).toHaveTextContent('6m selected');
+    expect(rangeResult).toHaveTextContent('No older capacity history is available');
     fireEvent.change(screen.getByRole('combobox', { name: 'Granularity' }), { target: { value: 'week' } });
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (
       String(input).includes('granularity=week')
@@ -96,7 +118,8 @@ describe('Limits live evidence flow', () => {
 
     const seriesCallsBeforeStatusCheck = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/series')).length;
     const evidenceCallsBeforeStatusCheck = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/evidence')).length;
-    fireEvent.click(screen.getByRole('button', { name: 'Check for new data' }));
+    const refreshButton = await screen.findByRole('button', { name: 'Check for new data' });
+    fireEvent.click(refreshButton);
     await waitFor(() => expect(screen.getByText('Allowance status checked')).toBeInTheDocument());
     expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/status'))[1][0]).toEqual(
       expect.stringContaining('since_revision=allowance-revision-1'),
@@ -226,6 +249,7 @@ function statusPayload(revision = 'allowance-revision-1') {
     data_as_of: '2026-07-15T10:00:00Z',
     weekly: {
       cohort_id: 'codex',
+      plan_type: 'pro',
       used_percent: 40,
       remaining_percent: 60,
       reset_at: null,
@@ -259,13 +283,13 @@ function unchangedStatusPayload() {
   };
 }
 
-function seriesPayload() {
+function seriesPayload(preset = '8w') {
   return {
     schema: 'codex-usage-tracker-allowance-series-v2',
     model_version: 'allowance-v2',
     generated_at: '2026-07-10T12:00:00Z',
     revision: 'allowance-revision-1',
-    requested_range: { preset: '8w', start_at: '2026-05-01T00:00:00Z', end_at: '2026-07-10T12:00:00Z' },
+    requested_range: { preset, start_at: '2026-05-01T00:00:00Z', end_at: '2026-07-10T12:00:00Z' },
     available_range: { start_at: '2026-06-01T00:00:00Z', end_at: '2026-06-15T00:00:00Z' },
     granularity: 'cycle',
     truncated: false,
@@ -280,6 +304,7 @@ function seriesPayload() {
         cycle_id: 'cycle-2', completed_at: '2026-07-01T00:00:00Z', credits_per_percent: 105.11,
         rolling_median: 105.11, rolling_q1: 95, rolling_q3: 115, quality_grade: 'high',
         price_coverage: 1, regime_id: 'regime-1',
+        plan_type: 'pro',
       }],
       boundaries: [], regimes: [],
     },
@@ -322,6 +347,8 @@ function analysisPayload() {
     rate_card_revision: 'rates-1',
     generated_at: '2026-07-15T12:00:00Z',
     eligible_cycle_count: 63,
+    excluded_cycle_count: 12,
+    candidate_count: 6,
     parameters: { min_cycles_per_regime: 4, permutation_count: 1999, familywise_alpha: 0.05 },
   };
 }
