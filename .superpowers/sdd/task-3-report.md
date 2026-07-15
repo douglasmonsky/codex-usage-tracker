@@ -37,7 +37,7 @@ row changes remain asserted stable.
 
 ## Reconciliation safety test hardening
 
-### RED
+### Reconciliation safety RED
 
 Added end-to-end coverage for canonical reconciliation with a noncanonical
 allowance observation and stale cycles, intervals, analysis snapshots, and
@@ -47,7 +47,7 @@ replacement. The first run could not collect the Task 3 tests because importing
 the materializer eagerly loaded allowance reports, which imported `store.api`
 back during initialization.
 
-### GREEN
+### Reconciliation safety GREEN
 
 Preserved the public allowance report exports with lazy package resolution,
 breaking that import cycle without changing report callers. The tests prove

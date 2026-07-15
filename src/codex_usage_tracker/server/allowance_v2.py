@@ -27,7 +27,7 @@ from codex_usage_tracker.store.connection import connect
 
 JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
 ErrorSender = Callable[..., None]
-TokenValidator = Callable[[Mapping[str, list[str]]], bool]
+TokenValidator = Callable[[dict[str, list[str]]], bool]
 
 _AUTH_ERROR = "Valid API token is required for allowance analysis"
 _MAX_CUSTOM_RANGE_DAYS = 366

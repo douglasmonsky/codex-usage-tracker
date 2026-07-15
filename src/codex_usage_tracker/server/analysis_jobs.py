@@ -227,9 +227,10 @@ def _job_view(job: Mapping[str, object], *, request_reused: str) -> dict[str, ob
             "poll_after_ms": 500,
         }
     elif payload["status"] == "completed":
-        payload["next"] = {"action": "reload_persisted_results"}
+        next_action: dict[str, object] = {"action": "reload_persisted_results"}
         if reload_endpoint := payload.get("_reload_endpoint"):
-            payload["next"]["endpoint"] = reload_endpoint
+            next_action["endpoint"] = reload_endpoint
+        payload["next"] = next_action
     else:
         payload["next"] = {"action": "retry"}
     payload.pop("_reload_endpoint", None)

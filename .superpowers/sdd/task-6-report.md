@@ -51,7 +51,7 @@ Result: passed.
 
 ## Walk-forward correctness completion
 
-### RED
+### Walk-forward correctness RED
 
 Added numeric tests for a latest accepted observation at 40% with one covered
 100-credit interval after it and a 10-credit/% capacity (expected 50%), and a
@@ -60,7 +60,7 @@ the implementation change, the first produced 60% by reusing pre-observation
 credits and the latter lacked a holdout payload entirely.  The focused test
 run failed with those two assertions.
 
-### GREEN
+### Walk-forward correctness GREEN
 
 ```bash
 PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker/.venv/bin/python -m pytest tests/allowance_intelligence/test_estimation.py tests/allowance_intelligence/test_allowance_intelligence.py tests/allowance_intelligence/test_service.py -q
@@ -71,13 +71,13 @@ Result: `32 passed`.
 Ruff passed for the touched production/test files and `git diff --check`
 passed.
 
-### Changed files
+### Walk-forward changed files
 
 - `src/codex_usage_tracker/allowance_intelligence/estimation.py`
 - `tests/allowance_intelligence/test_estimation.py`
 - `.superpowers/sdd/task-6-report.md`
 
-### Self-review
+### Walk-forward self-review
 
 - Capacity is calculated per completed, accepted, quality-approved cycle; the
   total ratio is true selected-credit / selected-percent movement, while the
@@ -97,7 +97,7 @@ passed.
   robust median center, and combined residual/spread bounds. Five-hour rows
   never enter this weekly-only engine.
 
-### Concerns
+### Walk-forward concerns
 
 - The deliberately strict promotion gate leaves short or tied synthetic
   histories descriptive. This is intentional: a tied baseline is not evidence
