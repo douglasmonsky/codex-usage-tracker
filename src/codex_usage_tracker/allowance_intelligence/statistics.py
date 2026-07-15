@@ -216,6 +216,35 @@ def _log_add(left: float, right: float) -> float:
     return larger + math.log1p(math.exp(smaller - larger))
 
 
+def _bounded_factorial(value: int, *, limit: int) -> int:
+    """Return ``value!`` by recurrence, stopping once the exact-work limit is exceeded."""
+    result = 1
+    for factor in range(2, value + 1):
+        result *= factor
+        if result > limit:
+            return limit + 1
+    return result
+
+
+def _wilson_interval(successes: int, trials: int, *, z: float = 1.959963984540054) -> tuple[float, float]:
+    """Stable binomial interval used to disclose Monte Carlo uncertainty."""
+    if trials <= 0:
+        return (0.0, 1.0)
+    proportion = successes / trials
+    z_squared = z * z
+    denominator = 1.0 + z_squared / trials
+    center = (proportion + z_squared / (2.0 * trials)) / denominator
+    margin = (
+        z
+        * math.sqrt(
+            (proportion * (1.0 - proportion) / trials)
+            + (z_squared / (4.0 * trials * trials))
+        )
+        / denominator
+    )
+    return (max(0.0, center - margin), min(1.0, center + margin))
+
+
 def _credits_per_percent_values(spans: list[dict[str, Any]]) -> list[float]:
     return [
         value
