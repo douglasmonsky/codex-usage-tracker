@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Download, FlaskConical, RefreshCw, ShieldCheck } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   loadAllowanceEvidenceExport,
@@ -15,13 +15,15 @@ import {
   startAllowanceAnalysis,
   type AllowanceSeriesRequest,
 } from '../../api/allowanceIntelligence';
-import type { AllowanceAnalysisPayload, ContextRuntime, DashboardModel } from '../../api/types';
+import type { ContextRuntime, DashboardModel } from '../../api/types';
 import { Button, MetricReadout, PageLoadProgress, SegmentedControl, StatusBadge, Surface } from '../../design';
 import { Visualization } from '../../visualization';
 import { csvDateStamp } from '../shared/exportCsv';
 import { AllowanceEvidenceLedger } from './AllowanceEvidenceLedger';
+import { AllowanceCapacityChangeTimeline } from './AllowanceCapacityChangeTimeline';
+import { AllowanceCapacityStatusRow } from './AllowanceCapacityStatusRow';
 import { AllowanceIntelligenceEvidenceTable } from './AllowanceIntelligenceEvidenceTable';
-import { buildAllowanceReadout, type AllowanceReadout } from './allowanceIntelligenceModel';
+import { buildAllowanceReadout } from './allowanceIntelligenceModel';
 import { buildAllowanceIntelligenceVisualization } from './allowanceIntelligenceVisualization';
 import {
   allowanceEvidenceCallsForCurrentUrl,
@@ -33,7 +35,11 @@ import {
 } from './allowanceModel';
 import { buildAllowanceVisualizationSpec } from './allowanceVisualization';
 import { allowanceAnalysisPollInterval, allowanceStatusPollInterval, isPageVisible } from './allowancePolling';
-import styles from './LimitsPage.module.css';
+import baseStyles from './LimitsPage.module.css';
+import intelligenceStyles from './LimitsIntelligence.module.css';
+import type { AllowanceStatusPayload } from '../../api/allowanceIntelligenceTypes';
+
+const styles = { ...baseStyles, ...intelligenceStyles };
 
 type LimitsPageProps = {
   model: DashboardModel;
@@ -60,16 +66,19 @@ function LiveLimitsPage({
   onOpenInvestigator,
   onCopyCallLink,
 }: LimitsPageProps) {
-  const initialState = readLimitState();
-  const [windowKind, setWindowKind] = useState<AllowanceWindowKind>(initialState.windowKind);
+  const windowKind: AllowanceWindowKind = 'weekly';
   const [rangePreset, setRangePreset] = useState<RangePreset>('8w');
-  const [granularity, setGranularity] = useState<Granularity>('auto');
+  const [granularity, setGranularity] = useState<Granularity>('cycle');
+  const [showFullRange, setShowFullRange] = useState(false);
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [evidenceCursors, setEvidenceCursors] = useState<(string | undefined)[]>([undefined]);
+  const [showPhysicalProvenance, setShowPhysicalProvenance] = useState(false);
   const [analysisJobId, setAnalysisJobId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('Canonical allowance evidence ready');
   const [exporting, setExporting] = useState(false);
+  const statusSnapshotRef = useRef<AllowanceStatusPayload | null>(null);
+  const automaticAnalysisRevisionRef = useRef<string | null>(null);
   const queryScope = [contextRuntime.apiToken, includeArchived] as const;
   const customStartAt = dateBoundary(customStart, false);
   const customEndAt = dateBoundary(customEnd, true);
@@ -78,7 +87,18 @@ function LiveLimitsPage({
 
   const statusQuery = useQuery({
     queryKey: ['allowance-v2', 'status', ...queryScope],
-    queryFn: ({ signal }) => loadAllowanceStatus(contextRuntime, { includeArchived }, signal),
+    queryFn: async ({ signal }) => {
+      const previous = statusSnapshotRef.current;
+      const payload = await loadAllowanceStatus(contextRuntime, {
+        includeArchived,
+        sinceRevision: previous?.revision,
+      }, signal);
+      if (!payload.changed && previous) {
+        return { ...previous, changed: false, quality: payload.quality, next: payload.next };
+      }
+      statusSnapshotRef.current = payload;
+      return payload;
+    },
     staleTime: 0,
     refetchInterval: query => allowanceStatusPollInterval(
       query.state.data?.data_state,
@@ -105,13 +125,13 @@ function LiveLimitsPage({
     retry: false,
   });
   const evidenceQuery = useQuery({
-    queryKey: ['allowance-v2', 'evidence', ...queryScope, allowanceRevision, windowKind, evidenceBefore, 100, 'local'],
+    queryKey: ['allowance-v2', 'evidence', ...queryScope, allowanceRevision, windowKind, evidenceBefore, 50, showPhysicalProvenance],
     queryFn: ({ signal }) => loadAllowanceEvidence(contextRuntime, {
       includeArchived,
       before: evidenceBefore,
-      limit: 100,
+      limit: 50,
       order: 'desc',
-      privacyMode: 'local',
+      privacyMode: showPhysicalProvenance ? 'local' : 'normal',
       windowKind,
     }, signal),
     enabled: Boolean(allowanceRevision),
@@ -147,21 +167,33 @@ function LiveLimitsPage({
       setStatusMessage('Allowance analysis failed');
     }
   }, [analysisJobQuery.data?.status, refetchAnalysis]);
+  useEffect(() => {
+    if (!allowanceRevision
+      || analysisQuery.isFetching
+      || analysisQuery.data?.status !== 'missing'
+      || analysisJobId
+      || automaticAnalysisRevisionRef.current === allowanceRevision) return;
+    automaticAnalysisRevisionRef.current = allowanceRevision;
+    setStatusMessage('Starting capacity analysis for new allowance data…');
+    void startAllowanceAnalysis(contextRuntime, { includeArchived })
+      .then(job => {
+        setAnalysisJobId(job.job_id);
+        setStatusMessage('Capacity analysis running');
+      })
+      .catch(analysisError => {
+        automaticAnalysisRevisionRef.current = null;
+        setStatusMessage(`Analysis failed: ${errorMessage(analysisError)}`);
+      });
+  }, [allowanceRevision, analysisJobId, analysisQuery.data?.status, analysisQuery.isFetching, contextRuntime, includeArchived]);
 
   const readout = useMemo(() => buildAllowanceReadout(statusQuery.data), [statusQuery.data]);
   const chartSpec = useMemo(() => seriesQuery.data
-    ? buildAllowanceIntelligenceVisualization(seriesQuery.data, statusQuery.data, windowKind)
-    : null, [seriesQuery.data, statusQuery.data, windowKind]);
+    ? buildAllowanceIntelligenceVisualization(seriesQuery.data, statusQuery.data, windowKind, { showFullRange })
+    : null, [seriesQuery.data, statusQuery.data, windowKind, showFullRange]);
   const loading = statusQuery.isFetching || seriesQuery.isFetching || evidenceQuery.isFetching || analysisQuery.isFetching;
   const error = statusQuery.error ?? seriesQuery.error ?? evidenceQuery.error ?? analysisQuery.error;
   const completedModules = Number(Boolean(statusQuery.data)) + Number(Boolean(seriesQuery.data))
     + Number(Boolean(evidenceQuery.data)) + Number(Boolean(analysisQuery.data));
-
-  function selectWindow(next: AllowanceWindowKind) {
-    setWindowKind(next);
-    syncIntelligenceUrl(next, rangePreset, granularity);
-    setStatusMessage(next === 'weekly' ? 'Weekly primary window selected' : '5-hour rolling context selected');
-  }
 
   function selectRange(next: RangePreset) {
     setRangePreset(next);
@@ -175,6 +207,7 @@ function LiveLimitsPage({
 
   async function refreshStatus() {
     if (loading) return;
+    automaticAnalysisRevisionRef.current = null;
     setStatusMessage('Checking for new allowance evidence…');
     const result = await statusQuery.refetch();
     setStatusMessage(result.isError ? 'Allowance status check failed' : 'Allowance status checked');
@@ -194,25 +227,13 @@ function LiveLimitsPage({
     }
   }
 
-  async function runAnalysis() {
-    if (analysisJobId) return;
-    setStatusMessage('Starting selection-corrected allowance analysis…');
-    try {
-      const job = await startAllowanceAnalysis(contextRuntime, { includeArchived });
-      setAnalysisJobId(job.job_id);
-      setStatusMessage('Allowance analysis running');
-    } catch (analysisError) {
-      setStatusMessage(`Analysis failed: ${errorMessage(analysisError)}`);
-    }
-  }
-
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <div>
           <p className={styles.eyebrow}>Allowance intelligence</p>
           <h1>Limits</h1>
-          <p>Observed allowance snapshots first, personal estimates second, with uncertainty and provenance kept visible.</p>
+          <p>Track how many priced local credits correspond to each weekly allowance percentage point, with supported changes and provenance kept visible.</p>
         </div>
         <div className={styles.headerActions}>
           <Button onClick={exportEvidence} disabled={exporting}><Download />{exporting ? 'Exporting' : 'Export evidence'}</Button>
@@ -229,41 +250,27 @@ function LiveLimitsPage({
         <span>{error ? `Live allowance data unavailable: ${errorMessage(error)}` : statusMessage}</span>
       </div>
 
-      <section className={styles.answerBand} data-tone={readout.primary.kind === 'estimated' ? 'context' : 'positive'} aria-labelledby="limits-answer-title">
-        <div className={styles.answerCopy}>
-          <span>{readout.primary.label}</span>
-          <h2 id="limits-answer-title">{readout.primary.value}</h2>
-          <p>{readout.primary.detail}</p>
-        </div>
-        <div className={styles.answerMeta}>
-          <StatusBadge tone={readout.primary.kind === 'observed' ? 'positive' : 'context'}>{readout.primary.grade}</StatusBadge>
-          <span>{statusQuery.data?.data_as_of ? `Data as of ${shortDateTime(statusQuery.data.data_as_of)}` : 'Awaiting a local observation'}</span>
-        </div>
-      </section>
-
-      <div className={styles.metricGrid}>
-        <ReadoutSurface readout={readout.weekly} />
-        <ReadoutSurface readout={readout.fiveHour} />
-        <ReadoutSurface readout={readout.reset} />
-        <ReadoutSurface readout={readout.capacity} />
-      </div>
+      <AllowanceCapacityStatusRow readout={readout} />
 
       <Surface className={styles.trendPanel}>
         <div className={styles.modeBar}>
-          <div><p className={styles.eyebrow}>History explorer</p><h2>Usage percentage over time</h2><p>Zoom from day-level snapshots to multi-month cycles. Reset markers break the observed sequence.</p></div>
-          <SegmentedControl label="Allowance window" options={[{ label: 'Weekly', value: 'weekly' }, { label: '5-hour', value: 'five_hour' }]} value={windowKind} onValueChange={selectWindow} />
+          <div><p className={styles.eyebrow}>Capacity history</p><p>Each point is one quality-approved completed weekly cycle. The line and band summarize recent capacity without letting extreme values flatten the chart.</p></div>
+          {(seriesQuery.data?.capacity_history.clipped_point_count ?? 0) > 0 ? (
+            <Button onClick={() => setShowFullRange(current => !current)}>
+              {showFullRange ? 'Use robust range' : 'Show full range'}
+            </Button>
+          ) : null}
         </div>
         <div className={styles.rangeControls}>
           <SegmentedControl
             label="History range"
-            options={[{ label: '24h', value: '24h' }, { label: '7d', value: '7d' }, { label: '8w', value: '8w' }, { label: '6m', value: '6m' }, { label: 'Custom', value: 'custom' }]}
+            options={[{ label: '8w', value: '8w' }, { label: '6m', value: '6m' }, { label: 'All', value: 'all' }, { label: 'Custom', value: 'custom' }]}
             value={rangePreset}
             onValueChange={selectRange}
           />
           <label className={styles.controlField}>Granularity
             <select value={granularity} onChange={event => selectGranularity(event.target.value as Granularity)}>
-              <option value="auto">Automatic</option><option value="raw">Every snapshot</option><option value="hour">Hourly</option>
-              <option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option><option value="cycle">By reset cycle</option>
+              <option value="cycle">By reset cycle</option><option value="week">Weekly</option><option value="month">Monthly</option>
             </select>
           </label>
         </div>
@@ -274,20 +281,21 @@ function LiveLimitsPage({
             {!customReady ? <span>Choose both dates to load the custom range.</span> : null}
           </div>
         ) : null}
-        {chartSpec ? <Visualization spec={chartSpec} height={380} /> : <div className={styles.chartPlaceholder}>{seriesQuery.isFetching ? 'Loading observed history…' : 'No observed history for this range.'}</div>}
+        {chartSpec ? <Visualization spec={chartSpec} height={380} /> : <div className={styles.chartPlaceholder}>{seriesQuery.isFetching ? 'Loading capacity history…' : 'No completed-cycle capacity history for this range.'}</div>}
       </Surface>
 
-      <div className={styles.insightGrid}>
-        <InsightCard title="Validated estimate" readout={readout.forecast} />
-        <InsightCard title="Conditional pace" readout={readout.pace} />
-        <AnalysisCard analysis={analysisQuery.data} running={Boolean(analysisJobId)} onRun={runAnalysis} />
-      </div>
+      <AllowanceCapacityChangeTimeline analysis={analysisQuery.data} running={Boolean(analysisJobId)} />
 
       <AllowanceIntelligenceEvidenceTable
         rows={evidenceQuery.data?.rows ?? []}
         page={evidenceCursors.length}
         hasOlder={Boolean(evidenceQuery.data?.next_cursor)}
         loading={evidenceQuery.isFetching}
+        showPhysicalProvenance={showPhysicalProvenance}
+        onTogglePhysicalProvenance={show => {
+          setEvidenceCursors([undefined]);
+          setShowPhysicalProvenance(show);
+        }}
         onNewer={() => setEvidenceCursors(current => current.length > 1 ? current.slice(0, -1) : current)}
         onOlder={() => evidenceQuery.data?.next_cursor && setEvidenceCursors(current => [...current, evidenceQuery.data?.next_cursor ?? undefined])}
         onOpenCall={onOpenInvestigator}
@@ -299,8 +307,9 @@ function LiveLimitsPage({
         <ul>
           <li>Observed percentages are local Codex rate-limit snapshots. They are not reconstructed from token totals.</li>
           <li>Personal calibration uses completed, quality-approved cycles with strict priced-usage coverage and one vote per cycle.</li>
-          <li>Forecasts appear only after time-ordered holdout validation; otherwise the dashboard stays observed-only.</li>
-          <li>Change claims use a selection-corrected cycle-block permutation test and exclude low-quality cycles.</li>
+          <li>The weekly percentage forecast remains available through the API only when it beats time-ordered baselines; this page does not treat a failed forecast as missing capacity data.</li>
+          <li>Change claims use a hierarchical cycle-block permutation test, control family-wise false positives, require a strong effect, and exclude low-quality cycles.</li>
+          <li>Five-hour allowance status is shown as observed context only because expiry makes it a rolling window; weekly monotonic capacity math is not applied to it.</li>
           <li>The tracker cannot read OpenAI's internal allowance or billing ledger.</li>
         </ul>
       </details>
@@ -600,58 +609,6 @@ function StaticLimitsPage({
   );
 }
 
-function ReadoutSurface({ readout }: { readout: AllowanceReadout['weekly'] }) {
-  return (
-    <Surface className={styles.readoutCard}>
-      <MetricReadout label={readout.label} value={readout.value} detail={readout.detail} />
-      <StatusBadge tone={readoutTone(readout.kind)}>{readout.grade}</StatusBadge>
-    </Surface>
-  );
-}
-
-function InsightCard({ title, readout }: { title: string; readout: AllowanceReadout['forecast'] }) {
-  return (
-    <Surface className={styles.insightCard}>
-      <div className={styles.panelHeader}><div><p className={styles.eyebrow}>Personal model</p><h2>{title}</h2></div><StatusBadge tone={readoutTone(readout.kind)}>{readout.grade}</StatusBadge></div>
-      <strong className={styles.insightValue}>{readout.value}</strong>
-      <p>{readout.detail}</p>
-    </Surface>
-  );
-}
-
-function AnalysisCard({
-  analysis,
-  running,
-  onRun,
-}: {
-  analysis: AllowanceAnalysisPayload | undefined;
-  running: boolean;
-  onRun: () => void;
-}) {
-  const status = analysis?.status ?? 'missing';
-  const effect = analysis?.effect_size;
-  return (
-    <Surface className={styles.insightCard}>
-      <div className={styles.panelHeader}>
-        <div><p className={styles.eyebrow}>Capacity change</p><h2>{analysisTitle(status)}</h2></div>
-        <StatusBadge tone={analysisTone(status)}>{status.replaceAll('_', ' ')}</StatusBadge>
-      </div>
-      <dl className={styles.methodList}>
-        <div><dt>Eligible cycles</dt><dd>{analysis?.eligible_cycle_count ?? 0}</dd></div>
-        <div><dt>Adjusted p-value</dt><dd>{formatStatistic(analysis?.adjusted_p_value)}</dd></div>
-        <div><dt>Median before</dt><dd>{formatCredits(effect?.median_before_credits_per_percent)}</dd></div>
-        <div><dt>Median after</dt><dd>{formatCredits(effect?.median_after_credits_per_percent)}</dd></div>
-      </dl>
-      <p>{analysisExplanation(analysis)}</p>
-      <Button variant="primary" onClick={onRun} disabled={running}>{running ? 'Analysis running' : status === 'missing' ? 'Run analysis' : 'Re-run for current revision'}</Button>
-    </Surface>
-  );
-}
-
-function readoutTone(kind: AllowanceReadout['weekly']['kind']): 'positive' | 'context' | 'neutral' {
-  return kind === 'observed' ? 'positive' : kind === 'estimated' ? 'context' : 'neutral';
-}
-
 function freshnessTone(state: string | undefined): 'positive' | 'caution' | 'neutral' {
   return state === 'fresh' ? 'positive' : state === 'aging' || state === 'partial' ? 'caution' : 'neutral';
 }
@@ -661,44 +618,10 @@ function freshnessLabel(state: string | undefined): string {
   return state === 'partial' ? 'Partial evidence' : `${state[0].toUpperCase()}${state.slice(1)} data`;
 }
 
-function analysisTone(status: AllowanceAnalysisPayload['status']): 'positive' | 'caution' | 'neutral' {
-  return status === 'supported_change' ? 'caution' : status === 'no_supported_change' ? 'positive' : 'neutral';
-}
-
-function analysisTitle(status: AllowanceAnalysisPayload['status']): string {
-  if (status === 'supported_change') return 'Supported capacity shift';
-  if (status === 'no_supported_change') return 'No supported capacity shift';
-  if (status === 'insufficient_evidence') return 'More completed cycles needed';
-  return 'Analysis not computed';
-}
-
-function analysisExplanation(analysis: AllowanceAnalysisPayload | undefined): string {
-  if (!analysis || analysis.status === 'missing') return 'Run the aggregate-only detector for this semantic data revision.';
-  if (analysis.status === 'insufficient_evidence') return 'The detector withheld a claim because too few quality-approved completed cycles exist on both sides of a candidate boundary.';
-  if (analysis.status === 'supported_change') return 'The best candidate boundary cleared both the selection-adjusted significance and strong-effect gates.';
-  return 'No candidate boundary cleared the selection-adjusted significance and strong-effect gates.';
-}
-
-function formatStatistic(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—';
-  return value < 0.001 ? '<0.001' : value.toFixed(3);
-}
-
-function formatCredits(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—';
-  return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)} / 1%`;
-}
-
 function dateBoundary(value: string, end: boolean): string | undefined {
   if (!value) return undefined;
   const timestamp = Date.parse(`${value}T${end ? '23:59:59.999' : '00:00:00.000'}Z`);
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
-}
-
-function shortDateTime(value: string): string {
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return value;
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(timestamp);
 }
 
 function syncIntelligenceUrl(windowKind: AllowanceWindowKind, range: RangePreset, granularity: Granularity) {

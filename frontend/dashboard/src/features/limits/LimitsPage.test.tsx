@@ -25,10 +25,14 @@ describe('Limits live evidence flow', () => {
   it('uses revision-aware v2 allowance endpoints and keeps export as an explicit offline action', async () => {
     const openCall = vi.fn();
     const copyCall = vi.fn();
+    let statusCalls = 0;
     const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
-      if (path.startsWith('/api/allowance/status')) return jsonResponse(statusPayload());
+      if (path.startsWith('/api/allowance/status')) {
+        statusCalls += 1;
+        return jsonResponse(statusCalls === 1 ? statusPayload() : unchangedStatusPayload());
+      }
       if (path.startsWith('/api/allowance/series')) return jsonResponse(seriesPayload());
       if (path.startsWith('/api/allowance/evidence')) return jsonResponse(evidencePayload());
       if (path.startsWith('/api/allowance/analysis')) return jsonResponse(analysisPayload());
@@ -58,16 +62,25 @@ describe('Limits live evidence flow', () => {
     await waitFor(() => expect(
       screen.queryByRole('progressbar', { name: 'Loading allowance intelligence' }),
     ).not.toBeInTheDocument());
-    expect(screen.getByRole('heading', { name: '40%' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'No supported capacity shift' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Current limit status' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Weekly limit capacity over time' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'No reliable capacity change detected' })).toBeInTheDocument();
+    expect(screen.queryByText('Usage percentage over time')).not.toBeInTheDocument();
+    expect(screen.queryByText('Personal model')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /analysis|revision/i })).not.toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Latest-first allowance intelligence evidence' })).toBeInTheDocument();
 
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/history'))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/diagnostics'))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/series?range_preset=8w'))).toBe(true);
-    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/evidence?limit=100'))).toBe(true);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('granularity=cycle'))).toBe(true);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/evidence?limit=50'))).toBe(true);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('privacy_mode=normal'))).toBe(true);
 
-    fireEvent.click(screen.getAllByTitle('Open source call')[0]);
+    expect(screen.queryByTitle('Open source call')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Show physical source links' }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes('privacy_mode=local'))).toBe(true));
+    fireEvent.click((await screen.findAllByTitle('Open source call'))[0]);
     expect(openCall).toHaveBeenCalledWith('rec-new');
     fireEvent.click(screen.getAllByTitle('Copy source call link')[0]);
     expect(copyCall).toHaveBeenCalledWith('rec-new');
@@ -76,15 +89,19 @@ describe('Limits live evidence flow', () => {
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (
       String(input).includes('/api/allowance/series?range_preset=6m')
     ))).toBe(true));
-    fireEvent.change(screen.getByRole('combobox', { name: 'Granularity' }), { target: { value: 'day' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Granularity' }), { target: { value: 'week' } });
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (
-      String(input).includes('granularity=day')
+      String(input).includes('granularity=week')
     ))).toBe(true));
 
     const seriesCallsBeforeStatusCheck = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/series')).length;
     const evidenceCallsBeforeStatusCheck = fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/evidence')).length;
     fireEvent.click(screen.getByRole('button', { name: 'Check for new data' }));
     await waitFor(() => expect(screen.getByText('Allowance status checked')).toBeInTheDocument());
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/status'))[1][0]).toEqual(
+      expect.stringContaining('since_revision=allowance-revision-1'),
+    );
+    expect(screen.getAllByText('40%').length).toBeGreaterThan(0);
     expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/series')).length).toBe(seriesCallsBeforeStatusCheck);
     expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/evidence')).length).toBe(evidenceCallsBeforeStatusCheck);
 
@@ -134,6 +151,70 @@ describe('Limits live evidence flow', () => {
     ).toHaveLength(2));
     expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith('/api/allowance/series'))).toHaveLength(2);
   });
+
+  it('automatically starts missing analysis for the current revision without exposing a run button', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path.startsWith('/api/allowance/status')) return jsonResponse(statusPayload());
+      if (path.startsWith('/api/allowance/series')) return jsonResponse(seriesPayload());
+      if (path.startsWith('/api/allowance/evidence')) return jsonResponse(evidencePayload());
+      if (path.startsWith('/api/allowance/analysis/jobs?') && init?.method === 'POST') {
+        return jsonResponse({ schema: 'codex-usage-tracker-analysis-job-v1', job_id: 'job-1', status: 'pending' });
+      }
+      if (path.startsWith('/api/allowance/analysis/jobs/job-1')) {
+        return jsonResponse({ schema: 'codex-usage-tracker-analysis-job-v1', job_id: 'job-1', status: 'running' });
+      }
+      if (path.startsWith('/api/allowance/analysis')) return jsonResponse({ ...analysisPayload(), status: 'missing' });
+      return jsonResponse({ error: 'unknown path' }, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <QueryClientProvider client={createDashboardQueryClient()}>
+        <LimitsPage
+          model={fixtureModel}
+          contextRuntime={{ apiToken: 'local-token', contextApiEnabled: false, fileMode: false }}
+          onOpenInvestigator={vi.fn()}
+          onCopyCallLink={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/allowance/analysis/jobs?window_kind=weekly'),
+      expect.objectContaining({ method: 'POST' }),
+    ));
+    expect(screen.queryByRole('button', { name: /analysis|revision/i })).not.toBeInTheDocument();
+  });
+
+  it('lists every supported capacity change newest first', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path.startsWith('/api/allowance/status')) return jsonResponse(statusPayload());
+      if (path.startsWith('/api/allowance/series')) return jsonResponse(seriesPayload());
+      if (path.startsWith('/api/allowance/evidence')) return jsonResponse(evidencePayload());
+      if (path.startsWith('/api/allowance/analysis')) return jsonResponse(multipleChangesPayload());
+      return jsonResponse({ error: 'unknown path' }, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <QueryClientProvider client={createDashboardQueryClient()}>
+        <LimitsPage
+          model={fixtureModel}
+          contextRuntime={{ apiToken: 'local-token', contextApiEnabled: false, fileMode: false }}
+          onOpenInvestigator={vi.fn()}
+          onCopyCallLink={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    const changes = await screen.findAllByRole('listitem', { name: /Credits per 1%/ });
+    expect(changes).toHaveLength(2);
+    expect(changes[0]).toHaveTextContent('Jul 1');
+    expect(changes[1]).toHaveTextContent('Jun 1');
+    expect(screen.queryByText('Adjusted p-value')).not.toBeInTheDocument();
+  });
 });
 
 function statusPayload(revision = 'allowance-revision-1') {
@@ -159,7 +240,22 @@ function statusPayload(revision = 'allowance-revision-1') {
     },
     five_hour: null,
     quality: { canonical: true, copied_rows_excluded: 2 },
+    estimation: {
+      capacity: {
+        status: 'descriptive', credits_per_percent: 105.11, completed_cycle_count: 63, price_coverage: 1,
+      },
+    },
     next: { action: 'poll_status', poll_after_seconds: 30 },
+  };
+}
+
+function unchangedStatusPayload() {
+  return {
+    schema: 'codex-usage-tracker-allowance-status-v2',
+    revision: 'allowance-revision-1',
+    changed: false,
+    quality: { canonical: true, copied_rows_excluded: 2 },
+    next: { action: 'poll_status', poll_after_seconds: 60 },
   };
 }
 
@@ -171,12 +267,22 @@ function seriesPayload() {
     revision: 'allowance-revision-1',
     requested_range: { preset: '8w', start_at: '2026-05-01T00:00:00Z', end_at: '2026-07-10T12:00:00Z' },
     available_range: { start_at: '2026-06-01T00:00:00Z', end_at: '2026-06-15T00:00:00Z' },
-    granularity: 'week',
+    granularity: 'cycle',
     truncated: false,
     downsampled: false,
     quality: { canonical: true, copied_rows_excluded: 2, observed_only: true },
     points: [],
     cycles: [],
+    capacity_history: {
+      status: 'ready', unit: 'credits_per_percent', eligible_cycle_count: 63,
+      robust_domain: { mode: 'tukey_1_5_iqr', min: 50, max: 180 }, clipped_point_count: 0,
+      points: [{
+        cycle_id: 'cycle-2', completed_at: '2026-07-01T00:00:00Z', credits_per_percent: 105.11,
+        rolling_median: 105.11, rolling_q1: 95, rolling_q3: 115, quality_grade: 'high',
+        price_coverage: 1, regime_id: 'regime-1',
+      }],
+      boundaries: [], regimes: [],
+    },
   };
 }
 
@@ -214,7 +320,35 @@ function analysisPayload() {
     source_revision: 'allowance-revision-1',
     model_version: 'allowance-v2',
     rate_card_revision: 'rates-1',
-    parameters: { min_cycles_per_side: 3, permutation_count: 2000 },
+    generated_at: '2026-07-15T12:00:00Z',
+    eligible_cycle_count: 63,
+    parameters: { min_cycles_per_regime: 4, permutation_count: 1999, familywise_alpha: 0.05 },
+  };
+}
+
+function multipleChangesPayload() {
+  const boundary = (id: string, effectiveAt: string, before: number, after: number) => ({
+    boundary_id: id,
+    split_index: 10,
+    before_cycle_id: `${id}-before`,
+    after_cycle_id: `${id}-after`,
+    effective_at: effectiveAt,
+    alpha: 0.025,
+    adjusted_p_value: 0.01,
+    effect_size: {
+      median_before_credits_per_percent: before,
+      median_after_credits_per_percent: after,
+      median_shift_credits_per_percent: after - before,
+      cliffs_delta: -0.8,
+    },
+  });
+  return {
+    ...analysisPayload(),
+    status: 'supported_changes',
+    boundaries: [
+      boundary('older', '2026-06-01T00:00:00Z', 140, 100),
+      boundary('newer', '2026-07-01T00:00:00Z', 100, 70),
+    ],
   };
 }
 

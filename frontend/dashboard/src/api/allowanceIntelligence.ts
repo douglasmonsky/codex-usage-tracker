@@ -1,15 +1,17 @@
 import type {
+  ContextRuntime,
+} from './types';
+import type {
   AllowanceAnalysisJobPayload,
   AllowanceAnalysisPayload,
   AllowanceEvidencePayload,
   AllowanceSeriesPayload,
   AllowanceStatusPayload,
   AllowanceWindowKindV2,
-  ContextRuntime,
-} from './types';
+} from './allowanceIntelligenceTypes';
 
 export type AllowanceSeriesRequest = {
-  rangePreset?: '24h' | '7d' | '8w' | '6m' | 'custom';
+  rangePreset?: '24h' | '7d' | '8w' | '6m' | 'all' | 'custom';
   startAt?: string;
   endAt?: string;
   granularity?: 'auto' | 'raw' | 'hour' | 'day' | 'week' | 'month' | 'cycle';

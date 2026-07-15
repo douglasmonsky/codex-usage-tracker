@@ -1,15 +1,20 @@
 import { ChevronLeft, ChevronRight, Copy, ExternalLink } from 'lucide-react';
 
-import type { AllowanceEvidenceRow } from '../../api/types';
 import { Button, StatusBadge, Surface } from '../../design';
 import { sortAllowanceEvidenceRows } from './allowanceIntelligenceModel';
-import styles from './LimitsPage.module.css';
+import baseStyles from './LimitsPage.module.css';
+import intelligenceStyles from './LimitsIntelligence.module.css';
+import type { AllowanceEvidenceRow } from '../../api/allowanceIntelligenceTypes';
+
+const styles = { ...baseStyles, ...intelligenceStyles };
 
 type Props = {
   rows: AllowanceEvidenceRow[];
   page: number;
   hasOlder: boolean;
   loading: boolean;
+  showPhysicalProvenance: boolean;
+  onTogglePhysicalProvenance: (show: boolean) => void;
   onNewer: () => void;
   onOlder: () => void;
   onOpenCall: (recordId: string) => void;
@@ -21,6 +26,8 @@ export function AllowanceIntelligenceEvidenceTable({
   page,
   hasOlder,
   loading,
+  showPhysicalProvenance,
+  onTogglePhysicalProvenance,
   onNewer,
   onOlder,
   onOpenCall,
@@ -33,9 +40,13 @@ export function AllowanceIntelligenceEvidenceTable({
         <div>
           <p className={styles.eyebrow}>Source evidence</p>
           <h2>Latest supporting intervals</h2>
-          <p>Newest first. Each page is bounded to 100 canonical local intervals.</p>
+          <p>Newest first. Each page is bounded to 50 canonical local intervals.</p>
         </div>
         <div className={styles.paginationActions}>
+          <label className={styles.provenanceToggle}>
+            <input type="checkbox" checked={showPhysicalProvenance} onChange={event => onTogglePhysicalProvenance(event.target.checked)} />
+            Show physical source links
+          </label>
           <Button onClick={onNewer} disabled={page === 1 || loading}><ChevronLeft />Newer</Button>
           <span>Page {page}</span>
           <Button onClick={onOlder} disabled={!hasOlder || loading}>Older<ChevronRight /></Button>
@@ -65,12 +76,12 @@ export function AllowanceIntelligenceEvidenceTable({
                   <td><StatusBadge tone={tone(row.point_kind)}>{label(row.point_kind, row.censor_reason)}</StatusBadge></td>
                   <td>{row.cohort_key || 'Codex'}</td>
                   <td>
-                    {recordId ? (
+                    {showPhysicalProvenance && recordId ? (
                       <div className={styles.rowActions}>
                         <button type="button" title="Open source call" onClick={() => onOpenCall(recordId)}><ExternalLink /><span className="sr-only">Open source call</span></button>
                         <button type="button" title="Copy source call link" onClick={() => onCopyCallLink(recordId)}><Copy /><span className="sr-only">Copy source call link</span></button>
                       </div>
-                    ) : 'Aggregate'}
+                    ) : 'Canonical aggregate'}
                   </td>
                 </tr>
               );

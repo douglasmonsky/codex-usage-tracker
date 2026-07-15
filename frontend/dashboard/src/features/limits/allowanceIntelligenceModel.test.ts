@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AllowanceEvidenceRow, AllowanceStatusPayload } from '../../api/types';
 import { buildAllowanceReadout, sortAllowanceEvidenceRows } from './allowanceIntelligenceModel';
+import type { AllowanceEvidenceRow, AllowanceStatusPayload } from '../../api/allowanceIntelligenceTypes';
 
 describe('allowance intelligence presentation model', () => {
   it('labels reconstructed usage and personal calibration without implying an official conversion', () => {

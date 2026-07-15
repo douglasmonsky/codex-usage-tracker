@@ -1,12 +1,8 @@
-import type {
-  AllowanceEvidenceRow,
-  AllowanceStatusPayload,
-  AllowanceStatusWindow,
-} from '../../api/types';
+import type { AllowanceEvidenceRow, AllowanceStatusPayload, AllowanceStatusWindow } from '../../api/allowanceIntelligenceTypes';
 
 type ReadoutKind = 'observed' | 'estimated' | 'unavailable';
 
-type MetricReadout = {
+export type MetricReadout = {
   label: string;
   value: string;
   detail: string;

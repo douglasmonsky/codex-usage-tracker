@@ -1,4 +1,4 @@
-import type { AllowanceDataState, AllowanceAnalysisJobPayload } from '../../api/types';
+import type { AllowanceAnalysisJobPayload, AllowanceDataState } from '../../api/allowanceIntelligenceTypes';
 
 const FRESH_POLL_MS = 30_000;
 const DEGRADED_POLL_MS = 60_000;
