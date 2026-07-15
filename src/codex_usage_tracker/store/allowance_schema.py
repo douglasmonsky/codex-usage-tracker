@@ -1,0 +1,136 @@
+"""Schema and rebuild boundary for derived allowance intelligence."""
+
+import sqlite3
+
+MIGRATION_NAMES = {26: "add allowance intelligence storage"}
+
+
+def migrate_allowance_intelligence_v2(conn: sqlite3.Connection) -> None:
+    """Create structural storage for reset-cycle allowance analysis.
+
+    Pricing estimates are deliberately nullable: they are materialized only by
+    later analysis services that can establish their pricing provenance.
+    """
+
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS allowance_source_state (
+            state_id INTEGER PRIMARY KEY CHECK (state_id = 1),
+            source_revision TEXT NOT NULL,
+            observation_count INTEGER NOT NULL,
+            latest_observed_at TEXT,
+            model_version TEXT NOT NULL,
+            rebuilt_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS allowance_cycles (
+            cycle_id TEXT PRIMARY KEY,
+            window_kind TEXT NOT NULL,
+            window_key TEXT NOT NULL,
+            cohort_key TEXT NOT NULL,
+            reset_at INTEGER,
+            reset_lower_bound INTEGER,
+            reset_upper_bound INTEGER,
+            first_observed_at TEXT,
+            last_observed_at TEXT,
+            start_used_percent REAL,
+            end_used_percent REAL,
+            peak_used_percent REAL,
+            conflict_count INTEGER NOT NULL DEFAULT 0,
+            canonical_observation_count INTEGER NOT NULL DEFAULT 0,
+            canonical_tokens INTEGER NOT NULL DEFAULT 0,
+            estimated_credits REAL,
+            price_coverage REAL,
+            status TEXT NOT NULL DEFAULT 'ambiguous',
+            source_revision TEXT NOT NULL,
+            model_version TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS allowance_intervals (
+            interval_id TEXT PRIMARY KEY,
+            cycle_id TEXT NOT NULL,
+            start_observation_id TEXT,
+            end_observation_id TEXT,
+            start_observed_at TEXT,
+            end_observed_at TEXT,
+            start_used_percent REAL,
+            end_used_percent REAL,
+            input_tokens INTEGER NOT NULL DEFAULT 0,
+            cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            uncached_input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0,
+            reasoning_output_tokens INTEGER NOT NULL DEFAULT 0,
+            total_tokens INTEGER NOT NULL DEFAULT 0,
+            estimated_credits REAL,
+            price_coverage REAL,
+            confidence REAL,
+            point_kind TEXT NOT NULL,
+            source_revision TEXT NOT NULL,
+            model_version TEXT,
+            FOREIGN KEY(cycle_id) REFERENCES allowance_cycles(cycle_id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS allowance_analysis_snapshots (
+            snapshot_id TEXT PRIMARY KEY,
+            source_revision TEXT NOT NULL,
+            model_version TEXT NOT NULL,
+            archive_scope TEXT NOT NULL,
+            window_kind TEXT NOT NULL,
+            cohort_key TEXT NOT NULL,
+            forecast_horizon INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'completed',
+            result_json TEXT,
+            created_at TEXT NOT NULL,
+            completed_at TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_observations_active_newest
+        ON allowance_observations(event_timestamp DESC, cumulative_total_tokens DESC, window_key DESC)
+        WHERE is_archived = 0;
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_observations_active_window_newest
+        ON allowance_observations(
+            window_kind, event_timestamp DESC, cumulative_total_tokens DESC, window_key DESC
+        ) WHERE is_archived = 0;
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_cycles_latest_cohort_window
+        ON allowance_cycles(window_kind, cohort_key, last_observed_at DESC, cycle_id DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_cycles_cohort_time_range
+        ON allowance_cycles(window_kind, cohort_key, first_observed_at, last_observed_at);
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_cycles_source_revision
+        ON allowance_cycles(source_revision);
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_intervals_cycle_evidence_desc
+        ON allowance_intervals(cycle_id, end_observed_at DESC, interval_id DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_allowance_intervals_source_revision
+        ON allowance_intervals(source_revision);
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_allowance_analysis_snapshots_cache_key
+        ON allowance_analysis_snapshots(
+            source_revision, model_version, archive_scope, window_kind, cohort_key, forecast_horizon
+        );
+        """
+    )
+
+
+def rebuild_allowance_intelligence(conn: sqlite3.Connection) -> None:
+    """Discard derived allowance analysis after canonical usage changes."""
+
+    if not _table_exists(conn, "allowance_source_state"):
+        return
+    conn.execute("DELETE FROM allowance_analysis_snapshots")
+    conn.execute("DELETE FROM allowance_intervals")
+    conn.execute("DELETE FROM allowance_cycles")
+    conn.execute("DELETE FROM allowance_source_state")
+
+
+def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+    return (
+        conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table_name,)
+        ).fetchone()
+        is not None
+    )

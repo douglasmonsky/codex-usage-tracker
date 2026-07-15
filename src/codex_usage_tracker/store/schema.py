@@ -6,6 +6,7 @@ import sqlite3
 from collections.abc import Callable
 from datetime import datetime, timezone
 
+import codex_usage_tracker.store.allowance_schema as allowance_schema
 import codex_usage_tracker.store.compression_schema as compression_schema
 import codex_usage_tracker.store.deduplication_schema as deduplication_schema
 import codex_usage_tracker.store.recommendation_schema as recommendation_schema
@@ -17,7 +18,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 26
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -37,6 +38,7 @@ MIGRATION_NAMES = {
     **recommendation_schema.MIGRATION_NAMES,
     **schema_query_indexes.MIGRATION_NAMES,
     **deduplication_schema.MIGRATION_NAMES,
+    **allowance_schema.MIGRATION_NAMES,
 }
 CALL_ORIGIN_REPAIR_COLUMNS: dict[str, str] = dict.fromkeys(
     ("call_initiator", "call_initiator_reason", "call_initiator_confidence"), "TEXT"
@@ -110,6 +112,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (23, schema_query_indexes.add_diagnostic_aggregate_index),
         (24, deduplication_schema.migrate_usage_deduplication),
         (25, deduplication_schema.migrate_clone_rewritten_usage),
+        (26, allowance_schema.migrate_allowance_intelligence_v2),
     )
 
 

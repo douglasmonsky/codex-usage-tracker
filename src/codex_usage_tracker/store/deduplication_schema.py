@@ -93,11 +93,13 @@ def _rebuild_canonical_derivatives(conn: sqlite3.Connection) -> None:
     from codex_usage_tracker.store.allowance_observations import (
         rebuild_allowance_observations,
     )
+    from codex_usage_tracker.store.allowance_schema import rebuild_allowance_intelligence
     from codex_usage_tracker.store.recommendation_schema import (
         reconcile_recommendation_facts_with_canonical_usage,
     )
     from codex_usage_tracker.store.thread_summaries import rebuild_thread_summaries
 
     rebuild_allowance_observations(conn)
+    rebuild_allowance_intelligence(conn)
     reconcile_recommendation_facts_with_canonical_usage(conn)
     rebuild_thread_summaries(conn)
