@@ -234,6 +234,8 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM diagnostic_snapshots")
         conn.execute("DELETE FROM allowance_observations")
+        conn.execute("DELETE FROM otel_completion_events")
+        conn.execute("DELETE FROM otel_completion_sources")
         conn.execute("DELETE FROM source_records")
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")

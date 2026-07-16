@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from codex_usage_tracker.store.otel_ingest import (
     discover_otel_sources,
     ingest_otel_completion_files,
@@ -98,6 +100,61 @@ def test_truncation_or_inode_replacement_resets_cursor_safely(tmp_path: Path) ->
             encoding="utf-8",
         )
         assert ingest_otel_completion_files(conn, directory).imported == 1
+
+
+def test_rotation_between_discovery_and_open_reads_replacement_from_zero(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = tmp_path / "otel"
+    source = directory / "codex-completions.jsonl"
+    replacement = tmp_path / "replacement.jsonl"
+    write_lines(source, [synthetic_fast_completion("conversation-a", 100)])
+
+    with initialized_connection(tmp_path) as conn:
+        ingest_otel_completion_files(conn, directory)
+        write_lines(
+            replacement,
+            [
+                synthetic_fast_completion(
+                    "conversation-b-with-a-longer-synthetic-identifier", 200
+                ),
+                synthetic_standard_completion("conversation-c", 300),
+            ],
+        )
+        real_open = Path.open
+        rotated = False
+
+        def rotate_before_open(path: Path, *args: object, **kwargs: object):
+            nonlocal rotated
+            if path == source and args and args[0] == "rb" and not rotated:
+                rotated = True
+                source.unlink()
+                replacement.replace(source)
+            return real_open(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "open", rotate_before_open)
+        result = ingest_otel_completion_files(conn, directory)
+        event_count = conn.execute(
+            "SELECT COUNT(*) FROM otel_completion_events"
+        ).fetchone()[0]
+        cursor = conn.execute(
+            """
+            SELECT device, inode, parsed_offset
+            FROM otel_completion_sources
+            WHERE source_path = ?
+            """,
+            (str(source.resolve()),),
+        ).fetchone()
+
+    source_stat = source.stat()
+    assert result.imported == 2
+    assert event_count == 3
+    assert tuple(cursor) == (
+        source_stat.st_dev,
+        source_stat.st_ino,
+        source_stat.st_size,
+    )
 
 
 def test_ingest_never_persists_body_or_arbitrary_attributes(tmp_path: Path) -> None:

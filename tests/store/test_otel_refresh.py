@@ -45,7 +45,7 @@ def test_refresh_ingests_session_rows_before_reconciling_otel(tmp_path: Path) ->
         record_id = str(conn.execute("SELECT record_id FROM usage_events").fetchone()[0])
     row = query_usage_record(db_path=db_path, record_id=record_id)
     assert row is not None
-    assert row["service_tier"] == "fast"
+    assert row["service_tier"] == "priority"
     assert result.parser_diagnostics["otel_matched"] == 1
 
 
@@ -158,7 +158,7 @@ def test_otel_before_jsonl_matches_on_a_later_refresh(tmp_path: Path) -> None:
     refresh_usage_index(codex_home=codex_home, db_path=db_path, otel_dir=otel_dir)
 
     with connect(db_path) as conn:
-        assert conn.execute("SELECT service_tier FROM usage_events").fetchone()[0] == "fast"
+        assert conn.execute("SELECT service_tier FROM usage_events").fetchone()[0] == "priority"
 
 
 def test_rebuild_retains_staging_resets_match_pointer_and_reapplies_tier(
@@ -177,7 +177,7 @@ def test_rebuild_retains_staging_resets_match_pointer_and_reapplies_tier(
 
     with connect(db_path) as conn:
         assert conn.execute("SELECT COUNT(*) FROM otel_completion_events").fetchone()[0] == 1
-        assert conn.execute("SELECT service_tier FROM usage_events").fetchone()[0] == "fast"
+        assert conn.execute("SELECT service_tier FROM usage_events").fetchone()[0] == "priority"
         state = conn.execute(
             "SELECT match_status, matched_record_id FROM otel_completion_events"
         ).fetchone()

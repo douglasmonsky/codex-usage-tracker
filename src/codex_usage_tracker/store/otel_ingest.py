@@ -66,18 +66,14 @@ def ingest_otel_completion_files(
     for path in discover_otel_sources(directory):
         source_path = str(path.resolve())
         try:
-            initial_stat = path.stat()
             state = _source_state(conn, source_path)
-            offset, line_number = _resume_position(state, initial_stat)
-            next_offset, next_line = _ingest_complete_lines(
+            final_stat, next_offset, next_line = _ingest_complete_lines(
                 conn,
                 path,
                 source_path,
-                offset,
-                line_number,
+                state,
                 totals,
             )
-            final_stat = path.stat()
         except FileNotFoundError:
             continue
         _upsert_source_cursor(
@@ -127,13 +123,38 @@ def _ingest_complete_lines(
     conn: sqlite3.Connection,
     path: Path,
     source_path: str,
-    offset: int,
-    line_number: int,
+    state: _SourceState | None,
     totals: _MutableIngestTotals,
-) -> tuple[int, int]:
-    next_offset = offset
-    next_line = line_number
+) -> tuple[os.stat_result, int, int]:
+    for attempt in range(2):
+        result = _read_source_descriptor(
+            conn,
+            path,
+            source_path,
+            state if attempt == 0 else None,
+            totals,
+        )
+        initial_stat, final_stat, next_offset, next_line = result
+        if (
+            initial_stat.st_dev == final_stat.st_dev
+            and initial_stat.st_ino == final_stat.st_ino
+        ):
+            return final_stat, next_offset, next_line
+    raise FileNotFoundError("OTel source descriptor identity changed during retry")
+
+
+def _read_source_descriptor(
+    conn: sqlite3.Connection,
+    path: Path,
+    source_path: str,
+    state: _SourceState | None,
+    totals: _MutableIngestTotals,
+) -> tuple[os.stat_result, os.stat_result, int, int]:
     with path.open("rb") as handle:
+        initial_stat = os.fstat(handle.fileno())
+        offset, line_number = _resume_position(state, initial_stat)
+        next_offset = offset
+        next_line = line_number
         handle.seek(offset)
         while line := handle.readline():
             if not line.endswith(b"\n"):
@@ -152,7 +173,8 @@ def _ingest_complete_lines(
                     totals.imported += 1
                 else:
                     totals.duplicates += 1
-    return next_offset, next_line
+        final_stat = os.fstat(handle.fileno())
+    return initial_stat, final_stat, next_offset, next_line
 
 
 def _insert_completion(
