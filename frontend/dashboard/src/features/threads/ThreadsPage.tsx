@@ -331,12 +331,14 @@ setThreadCallSortDirection(value === 'asc' ? 'asc' : 'desc');
       || selectedThreadName === detailFirstSelectedThreadName
       || selected
       || !focusedThreadsQuery.hasNextPage
-      || focusedThreadsQuery.isFetchingNextPage) return;
+      || focusedThreadsQuery.isFetchingNextPage
+      || focusedThreadsQuery.isFetchNextPageError) return;
     void focusedThreadsQuery.fetchNextPage();
   }, [
     endpointState.enabled,
     focusedThreadsQuery.data,
     focusedThreadsQuery.hasNextPage,
+    focusedThreadsQuery.isFetchNextPageError,
     focusedThreadsQuery.isFetchingNextPage,
     selected,
     selectedThreadName,

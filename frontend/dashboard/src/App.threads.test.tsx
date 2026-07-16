@@ -224,6 +224,80 @@ it('hydrates a direct thread link from a later focused summary page', async () =
   expect(fetchMock.mock.calls.some(([input]) => new URL(String(input), window.location.origin).searchParams.get('offset') === '1')).toBe(true);
 });
 
+it('preserves a direct thread link when a later focused summary page fails', async () => {
+  let pageTwoRequests = 0;
+  const summary = {
+    thread_key: 'page-one-thread', thread_label: 'page-one-thread',
+    first_event_timestamp: '2026-07-01T12:00:00Z', latest_event_timestamp: '2026-07-01T12:02:00Z',
+    latest_record_id: 'page-one-latest', call_count: 1, session_count: 1,
+    input_tokens: 100, cached_input_tokens: 20, uncached_input_tokens: 80, output_tokens: 10,
+    reasoning_output_tokens: 0, total_tokens: 110, estimated_cost_usd: 0.01, usage_credits: 0,
+    avg_cache_ratio: 0.2, max_context_window_percent: 0.2, max_recommendation_score: 0,
+    primary_recommendation: '', call_initiator_summary: 'user x1', archived_call_count: 0,
+    updated_at: '2026-07-01T12:02:00Z',
+  };
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const offset = Number(new URL(String(input), window.location.origin).searchParams.get('offset'));
+    if (offset === 1) {
+      pageTwoRequests += 1;
+      return new Response('temporary summary failure', { status: 500 });
+    }
+    return new Response(JSON.stringify({
+      schema: 'codex-usage-tracker-threads-v1', rows: [summary], row_count: 1, total_matched_rows: 2,
+      limit: 250, offset: 0, has_more: true, next_offset: 1, include_archived: false,
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }));
+  window.history.replaceState(null, '', '/?view=threads&thread=missing-page-two-thread');
+  const queryClient = new QueryClient();
+  render(<QueryClientProvider client={queryClient}><ThreadsPage
+    model={{ ...fixtureModel, contextRuntime: { apiToken: 'thread-token', contextApiEnabled: false, fileMode: false } }}
+    globalQuery="" onOpenInvestigator={vi.fn()} onCopyCallLink={vi.fn()}
+    contextRuntime={{ apiToken: 'thread-token', contextApiEnabled: false, fileMode: false }}
+    focusedEndpointsEnabled onNavigateView={vi.fn()}
+  /></QueryClientProvider>);
+
+  await waitFor(() => expect(pageTwoRequests).toBe(2), { timeout: 3_000 });
+  await new Promise(resolve => window.setTimeout(resolve, 100));
+  expect(pageTwoRequests).toBe(2);
+  expect(new URLSearchParams(window.location.search).get('thread')).toBe('missing-page-two-thread');
+});
+
+it('clears a missing direct thread only after focused summary pages are exhausted', async () => {
+  let finalPageReturned = false;
+  const summary = (thread: string) => ({
+    thread_key: thread, thread_label: thread,
+    first_event_timestamp: '2026-07-01T12:00:00Z', latest_event_timestamp: '2026-07-01T12:02:00Z',
+    latest_record_id: `${thread}-latest`, call_count: 1, session_count: 1,
+    input_tokens: 100, cached_input_tokens: 20, uncached_input_tokens: 80, output_tokens: 10,
+    reasoning_output_tokens: 0, total_tokens: 110, estimated_cost_usd: 0.01, usage_credits: 0,
+    avg_cache_ratio: 0.2, max_context_window_percent: 0.2, max_recommendation_score: 0,
+    primary_recommendation: '', call_initiator_summary: 'user x1', archived_call_count: 0,
+    updated_at: '2026-07-01T12:02:00Z',
+  });
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const offset = Number(new URL(String(input), window.location.origin).searchParams.get('offset'));
+    if (offset === 1) finalPageReturned = true;
+    return new Response(JSON.stringify({
+      schema: 'codex-usage-tracker-threads-v1', rows: [summary(offset === 0 ? 'page-one-thread' : 'page-two-thread')],
+      row_count: 1, total_matched_rows: 2, limit: 250, offset,
+      has_more: offset === 0, next_offset: offset === 0 ? 1 : null, include_archived: false,
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }));
+  window.history.replaceState(null, '', '/?view=threads&thread=never-present-thread');
+  const queryClient = new QueryClient();
+  render(<QueryClientProvider client={queryClient}><ThreadsPage
+    model={{ ...fixtureModel, contextRuntime: { apiToken: 'thread-token', contextApiEnabled: false, fileMode: false } }}
+    globalQuery="" onOpenInvestigator={vi.fn()} onCopyCallLink={vi.fn()}
+    contextRuntime={{ apiToken: 'thread-token', contextApiEnabled: false, fileMode: false }}
+    focusedEndpointsEnabled onNavigateView={vi.fn()}
+  /></QueryClientProvider>);
+
+  expect(new URLSearchParams(window.location.search).get('thread')).toBe('never-present-thread');
+  await waitFor(() => expect(new URLSearchParams(window.location.search).has('thread')).toBe(false));
+  expect(finalPageReturned).toBe(true);
+  expect(screen.queryByRole('region', { name: /Calls for never-present-thread/i })).not.toBeInTheDocument();
+});
+
 it('isolates progressive thread call pages and retries a partial result', async () => {
   let resolveOldThread: ((response: Response) => void) | undefined;
   let newThreadPageTwoAttempts = 0;
