@@ -152,6 +152,56 @@ def _credit_row_for_cost(
     }
 
 
+def _tiered_pricing_config(*, billing_basis: str = "unknown") -> PricingConfig:
+    standard = {
+        "input_per_million": 5.0,
+        "cached_input_per_million": 0.5,
+        "output_per_million": 30.0,
+    }
+    priority = {
+        "input_per_million": 10.0,
+        "cached_input_per_million": 1.0,
+        "output_per_million": 60.0,
+    }
+    return PricingConfig(
+        path=Path("/synthetic/pricing-v2.json"),
+        models={"gpt-5.6": standard},
+        loaded=True,
+        api_service_tiers={
+            "standard": {"gpt-5.6": standard},
+            "priority": {"gpt-5.6": priority},
+        },
+        billing_basis=billing_basis,
+    )
+
+
+def test_pricing_v2_service_tier_selects_api_cost() -> None:
+    pricing = _tiered_pricing_config(billing_basis="api_tokens")
+    standard = estimate_cost_usd(
+        _credit_row_for_cost(fast=0, service_tier="standard"), pricing
+    )
+    priority = estimate_cost_usd(
+        _credit_row_for_cost(fast=1, service_tier="priority"), pricing
+    )
+
+    assert priority == pytest.approx(float(standard) * 2)
+
+
+def test_efficiency_annotation_exposes_tier_cost_scenarios() -> None:
+    annotated = annotate_rows_with_efficiency(
+        [_credit_row_for_cost(fast=1, service_tier="priority")],
+        _tiered_pricing_config(),
+    )[0]
+
+    assert annotated["estimated_cost_usd"] == annotated["priority_cost_usd"]
+    assert annotated["priority_cost_usd"] == pytest.approx(
+        annotated["standard_cost_usd"] * 2
+    )
+    assert annotated["pricing_service_tier"] == "priority"
+    assert annotated["billing_basis"] == "unknown"
+    assert annotated["cost_semantics"] == "api_token_estimate"
+
+
 def test_pricing_fetch_rejects_non_https_sources() -> None:
     with pytest.raises(ValueError, match="must use HTTPS"):
         pricing_openai._fetch_text("file:///tmp/pricing.md")
