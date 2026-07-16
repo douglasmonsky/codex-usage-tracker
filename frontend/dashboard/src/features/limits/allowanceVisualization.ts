@@ -85,7 +85,7 @@ export function buildAllowanceVisualizationSpec(
           { field: 'deltaPercent', label: 'Observed movement', type: 'number' as const, unit: 'percent' as const, align: 'right' as const },
           { field: 'credits', label: 'Estimated credits', type: 'number' as const, unit: 'credits' as const, align: 'right' as const },
         ] : []),
-        { field: 'grade', label: 'Evidence grade', type: 'text', align: 'left' },
+        { field: 'grade', label: 'Evidence grade', type: 'text', align: 'left', localizeValues: true },
       ],
       defaultSort: { field: 'window', direction: 'desc' },
     },

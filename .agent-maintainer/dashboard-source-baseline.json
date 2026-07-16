@@ -20,6 +20,21 @@
       "nonblank": 424,
       "physical": 450
     },
+    "frontend/dashboard/src/app/zh-Hans/advancedPages.ts": {
+      "group": "source",
+      "nonblank": 456,
+      "physical": 468
+    },
+    "frontend/dashboard/src/app/zh-Hans/corePages.ts": {
+      "group": "source",
+      "nonblank": 716,
+      "physical": 733
+    },
+    "frontend/dashboard/src/app/zh-Hans/diagnosticsReports.ts": {
+      "group": "source",
+      "nonblank": 754,
+      "physical": 773
+    },
     "frontend/dashboard/src/features/call-investigator/CallInvestigatorPage.tsx": {
       "group": "source",
       "nonblank": 762,
@@ -44,11 +59,6 @@
       "group": "source",
       "nonblank": 639,
       "physical": 683
-    },
-    "frontend/dashboard/src/features/shared/tables.tsx": {
-      "group": "source",
-      "nonblank": 487,
-      "physical": 509
     },
     "frontend/dashboard/src/styles/context-evidence.css": {
       "group": "styles",

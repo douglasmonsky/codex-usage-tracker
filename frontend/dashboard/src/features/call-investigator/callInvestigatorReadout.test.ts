@@ -17,6 +17,8 @@ const shellI18n: ShellI18n = {
   direction: 'ltr',
   languages: [],
   t: (key, fallback) => fallback ?? key,
+  translateText: value => value,
+  formatText: (template, values) => template.replace(/\{(\w+)\}/gu, (token, key) => String(values[key] ?? token)),
   navLabel: (_view, fallback) => fallback,
 };
 

@@ -12,6 +12,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronsRight } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
+import { formatLocalizedText, type LocalizedText, useShellI18n } from '../../app/i18nContext';
 import styles from './EvidenceGrid.module.css';
 import { EvidenceGridControls } from './EvidenceGridControls';
 import type { EvidenceGridDensity } from './useEvidenceGridPreferences';
@@ -19,7 +20,7 @@ import type { EvidenceGridDensity } from './useEvidenceGridPreferences';
 type EvidenceGridMobilePresentation<TData> = {
   primary: (row: TData, rank: number) => ReactNode;
   secondary: (row: TData, rank: number) => ReactNode;
-  actionLabel: (row: TData, rank: number) => string;
+  actionLabel: (row: TData, rank: number) => string | LocalizedText;
 };
 
 export type EvidenceGridProps<TData> = {
@@ -98,6 +99,9 @@ export function EvidenceGrid<TData>({
   mobileBreakpoint = '(max-width: 700px)',
   manualSorting = false,
 }: EvidenceGridProps<TData>) {
+  const i18n = useShellI18n();
+  const localizedAriaLabel = i18n.translateText(ariaLabel);
+  const localizedEmptyLabel = i18n.translateText(emptyLabel);
   const isMobile = useMediaQuery(mobileBreakpoint);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -186,7 +190,7 @@ export function EvidenceGrid<TData>({
 
   const toolbar = (
     <EvidenceGridControls
-      ariaLabel={ariaLabel}
+      ariaLabel={localizedAriaLabel}
       table={table}
       lockedColumnIds={lockedColumns}
       density={density}
@@ -197,16 +201,16 @@ export function EvidenceGrid<TData>({
 
   if (!rows.length && isMobile) {
     return (
-      <section className={styles.grid} aria-label={ariaLabel}>
+      <section className={styles.grid} aria-label={localizedAriaLabel}>
         {toolbar}
-        <p className={styles.empty} role="status">{emptyLabel}</p>
+        <p className={styles.empty} role="status">{localizedEmptyLabel}</p>
       </section>
     );
   }
 
   if (isMobile) {
     return (
-      <section className={styles.grid} aria-label={ariaLabel}>
+      <section className={styles.grid} aria-label={localizedAriaLabel}>
         {toolbar}
         <div
           ref={scrollRef}
@@ -216,7 +220,7 @@ export function EvidenceGrid<TData>({
           data-virtualized="true"
           data-virtual-row-count={virtualRows.length}
         >
-        <ol className={styles.mobileList} aria-label={`${ariaLabel} ranked list`} style={{ height: virtualizer.getTotalSize() }}>
+        <ol className={styles.mobileList} aria-label={i18n.translateText(`${ariaLabel} ranked list`)} style={{ height: virtualizer.getTotalSize() }}>
           {virtualRows.map(virtualRow => {
             const row = rows[virtualRow.index];
             if (!row) return null;
@@ -227,7 +231,7 @@ export function EvidenceGrid<TData>({
                 <button
                   type="button"
                   className={selected ? styles.mobileRowSelected : styles.mobileRow}
-                  aria-label={mobile.actionLabel(row.original, rank)}
+                  aria-label={formatLocalizedText(i18n, mobile.actionLabel(row.original, rank))}
                   aria-pressed={selected}
                   data-row-index={virtualRow.index}
                   onClick={() => clickRow(row.original)}
@@ -246,7 +250,7 @@ export function EvidenceGrid<TData>({
           })}
         </ol>
         </div>
-        <p className={styles.rowCount}>{rows.length.toLocaleString()} ranked evidence rows</p>
+        <p className={styles.rowCount}>{i18n.translateText(`${rows.length.toLocaleString()} ranked evidence rows`)}</p>
       </section>
     );
   }
@@ -254,7 +258,7 @@ export function EvidenceGrid<TData>({
   const tableWidth = Math.max(table.getTotalSize(), 720);
 
   return (
-    <section className={styles.grid} aria-label={ariaLabel}>
+    <section className={styles.grid} aria-label={localizedAriaLabel}>
       {toolbar}
       {canScrollRight ? (
         <button
@@ -275,14 +279,14 @@ export function EvidenceGrid<TData>({
         data-virtualized="true"
         data-virtual-row-count={virtualRows.length}
       >
-        <table className={styles.table} aria-label={ariaLabel} aria-rowcount={rows.length + 1} style={{ width: tableWidth }}>
+        <table className={styles.table} aria-label={localizedAriaLabel} aria-rowcount={rows.length + 1} style={{ width: tableWidth }}>
           <thead>
             {table.getHeaderGroups().map(headerGroup => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map(header => {
                   const sorted = header.column.getIsSorted();
                   const frozen = header.column.id === identityColumnId;
-                  const label = headerText(header.column.columnDef.header, header.column.id);
+                  const label = i18n.translateText(headerText(header.column.columnDef.header, header.column.id));
                   return (
                     <th
                       key={header.id}
@@ -294,7 +298,7 @@ export function EvidenceGrid<TData>({
                       {header.isPlaceholder ? null : header.column.getCanSort() ? (
                         <button
                           type="button"
-                          aria-label={`Sort by ${label}`}
+                          aria-label={i18n.translateText(`Sort by ${label}`)}
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
@@ -345,8 +349,8 @@ export function EvidenceGrid<TData>({
           </tbody>
         </table>
       </div>
-      {!rows.length ? <p className={styles.empty} role="status">{emptyLabel}</p> : null}
-      <p className={styles.rowCount}>{rows.length.toLocaleString()} ranked evidence rows</p>
+      {!rows.length ? <p className={styles.empty} role="status">{localizedEmptyLabel}</p> : null}
+      <p className={styles.rowCount}>{i18n.translateText(`${rows.length.toLocaleString()} ranked evidence rows`)}</p>
     </section>
   );
 }

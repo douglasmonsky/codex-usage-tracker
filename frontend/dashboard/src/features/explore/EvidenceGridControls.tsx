@@ -1,5 +1,6 @@
 import type { Table } from '@tanstack/react-table';
 import { useEffect, useRef, useState } from 'react';
+import { useShellI18n } from '../../app/i18nContext';
 import type { EvidenceGridDensity } from './useEvidenceGridPreferences';
 import styles from './EvidenceGrid.module.css';
 
@@ -24,6 +25,7 @@ export function EvidenceGridControls<TData>({
   onDensityChange,
   onRestoreDefaults,
 }: EvidenceGridControlsProps<TData>) {
+  const i18n = useShellI18n();
   const chooserRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
 
@@ -46,7 +48,7 @@ export function EvidenceGridControls<TData>({
     };
   }, [open]);
 
-  return <div className={styles.toolbar} aria-label={`${ariaLabel} display controls`}>
+  return <div className={styles.toolbar} aria-label={i18n.translateText(`${ariaLabel} display controls`)}>
     <div className={styles.densityControl} role="group" aria-label="Density">
       <button type="button" aria-pressed={density === 'compact'} onClick={() => onDensityChange('compact')}>Dense</button>
       <button type="button" aria-pressed={density === 'comfortable'} onClick={() => onDensityChange('comfortable')}>Roomy</button>
@@ -64,7 +66,7 @@ export function EvidenceGridControls<TData>({
               disabled={locked}
               onChange={column.getToggleVisibilityHandler()}
             />
-            {headerText(column.columnDef.header, column.id)}
+            {i18n.translateText(headerText(column.columnDef.header, column.id))}
           </label>;
         })}
       </fieldset> : null}

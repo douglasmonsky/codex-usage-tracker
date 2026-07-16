@@ -35,6 +35,7 @@ export type VisualizationField = {
 export type VisualizationTableColumn = VisualizationField & {
   align?: 'left' | 'right';
   hiddenByDefault?: boolean;
+  localizeValues?: boolean;
 };
 
 export type VisualizationTableSpec = {
@@ -45,6 +46,7 @@ export type VisualizationTableSpec = {
 
 export type VisualizationAccessibility = {
   summary: string;
+  description?: string;
   details?: string[];
   keyboardInstructions?: string;
 };

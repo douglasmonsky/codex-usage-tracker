@@ -7,7 +7,7 @@ import type { VisualizationSelectionTarget } from './modelTypes';
 export function baseOption(spec: VisualizationSpecV1, animate: boolean): EChartsCoreOption {
   return {
     animation: animate,
-    aria: { enabled: true, description: visualizationAriaDescription(spec) },
+    aria: { enabled: true, description: spec.accessibility.description ?? visualizationAriaDescription(spec) },
     tooltip: { trigger: spec.kind === 'flow' ? 'item' : 'axis', confine: true },
   };
 }

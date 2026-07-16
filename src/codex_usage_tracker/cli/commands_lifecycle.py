@@ -17,6 +17,7 @@ from codex_usage_tracker.core.api_payloads import (
 from codex_usage_tracker.core.formatting import (
     format_doctor,
 )
+from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.diagnostics.api import run_doctor
 from codex_usage_tracker.pricing.api import update_pricing_from_openai_docs, write_pricing_template
 from codex_usage_tracker.recommendation_engine.api import (
@@ -25,6 +26,10 @@ from codex_usage_tracker.recommendation_engine.api import (
 )
 from codex_usage_tracker.reports.agentic_dogfood import build_agentic_dogfood_report
 from codex_usage_tracker.store.api import reset_usage_database
+
+
+def _chinese_output(args: argparse.Namespace) -> bool:
+    return normalize_language(getattr(args, "lang", None)) == "zh-Hans"
 
 
 def _run_setup(args: argparse.Namespace) -> int:
@@ -138,11 +143,18 @@ def _run_install_plugin(args: argparse.Namespace) -> int:
     if args.as_json:
         print_json(plugin_install_payload(result, schema="codex-usage-tracker-plugin-install-v1"))
         return 0
-    replacement_note = " Replaced existing plugin path." if result.replaced_existing else ""
-    print(f"Installed Codex Usage Tracker plugin at {result.plugin_dir}.{replacement_note}")
-    print(f"MCP Python: {result.python_executable}")
-    print(f"Updated marketplace: {result.marketplace_path}")
-    print("Restart Codex to discover the plugin.")
+    if _chinese_output(args):
+        replacement_note = "（已替换原有插件路径）" if result.replaced_existing else ""
+        print(f"Codex Usage Tracker 插件已安装到 {result.plugin_dir}{replacement_note}。")
+        print(f"MCP Python：{result.python_executable}")
+        print(f"已更新插件市场配置：{result.marketplace_path}")
+        print("请重启 Codex 以加载插件。")
+    else:
+        replacement_note = " Replaced existing plugin path." if result.replaced_existing else ""
+        print(f"Installed Codex Usage Tracker plugin at {result.plugin_dir}.{replacement_note}")
+        print(f"MCP Python: {result.python_executable}")
+        print(f"Updated marketplace: {result.marketplace_path}")
+        print("Restart Codex to discover the plugin.")
     return 0
 
 
@@ -156,10 +168,16 @@ def _run_upgrade_plugin(args: argparse.Namespace) -> int:
     if args.as_json:
         print_json(plugin_install_payload(result, schema="codex-usage-tracker-plugin-upgrade-v1"))
         return 0
-    print(f"Upgraded Codex Usage Tracker plugin at {result.plugin_dir}.")
-    print(f"MCP Python: {result.python_executable}")
-    print(f"Updated marketplace: {result.marketplace_path}")
-    print("Restart Codex to discover the refreshed plugin.")
+    if _chinese_output(args):
+        print(f"Codex Usage Tracker 插件已更新：{result.plugin_dir}。")
+        print(f"MCP Python：{result.python_executable}")
+        print(f"已更新插件市场配置：{result.marketplace_path}")
+        print("请重启 Codex 以加载更新后的插件。")
+    else:
+        print(f"Upgraded Codex Usage Tracker plugin at {result.plugin_dir}.")
+        print(f"MCP Python: {result.python_executable}")
+        print(f"Updated marketplace: {result.marketplace_path}")
+        print("Restart Codex to discover the refreshed plugin.")
     return 0
 
 
@@ -171,15 +189,22 @@ def _run_uninstall_plugin(args: argparse.Namespace) -> int:
     if args.as_json:
         print_json(plugin_uninstall_payload(result))
         return 0
-    print(
-        f"Removed plugin path: {'yes' if result.removed_plugin_path else 'already absent'} "
-        f"({result.plugin_dir})"
-    )
-    print(
-        f"Removed marketplace entry: {'yes' if result.removed_marketplace_entry else 'not present'} "
-        f"({result.marketplace_path})"
-    )
-    print("Restart Codex to unload plugin tools from new sessions.")
+    if _chinese_output(args):
+        plugin_state = "已移除" if result.removed_plugin_path else "原本不存在"
+        marketplace_state = "已移除" if result.removed_marketplace_entry else "原本不存在"
+        print(f"插件路径：{plugin_state}（{result.plugin_dir}）")
+        print(f"插件市场条目：{marketplace_state}（{result.marketplace_path}）")
+        print("请重启 Codex，使新会话不再加载该插件工具。")
+    else:
+        print(
+            f"Removed plugin path: {'yes' if result.removed_plugin_path else 'already absent'} "
+            f"({result.plugin_dir})"
+        )
+        print(
+            f"Removed marketplace entry: {'yes' if result.removed_marketplace_entry else 'not present'} "
+            f"({result.marketplace_path})"
+        )
+        print("Restart Codex to unload plugin tools from new sessions.")
     return 0
 
 

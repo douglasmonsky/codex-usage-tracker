@@ -214,7 +214,7 @@ CODEX_USAGE_TRACKER_LANG=vi codex-usage-tracker serve-dashboard --open
 
 The dashboard also includes a language selector. Browser selections are stored locally and can override the generated default for that browser.
 
-Supported dashboard locales include English, Vietnamese, Spanish, French, German, Portuguese, Japanese, Simplified Chinese, Korean, Russian, Italian, and Arabic. This localizes dashboard UI text, not raw Codex log content, thread names, project names, paths, full CLI output, or data exports.
+Supported dashboard locales include English, Vietnamese, Spanish, French, German, Portuguese, Japanese, Simplified Chinese, Korean, Russian, Italian, and Arabic. Simplified Chinese also localizes CLI help and dashboard lifecycle messages. Localization never rewrites raw Codex log content, thread names, project names, paths, or data exports.
 
 ### Adding A Dashboard Language
 

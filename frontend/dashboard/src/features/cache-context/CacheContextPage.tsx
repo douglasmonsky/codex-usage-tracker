@@ -2,6 +2,7 @@ import { Copy, Search } from 'lucide-react';
 import { useMemo, useState, type CSSProperties } from 'react';
 
 import type { CallRow, ContextRuntime, DashboardModel, HeatmapRow, ThreadRow } from '../../api/types';
+import { useShellI18n } from '../../app/i18nContext';
 import { LineChart } from '../../charts/LineChart';
 import { DataTable } from '../../components/DataTable';
 import { MetricCard } from '../../components/MetricCard';
@@ -41,6 +42,7 @@ export function CacheContextPage({
   onOpenInvestigator,
   onCopyCallLink,
 }: CacheContextPageProps) {
+  const i18n = useShellI18n();
   const [selectedThreadName, setSelectedThreadName] = useState<string | null>(cacheThreadParam);
   const evidence = useCacheContextEvidence({
     model,
@@ -160,7 +162,7 @@ activateOnClick
 selectOnHover
 ariaLabel="Cache context threads overview"
 />
-        <p className="table-caption">Showing {formatNumber(evidence.threads.length)} of {formatNumber(evidence.totalThreads)} full-scope thread summaries.</p>
+        <p className="table-caption">{i18n.translateText(`Showing ${formatNumber(evidence.threads.length)} of ${formatNumber(evidence.totalThreads)} full-scope thread summaries.`)}</p>
       </Panel>
 
 <SelectedCacheThreadPanel
@@ -190,6 +192,7 @@ heatmapWindowLabels,
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
 }) {
+  const i18n = useShellI18n();
   if (!selectedThread) {
     return (
       <aside className="side-panel">
@@ -206,7 +209,7 @@ heatmapWindowLabels,
         <div className="finding-module">
           <div className="section-heading compact">
             <h3>Efficiency Profile</h3>
-            <span>{selectedThread.coldResumeRisk} risk</span>
+            <span>{i18n.translateText(`${selectedThread.coldResumeRisk} risk`)}</span>
           </div>
           <div className="evidence-list">
             <span>
@@ -314,10 +317,10 @@ return (
       <div className="finding-module">
         <h3>Diagnosis Basis</h3>
         <ul className="compact-list">
-          <li>Risk: {selectedThread.coldResumeRisk} cold-resume score</li>
-          <li>Cache: {pct(selectedThread.cachePct)} hit rate; action threshold below 35%</li>
-          <li>Cost: {money(selectedThread.costPerCall)} per call; inspect threshold above $1.00</li>
-          <li>Evidence: {calls.length} loaded calls, {heatmap ? `${heatmap.values.length} cache windows` : 'no heatmap row'}</li>
+          <li>{i18n.translateText(`Risk: ${selectedThread.coldResumeRisk} cold-resume score`)}</li>
+          <li>{i18n.translateText(`Cache: ${pct(selectedThread.cachePct)} hit rate; action threshold below 35%`)}</li>
+          <li>{i18n.translateText(`Cost: ${money(selectedThread.costPerCall)} per call; inspect threshold above $1.00`)}</li>
+          <li>{i18n.translateText(`Evidence: ${calls.length} loaded calls, ${heatmap ? `${heatmap.values.length} cache windows` : 'no heatmap row'}`)}</li>
         </ul>
       </div>
 

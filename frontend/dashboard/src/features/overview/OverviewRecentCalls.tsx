@@ -47,7 +47,7 @@ export function OverviewRecentCalls(props: OverviewRecentCallsProps) {
 
   function exportCalls() {
     downloadCsv(`codex-overview-calls-${csvDateStamp()}.csv`, rowsToCsv(visibleCalls, callCsvColumns));
-    setExportStatus(`Exported ${formatNumber(visibleCalls.length)} loaded calls`);
+    setExportStatus(shellI18n.translateText(`Exported ${formatNumber(visibleCalls.length)} loaded calls`));
   }
 
   return (
@@ -55,7 +55,7 @@ export function OverviewRecentCalls(props: OverviewRecentCallsProps) {
       <div className={styles.header}>
         <div>
           <h2 id="overview-recent-calls-title">Calls</h2>
-          <p>{formatNumber(visibleCalls.length)} matching calls with the same evidence fields as the Calls workspace.</p>
+          <p>{shellI18n.translateText(`${formatNumber(visibleCalls.length)} matching calls with the same evidence fields as the Calls workspace.`)}</p>
         </div>
         <div className={styles.actions}>
           {exportStatus ? <StatusBadge tone="positive" role="status">{exportStatus}</StatusBadge> : null}
@@ -73,7 +73,7 @@ export function OverviewRecentCalls(props: OverviewRecentCallsProps) {
           getRowId={call => call.id}
           mobile={{
             primary: call => call.thread,
-            secondary: call => `${call.time} · ${call.model} · ${formatCompact(call.totalTokens)} tokens · ${pct(call.cachedPct)} cache`,
+            secondary: call => shellI18n.translateText(`${call.time} · ${call.model} · ${formatCompact(call.totalTokens)} tokens · ${pct(call.cachedPct)} cache`),
             actionLabel: call => callInvestigatorRowLabel(call),
           }}
           sorting={sorting}
@@ -89,7 +89,7 @@ export function OverviewRecentCalls(props: OverviewRecentCallsProps) {
           emptyLabel="No loaded calls match the current search."
         />
         <footer className={styles.footer}>
-          <span>Loaded {formatNumber(props.loadedRowCount)} of {formatNumber(props.totalAvailableRows)} available calls</span>
+          <span>{shellI18n.translateText(`Loaded ${formatNumber(props.loadedRowCount)} of ${formatNumber(props.totalAvailableRows)} available calls`)}</span>
           <div className={styles.actions}>
             <Button aria-label="Load more recent calls" onClick={props.onLoadMoreRows} disabled={!props.canLoadMoreRows || props.refreshing}>{props.refreshing ? 'Loading...' : loadMoreLabel}</Button>
             <Button onClick={props.onBrowseCalls}>Browse all calls</Button>

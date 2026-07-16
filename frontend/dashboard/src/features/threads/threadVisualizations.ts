@@ -93,7 +93,7 @@ export function buildThreadLifecycleSpec(
         { field: 'contextPercent', label: 'Context', type: 'number', unit: 'percent', align: 'right' },
         { field: 'cachePercent', label: 'Cache', type: 'number', unit: 'percent', align: 'right' },
         { field: 'totalTokens', label: 'Tokens', type: 'number', unit: 'tokens', align: 'right' },
-        { field: 'event', label: 'Lifecycle event', type: 'text' },
+        { field: 'event', label: 'Lifecycle event', type: 'text', localizeValues: true },
       ],
     },
     interactions: { selection: { keyField: 'id', labelField: 'call' }, zoom: { axis: 'x' } },

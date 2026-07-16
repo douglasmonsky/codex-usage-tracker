@@ -2,6 +2,7 @@ import type { ColumnDef, OnChangeFn, SortingState } from '@tanstack/react-table'
 import { Download, RotateCcw, Search } from 'lucide-react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import type { CallRow, ThreadRow } from '../../api/types';
+import { useShellI18n } from '../../app/i18nContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PageLoadProgress, SegmentedControl } from '../../design';
 import { Visualization, type VisualizationSpecV1 } from '../../visualization';
@@ -110,6 +111,7 @@ export function ThreadsExplorerView({
   onOpenInvestigator,
   onCopyCallLink,
 }: ThreadsExplorerViewProps) {
+  const i18n = useShellI18n();
   return (
     <div className={`${styles.page} page-grid`}>
       <header className={styles.pageHeader}>
@@ -172,9 +174,9 @@ export function ThreadsExplorerView({
             value={viewMode}
             onValueChange={onViewModeChange}
             options={[
-              { value: 'table', label: 'Table' },
+              { value: 'table', label: i18n.translateText('Table') },
               { value: 'frontier', label: 'Cache frontier' },
-              { value: 'lifecycle', label: 'Lifecycle' },
+              { value: 'lifecycle', label: i18n.translateText('Lifecycle') },
             ]}
           />
           <StatusBadge
@@ -224,7 +226,7 @@ export function ThreadsExplorerView({
               />
               <div className={styles.gridFooter} aria-live="polite">
                 <span>
-                  {displayedThreads.length.toLocaleString()} loaded / {totalMatchedThreads.toLocaleString()} matched
+                  {i18n.translateText(`${displayedThreads.length.toLocaleString()} loaded / ${totalMatchedThreads.toLocaleString()} matched`)}
                 </span>
                 {canLoadMoreThreads ? (
                   <button

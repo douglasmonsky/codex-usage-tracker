@@ -16,8 +16,17 @@ export function AllowanceCapacityLegend({ series }: AllowanceCapacityLegendProps
   )];
 
   return (
-    <div className={styles.capacityLegend} role="group" aria-label="Capacity chart legend">
-      <ul className={styles.legendKey} aria-label="Subscription plan key">
+    <div
+      className={styles.capacityLegend}
+      role="group"
+      aria-label="Capacity chart legend"
+      data-localization-attributes="aria-label"
+    >
+      <ul
+        className={styles.legendKey}
+        aria-label="Subscription plan key"
+        data-localization-attributes="aria-label"
+      >
         <li className={styles.legendKeyLabel}>Plan</li>
         {planTypes.map(planType => (
           <li key={planType}>
@@ -30,7 +39,11 @@ export function AllowanceCapacityLegend({ series }: AllowanceCapacityLegendProps
           </li>
         ))}
       </ul>
-      <ul className={styles.legendKey} aria-label="Chart mark key">
+      <ul
+        className={styles.legendKey}
+        aria-label="Chart mark key"
+        data-localization-attributes="aria-label"
+      >
         <li className={styles.legendKeyLabel}>Mark</li>
         <li><span className={styles.observedMark} aria-hidden="true" />Observed reset window</li>
         <li><span className={styles.medianMark} aria-hidden="true" />Trailing 8-window median</li>

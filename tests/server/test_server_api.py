@@ -3,14 +3,34 @@ from __future__ import annotations
 from functools import partial
 from pathlib import Path
 
+import pytest
+
 from codex_usage_tracker.server import api as server_api
 from codex_usage_tracker.server.query_cache import AggregateQueryCache
 
 
+@pytest.mark.parametrize(
+    ("language", "dashboard_message", "legacy_message"),
+    [
+        (
+            None,
+            "Serving Codex usage dashboard at http://127.0.0.1:8765/react-dashboard.html",
+            "Legacy dashboard fallback remains available at http://127.0.0.1:8765/dashboard.html",
+        ),
+        (
+            "zh-Hans",
+            "Codex 用量仪表盘正在运行：http://127.0.0.1:8765/react-dashboard.html",
+            "旧版仪表盘备用入口：http://127.0.0.1:8765/dashboard.html",
+        ),
+    ],
+)
 def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
     tmp_path: Path,
     monkeypatch,
     capsys,
+    language: str | None,
+    dashboard_message: str,
+    legacy_message: str,
 ) -> None:
     opened: list[str] = []
     handlers: list[object] = []
@@ -46,15 +66,13 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
         host="127.0.0.1",
         port=8765,
         open_browser=True,
+        language=language,
     )
 
     output = capsys.readouterr().out
     assert opened == ["http://127.0.0.1:8765/react-dashboard.html"]
-    assert "Serving Codex usage dashboard at http://127.0.0.1:8765/react-dashboard.html" in output
-    assert (
-        "Legacy dashboard fallback remains available at http://127.0.0.1:8765/dashboard.html"
-        in output
-    )
+    assert dashboard_message in output
+    assert legacy_message in output
     assert handlers
     handler = handlers[0]
     assert isinstance(handler, partial)

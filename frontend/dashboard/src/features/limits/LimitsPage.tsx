@@ -299,7 +299,7 @@ function LiveLimitsPage({
           </div>
         ) : null}
         {seriesQuery.data ? (
-          <p className={styles.rangeFeedback} role="status" aria-label="History range result">
+          <p className={styles.rangeFeedback} role="status" aria-label="History range result" data-localization-attributes="aria-label">
             <strong>{rangePreset === 'all' ? 'All history' : rangePreset} selected</strong>
             {' · '}{seriesQuery.data.capacity_history.eligible_cycle_count} eligible reset windows loaded.
             {rangeHasNoOlderData ? ' No older capacity history is available.' : ''}

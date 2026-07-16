@@ -17,6 +17,7 @@ import {
   type InvestigationWalkBranch,
 } from '../../api/investigations';
 import type { CallRow, ContextRuntime, DashboardModel } from '../../api/types';
+import { useShellI18n } from '../../app/i18nContext';
 import {
   investigatorWalkQueryOptions,
 } from '../../data/investigatorQueries';
@@ -68,6 +69,7 @@ export function InvestigatorPage({
   onCopyCallLink,
   onNavigateView,
 }: InvestigatorPageProps) {
+  const i18n = useShellI18n();
   const canUseLive = Boolean(contextRuntime.apiToken) && !contextRuntime.fileMode;
   const fallbackSnapshots = useMemo(() => fallbackDiagnosticSnapshots(model), [model]);
   const evidence = useInvestigatorEvidence({
@@ -211,11 +213,11 @@ export function InvestigatorPage({
       <section className={answerStyles.answerBand} data-tone={selected.tone} aria-labelledby="investigation-answer-title">
         <div className={answerStyles.answerCopy}>
           <span>Selected finding</span>
-          <h2 id="investigation-answer-title">{selected.title}</h2>
-          <p>{selected.summary}</p>
+          <h2 id="investigation-answer-title">{i18n.translateText(selected.title)}</h2>
+          <p>{i18n.translateText(selected.summary)}</p>
         </div>
         <div className={answerStyles.answerMetrics}>
-          <MetricReadout label="Confidence" value={selected.confidence} detail={selected.source} />
+          <MetricReadout label="Confidence" value={i18n.translateText(selected.confidence)} detail={i18n.translateText(selected.source)} />
           <MetricReadout label="Evidence" value={selected.evidenceCount.toLocaleString()} detail="Linked rows" />
           <MetricReadout label="Impact signal" value={formatCompact(selected.impactScore)} detail="Ranking score" />
         </div>
@@ -225,7 +227,7 @@ export function InvestigatorPage({
         <Surface className={styles.findingsPanel}>
           <div className={styles.panelHeader}>
             <div><h2>Ranked findings</h2><p>Confidence, scope, and evidence stay visible while comparing.</p></div>
-            <StatusBadge tone="context">{workspace.findings.length} signals</StatusBadge>
+            <StatusBadge tone="context">{i18n.translateText(`${workspace.findings.length} signals`)}</StatusBadge>
           </div>
           <div className={styles.findingList}>
             {workspace.findings.map(finding => (
@@ -237,7 +239,7 @@ export function InvestigatorPage({
                 onClick={() => selectFinding(finding)}
               >
                 <i className={styles.findingSignal} data-tone={finding.tone} aria-hidden="true" />
-                <span className={styles.findingCopy}><strong>{finding.title}</strong><span>{finding.category}</span></span>
+                <span className={styles.findingCopy}><strong>{i18n.translateText(finding.title)}</strong><span>{i18n.translateText(finding.category)}</span></span>
                 <span className={styles.findingEvidence}>{finding.evidenceCount} rows</span>
                 <ArrowRight aria-hidden="true" />
               </button>
@@ -250,11 +252,11 @@ export function InvestigatorPage({
             <div><h2>Recommended change</h2><p>Deterministic action from the selected evidence family.</p></div>
             <StatusBadge tone={toneToBadge(selected.tone)}>{selected.confidence}</StatusBadge>
           </div>
-          <p className={styles.recommendation}>{selected.action}</p>
+          <p className={styles.recommendation}>{i18n.translateText(selected.action)}</p>
           <dl className={styles.methodList}>
             <div><dt>Verify with</dt><dd>{selected.verification.join(', ') || 'linked evidence rows'}</dd></div>
-            <div><dt>Missing access</dt><dd>{selected.missingAccess}</dd></div>
-            <div><dt>Privacy</dt><dd>{selected.privacyNote}</dd></div>
+            <div><dt>Missing access</dt><dd>{i18n.translateText(selected.missingAccess)}</dd></div>
+            <div><dt>Privacy</dt><dd>{i18n.translateText(selected.privacyNote)}</dd></div>
           </dl>
           <Button variant="primary" onClick={() => selected.evidence[0]?.recordId && onOpenInvestigator(selected.evidence[0].recordId)} disabled={!selected.evidence.some(row => row.recordId)}>
             <Search />Verify in call
@@ -277,10 +279,10 @@ export function InvestigatorPage({
       <section className={styles.ledgerSection}>
         <div className={styles.panelHeader}>
           <div><h2>Evidence ledger</h2><p>Each supported row opens the underlying call or thread.</p></div>
-          <StatusBadge tone="positive">{selected.evidence.length} linked</StatusBadge>
+          <StatusBadge tone="positive">{i18n.translateText(`${selected.evidence.length} linked`)}</StatusBadge>
         </div>
         <InvestigationEvidenceLedger
-          findingTitle={selected.title}
+          findingTitle={i18n.translateText(selected.title)}
           rows={selected.evidence}
           onOpenCall={onOpenInvestigator}
           onCopyCallLink={onCopyCallLink}

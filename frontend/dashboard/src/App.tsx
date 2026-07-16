@@ -5,7 +5,7 @@ import { currentViewCsvExport } from './app/currentViewExport';
 import { errorMessage, refreshProgressLabel, type RefreshOptions } from './app/dashboardRefresh';
 import { historyScopeFromPayload, historyScopeStatusLabel } from './app/historyScope';
 import { createShellI18n, initialDashboardLanguage, storeDashboardLanguage } from './app/i18n';
-import { ShellI18nProvider } from './app/i18nContext';
+import { LocalizedShellI18nProvider } from './app/DocumentLocalizationBridge';
 import { modelWithLegacyShellFilters } from './app/legacyShellFilters';
 import { navItems, secondaryNavItems, type ViewId } from './app/navigation';
 import { RowLimitControl } from './app/RowLimitControl';
@@ -525,8 +525,8 @@ function clearInvestigationPreset() {
   }
 
   return (
-    <ShellI18nProvider value={shellI18n}>
-      <div className="app-shell">
+    <LocalizedShellI18nProvider value={shellI18n}>
+      <div className="app-shell" data-dashboard-localization-root>
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">
@@ -597,7 +597,7 @@ placeholder={shellI18n.t('filter.search_placeholder', 'Search calls, threads, mo
 {shellI18n.languages.length > 1 ? (
 <label className="topbar-select">
 <span>{shellI18n.t('language.label', 'Language')}</span>
-<select aria-label={shellI18n.t('language.label', 'Language')} value={shellI18n.language} onChange={event => handleLanguageChange(event.target.value)}>
+<select data-localization-skip="true" aria-label={shellI18n.t('language.label', 'Language')} value={shellI18n.language} onChange={event => handleLanguageChange(event.target.value)}>
 {shellI18n.languages.map(languageOption => (
 <option key={languageOption.code} value={languageOption.code}>
 {languageOption.native_name || languageOption.english_name || languageOption.code}
@@ -730,7 +730,7 @@ aria-label="History scope"
         </button>
       ) : null}
       </div>
-    </ShellI18nProvider>
+    </LocalizedShellI18nProvider>
   );
 
   function onRefresh() {

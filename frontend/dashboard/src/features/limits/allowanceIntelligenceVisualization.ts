@@ -135,11 +135,11 @@ export function buildAllowanceIntelligenceVisualization(
       columns: [
         { field: 'completedAt', label: 'Reset window completed', type: 'time', align: 'left' },
         { field: 'creditsPerPercent', label: 'Credits / 1%', type: 'number', unit: 'credits_per_percent', align: 'right' },
-        { field: 'planLabel', label: 'Subscription plan', type: 'text', align: 'left' },
+        { field: 'planLabel', label: 'Subscription plan', type: 'text', align: 'left', localizeValues: true },
         { field: 'rollingMedian', label: 'Rolling median', type: 'number', unit: 'credits_per_percent', align: 'right' },
         { field: 'rollingQ1', label: 'Rolling Q1', type: 'number', unit: 'credits_per_percent', align: 'right' },
         { field: 'rollingQ3', label: 'Rolling Q3', type: 'number', unit: 'credits_per_percent', align: 'right' },
-        { field: 'qualityGrade', label: 'Quality', type: 'text', align: 'left' },
+        { field: 'qualityGrade', label: 'Quality', type: 'text', align: 'left', localizeValues: true },
         { field: 'priceCoverage', label: 'Price coverage', type: 'number', unit: 'ratio', align: 'right' },
       ],
       defaultSort: { field: 'completedAt', direction: 'desc' },

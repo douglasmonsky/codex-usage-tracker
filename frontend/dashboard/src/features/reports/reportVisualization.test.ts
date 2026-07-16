@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { fixtureModel } from '../../test-fixtures/dashboardFixture';
 import { validateVisualizationSpec } from '../../visualization';
+import { localizeVisualizationSpec } from '../../visualization/react/localizeVisualizationSpec';
 import { reportEvidenceCalls } from './reportModel';
 import { buildReportVisualizationSpec } from './reportVisualization';
 
@@ -43,5 +44,30 @@ describe('report visualization contract', () => {
     expect(byTitle('Weekly Credits').axes.y.unit).toBe('credits');
     expect(byTitle('Weekly Credits').series[0]?.mark).toBe('line');
     expect(byTitle('Weekly Credits').series[0]?.label).toBe('Pro observed');
+  });
+
+  it('localizes owned duration buckets without translating thread names', () => {
+    const translate = (value: string) => ({
+      'Under 5s': '5秒以内',
+      Overview: '概览',
+    })[value] ?? value;
+    const build = (title: string, model = fixtureModel) => {
+      const report = model.reports.find(candidate => candidate.title === title);
+      return localizeVisualizationSpec(
+        buildReportVisualizationSpec(report, model, reportEvidenceCalls(report, model.calls), metadata),
+        translate,
+      );
+    };
+    const costModel = {
+      ...fixtureModel,
+      threads: fixtureModel.threads.map((thread, index) => (index === 0 ? { ...thread, name: 'Overview' } : thread)),
+    };
+    const cost = build('Cost Curves', costModel);
+    const speed = build('Fast Mode Proxy');
+
+    if (cost.kind === 'cartesian' && speed.kind === 'cartesian') {
+      expect(cost.data.rows[0].label).toBe('Overview');
+      expect(speed.data.rows[0].label).toBe('5秒以内');
+    }
   });
 });
