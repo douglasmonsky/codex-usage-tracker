@@ -1,6 +1,7 @@
 import type { DashboardDataScope, DashboardModelScope } from './dashboardDataScope';
+import type { CallServiceTierFields, UsageServiceTierFields } from './serviceTier';
 
-export type UsageRow = {
+export type UsageRow = UsageServiceTierFields & {
   id?: string;
   record_id?: string;
   session_id?: string;
@@ -44,13 +45,6 @@ export type UsageRow = {
   uncached_input_tokens?: number;
   estimated_cost_usd?: number;
   usage_credits?: number;
-  standard_usage_credits?: number | null;
-  usage_credit_multiplier?: number | null;
-  usage_credit_multiplier_source?: string | null;
-  service_tier?: string | null;
-  fast?: number | boolean | null;
-  service_tier_source?: string | null;
-  service_tier_confidence?: string | null;
   rate_limit_plan_type?: string | null;
   rate_limit_limit_id?: string | null;
   rate_limit_primary_used_percent?: number | null;
@@ -297,7 +291,7 @@ export type Finding = {
   summary: string;
 };
 
-export type CallRow = {
+export type CallRow = CallServiceTierFields & {
   id: string;
   threadKey?: string;
   rawTime: string;
@@ -315,7 +309,6 @@ export type CallRow = {
   uncachedInput: number;
   cachedPct: number;
   cost: number;
-  credits: number;
   duration: string;
   durationSeconds: number;
   previousCallGap: string;
@@ -324,14 +317,6 @@ export type CallRow = {
   initiator: string;
   initiatorReason: string;
   initiatorConfidence: string;
-  serviceTier: string;
-  fast: boolean | null;
-  serviceTierSource: string;
-  serviceTierConfidence: string;
-  fastProxyCandidate: boolean;
-  standardUsageCredits: number;
-  usageCreditMultiplier: number;
-  usageCreditMultiplierSource: string;
  usageCreditConfidence: string;
  usageCreditModel: string;
   usageCreditSource: string;

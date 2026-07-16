@@ -13,12 +13,12 @@
     "frontend/dashboard/src/api/client.ts": {
       "group": "source",
       "nonblank": 765,
-      "physical": 826
+      "physical": 825
     },
     "frontend/dashboard/src/api/types.ts": {
       "group": "source",
-      "nonblank": 424,
-      "physical": 450
+      "nonblank": 423,
+      "physical": 449
     },
     "frontend/dashboard/src/app/zh-Hans/advancedPages.ts": {
       "group": "source",

@@ -16,6 +16,27 @@ type ContextWindowInput = {
 
 type TopCountStyle = 'parenthetical' | 'x';
 
+type ServiceTierInput = {
+  fast: boolean | null;
+  serviceTierConfidence: string;
+  fastProxyCandidate: boolean;
+};
+
+export function serviceTierLabel(call: ServiceTierInput): 'Fast' | 'Standard' | 'Unknown' {
+  if (call.fast === true) return 'Fast';
+  if (call.fast === false) return 'Standard';
+  return 'Unknown';
+}
+
+export function serviceTierDetail(call: ServiceTierInput): string {
+  if (call.fast !== null) {
+    return `confirmed ${serviceTierLabel(call)} · ${call.serviceTierConfidence || 'exact'}`;
+  }
+  return call.fastProxyCandidate
+    ? 'tier unknown · Fast proxy candidate'
+    : 'tier unknown · normal throughput proxy';
+}
+
 export function cacheState(call: CacheStateInput): string {
   if (call.cachedPct < 25) return 'cold or weak cache';
   if (call.cachedPct < 50) return 'partial cache reuse';

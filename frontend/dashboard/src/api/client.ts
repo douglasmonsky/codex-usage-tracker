@@ -8,6 +8,7 @@ import {
 import { buildFindings, buildModelCosts, buildReports } from './modelInsights';
 import { buildOverviewSeriesFromDailyValues } from './overviewSeries';
 import { scopeSummaryFromBootPayload, summaryNumber } from './dashboardScopeSummary';
+import { usageServiceTierFields } from './serviceTier';
 import type { CallRow, ContextRuntime, DashboardBootPayload, DashboardModel, MetricCard, Series, ThreadRow, UsageRow, WeeklyWindow } from './types';
 import {
   loadAllUsagePayloadPaged,
@@ -537,13 +538,6 @@ export function usageRowToCall(row: UsageRow, index = 0): CallRow {
   const contextWindowPct = percentNumber(row.context_window_percent);
   const modelContextWindow = Number(row.model_context_window);
   const cumulativeTotalTokens = Number(row.cumulative_total_tokens);
-  const rawFast = row.fast;
-  const exactFast = rawFast === true || rawFast === 1
-    ? true
-    : rawFast === false || rawFast === 0
-      ? false
-      : null;
-
   return {
     id,
     threadKey: String(row.thread_key ?? ''),
@@ -562,7 +556,6 @@ export function usageRowToCall(row: UsageRow, index = 0): CallRow {
     uncachedInput,
     cachedPct,
     cost: Number(row.estimated_cost_usd ?? 0),
-    credits: Number(row.usage_credits ?? 0),
     duration: formatDuration(durationSeconds),
     durationSeconds,
     previousCallGap: formatDuration(previousCallGapSeconds),
@@ -571,14 +564,7 @@ export function usageRowToCall(row: UsageRow, index = 0): CallRow {
     initiator: String(row.call_initiator ?? 'unknown'),
     initiatorReason: String(row.call_initiator_reason ?? ''),
     initiatorConfidence: String(row.call_initiator_confidence ?? ''),
-    serviceTier: String(row.service_tier ?? ''),
-    fast: exactFast,
-    serviceTierSource: String(row.service_tier_source ?? ''),
-    serviceTierConfidence: String(row.service_tier_confidence ?? ''),
-    fastProxyCandidate: durationSeconds > 0 && totalTokens / Math.max(durationSeconds, 1) > 4_000,
-    standardUsageCredits: Number(row.standard_usage_credits ?? row.usage_credits ?? 0),
-    usageCreditMultiplier: Number(row.usage_credit_multiplier ?? 1),
-    usageCreditMultiplierSource: String(row.usage_credit_multiplier_source ?? ''),
+    ...usageServiceTierFields(row, durationSeconds, totalTokens),
     usageCreditConfidence: String(row.usage_credit_confidence ?? 'unknown'),
     usageCreditModel: String(row.usage_credit_model ?? ''),
     usageCreditSource: String(row.usage_credit_source ?? ''),

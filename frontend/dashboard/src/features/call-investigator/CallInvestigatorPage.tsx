@@ -7,7 +7,6 @@ import { enableContextApi, loadCallContext, type ContextRequestOptions } from '.
 import type { CallContextEntry, CallContextPayload, CallRow, ContextRuntime, DashboardModel } from '../../api/types';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
-import { serviceTierDetail } from '../calls/serviceTier';
 import { CallCacheDelta } from '../shared/CallCacheDelta';
 import { CallDecisionCard } from '../shared/CallDecisionCard';
 import { ContextAttributionModule } from '../shared/ContextAttributionModule';
@@ -15,7 +14,7 @@ import { ContextEntryMetadata } from '../shared/ContextEntryMetadata';
 import { CallSourceMetadata } from '../shared/CallSourceMetadata';
 import { TokenPricingBreakdown } from '../shared/TokenPricingBreakdown';
 import { ThreadCallTimeline } from '../shared/ThreadCallTimeline';
-import { cacheState, contextWindowLabel, sourceLine, summarizeTopCounts } from '../shared/callPresentation';
+import { cacheState, contextWindowLabel, serviceTierDetail, sourceLine, summarizeTopCounts } from '../shared/callPresentation';
 import { copyText } from '../shared/copyText';
 import { CallSignalPucks } from '../shared/tables';
 import {

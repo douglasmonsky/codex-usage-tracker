@@ -2,8 +2,8 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { useShellI18n } from '../../app/i18nContext';
 import type { CallRow, ThreadRow } from '../../api/types';
 import type { ColumnChoice } from '../../components/ColumnChooser';
-import { serviceTierLabel } from '../calls/serviceTier';
 import type { CsvColumn } from './exportCsv';
+import { serviceTierLabel } from './callPresentation';
 import { formatCompact, formatNumber, money, pct } from './format';
 
 export { callActionColumn, callInvestigatorRowLabel, threadActionColumn, threadInvestigatorRowLabel } from './tableActions';
