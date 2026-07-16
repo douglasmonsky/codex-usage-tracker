@@ -1,5 +1,7 @@
 import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, vi, waitFor, within } from './test-utils/appTestHarness';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { threadsForCurrentUrl } from './features/threads/ThreadsPage';
+import { ThreadsPage } from './features/threads/ThreadsPage';
 import { fixtureModel } from './test-fixtures/dashboardFixture';
 
 describe('React dashboard threads workspace', () => {
@@ -41,8 +43,7 @@ describe('React dashboard threads workspace', () => {
     render(<App />);
 
   expect(screen.getByText('Temas principales por puntuación de atención')).toBeInTheDocument();
-  expect(screen.getByRole('table', { name: 'Temas principales por puntuación de atención' })).toBeInTheDocument();
-  expect(screen.getByText('Siguiente acción')).toBeInTheDocument();
+  expect(screen.getByRole('treegrid', { name: 'Temas principales por puntuación de atención' })).toBeInTheDocument();
 });
 
   it('hydrates legacy detail-first threads URL state', async () => {
@@ -51,12 +52,10 @@ describe('React dashboard threads workspace', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
-    const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
-    expect(within(threadsTable).getByRole('columnheader', { name: 'Thread' })).toHaveClass('sticky-column');
-    expect(within(threadsTable).getByText('thread-9f3a').closest('td')).toHaveClass('sticky-column');
-    const firstThreadRow = within(threadsTable).getByText('thread-9f3a').closest('tr');
+    const threadsTable = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
+    const firstThreadRow = within(threadsTable).getByRole('row', { name: /Collapse calls for thread-9f3a/i });
     expect(firstThreadRow).not.toBeNull();
-    expect(firstThreadRow).toHaveAttribute('aria-selected', 'true');
+    expect(firstThreadRow).toHaveAttribute('aria-expanded', 'true');
 
     await waitFor(() => {
       const params = new URLSearchParams(window.location.search);
@@ -71,10 +70,10 @@ describe('React dashboard threads workspace', () => {
 
     render(<App />);
 
-    const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
-    const selectedThreadRow = within(threadsTable).getByText('thread-7c2b').closest('tr');
+    const threadsTable = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
+    const selectedThreadRow = within(threadsTable).getByRole('row', { name: /Collapse calls for thread-7c2b/i });
     expect(selectedThreadRow).not.toBeNull();
-    expect(selectedThreadRow).toHaveAttribute('aria-selected', 'true');
+    expect(selectedThreadRow).toHaveAttribute('aria-expanded', 'true');
 
     await waitFor(() => {
       const params = new URLSearchParams(window.location.search);
@@ -89,10 +88,10 @@ describe('React dashboard threads workspace', () => {
 
     render(<App />);
 
-    const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
-    const firstThreadRow = within(threadsTable).getByText('thread-9f3a').closest('tr');
+    const threadsTable = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
+    const firstThreadRow = within(threadsTable).getByRole('row', { name: /Collapse calls for thread-9f3a/i });
     expect(firstThreadRow).not.toBeNull();
-    expect(firstThreadRow).toHaveAttribute('aria-selected', 'true');
+    expect(firstThreadRow).toHaveAttribute('aria-expanded', 'true');
 
     await waitFor(() => {
       const params = new URLSearchParams(window.location.search);
@@ -105,7 +104,7 @@ describe('React dashboard threads workspace', () => {
     window.history.replaceState(null, '', '/?view=threads&model=o4-mini');
     render(<App />);
 
-    const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
+    const threadsTable = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
     expect(within(threadsTable).getByText('thread-7b2e91')).toBeInTheDocument();
     expect(within(threadsTable).getByText('thread-2f9e7d')).toBeInTheDocument();
     expect(within(threadsTable).queryByText('thread-9f3a')).not.toBeInTheDocument();
@@ -128,83 +127,134 @@ describe('React dashboard threads workspace', () => {
   expect(screen.getAllByText(/Exported \d+ calls/).length).toBeGreaterThan(0);
 });
 
-it('opens the full-page call investigator from selected thread calls', () => {
-    render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
-
-    expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
-    expect(screen.getByText('Thread Calls')).toBeInTheDocument();
-    const threadCallList = screen.getByText('Thread Calls').closest('.thread-call-list');
-    expect(threadCallList).not.toBeNull();
-    const firstCallRow = within(threadCallList as HTMLElement).getByText('codex-1 / high').closest('li');
-    expect(firstCallRow).not.toBeNull();
-    fireEvent.click(firstCallRow as HTMLElement);
-
-    expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
-    expect(screen.getByText('thread-9f3a1c / codex-1')).toBeInTheDocument();
-  expect(window.location.search).toContain('view=call');
-  expect(window.location.search).toContain('record=fixture-call-0');
-});
-
-it('opens full-page call investigator from thread leaderboard rows', () => {
+it('expands, switches, and collapses one thread inline', () => {
   render(<App />);
   fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+  const table = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
+  const first = within(table).getByRole('row', { name: /thread-9f3a/i });
+  const second = within(table).getByRole('row', { name: /thread-7c2b/i });
 
-  const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
-  fireEvent.click(within(threadsTable).getByRole('button', { name: /Open investigator for latest call in thread-9f3a/i }));
+  fireEvent.click(first);
+  expect(first).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('region', { name: /Calls for thread-9f3a/i })).toBeInTheDocument();
+  expect(window.location.search).toContain('thread=thread-9f3a');
 
-  expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
-  expect(screen.getByText('thread-9f3a1c / codex-1')).toBeInTheDocument();
-  expect(window.location.search).toContain('view=call');
-  expect(window.location.search).toContain('record=fixture-call-0');
-  expect(window.location.search).toContain('return=threads');
-  fireEvent.click(screen.getByRole('button', { name: /Back to Threads/i }));
-  expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
-  expect(window.location.search).toContain('view=threads');
-  expect(window.location.search).not.toContain('record=');
-  expect(window.location.search).not.toContain('return=');
+  fireEvent.click(second);
+  expect(second).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.queryByRole('region', { name: /Calls for thread-9f3a/i })).not.toBeInTheDocument();
+
+  fireEvent.click(second);
+  expect(screen.queryByRole('region', { name: /Calls for thread-7c2b/i })).not.toBeInTheDocument();
+  expect(new URLSearchParams(window.location.search).has('thread')).toBe(false);
 });
 
-it('expands thread evidence without leaving the thread leaderboard', () => {
+it('never opens a representative call from parent activation', () => {
   render(<App />);
   fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
-
-  const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
-  const row = within(threadsTable).getByText('thread-9f3a').closest('tr');
-  expect(row).not.toBeNull();
-fireEvent.click(row as HTMLTableRowElement);
-
+  const row = screen.getByRole('row', { name: /thread-9f3a/i });
+  fireEvent.doubleClick(row);
+  fireEvent.keyDown(row, { key: 'Enter' });
+  fireEvent.keyDown(row, { key: ' ' });
   expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
-  expect(screen.getByText('Thread Calls')).toBeInTheDocument();
-  expect(window.location.search).toContain('view=threads');
-  expect(window.location.search).not.toContain('record=');
+  expect(window.location.search).not.toContain('view=call');
 });
 
-it('copies call investigator links from thread row actions', async () => {
- const writeText = vi.fn().mockResolvedValue(undefined);
- Object.defineProperty(navigator, 'clipboard', {
- configurable: true,
- value: { writeText },
- });
+it('isolates progressive thread call pages and retries a partial result', async () => {
+  let resolveOldThread: ((response: Response) => void) | undefined;
+  let newThreadPageTwoAttempts = 0;
+  const callRow = (id: string, thread: string, model: string) => ({
+    record_id: id,
+    call_started_at: '2026-07-01T12:00:00Z',
+    thread_name: thread,
+    thread_key: thread,
+    model,
+    effort: 'high',
+    input_tokens: 100,
+    cached_input_tokens: 20,
+    output_tokens: 10,
+    total_tokens: 110,
+  });
+  const callsPage = (thread: string, rows: object[], offset: number, hasMore: boolean) => new Response(JSON.stringify({
+    schema: 'codex-usage-tracker-thread-calls-v1',
+    thread_key: thread,
+    rows,
+    row_count: rows.length,
+    total_matched_rows: 3,
+    limit: 100,
+    offset,
+    has_more: hasMore,
+    next_offset: hasMore ? 2 : null,
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  const summary = (thread: string) => ({
+    thread_key: thread,
+    thread_label: thread,
+    first_event_timestamp: '2026-07-01T12:00:00Z',
+    latest_event_timestamp: '2026-07-01T12:02:00Z',
+    latest_record_id: `${thread}-latest`,
+    call_count: 3,
+    session_count: 1,
+    input_tokens: 300,
+    cached_input_tokens: 60,
+    uncached_input_tokens: 240,
+    output_tokens: 30,
+    reasoning_output_tokens: 0,
+    total_tokens: 330,
+    estimated_cost_usd: 0.03,
+    usage_credits: 0,
+    avg_cache_ratio: 0.2,
+    max_context_window_percent: 0.2,
+    max_recommendation_score: 0,
+    primary_recommendation: '',
+    call_initiator_summary: 'user x3',
+    archived_call_count: 0,
+    updated_at: '2026-07-01T12:02:00Z',
+  });
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = new URL(String(input), window.location.origin);
+    if (url.pathname === '/api/threads') {
+      return new Response(JSON.stringify({
+        schema: 'codex-usage-tracker-threads-v1', rows: [summary('old-thread'), summary('new-thread')],
+        row_count: 2, total_matched_rows: 2, limit: 250, offset: 0, has_more: false, next_offset: null,
+        include_archived: false,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    const thread = url.searchParams.get('thread_key');
+    const offset = Number(url.searchParams.get('offset'));
+    if (thread === 'old-thread') {
+      return new Promise<Response>(resolve => { resolveOldThread = resolve; });
+    }
+    if (offset === 0) {
+      return callsPage('new-thread', [callRow('new-1', 'new-thread', 'new-model-1'), callRow('boundary', 'new-thread', 'new-model-boundary')], 0, true);
+    }
+    newThreadPageTwoAttempts += 1;
+    if (newThreadPageTwoAttempts <= 2) return new Response('temporary failure', { status: 500 });
+    return callsPage('new-thread', [callRow('boundary', 'new-thread', 'new-model-boundary'), callRow('new-3', 'new-thread', 'new-model-3')], 2, false);
+  }));
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  window.history.replaceState(null, '', '/?view=threads&thread=old-thread');
+  render(<QueryClientProvider client={queryClient}><ThreadsPage
+    model={{ ...fixtureModel, contextRuntime: { apiToken: 'thread-token', contextApiEnabled: false, fileMode: false } }}
+    globalQuery="" onOpenInvestigator={vi.fn()} onCopyCallLink={vi.fn()}
+    contextRuntime={{ apiToken: 'thread-token', contextApiEnabled: false, fileMode: false }}
+    focusedEndpointsEnabled onNavigateView={vi.fn()}
+  /></QueryClientProvider>);
 
- render(<App />);
- fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+  const grid = await screen.findByRole('treegrid', { name: 'Thread leaderboard' });
+  await within(grid).findByRole('row', { name: /Collapse calls for old-thread/i });
+  fireEvent.click(await within(grid).findByRole('row', { name: /new-thread/i }));
+  await screen.findByText(/Partial result:/i, {}, { timeout: 3_000 });
+  expect(screen.getByText('2 of 3 calls loaded')).toBeInTheDocument();
+  resolveOldThread?.(callsPage('old-thread', [callRow('old-1', 'old-thread', 'old-model')], 0, false));
+  await waitFor(() => expect(screen.queryByText('old-model / high')).not.toBeInTheDocument());
+  expect(screen.getAllByText('new-model-boundary / high')).toHaveLength(1);
 
- fireEvent.click(screen.getByRole('button', { name: /Copy link for latest call in thread-9f3a/i }));
- await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
- const tableUrl = new URL(writeText.mock.calls[0][0]);
- expect(tableUrl.searchParams.get('view')).toBe('call');
- expect(tableUrl.searchParams.get('return')).toBe('threads');
- expect(tableUrl.searchParams.get('record')).toBe('fixture-call-0');
-
- fireEvent.click(screen.getByRole('button', { name: /Copy link for thread call thread-9f3a1c codex-1/i }));
- await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
- const timelineUrl = new URL(writeText.mock.calls[1][0]);
- expect(timelineUrl.searchParams.get('return')).toBe('threads');
- expect(timelineUrl.searchParams.get('record')).toBe('fixture-call-0');
+  fireEvent.click(screen.getByRole('button', { name: 'Retry loading thread calls' }));
+  await screen.findByText('3 of 3 calls loaded');
+  expect(screen.getAllByText('new-model-boundary / high')).toHaveLength(1);
+  expect(screen.getByText('new-model-3 / high')).toBeInTheDocument();
 });
 
-it('pages and sorts selected thread calls', () => {
+it('shows and sorts all selected thread calls inline', () => {
   const tokenPattern = [700, 10, 600, 20, 500, 30, 400];
   window.__CODEX_USAGE_BOOT__ = {
     loaded_row_count: 7,
@@ -227,30 +277,19 @@ it('pages and sorts selected thread calls', () => {
 
   render(<App />);
   fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
-  const threadCalls = screen.getByText('Thread Calls').closest('.thread-call-list');
-  expect(threadCalls).not.toBeNull();
-  const threadCallList = within(threadCalls as HTMLElement);
+  fireEvent.click(screen.getByRole('row', { name: /thread-page-demo/i }));
+  const threadCallList = within(screen.getByRole('region', { name: /Calls for thread-page-demo/i }));
 
-  expect(threadCallList.getByText('5 of 7 loaded')).toBeInTheDocument();
-  expect(threadCallList.queryByText('model-0 / high')).not.toBeInTheDocument();
-fireEvent.click(threadCallList.getByRole('button', { name: /Show 2 more calls/i }));
-    expect(threadCallList.getByText('7 of 7 loaded')).toBeInTheDocument();
-    expect(threadCallList.getByText('model-0 / high')).toBeInTheDocument();
-    expect(threadCallList.getAllByText('CACHE')[0]).toHaveAttribute('title', 'Cache Risk');
-    expect(threadCallList.getByText('Prev -')).toBeInTheDocument();
-    expect(threadCallList.getAllByText('user initiated').length).toBeGreaterThan(0);
+  expect(threadCallList.getByText('7 of 7 calls loaded')).toBeInTheDocument();
+  expect(screen.getByText('model-0 / high')).toBeInTheDocument();
 
 fireEvent.change(threadCallList.getByLabelText('Sort thread calls'), { target: { value: 'tokens' } });
-expect(threadCallList.getByText('5 of 7 loaded')).toBeInTheDocument();
-expect(threadCallList.getByText('model-0 / high')).toBeInTheDocument();
-expect(threadCallList.getByText('2 more available')).toBeInTheDocument();
 expect(threadCallList.getByLabelText('Sort thread calls direction')).toHaveValue('desc');
 fireEvent.change(threadCallList.getByLabelText('Sort thread calls direction'), { target: { value: 'asc' } });
-expect(threadCallList.getByText('model-1 / high')).toBeInTheDocument();
-expect(threadCallList.queryByText('model-0 / high')).not.toBeInTheDocument();
+expect(screen.getByText('model-1 / high')).toBeInTheDocument();
 });
 
-it('hydrates and syncs selected thread call sort and page URL state', async () => {
+it('hydrates and syncs selected thread call sort URL state', async () => {
   const tokenPattern = [700, 10, 600, 20, 500, 30, 400];
   window.__CODEX_USAGE_BOOT__ = {
     loaded_row_count: 7,
@@ -271,25 +310,22 @@ it('hydrates and syncs selected thread call sort and page URL state', async () =
 
   render(<App />);
 
-  const threadCalls = screen.getByText('Thread Calls').closest('.thread-call-list');
-  expect(threadCalls).not.toBeNull();
-  const threadCallList = within(threadCalls as HTMLElement);
+  const threadCallList = within(screen.getByRole('region', { name: /Calls for thread-page-demo/i }));
 
   expect(threadCallList.getByLabelText('Sort thread calls')).toHaveValue('tokens');
-  expect(threadCallList.getByText('7 of 7 loaded')).toBeInTheDocument();
-  expect(threadCallList.getByText('model-0 / high')).toBeInTheDocument();
+  expect(threadCallList.getByText('7 of 7 calls loaded')).toBeInTheDocument();
+  expect(screen.getByText('model-0 / high')).toBeInTheDocument();
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
     expect(params.get('thread_call_sort')).toBe('tokens');
-    expect(params.get('thread_call_page')).toBe('2');
+    expect(params.get('thread_call_page')).toBeNull();
   });
 
   fireEvent.change(threadCallList.getByLabelText('Sort thread calls'), { target: { value: 'cost' } });
 
   expect(threadCallList.getByLabelText('Sort thread calls')).toHaveValue('cost');
-  expect(threadCallList.getByText('5 of 7 loaded')).toBeInTheDocument();
-  expect(threadCallList.getByText('model-6 / high')).toBeInTheDocument();
+  expect(screen.getByText('model-6 / high')).toBeInTheDocument();
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
@@ -297,11 +333,6 @@ it('hydrates and syncs selected thread call sort and page URL state', async () =
     expect(params.get('thread_call_page')).toBeNull();
   });
 
-  fireEvent.click(threadCallList.getByRole('button', { name: /Show 2 more calls/i }));
-
-  await waitFor(() => {
-    expect(new URLSearchParams(window.location.search).get('thread_call_page')).toBe('2');
-  });
 });
 
 it('shows selected thread lifecycle and relationship signals from aggregate calls', () => {
@@ -381,64 +412,11 @@ window.history.replaceState(null, '', '/?view=threads&thread=thread-lifecycle-de
 
 render(<App />);
 
-const threadStatus = screen.getByText('Thread Status').closest('.thread-status-card');
-expect(threadStatus).not.toBeNull();
-const threadStatusPanel = within(threadStatus as HTMLElement);
-expect(threadStatusPanel.getByText('Pricing status')).toBeInTheDocument();
-expect(threadStatusPanel.getByText('Credit status')).toBeInTheDocument();
-expect(threadStatusPanel.getAllByText('Mixed')).toHaveLength(2);
-expect(threadStatusPanel.getByText('Cache ratio')).toBeInTheDocument();
-expect(threadStatusPanel.getByText('Max context use')).toBeInTheDocument();
-expect(threadStatusPanel.getByText('Next action')).toBeInTheDocument();
-expect(threadStatusPanel.getAllByText('Review context growth').length).toBeGreaterThan(0);
-const threadImpact = screen.getByText('Thread Impact').closest('.thread-impact-card');
-expect(threadImpact).not.toBeNull();
-const threadImpactPanel = within(threadImpact as HTMLElement);
-expect(threadImpactPanel.getByText('Codex credits')).toBeInTheDocument();
-expect(threadImpactPanel.getByText('Allowance impact')).toBeInTheDocument();
-expect(threadImpactPanel.getByText('Attention score')).toBeInTheDocument();
-expect(threadImpactPanel.getByText('Cost per call')).toBeInTheDocument();
-expect(threadImpactPanel.getByText('3.1 credits (Mixed)')).toBeInTheDocument();
-expect(threadImpactPanel.getAllByText('3.1 credits counted').length).toBeGreaterThan(0);
-expect(threadImpactPanel.getByText(/^\d+$/)).toBeInTheDocument();
-expect(threadImpactPanel.getByText('$0.42')).toBeInTheDocument();
-expect(screen.getByText('Context 75.0%')).toBeInTheDocument();
-expect(screen.getByText('Best-guess estimate')).toBeInTheDocument();
-expect(screen.getAllByText('Configured price').length).toBeGreaterThan(0);
-expect(screen.getByText('30s')).toBeInTheDocument();
-expect(screen.getByText('2.4 credits')).toBeInTheDocument();
-
-  expect(screen.getByText('Thread Lifecycle')).toBeInTheDocument();
-  expect(screen.getByText('Subagent before spike')).toBeInTheDocument();
-  expect(screen.getByText('First expensive turn')).toBeInTheDocument();
-  expect(screen.getByText(/Call 3/)).toBeInTheDocument();
-  expect(screen.getByText('Largest token jump')).toBeInTheDocument();
-expect(screen.getByText(/1\.2K at/)).toBeInTheDocument();
-expect(screen.getByText('Cache trend')).toBeInTheDocument();
-expect(screen.getByText('-70.0%')).toBeInTheDocument();
-expect(screen.getByText('Context trend')).toBeInTheDocument();
-expect(screen.getByText('+65.0%')).toBeInTheDocument();
-const relationships = screen.getByText('Relationships').closest('.thread-relationships-card');
-expect(relationships).not.toBeNull();
-const relationshipPanel = within(relationships as HTMLElement);
-expect(relationshipPanel.getByText('parent-thread')).toBeInTheDocument();
-expect(relationshipPanel.getByText('Spawned from')).toBeInTheDocument();
-expect(relationshipPanel.getByText('Subagent calls')).toBeInTheDocument();
-expect(relationshipPanel.getByText('Auto-review calls')).toBeInTheDocument();
-expect(relationshipPanel.getByText('Attached calls')).toBeInTheDocument();
-expect(relationshipPanel.getByText('Spawned threads')).toBeInTheDocument();
-expect(relationshipPanel.getByText('Spawned child calls')).toBeInTheDocument();
-expect(relationshipPanel.getAllByText('1')).toHaveLength(5);
-const threadFields = screen.getByText('Thread Fields').closest('.thread-secondary-card');
-expect(threadFields).not.toBeNull();
-const threadFieldPanel = within(threadFields as HTMLElement);
-expect(threadFieldPanel.getByText('Latest activity')).toBeInTheDocument();
-expect(threadFieldPanel.getByText('Total tokens')).toBeInTheDocument();
-expect(threadFieldPanel.getByText('Loaded calls')).toBeInTheDocument();
-expect(threadFieldPanel.getByText('Efficiency signals')).toBeInTheDocument();
-expect(threadFieldPanel.getByText('Model mix')).toBeInTheDocument();
-expect(threadFieldPanel.getByText('Effort mix')).toBeInTheDocument();
-expect(threadFieldPanel.getByText('1 signals')).toBeInTheDocument();
+expect(screen.getByRole('region', { name: /Calls for thread-lifecycle-demo/i })).toBeInTheDocument();
+expect(screen.getByText('3 of 3 calls loaded')).toBeInTheDocument();
+fireEvent.click(screen.getByRole('button', { name: 'Lifecycle' }));
+expect(screen.getByRole('button', { name: 'Lifecycle' })).toHaveAttribute('aria-pressed', 'true');
+expect(screen.queryByRole('treegrid', { name: 'Thread leaderboard' })).not.toBeInTheDocument();
 });
 
 it('hydrates and syncs selected thread URL state', () => {
@@ -449,7 +427,7 @@ it('hydrates and syncs selected thread URL state', () => {
     expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
     expect(screen.getByText('No loaded aggregate call rows belong to this thread.')).toBeInTheDocument();
 
-const row = within(screen.getByRole('table', { name: 'Thread leaderboard' })).getByText('thread-9f3a').closest('tr');
+const row = within(screen.getByRole('treegrid', { name: 'Thread leaderboard' })).getByText('thread-9f3a').closest('[role="row"]');
 expect(row).not.toBeNull();
     fireEvent.click(row as HTMLTableRowElement);
 
@@ -487,7 +465,7 @@ it('hydrates and syncs thread table sort URL state', async () => {
 
   render(<App />);
 
-  const table = screen.getByRole('table', { name: 'Thread leaderboard' });
+  const table = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
   const rows = within(table).getAllByRole('row');
   expect(rows[1]).toHaveTextContent('thread-0e16');
 
