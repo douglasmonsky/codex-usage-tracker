@@ -13,6 +13,7 @@ import { ChevronsRight } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 import styles from './EvidenceGrid.module.css';
+import { EvidenceGridControls } from './EvidenceGridControls';
 import type { EvidenceGridDensity } from './useEvidenceGridPreferences';
 
 type EvidenceGridMobilePresentation<TData> = {
@@ -99,9 +100,7 @@ export function EvidenceGrid<TData>({
 }: EvidenceGridProps<TData>) {
   const isMobile = useMediaQuery(mobileBreakpoint);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const columnChooserRef = useRef<HTMLDivElement>(null);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [columnsOpen, setColumnsOpen] = useState(false);
   const table = useReactTable({
     columns,
     data,
@@ -153,25 +152,6 @@ export function EvidenceGrid<TData>({
     };
   }, [columns, data.length, isMobile, columnVisibility]);
 
-  useEffect(() => {
-    if (!columnsOpen) return undefined;
-    const close = (event: KeyboardEvent | PointerEvent) => {
-      if (event instanceof KeyboardEvent && event.key === 'Escape') {
-        setColumnsOpen(false);
-        return;
-      }
-      if (event instanceof PointerEvent && !columnChooserRef.current?.contains(event.target as Node)) {
-        setColumnsOpen(false);
-      }
-    };
-    document.addEventListener('keydown', close);
-    document.addEventListener('pointerdown', close);
-    return () => {
-      document.removeEventListener('keydown', close);
-      document.removeEventListener('pointerdown', close);
-    };
-  }, [columnsOpen]);
-
   const lockedColumns = new Set([identityColumnId, ...lockedColumnIds]);
 
   function clickRow(row: TData) {
@@ -205,36 +185,14 @@ export function EvidenceGrid<TData>({
   }
 
   const toolbar = (
-    <div className={styles.toolbar} aria-label={`${ariaLabel} display controls`}>
-      <div className={styles.densityControl} role="group" aria-label="Density">
-        <button type="button" aria-pressed={density === 'compact'} onClick={() => onDensityChange('compact')}>Dense</button>
-        <button type="button" aria-pressed={density === 'comfortable'} onClick={() => onDensityChange('comfortable')}>Roomy</button>
-      </div>
-      <div
-        className={styles.columnChooser}
-        ref={columnChooserRef}
-      >
-        <button type="button" aria-expanded={columnsOpen} onClick={() => setColumnsOpen(current => !current)}>Columns</button>
-        {columnsOpen ? <fieldset>
-          <legend>Visible columns</legend>
-          {table.getAllLeafColumns().map(column => {
-            const locked = lockedColumns.has(column.id);
-            return (
-              <label key={column.id}>
-                <input
-                  type="checkbox"
-                  checked={locked || column.getIsVisible()}
-                  disabled={locked}
-                  onChange={column.getToggleVisibilityHandler()}
-                />
-                {headerText(column.columnDef.header, column.id)}
-              </label>
-            );
-          })}
-        </fieldset> : null}
-      </div>
-      <button type="button" className={styles.restoreButton} onClick={onRestoreDefaults}>Restore defaults</button>
-    </div>
+    <EvidenceGridControls
+      ariaLabel={ariaLabel}
+      table={table}
+      lockedColumnIds={lockedColumns}
+      density={density}
+      onDensityChange={onDensityChange}
+      onRestoreDefaults={onRestoreDefaults}
+    />
   );
 
   if (!rows.length && isMobile) {
