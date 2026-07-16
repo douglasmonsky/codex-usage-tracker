@@ -48,15 +48,29 @@ it('toggles one inline thread without activating an investigator', () => {
   const onToggleThread = vi.fn();
   const onOpenInvestigator = vi.fn();
   renderGrid({ expandedThreadName: null, onToggleThread, onOpenInvestigator });
-  const row = screen.getByRole('row', { name: new RegExp(fixtureThread.name, 'i') });
+  const row = screen.getByRole('row', { name: `Expand calls for ${fixtureThread.name}` });
 
   fireEvent.click(row);
-  fireEvent.doubleClick(row);
   fireEvent.keyDown(row, { key: 'Enter' });
   fireEvent.keyDown(row, { key: ' ' });
 
-  expect(onToggleThread).toHaveBeenCalledTimes(4);
+  expect(onToggleThread).toHaveBeenCalledTimes(3);
   expect(onToggleThread).toHaveBeenLastCalledWith(fixtureThread.name);
+  expect(onOpenInvestigator).not.toHaveBeenCalled();
+});
+
+it('treats a real browser double-click sequence as one logical toggle', () => {
+  const onToggleThread = vi.fn();
+  const onOpenInvestigator = vi.fn();
+  renderGrid({ onToggleThread, onOpenInvestigator });
+  const row = screen.getByRole('row', { name: `Expand calls for ${fixtureThread.name}` });
+
+  fireEvent.click(row, { detail: 1 });
+  fireEvent.click(row, { detail: 2 });
+  fireEvent.doubleClick(row, { detail: 2 });
+
+  expect(onToggleThread).toHaveBeenCalledOnce();
+  expect(onToggleThread).toHaveBeenCalledWith(fixtureThread.name);
   expect(onOpenInvestigator).not.toHaveBeenCalled();
 });
 
@@ -70,12 +84,39 @@ it('renders an associated expanded region and explicit child actions', () => {
     onCopyCallLink,
   });
 
-  expect(screen.getByRole('row', { name: new RegExp(fixtureThread.name, 'i') })).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` })).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` })).toHaveAttribute('aria-level', '1');
+  expect(screen.getByRole('treegrid', { name: 'Thread leaderboard' })).toBeInTheDocument();
   expect(screen.getByRole('region', { name: `Calls for ${fixtureThread.name}` })).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: `Calls for ${fixtureThread.name}` })).toHaveAttribute(
+    'aria-describedby',
+    screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` }).id,
+  );
   fireEvent.click(screen.getByRole('button', { name: /Open investigator for thread call/i }));
   fireEvent.click(screen.getByRole('button', { name: /Copy link for thread call/i }));
   expect(onOpenInvestigator).toHaveBeenCalledWith(fixtureCall.id);
   expect(onCopyCallLink).toHaveBeenCalledWith(fixtureCall.id);
+});
+
+it('uses density-specific estimates and rendered spacing for parents and calls', () => {
+  const { rerender } = render(<ThreadAccordionGrid
+    {...defaultProps}
+    expandedThreadName={fixtureThread.name}
+    expandedCalls={[fixtureCall]}
+  />);
+  const compactParent = screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` });
+  const compactCall = screen.getByRole('button', { name: /Open investigator for thread call/i }).closest('[data-accordion-item]');
+  expect(compactParent).toHaveStyle({ minHeight: '44px' });
+  expect(compactCall).toHaveStyle({ minHeight: '96px' });
+
+  rerender(<ThreadAccordionGrid
+    {...defaultProps}
+    preferences={{ ...defaultProps.preferences, density: 'comfortable' }}
+    expandedThreadName={fixtureThread.name}
+    expandedCalls={[fixtureCall]}
+  />);
+  expect(screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` })).toHaveStyle({ minHeight: '56px' });
+  expect(screen.getByRole('button', { name: /Open investigator for thread call/i }).closest('[data-accordion-item]')).toHaveStyle({ minHeight: '128px' });
 });
 
 it('keeps a thousand child calls bounded to one virtual window', () => {
@@ -125,16 +166,16 @@ it('retains focus on the parent while its inline region opens', () => {
     />;
   }
   render(<FocusHarness />);
-  const row = screen.getByRole('row', { name: new RegExp(fixtureThread.name, 'i') });
+  const row = screen.getByRole('row', { name: `Expand calls for ${fixtureThread.name}` });
   row.focus();
   fireEvent.keyDown(row, { key: 'Enter' });
 
-  expect(screen.getByRole('row', { name: new RegExp(fixtureThread.name, 'i') })).toHaveFocus();
+  expect(screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` })).toHaveFocus();
 });
 
 it('keeps complete call copy in the stacked narrow-screen structure', () => {
   renderGrid({ expandedThreadName: fixtureThread.name, expandedCalls: [fixtureCall] });
-  const region = screen.getByRole('region', { name: `Calls for ${fixtureThread.name}` });
+  const region = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
 
   expect(region).toHaveTextContent(fixtureCall.model);
   expect(region).toHaveTextContent(fixtureCall.effort);
