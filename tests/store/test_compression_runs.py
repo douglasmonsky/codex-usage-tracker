@@ -28,7 +28,7 @@ from codex_usage_tracker.store.compression_runs import (
     update_compression_run,
 )
 from codex_usage_tracker.store.connection import connect
-from codex_usage_tracker.store.schema import init_db
+from codex_usage_tracker.store.schema import SCHEMA_VERSION, init_db
 
 
 class CacheKey(TypedDict):
@@ -171,7 +171,7 @@ def test_candidate_record_metadata_migration_backfills_existing_claims(
         conn.execute("PRAGMA user_version = 18")
     with connect(db_path) as conn:
         init_db(conn)
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 29
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     with connect(db_path) as conn:
         conn.execute("DELETE FROM usage_events WHERE record_id = ?", ("record-cmp_old",))
 
