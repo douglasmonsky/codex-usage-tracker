@@ -51,3 +51,7 @@ def test_usage_event_schema_matches_persisted_row_shape() -> None:
 
     assert tuple(EVENT_COLUMNS) == USAGE_EVENT_COLUMN_NAMES
     assert tuple(event.to_row().keys()) == USAGE_EVENT_COLUMN_NAMES
+    assert event.to_row()["service_tier"] is None
+    assert event.to_row()["fast"] is None
+    assert event.to_row()["service_tier_source"] is None
+    assert event.to_row()["service_tier_confidence"] is None

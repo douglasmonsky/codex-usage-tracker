@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import codex_usage_tracker.store.allowance_schema as allowance_schema
 import codex_usage_tracker.store.compression_schema as compression_schema
 import codex_usage_tracker.store.deduplication_schema as deduplication_schema
+import codex_usage_tracker.store.otel_schema as otel_schema
 import codex_usage_tracker.store.recommendation_schema as recommendation_schema
 import codex_usage_tracker.store.schema_query_indexes as schema_query_indexes
 from codex_usage_tracker.core.schema import (
@@ -18,7 +19,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 29
+SCHEMA_VERSION = 30
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -39,6 +40,7 @@ MIGRATION_NAMES = {
     **schema_query_indexes.MIGRATION_NAMES,
     **deduplication_schema.MIGRATION_NAMES,
     **allowance_schema.MIGRATION_NAMES,
+    **otel_schema.MIGRATION_NAMES,
 }
 CALL_ORIGIN_REPAIR_COLUMNS: dict[str, str] = dict.fromkeys(
     ("call_initiator", "call_initiator_reason", "call_initiator_confidence"), "TEXT"
@@ -116,6 +118,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (27, allowance_schema.migrate_allowance_intelligence_v2),
         (28, allowance_schema.migrate_allowance_query_indexes_v3),
         (29, allowance_schema.add_allowance_plan_provenance),
+        (30, otel_schema.migrate_otel_completion_tiers),
     )
 
 
