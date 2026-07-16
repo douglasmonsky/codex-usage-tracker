@@ -16,6 +16,10 @@ from codex_usage_tracker.store.content_index import (
 )
 
 _SOURCE_FILE_SQL_BATCH_SIZE = 400
+OTEL_ENRICHMENT_COLUMNS = frozenset(
+    {"service_tier", "fast", "service_tier_source", "service_tier_confidence"}
+)
+OtelEnrichment = tuple[object | None, object | None, object | None, object | None]
 
 
 def source_file_strings(replace_source_files: Iterable[Path] | None) -> list[str]:
@@ -36,6 +40,75 @@ def delete_usage_events_for_source_files(
         _delete_source_batch(conn, source_batch)
     if sync_content_fts:
         _rebuild_content_fts(conn)
+
+
+def capture_otel_enrichment_for_source_files(
+    conn: sqlite3.Connection,
+    source_files_to_replace: list[str],
+) -> dict[str, OtelEnrichment]:
+    """Capture one internally consistent non-null tier tuple per affected group."""
+
+    group_ids: set[str] = set()
+    for source_batch in _source_file_batches(source_files_to_replace):
+        placeholders = ", ".join("?" for _source in source_batch)
+        rows = conn.execute(
+            f"""
+            SELECT DISTINCT coalesce(nullif(canonical_record_id, ''), record_id) AS group_id
+            FROM usage_events
+            WHERE source_file IN ({placeholders})
+            """,  # nosec B608 - generated placeholders
+            source_batch,
+        ).fetchall()
+        group_ids.update(str(row["group_id"]) for row in rows)
+
+    tuples_by_group: dict[str, set[OtelEnrichment]] = {}
+    for group_batch in _value_batches(sorted(group_ids)):
+        placeholders = ", ".join("?" for _group in group_batch)
+        rows = conn.execute(
+            f"""
+            SELECT coalesce(nullif(canonical_record_id, ''), record_id) AS group_id,
+                   service_tier, fast, service_tier_source, service_tier_confidence
+            FROM usage_events
+            WHERE coalesce(nullif(canonical_record_id, ''), record_id) IN ({placeholders})
+            """,  # nosec B608 - generated placeholders
+            group_batch,
+        ).fetchall()
+        for row in rows:
+            enrichment: OtelEnrichment = (
+                row["service_tier"],
+                row["fast"],
+                row["service_tier_source"],
+                row["service_tier_confidence"],
+            )
+            tuples_by_group.setdefault(str(row["group_id"]), set()).add(enrichment)
+
+    captured: dict[str, OtelEnrichment] = {}
+    for group_id, enrichments in tuples_by_group.items():
+        if len(enrichments) != 1:
+            continue
+        enrichment = next(iter(enrichments))
+        if any(value is not None for value in enrichment):
+            captured[group_id] = enrichment
+    return captured
+
+
+def restore_otel_enrichment(
+    conn: sqlite3.Connection,
+    captured: Mapping[str, OtelEnrichment],
+) -> None:
+    """Restore captured tiers to reparsed clones without overwriting fresh values."""
+
+    conn.executemany(
+        """
+        UPDATE usage_events
+        SET service_tier = coalesce(service_tier, ?),
+            fast = coalesce(fast, ?),
+            service_tier_source = coalesce(service_tier_source, ?),
+            service_tier_confidence = coalesce(service_tier_confidence, ?)
+        WHERE coalesce(nullif(canonical_record_id, ''), record_id) = ?
+        """,
+        [(*enrichment, group_id) for group_id, enrichment in captured.items()],
+    )
 
 
 def thread_keys_for_source_files(
@@ -106,6 +179,11 @@ def _delete_source_batch(conn: sqlite3.Connection, source_batch: list[str]) -> N
 def _source_file_batches(source_files: list[str]) -> Iterator[list[str]]:
     for start in range(0, len(source_files), _SOURCE_FILE_SQL_BATCH_SIZE):
         yield source_files[start : start + _SOURCE_FILE_SQL_BATCH_SIZE]
+
+
+def _value_batches(values: list[str]) -> Iterator[list[str]]:
+    for start in range(0, len(values), _SOURCE_FILE_SQL_BATCH_SIZE):
+        yield values[start : start + _SOURCE_FILE_SQL_BATCH_SIZE]
 
 
 def _usage_row_value(

@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.schema import init_db
 
@@ -89,6 +90,73 @@ def synthetic_standard_completion(conversation_id: str, input_tokens: int) -> st
             tokens=(input_tokens, 0, 20, 5),
             service_tier=None,
         )
+    )
+
+
+def synthetic_usage_event(
+    record_id: str,
+    conversation_id: str,
+    tokens: tuple[int, int, int, int],
+    *,
+    canonical: str = "canonical-a",
+    model: str = "gpt-5.6-sol",
+    effort: str = "high",
+    service_tier: str | None = None,
+    fast: int | None = None,
+    duplicate: int = 0,
+) -> UsageEvent:
+    input_tokens, cached_tokens, output_tokens, reasoning_tokens = tokens
+    total_tokens = input_tokens + output_tokens
+    return UsageEvent(
+        record_id=record_id,
+        session_id=conversation_id,
+        thread_name="Synthetic thread",
+        session_updated_at="2026-07-16T00:00:00Z",
+        event_timestamp="2026-07-16T00:00:00Z",
+        source_file="/synthetic/session.jsonl",
+        line_number=1,
+        turn_id="synthetic-turn",
+        turn_timestamp="2026-07-16T00:00:00Z",
+        cwd="/synthetic/project",
+        model=model,
+        effort=effort,
+        current_date="2026-07-16",
+        timezone="UTC",
+        call_initiator="user",
+        call_initiator_reason="user_message",
+        call_initiator_confidence="high",
+        is_archived=0,
+        thread_key="thread:Synthetic",
+        thread_call_index=None,
+        previous_record_id=None,
+        next_record_id=None,
+        thread_source="user",
+        subagent_type=None,
+        agent_role=None,
+        agent_nickname=None,
+        parent_session_id=None,
+        parent_thread_name=None,
+        parent_session_updated_at=None,
+        model_context_window=258_400,
+        input_tokens=input_tokens,
+        cached_input_tokens=cached_tokens,
+        output_tokens=output_tokens,
+        reasoning_output_tokens=reasoning_tokens,
+        total_tokens=total_tokens,
+        cumulative_input_tokens=input_tokens,
+        cumulative_cached_input_tokens=cached_tokens,
+        cumulative_output_tokens=output_tokens,
+        cumulative_reasoning_output_tokens=reasoning_tokens,
+        cumulative_total_tokens=total_tokens,
+        usage_fingerprint=f"synthetic-fingerprint-{canonical}",
+        canonical_record_id=canonical,
+        is_duplicate=duplicate,
+        duplicate_reason="copied_usage_fingerprint" if duplicate else None,
+        service_tier=service_tier
+        or ("fast" if fast == 1 else "standard" if fast == 0 else None),
+        fast=fast,
+        service_tier_source="otel_response_completed" if fast is not None else None,
+        service_tier_confidence="exact" if fast is not None else None,
     )
 
 

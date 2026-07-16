@@ -105,7 +105,16 @@ from codex_usage_tracker.store.source_records import (
     sync_source_records,
 )
 from codex_usage_tracker.store.source_replacement import (
+    OTEL_ENRICHMENT_COLUMNS,
+)
+from codex_usage_tracker.store.source_replacement import (
+    capture_otel_enrichment_for_source_files as _capture_otel_enrichment_for_source_files,
+)
+from codex_usage_tracker.store.source_replacement import (
     delete_usage_events_for_source_files as _delete_usage_events_for_source_files,
+)
+from codex_usage_tracker.store.source_replacement import (
+    restore_otel_enrichment as _restore_otel_enrichment,
 )
 from codex_usage_tracker.store.source_replacement import (
     source_file_strings as _source_file_strings,
@@ -571,6 +580,9 @@ def _upsert_usage_events_in_connection(
     source_files_to_replace = _source_file_strings(replace_source_files)
     affected_thread_keys = _thread_keys_for_source_files(conn, source_files_to_replace)
     replaced_fingerprints = fingerprints_for_source_files(conn, source_files_to_replace)
+    preserved_otel_enrichment = _capture_otel_enrichment_for_source_files(
+        conn, source_files_to_replace
+    )
     _delete_usage_events_for_source_files(
         conn,
         source_files_to_replace,
@@ -603,6 +615,7 @@ def _upsert_usage_events_in_connection(
     _delete_diagnostic_facts_for_record_ids(conn, inserted_record_ids)
     with _deferred_usage_event_indexes(conn, enabled=defer_usage_indexes):
         _insert_usage_event_rows(conn, rows)
+    _restore_otel_enrichment(conn, preserved_otel_enrichment)
     if maintain_allowance_observations:
         sync_allowance_observations_for_record_ids(conn, record_ids)
     if maintain_source_records:
@@ -693,7 +706,11 @@ def _usage_event_record_ids(rows: list[dict[str, object]]) -> list[str]:
 def _usage_event_upsert_sql() -> str:
     placeholders = ", ".join("?" for _column in EVENT_COLUMNS)
     update_clause = ", ".join(
-        f"{column}=excluded.{column}" for column in EVENT_COLUMNS if column != "record_id"
+        f"{column}=COALESCE(usage_events.{column}, excluded.{column})"
+        if column in OTEL_ENRICHMENT_COLUMNS
+        else f"{column}=excluded.{column}"
+        for column in EVENT_COLUMNS
+        if column != "record_id"
     )
     return (
         f"INSERT INTO usage_events ({', '.join(EVENT_COLUMNS)}) "
