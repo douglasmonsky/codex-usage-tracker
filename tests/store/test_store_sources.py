@@ -100,6 +100,30 @@ def test_source_logs_requiring_parse_rejects_larger_replacement(
     assert plans[0].start_line == 0
 
 
+def test_source_logs_requiring_parse_reparses_malformed_filesystem_identity(
+    tmp_path: Path,
+) -> None:
+    conn = _memory_db()
+    source_path = tmp_path / "events.jsonl"
+    source_path.write_text("{}\n", encoding="utf-8")
+    state = ParserState(session_id="session")
+    upsert_source_file_metadata(
+        conn.connection,
+        parsed_files=[(source_path, [], {}, state)],
+    )
+    conn.execute(
+        "UPDATE source_files SET source_inode = ? WHERE source_file = ?",
+        ("not-a-filesystem-id", str(source_path)),
+    )
+
+    plans = source_logs_requiring_parse(conn.connection, [source_path])
+
+    assert len(plans) == 1
+    assert plans[0].replace_existing is True
+    assert plans[0].start_byte == 0
+    assert plans[0].start_line == 0
+
+
 def test_source_metadata_generation_advances_only_for_new_checkpoint(
     tmp_path: Path,
 ) -> None:

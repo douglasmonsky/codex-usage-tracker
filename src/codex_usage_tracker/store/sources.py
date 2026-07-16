@@ -21,6 +21,26 @@ from codex_usage_tracker.parser.state import (
 )
 
 _PREFIX_TAIL_BYTES = 64 * 1024
+_FILESYSTEM_ID_PREFIX = "fsid-v1:"
+
+
+def _serialize_filesystem_id(value: int) -> str:
+    return f"{_FILESYSTEM_ID_PREFIX}{value}"
+
+
+def _filesystem_id_key(value: object) -> str | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return _serialize_filesystem_id(value)
+    if not isinstance(value, str):
+        return None
+    payload = value.removeprefix(_FILESYSTEM_ID_PREFIX)
+    try:
+        identifier = int(payload)
+    except ValueError:
+        return None
+    return _serialize_filesystem_id(identifier)
 
 
 @dataclass(frozen=True)
@@ -100,8 +120,10 @@ def _source_metadata_matches(row: sqlite3.Row, metadata: dict[str, int]) -> bool
     return (
         int(row["size_bytes"]) == metadata["size_bytes"]
         and int(row["mtime_ns"]) == metadata["mtime_ns"]
-        and int(row["source_device"]) == metadata["source_device"]
-        and int(row["source_inode"]) == metadata["source_inode"]
+        and _filesystem_id_key(row["source_device"])
+        == _filesystem_id_key(metadata["source_device"])
+        and _filesystem_id_key(row["source_inode"])
+        == _filesystem_id_key(metadata["source_inode"])
     )
 
 
@@ -111,8 +133,10 @@ def _can_incrementally_parse_source(path: Path, metadata: dict[str, int], row: s
     expected_tail = str(row["parsed_prefix_tail_hash"] or "")
     return (
         0 < previous_byte <= previous_size < metadata["size_bytes"]
-        and int(row["source_device"]) == metadata["source_device"]
-        and int(row["source_inode"]) == metadata["source_inode"]
+        and _filesystem_id_key(row["source_device"])
+        == _filesystem_id_key(metadata["source_device"])
+        and _filesystem_id_key(row["source_inode"])
+        == _filesystem_id_key(metadata["source_inode"])
         and bool(expected_tail)
         and _parsed_prefix_tail_hash(path, previous_byte) == expected_tail
     )
