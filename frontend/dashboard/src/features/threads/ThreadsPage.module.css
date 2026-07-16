@@ -131,6 +131,7 @@
 .threadRow > div[role="gridcell"] { box-sizing: border-box; }
 .accordionHeader button { width: 100%; text-align: left; }
 .accordionCanvas { position: relative; }
+.threadCallsRegion { position: relative; }
 
 .accordionScroller[data-density="compact"] .accordionHeader > div,
 .accordionScroller[data-density="compact"] .threadRow > div[role="gridcell"] { padding: 6px 8px; }
@@ -187,8 +188,14 @@
 .accordionScroller[data-density="comfortable"] .threadCallEvidence,
 .accordionScroller[data-density="comfortable"] .threadLoadStatus { padding: 16px 18px; }
 
-.threadExpansionSummary { grid-template-columns: minmax(200px, 1fr) auto; gap: 16px; align-items: center; }
-.threadExpansionSummary > div:first-child { display: grid; gap: 4px; }
+.threadExpansionSummary { display: grid; gap: 10px; }
+.threadExpansionHeader { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.threadExpansionHeader > div:first-child { display: grid; gap: 4px; }
+.snapshotLabel { width: fit-content; padding: 2px 7px; border-radius: 999px; background: var(--surface-selected, var(--dashboard-surface-soft)); }
+.threadSummaryStrip { display: grid; grid-template-columns: repeat(8, minmax(92px, 1fr)); gap: 8px; margin: 0; }
+.threadSummaryStrip > div { min-width: 0; }
+.threadSummaryStrip dt { color: var(--ink-muted, var(--dashboard-muted)); font-size: 11px; }
+.threadSummaryStrip dd { margin: 2px 0 0; font-size: 12px; font-weight: 600; }
 .threadExpansionSummary span,
 .threadCallIdentity span,
 .threadCallSignals { color: var(--ink-muted, var(--dashboard-muted)); font-size: 12px; }
@@ -263,7 +270,10 @@
   .accordionHeader > div:first-child { width: 100% !important; }
   .threadExpansionSummary,
   .threadCallEvidence { grid-template-columns: minmax(0, 1fr); }
+  .threadExpansionHeader { align-items: stretch; }
+  .threadSummaryStrip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .threadCallControls { display: grid; grid-template-columns: 1fr 1fr; }
+  .threadCallControls select { min-height: 44px; }
   .threadCallEvidence button,
   .threadExpansionSummary button,
   .threadLoadStatus button { min-height: 44px; }

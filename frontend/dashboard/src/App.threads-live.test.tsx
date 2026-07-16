@@ -218,9 +218,82 @@ describe('React dashboard threads live queries', () => {
     await waitFor(() => expect(screen.queryByText('old-model / high')).not.toBeInTheDocument());
     expect(screen.getAllByText('new-model-boundary / high')).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Retry loading thread calls' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry loading thread calls' }));
     await screen.findByText('3 of 3 calls loaded');
     expect(screen.getAllByText('new-model-boundary / high')).toHaveLength(1);
     expect(screen.getByText('new-model-3 / high')).toBeInTheDocument();
+  });
+
+  it('keeps boot calls as a labelled snapshot and retries an initial call failure', async () => {
+    let callAttempts = 0;
+    const threadName = fixtureModel.threads[0].name;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), window.location.origin);
+      if (url.pathname === '/api/threads') {
+        return new Response(JSON.stringify({
+          schema: 'codex-usage-tracker-threads-v1',
+          rows: [{
+            thread_key: threadName,
+            thread_label: threadName,
+            first_event_timestamp: '2026-07-01T12:00:00Z',
+            latest_event_timestamp: '2026-07-01T12:02:00Z',
+            latest_record_id: fixtureModel.calls[0].id,
+            call_count: 1,
+            session_count: 1,
+            input_tokens: 100,
+            cached_input_tokens: 20,
+            uncached_input_tokens: 80,
+            output_tokens: 10,
+            reasoning_output_tokens: 0,
+            total_tokens: 110,
+            estimated_cost_usd: 0.01,
+            usage_credits: 0,
+            avg_cache_ratio: 0.2,
+            max_context_window_percent: 0.2,
+            max_recommendation_score: 0,
+            primary_recommendation: '',
+            call_initiator_summary: 'user x1',
+            archived_call_count: 0,
+            updated_at: '2026-07-01T12:02:00Z',
+          }],
+          row_count: 1,
+          total_matched_rows: 1,
+          limit: 250,
+          offset: 0,
+          has_more: false,
+          next_offset: null,
+          include_archived: false,
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      callAttempts += 1;
+      if (callAttempts <= 2) return new Response('temporary call failure', { status: 500 });
+      return new Response(JSON.stringify({
+        schema: 'codex-usage-tracker-thread-calls-v1',
+        thread_key: threadName,
+        rows: [],
+        row_count: 0,
+        total_matched_rows: 0,
+        limit: 100,
+        offset: 0,
+        has_more: false,
+        next_offset: null,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.replaceState(null, '', `/?view=threads&thread=${encodeURIComponent(threadName)}`);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={queryClient}><ThreadsPage
+      model={{ ...fixtureModel, contextRuntime: { apiToken: 'thread-token', contextApiEnabled: false, fileMode: false } }}
+      globalQuery="" onOpenInvestigator={vi.fn()} onCopyCallLink={vi.fn()}
+      contextRuntime={{ apiToken: 'thread-token', contextApiEnabled: false, fileMode: false }}
+      focusedEndpointsEnabled onNavigateView={vi.fn()}
+    /></QueryClientProvider>);
+
+    expect(await screen.findByText('Stored snapshot')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Open investigator for thread call/i })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry loading thread calls' }));
+    await waitFor(() => expect(callAttempts).toBe(3));
+    expect(await screen.findByText('No aggregate calls are available for this thread.')).toBeInTheDocument();
+    expect(screen.queryByText('Stored snapshot')).not.toBeInTheDocument();
   });
 });

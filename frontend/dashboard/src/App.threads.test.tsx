@@ -336,6 +336,11 @@ expect(screen.getByText('3 of 3 calls loaded')).toBeInTheDocument();
 fireEvent.click(screen.getByRole('button', { name: 'Lifecycle' }));
 expect(screen.getByRole('button', { name: 'Lifecycle' })).toHaveAttribute('aria-pressed', 'true');
 expect(screen.queryByRole('treegrid', { name: 'Thread leaderboard' })).not.toBeInTheDocument();
+fireEvent.click(screen.getByRole('button', { name: 'Table view' }));
+const lifecycleTable = screen.getByRole('table', { name: 'Selected thread lifecycle calls' });
+fireEvent.keyDown(within(lifecycleTable).getAllByRole('row')[1], { key: 'ArrowDown' });
+expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
+expect(new URLSearchParams(window.location.search).has('record')).toBe(false);
 });
 
 it('hydrates and syncs selected thread URL state', () => {
@@ -344,7 +349,7 @@ it('hydrates and syncs selected thread URL state', () => {
     render(<App />);
 
     expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
-    expect(screen.getByText('No loaded aggregate call rows belong to this thread.')).toBeInTheDocument();
+    expect(screen.getByText('No aggregate calls are available for this thread.')).toBeInTheDocument();
 
 const row = within(screen.getByRole('treegrid', { name: 'Thread leaderboard' })).getByText('thread-9f3a').closest('[role="row"]');
 expect(row).not.toBeNull();

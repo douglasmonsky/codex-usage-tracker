@@ -400,7 +400,7 @@ export type BarDatum = {
   color?: string;
 };
 
-export type DonutDatum = {
+type DonutDatum = {
   label: string;
   value: number;
   color: string;

@@ -39,6 +39,8 @@ type ThreadsExplorerViewProps = {
     count: number;
     hydrated: boolean;
     error: string | null;
+    initialError: string | null;
+    storedSnapshot: boolean;
   };
   selectedCalls: CallRow[];
   displayedThreads: ThreadRow[];
@@ -207,6 +209,8 @@ export function ThreadsExplorerView({
                 totalCallCount={selectedCallsState.count}
                 loadingCalls={selectedCallsState.isFetching && !selectedCallsState.hydrated}
                 loadingMoreCalls={selectedCallsState.isFetchingNextPage}
+                initialError={selectedCallsState.initialError}
+                storedSnapshot={selectedCallsState.storedSnapshot}
                 partialError={selectedCallsState.isFetchNextPageError ? `Partial result: ${selectedCallsState.error ?? 'Unable to load remaining calls.'}` : null}
                 callSort={callSort}
                 callSortDirection={callSortDirection}
@@ -241,7 +245,7 @@ export function ThreadsExplorerView({
             <Visualization spec={frontierSpec} height={520} onSelectionChange={onToggleThread} />
           ) : null}
           {viewMode === 'lifecycle' ? (
-            <Visualization spec={lifecycleSpec} height={520} onSelectionChange={onOpenInvestigator} />
+            <Visualization spec={lifecycleSpec} height={520} />
           ) : null}
         </section>
       </div>

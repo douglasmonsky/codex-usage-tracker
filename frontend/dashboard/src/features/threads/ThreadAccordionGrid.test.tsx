@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 import { expect, it, vi } from 'vitest';
 import type { CallRow } from '../../api/types';
@@ -87,11 +87,13 @@ it('renders an associated expanded region and explicit child actions', () => {
   expect(screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` })).toHaveAttribute('aria-expanded', 'true');
   expect(screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` })).toHaveAttribute('aria-level', '1');
   expect(screen.getByRole('treegrid', { name: 'Thread leaderboard' })).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: `Calls for ${fixtureThread.name}` })).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: `Calls for ${fixtureThread.name}` })).toHaveAttribute(
+  const callsRegion = screen.getByRole('region', { name: `Calls for ${fixtureThread.name}` });
+  expect(callsRegion).toBeInTheDocument();
+  expect(callsRegion).toHaveAttribute(
     'aria-describedby',
     screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` }).id,
   );
+  expect(within(callsRegion).getByRole('button', { name: /Open investigator for thread call/i })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /Open investigator for thread call/i }));
   fireEvent.click(screen.getByRole('button', { name: /Copy link for thread call/i }));
   expect(onOpenInvestigator).toHaveBeenCalledWith(fixtureCall.id);
@@ -138,8 +140,28 @@ it('shows loaded progress and a loading-more state', () => {
     loadingMoreCalls: true,
   });
 
-  expect(screen.getByText('1 of 3 calls loaded')).toBeInTheDocument();
-  expect(screen.getByRole('status')).toHaveTextContent('Loading more calls');
+  expect(screen.getByRole('status')).toHaveTextContent('1 of 3 calls loaded Loading more calls.');
+});
+
+it('shows the concise aggregate summary and explicit collapse action', () => {
+  const onToggleThread = vi.fn();
+  renderGrid({
+    expandedThreadName: fixtureThread.name,
+    expandedCalls: [fixtureCall],
+    totalCallCount: fixtureThread.turns,
+    onToggleThread,
+  });
+
+  const region = screen.getByRole('region', { name: `Calls for ${fixtureThread.name}` });
+  expect(region).toHaveTextContent('Total tokens');
+  expect(region).toHaveTextContent('Cached / uncached');
+  expect(region).toHaveTextContent('Cache ratio');
+  expect(region).toHaveTextContent('Cost / credits');
+  expect(region).toHaveTextContent('Peak context');
+  expect(region).toHaveTextContent('Duration');
+  expect(region).toHaveTextContent('Latest');
+  fireEvent.click(within(region).getByRole('button', { name: `Collapse calls for ${fixtureThread.name}` }));
+  expect(onToggleThread).toHaveBeenCalledWith(fixtureThread.name);
 });
 
 it('shows a partial error with an explicit retry action', () => {
@@ -153,6 +175,25 @@ it('shows a partial error with an explicit retry action', () => {
   expect(screen.getByText('The next page could not be loaded.')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Retry loading thread calls' }));
   expect(onRetryCalls).toHaveBeenCalledOnce();
+});
+
+it('labels boot calls as a stored snapshot after an initial query failure', () => {
+  renderGrid({
+    expandedThreadName: fixtureThread.name,
+    expandedCalls: [fixtureCall],
+    totalCallCount: fixtureThread.turns,
+    initialError: 'The focused call request failed.',
+    storedSnapshot: true,
+  });
+
+  expect(screen.getByText('Stored snapshot')).toBeInTheDocument();
+  expect(screen.getByText('The focused call request failed.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Retry loading thread calls' })).toBeInTheDocument();
+});
+
+it('uses the approved aggregate empty-state copy', () => {
+  renderGrid({ expandedThreadName: fixtureThread.name });
+  expect(screen.getByText('No aggregate calls are available for this thread.')).toBeInTheDocument();
 });
 
 it('retains focus on the parent while its inline region opens', () => {

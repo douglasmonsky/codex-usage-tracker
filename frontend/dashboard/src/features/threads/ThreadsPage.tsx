@@ -314,8 +314,11 @@ threadCallSortDirection,
   }
 
   function retrySelectedThreadCalls() {
-    if (!selectedThreadCallsQuery.hasNextPage) return;
-    void selectedThreadCallsQuery.fetchNextPage();
+    if (selectedThreadCallsQuery.isFetchNextPageError) {
+      void selectedThreadCallsQuery.fetchNextPage();
+      return;
+    }
+    void selectedThreadCallsQuery.refetch();
   }
 
   return (
@@ -344,6 +347,10 @@ threadCallSortDirection,
         count: selectedCallCount,
         hydrated: Boolean(selectedThreadCallsQuery.data),
         error: selectedThreadCallsQuery.error ? queryErrorMessage(selectedThreadCallsQuery.error) : null,
+        initialError: selectedThreadCallsQuery.isError && !selectedThreadCallsQuery.data
+          ? queryErrorMessage(selectedThreadCallsQuery.error)
+          : null,
+        storedSnapshot: Boolean(selectedCalls.length && !selectedThreadCallsQuery.data),
       }}
       selectedCalls={selectedCalls}
       displayedThreads={displayedThreads}

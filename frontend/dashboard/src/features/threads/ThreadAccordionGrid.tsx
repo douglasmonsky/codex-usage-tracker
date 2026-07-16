@@ -28,6 +28,8 @@ export type ThreadAccordionGridProps = {
   totalCallCount: number;
   loadingCalls: boolean;
   loadingMoreCalls: boolean;
+  initialError?: string | null;
+  storedSnapshot?: boolean;
   partialError: string | null;
   callSort: ThreadCallSortKey;
   callSortDirection: ThreadCallSortDirection;
@@ -79,6 +81,8 @@ export function ThreadAccordionGrid({
   totalCallCount,
   loadingCalls,
   loadingMoreCalls,
+  initialError = null,
+  storedSnapshot = false,
   partialError,
   callSort,
   callSortDirection,
@@ -121,7 +125,7 @@ export function ThreadAccordionGrid({
     overscan: 8,
     initialRect: { width: 1000, height: viewportHeight },
   });
-  useEffect(() => virtualizer.measure(), [preferences.density, virtualizer]);
+  useEffect(() => virtualizer.measure(), [items.length, preferences.density, virtualizer]);
   const measuredVirtualItems = virtualizer.getVirtualItems();
   let estimatedStart = 0;
   const estimatedItems = items.map((item, index) => {
@@ -138,6 +142,13 @@ export function ThreadAccordionGrid({
   const expandedThreadId = expandedThreadName ? `thread-row-${encodeURIComponent(expandedThreadName)}` : undefined;
   const regionId = expandedThreadName ? `thread-calls-${encodeURIComponent(expandedThreadName)}` : undefined;
   const regionLabelId = regionId ? `${regionId}-label` : undefined;
+  const progressMessage = `${expandedCalls.length} of ${totalCallCount} calls loaded`;
+  const progressDetail = `${
+    partialError || initialError ? ' Loading calls failed; retry is available.'
+      : loadingCalls ? ' Loading calls.'
+        : loadingMoreCalls ? ' Loading more calls.'
+          : ''
+  }`;
 
   function toggleKeyDown(event: React.KeyboardEvent<HTMLDivElement>, name: string, itemIndex: number) {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -192,11 +203,14 @@ export function ThreadAccordionGrid({
             })}
           </div>
         </div>
-        <div
-          className={styles.accordionCanvas}
-          role="rowgroup"
-          style={{ height: totalSize, width: tableWidth }}
+        <section
+          className={styles.threadCallsRegion}
+          role={expandedThreadName ? 'region' : undefined}
+          aria-labelledby={expandedThreadName ? regionLabelId : undefined}
+          aria-describedby={expandedThreadName ? expandedThreadId : undefined}
         >
+          {expandedThreadName ? <span id={regionLabelId} className={styles.visuallyHidden}>Calls for {expandedThreadName}</span> : null}
+          <div className={styles.accordionCanvas} role="rowgroup" style={{ height: totalSize, width: tableWidth }}>
           {virtualItems.map(virtualItem => {
             const item = items[virtualItem.index];
             if (!item) return null;
@@ -235,15 +249,22 @@ export function ThreadAccordionGrid({
             if (item.kind === 'summary') {
               return <div key={item.key} ref={virtualizer.measureElement} id={`${regionId}-summary-row`} role="row" aria-level={2} aria-describedby={expandedThreadId} className={styles.accordionItem} style={{ ...itemStyle, minHeight: estimatedSize(virtualItem.index) }} data-accordion-item data-index={virtualItem.index}>
                 <div role="gridcell">
-                  <section
-                    id={regionId}
-                    role="region"
-                    aria-labelledby={regionLabelId}
-                    aria-describedby={expandedThreadId}
-                    className={styles.threadExpansionSummary}
-                  >
-                    <span id={regionLabelId} className={styles.visuallyHidden}>Calls for {item.thread.name}</span>
-                    <div><strong>{item.thread.name}</strong><span>{expandedCalls.length} of {totalCallCount} calls loaded</span></div>
+                  <section id={regionId} className={styles.threadExpansionSummary}>
+                    <div className={styles.threadExpansionHeader}>
+                      <div><strong>{item.thread.name}</strong><span role="status" aria-live="polite"><span>{progressMessage}</span>{progressDetail ? <span className={styles.visuallyHidden}>{progressDetail}</span> : null}</span></div>
+                      <button type="button" className="toolbar-button" onClick={() => onToggleThread(item.thread.name)} aria-label={`Collapse calls for ${item.thread.name}`}>Collapse</button>
+                    </div>
+                    {storedSnapshot ? <span className={styles.snapshotLabel}>Stored snapshot</span> : null}
+                    <dl className={styles.threadSummaryStrip}>
+                      <div><dt>Calls</dt><dd>{item.thread.turns.toLocaleString()}</dd></div>
+                      <div><dt>Total tokens</dt><dd>{item.thread.totalTokens.toLocaleString()}</dd></div>
+                      <div><dt>Cached / uncached</dt><dd>{item.thread.cachedInput.toLocaleString()} / {item.thread.uncachedInput.toLocaleString()}</dd></div>
+                      <div><dt>Cache ratio</dt><dd>{item.thread.cachePct.toFixed(1)}%</dd></div>
+                      <div><dt>Cost / credits</dt><dd>${item.thread.cost.toFixed(2)} / {item.thread.credits.toLocaleString()}</dd></div>
+                      <div><dt>Peak context</dt><dd>{item.thread.contextPct == null ? '-' : `${item.thread.contextPct.toFixed(1)}%`}</dd></div>
+                      <div><dt>Duration</dt><dd>{item.thread.totalDuration}</dd></div>
+                      <div><dt>Latest</dt><dd>{item.thread.latestActivity}</dd></div>
+                    </dl>
                     <ThreadCallControls callSort={callSort} callSortDirection={callSortDirection} onCallSortChange={onCallSortChange} onCallSortDirectionChange={onCallSortDirectionChange} />
                   </section>
                 </div>
@@ -255,17 +276,18 @@ export function ThreadAccordionGrid({
               </div>;
             }
             return <div key={item.key} ref={virtualizer.measureElement} id={`${regionId}-status-row`} role="row" aria-level={2} aria-describedby={expandedThreadId} className={styles.accordionItem} style={{ ...itemStyle, minHeight: estimatedSize(virtualItem.index) }} data-accordion-item data-index={virtualItem.index}>
-              <div role="gridcell"><div className={styles.threadLoadStatus} role="status">
-                {partialError ? <><span>{partialError}</span><button type="button" onClick={onRetryCalls} aria-label="Retry loading thread calls">Retry</button></> : null}
-                {!partialError && loadingCalls ? <span>Loading calls</span> : null}
-                {!partialError && loadingMoreCalls ? <span>Loading more calls</span> : null}
-                {!partialError && !loadingCalls && !loadingMoreCalls && !expandedCalls.length ? <span>No loaded aggregate call rows belong to this thread.</span> : null}
-                {!partialError && !loadingCalls && !loadingMoreCalls && expandedCalls.length && expandedCalls.length < totalCallCount ? <span>{totalCallCount - expandedCalls.length} more calls available</span> : null}
-                {!partialError && !loadingCalls && !loadingMoreCalls && expandedCalls.length >= totalCallCount && expandedCalls.length ? <span>All loaded calls visible</span> : null}
+              <div role="gridcell"><div className={styles.threadLoadStatus}>
+                {partialError || initialError ? <><span>{partialError ?? initialError}</span><button type="button" onClick={onRetryCalls} aria-label="Retry loading thread calls">Retry</button></> : null}
+                {!partialError && !initialError && loadingCalls ? <span>Loading calls</span> : null}
+                {!partialError && !initialError && loadingMoreCalls ? <span>Loading more calls</span> : null}
+                {!partialError && !initialError && !loadingCalls && !loadingMoreCalls && !expandedCalls.length ? <span>No aggregate calls are available for this thread.</span> : null}
+                {!partialError && !initialError && !loadingCalls && !loadingMoreCalls && expandedCalls.length && expandedCalls.length < totalCallCount ? <span>{totalCallCount - expandedCalls.length} more calls available</span> : null}
+                {!partialError && !initialError && !loadingCalls && !loadingMoreCalls && expandedCalls.length >= totalCallCount && expandedCalls.length ? <span>All loaded calls visible</span> : null}
               </div></div>
             </div>;
           })}
-        </div>
+          </div>
+        </section>
       </div>
     </section>
   );
