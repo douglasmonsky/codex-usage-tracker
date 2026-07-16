@@ -325,12 +325,43 @@ setThreadCallSortDirection(value === 'asc' ? 'asc' : 'desc');
     : displayedThreads.length < sortedThreads.length;
 
   useEffect(() => {
-    if (endpointState.enabled && !focusedThreadsQuery.data) return;
+    if (!endpointState.enabled
+      || !focusedThreadsQuery.data
+      || !selectedThreadName
+      || selectedThreadName === detailFirstSelectedThreadName
+      || selected
+      || !focusedThreadsQuery.hasNextPage
+      || focusedThreadsQuery.isFetchingNextPage) return;
+    void focusedThreadsQuery.fetchNextPage();
+  }, [
+    endpointState.enabled,
+    focusedThreadsQuery.data,
+    focusedThreadsQuery.hasNextPage,
+    focusedThreadsQuery.isFetchingNextPage,
+    selected,
+    selectedThreadName,
+  ]);
+
+  useEffect(() => {
+    if (endpointState.enabled && (
+      !focusedThreadsQuery.data
+      || focusedThreadsQuery.isFetching
+      || focusedThreadsQuery.isFetchingNextPage
+      || focusedThreadsQuery.hasNextPage
+    )) return;
     if (selectedThreadName && selectedThreadName !== detailFirstSelectedThreadName
       && !displayedThreads.some(thread => thread.name === selectedThreadName)) {
       setSelectedThreadName(null);
     }
-  }, [displayedThreads, endpointState.enabled, focusedThreadsQuery.data, selectedThreadName]);
+  }, [
+    displayedThreads,
+    endpointState.enabled,
+    focusedThreadsQuery.data,
+    focusedThreadsQuery.hasNextPage,
+    focusedThreadsQuery.isFetching,
+    focusedThreadsQuery.isFetchingNextPage,
+    selectedThreadName,
+  ]);
 
   useEffect(() => {
     if (!shouldFetchNextThreadCallPage({

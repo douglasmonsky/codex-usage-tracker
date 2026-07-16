@@ -159,6 +159,71 @@ it('never opens a representative call from parent activation', () => {
   expect(window.location.search).not.toContain('view=call');
 });
 
+it('copies a child call link with the selected thread return state', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+  fireEvent.click(screen.getByRole('row', { name: /Expand calls for thread-9f3a/i }));
+  fireEvent.click(screen.getByRole('button', { name: /Copy link for thread call thread-9f3a1c codex-1/i }));
+
+  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+  const copied = new URL(writeText.mock.calls[0][0]);
+  expect(copied.searchParams.get('view')).toBe('call');
+  expect(copied.searchParams.get('record')).toBe('fixture-call-0');
+  expect(copied.searchParams.get('return')).toBe('threads');
+  expect(copied.searchParams.get('thread')).toBe('thread-9f3a');
+});
+
+it('hydrates a direct thread link from a later focused summary page', async () => {
+  const summary = (thread: string) => ({
+    thread_key: thread, thread_label: thread,
+    first_event_timestamp: '2026-07-01T12:00:00Z', latest_event_timestamp: '2026-07-01T12:02:00Z',
+    latest_record_id: `${thread}-latest`, call_count: 1, session_count: 1,
+    input_tokens: 100, cached_input_tokens: 20, uncached_input_tokens: 80, output_tokens: 10,
+    reasoning_output_tokens: 0, total_tokens: 110, estimated_cost_usd: 0.01, usage_credits: 0,
+    avg_cache_ratio: 0.2, max_context_window_percent: 0.2, max_recommendation_score: 0,
+    primary_recommendation: '', call_initiator_summary: 'user x1', archived_call_count: 0,
+    updated_at: '2026-07-01T12:02:00Z',
+  });
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = new URL(String(input), window.location.origin);
+    if (url.pathname === '/api/threads') {
+      const offset = Number(url.searchParams.get('offset'));
+      const rows = offset === 0 ? [summary('page-one-thread')] : [summary('page-two-thread')];
+      return new Response(JSON.stringify({
+        schema: 'codex-usage-tracker-threads-v1', rows, row_count: 1, total_matched_rows: 2,
+        limit: 250, offset, has_more: offset === 0, next_offset: offset === 0 ? 1 : null,
+        include_archived: false,
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response(JSON.stringify({
+      schema: 'codex-usage-tracker-thread-calls-v1', thread_key: 'page-two-thread',
+      rows: [{
+        record_id: 'page-two-call', call_started_at: '2026-07-01T12:02:00Z',
+        thread_name: 'page-two-thread', thread_key: 'page-two-thread', model: 'page-two-model', effort: 'high',
+        input_tokens: 100, cached_input_tokens: 20, output_tokens: 10, total_tokens: 110,
+      }],
+      row_count: 1, total_matched_rows: 1, limit: 100, offset: 0, has_more: false, next_offset: null,
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  window.history.replaceState(null, '', '/?view=threads&thread=page-two-thread');
+  const queryClient = new QueryClient();
+  render(<QueryClientProvider client={queryClient}><ThreadsPage
+    model={{ ...fixtureModel, contextRuntime: { apiToken: 'thread-token', contextApiEnabled: false, fileMode: false } }}
+    globalQuery="" onOpenInvestigator={vi.fn()} onCopyCallLink={vi.fn()}
+    contextRuntime={{ apiToken: 'thread-token', contextApiEnabled: false, fileMode: false }}
+    focusedEndpointsEnabled onNavigateView={vi.fn()}
+  /></QueryClientProvider>);
+
+  expect(await screen.findByRole('row', { name: /Collapse calls for page-two-thread/i })).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: /Calls for page-two-thread/i })).toBeInTheDocument();
+  expect(await screen.findByText('page-two-model / high')).toBeInTheDocument();
+  expect(new URLSearchParams(window.location.search).get('thread')).toBe('page-two-thread');
+  expect(fetchMock.mock.calls.some(([input]) => new URL(String(input), window.location.origin).searchParams.get('offset') === '1')).toBe(true);
+});
+
 it('isolates progressive thread call pages and retries a partial result', async () => {
   let resolveOldThread: ((response: Response) => void) | undefined;
   let newThreadPageTwoAttempts = 0;

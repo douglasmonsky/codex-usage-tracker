@@ -191,7 +191,7 @@ export function ThreadsExplorerView({
           />
         </div>
       </div>
-      <div className={styles.splitWorkspace}>
+      <div>
         <section className={styles.evidenceSurface} aria-label="Thread evidence">
           {viewMode === 'table' ? (
             <>
