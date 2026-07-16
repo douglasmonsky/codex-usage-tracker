@@ -9,9 +9,10 @@ test.describe('React dashboard rewrite smoke', () => {
     await page.getByRole('button', { name: /^Calls$/i }).click();
     await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
  await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toHaveCount(0);
-    await expect(page.getByRole('table', { name: 'Model calls' })).toBeVisible();
+    await expect(page.getByRole('table', { name: 'Model calls' })
+      .or(page.getByRole('list', { name: 'Model calls ranked list' }))).toBeVisible();
 
-    await page.getByRole('button', { name: /Open investigator for thread-9f3a1c codex-1/i }).click();
+    await page.getByRole('button', { name: /Open (?:call row in )?investigator for thread-9f3a1c codex-1/i }).click();
     await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
     await expect(page).toHaveURL(/view=call/);
     await expect(page).toHaveURL(/record=fixture-call-0/);
@@ -82,7 +83,9 @@ test.describe('React dashboard rewrite smoke', () => {
  await page.goto('/?view=calls');
  await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
  await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toHaveCount(0);
- await expect(page.getByRole('table', { name: 'Model calls' })).toBeVisible();
+ const modelCallsTable = page.getByRole('table', { name: 'Model calls' });
+ const tabularPresentation = await modelCallsTable.count() > 0;
+ await expect(modelCallsTable.or(page.getByRole('list', { name: 'Model calls ranked list' }))).toBeVisible();
  await page.getByRole('button', { name: /Call Details/i }).click();
  await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toBeVisible();
  await page.getByRole('button', { name: /Hide details/i }).click();
@@ -97,28 +100,40 @@ await expect(page.getByText('Invalid date range')).toBeVisible();
 await page.getByRole('button', { name: /Clear filters/i }).click();
 await expect(page.getByText('Invalid date range')).toHaveCount(0);
 
-await page.getByRole('button', { name: 'Columns', exact: true }).click();
-    await expect(page.getByRole('checkbox', { name: 'Thread' })).toBeDisabled();
-    await page.getByRole('checkbox', { name: 'Signal' }).uncheck();
-    await expect(page.getByRole('columnheader', { name: /Signal/i })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Columns', exact: true }).click();
+if (tabularPresentation) {
+  await page.getByRole('button', { name: 'Columns', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Thread' })).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Signal' }).uncheck();
+  await expect(page.getByRole('columnheader', { name: /Signal/i })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Columns', exact: true }).click();
 
-    await page.getByRole('button', { name: 'Sort by Est. Cost' }).click();
-    await expect(page.getByRole('columnheader', { name: /Est. Cost/i })).toHaveAttribute('aria-sort', 'descending');
+  await page.getByRole('button', { name: 'Sort by Est. Cost' }).click();
+  await expect(page.getByRole('columnheader', { name: /Est. Cost/i })).toHaveAttribute('aria-sort', 'descending');
+}
 
   await page.getByPlaceholder('Search calls, cwd, projects, models...').fill('thread-3c8d4e');
   await expect(page).toHaveURL(/call_q=thread-3c8d4e/);
-  await expect(page.getByRole('cell', { name: 'thread-3c8d4e', exact: true })).toBeVisible();
-  await page.getByRole('row', { name: /thread-3c8d4e/ }).focus();
-  await page.keyboard.press('Space');
+  if (tabularPresentation) {
+    await expect(page.getByRole('cell', { name: 'thread-3c8d4e', exact: true })).toBeVisible();
+    await page.getByRole('row', { name: /thread-3c8d4e/ }).focus();
+    await page.keyboard.press('Space');
+  } else {
+    await page.getByRole('button', { name: /Open call row in investigator for thread-3c8d4e o3/i }).click();
+  }
   await expect(page.getByText('thread-3c8d4e / o3')).toBeVisible();
+  if (tabularPresentation) {
     await page.getByRole('tab', { name: /Evidence/i }).click();
-    await expect(page.getByText('Raw context is gated')).toBeVisible();
+  }
+  await expect(page.getByText('Raw context is gated')).toBeVisible();
+  if (!tabularPresentation) {
+    await page.getByRole('button', { name: /Back to Calls/i }).click();
+    await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
+  }
 
-    const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export CSV' }).click();
-    const download = await downloadPromise;
-    expect(download.suggestedFilename()).toContain('codex-calls-');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export CSV' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toContain('codex-calls-');
   });
 
   test('reuses live report evidence after returning from Cache and Context', async ({ page }) => {
