@@ -32,7 +32,7 @@ def test_parse_otlp_batch_extracts_only_completion_allowlist() -> None:
     assert len(result.completions) == 1
     completion = result.completions[0]
     assert completion.conversation_id == "synthetic-conversation"
-    assert completion.service_tier == "fast"
+    assert completion.service_tier == "priority"
     assert completion.fast == 1
     assert completion.service_tier_source == "otel_response_completed"
     assert completion.service_tier_confidence == "exact"
@@ -74,13 +74,17 @@ def test_missing_service_tier_uses_versioned_protocol_semantics(
 @pytest.mark.parametrize(
     ("raw_tier", "normalized_tier", "fast"),
     [
+        ("priority", "priority", 1),
         ("fast", "fast", 1),
-        ("default", "standard", 0),
+        ("default", "default", 0),
         ("standard", "standard", 0),
         ("flex", "flex", 0),
+        ("batch", "batch", 0),
     ],
 )
-def test_explicit_tier_aliases(raw_tier: str, normalized_tier: str, fast: int) -> None:
+def test_explicit_tier_names_are_preserved(
+    raw_tier: str, normalized_tier: str, fast: int
+) -> None:
     attributes = completion_attributes(service_tier=raw_tier)
 
     completion = parse_otlp_json_line(

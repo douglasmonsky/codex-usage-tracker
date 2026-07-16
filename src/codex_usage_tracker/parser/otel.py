@@ -296,9 +296,7 @@ def _normalize_tier(
             return None, None, None, None
         normalized = raw_tier.lower()
         if normalized in {"priority", "fast"}:
-            return "fast", 1, "otel_response_completed", "exact"
-        if normalized in {"default", "standard"}:
-            return "standard", 0, "otel_response_completed", "exact"
+            return normalized, 1, "otel_response_completed", "exact"
         return normalized, 0, "otel_response_completed", "exact"
 
     parsed_version = _parse_version(app_version)
