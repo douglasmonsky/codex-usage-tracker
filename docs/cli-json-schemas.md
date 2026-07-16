@@ -1466,4 +1466,19 @@ Most setup and file-writing commands accept `--json` and return a schema-specifi
 - `init-thresholds --json`, `init-projects --json`
 - `support-bundle --json`
 
+Refresh and rebuild payloads add bounded OTel counters under
+`parser_diagnostics`: `otel_files_scanned`, `otel_imported`,
+`otel_duplicates`, `otel_matched`, `otel_pending`, `otel_ambiguous`, and
+`otel_conflicts` (zero-valued counters may be omitted from the immediate JSON
+payload). Stored refresh metadata keeps the same keys with zero defaults so
+localhost status is stable. These surfaces never expose OTel source paths,
+semantic fingerprints, response bodies, arbitrary attributes, or staging ids.
+
+Aggregate call rows may add nullable `service_tier`, `fast`,
+`service_tier_source`, and `service_tier_confidence` fields. Credit-annotated
+rows may also add `standard_usage_credits`, `usage_credit_multiplier`, and
+`usage_credit_multiplier_source`. `fast: null` means Unknown; clients must not
+replace it with the separate throughput proxy. CSV export includes both exact
+tier fields and the separately named proxy candidate.
+
 `context` already returns JSON because it is an explicit on-demand context request. Treat `codex-usage-tracker-context-v1` output as sensitive local context even though it is redacted and size-limited by default. `max_entries=0` requests all matching entries and `max_chars=0` removes the character cap for that explicit request. Tool output and compacted replacement history are omitted unless explicitly requested. Compaction entries may include metadata such as `replacement_history_available`, `replacement_entry_count`, and `replacement_history_included`; replacement text appears only when `include_compaction_history` is true for that local request. Evidence responses include `action_timing`, derived from timestamps in the same selected-turn source scan, plus per-entry `action_timing` fields such as `since_turn_start_ms`, `since_previous_entry_ms`, and `reported_duration_ms` when available. MCP returns `codex-usage-tracker-context-disabled-v1` when raw context loading has not been explicitly enabled with `CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT=1`.

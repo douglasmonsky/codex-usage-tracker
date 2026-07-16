@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Ingest aggregate `response.completed` telemetry from local
+  `codex-completions*.jsonl` exporter files and conservatively reconcile exact
+  Fast/Standard service-tier evidence to canonical calls without retaining raw
+  response bodies or arbitrary OTLP attributes.
+- Show exact service tier separately from the existing Fast proxy in Calls,
+  details, and CSV exports; older or unmatched history remains Unknown.
+- Apply documented model-family Fast multipliers to confirmed Codex credit
+  estimates with explicit provenance while leaving USD token-cost estimates and
+  standard-credit allowance calibration unchanged.
+
 ## 0.20.0 - 2026-07-16
 
 - Reinvent the Threads tab around inline row expansion, progressively loading and virtualizing every call in the selected thread while preserving explicit investigator actions, deep links, responsive layouts, retry recovery, and aggregate-first privacy boundaries.

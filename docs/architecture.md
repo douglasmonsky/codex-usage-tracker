@@ -17,6 +17,15 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
 ## Boundaries
 
 - `parser.py` converts local JSONL events into aggregate `UsageEvent` records. It also attaches metadata-only call-origin categories, diagnostic facts from `diagnostic_facts.py`, archived-session flags, conservative thread keys, source cursors, and parser diagnostics.
+- `parser/otel.py`, `store/otel_ingest.py`, and `store/otel_reconciliation.py`
+  provide aggregate-only completion enrichment from local
+  `~/.codex-usage-tracker/otel/codex-completions*.jsonl` files. The importer
+  retains only approved completion identifiers, token counters, model/effort,
+  application version, and service-tier metadata; response bodies and arbitrary
+  OTLP attributes are never persisted. Reconciliation requires one canonical
+  call group with the same conversation id and all four token counters. Model
+  and effort narrow a match when both sides provide them, but timestamps are not
+  identity evidence.
 - `store/content_index.py` owns normalized local content-index population and cleanup. It may persist bounded local snippets, tool-call metadata, command roots/labels, file path hashes/basenames, parser adapter metadata, source provenance, parse warnings, and FTS5 search rows. Investigation/report builders may persist bounded run summaries in `investigation_runs`. These surfaces must not feed raw/indexed content into default CSV, dashboard HTML, support bundle, or aggregate report payloads.
 - `call_origin.py` owns the pure call-origin classifier and migrated-row fallback. It must not open source JSONL files; source-log reads belong in refresh/indexing or explicit context loading.
 - `schema.py` owns persisted SQLite columns and migrations. Add columns or tables there before changing refresh, export, or MCP behavior.
@@ -62,6 +71,10 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
     totals through `canonical_usage_events`. New physical-row investigation
     surfaces must be bounded, explicitly labeled, and tested against an
     original/copy/new-call fixture.
+15. Treat service tier as exact only when a completion explicitly reports it, or
+    when Codex `0.143.0` or newer omits it under the documented Standard
+    protocol. Older or unmatched calls remain Unknown. Latency and reasoning
+    effort are useful throughput signals, not proof of Fast usage.
 
 Normal aggregate responses use a 64-entry, 256-KiB-per-entry process cache.
 Allowance history and diagnostics use a separate four-entry, 8-MiB-per-entry

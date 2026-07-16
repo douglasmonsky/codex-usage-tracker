@@ -62,6 +62,28 @@ codex-usage-tracker update-rate-card
 
 The local snapshot is written to `~/.codex-usage-tracker/rate-card.json`. Each bundled rate and alias includes source URL, fetched date, tier, confidence, and alias rationale where applicable. Use `--source-file` only when you have a reviewed replacement JSON snapshot you want the tracker to validate and use.
 
+### Confirmed Fast Usage
+
+When a call has exact OTel evidence that `fast=1`, the tracker first computes
+`standard_usage_credits`, then applies the documented model-family Fast
+multiplier to produce `usage_credits`:
+
+- GPT-5.6 family: `2.5x`
+- GPT-5.5 family: `2.5x`
+- GPT-5.4 family: `2.0x`
+
+The row also exposes `usage_credit_multiplier` and
+`usage_credit_multiplier_source` so the adjustment is auditable. A confirmed
+Fast call whose model has no documented multiplier stays at `1.0x` and is
+marked `no_documented_fast_multiplier`; the tracker does not guess. Standard
+and Unknown-tier calls also stay at `1.0x`.
+
+This adjustment applies only to Codex/ChatGPT usage-credit estimates. It never
+changes USD token-cost estimates, because those continue to use the selected
+pricing tier and aggregate token counters. Allowance-drain calibration uses the
+standard-credit baseline so a newly observed Fast label does not redefine the
+historical credit-to-percentage relationship.
+
 ## Usage Observed
 
 `Usage observed` is different from `Codex Credits`. The tracker cannot currently read your logged-in ChatGPT plan, live remaining credits, reset windows, or usage from other agentic surfaces automatically.
@@ -90,6 +112,10 @@ Configure the usage component:
 - Codex upstream log formats can change, and parser compatibility may require tracker updates before new event shapes are fully understood.
 - Pricing and rate-card sources can change outside this project. Refresh or pin local files when reports need a known source snapshot.
 - Local Codex logs may not include usage from other ChatGPT agentic surfaces that share the same allowance.
+- Service tier is exact only when a local completion explicitly reports it or
+  Codex `0.143.0` or newer establishes Standard through omission. Older or
+  unmatched history remains Unknown; latency and reasoning effort cannot prove
+  Fast usage.
 - Live account allowance cannot be read automatically by this local tracker, and the dashboard does not infer live remaining allowance from the logged-in account plan.
 - Observed local-log snapshots may be stale until Codex records another model call, and may omit other agentic surfaces that share the same allowance.
 - Pricing can change after a report is generated. Use `pin-pricing` when you need reproducible historical cost estimates.

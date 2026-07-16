@@ -22,10 +22,21 @@ The local SQLite database is stored at `~/.codex-usage-tracker/usage.sqlite3` by
   quality/coverage metrics, source revisions, and persisted statistical results
 - diagnostic fact labels tied to aggregate call records, safe event categories, payload type labels, counts, timestamps, and line ranges
 - pricing, credit, allowance, recommendation, and project metadata derived from aggregate fields
+- aggregate OTel completion identifiers, token counters, normalized service
+  tier/provenance, application version, semantic fingerprints, source cursors,
+  and bounded reconciliation status from local
+  `~/.codex-usage-tracker/otel/codex-completions*.jsonl` files
 - normalized local content-index rows for local investigation, including conversation turns, bounded content fragments, tool calls, command runs, file events, source provenance, parser adapter metadata, parser warnings, and FTS5 search rows when SQLite supports FTS5
 - bounded local investigation run summaries, including run kind, schema id, content-mode flags, strict summary JSON, branch counts, evidence counts, and timestamps
 
 The content index is intended for local MCP/API exploration. It is not a hosted collection system and it does not change where the original Codex logs live. Normalized command and file-event rows store command roots/labels plus path hashes/basenames rather than full shell commands or full paths; bounded raw snippets remain confined to `content_fragments`.
+
+The OTel completion reader accepts only `codex.sse_event` /
+`response.completed` aggregate fields needed for conservative call matching and
+tier classification. It never persists OTLP response bodies or arbitrary
+attributes. Default exports do not expose staging fingerprints, source paths,
+or matched record pointers. Support bundles report only whether the configured
+completion directory exists and bounded aggregate refresh/reconciliation counts.
 
 Cloned Codex tasks can copy historical calls into another local JSONL file. The tracker keeps every physical row and its source metadata in SQLite, but default dashboard, CLI, MCP, report, recommendation, allowance, compression, and export totals use one canonical representative for strict fingerprint matches. Similar calls are never excluded on fuzzy evidence. Deduplication diagnostics expose aggregate totals plus bounded provenance metadata for excluded rows; they never include prompt, response, tool-output, or raw-log content.
 
@@ -112,7 +123,7 @@ The report pack contains aggregate report definitions, linked aggregate call
 rows, a schema marker, and a server generation timestamp. It does not include
 prompts, assistant text, tool output, command output, or indexed content.
 
-Source JSONL reads happen during refresh/indexing, explicit on-demand context loading for one selected call, and explicit synthetic benchmark/diagnostic runs. Live refresh records source metadata and parser cursors so unchanged logs can be skipped and append-only growth can parse from the last indexed byte. Live aggregate APIs do not return indexed content unless an endpoint is explicitly documented as a local content investigation endpoint.
+Source JSONL reads happen during refresh/indexing, explicit on-demand context loading for one selected call, and explicit synthetic benchmark/diagnostic runs. Refresh also reads only local `codex-completions*.jsonl` OTLP exporter files for aggregate service-tier enrichment. Live refresh records source metadata and parser cursors so unchanged logs can be skipped and append-only growth can parse from the last indexed byte. Live aggregate APIs do not return indexed content unless an endpoint is explicitly documented as a local content investigation endpoint.
 
 ## Privacy Modes
 
@@ -142,7 +153,7 @@ Strict mode redacts local diagnostic path strings in bundle doctor details while
 
 Cost estimates are calculated only from aggregate token fields and your local pricing config. They are omitted when no matching model price is configured. Pricing refreshes pull only OpenAI's public pricing markdown and do not send local usage data anywhere.
 
-Codex credit estimates are calculated only from aggregate token fields and bundled or locally configured rate-card values. The optional allowance config stores only remaining percentages, reset times, and credit totals you manually enter. Observed rate-limit snapshots, when present in Codex token-count logs, store only structured percentages, window lengths, reset times, plan type, and limit id.
+Codex credit estimates are calculated only from aggregate token fields and bundled or locally configured rate-card values. Confirmed Fast calls may apply the documented model-family credit multiplier; this does not change USD token-cost estimates. The optional allowance config stores only remaining percentages, reset times, and credit totals you manually enter. Observed rate-limit snapshots, when present in Codex token-count logs, store only structured percentages, window lengths, reset times, plan type, and limit id.
 
 Allowance calibration and forecasts use canonical aggregate credits and observed
 percentages. A displayed credits-per-percent value is a personal historical
