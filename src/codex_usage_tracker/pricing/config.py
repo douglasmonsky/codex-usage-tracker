@@ -10,13 +10,24 @@ from typing import Any, TypeGuard
 
 from codex_usage_tracker.core.paths import DEFAULT_PRICING_PATH
 
-PRICING_SCHEMA = "codex-usage-tracker-pricing-v1"
+PRICING_SCHEMA = "codex-usage-tracker-pricing-v2"
+BILLING_BASES = ("unknown", "chatgpt_credits", "api_tokens")
+API_SERVICE_TIER_ALIASES = {
+    "fast": "priority",
+    "priority": "priority",
+    "default": "standard",
+    "standard": "standard",
+    "batch": "batch",
+    "flex": "flex",
+}
 PRICING_TEMPLATE = {
     "_comment": (
         "Fill in current prices in USD per 1 million tokens. The tracker does "
         "not fetch pricing during normal reports. Prefer update-pricing when "
         "you want to cache current OpenAI-published rates locally."
     ),
+    "_schema": PRICING_SCHEMA,
+    "billing_basis": "unknown",
     "models": {
         "replace-with-model-name": {
             "input_per_million": 0.0,
@@ -41,17 +52,24 @@ class PricingConfig:
     estimated_models: set[str] | None = None
     source: dict[str, Any] | None = None
     error: str | None = None
+    api_service_tiers: dict[str, dict[str, dict[str, float]]] | None = None
+    billing_basis: str = "unknown"
 
-    def rates_for(self, model: object) -> dict[str, float] | None:
-        if not isinstance(model, str) or not model:
-            return None
-        direct = self.models.get(model)
-        if direct is not None:
-            return direct
-        alias_target = (self.aliases or {}).get(model)
-        if not alias_target:
-            return None
-        return self.models.get(alias_target)
+    def rates_for(
+        self, model: object, *, service_tier: object | None = None
+    ) -> dict[str, float] | None:
+        normalized_tier = normalize_api_service_tier(service_tier)
+        tier_models = (self.api_service_tiers or {}).get(normalized_tier or "")
+        if tier_models is not None:
+            return _rates_for_models(tier_models, self.aliases, model)
+        return _rates_for_models(self.models, self.aliases, model)
+
+    def pricing_tier_for(self, service_tier: object | None) -> str | None:
+        normalized = normalize_api_service_tier(service_tier)
+        if normalized and normalized in (self.api_service_tiers or {}):
+            return normalized
+        source_tier = normalize_api_service_tier((self.source or {}).get("tier"))
+        return source_tier if source_tier else None
 
     def priced_as(self, model: object) -> str | None:
         if not isinstance(model, str) or not model:
@@ -76,6 +94,8 @@ def load_pricing_config(path: Path = DEFAULT_PRICING_PATH) -> PricingConfig:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
         models = parse_models(raw)
+        api_service_tiers = parse_api_service_tiers(raw)
+        billing_basis = parse_billing_basis(raw)
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
         return PricingConfig(path=path, models={}, loaded=False, error=str(exc))
     source = raw.get("_source") if isinstance(raw, dict) else None
@@ -87,6 +107,8 @@ def load_pricing_config(path: Path = DEFAULT_PRICING_PATH) -> PricingConfig:
         aliases=aliases,
         estimated_models=parse_estimated_models(raw),
         source=source if isinstance(source, dict) else None,
+        api_service_tiers=api_service_tiers,
+        billing_basis=billing_basis,
     )
 
 
@@ -137,6 +159,69 @@ def pin_pricing_snapshot(
 
 def parse_models(raw: object) -> dict[str, dict[str, float]]:
     model_payload = _required_model_payload(raw)
+    models: dict[str, dict[str, float]] = {}
+    for model, rates in model_payload.items():
+        if not _valid_model_name(model):
+            continue
+        parsed_rates = _parsed_model_rates(model, rates)
+        if parsed_rates is not None:
+            models[model] = parsed_rates
+    return models
+
+
+def parse_api_service_tiers(
+    raw: object,
+) -> dict[str, dict[str, dict[str, float]]]:
+    if not isinstance(raw, dict):
+        return {}
+    tier_payload = raw.get("api_service_tiers")
+    if tier_payload is None:
+        return {}
+    if not isinstance(tier_payload, dict):
+        raise ValueError("pricing config 'api_service_tiers' must be an object")
+    parsed: dict[str, dict[str, dict[str, float]]] = {}
+    for raw_tier, models in tier_payload.items():
+        tier = normalize_api_service_tier(raw_tier)
+        if tier is None or not isinstance(models, dict):
+            raise ValueError(f"invalid API service tier pricing entry: {raw_tier!r}")
+        parsed[tier] = _parse_model_payload(models)
+    return parsed
+
+
+def parse_billing_basis(raw: object) -> str:
+    if not isinstance(raw, dict):
+        return "unknown"
+    value = raw.get("billing_basis", "unknown")
+    if not isinstance(value, str) or value not in BILLING_BASES:
+        raise ValueError(
+            f"unknown billing_basis {value!r}; expected one of {', '.join(BILLING_BASES)}"
+        )
+    return value
+
+
+def normalize_api_service_tier(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    return API_SERVICE_TIER_ALIASES.get(value.strip().lower())
+
+
+def _rates_for_models(
+    models: dict[str, dict[str, float]],
+    aliases: dict[str, str] | None,
+    model: object,
+) -> dict[str, float] | None:
+    if not isinstance(model, str) or not model:
+        return None
+    direct = models.get(model)
+    if direct is not None:
+        return direct
+    alias_target = (aliases or {}).get(model)
+    return models.get(alias_target) if alias_target else None
+
+
+def _parse_model_payload(
+    model_payload: dict[object, object],
+) -> dict[str, dict[str, float]]:
     models: dict[str, dict[str, float]] = {}
     for model, rates in model_payload.items():
         if not _valid_model_name(model):
@@ -238,6 +323,15 @@ def load_existing_aliases(path: Path) -> dict[str, str]:
         return parse_aliases(json.loads(path.read_text(encoding="utf-8")))
     except (OSError, TypeError, json.JSONDecodeError):
         return {}
+
+
+def load_existing_billing_basis(path: Path) -> str:
+    if not path.exists():
+        return "unknown"
+    try:
+        return parse_billing_basis(json.loads(path.read_text(encoding="utf-8")))
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return "unknown"
 
 
 def _required_rate(rates: dict[str, Any], key: str, model: str) -> float:
