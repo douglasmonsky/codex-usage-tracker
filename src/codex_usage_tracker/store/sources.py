@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, TypeAlias, TypedDict
+from typing import Any, TypeAlias
 
 from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.parser.state import (
@@ -52,7 +52,8 @@ class SourceParsePlan:
     replace_existing: bool = True
 
 
-class SourceFileMetadata(TypedDict):
+@dataclass(frozen=True)
+class SourceFileMetadata:
     size_bytes: int
     mtime_ns: int
     source_device: str
@@ -126,10 +127,10 @@ def _requires_full_source_parse(row: sqlite3.Row, previous_state: ParserState | 
 
 def _source_metadata_matches(row: sqlite3.Row, metadata: SourceFileMetadata) -> bool:
     return (
-        int(row["size_bytes"]) == metadata["size_bytes"]
-        and int(row["mtime_ns"]) == metadata["mtime_ns"]
-        and _filesystem_id_key(row["source_device"]) == metadata["source_device"]
-        and _filesystem_id_key(row["source_inode"]) == metadata["source_inode"]
+        int(row["size_bytes"]) == metadata.size_bytes
+        and int(row["mtime_ns"]) == metadata.mtime_ns
+        and _filesystem_id_key(row["source_device"]) == metadata.source_device
+        and _filesystem_id_key(row["source_inode"]) == metadata.source_inode
     )
 
 
@@ -140,9 +141,9 @@ def _can_incrementally_parse_source(
     previous_byte = int(row["parsed_until_byte"])
     expected_tail = str(row["parsed_prefix_tail_hash"] or "")
     return (
-        0 < previous_byte <= previous_size < metadata["size_bytes"]
-        and _filesystem_id_key(row["source_device"]) == metadata["source_device"]
-        and _filesystem_id_key(row["source_inode"]) == metadata["source_inode"]
+        0 < previous_byte <= previous_size < metadata.size_bytes
+        and _filesystem_id_key(row["source_device"]) == metadata.source_device
+        and _filesystem_id_key(row["source_inode"]) == metadata.source_inode
         and bool(expected_tail)
         and _parsed_prefix_tail_hash(path, previous_byte) == expected_tail
     )
@@ -243,21 +244,21 @@ def _source_file_metadata_row(
         return None
     latest_event = _latest_source_usage_event(events)
     parsed_until_line = final_line_number or _count_lines(path)
-    parsed_until_byte = int(metadata["size_bytes"])
+    parsed_until_byte = metadata.size_bytes
     return {
         "source_file_id": _source_file_id(path),
         "source_file": str(path),
         "source_file_hash": _source_file_hash(path),
-        "is_archived": int(metadata["is_archived"]),
-        "size_bytes": int(metadata["size_bytes"]),
-        "mtime_ns": int(metadata["mtime_ns"]),
+        "is_archived": metadata.is_archived,
+        "size_bytes": metadata.size_bytes,
+        "mtime_ns": metadata.mtime_ns,
         "parsed_until_line": parsed_until_line,
         "parsed_until_byte": parsed_until_byte,
         "parsed_prefix_tail_hash": _parsed_prefix_tail_hash(path, parsed_until_byte),
         "parsed_row_count": parsed_until_line,
         "source_generation": 1,
-        "source_device": metadata["source_device"],
-        "source_inode": metadata["source_inode"],
+        "source_device": metadata.source_device,
+        "source_inode": metadata.source_inode,
         "latest_record_id": _latest_source_record_id(latest_event, parser_state),
         "latest_event_timestamp": _latest_source_event_timestamp(latest_event, parser_state),
         "parser_adapter": PARSER_ADAPTER_VERSION,
@@ -300,13 +301,13 @@ def _source_file_metadata(path: Path) -> SourceFileMetadata | None:
         stat = path.stat()
     except OSError:
         return None
-    return {
-        "size_bytes": int(stat.st_size),
-        "mtime_ns": int(stat.st_mtime_ns),
-        "source_device": _serialize_filesystem_id(int(stat.st_dev)),
-        "source_inode": _serialize_filesystem_id(int(stat.st_ino)),
-        "is_archived": _is_archived_source_file(path),
-    }
+    return SourceFileMetadata(
+        size_bytes=int(stat.st_size),
+        mtime_ns=int(stat.st_mtime_ns),
+        source_device=_serialize_filesystem_id(int(stat.st_dev)),
+        source_inode=_serialize_filesystem_id(int(stat.st_ino)),
+        is_archived=_is_archived_source_file(path),
+    )
 
 
 def _is_archived_source_file(path: Path) -> int:
