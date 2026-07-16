@@ -43,6 +43,11 @@ test.describe('React dashboard rewrite smoke', () => {
     await expect(region).toBeVisible();
     await page.getByRole('button', { name: /Open investigator for thread call/i }).first().click();
     await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
+    const investigatorUrl = new URL(page.url());
+    expect(investigatorUrl.searchParams.get('view')).toBe('call');
+    expect(investigatorUrl.searchParams.get('record')).toBe('fixture-call-0');
+    expect(investigatorUrl.searchParams.get('return')).toBe('threads');
+    expect(investigatorUrl.searchParams.get('thread')).toBe('thread-9f3a');
     await page.getByRole('button', { name: /Back to Threads/i }).click();
     await expect(page.getByRole('row', { name: /^(Expand|Collapse) calls for thread-9f3a$/i })).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByRole('region', { name: /Calls for thread-9f3a/i })).toBeVisible();

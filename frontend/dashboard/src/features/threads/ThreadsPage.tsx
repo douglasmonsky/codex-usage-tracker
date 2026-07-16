@@ -1,6 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import type { SortingState } from '@tanstack/react-table';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { useShellI18n } from '../../app/i18nContext';
 import type { CallRow, ContextRuntime, DashboardModel, ThreadRow } from '../../api/types';
 import { threadCallsInfiniteQueryOptions, threadsInfiniteQueryOptions } from '../../data/exploreQueries';
@@ -8,35 +7,24 @@ import { exploreWorkspaceUrl, type ExploreWorkspaceId } from '../explore/Explore
 import { useEvidenceGridPreferences } from '../explore/useEvidenceGridPreferences';
 import { csvDateStamp, downloadCsv, rowsToCsv } from '../shared/exportCsv';
 import { callCsvColumns, threadColumns } from '../shared/tables';
-import {
-  buildThreadsFilterSummary,
-  normalizeThreadRiskFilter,
-  type ThreadRiskFilter,
-} from './threadFilterSummary';
+import { buildThreadsFilterSummary } from './threadFilterSummary';
 import {
   buildThreadsViewLink,
-  defaultThreadCallSortDirection,
   detailFirstSelectedThreadName,
   filterThreads,
-  normalizeThreadCallSort,
-  readInitialSelectedThreadParam,
-  readThreadCallSortDirectionParam,
-  readThreadCallSortParam,
-  readThreadPageVisibleRowsParam,
   readThreadRiskParam,
   readThreadSearchParam,
   readThreadSortingParam,
   sortThreads,
   threadsTablePageSize,
-  type ThreadCallSortDirection,
-  type ThreadCallSortKey,
 } from './threadsUrlState';
 import { threadSummaryToRow, type ExploreThreadRow } from './threadSummaryAdapter';
 import { threadsEndpointState } from './threadsEndpointState';
 import { buildCacheFrontierSpec, buildThreadLifecycleSpec } from './threadVisualizations';
 import { compareCallTimeDescending, sortThreadCalls, threadLabelsMatch } from './threadAnalysis';
 import { dedupeThreadCallPages, shouldFetchNextThreadCallPage } from './threadCallLoading';
-import { ThreadsExplorerView, type ThreadEvidenceViewMode } from './ThreadsExplorerView';
+import { ThreadsExplorerView } from './ThreadsExplorerView';
+import { useThreadsPageControls } from './useThreadsPageControls';
 
 type ThreadsPageProps = {
   model: DashboardModel;
@@ -99,24 +87,17 @@ export function ThreadsPage({
   onNavigateView,
 }: ThreadsPageProps) {
   const shellI18n = useShellI18n();
-  const [localQuery, setLocalQuery] = useState(() => readThreadSearchParam('thread_q'));
-const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadRiskParam());
-  const [selectedThreadName, setSelectedThreadName] = useState<string | null>(() => readInitialSelectedThreadParam());
-  const [threadSorting, setThreadSorting] = useState<SortingState>(() => readThreadSortingParam());
-  const [visibleThreadRows, setVisibleThreadRows] = useState(() => readThreadPageVisibleRowsParam(threadsTablePageSize));
-  const initialThreadCallSort = readThreadCallSortParam();
-  const [threadCallSort, setThreadCallSort] = useState<ThreadCallSortKey>(() => initialThreadCallSort);
-  const [threadCallSortDirection, setThreadCallSortDirection] = useState<ThreadCallSortDirection>(() =>
-    readThreadCallSortDirectionParam(initialThreadCallSort),
-  );
-  const [exportStatus, setExportStatus] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [viewMode, setViewMode] = useState<ThreadEvidenceViewMode>('table');
+  const {
+    localQuery, riskFilter, selectedThreadName, threadSorting, visibleThreadRows,
+    threadCallSort, threadCallSortDirection, exportStatus, filterStatus, viewMode,
+    setSelectedThreadName, setVisibleThreadRows, setExportStatus, setViewMode,
+    updateLocalQuery, updateRiskFilter, updateThreadSorting, clearThreadFilters,
+    toggleThread, updateThreadCallSort, updateThreadCallSortDirection,
+  } = useThreadsPageControls(globalQuery);
   const gridPreferences = useEvidenceGridPreferences('codexUsageThreadsEvidenceGrid', {
     density: 'compact',
     columnVisibility: {},
   });
-  const previousGlobalQueryRef = useRef(globalQuery);
 
   const endpointState = useMemo(
     () => threadsEndpointState({
@@ -228,12 +209,6 @@ const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadR
   );
 
   useEffect(() => {
-    if (previousGlobalQueryRef.current === globalQuery) return;
-    previousGlobalQueryRef.current = globalQuery;
-    setVisibleThreadRows(threadsTablePageSize);
-  }, [globalQuery]);
-
-  useEffect(() => {
     if (selectedThreadName === detailFirstSelectedThreadName && selectedThreadNameForUrl) {
       setSelectedThreadName(selectedThreadNameForUrl);
     }
@@ -259,59 +234,6 @@ threadCallSortDirection,
     downloadCsv(`codex-thread-filtered-calls-${csvDateStamp()}.csv`, rowsToCsv(exportRows, callCsvColumns));
     setExportStatus(`Exported ${exportRows.length} calls`);
   }
-
-  function resetThreadTablePage() {
-    setVisibleThreadRows(threadsTablePageSize);
-  }
-
-  function updateLocalQuery(value: string) {
-    setLocalQuery(value);
-    resetThreadTablePage();
-  }
-
-  function updateRiskFilter(value: string) {
-    setRiskFilter(normalizeThreadRiskFilter(value));
-    resetThreadTablePage();
-  }
-
-  function updateThreadSorting(updater: SortingState | ((old: SortingState) => SortingState)) {
-    setThreadSorting(current => (typeof updater === 'function' ? updater(current) : updater));
-    resetThreadTablePage();
-  }
-
-  function clearThreadFilters() {
-    setLocalQuery('');
-    setRiskFilter('all');
-setSelectedThreadName(null);
-setVisibleThreadRows(threadsTablePageSize);
-setThreadCallSort('newest');
-setThreadCallSortDirection(defaultThreadCallSortDirection('newest'));
-    const url = buildThreadsViewLink({
-      localQuery: '',
-      riskFilter: 'all',
-      selectedThreadName: null,
-      sorting: threadSorting,
-      visibleRowCount: threadsTablePageSize,
-threadCallSort: 'newest',
-threadCallSortDirection: defaultThreadCallSortDirection('newest'),
-});
-    window.history.replaceState(null, '', url);
-    setFilterStatus('Thread filters cleared');
-  }
-
-  function toggleThread(threadName: string) {
-    setSelectedThreadName(current => current === threadName ? null : threadName);
-  }
-
-function updateThreadCallSort(value: string) {
-const nextSort = normalizeThreadCallSort(value);
-setThreadCallSort(nextSort);
-setThreadCallSortDirection(defaultThreadCallSortDirection(nextSort));
-}
-
-function updateThreadCallSortDirection(value: string) {
-setThreadCallSortDirection(value === 'asc' ? 'asc' : 'desc');
-}
 
   function selectExploreWorkspace(workspace: ExploreWorkspaceId) {
     if (workspace === 'threads') return;

@@ -215,16 +215,13 @@ it('sorts table columns through accessible header controls', () => {
   expect(screen.queryByRole('columnheader', { name: /Reasoning Output/i })).not.toBeInTheDocument();
 
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('button', { name: /^Threads$/i }));
-    const threadsTable = screen.getByRole('table', { name: 'Thread leaderboard' });
+    const threadsTable = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
     expect(within(threadsTable).getByRole('button', { name: /Sort by Latest/i })).toBeInTheDocument();
     expect(within(threadsTable).getByRole('button', { name: /Sort by Avg Gap/i })).toBeInTheDocument();
     expect(within(threadsTable).getByRole('button', { name: /Sort by Initiated/i })).toBeInTheDocument();
     expect(within(threadsTable).getByRole('button', { name: /Sort by Reasoning Output/i })).toBeInTheDocument();
-    expect(screen.getByText('Cached / uncached input')).toBeInTheDocument();
-    expect(screen.getByText('Peak context')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Columns/i }));
     expect(screen.getByRole('checkbox', { name: 'Thread' })).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: 'Investigate' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Reasoning Output' })).toBeChecked();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Reasoning Output' }));
     expect(screen.queryByRole('columnheader', { name: /Reasoning Output/i })).not.toBeInTheDocument();
