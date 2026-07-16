@@ -160,6 +160,74 @@ def synthetic_usage_event(
     )
 
 
+def write_usage_session(
+    tmp_path: Path,
+    conversation_id: str,
+    tokens: tuple[int, int, int, int],
+) -> Path:
+    input_tokens, cached_tokens, output_tokens, reasoning_tokens = tokens
+    total_tokens = input_tokens + output_tokens
+    codex_home = tmp_path / "codex"
+    log_path = codex_home / "sessions" / "2026" / "07" / "16" / "synthetic.jsonl"
+    rows = [
+        {
+            "timestamp": "2026-07-16T00:00:00.000Z",
+            "type": "session_meta",
+            "payload": {"id": conversation_id},
+        },
+        {
+            "timestamp": "2026-07-16T00:00:01.000Z",
+            "type": "event_msg",
+            "payload": {
+                "type": "token_count",
+                "info": {
+                    "total_token_usage": {
+                        "input_tokens": input_tokens,
+                        "cached_input_tokens": cached_tokens,
+                        "output_tokens": output_tokens,
+                        "reasoning_output_tokens": reasoning_tokens,
+                        "total_tokens": total_tokens,
+                    },
+                    "last_token_usage": {
+                        "input_tokens": input_tokens,
+                        "cached_input_tokens": cached_tokens,
+                        "output_tokens": output_tokens,
+                        "reasoning_output_tokens": reasoning_tokens,
+                        "total_tokens": total_tokens,
+                    },
+                    "model_context_window": 258_400,
+                },
+            },
+        },
+    ]
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+    )
+    return codex_home
+
+
+def write_otel_directory(
+    tmp_path: Path,
+    conversation_id: str,
+    tokens: tuple[int, int, int, int],
+) -> Path:
+    directory = tmp_path / "otel"
+    write_lines(
+        directory / "codex-completions.jsonl",
+        [
+            synthetic_otlp_line(
+                attributes=completion_attributes(
+                    conversation_id=conversation_id,
+                    tokens=tokens,
+                    service_tier="priority",
+                )
+            )
+        ],
+    )
+    return directory
+
+
 def write_lines(path: Path, lines: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(f"{line}\n" for line in lines), encoding="utf-8")

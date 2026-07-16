@@ -12,12 +12,17 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.core.models import DiagnosticFact, RefreshResult, UsageEvent
-from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH
+from codex_usage_tracker.core.paths import (
+    DEFAULT_CODEX_HOME,
+    DEFAULT_DB_PATH,
+    DEFAULT_OTEL_COMPLETIONS_DIR,
+)
 from codex_usage_tracker.core.schema import (
     DIAGNOSTIC_FACT_COLUMN_NAMES,
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
+from codex_usage_tracker.parser.otel import OTEL_DIAGNOSTIC_KEYS
 from codex_usage_tracker.parser.state import (
     PARSER_ADAPTER_VERSION,
     PARSER_DIAGNOSTIC_KEYS,
@@ -152,6 +157,16 @@ from codex_usage_tracker.store.usage_record_queries import (
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 DIAGNOSTIC_FACT_COLUMNS = list(DIAGNOSTIC_FACT_COLUMN_NAMES)
+OTEL_REFRESH_COUNTER_KEYS = (
+    "otel_files_scanned",
+    "otel_imported",
+    "otel_duplicates",
+    "otel_matched",
+    "otel_pending",
+    "otel_ambiguous",
+    "otel_conflicts",
+    *OTEL_DIAGNOSTIC_KEYS,
+)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
 SQLITE_VARIABLE_BATCH_SIZE = 500
 RefreshProgressCallback = Callable[[dict[str, object]], None]
@@ -162,6 +177,7 @@ def refresh_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
+    otel_dir: Path = DEFAULT_OTEL_COMPLETIONS_DIR,
     progress_callback: RefreshProgressCallback | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
@@ -176,6 +192,7 @@ def refresh_usage_index(
         db_path=db_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
+        otel_dir=otel_dir,
         progress_callback=progress_callback,
         derived_fact_sync=derived_fact_sync,
     )
@@ -186,6 +203,7 @@ def rebuild_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
+    otel_dir: Path = DEFAULT_OTEL_COMPLETIONS_DIR,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
     """Drop and rebuild the usage index from all selected Codex logs."""
@@ -199,6 +217,7 @@ def rebuild_usage_index(
         db_path=db_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
+        otel_dir=otel_dir,
         derived_fact_sync=derived_fact_sync,
     )
 
@@ -348,6 +367,7 @@ def record_refresh_metadata(
     skipped_events: int,
     inserted_or_updated_events: int,
     parser_diagnostics: dict[str, int] | None = None,
+    otel_diagnostics: dict[str, int] | None = None,
     parsed_source_files: int | None = None,
     skipped_source_files: int | None = None,
 ) -> None:
@@ -370,6 +390,9 @@ def record_refresh_metadata(
     diagnostics = parser_diagnostics or {}
     for key in PARSER_DIAGNOSTIC_KEYS:
         values[f"parser_{key}"] = str(int(diagnostics.get(key, 0)))
+    otel_counters = otel_diagnostics or {}
+    for key in OTEL_REFRESH_COUNTER_KEYS:
+        values[key] = str(int(otel_counters.get(key, 0)))
     with connect(db_path) as conn:
         init_db(conn)
         conn.executemany(

@@ -146,6 +146,12 @@ def _apply_to_canonical_group(
             service_tier_source = coalesce(service_tier_source, ?),
             service_tier_confidence = coalesce(service_tier_confidence, ?)
         WHERE coalesce(nullif(canonical_record_id, ''), record_id) = ?
+          AND (
+              service_tier IS NULL
+              OR fast IS NULL
+              OR service_tier_source IS NULL
+              OR service_tier_confidence IS NULL
+          )
         """,
         (*desired, canonical_id),
     )

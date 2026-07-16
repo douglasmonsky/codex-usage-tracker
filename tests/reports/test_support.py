@@ -119,6 +119,19 @@ def test_support_bundle_strict_mode_redacts_local_paths_and_doctor_text(
         assert raw_path not in bundle_text
 
 
+def test_support_bundle_exposes_counts_without_otel_identifiers(tmp_path: Path) -> None:
+    payload = support_bundle_payload(
+        db_path=tmp_path / "usage.sqlite3", codex_home=tmp_path / "codex"
+    )
+    encoded = json.dumps(payload, sort_keys=True)
+    otel_encoded = json.dumps(payload["otel"], sort_keys=True)
+
+    assert payload["otel"]["completion_directory_exists"] in {True, False}
+    assert "conversation-a" not in encoded
+    assert "fingerprint" not in otel_encoded
+    assert "source_path" not in otel_encoded
+
+
 def _make_support_fixture(tmp_path: Path) -> dict[str, Path]:
     codex_home = tmp_path / ".codex"
     db_path = tmp_path / "usage.sqlite3"

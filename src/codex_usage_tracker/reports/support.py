@@ -17,6 +17,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_DASHBOARD_PATH,
     DEFAULT_DB_PATH,
     DEFAULT_MARKETPLACE_PATH,
+    DEFAULT_OTEL_COMPLETIONS_DIR,
     DEFAULT_PLUGIN_LINK,
     DEFAULT_PRICING_PATH,
     DEFAULT_PROJECTS_PATH,
@@ -41,6 +42,7 @@ ISSUE_SAFE_SECTIONS = (
     "paths",
     "database",
     "refresh",
+    "otel",
     "pricing",
     "allowance",
     "thresholds",
@@ -58,6 +60,7 @@ ISSUE_SAFE_FIELDS = (
     "paths.sessions_dir_exists",
     "database",
     "refresh",
+    "otel",
     "pricing.loaded",
     "pricing.error",
     "pricing.model_count",
@@ -162,6 +165,7 @@ def support_bundle_payload(
     allowance = load_allowance_config(allowance_path, rate_card_path=rate_card_path)
     thresholds = load_threshold_config(thresholds_path)
     projects = load_project_config(projects_path)
+    refresh = refresh_metadata(db_path)
     payload = {
         "bundle_version": 1,
         "generated_at": datetime.now(timezone.utc)
@@ -197,7 +201,13 @@ def support_bundle_payload(
         },
         "issue_report": support_bundle_issue_guidance(privacy_mode),
         "database": schema_state(db_path),
-        "refresh": refresh_metadata(db_path),
+        "refresh": refresh,
+        "otel": {
+            "completion_directory_exists": DEFAULT_OTEL_COMPLETIONS_DIR.is_dir(),
+            "refresh_counts": {
+                key: value for key, value in refresh.items() if key.startswith("otel_")
+            },
+        },
         "pricing": {
             "loaded": pricing.loaded,
             "error": pricing.error,

@@ -265,4 +265,5 @@ def test_matched_rows_are_idempotent_and_can_be_reset_for_rebuild(tmp_path: Path
 
     assert first.matched == 1
     assert second.matched == 1
+    assert second.updated_usage_rows == 0
     assert tuple(state) == ("pending", None)
