@@ -29,6 +29,7 @@ from codex_usage_tracker.pricing.allowance_rate_card import (
 )
 from codex_usage_tracker.pricing.allowance_usage import (
     annotate_rows_with_allowance,
+    estimate_standard_usage_credits,
     estimate_usage_credits,
     resolve_credit_rate,
     summarize_allowance_usage,
@@ -45,6 +46,7 @@ __all__ = (
     "UsageAllowanceConfig",
     "RateCardUpdateResult",
     "annotate_rows_with_allowance",
+    "estimate_standard_usage_credits",
     "estimate_usage_credits",
     "load_allowance_config",
     "load_bundled_rate_card",

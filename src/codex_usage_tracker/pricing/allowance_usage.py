@@ -17,9 +17,11 @@ from codex_usage_tracker.pricing.allowance_rate_card import (
     number_value,
     optional_str,
 )
+from codex_usage_tracker.pricing.fast_tier import credit_multiplier_for_row
 
 __all__ = (
     "annotate_rows_with_allowance",
+    "estimate_standard_usage_credits",
     "estimate_usage_credits",
     "resolve_credit_rate",
     "summarize_allowance_usage",
@@ -41,10 +43,14 @@ def annotate_rows_with_allowance(
         copy = dict(row)
         model = copy.get(model_field)
         match = resolve_credit_rate(model, resolved)
+        multiplier, multiplier_source = credit_multiplier_for_row(copy)
         if match is None:
             copy.update(
                 {
                     "usage_credits": None,
+                    "standard_usage_credits": None,
+                    "usage_credit_multiplier": multiplier,
+                    "usage_credit_multiplier_source": multiplier_source,
                     "usage_credit_model": None,
                     "usage_credit_confidence": "unpriced",
                     "usage_credit_source": "No Codex credit rate",
@@ -56,9 +62,13 @@ def annotate_rows_with_allowance(
             )
         else:
             rated_model, rates, confidence, note, metadata = match
+            standard_credits = estimate_standard_usage_credits(copy, rates)
             copy.update(
                 {
-                    "usage_credits": estimate_usage_credits(copy, rates),
+                    "usage_credits": standard_credits * multiplier,
+                    "standard_usage_credits": standard_credits,
+                    "usage_credit_multiplier": multiplier,
+                    "usage_credit_multiplier_source": multiplier_source,
                     "usage_credit_model": rated_model,
                     "usage_credit_confidence": confidence,
                     "usage_credit_source": metadata.get("source_name")
@@ -185,8 +195,10 @@ def _resolve_alias_credit_rate(
     return target, rates, confidence, note, metadata
 
 
-def estimate_usage_credits(row: dict[str, Any], rates: dict[str, float]) -> float:
-    """Estimate Codex credits from aggregate token counters."""
+def estimate_standard_usage_credits(
+    row: dict[str, Any], rates: dict[str, float]
+) -> float:
+    """Estimate Standard-tier Codex credits from aggregate token counters."""
 
     input_rate = rates["input_per_million"]
     cached_rate = rates["cached_input_per_million"]
@@ -199,3 +211,11 @@ def estimate_usage_credits(row: dict[str, Any], rates: dict[str, float]) -> floa
     return (
         (uncached_input * input_rate) + (cached_input * cached_rate) + (output_tokens * output_rate)
     ) / 1_000_000
+
+
+def estimate_usage_credits(row: dict[str, Any], rates: dict[str, float]) -> float:
+    """Estimate effective Codex credits, including confirmed Fast multipliers."""
+
+    standard = estimate_standard_usage_credits(row, rates)
+    multiplier, _source = credit_multiplier_for_row(row)
+    return standard * multiplier

@@ -11,6 +11,7 @@ from codex_usage_tracker.pricing.api import (
     OPENAI_LATEST_MODEL_MD_URL,
     OPENAI_PRICING_MD_URL,
     PRICING_SCHEMA,
+    PricingConfig,
     PricingParseError,
     annotate_rows_with_efficiency,
     efficiency_flags,
@@ -43,6 +44,43 @@ OPENAI_PRICING_FIXTURE = """
   ]}
 />
 """
+
+
+def test_service_tier_does_not_change_estimated_cost_usd() -> None:
+    pricing = PricingConfig(
+        path=Path("/synthetic/pricing.json"),
+        models={
+            "gpt-5.6": {
+                "input_per_million": 10.0,
+                "cached_input_per_million": 1.0,
+                "output_per_million": 50.0,
+            }
+        },
+        loaded=True,
+    )
+    row = _credit_row_for_cost(fast=0, service_tier="standard")
+
+    standard = estimate_cost_usd(row, pricing)
+    fast = estimate_cost_usd(
+        {**row, "fast": 1, "service_tier": "fast"}, pricing
+    )
+
+    assert fast == standard
+
+
+def _credit_row_for_cost(
+    *, fast: int | None, service_tier: str | None
+) -> dict[str, object]:
+    return {
+        "record_id": "synthetic-call",
+        "model": "gpt-5.6",
+        "input_tokens": 100,
+        "cached_input_tokens": 20,
+        "uncached_input_tokens": 80,
+        "output_tokens": 10,
+        "fast": fast,
+        "service_tier": service_tier,
+    }
 
 
 def test_pricing_fetch_rejects_non_https_sources() -> None:
