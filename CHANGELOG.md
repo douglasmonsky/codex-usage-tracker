@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 0.20.0 - 2026-07-16
+
+- Reinvent the Threads tab around inline row expansion, progressively loading and virtualizing every call in the selected thread while preserving explicit investigator actions, deep links, responsive layouts, retry recovery, and aggregate-first privacy boundaries.
 - Complete the Simplified Chinese dashboard experience across React views, visualization metadata, tables, accessibility text, CLI help, and dashboard lifecycle messages while preserving user-provided data verbatim.
 - Improve the Overview token-flow chart at constrained desktop widths with a taller single-column layout, larger Sankey node gaps, and label-safe padding; keep virtualized evidence-table actions on one row.
 - Apply official long-context input, cached-input, and output price multipliers to concrete calls above 272K input tokens when the selected OpenAI service tier publishes long-context rates, while keeping aggregate summaries from being incorrectly thresholded.
