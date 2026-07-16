@@ -1,0 +1,139 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from codex_usage_tracker.store.otel_ingest import (
+    discover_otel_sources,
+    ingest_otel_completion_files,
+)
+from tests.otel_helpers import (
+    append_text,
+    completion_attributes,
+    initialized_connection,
+    synthetic_fast_completion,
+    synthetic_otlp_line,
+    synthetic_standard_completion,
+    write_lines,
+)
+
+
+def test_discovery_is_bounded_and_deterministic(tmp_path: Path) -> None:
+    directory = tmp_path / "otel"
+    write_lines(directory / "codex-completions.jsonl", [])
+    write_lines(directory / "codex-completions-20260716.jsonl", [])
+    write_lines(directory / "unrelated.jsonl", [])
+
+    assert [path.name for path in discover_otel_sources(directory)] == [
+        "codex-completions-20260716.jsonl",
+        "codex-completions.jsonl",
+    ]
+    assert discover_otel_sources(tmp_path / "missing") == []
+
+
+def test_incremental_ingest_reads_each_complete_line_once(tmp_path: Path) -> None:
+    directory = tmp_path / "otel"
+    source = directory / "codex-completions.jsonl"
+    write_lines(source, [synthetic_fast_completion("conversation-a", 100)])
+    with initialized_connection(tmp_path) as conn:
+        first = ingest_otel_completion_files(conn, directory)
+        append_text(source, synthetic_standard_completion("conversation-b", 200) + "\n")
+        second = ingest_otel_completion_files(conn, directory)
+        rows = conn.execute("SELECT fingerprint FROM otel_completion_events").fetchall()
+
+    assert first.imported == 1
+    assert second.imported == 1
+    assert len(rows) == 2
+
+
+def test_partial_last_line_is_retried_after_append(tmp_path: Path) -> None:
+    directory = tmp_path / "otel"
+    source = directory / "codex-completions.jsonl"
+    complete = synthetic_otlp_line(attributes=completion_attributes())
+    source.parent.mkdir(parents=True)
+    source.write_text(complete[:-1], encoding="utf-8")
+    with initialized_connection(tmp_path) as conn:
+        assert ingest_otel_completion_files(conn, directory).imported == 0
+        source.write_text(complete + "\n", encoding="utf-8")
+        assert ingest_otel_completion_files(conn, directory).imported == 1
+
+
+def test_rotation_and_reread_do_not_duplicate_semantic_completion(tmp_path: Path) -> None:
+    directory = tmp_path / "otel"
+    current = directory / "codex-completions.jsonl"
+    rotated = directory / "codex-completions-20260716.jsonl"
+    line = synthetic_otlp_line(attributes=completion_attributes()) + "\n"
+    current.parent.mkdir(parents=True)
+    current.write_text(line, encoding="utf-8")
+    with initialized_connection(tmp_path) as conn:
+        ingest_otel_completion_files(conn, directory)
+        current.replace(rotated)
+        current.write_text(line, encoding="utf-8")
+        result = ingest_otel_completion_files(conn, directory)
+        count = conn.execute("SELECT COUNT(*) FROM otel_completion_events").fetchone()[0]
+
+    assert count == 1
+    assert result.duplicates >= 1
+
+
+def test_truncation_or_inode_replacement_resets_cursor_safely(tmp_path: Path) -> None:
+    directory = tmp_path / "otel"
+    source = directory / "codex-completions.jsonl"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        synthetic_otlp_line(
+            attributes=completion_attributes(conversation_id="synthetic-a")
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with initialized_connection(tmp_path) as conn:
+        ingest_otel_completion_files(conn, directory)
+        source.unlink()
+        source.write_text(
+            synthetic_otlp_line(
+                attributes=completion_attributes(conversation_id="synthetic-b")
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        assert ingest_otel_completion_files(conn, directory).imported == 1
+
+
+def test_ingest_never_persists_body_or_arbitrary_attributes(tmp_path: Path) -> None:
+    directory = tmp_path / "otel"
+    attributes = completion_attributes()
+    attributes["secret.attribute"] = "synthetic-secret-value"
+    write_lines(
+        directory / "codex-completions.jsonl",
+        [
+            synthetic_otlp_line(
+                attributes=attributes, body="synthetic-private-body"
+            )
+        ],
+    )
+    with initialized_connection(tmp_path) as conn:
+        ingest_otel_completion_files(conn, directory)
+        rows = conn.execute("SELECT * FROM otel_completion_events").fetchall()
+        encoded = json.dumps([dict(row) for row in rows], sort_keys=True)
+
+    assert "synthetic-private-body" not in encoded
+    assert "synthetic-secret-value" not in encoded
+    assert "secret.attribute" not in encoded
+
+
+def test_cursor_advances_past_complete_invalid_lines(tmp_path: Path) -> None:
+    directory = tmp_path / "otel"
+    source = directory / "codex-completions.jsonl"
+    write_lines(source, ["{"])
+
+    with initialized_connection(tmp_path) as conn:
+        first = ingest_otel_completion_files(conn, directory)
+        second = ingest_otel_completion_files(conn, directory)
+        cursor = conn.execute(
+            "SELECT parsed_line, parsed_offset FROM otel_completion_sources"
+        ).fetchone()
+
+    assert first.diagnostics["otel_invalid_json"] == 1
+    assert second.diagnostics == {}
+    assert tuple(cursor) == (1, source.stat().st_size)
