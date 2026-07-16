@@ -120,6 +120,16 @@ expect(header).toContain('model_context_window');
   it('includes an exact Service Tier column', () => {
     expect(callColumns.some(column => column.id === 'serviceTier')).toBe(true);
   });
+
+  it('renders Flex and Priority from the exact tier instead of the boolean fallback', () => {
+    const serviceTierColumn = callColumns.find(column => column.id === 'serviceTier');
+    const accessor = serviceTierColumn && 'accessorFn' in serviceTierColumn
+      ? serviceTierColumn.accessorFn
+      : undefined;
+
+    expect(accessor?.({ serviceTier: 'flex', fast: false } as CallRow, 0)).toBe('Flex');
+    expect(accessor?.({ serviceTier: 'priority', fast: true } as CallRow, 0)).toBe('Priority / Fast');
+  });
 });
 
 describe('call table columns', () => {

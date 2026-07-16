@@ -17,18 +17,46 @@ type ContextWindowInput = {
 type TopCountStyle = 'parenthetical' | 'x';
 
 type ServiceTierInput = {
+  serviceTier: string;
   fast: boolean | null;
   serviceTierConfidence: string;
   fastProxyCandidate: boolean;
 };
 
-export function serviceTierLabel(call: ServiceTierInput): 'Fast' | 'Standard' | 'Unknown' {
+const knownServiceTierLabels: Record<string, string> = {
+  priority: 'Priority / Fast',
+  fast: 'Fast',
+  default: 'Default / Standard',
+  standard: 'Standard',
+  flex: 'Flex',
+  batch: 'Batch',
+};
+
+function exactServiceTierLabel(value: string): string | null {
+  const normalized = value.trim().toLowerCase().replace(/[\s_]+/g, '-');
+  if (!normalized) return null;
+  const known = knownServiceTierLabels[normalized];
+  if (known) return known;
+  if (normalized.length > 48 || !/^[a-z0-9.-]+$/.test(normalized)) return 'Other';
+  return normalized
+    .split(/[-.]+/)
+    .filter(Boolean)
+    .map(part => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
+}
+
+export function serviceTierLabel(call: ServiceTierInput): string {
+  const exactLabel = exactServiceTierLabel(call.serviceTier);
+  if (exactLabel) return exactLabel;
   if (call.fast === true) return 'Fast';
   if (call.fast === false) return 'Standard';
   return 'Unknown';
 }
 
 export function serviceTierDetail(call: ServiceTierInput): string {
+  if (exactServiceTierLabel(call.serviceTier)) {
+    return `observed ${serviceTierLabel(call)} · ${call.serviceTierConfidence || 'exact'}`;
+  }
   if (call.fast !== null) {
     return `confirmed ${serviceTierLabel(call)} · ${call.serviceTierConfidence || 'exact'}`;
   }

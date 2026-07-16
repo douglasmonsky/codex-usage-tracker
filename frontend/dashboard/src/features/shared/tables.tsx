@@ -78,7 +78,7 @@ export const callColumns: Array<ColumnDef<CallRow>> = [
     header: 'Service Tier',
     cell: info => {
       const label = String(info.getValue());
-      const tone = label === 'Fast' ? 'green' : label === 'Standard' ? 'blue' : '';
+      const tone = label.includes('Fast') ? 'green' : label.includes('Standard') ? 'blue' : '';
       return <span className={`status-badge ${tone}`.trim()}>{label}</span>;
     },
   },
