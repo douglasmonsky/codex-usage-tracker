@@ -19,7 +19,6 @@ export type ThreadCallSortKey =
   | 'cache';
 export type ThreadCallSortDirection = 'asc' | 'desc';
 
-export const threadCallPageSize = 5;
 export const threadsTablePageSize = 250;
 export const detailFirstSelectedThreadName = '__detail_first__';
 
@@ -100,11 +99,6 @@ export function readThreadCallSortDirectionParam(
   return direction === 'asc' || direction === 'desc' ? direction : defaultThreadCallSortDirection(sortKey);
 }
 
-export function readThreadCallPageVisibleRowsParam(pageSize: number, href = window.location.href): number {
-  const page = Number(readThreadSearchParam('thread_call_page', href) || 1);
-  return Number.isFinite(page) && page > 1 ? Math.floor(page) * pageSize : pageSize;
-}
-
 export function normalizeThreadCallSort(value: string): ThreadCallSortKey {
 const normalizedValue = normalizeLegacyThreadCallSortKey(value);
 return threadCallSortValues.has(normalizedValue) ? (normalizedValue as ThreadCallSortKey) : 'newest';
@@ -122,7 +116,6 @@ export type ThreadsViewLinkState = {
   visibleRowCount: number;
 threadCallSort: ThreadCallSortKey;
 threadCallSortDirection: ThreadCallSortDirection;
-visibleThreadCallCount: number;
 };
 
 export function buildThreadsViewLink(state: ThreadsViewLinkState, href = window.location.href): URL {
@@ -132,6 +125,7 @@ export function buildThreadsViewLink(state: ThreadsViewLinkState, href = window.
   url.searchParams.delete('detail');
   url.searchParams.delete('expand');
   url.searchParams.delete('threads');
+  url.searchParams.delete('thread_call_page');
 
   const activeSort = state.sorting[0];
   const sortKey = activeSort && threadSortKeyValues.has(activeSort.id) ? activeSort.id : '';
@@ -141,19 +135,13 @@ export function buildThreadsViewLink(state: ThreadsViewLinkState, href = window.
   setOptionalThreadParam(url, 'sort', sortKey, '');
   setOptionalThreadParam(url, 'direction', sortKey ? (activeSort?.desc ? 'desc' : 'asc') : '', '');
 setOptionalThreadParam(url, 'page', String(threadPageNumberFromVisibleRows(state.visibleRowCount, threadsTablePageSize)), '1');
-setOptionalThreadParam(url, 'thread_call_sort', state.threadCallSort, 'newest');
+setOptionalThreadParam(url, 'thread_call_sort', state.selectedThreadName ? state.threadCallSort : '', 'newest');
 setOptionalThreadParam(
   url,
   'thread_call_direction',
-  state.threadCallSortDirection,
+  state.selectedThreadName ? state.threadCallSortDirection : '',
   defaultThreadCallSortDirection(state.threadCallSort),
 );
-setOptionalThreadParam(
-    url,
-    'thread_call_page',
-    String(threadPageNumberFromVisibleRows(state.visibleThreadCallCount, threadCallPageSize)),
-    '1',
-  );
   return url;
 }
 
