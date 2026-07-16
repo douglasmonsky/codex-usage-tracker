@@ -1,43 +1,30 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import type { SortingState } from '@tanstack/react-table';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { useShellI18n } from '../../app/i18nContext';
 import type { CallRow, ContextRuntime, DashboardModel, ThreadRow } from '../../api/types';
 import { threadCallsInfiniteQueryOptions, threadsInfiniteQueryOptions } from '../../data/exploreQueries';
 import { exploreWorkspaceUrl, type ExploreWorkspaceId } from '../explore/ExploreWorkspaceSwitcher';
 import { useEvidenceGridPreferences } from '../explore/useEvidenceGridPreferences';
 import { csvDateStamp, downloadCsv, rowsToCsv } from '../shared/exportCsv';
-import { callCsvColumns, threadActionColumn, threadColumns } from '../shared/tables';
-import {
-  buildThreadsFilterSummary,
-  normalizeThreadRiskFilter,
-  type ThreadRiskFilter,
-} from './threadFilterSummary';
+import { callCsvColumns, threadColumns } from '../shared/tables';
+import { buildThreadsFilterSummary } from './threadFilterSummary';
 import {
   buildThreadsViewLink,
-  defaultThreadCallSortDirection,
   detailFirstSelectedThreadName,
   filterThreads,
-  normalizeThreadCallSort,
-  readInitialSelectedThreadParam,
-  readThreadCallPageVisibleRowsParam,
-  readThreadCallSortDirectionParam,
-  readThreadCallSortParam,
-  readThreadPageVisibleRowsParam,
   readThreadRiskParam,
   readThreadSearchParam,
   readThreadSortingParam,
   sortThreads,
-  threadCallPageSize,
   threadsTablePageSize,
-  type ThreadCallSortDirection,
-  type ThreadCallSortKey,
 } from './threadsUrlState';
 import { threadSummaryToRow, type ExploreThreadRow } from './threadSummaryAdapter';
 import { threadsEndpointState } from './threadsEndpointState';
 import { buildCacheFrontierSpec, buildThreadLifecycleSpec } from './threadVisualizations';
-import { compareCallTimeDescending, threadLabelsMatch } from './threadAnalysis';
-import { ThreadsExplorerView, type ThreadEvidenceViewMode } from './ThreadsExplorerView';
+import { compareCallTimeDescending, sortThreadCalls, threadLabelsMatch } from './threadAnalysis';
+import { dedupeThreadCallPages, shouldFetchNextThreadCallPage } from './threadCallLoading';
+import { ThreadsExplorerView } from './ThreadsExplorerView';
+import { useThreadsPageControls } from './useThreadsPageControls';
 
 type ThreadsPageProps = {
   model: DashboardModel;
@@ -100,25 +87,17 @@ export function ThreadsPage({
   onNavigateView,
 }: ThreadsPageProps) {
   const shellI18n = useShellI18n();
-  const [localQuery, setLocalQuery] = useState(() => readThreadSearchParam('thread_q'));
-const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadRiskParam());
-  const [selectedThreadName, setSelectedThreadName] = useState<string | null>(() => readInitialSelectedThreadParam());
-  const [threadSorting, setThreadSorting] = useState<SortingState>(() => readThreadSortingParam());
-  const [visibleThreadRows, setVisibleThreadRows] = useState(() => readThreadPageVisibleRowsParam(threadsTablePageSize));
-  const initialThreadCallSort = readThreadCallSortParam();
-  const [threadCallSort, setThreadCallSort] = useState<ThreadCallSortKey>(() => initialThreadCallSort);
-  const [threadCallSortDirection, setThreadCallSortDirection] = useState<ThreadCallSortDirection>(() =>
-    readThreadCallSortDirectionParam(initialThreadCallSort),
-  );
-  const [visibleThreadCallCount, setVisibleThreadCallCount] = useState(() => readThreadCallPageVisibleRowsParam(threadCallPageSize));
-  const [exportStatus, setExportStatus] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [viewMode, setViewMode] = useState<ThreadEvidenceViewMode>('table');
+  const {
+    localQuery, riskFilter, selectedThreadName, threadSorting, visibleThreadRows,
+    threadCallSort, threadCallSortDirection, exportStatus, filterStatus, viewMode,
+    setSelectedThreadName, setVisibleThreadRows, setExportStatus, setViewMode,
+    updateLocalQuery, updateRiskFilter, updateThreadSorting, clearThreadFilters,
+    toggleThread, updateThreadCallSort, updateThreadCallSortDirection,
+  } = useThreadsPageControls(globalQuery);
   const gridPreferences = useEvidenceGridPreferences('codexUsageThreadsEvidenceGrid', {
     density: 'compact',
     columnVisibility: {},
   });
-  const previousGlobalQueryRef = useRef(globalQuery);
 
   const endpointState = useMemo(
     () => threadsEndpointState({
@@ -181,14 +160,22 @@ const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadR
   const selected =
     selectedThreadName === detailFirstSelectedThreadName
       ? sortedThreads[0] ?? null
-      : sortedThreads.find(thread => thread.name === selectedThreadName) ?? sortedThreads[0] ?? null;
+      : sortedThreads.find(thread => thread.name === selectedThreadName) ?? null;
   const selectedThreadNameForUrl =
     selectedThreadName === detailFirstSelectedThreadName ? (selected?.name ?? null) : selectedThreadName;
   const localSelectedCalls = useMemo(() => {
     if (!selected) return [];
-    return model.calls.filter(call => threadLabelsMatch(call.thread, selected.name)).sort(compareCallTimeDescending);
-  }, [model.calls, selected]);
+    return sortThreadCalls(
+      model.calls.filter(call => threadLabelsMatch(call.thread, selected.name)),
+      threadCallSort,
+      threadCallSortDirection,
+    );
+  }, [model.calls, selected, threadCallSort, threadCallSortDirection]);
   const selectedThreadKey = (selected as ExploreThreadRow | null)?.threadKey || localSelectedCalls[0]?.threadKey || selected?.name || '';
+  const selectedThreadQueryEnabled = focusedEndpointsEnabled
+    && !contextRuntime.fileMode
+    && Boolean(contextRuntime.apiToken)
+    && Boolean(selectedThreadKey);
   const selectedThreadCallsQuery = useInfiniteQuery({
     ...threadCallsInfiniteQueryOptions({
       runtime: contextRuntime,
@@ -199,41 +186,27 @@ const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadR
       sort: threadCallSort === 'newest' ? 'time' : threadCallSort,
       direction: threadCallSortDirection,
     }),
-    enabled: focusedEndpointsEnabled && !contextRuntime.fileMode && Boolean(contextRuntime.apiToken) && Boolean(selectedThreadKey),
-    placeholderData: previous => previous,
+    enabled: selectedThreadQueryEnabled,
   });
-  const selectedCalls = selectedThreadCallsQuery.data?.pages.flatMap(page => page.rows) ?? localSelectedCalls;
-  const selectedCallCount = selectedThreadCallsQuery.data?.pages[0]?.totalMatchedRows ?? selectedCalls.length;
-  const selectedWithLatest = selected
-    ? { ...selected, latestCallId: selected.latestCallId || selectedCalls[0]?.id || '' }
-    : null;
-  const previousSelectedThreadRef = useRef(selected?.name ?? '');
-  const threadTableColumns = useMemo(
-    () => [...threadColumns, threadActionColumn({ onOpenInvestigator, onCopyCallLink })],
-    [onCopyCallLink, onOpenInvestigator],
+  const focusedCallPages = selectedThreadCallsQuery.data?.pages ?? [];
+  const selectedCalls = useMemo(
+    () => dedupeThreadCallPages(focusedCallPages, localSelectedCalls),
+    [focusedCallPages, localSelectedCalls],
   );
+  const selectedCallCount = selectedThreadCallsQuery.data?.pages[0]?.totalMatchedRows ?? selectedCalls.length;
+  const threadTableColumns = threadColumns;
   const frontierSpec = useMemo(
     () => buildCacheFrontierSpec(sortedThreads, includeArchived ? 'all' : 'active', sourceRevision),
     [includeArchived, sortedThreads, sourceRevision],
   );
+  const lifecycleThread = selected ?? sortedThreads[0] ?? null;
+  const lifecycleCalls = selected ? selectedCalls : lifecycleThread
+    ? model.calls.filter(call => threadLabelsMatch(call.thread, lifecycleThread.name)).sort(compareCallTimeDescending)
+    : [];
   const lifecycleSpec = useMemo(
-    () => buildThreadLifecycleSpec(selectedCalls, selected?.name ?? '', includeArchived ? 'all' : 'active', sourceRevision),
-    [includeArchived, selected?.name, selectedCalls, sourceRevision],
+    () => buildThreadLifecycleSpec(lifecycleCalls, lifecycleThread?.name ?? '', includeArchived ? 'all' : 'active', sourceRevision),
+    [includeArchived, lifecycleCalls, lifecycleThread?.name, sourceRevision],
   );
-
-  useEffect(() => {
-    const selectedName = selected?.name ?? '';
-    if (previousSelectedThreadRef.current === selectedName) return;
-    previousSelectedThreadRef.current = selectedName;
-    setVisibleThreadCallCount(threadCallPageSize);
-  }, [selected?.name]);
-
-  useEffect(() => {
-    if (previousGlobalQueryRef.current === globalQuery) return;
-    previousGlobalQueryRef.current = globalQuery;
-    setVisibleThreadRows(threadsTablePageSize);
-    setVisibleThreadCallCount(threadCallPageSize);
-  }, [globalQuery]);
 
   useEffect(() => {
     if (selectedThreadName === detailFirstSelectedThreadName && selectedThreadNameForUrl) {
@@ -250,82 +223,16 @@ const [riskFilter, setRiskFilter] = useState<ThreadRiskFilter>(() => readThreadR
       visibleRowCount: visibleThreadRows,
 threadCallSort,
 threadCallSortDirection,
-visibleThreadCallCount,
 });
     if (url.toString() !== window.location.href) {
       window.history.replaceState(null, '', url);
     }
-}, [localQuery, riskFilter, selectedThreadNameForUrl, threadCallSort, threadCallSortDirection, threadSorting, visibleThreadCallCount, visibleThreadRows]);
+}, [localQuery, riskFilter, selectedThreadNameForUrl, threadCallSort, threadCallSortDirection, threadSorting, visibleThreadRows]);
 
   function exportThreads() {
     const exportRows = callsForThreadRows(model.calls, sortThreads(filteredThreads, threadSorting));
     downloadCsv(`codex-thread-filtered-calls-${csvDateStamp()}.csv`, rowsToCsv(exportRows, callCsvColumns));
     setExportStatus(`Exported ${exportRows.length} calls`);
-  }
-
-  function resetThreadTablePage() {
-    setVisibleThreadRows(threadsTablePageSize);
-    setVisibleThreadCallCount(threadCallPageSize);
-  }
-
-  function updateLocalQuery(value: string) {
-    setLocalQuery(value);
-    resetThreadTablePage();
-  }
-
-  function updateRiskFilter(value: string) {
-    setRiskFilter(normalizeThreadRiskFilter(value));
-    resetThreadTablePage();
-  }
-
-  function updateThreadSorting(updater: SortingState | ((old: SortingState) => SortingState)) {
-    setThreadSorting(current => (typeof updater === 'function' ? updater(current) : updater));
-    resetThreadTablePage();
-  }
-
-  function clearThreadFilters() {
-    setLocalQuery('');
-    setRiskFilter('all');
-setSelectedThreadName(null);
-setVisibleThreadRows(threadsTablePageSize);
-setThreadCallSort('newest');
-setThreadCallSortDirection(defaultThreadCallSortDirection('newest'));
-setVisibleThreadCallCount(threadCallPageSize);
-    const url = buildThreadsViewLink({
-      localQuery: '',
-      riskFilter: 'all',
-      selectedThreadName: null,
-      sorting: threadSorting,
-      visibleRowCount: threadsTablePageSize,
-threadCallSort: 'newest',
-threadCallSortDirection: defaultThreadCallSortDirection('newest'),
-visibleThreadCallCount: threadCallPageSize,
-});
-    window.history.replaceState(null, '', url);
-    setFilterStatus('Thread filters cleared');
-  }
-
-  function selectThread(threadName: string) {
-    setSelectedThreadName(threadName);
-    setVisibleThreadCallCount(threadCallPageSize);
-  }
-
-function updateThreadCallSort(value: string) {
-const nextSort = normalizeThreadCallSort(value);
-setThreadCallSort(nextSort);
-setThreadCallSortDirection(defaultThreadCallSortDirection(nextSort));
-setVisibleThreadCallCount(threadCallPageSize);
-}
-
-function updateThreadCallSortDirection(value: string) {
-setThreadCallSortDirection(value === 'asc' ? 'asc' : 'desc');
-setVisibleThreadCallCount(threadCallPageSize);
-}
-
-  function openThreadInvestigator(thread: ThreadRow) {
-    if (thread.latestCallId) {
-      onOpenInvestigator(thread.latestCallId);
-    }
   }
 
   function selectExploreWorkspace(workspace: ExploreWorkspaceId) {
@@ -339,6 +246,65 @@ setVisibleThreadCallCount(threadCallPageSize);
     ? Boolean(focusedThreadsQuery.hasNextPage)
     : displayedThreads.length < sortedThreads.length;
 
+  useEffect(() => {
+    if (!endpointState.enabled
+      || !focusedThreadsQuery.data
+      || !selectedThreadName
+      || selectedThreadName === detailFirstSelectedThreadName
+      || selected
+      || !focusedThreadsQuery.hasNextPage
+      || focusedThreadsQuery.isFetchingNextPage
+      || focusedThreadsQuery.isFetchNextPageError) return;
+    void focusedThreadsQuery.fetchNextPage();
+  }, [
+    endpointState.enabled,
+    focusedThreadsQuery.data,
+    focusedThreadsQuery.hasNextPage,
+    focusedThreadsQuery.isFetchNextPageError,
+    focusedThreadsQuery.isFetchingNextPage,
+    selected,
+    selectedThreadName,
+  ]);
+
+  useEffect(() => {
+    if (endpointState.enabled && (
+      !focusedThreadsQuery.data
+      || focusedThreadsQuery.isFetching
+      || focusedThreadsQuery.isFetchingNextPage
+      || focusedThreadsQuery.hasNextPage
+    )) return;
+    if (selectedThreadName && selectedThreadName !== detailFirstSelectedThreadName
+      && !displayedThreads.some(thread => thread.name === selectedThreadName)) {
+      setSelectedThreadName(null);
+    }
+  }, [
+    displayedThreads,
+    endpointState.enabled,
+    focusedThreadsQuery.data,
+    focusedThreadsQuery.hasNextPage,
+    focusedThreadsQuery.isFetching,
+    focusedThreadsQuery.isFetchingNextPage,
+    selectedThreadName,
+  ]);
+
+  useEffect(() => {
+    if (!shouldFetchNextThreadCallPage({
+      expanded: Boolean(selected),
+      enabled: selectedThreadQueryEnabled,
+      hasNextPage: Boolean(selectedThreadCallsQuery.hasNextPage),
+      isFetchingNextPage: selectedThreadCallsQuery.isFetchingNextPage,
+      isFetchNextPageError: selectedThreadCallsQuery.isFetchNextPageError,
+    })) return;
+    void selectedThreadCallsQuery.fetchNextPage();
+  }, [
+    selected,
+    selectedThreadCallsQuery.data,
+    selectedThreadCallsQuery.hasNextPage,
+    selectedThreadQueryEnabled,
+    selectedThreadCallsQuery.isFetchNextPageError,
+    selectedThreadCallsQuery.isFetchingNextPage,
+  ]);
+
   function loadMoreThreads() {
     if (usingFocusedThreads && focusedThreadsQuery.hasNextPage) {
       void focusedThreadsQuery.fetchNextPage();
@@ -347,13 +313,12 @@ setVisibleThreadCallCount(threadCallPageSize);
     setVisibleThreadRows(current => Math.min(current + threadsTablePageSize, sortedThreads.length));
   }
 
-  function loadMoreSelectedThreadCalls() {
-    if (!selectedThreadCallsQuery.hasNextPage) return;
-    void selectedThreadCallsQuery.fetchNextPage().then(result => {
-      if (!result.isError) {
-        setVisibleThreadCallCount(current => Math.min(current + threadCallPageSize, selectedCallCount));
-      }
-    });
+  function retrySelectedThreadCalls() {
+    if (selectedThreadCallsQuery.isFetchNextPageError) {
+      void selectedThreadCallsQuery.fetchNextPage();
+      return;
+    }
+    void selectedThreadCallsQuery.refetch();
   }
 
   return (
@@ -377,10 +342,17 @@ setVisibleThreadCallCount(threadCallPageSize);
       }}
       selectedCallsState={{
         isFetching: selectedThreadCallsQuery.isFetching,
+        isFetchingNextPage: selectedThreadCallsQuery.isFetchingNextPage,
+        isFetchNextPageError: selectedThreadCallsQuery.isFetchNextPageError,
         count: selectedCallCount,
         hydrated: Boolean(selectedThreadCallsQuery.data),
         error: selectedThreadCallsQuery.error ? queryErrorMessage(selectedThreadCallsQuery.error) : null,
+        initialError: selectedThreadCallsQuery.isError && !selectedThreadCallsQuery.data
+          ? queryErrorMessage(selectedThreadCallsQuery.error)
+          : null,
+        storedSnapshot: Boolean(selectedCalls.length && !selectedThreadCallsQuery.data),
       }}
+      selectedCalls={selectedCalls}
       displayedThreads={displayedThreads}
       totalMatchedThreads={totalMatchedThreads}
       canLoadMoreThreads={canLoadMoreThreads}
@@ -390,19 +362,8 @@ setVisibleThreadCallCount(threadCallPageSize);
       selected={selected}
       frontierSpec={frontierSpec}
       lifecycleSpec={lifecycleSpec}
-      inspector={{
-        selected: selectedWithLatest,
-        calls: selectedCalls,
-        allCalls: model.calls,
-        totalCallCount: selectedCallCount,
-        hasMoreCalls: Boolean(selectedThreadCallsQuery.hasNextPage),
-        isFetchingMoreCalls: selectedThreadCallsQuery.isFetchingNextPage,
-        callSort: threadCallSort,
-        callSortDirection: threadCallSortDirection,
-        visibleCallCount: visibleThreadCallCount,
-        onVisibleCallCountChange: setVisibleThreadCallCount,
-        onLoadMoreCalls: loadMoreSelectedThreadCalls,
-      }}
+      callSort={threadCallSort}
+      callSortDirection={threadCallSortDirection}
       onWorkspaceChange={selectExploreWorkspace}
       onExport={exportThreads}
       onClearFilters={clearThreadFilters}
@@ -410,8 +371,8 @@ setVisibleThreadCallCount(threadCallPageSize);
       onRiskFilterChange={updateRiskFilter}
       onViewModeChange={setViewMode}
       onSortingChange={updateThreadSorting}
-      onSelectThread={selectThread}
-      onActivateThread={openThreadInvestigator}
+      onToggleThread={toggleThread}
+      onRetryCalls={retrySelectedThreadCalls}
       onLoadMoreThreads={loadMoreThreads}
       onCallSortChange={updateThreadCallSort}
       onCallSortDirectionChange={updateThreadCallSortDirection}

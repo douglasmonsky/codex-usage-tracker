@@ -6,12 +6,9 @@ import { useShellI18n } from '../../app/i18nContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PageLoadProgress, SegmentedControl } from '../../design';
 import { Visualization, type VisualizationSpecV1 } from '../../visualization';
-import { EvidenceGrid } from '../explore/EvidenceGrid';
 import { ExploreWorkspaceSwitcher } from '../explore/ExploreWorkspaceSwitcher';
 import type { EvidenceGridPreferences } from '../explore/useEvidenceGridPreferences';
-import { formatCompact, pct } from '../shared/format';
-import { threadInvestigatorRowLabel } from '../shared/tables';
-import { ThreadInspector } from './ThreadInspector';
+import { ThreadAccordionGrid } from './ThreadAccordionGrid';
 import type { ThreadRiskFilter } from './threadFilterSummary';
 import { threadsTablePageSize, type ThreadCallSortDirection, type ThreadCallSortKey } from './threadsUrlState';
 import styles from './ThreadsPage.module.css';
@@ -36,7 +33,17 @@ type ThreadsExplorerViewProps = {
     fallbackReason: string;
     error: string | null;
   };
-  selectedCallsState: { isFetching: boolean; count: number; hydrated: boolean; error: string | null };
+  selectedCallsState: {
+    isFetching: boolean;
+    isFetchingNextPage: boolean;
+    isFetchNextPageError: boolean;
+    count: number;
+    hydrated: boolean;
+    error: string | null;
+    initialError: string | null;
+    storedSnapshot: boolean;
+  };
+  selectedCalls: CallRow[];
   displayedThreads: ThreadRow[];
   totalMatchedThreads: number;
   canLoadMoreThreads: boolean;
@@ -46,19 +53,8 @@ type ThreadsExplorerViewProps = {
   selected: ThreadRow | null;
   frontierSpec: VisualizationSpecV1;
   lifecycleSpec: VisualizationSpecV1;
-  inspector: {
-    selected: ThreadRow | null;
-    calls: CallRow[];
-    allCalls: CallRow[];
-    totalCallCount: number;
-    hasMoreCalls: boolean;
-    isFetchingMoreCalls: boolean;
-    callSort: ThreadCallSortKey;
-    callSortDirection: ThreadCallSortDirection;
-    visibleCallCount: number;
-    onVisibleCallCountChange: Dispatch<SetStateAction<number>>;
-    onLoadMoreCalls(): void;
-  };
+  callSort: ThreadCallSortKey;
+  callSortDirection: ThreadCallSortDirection;
   onWorkspaceChange(workspace: 'calls' | 'tools' | 'files'): void;
   onExport(): void;
   onClearFilters(): void;
@@ -66,8 +62,8 @@ type ThreadsExplorerViewProps = {
   onRiskFilterChange(value: string): void;
   onViewModeChange: Dispatch<SetStateAction<ThreadEvidenceViewMode>>;
   onSortingChange: OnChangeFn<SortingState>;
-  onSelectThread(threadName: string): void;
-  onActivateThread(thread: ThreadRow): void;
+  onToggleThread(threadName: string): void;
+  onRetryCalls(): void;
   onLoadMoreThreads(): void;
   onCallSortChange(value: string): void;
   onCallSortDirectionChange(value: string): void;
@@ -88,6 +84,7 @@ export function ThreadsExplorerView({
   viewMode,
   focusedState,
   selectedCallsState,
+  selectedCalls,
   displayedThreads,
   totalMatchedThreads,
   canLoadMoreThreads,
@@ -97,7 +94,8 @@ export function ThreadsExplorerView({
   selected,
   frontierSpec,
   lifecycleSpec,
-  inspector,
+  callSort,
+  callSortDirection,
   onWorkspaceChange,
   onExport,
   onClearFilters,
@@ -105,8 +103,8 @@ export function ThreadsExplorerView({
   onRiskFilterChange,
   onViewModeChange,
   onSortingChange,
-  onSelectThread,
-  onActivateThread,
+  onToggleThread,
+  onRetryCalls,
   onLoadMoreThreads,
   onCallSortChange,
   onCallSortDirectionChange,
@@ -197,33 +195,33 @@ export function ThreadsExplorerView({
           />
         </div>
       </div>
-      <div className={styles.splitWorkspace}>
+      <div>
         <section className={styles.evidenceSurface} aria-label="Thread evidence">
           {viewMode === 'table' ? (
             <>
-              <EvidenceGrid
+              <ThreadAccordionGrid
                 ariaLabel={tableLabel}
                 columns={columns}
-                data={displayedThreads}
-                identityColumnId="name"
-                lockedColumnIds={['investigate']}
-                getRowId={thread => thread.name}
-                mobile={{
-                  primary: thread => thread.name,
-                  secondary: thread => i18n.translateText(`${thread.turns} calls · ${formatCompact(thread.totalTokens)} tokens · ${pct(thread.cachePct)} cache`),
-                  actionLabel: thread => threadInvestigatorRowLabel(thread),
-                }}
+                threads={displayedThreads}
                 sorting={sorting}
                 onSortingChange={onSortingChange}
-                manualSorting
-                columnVisibility={gridPreferences.columnVisibility}
-                onColumnVisibilityChange={gridPreferences.setColumnVisibility}
-                density={gridPreferences.density}
-                onDensityChange={gridPreferences.setDensity}
-                onRestoreDefaults={gridPreferences.restoreDefaults}
-                selectedRowId={selected?.name}
-                onRowSelect={thread => onSelectThread(thread.name)}
-                onRowActivate={onActivateThread}
+                preferences={gridPreferences}
+                expandedThreadName={selected?.name ?? null}
+                expandedCalls={selectedCalls}
+                totalCallCount={selectedCallsState.count}
+                loadingCalls={selectedCallsState.isFetching && !selectedCallsState.hydrated}
+                loadingMoreCalls={selectedCallsState.isFetchingNextPage}
+                initialError={selectedCallsState.initialError}
+                storedSnapshot={selectedCallsState.storedSnapshot}
+                partialError={selectedCallsState.isFetchNextPageError ? `Partial result: ${selectedCallsState.error ?? 'Unable to load remaining calls.'}` : null}
+                callSort={callSort}
+                callSortDirection={callSortDirection}
+                onToggleThread={onToggleThread}
+                onRetryCalls={onRetryCalls}
+                onCallSortChange={onCallSortChange}
+                onCallSortDirectionChange={onCallSortDirectionChange}
+                onOpenInvestigator={onOpenInvestigator}
+                onCopyCallLink={onCopyCallLink}
                 viewportHeight={560}
               />
               <div className={styles.gridFooter} aria-live="polite">
@@ -246,19 +244,12 @@ export function ThreadsExplorerView({
             </>
           ) : null}
           {viewMode === 'frontier' ? (
-            <Visualization spec={frontierSpec} height={520} onSelectionChange={onSelectThread} />
+            <Visualization spec={frontierSpec} height={520} onSelectionChange={onToggleThread} />
           ) : null}
           {viewMode === 'lifecycle' ? (
-            <Visualization spec={lifecycleSpec} height={520} onSelectionChange={onOpenInvestigator} />
+            <Visualization spec={lifecycleSpec} height={520} />
           ) : null}
         </section>
-        <ThreadInspector
-          {...inspector}
-          onCallSortChange={onCallSortChange}
-          onCallSortDirectionChange={onCallSortDirectionChange}
-          onOpenInvestigator={onOpenInvestigator}
-          onCopyCallLink={onCopyCallLink}
-        />
       </div>
     </div>
   );

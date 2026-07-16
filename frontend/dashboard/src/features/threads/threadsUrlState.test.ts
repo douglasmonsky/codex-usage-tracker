@@ -5,7 +5,6 @@ buildThreadsViewLink,
 detailFirstSelectedThreadName,
 filterThreads,
   readInitialSelectedThreadParam,
-  readThreadCallPageVisibleRowsParam,
   readThreadCallSortDirectionParam,
   readThreadCallSortParam,
 readThreadPageVisibleRowsParam,
@@ -13,7 +12,6 @@ readThreadRiskParam,
   readThreadSearchParam,
   readThreadSortingParam,
   sortThreads,
-  threadCallPageSize,
   threadPageNumberFromVisibleRows,
   threadsTablePageSize,
 } from './threadsUrlState';
@@ -21,6 +19,40 @@ readThreadRiskParam,
 const baseHref = 'http://localhost/react-dashboard.html?view=threads';
 
 describe('threadsUrlState', () => {
+  it('normalizes legacy expansion while dropping obsolete child page state', () => {
+    expect(readInitialSelectedThreadParam('http://localhost/?view=threads&threads=alpha,beta')).toBe('alpha');
+    expect(readInitialSelectedThreadParam('http://localhost/?view=threads&expand=first')).toBe(detailFirstSelectedThreadName);
+
+    const url = buildThreadsViewLink({
+      localQuery: 'cache',
+      riskFilter: 'High',
+      selectedThreadName: 'alpha',
+      sorting: [{ id: 'totalTokens', desc: true }],
+      visibleRowCount: threadsTablePageSize,
+      threadCallSort: 'tokens',
+      threadCallSortDirection: 'desc',
+    }, 'http://localhost/?view=threads&thread_call_page=9');
+
+    expect(url.searchParams.get('thread')).toBe('alpha');
+    expect(url.searchParams.get('thread_call_sort')).toBe('tokens');
+    expect(url.searchParams.has('thread_call_page')).toBe(false);
+  });
+
+  it('removes thread-only state when the accordion is collapsed', () => {
+    const url = buildThreadsViewLink({
+      localQuery: '',
+      riskFilter: 'all',
+      selectedThreadName: null,
+      sorting: [],
+      visibleRowCount: threadsTablePageSize,
+      threadCallSort: 'newest',
+      threadCallSortDirection: 'desc',
+    }, 'http://localhost/?view=threads&thread=alpha&thread_call_page=4');
+
+    expect(url.searchParams.has('thread')).toBe(false);
+    expect(url.searchParams.has('thread_call_page')).toBe(false);
+  });
+
   it('hydrates selected thread state from current and legacy thread URLs', () => {
     expect(readInitialSelectedThreadParam(`${baseHref}&thread=thread-3c5d`)).toBe('thread-3c5d');
     expect(readInitialSelectedThreadParam(`${baseHref}&detail=first`)).toBe(detailFirstSelectedThreadName);
@@ -37,7 +69,6 @@ const href = `${baseHref}&thread_q=%20thread-3c5d%20&risk=High&sort=totalTokens&
 expect(readThreadPageVisibleRowsParam(threadsTablePageSize, href)).toBe(750);
 expect(readThreadCallSortParam(href)).toBe('cache');
 expect(readThreadCallSortDirectionParam('cache', href)).toBe('desc');
-expect(readThreadCallPageVisibleRowsParam(threadCallPageSize, href)).toBe(10);
     expect(readThreadSortingParam(`${baseHref}&sort=total&direction=desc`)).toEqual([{ id: 'totalTokens', desc: true }]);
     expect(readThreadSortingParam(`${baseHref}&sort=usage&direction=desc`)).toEqual([{ id: 'credits', desc: true }]);
     expect(readThreadSortingParam(`${baseHref}&sort=cache&direction=asc`)).toEqual([{ id: 'cachePct', desc: false }]);
@@ -57,7 +88,6 @@ expect(readThreadCallSortDirectionParam('cache', `${baseHref}&thread_call_sort=c
     expect(readThreadSortingParam(href)).toEqual([]);
     expect(readThreadPageVisibleRowsParam(threadsTablePageSize, href)).toBe(threadsTablePageSize);
     expect(readThreadCallSortParam(href)).toBe('newest');
-    expect(readThreadCallPageVisibleRowsParam(threadCallPageSize, href)).toBe(threadCallPageSize);
   });
 
   it('builds normalized thread view links and clears stale legacy params', () => {
@@ -70,7 +100,6 @@ expect(readThreadCallSortDirectionParam('cache', `${baseHref}&thread_call_sort=c
 visibleRowCount: 501,
 threadCallSort: 'tokens',
 threadCallSortDirection: 'asc',
-visibleThreadCallCount: 12,
       },
       `${baseHref}&record=stale&detail=first&expand=all&threads=legacy-a,legacy-b`,
     );
@@ -84,7 +113,7 @@ visibleThreadCallCount: 12,
 expect(url.searchParams.get('page')).toBe('3');
 expect(url.searchParams.get('thread_call_sort')).toBe('tokens');
 expect(url.searchParams.get('thread_call_direction')).toBe('asc');
-expect(url.searchParams.get('thread_call_page')).toBe('3');
+expect(url.searchParams.get('thread_call_page')).toBeNull();
     expect(url.searchParams.get('record')).toBeNull();
     expect(url.searchParams.get('detail')).toBeNull();
     expect(url.searchParams.get('expand')).toBeNull();
@@ -101,7 +130,6 @@ expect(url.searchParams.get('thread_call_page')).toBe('3');
 visibleRowCount: threadsTablePageSize,
 threadCallSort: 'newest',
 threadCallSortDirection: 'desc',
-visibleThreadCallCount: threadCallPageSize,
       },
       `${baseHref}&thread_q=old&risk=High&thread=old&sort=totalTokens&direction=desc&page=4&thread_call_sort=cache&thread_call_page=2`,
     );
@@ -128,7 +156,6 @@ expect(url.searchParams.get('thread_call_page')).toBeNull();
 visibleRowCount: threadsTablePageSize,
 threadCallSort: 'newest',
 threadCallSortDirection: 'desc',
-visibleThreadCallCount: threadCallPageSize,
       },
       baseHref,
     );

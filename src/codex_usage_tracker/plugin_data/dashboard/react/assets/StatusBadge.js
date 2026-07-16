@@ -1,0 +1,1 @@
+import{j as e}from"./dashboard-react.js";import{u as n}from"./App.js";function u({label:t,tone:s="neutral"}){const a=n();return e.jsx("span",{className:`status-badge ${s}`,children:a.translateText(t)})}export{u as S};

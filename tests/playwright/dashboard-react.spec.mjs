@@ -9,9 +9,10 @@ test.describe('React dashboard rewrite smoke', () => {
     await page.getByRole('button', { name: /^Calls$/i }).click();
     await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
  await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toHaveCount(0);
-    await expect(page.getByRole('table', { name: 'Model calls' })).toBeVisible();
+    await expect(page.getByRole('table', { name: 'Model calls' })
+      .or(page.getByRole('list', { name: 'Model calls ranked list' }))).toBeVisible();
 
-    await page.getByRole('button', { name: /Open investigator for thread-9f3a1c codex-1/i }).click();
+    await page.getByRole('button', { name: /Open (?:call row in )?investigator for thread-9f3a1c codex-1/i }).click();
     await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
     await expect(page).toHaveURL(/view=call/);
     await expect(page).toHaveURL(/record=fixture-call-0/);
@@ -31,11 +32,60 @@ test.describe('React dashboard rewrite smoke', () => {
     await expect(page.getByText('Weekly Credits').first()).toBeVisible();
   });
 
+  test('threads expand inline before an explicit child call opens', async ({ page }) => {
+    await page.goto('/?view=threads');
+    const threadRow = page.getByRole('row', { name: /^(Expand|Collapse) calls for thread-9f3a$/i });
+    await threadRow.click();
+
+    await expect(threadRow).toHaveAttribute('aria-expanded', 'true');
+    await expect(page).toHaveURL(/view=threads/);
+    await expect(page).not.toHaveURL(/view=call/);
+    const region = page.getByRole('region', { name: /Calls for thread-9f3a/i });
+    await expect(region).toBeVisible();
+    await page.getByRole('button', { name: /Open investigator for thread call/i }).first().click();
+    await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
+    const investigatorUrl = new URL(page.url());
+    expect(investigatorUrl.searchParams.get('view')).toBe('call');
+    expect(investigatorUrl.searchParams.get('record')).toBe('fixture-call-0');
+    expect(investigatorUrl.searchParams.get('return')).toBe('threads');
+    expect(investigatorUrl.searchParams.get('thread')).toBe('thread-9f3a');
+    await page.getByRole('button', { name: /Back to Threads/i }).click();
+    await expect(page.getByRole('row', { name: /^(Expand|Collapse) calls for thread-9f3a$/i })).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('region', { name: /Calls for thread-9f3a/i })).toBeVisible();
+  });
+
+  test('threads expand inline with stacked evidence at 390px', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/?view=threads');
+    await page.getByRole('row', { name: 'Expand calls for thread-9f3a', exact: true }).click();
+
+    const region = page.getByRole('region', { name: /Calls for thread-9f3a/i });
+    await expect(region).toBeVisible();
+    const openAction = page.getByRole('button', { name: /Open investigator for thread call/i }).first();
+    await expect(openAction).toBeVisible();
+    const evidence = openAction.locator('xpath=ancestor::div[@role="gridcell"]/div[1]');
+    const [identity, signals] = [evidence.locator(':scope > div').nth(0), evidence.locator(':scope > div').nth(1)];
+    const [identityBox, signalsBox, actionBox] = await Promise.all([
+      identity.boundingBox(),
+      signals.boundingBox(),
+      openAction.boundingBox(),
+    ]);
+    expect(identityBox).not.toBeNull();
+    expect(signalsBox).not.toBeNull();
+    expect(actionBox).not.toBeNull();
+    expect(Math.abs(signalsBox.x - identityBox.x)).toBeLessThan(2);
+    expect(signalsBox.y).toBeGreaterThan(identityBox.y);
+    expect(actionBox.height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  });
+
   test('filters, sorts, drills into calls, and exports aggregate CSV', async ({ page }) => {
  await page.goto('/?view=calls');
  await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
  await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toHaveCount(0);
- await expect(page.getByRole('table', { name: 'Model calls' })).toBeVisible();
+ const modelCallsTable = page.getByRole('table', { name: 'Model calls' });
+ const tabularPresentation = await modelCallsTable.count() > 0;
+ await expect(modelCallsTable.or(page.getByRole('list', { name: 'Model calls ranked list' }))).toBeVisible();
  await page.getByRole('button', { name: /Call Details/i }).click();
  await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toBeVisible();
  await page.getByRole('button', { name: /Hide details/i }).click();
@@ -50,28 +100,40 @@ await expect(page.getByText('Invalid date range')).toBeVisible();
 await page.getByRole('button', { name: /Clear filters/i }).click();
 await expect(page.getByText('Invalid date range')).toHaveCount(0);
 
-await page.getByRole('button', { name: 'Columns', exact: true }).click();
-    await expect(page.getByRole('checkbox', { name: 'Thread' })).toBeDisabled();
-    await page.getByRole('checkbox', { name: 'Signal' }).uncheck();
-    await expect(page.getByRole('columnheader', { name: /Signal/i })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Columns', exact: true }).click();
+if (tabularPresentation) {
+  await page.getByRole('button', { name: 'Columns', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Thread' })).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Signal' }).uncheck();
+  await expect(page.getByRole('columnheader', { name: /Signal/i })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Columns', exact: true }).click();
 
-    await page.getByRole('button', { name: 'Sort by Est. Cost' }).click();
-    await expect(page.getByRole('columnheader', { name: /Est. Cost/i })).toHaveAttribute('aria-sort', 'descending');
+  await page.getByRole('button', { name: 'Sort by Est. Cost' }).click();
+  await expect(page.getByRole('columnheader', { name: /Est. Cost/i })).toHaveAttribute('aria-sort', 'descending');
+}
 
   await page.getByPlaceholder('Search calls, cwd, projects, models...').fill('thread-3c8d4e');
   await expect(page).toHaveURL(/call_q=thread-3c8d4e/);
-  await expect(page.getByRole('cell', { name: 'thread-3c8d4e', exact: true })).toBeVisible();
-  await page.getByRole('row', { name: /thread-3c8d4e/ }).focus();
-  await page.keyboard.press('Space');
+  if (tabularPresentation) {
+    await expect(page.getByRole('cell', { name: 'thread-3c8d4e', exact: true })).toBeVisible();
+    await page.getByRole('row', { name: /thread-3c8d4e/ }).focus();
+    await page.keyboard.press('Space');
+  } else {
+    await page.getByRole('button', { name: /Open call row in investigator for thread-3c8d4e o3/i }).click();
+  }
   await expect(page.getByText('thread-3c8d4e / o3')).toBeVisible();
+  if (tabularPresentation) {
     await page.getByRole('tab', { name: /Evidence/i }).click();
-    await expect(page.getByText('Raw context is gated')).toBeVisible();
+  }
+  await expect(page.getByText('Raw context is gated')).toBeVisible();
+  if (!tabularPresentation) {
+    await page.getByRole('button', { name: /Back to Calls/i }).click();
+    await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
+  }
 
-    const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export CSV' }).click();
-    const download = await downloadPromise;
-    expect(download.suggestedFilename()).toContain('codex-calls-');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export CSV' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toContain('codex-calls-');
   });
 
   test('reuses live report evidence after returning from Cache and Context', async ({ page }) => {
