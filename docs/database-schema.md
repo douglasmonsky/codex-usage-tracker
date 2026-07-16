@@ -40,7 +40,10 @@ not have exact tier evidence; it is not interpreted as Standard.
 
 `otel_completion_sources` records device/inode identity, size, the last complete
 byte and line cursor, and an update timestamp for each local
-`codex-completions*.jsonl` file. `otel_completion_events` stores one semantic
+`codex-completions*.jsonl` file. The default directory is the `otel` sibling of
+the selected database (`~/.codex-usage-tracker/otel` for the default database),
+so alternate databases do not ingest another tracker instance's telemetry.
+`otel_completion_events` stores one semantic
 fingerprint plus aggregate matching fields, normalized tier provenance, a
 bounded match status (`pending`, `matched`, `ambiguous`, `conflict`, or
 `invalid`), and the matched aggregate record id when available.

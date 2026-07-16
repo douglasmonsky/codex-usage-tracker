@@ -59,6 +59,34 @@ def test_absent_otel_directory_is_a_supported_noop(tmp_path: Path) -> None:
     assert result.parser_diagnostics.get("otel_files_scanned", 0) == 0
 
 
+def test_default_otel_directory_follows_database_directory(tmp_path: Path) -> None:
+    tracker_dir = tmp_path / "tracker"
+    codex_home = write_usage_session(
+        tmp_path, conversation_id="conversation-local-default", tokens=(90, 30, 20, 5)
+    )
+    write_lines(
+        tracker_dir / "otel" / "codex-completions.jsonl",
+        [
+            synthetic_otlp_line(
+                attributes=completion_attributes(
+                    conversation_id="conversation-local-default",
+                    tokens=(90, 30, 20, 5),
+                    service_tier="priority",
+                )
+            )
+        ],
+    )
+    db_path = tracker_dir / "usage.sqlite3"
+
+    result = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+
+    with connect(db_path) as conn:
+        row = conn.execute("SELECT fast FROM usage_events").fetchone()
+    assert row is not None
+    assert row["fast"] == 1
+    assert result.parser_diagnostics["otel_matched"] == 1
+
+
 def test_refresh_records_protocol_confirmed_standard(tmp_path: Path) -> None:
     codex_home = write_usage_session(
         tmp_path, "conversation-standard", (100, 40, 30, 10)

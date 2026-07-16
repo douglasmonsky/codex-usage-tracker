@@ -40,7 +40,7 @@ def refresh_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
-    otel_dir: Path = DEFAULT_OTEL_COMPLETIONS_DIR,
+    otel_dir: Path | None = None,
     progress_callback: RefreshProgressCallback | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
@@ -107,7 +107,10 @@ def refresh_usage_index(
         total=1,
         message="Reconciling aggregate OTel completion tiers",
     )
-    otel_diagnostics = _refresh_otel_completions(db_path=db_path, otel_dir=otel_dir)
+    resolved_otel_dir = otel_dir or db_path.parent / DEFAULT_OTEL_COMPLETIONS_DIR.name
+    otel_diagnostics = _refresh_otel_completions(
+        db_path=db_path, otel_dir=resolved_otel_dir
+    )
     emit_refresh_progress(
         progress_callback,
         phase="otel",
@@ -215,7 +218,7 @@ def rebuild_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
-    otel_dir: Path = DEFAULT_OTEL_COMPLETIONS_DIR,
+    otel_dir: Path | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
     """Clear aggregate rows and rescan local Codex logs."""

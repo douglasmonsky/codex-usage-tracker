@@ -15,7 +15,6 @@ from codex_usage_tracker.core.models import DiagnosticFact, RefreshResult, Usage
 from codex_usage_tracker.core.paths import (
     DEFAULT_CODEX_HOME,
     DEFAULT_DB_PATH,
-    DEFAULT_OTEL_COMPLETIONS_DIR,
 )
 from codex_usage_tracker.core.schema import (
     DIAGNOSTIC_FACT_COLUMN_NAMES,
@@ -177,7 +176,7 @@ def refresh_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
-    otel_dir: Path = DEFAULT_OTEL_COMPLETIONS_DIR,
+    otel_dir: Path | None = None,
     progress_callback: RefreshProgressCallback | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
@@ -203,7 +202,7 @@ def rebuild_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
-    otel_dir: Path = DEFAULT_OTEL_COMPLETIONS_DIR,
+    otel_dir: Path | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
     """Drop and rebuild the usage index from all selected Codex logs."""
