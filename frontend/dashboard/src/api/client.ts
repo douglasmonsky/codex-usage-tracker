@@ -8,7 +8,7 @@ import {
 import { buildFindings, buildModelCosts, buildReports } from './modelInsights';
 import { buildOverviewSeriesFromDailyValues } from './overviewSeries';
 import { scopeSummaryFromBootPayload, summaryNumber } from './dashboardScopeSummary';
-import { usageServiceTierFields } from './serviceTier';
+import { usageBillingFields, usageServiceTierFields } from './rowAnnotations';
 import type { CallRow, ContextRuntime, DashboardBootPayload, DashboardModel, MetricCard, Series, ThreadRow, UsageRow, WeeklyWindow } from './types';
 import {
   loadAllUsagePayloadPaged,
@@ -555,7 +555,7 @@ export function usageRowToCall(row: UsageRow, index = 0): CallRow {
     cachedInput: cached,
     uncachedInput,
     cachedPct,
-    cost: Number(row.estimated_cost_usd ?? 0),
+    ...usageBillingFields(row),
     duration: formatDuration(durationSeconds),
     durationSeconds,
     previousCallGap: formatDuration(previousCallGapSeconds),

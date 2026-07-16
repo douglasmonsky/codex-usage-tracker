@@ -37,6 +37,13 @@ tier classification. It never persists OTLP response bodies or arbitrary
 attributes. Default exports do not expose staging fingerprints, source paths,
 or matched record pointers. Support bundles report only whether the configured
 completion directory exists and bounded aggregate refresh/reconciliation counts.
+The exact response tier does not reveal whether ChatGPT credits or an API key
+paid for the call; the tracker keeps that billing basis as separate local
+configuration and defaults it to Unknown.
+
+`rebuild-index` retains aggregate OTel staging so it can reconcile tiers after
+canonical rows are recreated. Confirmed `reset-db --yes` deletes that staging
+and its cursors. Neither operation changes or deletes the source exporter files.
 
 Cloned Codex tasks can copy historical calls into another local JSONL file. The tracker keeps every physical row and its source metadata in SQLite, but default dashboard, CLI, MCP, report, recommendation, allowance, compression, and export totals use one canonical representative for strict fingerprint matches. Similar calls are never excluded on fuzzy evidence. Deduplication diagnostics expose aggregate totals plus bounded provenance metadata for excluded rows; they never include prompt, response, tool-output, or raw-log content.
 
@@ -52,6 +59,11 @@ Default shareable outputs omit indexed or raw content. That includes:
 - recommendation reports
 - allowance exports
 - source coverage reports
+
+Tier-aware shareable rows may include exact service-tier labels, API-equivalent
+Standard/Priority cost scenarios, ChatGPT-equivalent credit scenarios, billing
+basis, and source-stamped multiplier metadata. These are aggregate pricing
+annotations and do not include authentication tokens or raw OTel payloads.
 
 Those outputs should not include prompts, assistant messages, tool output, pasted secrets, raw snippets, reconstructed transcript evidence, indexed fragments, or full JSONL records unless a future command is explicitly documented as a local raw/content export.
 

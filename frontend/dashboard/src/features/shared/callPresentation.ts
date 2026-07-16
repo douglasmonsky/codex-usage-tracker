@@ -23,6 +23,11 @@ type ServiceTierInput = {
   fastProxyCandidate: boolean;
 };
 
+type BillingBasisInput = {
+  billingBasis: string;
+  pricingServiceTier: string;
+};
+
 const knownServiceTierLabels: Record<string, string> = {
   priority: 'Priority / Fast',
   fast: 'Fast',
@@ -63,6 +68,20 @@ export function serviceTierDetail(call: ServiceTierInput): string {
   return call.fastProxyCandidate
     ? 'tier unknown · Fast proxy candidate'
     : 'tier unknown · normal throughput proxy';
+}
+
+export function billingBasisDetail(call: BillingBasisInput): string {
+  if (call.billingBasis === 'api_tokens') {
+    const tier = call.pricingServiceTier.trim();
+    const label = tier
+      ? `${tier.charAt(0).toUpperCase()}${tier.slice(1).toLowerCase()} rates`
+      : 'configured rates';
+    return `API token estimate · ${label}`;
+  }
+  if (call.billingBasis === 'chatgpt_credits') {
+    return 'API-equivalent scenario · ChatGPT credits selected';
+  }
+  return 'API-equivalent scenario · billing basis unknown';
 }
 
 export function cacheState(call: CacheStateInput): string {

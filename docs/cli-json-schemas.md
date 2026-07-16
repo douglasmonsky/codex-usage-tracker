@@ -1475,10 +1475,29 @@ localhost status is stable. These surfaces never expose OTel source paths,
 semantic fingerprints, response bodies, arbitrary attributes, or staging ids.
 
 Aggregate call rows may add nullable `service_tier`, `fast`,
-`service_tier_source`, and `service_tier_confidence` fields. Credit-annotated
-rows may also add `standard_usage_credits`, `usage_credit_multiplier`, and
-`usage_credit_multiplier_source`. `fast: null` means Unknown; clients must not
-replace it with the separate throughput proxy. CSV export includes both exact
-tier fields and the separately named proxy candidate.
+`service_tier_source`, and `service_tier_confidence` fields. `service_tier`
+preserves the exact normalized response value such as `priority`, `default`,
+`standard`, `flex`, or `batch`; `fast` is the derived speed classification.
+
+Cost-annotated rows may add `standard_cost_usd`, `priority_cost_usd`,
+`pricing_service_tier`, `billing_basis`, and
+`cost_semantics="api_token_estimate"`. `estimated_cost_usd` remains the
+API-token-equivalent estimate selected from the observed tier when pricing-v2
+contains that table. `billing_basis` is `unknown`, `chatgpt_credits`, or
+`api_tokens` and describes applicability rather than changing the observed tier.
+
+Credit-annotated rows may also add `standard_usage_credits`,
+`fast_usage_credits`, `usage_credit_multiplier`,
+`usage_credit_multiplier_source`, `usage_credit_multiplier_source_url`,
+`usage_credit_multiplier_fetched_at`, and
+`usage_credit_multiplier_confidence`. These are ChatGPT-equivalent credit
+scenarios and are never used as generic multipliers for API USD. `fast: null`
+means Unknown; clients must not replace it with the separate throughput proxy.
+CSV export includes the exact tier, both scenario families, multiplier
+provenance, and the separately named proxy candidate.
+
+`rebuild-index` retains aggregate OTel staging for reconciliation. Confirmed
+`reset-db --yes` clears both `otel_completion_events` and
+`otel_completion_sources` along with the other tracker-owned rows.
 
 `context` already returns JSON because it is an explicit on-demand context request. Treat `codex-usage-tracker-context-v1` output as sensitive local context even though it is redacted and size-limited by default. `max_entries=0` requests all matching entries and `max_chars=0` removes the character cap for that explicit request. Tool output and compacted replacement history are omitted unless explicitly requested. Compaction entries may include metadata such as `replacement_history_available`, `replacement_entry_count`, and `replacement_history_included`; replacement text appears only when `include_compaction_history` is true for that local request. Evidence responses include `action_timing`, derived from timestamps in the same selected-turn source scan, plus per-entry `action_timing` fields such as `since_turn_start_ms`, `since_previous_entry_ms`, and `reported_duration_ms` when available. MCP returns `codex-usage-tracker-context-disabled-v1` when raw context loading has not been explicitly enabled with `CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT=1`.

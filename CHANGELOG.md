@@ -9,8 +9,15 @@
 - Show exact service tier separately from the existing Fast proxy in Calls,
   details, and CSV exports; older or unmatched history remains Unknown.
 - Apply documented model-family Fast multipliers to confirmed Codex credit
-  estimates with explicit provenance while leaving USD token-cost estimates and
+  estimates with source URL/date/confidence and local overrides while leaving
   standard-credit allowance calibration unchanged.
+- Cache Standard, Batch, Flex, and Priority API pricing together, select the
+  observed tier per call, and expose Standard/Priority cost scenarios plus an
+  explicit local billing basis without applying ChatGPT Fast multipliers to API
+  USD estimates.
+- Preserve exact response tiers in dashboard labels and CSV contracts, clear
+  OTel staging on confirmed database reset, and make incremental source cursors
+  descriptor-safe across concurrent file rotation.
 
 ## 0.20.0 - 2026-07-16
 

@@ -665,7 +665,11 @@ def test_dashboard_payload_keeps_tier_fields_aggregate_only(tmp_path: Path) -> N
     upsert_usage_events(
         [
             synthetic_usage_event(
-                "record-a", "conversation-a", (100, 40, 30, 10), fast=1
+                "record-a",
+                "conversation-a",
+                (100, 40, 30, 10),
+                service_tier="priority",
+                fast=1,
             )
         ],
         db_path=db_path,
@@ -673,7 +677,7 @@ def test_dashboard_payload_keeps_tier_fields_aggregate_only(tmp_path: Path) -> N
 
     row = dashboard_payload(db_path=db_path)["rows"][0]
 
-    assert row["service_tier"] == "fast"
+    assert row["service_tier"] == "priority"
     assert row["fast"] == 1
     assert "otel_source_path" not in row
 
@@ -721,6 +725,15 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "project_name",
         "project_key",
         "thread_attachment_label",
+        "standard_cost_usd",
+        "priority_cost_usd",
+        "pricing_service_tier",
+        "billing_basis",
+        "cost_semantics",
+        "fast_usage_credits",
+        "usage_credit_multiplier_source_url",
+        "usage_credit_multiplier_fetched_at",
+        "usage_credit_multiplier_confidence",
     } <= set(row)
 
 

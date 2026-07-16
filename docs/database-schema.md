@@ -44,17 +44,23 @@ byte and line cursor, and an update timestamp for each local
 the selected database (`~/.codex-usage-tracker/otel` for the default database),
 so alternate databases do not ingest another tracker instance's telemetry.
 `otel_completion_events` stores one semantic
-fingerprint plus aggregate matching fields, normalized tier provenance, a
+fingerprint plus aggregate matching fields, the exact normalized response tier,
+derived Fast classification, tier provenance, a
 bounded match status (`pending`, `matched`, `ambiguous`, `conflict`, or
 `invalid`), and the matched aggregate record id when available.
 
 Append refresh resumes after the last complete JSONL line, retries a partial
-trailing line, and restarts a cursor after rotation or truncation. Rebuild keeps
+trailing line, and restarts a cursor after rotation or truncation. Cursor
+identity, size, and offsets come from the open descriptor so a path rotation
+cannot persist an offset from one inode against another. Rebuild keeps
 the aggregate OTel staging rows, resets their match pointers, and reconciles
 them against the rebuilt canonical calls. A match requires conversation id plus
 input, cached-input, output, and reasoning-output counters to resolve to exactly
 one canonical group. Existing contradictory tier values are preserved and the
 completion is marked as a conflict.
+
+`reset-db --yes` is intentionally different from rebuild: it deletes both OTel
+staging tables and their source cursors along with the other tracker-owned rows.
 
 ## Allowance Intelligence Materializations
 

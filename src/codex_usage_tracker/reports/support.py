@@ -212,6 +212,8 @@ def support_bundle_payload(
             "loaded": pricing.loaded,
             "error": pricing.error,
             "model_count": len(pricing.models),
+            "api_service_tier_count": len(pricing.api_service_tiers or {}),
+            "billing_basis": pricing.billing_basis,
             "source": pricing.source,
         },
         "allowance": {
@@ -223,6 +225,7 @@ def support_bundle_payload(
             "rate_card_error": allowance.rate_card_error,
             "credit_rate_count": len(allowance.credit_rates),
             "alias_count": len(allowance.aliases),
+            "fast_multiplier_count": len(allowance.fast_multipliers),
         },
         "thresholds": {
             "loaded": thresholds.loaded,

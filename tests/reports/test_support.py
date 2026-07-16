@@ -57,7 +57,10 @@ def test_support_bundle_default_mode_contract_and_secret_safety(tmp_path: Path) 
     assert bundle["database"]["exists"] is True
     assert bundle["refresh"]["parsed_events"] == "1"
     assert bundle["pricing"]["loaded"] is True
+    assert bundle["pricing"]["billing_basis"] == "unknown"
+    assert bundle["pricing"]["api_service_tier_count"] == 0
     assert bundle["allowance"]["window_count"] == 0
+    assert bundle["allowance"]["fast_multiplier_count"] == 3
     assert "low_cache_ratio" in bundle["thresholds"]["keys"]
     assert bundle["projects"]["tag_group_count"] == 1
     assert bundle["doctor"]["schema"] == "codex-usage-tracker-doctor-v1"
