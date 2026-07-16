@@ -31,6 +31,48 @@ test.describe('React dashboard rewrite smoke', () => {
     await expect(page.getByText('Weekly Credits').first()).toBeVisible();
   });
 
+  test('threads expand inline before an explicit child call opens', async ({ page }) => {
+    await page.goto('/?view=threads');
+    const threadRow = page.getByRole('row', { name: /^(Expand|Collapse) calls for thread-9f3a$/i });
+    await threadRow.click();
+
+    await expect(threadRow).toHaveAttribute('aria-expanded', 'true');
+    await expect(page).toHaveURL(/view=threads/);
+    await expect(page).not.toHaveURL(/view=call/);
+    const region = page.getByRole('region', { name: /Calls for thread-9f3a/i });
+    await expect(region).toBeVisible();
+    await page.getByRole('button', { name: /Open investigator for thread call/i }).first().click();
+    await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
+    await page.getByRole('button', { name: /Back to Threads/i }).click();
+    await expect(page.getByRole('row', { name: /^(Expand|Collapse) calls for thread-9f3a$/i })).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('region', { name: /Calls for thread-9f3a/i })).toBeVisible();
+  });
+
+  test('threads expand inline with stacked evidence at 390px', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/?view=threads');
+    await page.getByRole('row', { name: 'Expand calls for thread-9f3a', exact: true }).click();
+
+    const region = page.getByRole('region', { name: /Calls for thread-9f3a/i });
+    await expect(region).toBeVisible();
+    const openAction = page.getByRole('button', { name: /Open investigator for thread call/i }).first();
+    await expect(openAction).toBeVisible();
+    const evidence = openAction.locator('xpath=ancestor::div[@role="gridcell"]/div[1]');
+    const [identity, signals] = [evidence.locator(':scope > div').nth(0), evidence.locator(':scope > div').nth(1)];
+    const [identityBox, signalsBox, actionBox] = await Promise.all([
+      identity.boundingBox(),
+      signals.boundingBox(),
+      openAction.boundingBox(),
+    ]);
+    expect(identityBox).not.toBeNull();
+    expect(signalsBox).not.toBeNull();
+    expect(actionBox).not.toBeNull();
+    expect(Math.abs(signalsBox.x - identityBox.x)).toBeLessThan(2);
+    expect(signalsBox.y).toBeGreaterThan(identityBox.y);
+    expect(actionBox.height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  });
+
   test('filters, sorts, drills into calls, and exports aggregate CSV', async ({ page }) => {
  await page.goto('/?view=calls');
  await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();

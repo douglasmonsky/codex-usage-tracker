@@ -33,6 +33,8 @@ const captures = [
     name: 'dashboard-threads.png',
     query: '?view=threads&thread=thread-9f3a1c&qa=docs-r11',
     heading: 'Threads',
+    expandThread: /^Expand calls for thread-9f3a$/i,
+    region: /^Calls for thread-9f3a/i,
   },
   {
     name: 'dashboard-diagnostics.png',
@@ -71,6 +73,12 @@ try {
     await page.goto(new URL(capture.query, dashboardBaseUrl).href, { waitUntil: 'networkidle' });
     await page.getByRole('heading', { name: capture.heading, exact: true }).first().waitFor();
     await assertSyntheticFixture(page);
+    if (capture.expandThread) {
+      await page.getByRole('row', { name: capture.expandThread }).click();
+    }
+    if (capture.region) {
+      await page.getByRole('region', { name: capture.region }).waitFor();
+    }
     if (capture.scrollTo) {
       await page.getByRole('heading', { name: capture.scrollTo, exact: true }).scrollIntoViewIfNeeded();
     }
@@ -88,9 +96,16 @@ try {
 async function assertSyntheticFixture(page) {
   const state = await page.evaluate(() => ({
     apiToken: globalThis.__CODEX_USAGE_BOOT__?.api_token ?? '',
+    hasEmbeddedPayload: Boolean(globalThis.document.getElementById('usage-data')?.textContent),
     text: globalThis.document.body.textContent ?? '',
   }));
-  if (state.apiToken || !state.text.includes('Stored snapshot') || !state.text.includes('8 loaded / 8 total')) {
+  if (
+    state.apiToken
+    || state.hasEmbeddedPayload
+    || !state.text.includes('Stored snapshot')
+    || !state.text.includes('8 calls analyzed')
+    || !state.text.includes('Local data only')
+  ) {
     throw new Error('Dashboard documentation screenshots require the synthetic fixture payload.');
   }
 }

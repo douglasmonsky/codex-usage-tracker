@@ -147,16 +147,15 @@ Use `Threads` view when you want to understand a work session as a group instead
 - Threads pages through `/api/threads` on localhost and hydrates the selected
   thread's supporting calls through `/api/thread-calls`; loaded snapshot rows
   remain the fallback.
-- Switch between the virtualized table, cache-efficiency frontier, and lifecycle
-  view. Chart selections update the same selected-thread evidence used by the
-  inspector.
+- Click a thread row to expand all of its aggregate calls directly beneath it.
+- Only one thread stays expanded at a time.
+- Remaining call pages load progressively with visible progress and retry.
+- Parent rows never open a representative call.
+- Explicit child `Open` and `Copy` actions reach Call Investigator.
+- Cache Frontier and Lifecycle remain secondary analysis modes.
 - Each thread row groups the filtered model calls by thread name, falling back to session id when no name is available.
 - Thread rows show latest activity, call count, model mix, effort mix, total tokens, estimated cost, Codex credits, cache ratio, and signal count.
 - Mixed model summaries prefer the primary non-review model; `codex-auto-review` appears as the thread model only for review-only threads.
-- Hover or keyboard-select a thread to scan its aggregate inspector. Activating
-  a row opens the latest supporting call in Call Investigator.
-- The inspector's call timeline supports independent sorting, incremental
-  disclosure, copy-link actions, and direct Call Investigator navigation.
 - Subagents with logged parent session ids are shown under the parent thread. Auto-review sessions without explicit parent ids may be attached by cwd and nearby activity and are marked as attached or inferred in the details.
 
 ### Tools And Files Explorers
