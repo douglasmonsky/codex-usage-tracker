@@ -219,7 +219,7 @@ def _completion_from_attributes(
         match_status = "invalid"
         diagnostics["otel_invalid_record"] += 1
 
-    normalized = {
+    normalized: dict[str, object] = {
         "conversation_id": conversation_id,
         "event_timestamp": event_timestamp,
         "input_tokens": input_tokens,
@@ -269,6 +269,9 @@ def _integer(
 ) -> int | None:
     value = attributes.get(key)
     if isinstance(value, bool) or value is None:
+        diagnostics["otel_invalid_integer"] += 1
+        return None
+    if not isinstance(value, str | int | float):
         diagnostics["otel_invalid_integer"] += 1
         return None
     try:

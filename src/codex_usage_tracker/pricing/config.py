@@ -59,15 +59,19 @@ class PricingConfig:
         self, model: object, *, service_tier: object | None = None
     ) -> dict[str, float] | None:
         normalized_tier = normalize_api_service_tier(service_tier)
-        tier_models = (self.api_service_tiers or {}).get(normalized_tier or "")
-        if tier_models is not None:
+        tier_tables = self.api_service_tiers or {}
+        if normalized_tier and tier_tables:
+            tier_models = tier_tables.get(normalized_tier)
+            if tier_models is None:
+                return None
             return _rates_for_models(tier_models, self.aliases, model)
         return _rates_for_models(self.models, self.aliases, model)
 
     def pricing_tier_for(self, service_tier: object | None) -> str | None:
         normalized = normalize_api_service_tier(service_tier)
-        if normalized and normalized in (self.api_service_tiers or {}):
-            return normalized
+        tier_tables = self.api_service_tiers or {}
+        if normalized and tier_tables:
+            return normalized if normalized in tier_tables else None
         source_tier = normalize_api_service_tier((self.source or {}).get("tier"))
         return source_tier if source_tier else None
 

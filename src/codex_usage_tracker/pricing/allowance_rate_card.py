@@ -165,6 +165,8 @@ def parse_fast_multipliers(
 
 
 def _fast_multiplier_number(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         multiplier = number_value(value)
     except (TypeError, ValueError):

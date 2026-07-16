@@ -54,6 +54,24 @@ def test_malformed_local_multiplier_retains_valid_bundled_rate(tmp_path: Path) -
     assert config.fast_multipliers["gpt-5.6"].confidence == "exact"
 
 
+def test_boolean_local_multiplier_retains_valid_bundled_rate(tmp_path: Path) -> None:
+    path = tmp_path / "allowance.json"
+    path.write_text(
+        json.dumps(
+            {"fast_multipliers": {"gpt-5.6": {"multiplier": True}}}
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_allowance_config(
+        path, rate_card_path=tmp_path / "missing-rate-card.json"
+    )
+
+    assert config.loaded is True
+    assert config.fast_multipliers["gpt-5.6"].multiplier == 2.5
+    assert config.fast_multipliers["gpt-5.6"].confidence == "exact"
+
+
 def test_legacy_local_rate_card_inherits_bundled_fast_multipliers(
     tmp_path: Path,
 ) -> None:

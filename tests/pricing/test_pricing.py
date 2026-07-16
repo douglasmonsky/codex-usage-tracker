@@ -119,6 +119,31 @@ def test_pricing_v2_selects_rates_by_service_tier(tmp_path: Path) -> None:
     assert config.rates_for("gpt-5.6", service_tier="default") == standard
 
 
+def test_tiered_pricing_does_not_fallback_for_an_unconfigured_tier(
+    tmp_path: Path,
+) -> None:
+    selected = {
+        "input_per_million": 5.0,
+        "cached_input_per_million": 0.5,
+        "output_per_million": 20.0,
+    }
+    pricing_path = tmp_path / "pricing.json"
+    pricing_path.write_text(
+        json.dumps(
+            {
+                "models": {"gpt-5.6": selected},
+                "api_service_tiers": {"standard": {"gpt-5.6": selected}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_pricing_config(pricing_path)
+
+    assert config.rates_for("gpt-5.6", service_tier="flex") is None
+    assert config.pricing_tier_for("flex") is None
+
+
 def test_pricing_v1_keeps_selected_projection_for_every_row_tier(tmp_path: Path) -> None:
     pricing_path = tmp_path / "pricing.json"
     selected = {
