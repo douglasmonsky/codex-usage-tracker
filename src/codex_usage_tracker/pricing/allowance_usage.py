@@ -43,14 +43,32 @@ def annotate_rows_with_allowance(
         copy = dict(row)
         model = copy.get(model_field)
         match = resolve_credit_rate(model, resolved)
-        multiplier, multiplier_source = credit_multiplier_for_row(copy)
+        multiplier, multiplier_match, multiplier_fallback = credit_multiplier_for_row(
+            copy, resolved.fast_multipliers
+        )
+        multiplier_source = (
+            multiplier_match.source_name if multiplier_match else multiplier_fallback
+        )
+        multiplier_source_url = (
+            multiplier_match.source_url if multiplier_match else None
+        )
+        multiplier_fetched_at = (
+            multiplier_match.fetched_at if multiplier_match else None
+        )
+        multiplier_confidence = (
+            multiplier_match.confidence if multiplier_match else None
+        )
         if match is None:
             copy.update(
                 {
                     "usage_credits": None,
                     "standard_usage_credits": None,
+                    "fast_usage_credits": None,
                     "usage_credit_multiplier": multiplier,
                     "usage_credit_multiplier_source": multiplier_source,
+                    "usage_credit_multiplier_source_url": multiplier_source_url,
+                    "usage_credit_multiplier_fetched_at": multiplier_fetched_at,
+                    "usage_credit_multiplier_confidence": multiplier_confidence,
                     "usage_credit_model": None,
                     "usage_credit_confidence": "unpriced",
                     "usage_credit_source": "No Codex credit rate",
@@ -63,12 +81,21 @@ def annotate_rows_with_allowance(
         else:
             rated_model, rates, confidence, note, metadata = match
             standard_credits = estimate_standard_usage_credits(copy, rates)
+            fast_credits = (
+                standard_credits * multiplier_match.multiplier
+                if multiplier_match is not None
+                else None
+            )
             copy.update(
                 {
                     "usage_credits": standard_credits * multiplier,
                     "standard_usage_credits": standard_credits,
+                    "fast_usage_credits": fast_credits,
                     "usage_credit_multiplier": multiplier,
                     "usage_credit_multiplier_source": multiplier_source,
+                    "usage_credit_multiplier_source_url": multiplier_source_url,
+                    "usage_credit_multiplier_fetched_at": multiplier_fetched_at,
+                    "usage_credit_multiplier_confidence": multiplier_confidence,
                     "usage_credit_model": rated_model,
                     "usage_credit_confidence": confidence,
                     "usage_credit_source": metadata.get("source_name")
@@ -217,5 +244,5 @@ def estimate_usage_credits(row: dict[str, Any], rates: dict[str, float]) -> floa
     """Estimate effective Codex credits, including confirmed Fast multipliers."""
 
     standard = estimate_standard_usage_credits(row, rates)
-    multiplier, _source = credit_multiplier_for_row(row)
+    multiplier, _match, _source = credit_multiplier_for_row(row)
     return standard * multiplier

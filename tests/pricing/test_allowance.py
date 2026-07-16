@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from codex_usage_tracker.pricing.allowance import (
+    FastMultiplierRate,
     UsageAllowanceConfig,
     annotate_rows_with_allowance,
     load_allowance_config,
@@ -46,6 +48,12 @@ def _synthetic_allowance_config() -> UsageAllowanceConfig:
         "gpt-5.4",
         "synthetic-unknown",
     )
+    multiplier_source = {
+        "source_name": "OpenAI Codex Fast mode docs",
+        "source_url": "https://learn.chatgpt.com/docs/agent-configuration/speed",
+        "fetched_at": "2026-07-16",
+        "confidence": "exact",
+    }
     return UsageAllowanceConfig(
         path=Path("/synthetic/allowance.json"),
         rate_card_path=Path("/synthetic/rate-card.json"),
@@ -57,6 +65,11 @@ def _synthetic_allowance_config() -> UsageAllowanceConfig:
         loaded=True,
         rate_card_loaded=True,
         source={"name": "Synthetic credit rates"},
+        fast_multipliers={
+            "gpt-5.6": FastMultiplierRate(multiplier=2.5, **multiplier_source),
+            "gpt-5.5": FastMultiplierRate(multiplier=2.5, **multiplier_source),
+            "gpt-5.4": FastMultiplierRate(multiplier=2.0, **multiplier_source),
+        },
     )
 
 
@@ -82,7 +95,39 @@ def test_confirmed_fast_multiplies_standard_credit_estimate(
         annotated["standard_usage_credits"] * multiplier
     )
     assert annotated["usage_credit_multiplier"] == multiplier
-    assert annotated["usage_credit_multiplier_source"] == "otel_response_completed"
+    assert annotated["usage_credit_multiplier_source"] == "OpenAI Codex Fast mode docs"
+
+
+def test_fast_multiplier_provenance_comes_from_rate_card() -> None:
+    config = replace(
+        _synthetic_allowance_config(),
+        fast_multipliers={
+            "gpt-5.6": FastMultiplierRate(
+                multiplier=2.5,
+                source_name="OpenAI Codex Fast mode docs",
+                source_url="https://learn.chatgpt.com/docs/agent-configuration/speed",
+                fetched_at="2026-07-16",
+                confidence="exact",
+            )
+        },
+    )
+
+    annotated = annotate_rows_with_allowance(
+        [_credit_row(model="gpt-5.6", fast=1, service_tier="priority")],
+        config,
+    )[0]
+
+    assert annotated["usage_credit_multiplier"] == 2.5
+    assert annotated["usage_credit_multiplier_source"] == "OpenAI Codex Fast mode docs"
+    assert annotated["usage_credit_multiplier_source_url"].endswith(
+        "/agent-configuration/speed"
+    )
+    assert annotated["usage_credit_multiplier_fetched_at"] == "2026-07-16"
+    assert annotated["usage_credit_multiplier_confidence"] == "exact"
+    assert annotated["fast_usage_credits"] == pytest.approx(
+        annotated["standard_usage_credits"] * 2.5
+    )
+    assert annotated["service_tier_source"] == "otel_response_completed"
 
 
 @pytest.mark.parametrize("fast", [0, None])
@@ -342,6 +387,7 @@ def test_update_rate_card_writes_bundled_snapshot(tmp_path: Path) -> None:
     assert config.credit_rates["gpt-5.6-sol"]["output_per_million"] == 1500.0
     assert config.credit_rates["gpt-5.6-terra"]["output_per_million"] == 125.0
     assert config.credit_rates["gpt-5.6-luna"]["output_per_million"] == 300.0
+    assert config.fast_multipliers["gpt-5.6"].multiplier == 2.5
 
 
 def test_write_allowance_template_refuses_to_overwrite(tmp_path: Path) -> None:
