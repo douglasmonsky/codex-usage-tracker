@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { loadUsagePayload, modelFromBootPayload } from './client';
+import { loadUsagePayload, modelFromBootPayload, usageRowToCall } from './client';
 import type { DashboardBootPayload } from './types';
 
 afterEach(() => {
@@ -8,6 +8,20 @@ afterEach(() => {
 });
 
 describe('dashboard API model builder', () => {
+  it('keeps exact tier separate from throughput proxy', () => {
+    const call = usageRowToCall({
+      service_tier: 'standard',
+      fast: 0,
+      service_tier_confidence: 'protocol',
+      duration_seconds: 1,
+      total_tokens: 9000,
+    }, 0);
+
+    expect(call.fast).toBe(false);
+    expect(call.fastProxyCandidate).toBe(true);
+    expect(call.serviceTier).toBe('standard');
+  });
+
   it('derives model cost bars from live aggregate rows', () => {
     const payload: DashboardBootPayload = {
       loaded_row_count: 3,

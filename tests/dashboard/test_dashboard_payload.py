@@ -10,7 +10,9 @@ from codex_usage_tracker.store.api import (
     connect,
     export_usage_csv,
     refresh_usage_index,
+    upsert_usage_events,
 )
+from tests.otel_helpers import synthetic_usage_event
 from tests.store_dashboard_helpers import (
     _extract_js_function,
     _make_codex_home,
@@ -656,6 +658,24 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     generate_dashboard(db_path=db_path, output_path=dashboard_path, pricing_path=pricing_path)
     updated_dashboard = dashboard_path.read_text(encoding="utf-8")
     assert "Pricing snapshot changed since the previous dashboard render" in updated_dashboard
+
+
+def test_dashboard_payload_keeps_tier_fields_aggregate_only(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            synthetic_usage_event(
+                "record-a", "conversation-a", (100, 40, 30, 10), fast=1
+            )
+        ],
+        db_path=db_path,
+    )
+
+    row = dashboard_payload(db_path=db_path)["rows"][0]
+
+    assert row["service_tier"] == "fast"
+    assert row["fast"] == 1
+    assert "otel_source_path" not in row
 
 
 def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -> None:

@@ -2,6 +2,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { useShellI18n } from '../../app/i18nContext';
 import type { CallRow, ThreadRow } from '../../api/types';
 import type { ColumnChoice } from '../../components/ColumnChooser';
+import { serviceTierLabel } from '../calls/serviceTier';
 import type { CsvColumn } from './exportCsv';
 import { formatCompact, formatNumber, money, pct } from './format';
 
@@ -72,6 +73,16 @@ export const callColumns: Array<ColumnDef<CallRow>> = [
   },
   { accessorKey: 'duration', header: 'Duration' },
   {
+    id: 'serviceTier',
+    accessorFn: call => serviceTierLabel(call),
+    header: 'Service Tier',
+    cell: info => {
+      const label = String(info.getValue());
+      const tone = label === 'Fast' ? 'green' : label === 'Standard' ? 'blue' : '';
+      return <span className={`status-badge ${tone}`.trim()}>{label}</span>;
+    },
+  },
+  {
     accessorKey: 'previousCallGap',
     header: 'Prev Gap',
     cell: info => <span className="num">{String(info.getValue())}</span>,
@@ -108,6 +119,14 @@ export const callCsvColumns: Array<CsvColumn<CallRow>> = [
   { header: 'reasoning_output_tokens', value: row => row.reasoningOutput },
   { header: 'estimated_cost_usd', value: row => row.cost.toFixed(6) },
   { header: 'usage_credits', value: row => row.credits.toFixed(6) },
+  { header: 'standard_usage_credits', value: row => row.standardUsageCredits.toFixed(6) },
+  { header: 'service_tier', value: row => row.serviceTier },
+  { header: 'fast', value: row => row.fast === null ? '' : row.fast ? 1 : 0 },
+  { header: 'service_tier_source', value: row => row.serviceTierSource },
+  { header: 'service_tier_confidence', value: row => row.serviceTierConfidence },
+  { header: 'fast_proxy_candidate', value: row => String(row.fastProxyCandidate) },
+  { header: 'usage_credit_multiplier', value: row => row.usageCreditMultiplier },
+  { header: 'usage_credit_multiplier_source', value: row => row.usageCreditMultiplierSource },
   { header: 'cache_ratio', value: row => row.cachedPct.toFixed(2) },
   { header: 'context_window_percent', value: row => row.contextWindowPct?.toFixed(2) ?? '' },
   { header: 'pricing_model', value: row => row.pricingModel },

@@ -33,6 +33,13 @@ describe('call CSV columns', () => {
       initiatorReason: 'tool-driven continuation',
       initiatorConfidence: 'high',
       fast: false,
+      serviceTier: 'standard',
+      serviceTierSource: 'otel_response_completed',
+      serviceTierConfidence: 'protocol',
+      fastProxyCandidate: true,
+      standardUsageCredits: 4.5,
+      usageCreditMultiplier: 1,
+      usageCreditMultiplierSource: 'otel_response_completed',
       usageCreditConfidence: 'credit-estimated',
       usageCreditModel: 'codex-1',
       usageCreditSource: 'rate-card',
@@ -88,6 +95,10 @@ describe('call CSV columns', () => {
     expect(header).toContain('previous_call_event_timestamp');
     expect(header).toContain('pricing_model');
 expect(header).toContain('usage_credit_confidence');
+    expect(header).toContain('service_tier');
+    expect(header).toContain('service_tier_confidence');
+    expect(header).toContain('fast_proxy_candidate');
+    expect(header).toContain('usage_credit_multiplier');
 expect(header).toContain('thread_attachment');
 expect(header).toContain('model_context_window');
     expect(values).toContain('record-csv-1');
@@ -101,8 +112,13 @@ expect(header).toContain('model_context_window');
     expect(values).toContain('2026-07-01T11:54:30Z');
     expect(values).toContain('codex-1-pricing');
     expect(values).toContain('credit-estimated');
+    expect(values).toContain('otel_response_completed');
     expect(values).toContain('spawned child');
     expect(values).toContain('cache-drop|context-heavy');
+  });
+
+  it('includes an exact Service Tier column', () => {
+    expect(callColumns.some(column => column.id === 'serviceTier')).toBe(true);
   });
 });
 

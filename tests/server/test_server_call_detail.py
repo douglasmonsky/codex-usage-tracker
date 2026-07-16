@@ -8,6 +8,8 @@ from typing import Any
 import pytest
 
 from codex_usage_tracker.server import call_detail as server_call_detail
+from codex_usage_tracker.store.api import upsert_usage_events
+from tests.otel_helpers import synthetic_usage_event
 
 
 class _RouteSenders:
@@ -151,6 +153,27 @@ def test_call_detail_payload_requires_record_id(tmp_path: Path) -> None:
             db_path=tmp_path / "usage.sqlite3",
             annotate_rows=lambda rows: rows,
         )
+
+
+def test_call_detail_exposes_tier_without_sidecar_identity(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            synthetic_usage_event(
+                "record-a", "conversation-a", (100, 40, 30, 10), fast=1
+            )
+        ],
+        db_path=db_path,
+    )
+
+    payload = server_call_detail.call_detail_payload(
+        "record_id=record-a", db_path=db_path, annotate_rows=lambda rows: rows
+    )
+
+    record = payload["record"]
+    assert record["service_tier"] == "fast"
+    assert record["service_tier_confidence"] == "exact"
+    assert "source_path" not in record
 
 
 def test_call_detail_payload_raises_when_record_missing(

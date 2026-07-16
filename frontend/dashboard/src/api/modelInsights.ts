@@ -52,7 +52,7 @@ export function buildReports(calls: CallRow[]): ReportSummary[] {
       description: 'Highest estimated credit-impact calls from loaded aggregate rows.',
     },
   ];
-  if (calls.some(call => call.fast || call.effort.toLowerCase() === 'low')) {
+  if (calls.some(call => call.fastProxyCandidate || call.effort.toLowerCase() === 'low')) {
     reports.push({
       title: 'Fast Mode Proxy',
       status: 'Ready',
