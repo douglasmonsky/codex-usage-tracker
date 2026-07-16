@@ -2,9 +2,9 @@
 
 ## Status
 
-DONE_WITH_CONCERNS. Task 4 implementation, generated assets, synthetic screenshot proof, focused validation, release readiness, and targeted Playwright smoke are complete. Two broader gates expose prior-task follow-up work described below.
+DONE. Task 4 implementation, generated assets, synthetic screenshot proof, source-budget corrections, release readiness, and targeted Playwright smoke are complete. The earlier gate failures below are retained as resolved historical RED evidence; the appended final-fix section records the green branch state.
 
-Commit: `ae21c6f docs: update threads expansion workflow`
+Commits: `ae21c6f docs: update threads expansion workflow`; `1d324fb fix: resolve threads final review gates`
 
 ## RED / GREEN Evidence
 
