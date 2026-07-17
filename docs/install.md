@@ -11,8 +11,14 @@ python -m pip install --user pipx
 python -m pipx ensurepath
 pipx install codex-usage-tracking
 codex-usage-tracker setup
-codex-usage-tracker serve-dashboard --open
+codex-usage-tracker dashboard-service install  # macOS
 ```
+
+On macOS, the persistent service starts at login, restarts after a failure, and
+keeps the live dashboard available at `http://127.0.0.1:47821` without opening
+browser tabs automatically. Check it with
+`codex-usage-tracker dashboard-service status`. On Linux and Windows, or for a
+one-time macOS session, use `codex-usage-tracker serve-dashboard --open`.
 
 Use the Python launcher that is normal for your platform:
 
@@ -112,6 +118,21 @@ codex-usage-tracker install-plugin --python .venv/bin/python --force
 
 ## Local Dashboard
 
+On macOS, install the localhost-only login service once:
+
+```bash
+codex-usage-tracker dashboard-service install
+codex-usage-tracker dashboard-service status
+open http://127.0.0.1:47821
+```
+
+The service uses fixed port `47821` by default and never exposes a non-loopback
+host. If another local process owns that port, installation stops with a clear
+error instead of changing the URL; choose an explicit alternative with
+`codex-usage-tracker dashboard-service install --port PORT`. To remove only the
+tracker-managed LaunchAgent, run
+`codex-usage-tracker dashboard-service uninstall`.
+
 Generate a static dashboard:
 
 ```bash
@@ -125,6 +146,9 @@ Serve the dashboard with live aggregate refresh and lazy context loading:
 codex-usage-tracker serve-dashboard --open
 codex-usage-tracker serve-dashboard --no-context-api --open
 ```
+
+Foreground `serve-dashboard` remains the cross-platform, on-demand option and
+retains its existing default port `8765`.
 
 The server binds to localhost, requires a per-server token for refresh/context endpoints, and rejects non-loopback `Host` or cross-origin `Origin` headers.
 `--no-context-api` starts context loading off; the details panel can enable it later without restarting the server.

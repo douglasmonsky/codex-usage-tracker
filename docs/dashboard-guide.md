@@ -6,14 +6,33 @@ This guide uses synthetic aggregate data. The screenshots do not contain real pr
 
 ## Open The Dashboard
 
-For the best experience, run the localhost dashboard server:
+On macOS, install the persistent localhost dashboard once:
 
 ```bash
 codex-usage-tracker setup
 codex-usage-tracker update-pricing
 codex-usage-tracker update-rate-card
+codex-usage-tracker dashboard-service install
+codex-usage-tracker dashboard-service status
+open http://127.0.0.1:47821
+```
+
+The LaunchAgent starts at login, restarts after a failure, stays bound to
+`127.0.0.1`, and does not open browser tabs automatically. If port `47821` is
+already owned by another process, installation refuses the collision; use
+`dashboard-service install --port PORT` to choose and persist a different
+address. Remove the managed service with
+`codex-usage-tracker dashboard-service uninstall`.
+
+For Linux, Windows, or an on-demand macOS session, run the foreground server:
+
+```bash
+codex-usage-tracker setup
 codex-usage-tracker serve-dashboard --open
 ```
+
+The foreground command retains its existing default port `8765` and stops when
+its process exits.
 
 For optional allowance context, initialize a local template and copy values from Codex Usage or `/status`:
 

@@ -81,6 +81,22 @@ codex-usage-tracker serve-dashboard --no-refresh --open
 codex-usage-tracker serve-dashboard --no-context-api --open
 ```
 
+Keep the live dashboard available across terminal and Codex task lifetimes on
+macOS with the user LaunchAgent commands:
+
+```bash
+codex-usage-tracker dashboard-service install
+codex-usage-tracker dashboard-service status
+codex-usage-tracker dashboard-service uninstall
+```
+
+The persistent service defaults to `http://127.0.0.1:47821`, starts at login,
+restarts after failure, and never opens a browser automatically. Installation
+refuses an occupied port rather than silently changing the URL; use
+`dashboard-service install --port PORT` for an explicit alternative. These
+management actions are macOS-only. The foreground `serve-dashboard` command is
+cross-platform and keeps its existing default port `8765`.
+
 `serve-dashboard --context-api explicit` is the default and keeps context loading as an explicit per-row action. `serve-dashboard --no-context-api` or `--context-api disabled` starts with context loading off; a token-protected button in the local details panel can enable it without restarting the server.
 
 `open-dashboard` and `serve-dashboard` refresh active-session logs before opening by default. `serve-dashboard --open` opens the React dashboard; the legacy dashboard remains available at `/dashboard.html` on the same localhost server. Use `--no-refresh` only for an intentionally cached snapshot. The lower-level `dashboard` command writes from the current SQLite index and does not rescan logs.
