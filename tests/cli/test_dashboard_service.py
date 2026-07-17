@@ -4,11 +4,14 @@ import plistlib
 import socket
 import subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from importlib import import_module
 from pathlib import Path
 from threading import Thread
 
 import pytest
 
+from codex_usage_tracker.cli import dashboard_service as cli_dashboard_service
+from codex_usage_tracker.cli.parser import build_parser
 from codex_usage_tracker.dashboard_service import (
     DEFAULT_SERVICE_PORT,
     SERVICE_LABEL,
@@ -22,6 +25,8 @@ from codex_usage_tracker.dashboard_service import (
     uninstall_dashboard_service,
     validate_service_port,
 )
+
+cli_main = import_module("codex_usage_tracker.cli.main")
 
 
 class FakeRunner:
@@ -339,3 +344,95 @@ def test_lifecycle_refuses_unsupported_platform(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="macOS only"):
         install_dashboard_service(home=tmp_path, python=python, platform="linux")
+
+
+def test_dashboard_service_parser_defaults_install_port() -> None:
+    args = build_parser("en").parse_args(["dashboard-service", "install"])
+
+    assert args.command == "dashboard-service"
+    assert args.service_action == "install"
+    assert args.port == DEFAULT_SERVICE_PORT
+
+
+def test_dashboard_service_parser_accepts_install_port_override() -> None:
+    args = build_parser("en").parse_args(
+        ["dashboard-service", "install", "--port", "48123"]
+    )
+
+    assert args.port == 48123
+
+
+def test_dashboard_service_uninstall_rejects_port_override() -> None:
+    with pytest.raises(SystemExit):
+        build_parser("en").parse_args(
+            ["dashboard-service", "uninstall", "--port", "48123"]
+        )
+
+
+def test_dashboard_service_status_prints_stable_url(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        cli_dashboard_service,
+        "dashboard_service_status",
+        lambda **_: DashboardServiceStatus(True, True, True, 47821, "healthy"),
+    )
+
+    args = build_parser("en").parse_args(["dashboard-service", "status"])
+
+    assert cli_dashboard_service.run_dashboard_service(args) == 0
+    assert capsys.readouterr().out == (
+        "Dashboard service is healthy at http://127.0.0.1:47821\n"
+    )
+
+
+def test_dashboard_service_unhealthy_status_returns_one(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        cli_dashboard_service,
+        "dashboard_service_status",
+        lambda **_: DashboardServiceStatus(
+            True,
+            True,
+            False,
+            47821,
+            "loaded but unreachable",
+        ),
+    )
+
+    args = build_parser("en").parse_args(["dashboard-service", "status"])
+
+    assert cli_dashboard_service.run_dashboard_service(args) == 1
+    assert capsys.readouterr().out == (
+        "Dashboard service is loaded but unreachable; "
+        "expected http://127.0.0.1:47821\n"
+    )
+
+
+def test_dashboard_service_install_forwards_port(monkeypatch, capsys) -> None:
+    captured: dict[str, object] = {}
+
+    def install(**kwargs: object) -> DashboardServiceStatus:
+        captured.update(kwargs)
+        return DashboardServiceStatus(True, True, True, 48123, "healthy")
+
+    monkeypatch.setattr(cli_dashboard_service, "install_dashboard_service", install)
+    args = build_parser("en").parse_args(
+        ["dashboard-service", "install", "--port", "48123"]
+    )
+
+    assert cli_dashboard_service.run_dashboard_service(args) == 0
+    assert captured["port"] == 48123
+    assert capsys.readouterr().out == (
+        "Dashboard service installed at http://127.0.0.1:48123\n"
+    )
+
+
+def test_dashboard_service_command_is_registered() -> None:
+    assert (
+        cli_main._COMMAND_HANDLERS["dashboard-service"]
+        is cli_dashboard_service.run_dashboard_service
+    )
+
+
+def test_dashboard_service_help_is_localized() -> None:
+    help_text = build_parser("zh-Hans").format_help()
+
+    assert "管理常驻仪表盘服务" in help_text

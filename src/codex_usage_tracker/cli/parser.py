@@ -11,6 +11,7 @@ from codex_usage_tracker.cli.parser_data import (
     _add_allowance_intelligence_parsers,
     _add_allowance_parser,
     _add_dashboard_parsers,
+    _add_dashboard_service_parser,
     _add_dedupe_diagnostics_parser,
     _add_expensive_parser,
     _add_export_parser,
@@ -100,6 +101,7 @@ def build_parser(language: str | None = None) -> argparse.ArgumentParser:
     _add_session_parser(subparsers)
     _add_context_parser(subparsers)
     _add_dashboard_parsers(subparsers)
+    _add_dashboard_service_parser(subparsers)
     _add_dedupe_diagnostics_parser(subparsers)
     _add_expensive_parser(subparsers)
     _add_pricing_coverage_parser(subparsers)

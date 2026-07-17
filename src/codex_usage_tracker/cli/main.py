@@ -51,6 +51,7 @@ from codex_usage_tracker.cli.dashboard import (
     run_open_dashboard,
     run_serve_dashboard,
 )
+from codex_usage_tracker.cli.dashboard_service import run_dashboard_service
 from codex_usage_tracker.cli.diagnostics import run_diagnostics
 from codex_usage_tracker.cli.help_i18n import localized_cli_error_prefix, requested_cli_language
 from codex_usage_tracker.cli.inspect_log_output import print_inspect_log_summary
@@ -120,6 +121,7 @@ _COMMAND_HANDLERS = {
     "dashboard": run_dashboard,
     "open-dashboard": run_open_dashboard,
     "serve-dashboard": run_serve_dashboard,
+    "dashboard-service": run_dashboard_service,
     "expensive": _run_expensive,
     "pricing-coverage": _run_pricing_coverage,
     "source-coverage": _run_source_coverage,

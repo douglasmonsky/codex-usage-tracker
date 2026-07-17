@@ -12,6 +12,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_PRICING_PATH,
     DEFAULT_SUPPORT_BUNDLE_PATH,
 )
+from codex_usage_tracker.dashboard_service import DEFAULT_SERVICE_PORT
 from codex_usage_tracker.pricing.api import OPENAI_PRICING_MD_URL, VALID_PRICING_TIERS
 from codex_usage_tracker.reports.api import (
     EXPENSIVE_PRESET_CHOICES,
@@ -100,6 +101,31 @@ def _add_dashboard_parsers(
         action="store_true",
         dest="as_json",
         help="Accepted for API consistency; serve-dashboard still runs as a long-lived server.",
+    )
+
+
+def _add_dashboard_service_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    service = subparsers.add_parser(
+        "dashboard-service",
+        help="Manage the persistent dashboard service",
+    )
+    actions = service.add_subparsers(dest="service_action", required=True)
+    install = actions.add_parser(
+        "install",
+        help="Install and start the dashboard service",
+    )
+    install.add_argument(
+        "--port",
+        type=int,
+        default=DEFAULT_SERVICE_PORT,
+        help="Persistent dashboard port",
+    )
+    actions.add_parser("status", help="Show dashboard service health")
+    actions.add_parser(
+        "uninstall",
+        help="Stop and remove the dashboard service",
     )
 
 
