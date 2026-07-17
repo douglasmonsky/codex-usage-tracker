@@ -133,6 +133,10 @@ error instead of changing the URL; choose an explicit alternative with
 tracker-managed LaunchAgent, run
 `codex-usage-tracker dashboard-service uninstall`.
 
+The login service binds promptly from the cached aggregate index. Use the
+dashboard's Refresh or Live controls when you want to rescan Codex logs; the
+initial background process does not hold the port closed during a full rescan.
+
 Generate a static dashboard:
 
 ```bash

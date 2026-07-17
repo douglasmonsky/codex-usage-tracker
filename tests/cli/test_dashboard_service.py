@@ -97,6 +97,7 @@ def test_launch_agent_is_loopback_only_and_contains_no_content(tmp_path: Path) -
         "47821",
         "--context-api",
         "explicit",
+        "--no-refresh",
     ]
     assert payload["RunAtLoad"] is True
     assert payload["KeepAlive"] is True

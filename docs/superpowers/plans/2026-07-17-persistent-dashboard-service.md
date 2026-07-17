@@ -13,7 +13,7 @@
 - Keep `serve-dashboard` backward-compatible, including its existing default port `8765`.
 - The persistent service defaults to `127.0.0.1:47821` and offers no non-loopback host option.
 - Use LaunchAgent label `com.codex-usage-tracker.dashboard` and plist path `~/Library/LaunchAgents/com.codex-usage-tracker.dashboard.plist`.
-- Start with `--context-api explicit`, never `--open`, and never put credentials or raw usage content in the plist or service logs.
+- Start with `--context-api explicit --no-refresh`, never `--open`, and never put credentials or raw usage content in the plist or service logs.
 - Use the absolute install-time Python interpreter and separate `ProgramArguments`; never invoke launchctl through a shell string.
 - Refuse unknown port owners and never silently select another port or kill an unknown process.
 - Automated tests use temporary homes and fakes/disposable sockets; they never load the developer's real LaunchAgent.
@@ -88,7 +88,7 @@ def test_launch_agent_is_loopback_only_and_contains_no_content(tmp_path: Path) -
     assert payload["ProgramArguments"] == [
         "/opt/tracker/bin/python", "-m", "codex_usage_tracker",
         "serve-dashboard", "--host", "127.0.0.1", "--port", "47821",
-        "--context-api", "explicit",
+        "--context-api", "explicit", "--no-refresh",
     ]
     assert payload["RunAtLoad"] is True
     assert payload["KeepAlive"] is True
@@ -201,7 +201,7 @@ def build_launch_agent(*, python: Path, home: Path, port: int) -> dict[str, Any]
         "ProgramArguments": [
             str(python), "-m", "codex_usage_tracker", "serve-dashboard",
             "--host", SERVICE_HOST, "--port", str(validate_service_port(port)),
-            "--context-api", "explicit",
+            "--context-api", "explicit", "--no-refresh",
         ],
         "EnvironmentVariables": {"HOME": str(home)},
         "RunAtLoad": True,

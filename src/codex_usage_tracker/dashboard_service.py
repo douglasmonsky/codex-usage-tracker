@@ -83,6 +83,7 @@ def build_launch_agent(*, python: Path, home: Path, port: int) -> dict[str, Any]
             str(validate_service_port(port)),
             "--context-api",
             "explicit",
+            "--no-refresh",
         ],
         "EnvironmentVariables": {"HOME": str(home)},
         "RunAtLoad": True,

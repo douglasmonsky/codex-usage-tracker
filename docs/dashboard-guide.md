@@ -24,6 +24,9 @@ already owned by another process, installation refuses the collision; use
 address. Remove the managed service with
 `codex-usage-tracker dashboard-service uninstall`.
 
+Persistent startup serves the cached aggregate index immediately. Use Refresh
+or Live in the dashboard to rescan Codex logs after the page is reachable.
+
 For Linux, Windows, or an on-demand macOS session, run the foreground server:
 
 ```bash

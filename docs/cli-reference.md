@@ -97,6 +97,10 @@ refuses an occupied port rather than silently changing the URL; use
 management actions are macOS-only. The foreground `serve-dashboard` command is
 cross-platform and keeps its existing default port `8765`.
 
+The persistent process starts with the cached aggregate index so the fixed URL
+binds promptly. Its Refresh and Live controls remain the explicit way to rescan
+Codex logs.
+
 `serve-dashboard --context-api explicit` is the default and keeps context loading as an explicit per-row action. `serve-dashboard --no-context-api` or `--context-api disabled` starts with context loading off; a token-protected button in the local details panel can enable it without restarting the server.
 
 `open-dashboard` and `serve-dashboard` refresh active-session logs before opening by default. `serve-dashboard --open` opens the React dashboard; the legacy dashboard remains available at `/dashboard.html` on the same localhost server. Use `--no-refresh` only for an intentionally cached snapshot. The lower-level `dashboard` command writes from the current SQLite index and does not rescan logs.

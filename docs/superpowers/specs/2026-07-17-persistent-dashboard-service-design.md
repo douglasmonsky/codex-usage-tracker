@@ -89,6 +89,7 @@ python -m codex_usage_tracker serve-dashboard
   --host 127.0.0.1
   --port 47821
   --context-api explicit
+  --no-refresh
 ```
 
 The actual plist stores these as separate `ProgramArguments`. It uses
@@ -111,9 +112,10 @@ be reinstalled from the current package environment.
    LaunchAgent in the current user's `gui/<uid>` domain.
 4. launchd starts the existing localhost dashboard server and restarts it when
    needed.
-5. The dashboard continues using its existing explicit refresh and lazy
-   context-loading behavior. Persistence does not introduce background log
-   polling beyond behavior already performed by `serve-dashboard`.
+5. The service binds promptly from the cached aggregate index instead of
+   blocking its port on a startup rescan. The dashboard's existing explicit
+   Refresh and Live controls update the index after it is reachable, and lazy
+   context-loading behavior remains unchanged.
 6. `status` combines launchd state with a bounded HTTP probe so a loaded but
    unreachable process is distinguishable from a healthy service.
 
