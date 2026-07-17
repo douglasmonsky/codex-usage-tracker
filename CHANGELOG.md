@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.21.0 - 2026-07-17
+
+- Keep the macOS dashboard available at a stable, localhost-only URL with a
+  login LaunchAgent, explicit port-collision handling, health checks, and
+  install, status, and uninstall commands.
+- Preserve responsive inline thread expansion while bounding initial work and
+  polishing progressive call loading, retry behavior, and row presentation.
+- Preserve full-width Windows filesystem identifiers so distinct sources do
+  not collapse during aggregate usage ingestion.
 - Ingest aggregate `response.completed` telemetry from local
   `codex-completions*.jsonl` exporter files and conservatively reconcile exact
   Fast/Standard service-tier evidence to canonical calls without retaining raw
