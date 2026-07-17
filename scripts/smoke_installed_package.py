@@ -58,6 +58,7 @@ CLI_HELP_SUBCOMMANDS = [
     "dashboard",
     "open-dashboard",
     "serve-dashboard",
+    "dashboard-service",
     "expensive",
     "pricing-coverage",
     "source-coverage",
