@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import plistlib
 import socket
-import subprocess
+import subprocess  # nosec B404 - launchctl receives fixed argv without a shell.
 import sys
 import tempfile
 import time
@@ -111,7 +111,7 @@ def dashboard_is_reachable(port: int, *, timeout: float = 1.0) -> bool:
 
     validate_service_port(port)
     try:
-        with urlopen(  # noqa: S310 - fixed loopback URL only
+        with urlopen(  # nosec B310  # noqa: S310 - fixed loopback URL only
             f"http://{SERVICE_HOST}:{port}/api/health",
             timeout=timeout,
         ) as response:
