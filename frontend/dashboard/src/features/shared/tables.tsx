@@ -271,91 +271,97 @@ function signalPuckAbbreviation(signal: string): string {
 }
 
 export const threadColumns: Array<ColumnDef<ThreadRow>> = [
-  { accessorKey: 'name', header: 'Thread' },
-  { accessorKey: 'latestActivity', header: 'Latest' },
   {
-    accessorKey: 'turns',
-    header: 'Turns',
+    accessorKey: 'name', header: 'Thread', size: 280, minSize: 220, maxSize: 360,
+    cell: info => {
+      const value = String(info.getValue());
+      return <span className="thread-name-cell" title={value}>{value}</span>;
+    },
+  },
+  { accessorKey: 'latestActivity', header: 'Latest', size: 130, minSize: 116 },
+  {
+    accessorKey: 'turns', header: 'Turns', size: 82, minSize: 72,
     cell: info => <span className="num">{formatNumber(Number(info.getValue()))}</span>,
   },
-  { accessorKey: 'totalDuration', header: 'Duration' },
+  { accessorKey: 'totalDuration', header: 'Duration', size: 110 },
   {
-    accessorKey: 'averageGap',
-    header: 'Avg Gap',
+    accessorKey: 'averageGap', header: 'Avg Gap', size: 110,
     cell: info => <span className="num">{String(info.getValue())}</span>,
   },
   {
-    accessorKey: 'initiatorSummary',
-    header: 'Initiated',
-    cell: info => <span className="status-badge blue">{String(info.getValue())}</span>,
+    accessorKey: 'initiatorSummary', header: 'Initiated', size: 116,
+    cell: info => {
+      const value = String(info.getValue());
+      return <span className={`status-badge ${value === 'unknown' ? 'neutral' : 'blue'}`}>{signalLabel(value)}</span>;
+    },
   },
   {
-    accessorKey: 'modelSummary',
-    header: 'Models',
-    cell: info => <span className="pill model-pill">{String(info.getValue())}</span>,
+    accessorKey: 'modelSummary', header: 'Models', size: 190,
+    cell: info => {
+      const value = String(info.getValue());
+      return value === 'Load thread calls'
+        ? <span className="table-placeholder" title="Expand this thread to load its model mix" aria-label="Model mix not loaded">—</span>
+        : <span className="pill model-pill" title={value}>{value}</span>;
+    },
   },
-  { accessorKey: 'effortSummary', header: 'Effort Mix' },
   {
-    accessorKey: 'totalTokens',
-    header: 'Total Tokens',
+    accessorKey: 'effortSummary', header: 'Effort Mix', size: 160,
+    cell: info => {
+      const value = String(info.getValue());
+      return value === 'Load thread calls'
+        ? <span className="table-placeholder" title="Expand this thread to load its effort mix" aria-label="Effort mix not loaded">—</span>
+        : <span title={value}>{value}</span>;
+    },
+  },
+  {
+    accessorKey: 'totalTokens', header: 'Total Tokens', size: 118,
     cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
   },
   {
-    accessorKey: 'cachedInput',
-    header: 'Cached Input',
+    accessorKey: 'cachedInput', header: 'Cached Input', size: 118,
     cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
   },
   {
-    accessorKey: 'uncachedInput',
-    header: 'Uncached Input',
+    accessorKey: 'uncachedInput', header: 'Uncached Input', size: 124,
     cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
   },
   {
-    accessorKey: 'outputTokens',
-    header: 'Output Tokens',
+    accessorKey: 'outputTokens', header: 'Output Tokens', size: 116,
     cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
   },
   {
-    accessorKey: 'reasoningOutput',
-    header: 'Reasoning Output',
+    accessorKey: 'reasoningOutput', header: 'Reasoning Output', size: 130,
     cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
   },
   {
-    accessorKey: 'cost',
-    header: 'Est. Cost',
+    accessorKey: 'cost', header: 'Est. Cost', size: 100,
     cell: info => <span className="num">{money(Number(info.getValue()))}</span>,
   },
   {
-    accessorKey: 'credits',
-    header: 'Codex Credits',
+    accessorKey: 'credits', header: 'Codex Credits', size: 112,
     cell: info => <span className="num">{formatCompact(Number(info.getValue()))}</span>,
   },
   {
-    accessorKey: 'cachePct',
-    header: 'Cache %',
+    accessorKey: 'cachePct', header: 'Cache %', size: 92,
     cell: info => <span className="cache-pill">{pct(Number(info.getValue()))}</span>,
   },
   {
-    accessorKey: 'contextPct',
-    header: 'Context %',
+    accessorKey: 'contextPct', header: 'Context %', size: 100,
     cell: info => {
       const value = info.getValue<number | null>();
       return <span className="num">{typeof value === 'number' ? pct(value) : '-'}</span>;
     },
   },
   {
-    accessorKey: 'costPerCall',
-    header: 'Cost / Call',
+    accessorKey: 'costPerCall', header: 'Cost / Call', size: 100,
     cell: info => <span className="num">{money(Number(info.getValue()))}</span>,
   },
   {
-    accessorKey: 'coldResumeRisk',
-    header: 'Cold Resume Risk',
+    accessorKey: 'coldResumeRisk', header: 'Cold Resume Risk', size: 132,
     cell: info => <span className={`status-badge ${riskTone(String(info.getValue()))}`}>{String(info.getValue())}</span>,
   },
   {
-    accessorKey: 'productivity',
-    header: 'Productivity',
+    accessorKey: 'productivity', header: 'Productivity', size: 108,
     cell: info => <span className="score">{Number(info.getValue())}</span>,
   },
 ];
@@ -385,14 +391,8 @@ export const threadColumnChoices: ColumnChoice[] = [
 ];
 
 function riskTone(value: string): 'green' | 'orange' | 'red' | 'neutral' {
-  if (value === 'High') {
-    return 'red';
-  }
-  if (value === 'Medium') {
-    return 'orange';
-  }
-  if (value === 'Low') {
-    return 'green';
-  }
+  if (value === 'High') return 'red';
+  if (value === 'Medium') return 'orange';
+  if (value === 'Low') return 'green';
   return 'neutral';
 }

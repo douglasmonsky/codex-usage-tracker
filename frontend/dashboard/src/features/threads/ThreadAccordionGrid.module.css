@@ -1,0 +1,239 @@
+.accordionGrid { min-width: 0; }
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.accordionScroller {
+  position: relative;
+  height: 620px;
+  overflow: auto;
+  border: 1px solid var(--line-subtle, var(--dashboard-border));
+  border-radius: 8px;
+  background: var(--surface-panel, var(--dashboard-surface));
+}
+
+.accordionHeaderGroup {
+  position: sticky;
+  z-index: 4;
+  top: 0;
+}
+
+.accordionHeader {
+  display: flex;
+  min-width: max(720px, 100%);
+  min-height: 42px;
+  color: var(--ink-muted, var(--dashboard-muted));
+  background: var(--surface-subtle, #eef1f5);
+  border-bottom: 1px solid var(--line-subtle, var(--dashboard-border));
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.accordionHeader > div,
+.threadRow > div[role="gridcell"] {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sortHeader {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  font: inherit;
+  font-weight: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sortHeader:hover {
+  color: var(--signal-info-ink, var(--dashboard-accent-strong));
+}
+
+.sortHeader:focus-visible {
+  outline: 2px solid var(--signal-info, var(--dashboard-accent));
+  outline-offset: 2px;
+}
+
+.headerLabel,
+.threadCellContent {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sortIndicator {
+  flex: 0 0 auto;
+  margin-left: auto;
+  opacity: .65;
+}
+
+.disclosureSpacer,
+.disclosureChevron {
+  flex: 0 0 16px;
+  width: 16px;
+}
+
+.identityHeaderCell,
+.threadIdentityCell {
+  position: sticky;
+  z-index: 5;
+  left: 0;
+  background: inherit;
+  box-shadow: 1px 0 0 var(--line-subtle, var(--dashboard-border)), 8px 0 14px -14px currentColor;
+}
+
+.identityHeaderCell {
+  z-index: 6;
+  background: var(--surface-subtle, #eef1f5);
+}
+
+.threadIdentityCell { gap: 6px; }
+
+.threadRow :global(.thread-name-cell),
+.threadRow :global(.model-pill),
+.threadRow :global(.status-badge) {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threadRow :global(.table-placeholder) {
+  color: var(--ink-muted, var(--dashboard-muted));
+  font-weight: 700;
+}
+
+.accordionCanvas { position: relative; min-width: max(720px, 100%); }
+.threadCallsRegion { position: relative; }
+
+.accordionScroller[data-density="compact"] .accordionHeader > div,
+.accordionScroller[data-density="compact"] .threadRow > div[role="gridcell"] { padding: 6px 8px; }
+
+.accordionScroller[data-density="comfortable"] .accordionHeader > div,
+.accordionScroller[data-density="comfortable"] .threadRow > div[role="gridcell"] { padding: 12px; }
+
+.accordionItem {
+  position: absolute;
+  inset-inline: 0;
+  display: grid;
+  min-width: max(720px, 100%);
+  box-sizing: border-box;
+}
+
+.threadRow {
+  display: flex;
+  min-height: 52px;
+  cursor: pointer;
+  background: var(--surface-panel, var(--dashboard-surface));
+  border-bottom: 1px solid var(--line-subtle, var(--dashboard-border));
+}
+
+.threadRow:hover { background: var(--surface-subtle, #f5f7fa); }
+
+.threadRow:focus-visible {
+  z-index: 3;
+  outline: 3px solid var(--signal-info, var(--dashboard-accent));
+  outline-offset: -3px;
+}
+
+.expandedThreadRow {
+  box-shadow: inset 4px 0 0 var(--signal-info, var(--dashboard-accent));
+  background: var(--surface-selected, var(--dashboard-surface-soft));
+}
+
+.disclosureChevron { font-size: 20px; line-height: 1; text-align: center; transition: transform 120ms ease; }
+.expandedThreadRow .disclosureChevron { transform: rotate(90deg); }
+
+.threadExpansionSummary,
+.threadCallEvidence,
+.threadLoadStatus {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line-subtle, var(--dashboard-border));
+  background: var(--surface-panel, var(--dashboard-surface));
+}
+
+.accordionScroller[data-density="compact"] .threadExpansionSummary,
+.accordionScroller[data-density="compact"] .threadCallEvidence,
+.accordionScroller[data-density="compact"] .threadLoadStatus { padding: 8px 12px; }
+
+.accordionScroller[data-density="comfortable"] .threadExpansionSummary,
+.accordionScroller[data-density="comfortable"] .threadCallEvidence,
+.accordionScroller[data-density="comfortable"] .threadLoadStatus { padding: 16px 18px; }
+
+.threadExpansionSummary { display: grid; gap: 10px; }
+.threadExpansionHeader { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.threadExpansionHeader > div:first-child { display: grid; gap: 4px; }
+.snapshotLabel { width: fit-content; padding: 2px 7px; border-radius: 999px; background: var(--surface-selected, var(--dashboard-surface-soft)); }
+.threadSummaryStrip { display: grid; grid-template-columns: repeat(8, minmax(92px, 1fr)); gap: 8px; margin: 0; }
+.threadSummaryStrip > div { min-width: 0; }
+.threadSummaryStrip dt { color: var(--ink-muted, var(--dashboard-muted)); font-size: 11px; }
+.threadSummaryStrip dd { margin: 2px 0 0; font-size: 12px; font-weight: 600; }
+.threadExpansionSummary span,
+.threadCallIdentity span,
+.threadCallSignals { color: var(--ink-muted, var(--dashboard-muted)); font-size: 12px; }
+.threadCallControls { display: flex; gap: 8px; }
+.threadCallControls label { display: grid; gap: 4px; font-size: 12px; }
+
+.threadCallEvidence {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) repeat(3, minmax(100px, .8fr)) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.threadCallIdentity,
+.threadCallSignals { display: grid; gap: 4px; }
+.threadCallActions { display: flex; gap: 6px; }
+.threadCallRecommendation { grid-column: 1 / -1; margin: 0; }
+.threadContextBar { grid-column: 1 / -1; height: 4px; overflow: hidden; border-radius: 2px; background: var(--surface-selected, var(--dashboard-surface-soft)); }
+.threadContextBar > span { display: block; height: 100%; }
+.threadLoadStatus { display: flex; min-height: 52px; gap: 10px; align-items: center; color: var(--ink-muted, var(--dashboard-muted)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .disclosureChevron { transition: none; }
+}
+
+@media (max-width: 760px) {
+  .accordionHeader,
+  .accordionItem { min-width: 0; }
+  .threadRow > div[role="gridcell"]:not(:first-of-type),
+  .accordionHeader > div:not(:first-child) { display: none; }
+  .threadRow > div[role="gridcell"]:first-of-type,
+  .accordionHeader > div:first-child { width: 100% !important; }
+  .identityHeaderCell,
+  .threadIdentityCell { position: static; }
+  .threadExpansionSummary,
+  .threadCallEvidence { grid-template-columns: minmax(0, 1fr); }
+  .threadExpansionHeader { align-items: stretch; }
+  .threadSummaryStrip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .threadCallControls { display: grid; grid-template-columns: 1fr 1fr; }
+  .threadCallControls select { min-height: 44px; }
+  .threadCallEvidence button,
+  .threadExpansionSummary button,
+  .threadLoadStatus button { min-height: 44px; }
+}

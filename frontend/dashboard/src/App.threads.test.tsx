@@ -63,6 +63,22 @@ describe('React dashboard threads workspace', () => {
     });
   });
 
+  it('starts with scan-first columns while keeping advanced metrics available', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+
+    const table = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
+    expect(within(table).getByRole('columnheader', { name: 'Thread' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Total Tokens' })).toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: 'Models' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    const modelsToggle = screen.getByRole('checkbox', { name: 'Models' });
+    expect(modelsToggle).not.toBeChecked();
+    fireEvent.click(modelsToggle);
+    expect(within(table).getByRole('columnheader', { name: 'Models' })).toBeInTheDocument();
+  });
+
   it('hydrates legacy expanded thread URL state', async () => {
     window.history.replaceState(null, '', '/?view=threads&threads=thread-7c2b,thread-9f3a');
 

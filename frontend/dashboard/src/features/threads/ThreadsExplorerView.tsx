@@ -37,6 +37,7 @@ type ThreadsExplorerViewProps = {
     isFetching: boolean;
     isFetchingNextPage: boolean;
     isFetchNextPageError: boolean;
+    canLoadMore: boolean;
     count: number;
     hydrated: boolean;
     error: string | null;
@@ -44,6 +45,7 @@ type ThreadsExplorerViewProps = {
     storedSnapshot: boolean;
   };
   selectedCalls: CallRow[];
+  callPageSize: number;
   displayedThreads: ThreadRow[];
   totalMatchedThreads: number;
   canLoadMoreThreads: boolean;
@@ -64,6 +66,7 @@ type ThreadsExplorerViewProps = {
   onSortingChange: OnChangeFn<SortingState>;
   onToggleThread(threadName: string): void;
   onRetryCalls(): void;
+  onLoadMoreCalls(): void;
   onLoadMoreThreads(): void;
   onCallSortChange(value: string): void;
   onCallSortDirectionChange(value: string): void;
@@ -85,6 +88,7 @@ export function ThreadsExplorerView({
   focusedState,
   selectedCallsState,
   selectedCalls,
+  callPageSize,
   displayedThreads,
   totalMatchedThreads,
   canLoadMoreThreads,
@@ -105,6 +109,7 @@ export function ThreadsExplorerView({
   onSortingChange,
   onToggleThread,
   onRetryCalls,
+  onLoadMoreCalls,
   onLoadMoreThreads,
   onCallSortChange,
   onCallSortDirectionChange,
@@ -209,6 +214,8 @@ export function ThreadsExplorerView({
                 expandedThreadName={selected?.name ?? null}
                 expandedCalls={selectedCalls}
                 totalCallCount={selectedCallsState.count}
+                loadMoreCallCount={callPageSize}
+                canLoadMoreCalls={selectedCallsState.canLoadMore}
                 loadingCalls={selectedCallsState.isFetching && !selectedCallsState.hydrated}
                 loadingMoreCalls={selectedCallsState.isFetchingNextPage}
                 initialError={selectedCallsState.initialError}
@@ -218,6 +225,7 @@ export function ThreadsExplorerView({
                 callSortDirection={callSortDirection}
                 onToggleThread={onToggleThread}
                 onRetryCalls={onRetryCalls}
+                onLoadMoreCalls={onLoadMoreCalls}
                 onCallSortChange={onCallSortChange}
                 onCallSortDirectionChange={onCallSortDirectionChange}
                 onOpenInvestigator={onOpenInvestigator}
