@@ -220,6 +220,32 @@ def test_install_reuses_identical_healthy_service_without_restart(tmp_path: Path
     ]
 
 
+def test_install_waits_for_cached_dashboard_to_bind(tmp_path: Path, monkeypatch) -> None:
+    python = tmp_path / "python"
+    python.touch()
+    attempts = 0
+
+    def reachable(_: int) -> bool:
+        nonlocal attempts
+        attempts += 1
+        return attempts == 25
+
+    monkeypatch.setattr("codex_usage_tracker.dashboard_service.time.sleep", lambda _: None)
+
+    status = install_dashboard_service(
+        home=tmp_path,
+        python=python,
+        platform="darwin",
+        uid=501,
+        runner=FakeRunner(),
+        port_available=lambda _: True,
+        reachable=reachable,
+    )
+
+    assert status.reachable is True
+    assert attempts == 25
+
+
 def test_install_restores_previous_plist_when_bootstrap_fails(tmp_path: Path) -> None:
     python = tmp_path / "python"
     python.touch()

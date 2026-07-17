@@ -349,8 +349,8 @@ def _wait_until_reachable(
     port: int,
     reachable: Callable[[int], bool],
     *,
-    attempts: int = 20,
-    delay: float = 0.1,
+    attempts: int = 60,
+    delay: float = 0.25,
 ) -> bool:
     for attempt in range(attempts):
         if reachable(port):
