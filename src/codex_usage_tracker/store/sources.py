@@ -21,6 +21,26 @@ from codex_usage_tracker.parser.state import (
 )
 
 _PREFIX_TAIL_BYTES = 64 * 1024
+_FILESYSTEM_ID_PREFIX = "fsid-v1:"
+
+
+def _serialize_filesystem_id(value: int) -> str:
+    return f"{_FILESYSTEM_ID_PREFIX}{value}"
+
+
+def _filesystem_id_key(value: object) -> str | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return _serialize_filesystem_id(value)
+    if not isinstance(value, str):
+        return None
+    payload = value.removeprefix(_FILESYSTEM_ID_PREFIX)
+    try:
+        identifier = int(payload)
+    except ValueError:
+        return None
+    return _serialize_filesystem_id(identifier)
 
 
 @dataclass(frozen=True)
@@ -30,6 +50,15 @@ class SourceParsePlan:
     start_line: int = 0
     initial_state: ParserState | None = None
     replace_existing: bool = True
+
+
+@dataclass(frozen=True)
+class SourceFileMetadata:
+    size_bytes: int
+    mtime_ns: int
+    source_device: str
+    source_inode: str
+    is_archived: int
 
 
 ParsedSourceFile: TypeAlias = (
@@ -73,7 +102,7 @@ def _source_file_parse_row(conn: sqlite3.Connection, path: Path) -> sqlite3.Row 
 
 
 def _source_parse_plan_from_row(
-    path: Path, metadata: dict[str, int], row: sqlite3.Row
+    path: Path, metadata: SourceFileMetadata, row: sqlite3.Row
 ) -> SourceParsePlan | None:
     previous_state = parser_state_from_json(row["parser_state_json"])
     if _requires_full_source_parse(row, previous_state):
@@ -96,23 +125,25 @@ def _requires_full_source_parse(row: sqlite3.Row, previous_state: ParserState | 
     return previous_adapter != PARSER_ADAPTER_VERSION or previous_state is None
 
 
-def _source_metadata_matches(row: sqlite3.Row, metadata: dict[str, int]) -> bool:
+def _source_metadata_matches(row: sqlite3.Row, metadata: SourceFileMetadata) -> bool:
     return (
-        int(row["size_bytes"]) == metadata["size_bytes"]
-        and int(row["mtime_ns"]) == metadata["mtime_ns"]
-        and int(row["source_device"]) == metadata["source_device"]
-        and int(row["source_inode"]) == metadata["source_inode"]
+        int(row["size_bytes"]) == metadata.size_bytes
+        and int(row["mtime_ns"]) == metadata.mtime_ns
+        and _filesystem_id_key(row["source_device"]) == metadata.source_device
+        and _filesystem_id_key(row["source_inode"]) == metadata.source_inode
     )
 
 
-def _can_incrementally_parse_source(path: Path, metadata: dict[str, int], row: sqlite3.Row) -> bool:
+def _can_incrementally_parse_source(
+    path: Path, metadata: SourceFileMetadata, row: sqlite3.Row
+) -> bool:
     previous_size = int(row["size_bytes"])
     previous_byte = int(row["parsed_until_byte"])
     expected_tail = str(row["parsed_prefix_tail_hash"] or "")
     return (
-        0 < previous_byte <= previous_size < metadata["size_bytes"]
-        and int(row["source_device"]) == metadata["source_device"]
-        and int(row["source_inode"]) == metadata["source_inode"]
+        0 < previous_byte <= previous_size < metadata.size_bytes
+        and _filesystem_id_key(row["source_device"]) == metadata.source_device
+        and _filesystem_id_key(row["source_inode"]) == metadata.source_inode
         and bool(expected_tail)
         and _parsed_prefix_tail_hash(path, previous_byte) == expected_tail
     )
@@ -213,21 +244,21 @@ def _source_file_metadata_row(
         return None
     latest_event = _latest_source_usage_event(events)
     parsed_until_line = final_line_number or _count_lines(path)
-    parsed_until_byte = int(metadata["size_bytes"])
+    parsed_until_byte = metadata.size_bytes
     return {
         "source_file_id": _source_file_id(path),
         "source_file": str(path),
         "source_file_hash": _source_file_hash(path),
-        "is_archived": int(metadata["is_archived"]),
-        "size_bytes": int(metadata["size_bytes"]),
-        "mtime_ns": int(metadata["mtime_ns"]),
+        "is_archived": metadata.is_archived,
+        "size_bytes": metadata.size_bytes,
+        "mtime_ns": metadata.mtime_ns,
         "parsed_until_line": parsed_until_line,
         "parsed_until_byte": parsed_until_byte,
         "parsed_prefix_tail_hash": _parsed_prefix_tail_hash(path, parsed_until_byte),
         "parsed_row_count": parsed_until_line,
         "source_generation": 1,
-        "source_device": int(metadata["source_device"]),
-        "source_inode": int(metadata["source_inode"]),
+        "source_device": metadata.source_device,
+        "source_inode": metadata.source_inode,
         "latest_record_id": _latest_source_record_id(latest_event, parser_state),
         "latest_event_timestamp": _latest_source_event_timestamp(latest_event, parser_state),
         "parser_adapter": PARSER_ADAPTER_VERSION,
@@ -265,18 +296,18 @@ def _latest_source_usage_event(events: list[UsageEvent]) -> UsageEvent | None:
     )
 
 
-def _source_file_metadata(path: Path) -> dict[str, int] | None:
+def _source_file_metadata(path: Path) -> SourceFileMetadata | None:
     try:
         stat = path.stat()
     except OSError:
         return None
-    return {
-        "size_bytes": int(stat.st_size),
-        "mtime_ns": int(stat.st_mtime_ns),
-        "source_device": int(stat.st_dev),
-        "source_inode": int(stat.st_ino),
-        "is_archived": _is_archived_source_file(path),
-    }
+    return SourceFileMetadata(
+        size_bytes=int(stat.st_size),
+        mtime_ns=int(stat.st_mtime_ns),
+        source_device=_serialize_filesystem_id(int(stat.st_dev)),
+        source_inode=_serialize_filesystem_id(int(stat.st_ino)),
+        is_archived=_is_archived_source_file(path),
+    )
 
 
 def _is_archived_source_file(path: Path) -> int:
