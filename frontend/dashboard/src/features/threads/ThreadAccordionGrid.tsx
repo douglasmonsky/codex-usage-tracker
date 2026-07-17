@@ -14,7 +14,7 @@ import { EvidenceGridControls } from '../explore/EvidenceGridControls';
 import type { EvidenceGridPreferences } from '../explore/useEvidenceGridPreferences';
 import { ThreadCallControls, ThreadCallEvidenceRow } from './ThreadAccordionRows';
 import type { ThreadCallSortDirection, ThreadCallSortKey } from './threadsUrlState';
-import styles from './ThreadsPage.module.css';
+import styles from './ThreadAccordionGrid.module.css';
 
 export type ThreadAccordionGridProps = {
   ariaLabel: string;
@@ -200,10 +200,12 @@ export function ThreadAccordionGrid({
             {table.getHeaderGroups()[0]?.headers.map(header => {
               const sorted = header.column.getIsSorted();
               const label = headerText(header.column.columnDef.header, header.column.id);
-              return <div key={header.id} role="columnheader" aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : undefined} style={{ width: header.getSize() }}>
-                {header.column.getCanSort() ? <button type="button" aria-label={`Sort by ${label}`} onClick={header.column.getToggleSortingHandler()}>
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                  <span aria-hidden="true">{sorted === 'asc' ? ' ↑' : sorted === 'desc' ? ' ↓' : ' ↕'}</span>
+              const identity = header.column.id === 'name';
+              return <div key={header.id} className={identity ? styles.identityHeaderCell : undefined} role="columnheader" aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : undefined} style={{ width: header.getSize() }}>
+                {header.column.getCanSort() ? <button className={styles.sortHeader} type="button" aria-label={`Sort by ${label}`} onClick={header.column.getToggleSortingHandler()}>
+                  {identity ? <span className={styles.disclosureSpacer} aria-hidden="true" /> : null}
+                  <span className={styles.headerLabel}>{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                  <span className={styles.sortIndicator} aria-hidden="true">{sorted === 'asc' ? '↑' : sorted === 'desc' ? '↓' : '↕'}</span>
                 </button> : flexRender(header.column.columnDef.header, header.getContext())}
               </div>;
             })}
@@ -246,10 +248,13 @@ export function ThreadAccordionGrid({
                 }}
                 onKeyDown={event => toggleKeyDown(event, item.thread.name, virtualItem.index)}
               >
-                <span className={styles.disclosureChevron} aria-hidden="true">›</span>
-                {row.getVisibleCells().map(cell => <div key={cell.id} role="gridcell" style={{ width: cell.column.getSize() }}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </div>)}
+                {row.getVisibleCells().map(cell => {
+                  const identity = cell.column.id === 'name';
+                  return <div key={cell.id} className={identity ? styles.threadIdentityCell : undefined} role="gridcell" style={{ width: cell.column.getSize() }}>
+                    {identity ? <span className={styles.disclosureChevron} aria-hidden="true">›</span> : null}
+                    <span className={styles.threadCellContent}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</span>
+                  </div>;
+                })}
               </div>;
             }
             if (item.kind === 'summary') {

@@ -11,7 +11,7 @@ import {
   timelineWidth,
 } from './threadAnalysis';
 import type { ThreadCallSortDirection, ThreadCallSortKey } from './threadsUrlState';
-import styles from './ThreadsPage.module.css';
+import styles from './ThreadAccordionGrid.module.css';
 
 export type ThreadCallControlsProps = {
   callSort: ThreadCallSortKey;

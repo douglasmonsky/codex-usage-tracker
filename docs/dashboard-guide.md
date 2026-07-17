@@ -164,6 +164,9 @@ Use `Threads` view when you want to understand a work session as a group instead
   remain the fallback.
 - Click a thread row to load the first 100 aggregate calls directly beneath it.
 - Only one thread stays expanded at a time.
+- The compact default keeps the most useful comparison columns visible; use
+  `Columns` to reveal duration, model/effort mix, token breakdowns, and other
+  advanced fields without making the default leaderboard excessively wide.
 - Use `Load 100 more` to request each additional page; visible progress and retry
   keep large threads bounded and recoverable.
 - Parent rows never open a representative call.

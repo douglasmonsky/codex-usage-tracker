@@ -77,6 +77,29 @@ it('treats a real browser double-click sequence as one logical toggle', () => {
   expect(onOpenInvestigator).not.toHaveBeenCalled();
 });
 
+it('aligns disclosure inside a truncated identity cell and quiets unloaded metadata', () => {
+  const lazyThread = {
+    ...fixtureThread,
+    name: '019f6393-a720-7da2-bb96-5ee5f4b55506',
+    initiatorSummary: 'mostly_user',
+    modelSummary: 'Load thread calls',
+    effortSummary: 'Load thread calls',
+  };
+  renderGrid({ threads: [lazyThread] });
+
+  const row = screen.getByRole('row', { name: `Expand calls for ${lazyThread.name}` });
+  const identityCell = within(row).getAllByRole('gridcell')[0];
+  expect(within(identityCell).getByText('›')).toBeInTheDocument();
+  expect(screen.getByTitle(lazyThread.name)).toHaveTextContent(lazyThread.name);
+  expect(screen.getByText('Mostly User')).toBeInTheDocument();
+  expect(screen.getByTitle('Expand this thread to load its model mix')).toHaveTextContent('—');
+  expect(screen.getByTitle('Expand this thread to load its effort mix')).toHaveTextContent('—');
+  expect(screen.queryByText('Load thread calls')).not.toBeInTheDocument();
+
+  const threadHeader = screen.getByRole('columnheader', { name: 'Thread' });
+  expect(threadHeader).toHaveStyle({ width: '280px' });
+});
+
 it('renders an associated expanded region and explicit child actions', () => {
   const onOpenInvestigator = vi.fn();
   const onCopyCallLink = vi.fn();

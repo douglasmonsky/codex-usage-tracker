@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CallRow } from '../../api/types';
-import { callActionColumn, callColumns, callCsvColumns, callSignalPucks } from './tables';
+import { callActionColumn, callColumns, callCsvColumns, callSignalPucks, threadColumns } from './tables';
 import { rowsToCsv } from './exportCsv';
 
 describe('call CSV columns', () => {
@@ -186,5 +186,19 @@ describe('call signal pucks', () => {
     expect(pucks.visible.map(puck => puck.shortLabel)).toEqual(['CACHE', 'CTX', '$']);
     expect(pucks.hidden.map(puck => puck.shortLabel)).toEqual(['RSN']);
     expect(pucks.visible.map(puck => puck.label)).toEqual(['Cache Risk', 'Context Heavy', 'High Cost']);
+  });
+});
+
+describe('thread table columns', () => {
+  it('uses scan-friendly widths for the compact leaderboard', () => {
+    const column = (accessorKey: string) => threadColumns.find(candidate => (
+      'accessorKey' in candidate && candidate.accessorKey === accessorKey
+    ));
+
+    expect(column('name')).toMatchObject({ size: 280, minSize: 220 });
+    expect(column('latestActivity')).toMatchObject({ size: 130 });
+    expect(column('turns')).toMatchObject({ size: 82 });
+    expect(column('totalTokens')).toMatchObject({ size: 118 });
+    expect(column('cachePct')).toMatchObject({ size: 92 });
   });
 });

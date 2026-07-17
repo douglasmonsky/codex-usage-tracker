@@ -41,6 +41,19 @@ type ThreadsPageProps = {
 };
 
 const threadCallsPageSize = 100;
+const threadDefaultColumnVisibility = {
+  totalDuration: false,
+  averageGap: false,
+  initiatorSummary: false,
+  modelSummary: false,
+  effortSummary: false,
+  cachedInput: false,
+  uncachedInput: false,
+  outputTokens: false,
+  reasoningOutput: false,
+  costPerCall: false,
+  productivity: false,
+};
 
 export function threadsForCurrentUrl(threads: ThreadRow[], globalQuery = ''): ThreadRow[] {
   return sortThreads(
@@ -96,9 +109,9 @@ export function ThreadsPage({
     updateLocalQuery, updateRiskFilter, updateThreadSorting, clearThreadFilters,
     toggleThread, updateThreadCallSort, updateThreadCallSortDirection,
   } = useThreadsPageControls(globalQuery);
-  const gridPreferences = useEvidenceGridPreferences('codexUsageThreadsEvidenceGrid', {
+  const gridPreferences = useEvidenceGridPreferences('codexUsageThreadsEvidenceGridV2', {
     density: 'compact',
-    columnVisibility: {},
+    columnVisibility: threadDefaultColumnVisibility,
   });
 
   const endpointState = useMemo(
