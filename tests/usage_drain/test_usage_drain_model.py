@@ -13,6 +13,7 @@ from codex_usage_tracker.usage_drain.model import (
     load_fast_proxy_annotations,
     summarize_usage_drain_model,
 )
+from codex_usage_tracker.usage_drain.spans import _span_from_rows
 from tests.usage_drain.model_test_helpers import (
     coefficients_by_feature as _coefficients_by_feature,
 )
@@ -145,6 +146,17 @@ def test_alternate_codex_limit_rows_count_as_work_but_not_boundaries() -> None:
     assert spans[0].row_count == 3
     assert spans[0].standard_usage_credits == 10.0
     assert spans[0].rate_limit_limit_id == "codex"
+
+
+def test_usage_drain_prefers_standard_credits_after_fast_annotation() -> None:
+    row = _row("fast", "2026-06-01T00:00:00Z", 1.0, 2.5)
+    row["standard_usage_credits"] = 1.0
+
+    span = _span_from_rows(
+        [row], baseline_percent=0.0, end_used_percent=1.0, proxies={}
+    )
+
+    assert span.standard_usage_credits == 1.0
 
 
 def test_build_usage_delta_spans_prefers_five_hour_window_when_secondary() -> None:

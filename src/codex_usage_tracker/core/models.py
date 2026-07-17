@@ -71,6 +71,10 @@ class UsageEvent:
     canonical_record_id: str | None = None
     is_duplicate: int = 0
     duplicate_reason: str | None = None
+    service_tier: str | None = None
+    fast: int | None = None
+    service_tier_source: str | None = None
+    service_tier_confidence: str | None = None
 
     @property
     def uncached_input_tokens(self) -> int:

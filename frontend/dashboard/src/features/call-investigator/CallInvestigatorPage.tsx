@@ -14,7 +14,7 @@ import { ContextEntryMetadata } from '../shared/ContextEntryMetadata';
 import { CallSourceMetadata } from '../shared/CallSourceMetadata';
 import { TokenPricingBreakdown } from '../shared/TokenPricingBreakdown';
 import { ThreadCallTimeline } from '../shared/ThreadCallTimeline';
-import { cacheState, contextWindowLabel, sourceLine, summarizeTopCounts } from '../shared/callPresentation';
+import { billingBasisDetail, cacheState, contextWindowLabel, serviceTierDetail, sourceLine, summarizeTopCounts } from '../shared/callPresentation';
 import { copyText } from '../shared/copyText';
 import { CallSignalPucks } from '../shared/tables';
 import {
@@ -209,8 +209,8 @@ throw new Error('Clipboard unavailable');
           <InvestigatorMetric label="Total tokens" value={formatNumber(call.totalTokens)} detail={`${formatCompact(call.input)} input`} />
           <InvestigatorMetric label="Uncached input" value={formatNumber(call.uncachedInput)} detail="fresh billed input" />
           <InvestigatorMetric label="Cache hit rate" value={pct(call.cachedPct)} detail={cacheState(call)} />
-          <InvestigatorMetric label="Estimated cost" value={money(call.cost)} detail={call.pricingEstimated ? 'estimated pricing' : 'configured pricing'} />
-          <InvestigatorMetric label="Duration" value={call.duration} detail={call.fast ? 'fast candidate' : 'normal throughput'} />
+          <InvestigatorMetric label="Estimated cost" value={money(call.cost)} detail={billingBasisDetail(call)} />
+          <InvestigatorMetric label="Duration" value={call.duration} detail={serviceTierDetail(call)} />
 <InvestigatorMetric label="Usage credits" value={call.credits ? call.credits.toFixed(3) : '-'} detail={call.usageCreditConfidence} />
 </div>
 <CallDecisionCard call={call} />

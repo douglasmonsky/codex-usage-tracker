@@ -14,7 +14,7 @@ Enable optional cost estimates:
 codex-usage-tracker update-pricing
 ```
 
-This fetches OpenAI text-token pricing from `https://developers.openai.com/api/docs/pricing.md`, parses the selected tier, and writes a source-stamped local cache to `~/.codex-usage-tracker/pricing.json`. The default tier is `standard`; other supported tiers are `batch`, `flex`, and `priority`.
+This fetches OpenAI text-token pricing from `https://developers.openai.com/api/docs/pricing.md` once, parses the `standard`, `batch`, `flex`, and `priority` tables, and writes a source-stamped pricing-v2 cache to `~/.codex-usage-tracker/pricing.json`. The top-level `models` object remains the selected-tier compatibility projection, while `api_service_tiers` retains every published table so mixed historical calls can be priced by their observed response tier.
 
 The updater supports both the older four-value pricing rows and the newer five-value rows used by GPT-5.6 for input, cached input, cache writes, and output. GPT-5.6 Sol, Terra, and Luna are loaded from the published table, and the documented `gpt-5.6` alias resolves to `gpt-5.6-sol`. Current Codex logs do not expose a separate cache-write token counter, so cost estimates use the logged uncached input, cached input, and output counters without adding an explicit cache-write charge.
 
@@ -39,6 +39,20 @@ codex-usage-tracker init-pricing
 
 Edit `~/.codex-usage-tracker/pricing.json` with USD-per-million-token rates for local overrides or models that are not present in the OpenAI pricing table. Normal reports never contact the network; only `update-pricing` refreshes the local pricing cache.
 
+### Billing Basis And Tier Scenarios
+
+OTel `service_tier=priority` proves the response tier, but it does not prove whether the call used ChatGPT/Codex credits or an API key. Set the top-level local `billing_basis` only when you know the billing path:
+
+```json
+{
+  "billing_basis": "unknown"
+}
+```
+
+Supported values are `unknown`, `chatgpt_credits`, and `api_tokens`. `update-pricing` preserves this local value. Invalid values make the pricing config invalid instead of silently guessing.
+
+`estimated_cost_usd` is always an API-token-equivalent estimate. With pricing-v2, it selects the exact observed API table for `priority`, `default`/`standard`, `flex`, or `batch`; it never applies a generic ChatGPT Fast multiplier. Each annotated row also exposes `standard_cost_usd`, `priority_cost_usd`, `pricing_service_tier`, `billing_basis`, and `cost_semantics` so an unknown billing path can be reported as bounded scenarios rather than false actual spend. Pricing-v1 files remain readable and keep their existing single-table behavior.
+
 ## Codex Credits
 
 `Codex Credits` is a calculated usage number, not a dashboard-only unit. The tracker uses Codex's logged aggregate token counters and the bundled OpenAI Codex rate-card snapshot to estimate credits consumed by local Codex calls.
@@ -61,6 +75,34 @@ codex-usage-tracker update-rate-card
 ```
 
 The local snapshot is written to `~/.codex-usage-tracker/rate-card.json`. Each bundled rate and alias includes source URL, fetched date, tier, confidence, and alias rationale where applicable. Use `--source-file` only when you have a reviewed replacement JSON snapshot you want the tracker to validate and use.
+
+### Confirmed Fast Usage
+
+When a call has exact OTel evidence that `fast=1`, the tracker first computes
+`standard_usage_credits`, then applies the documented model-family Fast
+multiplier to produce `usage_credits`:
+
+- GPT-5.6 family: `2.5x`
+- GPT-5.5 family: `2.5x`
+- GPT-5.4 family: `2.0x`
+
+The row also exposes `fast_usage_credits`, `usage_credit_multiplier`, and
+source URL/date/confidence fields so the adjustment is auditable independently
+from OTel tier evidence. A confirmed
+Fast call whose model has no documented multiplier stays at `1.0x` and is
+marked `no_documented_fast_multiplier`; the tracker does not guess. Standard
+and Unknown-tier calls also stay at `1.0x`.
+
+The bundled `fast_multipliers` rate-card entries are source-stamped. A local
+`allowance.json` may override a model-family entry with `multiplier`,
+`source_name`, `source_url`, and `fetched_at`; valid local entries are marked
+`user_override`, while malformed entries do not replace the bundled value.
+
+This adjustment applies only to Codex/ChatGPT usage-credit estimates. It never
+changes API USD estimates, which use the observed API service-tier table and
+aggregate token counters. Allowance-drain calibration uses the
+standard-credit baseline so a newly observed Fast label does not redefine the
+historical credit-to-percentage relationship.
 
 ## Usage Observed
 
@@ -90,6 +132,13 @@ Configure the usage component:
 - Codex upstream log formats can change, and parser compatibility may require tracker updates before new event shapes are fully understood.
 - Pricing and rate-card sources can change outside this project. Refresh or pin local files when reports need a known source snapshot.
 - Local Codex logs may not include usage from other ChatGPT agentic surfaces that share the same allowance.
+- Service tier is exact only when a local completion explicitly reports it or
+  Codex `0.143.0` or newer establishes Standard through omission. Older or
+  unmatched history remains Unknown; latency and reasoning effort cannot prove
+  Fast usage.
+- `priority` can describe ChatGPT Fast mode or API Priority processing. The
+  retained telemetry does not identify authentication or billing, so leave
+  `billing_basis` as `unknown` unless you have independent evidence.
 - Live account allowance cannot be read automatically by this local tracker, and the dashboard does not infer live remaining allowance from the logged-in account plan.
 - Observed local-log snapshots may be stale until Codex records another model call, and may omit other agentic surfaces that share the same allowance.
 - Pricing can change after a report is generated. Use `pin-pricing` when you need reproducible historical cost estimates.

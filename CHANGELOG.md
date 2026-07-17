@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- Ingest aggregate `response.completed` telemetry from local
+  `codex-completions*.jsonl` exporter files and conservatively reconcile exact
+  Fast/Standard service-tier evidence to canonical calls without retaining raw
+  response bodies or arbitrary OTLP attributes.
+- Show exact service tier separately from the existing Fast proxy in Calls,
+  details, and CSV exports; older or unmatched history remains Unknown.
+- Apply documented model-family Fast multipliers to confirmed Codex credit
+  estimates with source URL/date/confidence and local overrides while leaving
+  standard-credit allowance calibration unchanged.
+- Cache Standard, Batch, Flex, and Priority API pricing together, select the
+  observed tier per call, and expose Standard/Priority cost scenarios plus an
+  explicit local billing basis without applying ChatGPT Fast multipliers to API
+  USD estimates.
+- Preserve exact response tiers in dashboard labels and CSV contracts, clear
+  OTel staging on confirmed database reset, and make incremental source cursors
+  descriptor-safe across concurrent file rotation. Verify a bounded content
+  anchor before resuming so same-inode rewrites cannot silently skip telemetry.
+
 ## 0.20.0 - 2026-07-16
 
 - Reinvent the Threads tab around inline row expansion, progressively loading and virtualizing every call in the selected thread while preserving explicit investigator actions, deep links, responsive layouts, retry recovery, and aggregate-first privacy boundaries.

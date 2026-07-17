@@ -77,6 +77,10 @@ USAGE_EVENT_COLUMNS = (
         "is_duplicate", "INTEGER NOT NULL DEFAULT 0", "INTEGER NOT NULL DEFAULT 0", repairable=True
     ),
     UsageColumn("duplicate_reason", "TEXT", "TEXT", repairable=True),
+    UsageColumn("service_tier", "TEXT", "TEXT", repairable=True),
+    UsageColumn("fast", "INTEGER", "INTEGER", repairable=True),
+    UsageColumn("service_tier_source", "TEXT", "TEXT", repairable=True),
+    UsageColumn("service_tier_confidence", "TEXT", "TEXT", repairable=True),
     UsageColumn("uncached_input_tokens", "INTEGER NOT NULL", "INTEGER"),
     UsageColumn("cache_ratio", "REAL NOT NULL", "REAL"),
     UsageColumn("reasoning_output_ratio", "REAL NOT NULL", "REAL"),

@@ -337,7 +337,12 @@ def _span_from_rows(
     token_totals: dict[str, float] = dict.fromkeys(TOKEN_TOTAL_FIELDS, 0.0)
     timing_totals: dict[str, float] = dict.fromkeys(TIMING_TOTAL_FIELDS, 0.0)
     for row in rows:
-        credits = max(_span_number(row.get("usage_credits")), 0.0)
+        credit_field = (
+            "standard_usage_credits"
+            if "standard_usage_credits" in row
+            else "usage_credits"
+        )
+        credits = max(_span_number(row.get(credit_field)), 0.0)
         standard += credits
         _add_span_row_dimensions(
             row,

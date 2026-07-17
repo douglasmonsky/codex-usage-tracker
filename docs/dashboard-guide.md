@@ -117,6 +117,11 @@ Use `Calls` view when you want to inspect individual model calls.
 - Time values are shown in your browser's local date/time format while sorting and time filtering still use the logged timestamp.
 - Calls include `Duration`, derived from turn start for a new turn or the previous same-turn call end for continuations, and `Prev gap`, the elapsed time since the previous call in the resolved thread.
 - Calls view token columns separate total tokens, cached input, uncached input, and output so the accounting can be scanned without expanding a row.
+- The `Service Tier` column preserves the exact response value with distinct
+  labels for Priority/Fast, Fast, Default/Standard, Standard, Flex, Batch, and
+  other bounded explicit tiers. It shows `Unknown` when completion telemetry is
+  absent. The detail view keeps the older throughput heuristic labeled as a
+  separate Fast proxy candidate rather than historical proof.
 - Source pucks are call-level estimates derived from local event metadata. `User` means the token-count segment included a user message, `Codex` means it followed tool output, compaction, or agent-continuation metadata, and `Unknown` means the source event metadata was unavailable or ambiguous.
 - Click a column header like `Time`, `Thread`, `Tokens`, `Cost`, or `Cache` to sort. Use the sort menu for `Highest Codex credits`. Click the same header again to reverse the direction.
 - Hover a row to scan a compact aggregate preview in `Call Details`; click a Calls row to open the dedicated call investigator.
@@ -136,6 +141,16 @@ Useful interpretation notes:
 - `Cached input` and `Uncached input` are split so cache behavior is visible without storing transcript text.
 - A cost with `*` means the pricing row is marked as a best-guess estimate.
 - Codex credits are estimated from aggregate input, cached-input, and output token counters. Direct model matches use the bundled OpenAI Codex rate-card snapshot; inferred labels are marked estimated, and local credit-rate overrides are marked user-provided.
+- Confirmed Fast rows apply the source-stamped model-family multiplier to
+  ChatGPT-equivalent Codex credits. API-equivalent USD estimates instead select
+  the exact API tier table; the cost detail identifies whether the configured
+  billing basis is API tokens, ChatGPT credits, or Unknown without claiming
+  actual spend when the basis is unknown.
+- CSV exports include exact tier/provenance, the separate Fast proxy,
+  Standard/Priority API cost scenarios, Standard/Fast credit scenarios,
+  `billing_basis`, and credit multiplier source URL/date/confidence. Missing
+  exact tier evidence remains blank/Unknown instead of being reconstructed from
+  duration or reasoning effort.
 - `Usage observed` is not a live account query. It uses the latest local Codex `token_count.rate_limits` snapshot when present; otherwise configure `~/.codex-usage-tracker/allowance.json` with values copied from Codex Settings > Usage, the Codex Usage dashboard, or `/status` when you want current remaining allowance context.
 
 ## Threads View

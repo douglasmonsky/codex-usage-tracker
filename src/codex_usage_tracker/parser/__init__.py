@@ -5,6 +5,20 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any
 
+from codex_usage_tracker.parser.otel import (
+    OTEL_DIAGNOSTIC_KEYS,
+    OtelCompletion,
+    OtelParseResult,
+    parse_otlp_json_line,
+)
+
+__all__ = [
+    "OTEL_DIAGNOSTIC_KEYS",
+    "OtelCompletion",
+    "OtelParseResult",
+    "parse_otlp_json_line",
+]
+
 _API_MODULE = "codex_usage_tracker.parser.api"
 
 

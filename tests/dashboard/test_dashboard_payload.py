@@ -10,7 +10,9 @@ from codex_usage_tracker.store.api import (
     connect,
     export_usage_csv,
     refresh_usage_index,
+    upsert_usage_events,
 )
+from tests.otel_helpers import synthetic_usage_event
 from tests.store_dashboard_helpers import (
     _extract_js_function,
     _make_codex_home,
@@ -658,6 +660,28 @@ def test_dashboard_and_csv_are_aggregate_only(tmp_path: Path) -> None:
     assert "Pricing snapshot changed since the previous dashboard render" in updated_dashboard
 
 
+def test_dashboard_payload_keeps_tier_fields_aggregate_only(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            synthetic_usage_event(
+                "record-a",
+                "conversation-a",
+                (100, 40, 30, 10),
+                service_tier="priority",
+                fast=1,
+            )
+        ],
+        db_path=db_path,
+    )
+
+    row = dashboard_payload(db_path=db_path)["rows"][0]
+
+    assert row["service_tier"] == "priority"
+    assert row["fast"] == 1
+    assert "otel_source_path" not in row
+
+
 def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
@@ -701,6 +725,15 @@ def test_dashboard_payload_contract_includes_analysis_metadata(tmp_path: Path) -
         "project_name",
         "project_key",
         "thread_attachment_label",
+        "standard_cost_usd",
+        "priority_cost_usd",
+        "pricing_service_tier",
+        "billing_basis",
+        "cost_semantics",
+        "fast_usage_credits",
+        "usage_credit_multiplier_source_url",
+        "usage_credit_multiplier_fetched_at",
+        "usage_credit_multiplier_confidence",
     } <= set(row)
 
 

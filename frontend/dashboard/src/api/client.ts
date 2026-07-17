@@ -8,6 +8,7 @@ import {
 import { buildFindings, buildModelCosts, buildReports } from './modelInsights';
 import { buildOverviewSeriesFromDailyValues } from './overviewSeries';
 import { scopeSummaryFromBootPayload, summaryNumber } from './dashboardScopeSummary';
+import { usageBillingFields, usageServiceTierFields } from './rowAnnotations';
 import type { CallRow, ContextRuntime, DashboardBootPayload, DashboardModel, MetricCard, Series, ThreadRow, UsageRow, WeeklyWindow } from './types';
 import {
   loadAllUsagePayloadPaged,
@@ -537,7 +538,6 @@ export function usageRowToCall(row: UsageRow, index = 0): CallRow {
   const contextWindowPct = percentNumber(row.context_window_percent);
   const modelContextWindow = Number(row.model_context_window);
   const cumulativeTotalTokens = Number(row.cumulative_total_tokens);
-
   return {
     id,
     threadKey: String(row.thread_key ?? ''),
@@ -555,8 +555,7 @@ export function usageRowToCall(row: UsageRow, index = 0): CallRow {
     cachedInput: cached,
     uncachedInput,
     cachedPct,
-    cost: Number(row.estimated_cost_usd ?? 0),
-    credits: Number(row.usage_credits ?? 0),
+    ...usageBillingFields(row),
     duration: formatDuration(durationSeconds),
     durationSeconds,
     previousCallGap: formatDuration(previousCallGapSeconds),
@@ -565,7 +564,7 @@ export function usageRowToCall(row: UsageRow, index = 0): CallRow {
     initiator: String(row.call_initiator ?? 'unknown'),
     initiatorReason: String(row.call_initiator_reason ?? ''),
     initiatorConfidence: String(row.call_initiator_confidence ?? ''),
-    fast: durationSeconds > 0 && totalTokens / Math.max(durationSeconds, 1) > 4_000,
+    ...usageServiceTierFields(row, durationSeconds, totalTokens),
     usageCreditConfidence: String(row.usage_credit_confidence ?? 'unknown'),
     usageCreditModel: String(row.usage_credit_model ?? ''),
     usageCreditSource: String(row.usage_credit_source ?? ''),

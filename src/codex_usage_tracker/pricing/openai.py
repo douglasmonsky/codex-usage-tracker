@@ -16,7 +16,11 @@ from urllib.request import Request, urlopen
 
 from codex_usage_tracker import __version__
 from codex_usage_tracker.core.paths import DEFAULT_PRICING_PATH
-from codex_usage_tracker.pricing.config import PRICING_SCHEMA, load_existing_aliases
+from codex_usage_tracker.pricing.config import (
+    PRICING_SCHEMA,
+    load_existing_aliases,
+    load_existing_billing_basis,
+)
 from codex_usage_tracker.pricing.estimates import ESTIMATED_MODEL_PRICES, estimated_model_prices
 
 OPENAI_PRICING_MD_URL = "https://developers.openai.com/api/docs/pricing.md"
@@ -65,7 +69,8 @@ def update_pricing_from_openai_docs(
         )
     fetcher = fetch_text or _fetch_text
     text = fetcher(source_url)
-    parsed_models = parse_openai_pricing_markdown(text, tier=tier)
+    parsed_tiers = parse_all_openai_pricing_tiers(text)
+    parsed_models = parsed_tiers[tier]
     if not parsed_models:
         raise PricingParseError(
             f"pricing source schema changed: no text-token pricing rows were parsed "
@@ -74,12 +79,18 @@ def update_pricing_from_openai_docs(
     models: dict[str, dict[str, Any]] = {
         model: dict(rates) for model, rates in parsed_models.items()
     }
+    available_official_models = {
+        model for tier_models in parsed_tiers.values() for model in tier_models
+    }
     aliases = {
         **{
-            alias: target for alias, target in _OFFICIAL_PRICING_ALIASES.items() if target in models
+            alias: target
+            for alias, target in _OFFICIAL_PRICING_ALIASES.items()
+            if target in available_official_models
         },
         **load_existing_aliases(path),
     }
+    billing_basis = load_existing_billing_basis(path)
     estimated_model_count = 0
     if include_estimates:
         models.update(estimated_model_prices())
@@ -92,12 +103,18 @@ def update_pricing_from_openai_docs(
             "name": "OpenAI Developers pricing docs",
             "url": source_url,
             "tier": tier,
+            "tiers": list(VALID_PRICING_TIERS),
+            "tier_model_counts": {
+                name: len(tier_models) for name, tier_models in parsed_tiers.items()
+            },
             "fetched_at": fetched_at,
             "model_count": len(models),
             "official_model_count": len(models) - estimated_model_count,
             "estimated_model_count": estimated_model_count,
         },
+        "billing_basis": billing_basis,
         "models": models,
+        "api_service_tiers": parsed_tiers,
     }
     if aliases:
         payload["aliases"] = aliases
@@ -157,6 +174,17 @@ def parse_openai_pricing_markdown(
             "parseable text-token pricing rows"
         )
     return models
+
+
+def parse_all_openai_pricing_tiers(
+    markdown: str,
+) -> dict[str, dict[str, dict[str, float]]]:
+    """Parse every published API service-tier table from one source document."""
+
+    return {
+        tier: parse_openai_pricing_markdown(markdown, tier=tier)
+        for tier in VALID_PRICING_TIERS
+    }
 
 
 def parse_openai_latest_model_id(markdown: str) -> str:

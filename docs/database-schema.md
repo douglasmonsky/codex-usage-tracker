@@ -32,6 +32,39 @@ identity, parser coverage, replacement, and refresh revision. Changing or removi
 a source causes its owned physical rows/materializations to be replaced in a
 transaction rather than accumulated blindly.
 
+## OTel Service-Tier Enrichment (Schemas 30–31)
+
+Schema 30 adds nullable `service_tier`, `fast`, `service_tier_source`, and
+`service_tier_confidence` columns to `usage_events`. Null means the tracker does
+not have exact tier evidence; it is not interpreted as Standard.
+
+`otel_completion_sources` records device/inode identity, size, the last complete
+byte and line cursor, a bounded SHA-256 resume anchor, and an update timestamp
+for each local `codex-completions*.jsonl` file. The default directory is the
+`otel` sibling of the selected database (`~/.codex-usage-tracker/otel` for the
+default database), so alternate databases do not ingest another tracker
+instance's telemetry.
+`otel_completion_events` stores one semantic
+fingerprint plus aggregate matching fields, the exact normalized response tier,
+derived Fast classification, tier provenance, a
+bounded match status (`pending`, `matched`, `ambiguous`, `conflict`, or
+`invalid`), and the matched aggregate record id when available.
+
+Append refresh resumes after the last complete JSONL line, retries a partial
+trailing line, and restarts a cursor after rotation, truncation, or a mismatched
+resume anchor. Schema 31 adds the anchor; a legacy cursor without one is safely
+reread once and then anchored. Cursor identity, size, offsets, and anchor bytes
+come from the open descriptor so a path rotation or same-inode replacement
+cannot persist an offset against different content. Rebuild keeps
+the aggregate OTel staging rows, resets their match pointers, and reconciles
+them against the rebuilt canonical calls. A match requires conversation id plus
+input, cached-input, output, and reasoning-output counters to resolve to exactly
+one canonical group. Existing contradictory tier values are preserved and the
+completion is marked as a conflict.
+
+`reset-db --yes` is intentionally different from rebuild: it deletes both OTel
+staging tables and their source cursors along with the other tracker-owned rows.
+
 ## Allowance Intelligence Materializations
 
 `allowance_observations` stores normalized structured weekly and 5-hour snapshots,
@@ -68,7 +101,7 @@ Identical keys reuse a completed snapshot or the same in-flight job.
 
 ## Privacy And Rebuilds
 
-Allowance materializations and logical identity contain aggregate metadata only.
+Allowance materializations, OTel completion staging, and logical identity contain aggregate metadata only.
 They do not contain prompts, assistant text, tool output, or raw JSONL content.
 Rebuilds can recreate them from physical aggregate rows and source provenance.
 The local content index is a separate opt-in investigation layer and is not used

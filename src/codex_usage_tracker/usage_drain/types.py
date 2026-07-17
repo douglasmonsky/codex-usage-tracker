@@ -5,10 +5,12 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-DOCUMENTED_FAST_CREDIT_MULTIPLIERS = {
-    "gpt-5.5": 2.5,
-    "gpt-5.4": 2.0,
-}
+from codex_usage_tracker.pricing.fast_tier import (
+    DOCUMENTED_FAST_CREDIT_MULTIPLIERS as DOCUMENTED_FAST_CREDIT_MULTIPLIERS,
+)
+from codex_usage_tracker.pricing.fast_tier import (
+    documented_fast_credit_multiplier as documented_fast_credit_multiplier,
+)
 
 DEFAULT_PROXY_NAMES = (
     "all_candidates",
@@ -177,10 +179,3 @@ class PredictiveModelSpec:
     numeric_features: tuple[str, ...]
     categorical_features: tuple[str, ...] = ()
     ridge_alpha: float = 1.0
-
-
-def documented_fast_credit_multiplier(model: object) -> float | None:
-    """Return the documented fast-mode credit multiplier for a model label."""
-
-    normalized = str(model or "").strip().lower()
-    return DOCUMENTED_FAST_CREDIT_MULTIPLIERS.get(normalized)

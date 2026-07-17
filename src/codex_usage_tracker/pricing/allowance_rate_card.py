@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -39,6 +40,17 @@ class RateCardUpdateResult:
     backup_path: Path | None = None
 
 
+@dataclass(frozen=True)
+class FastMultiplierRate:
+    """One source-stamped ChatGPT Fast credit multiplier."""
+
+    multiplier: float
+    source_name: str
+    source_url: str | None
+    fetched_at: str | None
+    confidence: str
+
+
 def load_bundled_rate_card() -> dict[str, Any]:
     """Load the package-bundled Codex credit rate-card snapshot."""
 
@@ -68,10 +80,17 @@ def update_rate_card(
     source = parse_rate_card_source(raw)
     credit_rates = parse_credit_rates(raw.get("credit_rates", {}))
     aliases = parse_aliases(raw.get("aliases", {}))
+    fast_multipliers = parse_fast_multipliers(
+        raw.get("fast_multipliers", {}), source=source
+    )
     if not credit_rates:
         raise ValueError("rate card must contain at least one credit rate")
     parse_credit_rate_metadata(raw.get("credit_rates", {}), source=source)
     parse_alias_metadata(raw.get("aliases", {}), source=source)
+    if isinstance(raw.get("fast_multipliers"), dict) and len(fast_multipliers) != len(
+        raw["fast_multipliers"]
+    ):
+        raise ValueError("rate card contains an invalid Fast multiplier")
 
     path = path.expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -105,6 +124,56 @@ def parse_credit_rates(raw: object) -> dict[str, dict[str, float]]:
             "output_per_million": _required_rate(rates, "output_per_million", normalized),
         }
     return parsed
+
+
+def parse_fast_multipliers(
+    raw: object,
+    *,
+    source: dict[str, Any],
+    default_confidence: str = "exact",
+) -> dict[str, FastMultiplierRate]:
+    """Parse valid source-stamped Fast multipliers, skipping malformed entries."""
+
+    if not isinstance(raw, dict):
+        return {}
+    parsed: dict[str, FastMultiplierRate] = {}
+    for family, value in raw.items():
+        normalized = normalize_model(family)
+        if not normalized:
+            continue
+        entry = value if isinstance(value, dict) else {"multiplier": value}
+        multiplier = _fast_multiplier_number(entry.get("multiplier"))
+        if multiplier is None:
+            continue
+        confidence = (
+            "user_override"
+            if default_confidence == "user_override"
+            else optional_str(entry.get("confidence")) or default_confidence
+        )
+        parsed[normalized] = FastMultiplierRate(
+            multiplier=multiplier,
+            source_name=optional_str(entry.get("source_name"))
+            or optional_str(source.get("name"))
+            or "Codex Fast multiplier",
+            source_url=optional_str(entry.get("source_url"))
+            or optional_str(source.get("url")),
+            fetched_at=optional_str(entry.get("fetched_at"))
+            or optional_str(source.get("fetched_at")),
+            confidence=confidence,
+        )
+    return parsed
+
+
+def _fast_multiplier_number(value: object) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        multiplier = number_value(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(multiplier) or multiplier < 1.0:
+        return None
+    return multiplier
 
 
 def parse_aliases(raw: object) -> dict[str, dict[str, str]]:

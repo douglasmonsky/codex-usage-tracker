@@ -12,12 +12,16 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.core.models import DiagnosticFact, RefreshResult, UsageEvent
-from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH
+from codex_usage_tracker.core.paths import (
+    DEFAULT_CODEX_HOME,
+    DEFAULT_DB_PATH,
+)
 from codex_usage_tracker.core.schema import (
     DIAGNOSTIC_FACT_COLUMN_NAMES,
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
+from codex_usage_tracker.parser.otel import OTEL_DIAGNOSTIC_KEYS
 from codex_usage_tracker.parser.state import (
     PARSER_ADAPTER_VERSION,
     PARSER_DIAGNOSTIC_KEYS,
@@ -105,7 +109,16 @@ from codex_usage_tracker.store.source_records import (
     sync_source_records,
 )
 from codex_usage_tracker.store.source_replacement import (
+    OTEL_ENRICHMENT_COLUMNS,
+)
+from codex_usage_tracker.store.source_replacement import (
+    capture_otel_enrichment_for_source_files as _capture_otel_enrichment_for_source_files,
+)
+from codex_usage_tracker.store.source_replacement import (
     delete_usage_events_for_source_files as _delete_usage_events_for_source_files,
+)
+from codex_usage_tracker.store.source_replacement import (
+    restore_otel_enrichment as _restore_otel_enrichment,
 )
 from codex_usage_tracker.store.source_replacement import (
     source_file_strings as _source_file_strings,
@@ -143,6 +156,16 @@ from codex_usage_tracker.store.usage_record_queries import (
 
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 DIAGNOSTIC_FACT_COLUMNS = list(DIAGNOSTIC_FACT_COLUMN_NAMES)
+OTEL_REFRESH_COUNTER_KEYS = (
+    "otel_files_scanned",
+    "otel_imported",
+    "otel_duplicates",
+    "otel_matched",
+    "otel_pending",
+    "otel_ambiguous",
+    "otel_conflicts",
+    *OTEL_DIAGNOSTIC_KEYS,
+)
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
 SQLITE_VARIABLE_BATCH_SIZE = 500
 RefreshProgressCallback = Callable[[dict[str, object]], None]
@@ -153,6 +176,7 @@ def refresh_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
+    otel_dir: Path | None = None,
     progress_callback: RefreshProgressCallback | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
@@ -167,6 +191,7 @@ def refresh_usage_index(
         db_path=db_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
+        otel_dir=otel_dir,
         progress_callback=progress_callback,
         derived_fact_sync=derived_fact_sync,
     )
@@ -177,6 +202,7 @@ def rebuild_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
+    otel_dir: Path | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
     """Drop and rebuild the usage index from all selected Codex logs."""
@@ -190,6 +216,7 @@ def rebuild_usage_index(
         db_path=db_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
+        otel_dir=otel_dir,
         derived_fact_sync=derived_fact_sync,
     )
 
@@ -207,6 +234,8 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM diagnostic_snapshots")
         conn.execute("DELETE FROM allowance_observations")
+        conn.execute("DELETE FROM otel_completion_events")
+        conn.execute("DELETE FROM otel_completion_sources")
         conn.execute("DELETE FROM source_records")
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
@@ -339,6 +368,7 @@ def record_refresh_metadata(
     skipped_events: int,
     inserted_or_updated_events: int,
     parser_diagnostics: dict[str, int] | None = None,
+    otel_diagnostics: dict[str, int] | None = None,
     parsed_source_files: int | None = None,
     skipped_source_files: int | None = None,
 ) -> None:
@@ -361,6 +391,9 @@ def record_refresh_metadata(
     diagnostics = parser_diagnostics or {}
     for key in PARSER_DIAGNOSTIC_KEYS:
         values[f"parser_{key}"] = str(int(diagnostics.get(key, 0)))
+    otel_counters = otel_diagnostics or {}
+    for key in OTEL_REFRESH_COUNTER_KEYS:
+        values[key] = str(int(otel_counters.get(key, 0)))
     with connect(db_path) as conn:
         init_db(conn)
         conn.executemany(
@@ -571,6 +604,9 @@ def _upsert_usage_events_in_connection(
     source_files_to_replace = _source_file_strings(replace_source_files)
     affected_thread_keys = _thread_keys_for_source_files(conn, source_files_to_replace)
     replaced_fingerprints = fingerprints_for_source_files(conn, source_files_to_replace)
+    preserved_otel_enrichment = _capture_otel_enrichment_for_source_files(
+        conn, source_files_to_replace
+    )
     _delete_usage_events_for_source_files(
         conn,
         source_files_to_replace,
@@ -603,6 +639,7 @@ def _upsert_usage_events_in_connection(
     _delete_diagnostic_facts_for_record_ids(conn, inserted_record_ids)
     with _deferred_usage_event_indexes(conn, enabled=defer_usage_indexes):
         _insert_usage_event_rows(conn, rows)
+    _restore_otel_enrichment(conn, preserved_otel_enrichment)
     if maintain_allowance_observations:
         sync_allowance_observations_for_record_ids(conn, record_ids)
     if maintain_source_records:
@@ -693,7 +730,11 @@ def _usage_event_record_ids(rows: list[dict[str, object]]) -> list[str]:
 def _usage_event_upsert_sql() -> str:
     placeholders = ", ".join("?" for _column in EVENT_COLUMNS)
     update_clause = ", ".join(
-        f"{column}=excluded.{column}" for column in EVENT_COLUMNS if column != "record_id"
+        f"{column}=COALESCE(usage_events.{column}, excluded.{column})"
+        if column in OTEL_ENRICHMENT_COLUMNS
+        else f"{column}=excluded.{column}"
+        for column in EVENT_COLUMNS
+        if column != "record_id"
     )
     return (
         f"INSERT INTO usage_events ({', '.join(EVENT_COLUMNS)}) "

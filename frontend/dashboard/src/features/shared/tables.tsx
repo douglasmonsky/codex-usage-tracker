@@ -3,6 +3,7 @@ import { useShellI18n } from '../../app/i18nContext';
 import type { CallRow, ThreadRow } from '../../api/types';
 import type { ColumnChoice } from '../../components/ColumnChooser';
 import type { CsvColumn } from './exportCsv';
+import { serviceTierLabel } from './callPresentation';
 import { formatCompact, formatNumber, money, pct } from './format';
 
 export { callActionColumn, callInvestigatorRowLabel, threadActionColumn, threadInvestigatorRowLabel } from './tableActions';
@@ -72,6 +73,16 @@ export const callColumns: Array<ColumnDef<CallRow>> = [
   },
   { accessorKey: 'duration', header: 'Duration' },
   {
+    id: 'serviceTier',
+    accessorFn: call => serviceTierLabel(call),
+    header: 'Service Tier',
+    cell: info => {
+      const label = String(info.getValue());
+      const tone = label.includes('Fast') ? 'green' : label.includes('Standard') ? 'blue' : '';
+      return <span className={`status-badge ${tone}`.trim()}>{label}</span>;
+    },
+  },
+  {
     accessorKey: 'previousCallGap',
     header: 'Prev Gap',
     cell: info => <span className="num">{String(info.getValue())}</span>,
@@ -107,7 +118,24 @@ export const callCsvColumns: Array<CsvColumn<CallRow>> = [
   { header: 'output_tokens', value: row => row.output },
   { header: 'reasoning_output_tokens', value: row => row.reasoningOutput },
   { header: 'estimated_cost_usd', value: row => row.cost.toFixed(6) },
+  { header: 'standard_cost_usd', value: row => row.standardCost?.toFixed(6) ?? '' },
+  { header: 'priority_cost_usd', value: row => row.priorityCost?.toFixed(6) ?? '' },
+  { header: 'pricing_service_tier', value: row => row.pricingServiceTier },
+  { header: 'billing_basis', value: row => row.billingBasis },
+  { header: 'cost_semantics', value: row => row.costSemantics },
   { header: 'usage_credits', value: row => row.credits.toFixed(6) },
+  { header: 'standard_usage_credits', value: row => row.standardUsageCredits.toFixed(6) },
+  { header: 'fast_usage_credits', value: row => row.fastUsageCredits?.toFixed(6) ?? '' },
+  { header: 'service_tier', value: row => row.serviceTier },
+  { header: 'fast', value: row => row.fast === null ? '' : row.fast ? 1 : 0 },
+  { header: 'service_tier_source', value: row => row.serviceTierSource },
+  { header: 'service_tier_confidence', value: row => row.serviceTierConfidence },
+  { header: 'fast_proxy_candidate', value: row => String(row.fastProxyCandidate) },
+  { header: 'usage_credit_multiplier', value: row => row.usageCreditMultiplier },
+  { header: 'usage_credit_multiplier_source', value: row => row.usageCreditMultiplierSource },
+  { header: 'usage_credit_multiplier_source_url', value: row => row.usageCreditMultiplierSourceUrl },
+  { header: 'usage_credit_multiplier_fetched_at', value: row => row.usageCreditMultiplierFetchedAt },
+  { header: 'usage_credit_multiplier_confidence', value: row => row.usageCreditMultiplierConfidence },
   { header: 'cache_ratio', value: row => row.cachedPct.toFixed(2) },
   { header: 'context_window_percent', value: row => row.contextWindowPct?.toFixed(2) ?? '' },
   { header: 'pricing_model', value: row => row.pricingModel },

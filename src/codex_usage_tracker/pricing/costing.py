@@ -96,6 +96,17 @@ def annotate_rows_with_efficiency(
         savings = estimate_cache_savings_usd(copy, config, model=model)
         copy["estimated_cost_usd"] = cost
         copy["estimated_cache_savings_usd"] = savings
+        copy["standard_cost_usd"] = _estimate_cost_usd_for_tier(
+            copy, config, model=model, service_tier="standard"
+        )
+        copy["priority_cost_usd"] = _estimate_cost_usd_for_tier(
+            copy, config, model=model, service_tier="priority"
+        )
+        copy["pricing_service_tier"] = config.pricing_tier_for(
+            copy.get("service_tier")
+        )
+        copy["billing_basis"] = config.billing_basis
+        copy["cost_semantics"] = "api_token_estimate"
         copy["pricing_model"] = config.priced_as(model)
         copy["pricing_estimated"] = config.is_estimated_model(model)
         copy["efficiency_flags"] = efficiency_flags(copy)
@@ -113,7 +124,25 @@ def estimate_cost_usd(
 ) -> float | None:
     """Estimate call cost from aggregate tokens and local model rates."""
 
-    rates = pricing.rates_for(model if model is not None else row.get("model"))
+    return _estimate_cost_usd_for_tier(
+        row,
+        pricing,
+        model=model,
+        service_tier=row.get("service_tier"),
+    )
+
+
+def _estimate_cost_usd_for_tier(
+    row: dict[str, Any],
+    pricing: PricingConfig,
+    *,
+    model: object | None,
+    service_tier: object | None,
+) -> float | None:
+    rates = pricing.rates_for(
+        model if model is not None else row.get("model"),
+        service_tier=service_tier,
+    )
     if not rates:
         return None
 
@@ -144,7 +173,10 @@ def estimate_cache_savings_usd(
 ) -> float | None:
     """Estimate local cache savings when cached input has a lower configured rate."""
 
-    rates = pricing.rates_for(model if model is not None else row.get("model"))
+    rates = pricing.rates_for(
+        model if model is not None else row.get("model"),
+        service_tier=row.get("service_tier"),
+    )
     if not rates:
         return None
     input_rate = rates.get("input_per_million")

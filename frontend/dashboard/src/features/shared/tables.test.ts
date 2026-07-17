@@ -23,6 +23,11 @@ describe('call CSV columns', () => {
       uncachedInput: 600,
       cachedPct: 40,
       cost: 0.123456,
+      standardCost: 0.1,
+      priorityCost: 0.2,
+      pricingServiceTier: 'standard',
+      billingBasis: 'unknown',
+      costSemantics: 'api_token_estimate',
       credits: 4.5,
       duration: '2m 0s',
       durationSeconds: 120,
@@ -33,6 +38,17 @@ describe('call CSV columns', () => {
       initiatorReason: 'tool-driven continuation',
       initiatorConfidence: 'high',
       fast: false,
+      serviceTier: 'standard',
+      serviceTierSource: 'otel_response_completed',
+      serviceTierConfidence: 'protocol',
+      fastProxyCandidate: true,
+      standardUsageCredits: 4.5,
+      fastUsageCredits: 9,
+      usageCreditMultiplier: 1,
+      usageCreditMultiplierSource: 'otel_response_completed',
+      usageCreditMultiplierSourceUrl: 'https://example.invalid/fast',
+      usageCreditMultiplierFetchedAt: '2026-07-16',
+      usageCreditMultiplierConfidence: 'exact',
       usageCreditConfidence: 'credit-estimated',
       usageCreditModel: 'codex-1',
       usageCreditSource: 'rate-card',
@@ -88,6 +104,15 @@ describe('call CSV columns', () => {
     expect(header).toContain('previous_call_event_timestamp');
     expect(header).toContain('pricing_model');
 expect(header).toContain('usage_credit_confidence');
+    expect(header).toContain('service_tier');
+    expect(header).toContain('service_tier_confidence');
+    expect(header).toContain('fast_proxy_candidate');
+    expect(header).toContain('usage_credit_multiplier');
+    expect(header).toContain('standard_cost_usd');
+    expect(header).toContain('priority_cost_usd');
+    expect(header).toContain('billing_basis');
+    expect(header).toContain('fast_usage_credits');
+    expect(header).toContain('usage_credit_multiplier_source_url');
 expect(header).toContain('thread_attachment');
 expect(header).toContain('model_context_window');
     expect(values).toContain('record-csv-1');
@@ -101,8 +126,23 @@ expect(header).toContain('model_context_window');
     expect(values).toContain('2026-07-01T11:54:30Z');
     expect(values).toContain('codex-1-pricing');
     expect(values).toContain('credit-estimated');
+    expect(values).toContain('otel_response_completed');
     expect(values).toContain('spawned child');
     expect(values).toContain('cache-drop|context-heavy');
+  });
+
+  it('includes an exact Service Tier column', () => {
+    expect(callColumns.some(column => column.id === 'serviceTier')).toBe(true);
+  });
+
+  it('renders Flex and Priority from the exact tier instead of the boolean fallback', () => {
+    const serviceTierColumn = callColumns.find(column => column.id === 'serviceTier');
+    const accessor = serviceTierColumn && 'accessorFn' in serviceTierColumn
+      ? serviceTierColumn.accessorFn
+      : undefined;
+
+    expect(accessor?.({ serviceTier: 'flex', fast: false } as CallRow, 0)).toBe('Flex');
+    expect(accessor?.({ serviceTier: 'priority', fast: true } as CallRow, 0)).toBe('Priority / Fast');
   });
 });
 

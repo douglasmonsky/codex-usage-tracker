@@ -45,7 +45,7 @@ export function reportEvidenceCalls(report: ReportView | undefined, calls: CallR
   const rows = [...calls];
   if (text.includes('fast')) {
     return rows
-      .filter(call => call.fast || call.effort.toLowerCase() === 'low')
+      .filter(call => call.fastProxyCandidate || call.effort.toLowerCase() === 'low')
       .sort((left, right) => left.durationSeconds - right.durationSeconds || callCredits(right) - callCredits(left))
       .slice(0, 8);
   }

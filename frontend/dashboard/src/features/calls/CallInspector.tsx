@@ -20,13 +20,14 @@ import { CallDecisionCard } from '../shared/CallDecisionCard';
 import { CallSourceMetadata } from '../shared/CallSourceMetadata';
 import { TokenPricingBreakdown } from '../shared/TokenPricingBreakdown';
 import { ThreadCallTimeline } from '../shared/ThreadCallTimeline';
-import { cacheState, summarizeTopCounts } from '../shared/callPresentation';
+import { billingBasisDetail, cacheState, summarizeTopCounts } from '../shared/callPresentation';
 import { copyText } from '../shared/copyText';
 import { formatCompact, formatNumber, money, pct } from '../shared/format';
 import { CallSignalPucks } from '../shared/tables';
 import { compareCallTimeDescending } from './callsFilterSort';
 import { CallContextEvidence } from './CallContextEvidence';
 import { DetailRow, DrillMetric } from './CallDetailPrimitives';
+import { serviceTierDetail } from './serviceTier';
 
 type DrillDownTab = 'summary' | 'tokens' | 'cache' | 'thread' | 'evidence';
 
@@ -165,8 +166,8 @@ function SummaryTab({ call }: { call: CallRow }) {
       <DrillMetric label="Total tokens" value={formatNumber(call.totalTokens)} detail={`${formatCompact(call.input)} input`} />
       <DrillMetric label="Uncached input" value={formatNumber(call.uncachedInput)} detail="fresh billed input" />
         <DrillMetric label="Cache hit rate" value={pct(call.cachedPct)} detail={cacheState(call)} />
-        <DrillMetric label="Estimated cost" value={money(call.cost)} detail={call.pricingEstimated ? 'estimated pricing' : 'configured pricing'} />
-        <DrillMetric label="Duration" value={call.duration} detail={call.fast ? 'fast candidate' : 'normal throughput'} />
+        <DrillMetric label="Estimated cost" value={money(call.cost)} detail={billingBasisDetail(call)} />
+        <DrillMetric label="Duration" value={call.duration} detail={serviceTierDetail(call)} />
 <DrillMetric label="Usage credits" value={call.credits ? call.credits.toFixed(3) : '-'} detail={call.usageCreditConfidence} />
     </div>
     <CallDecisionCard call={call} />

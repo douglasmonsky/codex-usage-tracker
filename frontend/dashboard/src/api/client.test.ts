@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { loadUsagePayload, modelFromBootPayload } from './client';
+import { loadUsagePayload, modelFromBootPayload, usageRowToCall } from './client';
 import type { DashboardBootPayload } from './types';
 
 afterEach(() => {
@@ -8,6 +8,53 @@ afterEach(() => {
 });
 
 describe('dashboard API model builder', () => {
+  it('keeps exact tier separate from throughput proxy', () => {
+    const call = usageRowToCall({
+      service_tier: 'standard',
+      fast: 0,
+      service_tier_confidence: 'protocol',
+      duration_seconds: 1,
+      total_tokens: 9000,
+    }, 0);
+
+    expect(call.fast).toBe(false);
+    expect(call.fastProxyCandidate).toBe(true);
+    expect(call.serviceTier).toBe('standard');
+  });
+
+  it('preserves billing scenarios and Fast multiplier provenance', () => {
+    const call = usageRowToCall({
+      service_tier: 'priority',
+      fast: 1,
+      estimated_cost_usd: 0.2,
+      standard_cost_usd: 0.1,
+      priority_cost_usd: 0.2,
+      pricing_service_tier: 'priority',
+      billing_basis: 'unknown',
+      cost_semantics: 'api_token_estimate',
+      standard_usage_credits: 4,
+      fast_usage_credits: 10,
+      usage_credit_multiplier: 2.5,
+      usage_credit_multiplier_source: 'OpenAI Codex Fast mode docs',
+      usage_credit_multiplier_source_url: 'https://example.invalid/fast',
+      usage_credit_multiplier_fetched_at: '2026-07-16',
+      usage_credit_multiplier_confidence: 'exact',
+    });
+
+    expect(call).toEqual(expect.objectContaining({
+      standardCost: 0.1,
+      priorityCost: 0.2,
+      pricingServiceTier: 'priority',
+      billingBasis: 'unknown',
+      costSemantics: 'api_token_estimate',
+      standardUsageCredits: 4,
+      fastUsageCredits: 10,
+      usageCreditMultiplierSourceUrl: 'https://example.invalid/fast',
+      usageCreditMultiplierFetchedAt: '2026-07-16',
+      usageCreditMultiplierConfidence: 'exact',
+    }));
+  });
+
   it('derives model cost bars from live aggregate rows', () => {
     const payload: DashboardBootPayload = {
       loaded_row_count: 3,

@@ -15,6 +15,8 @@ from codex_usage_tracker.store.api import (
     reset_usage_database,
     upsert_usage_events,
 )
+from codex_usage_tracker.store.otel_ingest import ingest_otel_completion_files
+from tests.otel_helpers import write_otel_directory
 from tests.store_dashboard_helpers import _usage_event
 
 
@@ -228,3 +230,30 @@ def test_reset_usage_database_clears_content_index_tables(tmp_path: Path) -> Non
     assert fragment_count is not None
     assert turn_count[0] == 0
     assert fragment_count[0] == 0
+
+
+def test_reset_usage_database_clears_otel_staging_and_cursors(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    otel_dir = write_otel_directory(
+        tmp_path,
+        "synthetic-reset",
+        (120, 40, 30, 10),
+    )
+    with connect(db_path) as conn:
+        init_db(conn)
+        ingest_otel_completion_files(conn, otel_dir)
+
+    reset_usage_database(db_path)
+
+    with connect(db_path) as conn:
+        event_count = conn.execute(
+            "SELECT COUNT(*) FROM otel_completion_events"
+        ).fetchone()[0]
+        source_count = conn.execute(
+            "SELECT COUNT(*) FROM otel_completion_sources"
+        ).fetchone()[0]
+
+    assert event_count == 0
+    assert source_count == 0

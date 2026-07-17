@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { cacheState, contextWindowLabel, sourceLine, summarizeTopCounts } from './callPresentation';
+import {
+  billingBasisDetail,
+  cacheState,
+  contextWindowLabel,
+  sourceLine,
+  summarizeTopCounts,
+} from './callPresentation';
 
 describe('call presentation helpers', () => {
   it('labels cache state thresholds consistently across call surfaces', () => {
@@ -29,5 +35,17 @@ describe('call presentation helpers', () => {
       'Unknown (2), codex-1 (1), o3 (1)',
     );
     expect(summarizeTopCounts([], { emptyLabel: 'no model mix' })).toBe('no model mix');
+  });
+
+  it('labels API-equivalent scenarios without claiming actual billing', () => {
+    expect(billingBasisDetail({ billingBasis: 'unknown', pricingServiceTier: 'priority' })).toBe(
+      'API-equivalent scenario · billing basis unknown',
+    );
+    expect(billingBasisDetail({ billingBasis: 'api_tokens', pricingServiceTier: 'priority' })).toBe(
+      'API token estimate · Priority rates',
+    );
+    expect(billingBasisDetail({ billingBasis: 'chatgpt_credits', pricingServiceTier: 'priority' })).toBe(
+      'API-equivalent scenario · ChatGPT credits selected',
+    );
   });
 });

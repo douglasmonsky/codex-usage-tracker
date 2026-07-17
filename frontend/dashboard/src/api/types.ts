@@ -1,6 +1,8 @@
+import type { CallBillingFields, UsageBillingFields } from './billing';
 import type { DashboardDataScope, DashboardModelScope } from './dashboardDataScope';
+import type { CallServiceTierFields, UsageServiceTierFields } from './serviceTier';
 
-export type UsageRow = {
+export type UsageRow = UsageBillingFields & UsageServiceTierFields & {
   id?: string;
   record_id?: string;
   session_id?: string;
@@ -42,7 +44,6 @@ export type UsageRow = {
   reasoning_output_tokens?: number;
   total_tokens?: number;
   uncached_input_tokens?: number;
-  estimated_cost_usd?: number;
   usage_credits?: number;
   rate_limit_plan_type?: string | null;
   rate_limit_limit_id?: string | null;
@@ -290,7 +291,7 @@ export type Finding = {
   summary: string;
 };
 
-export type CallRow = {
+export type CallRow = CallBillingFields & CallServiceTierFields & {
   id: string;
   threadKey?: string;
   rawTime: string;
@@ -307,8 +308,6 @@ export type CallRow = {
   cachedInput: number;
   uncachedInput: number;
   cachedPct: number;
-  cost: number;
-  credits: number;
   duration: string;
   durationSeconds: number;
   previousCallGap: string;
@@ -317,7 +316,6 @@ export type CallRow = {
   initiator: string;
   initiatorReason: string;
   initiatorConfidence: string;
- fast: boolean;
  usageCreditConfidence: string;
  usageCreditModel: string;
   usageCreditSource: string;
