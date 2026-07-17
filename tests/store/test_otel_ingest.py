@@ -45,6 +45,7 @@ def test_incremental_ingest_reads_each_complete_line_once(tmp_path: Path) -> Non
 
     assert first.imported == 1
     assert second.imported == 1
+    assert second.duplicates == 0
     assert len(rows) == 2
 
 
@@ -100,6 +101,49 @@ def test_truncation_or_inode_replacement_resets_cursor_safely(tmp_path: Path) ->
             encoding="utf-8",
         )
         assert ingest_otel_completion_files(conn, directory).imported == 1
+
+
+def test_same_inode_same_size_rewrite_resets_cursor_safely(tmp_path: Path) -> None:
+    directory = tmp_path / "otel"
+    source = directory / "codex-completions.jsonl"
+    first_line = synthetic_otlp_line(
+        attributes=completion_attributes(conversation_id="synthetic-a")
+    )
+    replacement_line = synthetic_otlp_line(
+        attributes=completion_attributes(conversation_id="synthetic-b")
+    )
+    assert len(first_line) == len(replacement_line)
+    source.parent.mkdir(parents=True)
+    source.write_text(first_line + "\n", encoding="utf-8")
+
+    with initialized_connection(tmp_path) as conn:
+        ingest_otel_completion_files(conn, directory)
+        first_stat = source.stat()
+        source.write_text(replacement_line + "\n", encoding="utf-8")
+        replacement_stat = source.stat()
+        result = ingest_otel_completion_files(conn, directory)
+
+    assert first_stat.st_ino == replacement_stat.st_ino
+    assert first_stat.st_size == replacement_stat.st_size
+    assert result.imported == 1
+
+
+def test_legacy_cursor_without_anchor_is_reread_once(tmp_path: Path) -> None:
+    directory = tmp_path / "otel"
+    source = directory / "codex-completions.jsonl"
+    write_lines(source, [synthetic_otlp_line(attributes=completion_attributes())])
+
+    with initialized_connection(tmp_path) as conn:
+        assert ingest_otel_completion_files(conn, directory).imported == 1
+        conn.execute("UPDATE otel_completion_sources SET resume_anchor = NULL")
+
+        legacy_resume = ingest_otel_completion_files(conn, directory)
+        anchored_resume = ingest_otel_completion_files(conn, directory)
+
+    assert legacy_resume.imported == 0
+    assert legacy_resume.duplicates == 1
+    assert anchored_resume.imported == 0
+    assert anchored_resume.duplicates == 0
 
 
 def test_rotation_between_discovery_and_open_reads_replacement_from_zero(

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import sqlite3
 
-MIGRATION_NAMES = {30: "persist OTel completion tier enrichment"}
-
-OTEL_MATCH_STATUSES = ("pending", "matched", "ambiguous", "conflict", "invalid")
+MIGRATION_NAMES = {
+    30: "persist OTel completion tier enrichment",
+    31: "persist OTel cursor continuity anchors",
+}
 
 _USAGE_EVENT_TIER_COLUMNS = {
     "service_tier": "TEXT",
@@ -36,6 +37,7 @@ def migrate_otel_completion_tiers(conn: sqlite3.Connection) -> None:
             size INTEGER NOT NULL,
             parsed_offset INTEGER NOT NULL,
             parsed_line INTEGER NOT NULL,
+            resume_anchor TEXT,
             updated_at TEXT NOT NULL
         );
 
@@ -74,3 +76,14 @@ def migrate_otel_completion_tiers(conn: sqlite3.Connection) -> None:
             );
         """
     )
+
+
+def add_otel_cursor_resume_anchor(conn: sqlite3.Connection) -> None:
+    """Add a bounded-content continuity marker to existing OTel source cursors."""
+
+    source_columns = {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(otel_completion_sources)").fetchall()
+    }
+    if "resume_anchor" not in source_columns:
+        conn.execute("ALTER TABLE otel_completion_sources ADD COLUMN resume_anchor TEXT")

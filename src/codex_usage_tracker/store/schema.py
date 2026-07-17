@@ -19,7 +19,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 30
+SCHEMA_VERSION = 31
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -119,6 +119,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (28, allowance_schema.migrate_allowance_query_indexes_v3),
         (29, allowance_schema.add_allowance_plan_provenance),
         (30, otel_schema.migrate_otel_completion_tiers),
+        (31, otel_schema.add_otel_cursor_resume_anchor),
     )
 
 

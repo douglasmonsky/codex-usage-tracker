@@ -19,7 +19,6 @@ class FastMultiplierMatch:
     """A model-family multiplier match with independent numeric provenance."""
 
     multiplier: float
-    model_family: str
     source_name: str
     source_url: str | None
     fetched_at: str | None
@@ -53,7 +52,6 @@ def match_fast_credit_multiplier(
             rate = configured[family]
             return FastMultiplierMatch(
                 multiplier=rate.multiplier,
-                model_family=family,
                 source_name=rate.source_name,
                 source_url=rate.source_url,
                 fetched_at=rate.fetched_at,

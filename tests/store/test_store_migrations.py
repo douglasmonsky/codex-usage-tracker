@@ -70,9 +70,9 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
     assert len(str(source_rows[0]["source_record_hash"])) == 64
     assert metadata["parsed_events"] == "legacy"
     assert metadata["parser_invalid_integer"] == "2"
-    assert state["schema_version"] == 30
+    assert state["schema_version"] == 31
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == list(range(1, 31))
+    assert [row["version"] for row in state["migrations"]] == list(range(1, 32))
     with connect(db_path) as conn:
         init_db(conn)
         facts = conn.execute("SELECT COUNT(*) AS count FROM call_diagnostic_facts").fetchone()
@@ -108,7 +108,7 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     assert second_count == 2
     assert legacy_rows[0]["record_id"] == "legacy-record"
     assert new_rows[0]["thread_name"] == "Synthetic migration thread"
-    assert metadata["schema_version"] == "30"
+    assert metadata["schema_version"] == "31"
     assert metadata["parsed_events"] == "0"
     assert metadata["inserted_or_updated_events"] == "0"
     assert metadata["parsed_source_files"] == "0"
@@ -258,8 +258,8 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
             ).fetchall()
         ]
 
-    assert versions == list(range(1, 31))
-    assert user_version == 30
+    assert versions == list(range(1, 32))
+    assert user_version == 31
     assert "idx_usage_source_file_line" in usage_indexes
     assert {
         "idx_recommendation_facts_rank_active",
@@ -462,7 +462,7 @@ def test_init_db_upgrades_v25_database_without_changing_physical_rows(tmp_path: 
         conn.execute("DROP TABLE allowance_source_state")
         conn.execute("DROP INDEX idx_allowance_observations_active_newest")
         conn.execute("DROP INDEX idx_allowance_observations_active_window_newest")
-        conn.execute("DELETE FROM schema_migrations WHERE version IN (26, 27, 28, 29, 30)")
+        conn.execute("DELETE FROM schema_migrations WHERE version IN (26, 27, 28, 29, 30, 31)")
         conn.execute("PRAGMA user_version = 25")
         versions_before = [
             row[0]
@@ -484,7 +484,7 @@ def test_init_db_upgrades_v25_database_without_changing_physical_rows(tmp_path: 
         user_version = conn.execute("PRAGMA user_version").fetchone()[0]
 
     assert versions_before == list(range(1, 26))
-    assert user_version == 30
+    assert user_version == 31
     assert {
         "allowance_source_state",
         "allowance_cycles",
@@ -503,7 +503,7 @@ def test_init_db_upgrades_v27_allowance_indexes_to_v28(tmp_path: Path) -> None:
             """
             DROP INDEX idx_allowance_intervals_evidence_cohort;
             DROP INDEX idx_allowance_intervals_evidence_global;
-            DELETE FROM schema_migrations WHERE version IN (28, 29, 30);
+            DELETE FROM schema_migrations WHERE version IN (28, 29, 30, 31);
             PRAGMA user_version = 27;
             """
         )
@@ -518,8 +518,8 @@ def test_init_db_upgrades_v27_allowance_indexes_to_v28(tmp_path: Path) -> None:
         ]
         user_version = conn.execute("PRAGMA user_version").fetchone()[0]
 
-    assert user_version == 30
-    assert versions == list(range(1, 31))
+    assert user_version == 31
+    assert versions == list(range(1, 32))
     assert {
         "idx_allowance_intervals_evidence_cohort",
         "idx_allowance_intervals_evidence_global",
@@ -533,7 +533,7 @@ def test_init_db_upgrades_v28_with_allowance_plan_provenance(tmp_path: Path) -> 
         conn.executescript(
             """
             ALTER TABLE allowance_cycles DROP COLUMN plan_type;
-            DELETE FROM schema_migrations WHERE version IN (29, 30);
+            DELETE FROM schema_migrations WHERE version IN (29, 30, 31);
             PRAGMA user_version = 28;
             """
         )
@@ -549,8 +549,8 @@ def test_init_db_upgrades_v28_with_allowance_plan_provenance(tmp_path: Path) -> 
         ]
         user_version = conn.execute("PRAGMA user_version").fetchone()[0]
 
-    assert user_version == 30
-    assert versions == list(range(1, 31))
+    assert user_version == 31
+    assert versions == list(range(1, 32))
     assert "plan_type" in columns
 
 

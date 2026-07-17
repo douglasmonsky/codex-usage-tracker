@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import sqlite3
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import BinaryIO
 
 from codex_usage_tracker.parser.otel import OtelCompletion, parse_otlp_json_line
+
+_CURSOR_ANCHOR_BYTES = 4096
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,7 @@ class _SourceState:
     size: int
     parsed_offset: int
     parsed_line: int
+    resume_anchor: str | None
 
 
 def discover_otel_sources(directory: Path) -> list[Path]:
@@ -67,7 +73,7 @@ def ingest_otel_completion_files(
         source_path = str(path.resolve())
         try:
             state = _source_state(conn, source_path)
-            final_stat, next_offset, next_line = _ingest_complete_lines(
+            final_stat, next_offset, next_line, resume_anchor = _ingest_complete_lines(
                 conn,
                 path,
                 source_path,
@@ -82,6 +88,7 @@ def ingest_otel_completion_files(
             final_stat,
             next_offset,
             next_line,
+            resume_anchor,
         )
         totals.files_scanned += 1
     return totals.freeze()
@@ -90,7 +97,7 @@ def ingest_otel_completion_files(
 def _source_state(conn: sqlite3.Connection, source_path: str) -> _SourceState | None:
     row = conn.execute(
         """
-        SELECT device, inode, size, parsed_offset, parsed_line
+        SELECT device, inode, size, parsed_offset, parsed_line, resume_anchor
         FROM otel_completion_sources
         WHERE source_path = ?
         """,
@@ -104,17 +111,24 @@ def _source_state(conn: sqlite3.Connection, source_path: str) -> _SourceState | 
         size=int(row["size"]),
         parsed_offset=int(row["parsed_offset"]),
         parsed_line=int(row["parsed_line"]),
+        resume_anchor=str(row["resume_anchor"]) if row["resume_anchor"] else None,
     )
 
 
 def _resume_position(
-    state: _SourceState | None, stat: os.stat_result
+    state: _SourceState | None,
+    stat: os.stat_result,
+    handle: BinaryIO,
 ) -> tuple[int, int]:
     if state is None:
         return 0, 0
     unchanged_file = state.device == stat.st_dev and state.inode == stat.st_ino
     has_not_shrunk = stat.st_size >= state.size and stat.st_size >= state.parsed_offset
-    if unchanged_file and has_not_shrunk:
+    anchor_matches = state.resume_anchor is not None and hmac.compare_digest(
+        state.resume_anchor,
+        _cursor_anchor(handle, state.parsed_offset),
+    )
+    if unchanged_file and has_not_shrunk and anchor_matches:
         return state.parsed_offset, state.parsed_line
     return 0, 0
 
@@ -125,7 +139,7 @@ def _ingest_complete_lines(
     source_path: str,
     state: _SourceState | None,
     totals: _MutableIngestTotals,
-) -> tuple[os.stat_result, int, int]:
+) -> tuple[os.stat_result, int, int, str]:
     for attempt in range(2):
         result = _read_source_descriptor(
             conn,
@@ -134,12 +148,12 @@ def _ingest_complete_lines(
             state if attempt == 0 else None,
             totals,
         )
-        initial_stat, final_stat, next_offset, next_line = result
+        initial_stat, final_stat, next_offset, next_line, resume_anchor = result
         if (
             initial_stat.st_dev == final_stat.st_dev
             and initial_stat.st_ino == final_stat.st_ino
         ):
-            return final_stat, next_offset, next_line
+            return final_stat, next_offset, next_line, resume_anchor
     raise FileNotFoundError("OTel source descriptor identity changed during retry")
 
 
@@ -149,10 +163,10 @@ def _read_source_descriptor(
     source_path: str,
     state: _SourceState | None,
     totals: _MutableIngestTotals,
-) -> tuple[os.stat_result, os.stat_result, int, int]:
+) -> tuple[os.stat_result, os.stat_result, int, int, str]:
     with path.open("rb") as handle:
         initial_stat = os.fstat(handle.fileno())
-        offset, line_number = _resume_position(state, initial_stat)
+        offset, line_number = _resume_position(state, initial_stat, handle)
         next_offset = offset
         next_line = line_number
         handle.seek(offset)
@@ -174,7 +188,19 @@ def _read_source_descriptor(
                 else:
                     totals.duplicates += 1
         final_stat = os.fstat(handle.fileno())
-    return initial_stat, final_stat, next_offset, next_line
+        resume_anchor = _cursor_anchor(handle, next_offset)
+    return initial_stat, final_stat, next_offset, next_line, resume_anchor
+
+
+def _cursor_anchor(handle: BinaryIO, parsed_offset: int) -> str:
+    """Hash a bounded suffix of committed bytes without changing the read position."""
+
+    anchor_start = max(parsed_offset - _CURSOR_ANCHOR_BYTES, 0)
+    original_position = handle.tell()
+    handle.seek(anchor_start)
+    payload = handle.read(parsed_offset - anchor_start)
+    handle.seek(original_position)
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _insert_completion(
@@ -235,18 +261,21 @@ def _upsert_source_cursor(
     stat: os.stat_result,
     parsed_offset: int,
     parsed_line: int,
+    resume_anchor: str,
 ) -> None:
     conn.execute(
         """
         INSERT INTO otel_completion_sources (
-            source_path, device, inode, size, parsed_offset, parsed_line, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            source_path, device, inode, size, parsed_offset, parsed_line,
+            resume_anchor, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(source_path) DO UPDATE SET
             device = excluded.device,
             inode = excluded.inode,
             size = excluded.size,
             parsed_offset = excluded.parsed_offset,
             parsed_line = excluded.parsed_line,
+            resume_anchor = excluded.resume_anchor,
             updated_at = excluded.updated_at
         """,
         (
@@ -256,6 +285,7 @@ def _upsert_source_cursor(
             stat.st_size,
             parsed_offset,
             parsed_line,
+            resume_anchor,
             datetime.now(timezone.utc).isoformat(),
         ),
     )

@@ -17,7 +17,8 @@
   USD estimates.
 - Preserve exact response tiers in dashboard labels and CSV contracts, clear
   OTel staging on confirmed database reset, and make incremental source cursors
-  descriptor-safe across concurrent file rotation.
+  descriptor-safe across concurrent file rotation. Verify a bounded content
+  anchor before resuming so same-inode rewrites cannot silently skip telemetry.
 
 ## 0.20.0 - 2026-07-16
 
