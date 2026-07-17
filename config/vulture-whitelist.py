@@ -42,6 +42,7 @@ corr_candidate_credit_share_vs_drain_per_standard_credit
 spans_with_candidates
 spans_without_candidates
 with_vs_without_median_drain_ratio
+installed
 
 # HTTP handlers are selected by BaseHTTPRequestHandler or route dispatch maps.
 _.do_POST
@@ -75,6 +76,7 @@ _._handle_compression_profile
 _._handle_context
 _._handle_context_settings
 _._handle_open_investigator
+_._handle_health
 _._handle_status
 _._handle_dedupe_diagnostics
 _._handle_calls
