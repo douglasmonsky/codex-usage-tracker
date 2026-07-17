@@ -60,6 +60,12 @@ def test_dashboard_server_live_sql_api_slices_are_aggregate_only(tmp_path: Path)
     try:
         base_url = f"http://127.0.0.1:{server.server_port}"
 
+        health_payload = _as_json_object(_read_json(f"{base_url}/api/health"))
+        assert health_payload == {
+            "schema": "codex-usage-tracker-health-v1",
+            "status": "ok",
+        }
+
         status_payload = _as_json_object(_read_json(f"{base_url}/api/status"))
         calls_payload = _as_json_object(
             _read_json(f"{base_url}/api/calls?limit=2&sort=tokens&direction=desc&q=Codex")

@@ -81,6 +81,16 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
     ),
     _profile(
         "GET",
+        "/api/health",
+        "_handle_health",
+        "server.health",
+        "interactive",
+        "Reads in-memory process health.",
+        "One constant-size health payload.",
+        "No persisted state.",
+    ),
+    _profile(
+        "GET",
         "/api/status",
         "_handle_status",
         "server.status",

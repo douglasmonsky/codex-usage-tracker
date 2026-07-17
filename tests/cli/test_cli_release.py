@@ -34,6 +34,7 @@ STABLE_CLI_COMMANDS = {
     "dashboard",
     "open-dashboard",
     "serve-dashboard",
+    "dashboard-service",
     "expensive",
     "pricing-coverage",
     "source-coverage",
