@@ -107,12 +107,12 @@ def port_is_available(port: int) -> bool:
 
 
 def dashboard_is_reachable(port: int, *, timeout: float = 1.0) -> bool:
-    """Return whether an HTTP server responds at the dashboard root."""
+    """Return whether the dashboard's lightweight health endpoint responds."""
 
     validate_service_port(port)
     try:
         with urlopen(  # noqa: S310 - fixed loopback URL only
-            f"http://{SERVICE_HOST}:{port}/",
+            f"http://{SERVICE_HOST}:{port}/api/health",
             timeout=timeout,
         ) as response:
             return response.status == 200

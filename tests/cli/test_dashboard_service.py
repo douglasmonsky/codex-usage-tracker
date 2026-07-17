@@ -128,6 +128,7 @@ def test_port_check_detects_an_existing_listener() -> None:
 def test_dashboard_probe_distinguishes_reachable_http_server() -> None:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
+            assert self.path == "/api/health"
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"Codex Usage Tracker")

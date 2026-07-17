@@ -227,6 +227,13 @@ class _UsageDashboardHandler(
             send_json=self._send_json,
         )
 
+    def _handle_health(self, query: str) -> None:
+        del query
+        self._send_json(
+            HTTPStatus.OK,
+            {"schema": "codex-usage-tracker-health-v1", "status": "ok"},
+        )
+
     def _handle_calls(self, query: str) -> None:
         handle_calls_request(
             query,
