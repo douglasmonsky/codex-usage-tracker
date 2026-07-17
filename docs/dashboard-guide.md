@@ -162,9 +162,10 @@ Use `Threads` view when you want to understand a work session as a group instead
 - Threads pages through `/api/threads` on localhost and hydrates the selected
   thread's supporting calls through `/api/thread-calls`; loaded snapshot rows
   remain the fallback.
-- Click a thread row to expand all of its aggregate calls directly beneath it.
+- Click a thread row to load the first 100 aggregate calls directly beneath it.
 - Only one thread stays expanded at a time.
-- Remaining call pages load progressively with visible progress and retry.
+- Use `Load 100 more` to request each additional page; visible progress and retry
+  keep large threads bounded and recoverable.
 - Parent rows never open a representative call.
 - Explicit child `Open` and `Copy` actions reach Call Investigator.
 - Cache Frontier and Lifecycle remain secondary analysis modes.

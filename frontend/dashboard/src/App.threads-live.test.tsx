@@ -129,7 +129,7 @@ describe('React dashboard threads live queries', () => {
     expect(screen.queryByRole('region', { name: /Calls for never-present-thread/i })).not.toBeInTheDocument();
   });
 
-  it('isolates progressive thread call pages and retries a partial result', async () => {
+  it('loads additional thread calls only on request and retries a partial result', async () => {
     let resolveOldThread: ((response: Response) => void) | undefined;
     let newThreadPageTwoAttempts = 0;
     const callRow = (id: string, thread: string, model: string) => ({
@@ -212,12 +212,14 @@ describe('React dashboard threads live queries', () => {
     const grid = await screen.findByRole('treegrid', { name: 'Thread leaderboard' });
     await within(grid).findByRole('row', { name: /Collapse calls for old-thread/i });
     fireEvent.click(await within(grid).findByRole('row', { name: /new-thread/i }));
-    await screen.findByText(/Partial result:/i, {}, { timeout: 3_000 });
-    expect(screen.getByText('2 of 3 calls loaded')).toBeInTheDocument();
+    expect(await screen.findByText('2 of 3 calls loaded')).toBeInTheDocument();
+    expect(newThreadPageTwoAttempts).toBe(0);
     resolveOldThread?.(callsPage('old-thread', [callRow('old-1', 'old-thread', 'old-model')], 0, false));
     await waitFor(() => expect(screen.queryByText('old-model / high')).not.toBeInTheDocument());
     expect(screen.getAllByText('new-model-boundary / high')).toHaveLength(1);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Load 100 more thread calls' }));
+    await screen.findByText(/Partial result:/i, {}, { timeout: 3_000 });
     fireEvent.click(await screen.findByRole('button', { name: 'Retry loading thread calls' }));
     await screen.findByText('3 of 3 calls loaded');
     expect(screen.getAllByText('new-model-boundary / high')).toHaveLength(1);

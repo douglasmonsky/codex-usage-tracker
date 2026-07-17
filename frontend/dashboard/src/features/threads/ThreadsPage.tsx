@@ -22,7 +22,7 @@ import { threadSummaryToRow, type ExploreThreadRow } from './threadSummaryAdapte
 import { threadsEndpointState } from './threadsEndpointState';
 import { buildCacheFrontierSpec, buildThreadLifecycleSpec } from './threadVisualizations';
 import { compareCallTimeDescending, sortThreadCalls, threadLabelsMatch } from './threadAnalysis';
-import { dedupeThreadCallPages, shouldFetchNextThreadCallPage } from './threadCallLoading';
+import { dedupeThreadCallPages } from './threadCallLoading';
 import { ThreadsExplorerView } from './ThreadsExplorerView';
 import { useThreadsPageControls } from './useThreadsPageControls';
 
@@ -39,6 +39,8 @@ type ThreadsPageProps = {
   focusedEndpointsEnabled?: boolean;
   onNavigateView: (view: 'calls' | 'threads') => void;
 };
+
+const threadCallsPageSize = 100;
 
 export function threadsForCurrentUrl(threads: ThreadRow[], globalQuery = ''): ThreadRow[] {
   return sortThreads(
@@ -185,6 +187,7 @@ export function ThreadsPage({
       threadKey: selectedThreadKey,
       sort: threadCallSort === 'newest' ? 'time' : threadCallSort,
       direction: threadCallSortDirection,
+      pageSize: threadCallsPageSize,
     }),
     enabled: selectedThreadQueryEnabled,
   });
@@ -287,24 +290,6 @@ threadCallSortDirection,
     selectedThreadName,
   ]);
 
-  useEffect(() => {
-    if (!shouldFetchNextThreadCallPage({
-      expanded: Boolean(selected),
-      enabled: selectedThreadQueryEnabled,
-      hasNextPage: Boolean(selectedThreadCallsQuery.hasNextPage),
-      isFetchingNextPage: selectedThreadCallsQuery.isFetchingNextPage,
-      isFetchNextPageError: selectedThreadCallsQuery.isFetchNextPageError,
-    })) return;
-    void selectedThreadCallsQuery.fetchNextPage();
-  }, [
-    selected,
-    selectedThreadCallsQuery.data,
-    selectedThreadCallsQuery.hasNextPage,
-    selectedThreadQueryEnabled,
-    selectedThreadCallsQuery.isFetchNextPageError,
-    selectedThreadCallsQuery.isFetchingNextPage,
-  ]);
-
   function loadMoreThreads() {
     if (usingFocusedThreads && focusedThreadsQuery.hasNextPage) {
       void focusedThreadsQuery.fetchNextPage();
@@ -319,6 +304,11 @@ threadCallSortDirection,
       return;
     }
     void selectedThreadCallsQuery.refetch();
+  }
+
+  function loadMoreSelectedThreadCalls() {
+    if (!selectedThreadCallsQuery.hasNextPage || selectedThreadCallsQuery.isFetchingNextPage) return;
+    void selectedThreadCallsQuery.fetchNextPage();
   }
 
   return (
@@ -344,6 +334,7 @@ threadCallSortDirection,
         isFetching: selectedThreadCallsQuery.isFetching,
         isFetchingNextPage: selectedThreadCallsQuery.isFetchingNextPage,
         isFetchNextPageError: selectedThreadCallsQuery.isFetchNextPageError,
+        canLoadMore: Boolean(selectedThreadCallsQuery.hasNextPage),
         count: selectedCallCount,
         hydrated: Boolean(selectedThreadCallsQuery.data),
         error: selectedThreadCallsQuery.error ? queryErrorMessage(selectedThreadCallsQuery.error) : null,
@@ -353,6 +344,7 @@ threadCallSortDirection,
         storedSnapshot: Boolean(selectedCalls.length && !selectedThreadCallsQuery.data),
       }}
       selectedCalls={selectedCalls}
+      callPageSize={threadCallsPageSize}
       displayedThreads={displayedThreads}
       totalMatchedThreads={totalMatchedThreads}
       canLoadMoreThreads={canLoadMoreThreads}
@@ -373,6 +365,7 @@ threadCallSortDirection,
       onSortingChange={updateThreadSorting}
       onToggleThread={toggleThread}
       onRetryCalls={retrySelectedThreadCalls}
+      onLoadMoreCalls={loadMoreSelectedThreadCalls}
       onLoadMoreThreads={loadMoreThreads}
       onCallSortChange={updateThreadCallSort}
       onCallSortDirectionChange={updateThreadCallSortDirection}

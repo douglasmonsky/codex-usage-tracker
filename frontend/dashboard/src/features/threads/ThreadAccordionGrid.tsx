@@ -26,6 +26,8 @@ export type ThreadAccordionGridProps = {
   expandedThreadName: string | null;
   expandedCalls: CallRow[];
   totalCallCount: number;
+  loadMoreCallCount: number;
+  canLoadMoreCalls: boolean;
   loadingCalls: boolean;
   loadingMoreCalls: boolean;
   initialError?: string | null;
@@ -36,6 +38,7 @@ export type ThreadAccordionGridProps = {
   viewportHeight?: number;
   onToggleThread(threadName: string): void;
   onRetryCalls(): void;
+  onLoadMoreCalls(): void;
   onCallSortChange(value: string): void;
   onCallSortDirectionChange(value: string): void;
   onOpenInvestigator(recordId: string): void;
@@ -79,6 +82,8 @@ export function ThreadAccordionGrid({
   expandedThreadName,
   expandedCalls,
   totalCallCount,
+  loadMoreCallCount,
+  canLoadMoreCalls,
   loadingCalls,
   loadingMoreCalls,
   initialError = null,
@@ -89,6 +94,7 @@ export function ThreadAccordionGrid({
   viewportHeight = 620,
   onToggleThread,
   onRetryCalls,
+  onLoadMoreCalls,
   onCallSortChange,
   onCallSortDirectionChange,
   onOpenInvestigator,
@@ -280,6 +286,15 @@ export function ThreadAccordionGrid({
                 {partialError || initialError ? <><span>{partialError ?? initialError}</span><button type="button" onClick={onRetryCalls} aria-label="Retry loading thread calls">Retry</button></> : null}
                 {!partialError && !initialError && loadingCalls ? <span>Loading calls</span> : null}
                 {!partialError && !initialError && loadingMoreCalls ? <span>Loading more calls</span> : null}
+                {!partialError && !initialError && !loadingCalls && canLoadMoreCalls ? <button
+                  className="toolbar-button"
+                  type="button"
+                  onClick={onLoadMoreCalls}
+                  disabled={loadingMoreCalls}
+                  aria-label={`Load ${loadMoreCallCount} more thread calls`}
+                >
+                  {loadingMoreCalls ? 'Loading more...' : `Load ${loadMoreCallCount} more`}
+                </button> : null}
                 {!partialError && !initialError && !loadingCalls && !loadingMoreCalls && !expandedCalls.length ? <span>No aggregate calls are available for this thread.</span> : null}
                 {!partialError && !initialError && !loadingCalls && !loadingMoreCalls && expandedCalls.length && expandedCalls.length < totalCallCount ? <span>{totalCallCount - expandedCalls.length} more calls available</span> : null}
                 {!partialError && !initialError && !loadingCalls && !loadingMoreCalls && expandedCalls.length >= totalCallCount && expandedCalls.length ? <span>All loaded calls visible</span> : null}
