@@ -9,7 +9,7 @@ import { LocalizedShellI18nProvider } from './app/DocumentLocalizationBridge';
 import { modelWithLegacyShellFilters } from './app/legacyShellFilters';
 import { navItems, secondaryNavItems, type ViewId } from './app/navigation';
 import { routeDefinition } from './app/routeCatalog';
-import { useExperimentalDashboardFeatures } from './app/useExperimentalDashboardFeatures';
+import { useConversationalReadiness, useExperimentalDashboardFeatures } from './app/dashboardHooks';
 import { RowLimitControl } from './app/RowLimitControl';
 import { ShellGlobalFilters } from './app/ShellGlobalFilters';
 import {
@@ -100,7 +100,7 @@ const initialLiveLoadAttempted = useRef(false);
   const [loadWindow, setLoadWindow] = useState<LoadWindow>(() => initialLoadWindowFromPayload(initialPayload));
   const [historyScope, setHistoryScope] = useState<HistoryScope>(() => historyScopeFromUrl(historyScopeFromPayload(initialPayload)));
   const [contextApiEnabled, setContextApiEnabled] = useState(model.contextRuntime.contextApiEnabled);
-const canUseLiveApi = Boolean(dashboardPayload?.api_token);
+const { canUseLiveApi, conversationalAnalysis } = useConversationalReadiness(initialPayload, dashboardPayload);
 const sourceIdentity = useMemo(() => dashboardSourceIdentityFromPayload(dashboardPayload), [dashboardPayload]);
 const shellI18n = useMemo(() => createShellI18n(dashboardPayload, language), [dashboardPayload, language]);
 const contextRuntime = useMemo<ContextRuntime>(
@@ -358,7 +358,7 @@ useEffect(() => {
   if (
     !canUseLiveApi ||
     (!needsSessionRestore && hasLoadedRows) ||
-    availableRows <= 0 ||
+    (dashboardPayload?.shell_boot !== true && availableRows <= 0) ||
     refreshing ||
     initialLiveLoadAttempted.current
   ) {
@@ -700,7 +700,7 @@ aria-label="History scope"
         }
         backFromCallInvestigator={backFromCallInvestigator}
         dashboardPayload={dashboardPayload}
-        conversationalAnalysis={initialPayload?.conversational_analysis}
+        conversationalAnalysis={conversationalAnalysis}
         sourceIdentity={sourceIdentity}
         historyScope={historyScope}
         loadWindow={loadWindow}

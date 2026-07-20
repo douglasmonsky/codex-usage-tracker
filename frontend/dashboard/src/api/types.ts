@@ -113,7 +113,7 @@ rows?: UsageRow[];
   dedupe?: DedupeSummary;
   project_metadata_privacy?: ProjectMetadataPrivacy;
   privacy_mode?: string;
-shell_boot?: boolean;
+shell_boot?: boolean; readiness_deferred?: boolean;
 };
 
 export type ConversationalReadiness = {

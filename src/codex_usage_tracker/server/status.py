@@ -25,6 +25,11 @@ ExceptionSender = Callable[[str, BaseException], None]
 JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
 
 
+def handle_readiness_request(*, codex_home: Path, send_json: JsonSender) -> None:
+    """Return MCP conversational readiness without querying usage data."""
+    send_json(HTTPStatus.OK, dict(conversational_readiness(codex_home=codex_home)))
+
+
 def handle_status_request(
     query: str,
     *,
