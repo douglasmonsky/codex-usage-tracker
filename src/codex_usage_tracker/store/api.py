@@ -49,6 +49,9 @@ from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_event_count as query_dashboard_event_count,
 )
 from codex_usage_tracker.store.dashboard_queries import (
+    query_dashboard_event_counts as query_dashboard_event_counts,
+)
+from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_events as query_dashboard_events,
 )
 from codex_usage_tracker.store.dashboard_queries import (

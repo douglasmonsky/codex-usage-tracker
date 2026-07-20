@@ -51,7 +51,8 @@ describe('React dashboard threads live queries', () => {
     expect(await screen.findByRole('row', { name: /Collapse calls for page-two-thread/i })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: /Calls for page-two-thread/i })).toBeInTheDocument();
     expect(await screen.findByText('page-two-model / high')).toBeInTheDocument();
-    expect(new URLSearchParams(window.location.search).get('thread')).toBe('page-two-thread');
+    expect(new URLSearchParams(window.location.search).get('thread_key')).toBe('page-two-thread');
+    expect(new URLSearchParams(window.location.search).has('thread')).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => new URL(String(input), window.location.origin).searchParams.get('offset') === '1')).toBe(true);
   });
 
@@ -229,13 +230,14 @@ describe('React dashboard threads live queries', () => {
   it('keeps boot calls as a labelled snapshot and retries an initial call failure', async () => {
     let callAttempts = 0;
     const threadName = fixtureModel.threads[0].name;
+    const threadKey = fixtureModel.threads[0].threadKey;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input), window.location.origin);
       if (url.pathname === '/api/threads') {
         return new Response(JSON.stringify({
           schema: 'codex-usage-tracker-threads-v1',
           rows: [{
-            thread_key: threadName,
+            thread_key: threadKey,
             thread_label: threadName,
             first_event_timestamp: '2026-07-01T12:00:00Z',
             latest_event_timestamp: '2026-07-01T12:02:00Z',
@@ -271,7 +273,7 @@ describe('React dashboard threads live queries', () => {
       if (callAttempts <= 2) return new Response('temporary call failure', { status: 500 });
       return new Response(JSON.stringify({
         schema: 'codex-usage-tracker-thread-calls-v1',
-        thread_key: threadName,
+        thread_key: threadKey,
         rows: [],
         row_count: 0,
         total_matched_rows: 0,
@@ -282,7 +284,7 @@ describe('React dashboard threads live queries', () => {
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     });
     vi.stubGlobal('fetch', fetchMock);
-    window.history.replaceState(null, '', `/?view=threads&thread=${encodeURIComponent(threadName)}`);
+    window.history.replaceState(null, '', `/?view=threads&thread_key=${encodeURIComponent(threadKey || '')}`);
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={queryClient}><ThreadsPage
       model={{ ...fixtureModel, contextRuntime: { apiToken: 'thread-token', contextApiEnabled: false, fileMode: false } }}

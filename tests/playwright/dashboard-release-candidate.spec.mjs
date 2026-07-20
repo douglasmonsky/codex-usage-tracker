@@ -1,5 +1,11 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 const workspaces = [
   ['Overview', '/?view=overview&qa=r11-accessibility'],
@@ -21,6 +27,23 @@ const viewports = [
 ];
 
 test.describe('R11 dashboard release candidate', () => {
+  test('defines and gates the release-candidate command in one Chromium CI job', async () => {
+    const packageJson = JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8'));
+    expect(packageJson.scripts['dashboard:release-candidate']).toBe(
+      'REACT_DASHBOARD_WEB_SERVER=1 DASHBOARD_BASE_URL=http://127.0.0.1:5173 playwright test tests/playwright/dashboard-release-candidate.spec.mjs --project=chromium-desktop',
+    );
+
+    const workflow = await readFile(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8');
+    const hardeningJob = workflow.split('\n  hardening_dashboard:\n')[1]?.split(/\n  [a-z][a-z0-9_-]*:\n/)[0] || '';
+    const npmCi = hardeningJob.indexOf('run: npm ci');
+    const installChromium = hardeningJob.indexOf('run: npx playwright install --with-deps chromium');
+    const releaseCandidate = hardeningJob.indexOf('run: npm run dashboard:release-candidate');
+
+    expect(npmCi, 'hardening_dashboard runs npm ci').toBeGreaterThanOrEqual(0);
+    expect(installChromium, 'hardening_dashboard installs Chromium').toBeGreaterThan(npmCi);
+    expect(releaseCandidate, 'hardening_dashboard runs the release-candidate gate').toBeGreaterThan(installChromium);
+  });
+
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium-desktop', 'This spec owns its viewport and media matrix.');
     test.setTimeout(180_000);
@@ -192,6 +215,145 @@ test.describe('R11 dashboard release candidate', () => {
 
       expect(browserIssues, `${workspaceName} chart/table console/page errors`).toEqual([]);
     }
+  });
+
+  test('preserves baseline navigation and the browser-local experimental preference', async ({ page }) => {
+    await openWorkspace(page, 'Overview', '/?view=overview&qa=release-n-preference');
+    const primary = page.getByRole('navigation', { name: 'Primary' });
+    for (const label of [
+      'Overview', 'Investigate', 'Compression Lab', 'Calls', 'Threads',
+      'Limits', 'Cache And Context', 'Diagnostics Notebook', 'Reports', 'Settings',
+    ]) {
+      await expect(primary.getByRole('button', { name: label, exact: true }), `${label} baseline navigation`).toBeVisible();
+    }
+
+    await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference');
+    await page.getByRole('button', { name: 'Advanced', exact: true }).click();
+    const toggle = page.getByRole('checkbox', { name: 'Show experimental dashboard features' });
+    await toggle.check();
+    expect(await page.evaluate(() => localStorage.getItem('codex-usage-dashboard-show-experimental-v1'))).toBe('true');
+    await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference-reload');
+    await page.getByRole('button', { name: 'Advanced', exact: true }).click();
+    await expect(page.getByRole('checkbox', { name: 'Show experimental dashboard features' })).toBeChecked();
+    await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();
+    await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toBeVisible();
+
+    await page.getByRole('checkbox', { name: 'Show experimental dashboard features' }).uncheck();
+    await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference-reset');
+    await page.getByRole('button', { name: 'Advanced', exact: true }).click();
+    await expect(page.getByRole('checkbox', { name: 'Show experimental dashboard features' })).not.toBeChecked();
+    await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();
+    await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toBeVisible();
+  });
+
+  test('keeps direct lifecycle routes reachable with their maturity banners', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('codex-usage-dashboard-show-experimental-v1', 'false'));
+    const routes = [
+      ['Investigate', '/?view=investigator&qa=release-n-direct', 'Feature maturity: Highly experimental'],
+      ['Compression Lab', '/?view=compression-lab&qa=release-n-direct', 'Feature maturity: Highly experimental'],
+      ['Cache And Context Lab', '/?view=cache-context&qa=release-n-direct', 'Feature maturity: Available during transition'],
+      ['Reports', '/?view=reports&qa=release-n-direct', 'Feature maturity: Available during transition'],
+      ['Diagnostics Notebook', '/?view=diagnostics&qa=release-n-direct', 'Feature maturity: Highly experimental'],
+    ];
+    for (const [workspace, route, banner] of routes) {
+      await openWorkspace(page, workspace, route);
+      await expect(page.getByRole('note', { name: banner })).toBeVisible();
+    }
+    await expect(
+      page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Diagnostics Notebook', exact: true }),
+    ).toBeVisible();
+  });
+
+  test('preserves the Call Investigator return route and thread context', async ({ page }) => {
+    await openWorkspace(
+      page,
+      'Call Investigator',
+      '/?view=call&record=fixture-call-2&return=threads&thread=thread-9f3a1c&qa=release-n-return',
+    );
+    await page.getByRole('button', { name: 'Back to Threads' }).click();
+    await expect(page.getByRole('heading', { name: 'Threads', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/view=threads/);
+    await expect(page).not.toHaveURL(/record=|return=/);
+  });
+
+  test('renders every readiness state with recovery guidance and manual fallbacks', async ({ browser }, testInfo) => {
+    const states = [
+      ['ready', 'Ready', /current task loaded MCP tools/i],
+      ['restart-required', 'Restart required', /Restart Codex and open a fresh task/i],
+      ['unavailable', 'Unavailable', /setup|doctor/i],
+      ['unknown', 'Unknown', /could not be determined/i],
+    ];
+    for (const [state, label, guidance] of states) {
+      const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL });
+      const statePage = await context.newPage();
+      const browserIssues = collectBrowserIssues(statePage);
+      await statePage.addInitScript(readiness => {
+        window.__CODEX_USAGE_BOOT__ = {
+          rows: [],
+          loaded_row_count: 0,
+          total_available_rows: 0,
+          limit: 500,
+          history_scope: 'active',
+          conversational_analysis: readiness,
+        };
+      }, {
+        schema: 'codex-usage-tracker-conversational-readiness-v1',
+        state,
+        summary: state === 'ready' ? 'Local checks passed.' : `Readiness is ${state}.`,
+        next_action: null,
+        evidence: [],
+      });
+      await openWorkspace(statePage, 'Overview', '/?view=overview&qa=release-n-readiness');
+      const readiness = statePage.getByRole('heading', { name: 'Analysis readiness' }).locator('xpath=ancestor::section');
+      await expect(readiness.getByText(label, { exact: true })).toBeVisible();
+      await expect(readiness.getByText(guidance)).toBeVisible();
+      await expect(readiness.getByText('Manual fallback', { exact: true })).toBeVisible();
+      for (const fallback of ['Calls', 'Threads', 'Limits', 'Diagnostics', 'Advanced experimental controls']) {
+        await expect(readiness.getByText(fallback, { exact: true })).toBeVisible();
+      }
+      expect(browserIssues, `${state} readiness console/page errors`).toEqual([]);
+      await context.close();
+    }
+  });
+
+  test('renders Release N shell copy in the selected locale without English fallback', async ({ page }) => {
+    const englishCatalog = JSON.parse(await readFile(
+      path.join(repoRoot, 'src/codex_usage_tracker/plugin_data/dashboard/locales/en.json'),
+      'utf8',
+    ));
+    const spanishCatalog = JSON.parse(await readFile(
+      path.join(repoRoot, 'src/codex_usage_tracker/plugin_data/dashboard/locales/es.json'),
+      'utf8',
+    ));
+    await page.addInitScript(catalogs => {
+      window.__CODEX_USAGE_BOOT__ = {
+        rows: [],
+        loaded_row_count: 0,
+        total_available_rows: 0,
+        limit: 500,
+        history_scope: 'active',
+        language: 'en',
+        language_direction: 'ltr',
+        available_languages: [
+          { code: 'en', english_name: 'English', native_name: 'English', dir: 'ltr' },
+          { code: 'es', english_name: 'Spanish', native_name: 'Español', dir: 'ltr' },
+        ],
+        translation_catalog: { en: catalogs.english, es: catalogs.spanish },
+      };
+    }, { english: englishCatalog, spanish: spanishCatalog });
+    await openWorkspace(page, 'Settings', '/?view=settings&qa=release-n-locale');
+    await page.getByRole('button', { name: 'Application', exact: true }).click();
+    await page.getByLabel('Language').selectOption('es');
+    await page.getByRole('button', { name: /Advanced|Avanzado/, exact: true }).click();
+    await expect(page.getByRole('checkbox', { name: 'Mostrar funciones experimentales del panel' })).toBeVisible();
+    await expect(page.getByText(
+      'Esta preferencia se guarda para este origen del navegador. Los espacios de trabajo experimentales siguen disponibles mediante enlaces directos y Diagnóstico permanece visible.',
+    )).toBeVisible();
+
+    await page.goto('/?view=diagnostics&qa=release-n-locale');
+    await expect(page.getByRole('note', { name: 'Madurez de la función: Altamente experimental' })).toBeVisible();
+    await expect(page.getByText('Altamente experimental', { exact: true })).toBeVisible();
+    await expect(page.getByText('Highly experimental', { exact: true })).toHaveCount(0);
   });
 });
 

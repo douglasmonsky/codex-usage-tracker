@@ -72,6 +72,12 @@ codex-usage-tracker install-plugin
 
 Then restart Codex and start a fresh Codex session.
 
+A healthy local installation or dashboard service does not prove that the current
+Codex task loaded MCP tools. Check the tools exposed to the current task. When an MCP
+result includes a dashboard evidence target, open its absolute localhost URL when
+present; otherwise use the relative target only after following its launch guidance
+(`codex-usage-tracker serve-dashboard --open`).
+
 ## What To Attach To Issues
 
 For public GitHub issues, prefer a strict support bundle:

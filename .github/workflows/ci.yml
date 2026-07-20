@@ -27,6 +27,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install dashboard tooling
         run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
       - name: Dashboard lint
         run: npm run dashboard:lint
       - name: Dashboard type check
@@ -39,6 +41,8 @@ jobs:
         run: npm run dashboard:governance
       - name: Dashboard bundle budget
         run: node scripts/check-dashboard-bundles.mjs
+      - name: Dashboard release candidate
+        run: npm run dashboard:release-candidate
 
   hardening_routes:
     name: Hardening / Dashboard route budget
@@ -268,6 +272,15 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dashboard tooling
+        run: npm ci
+      - name: Verify packaged dashboard assets
+        run: npm run dashboard:assets:check
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
@@ -278,3 +291,5 @@ jobs:
         run: python -m twine check dist/*
       - name: Verify built wheel
         run: python scripts/check_release.py --dist
+      - name: Smoke installed wheel
+        run: python scripts/smoke_installed_package.py

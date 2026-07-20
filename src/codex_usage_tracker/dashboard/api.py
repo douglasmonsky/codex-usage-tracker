@@ -50,7 +50,7 @@ from codex_usage_tracker.reports.recommendations import (
     load_threshold_config,
 )
 from codex_usage_tracker.store.api import (
-    query_dashboard_event_count,
+    query_dashboard_event_counts,
     query_dashboard_events,
     query_dashboard_token_summary,
     query_latest_observed_usage,
@@ -227,21 +227,10 @@ def _annotated_dashboard_rows(
 def _dashboard_available_row_counts(
     *, db_path: Path, since: str | None, include_archived: bool
 ) -> dict[str, int]:
-    total_available_rows = query_dashboard_event_count(
-        db_path=db_path,
-        since=since,
-        include_archived=include_archived,
-    )
-    active_available_rows = query_dashboard_event_count(
-        db_path=db_path,
-        since=since,
-        include_archived=False,
-    )
-    all_history_available_rows = query_dashboard_event_count(
-        db_path=db_path,
-        since=since,
-        include_archived=True,
-    )
+    counts = query_dashboard_event_counts(db_path=db_path, since=since)
+    active_available_rows = counts["active_available_rows"]
+    all_history_available_rows = counts["all_history_available_rows"]
+    total_available_rows = all_history_available_rows if include_archived else active_available_rows
     return {
         "total_available_rows": total_available_rows,
         "active_available_rows": active_available_rows,

@@ -4,13 +4,15 @@ describe('React dashboard shell live loading', () => {
   installAppTestHooks();
 
 it('auto-loads live rows for shell boot payloads without showing fixture rows', async () => {
-  window.__CODEX_USAGE_BOOT__ = {
+  const embedded = document.createElement('script');
+  embedded.id = 'usage-data';
+  embedded.type = 'application/json';
+  embedded.textContent = JSON.stringify({
     api_token: 'shell-load-token',
     context_api_enabled: true,
     shell_boot: true,
+    readiness_deferred: true,
     loaded_row_count: 0,
-    total_available_rows: 2,
-    active_available_rows: 2,
     default_load_window: 'all',
     load_window: 'rows',
     limit: 500,
@@ -23,10 +25,23 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
       total_tokens: 1_250,
       estimated_cost_usd: 0.12,
     },
-  };
+  });
+  document.body.append(embedded);
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     void init;
     const url = String(input);
+    if (url.includes('/api/readiness')) {
+      return {
+        ok: true,
+        json: async () => ({
+          schema: 'codex-usage-tracker-conversational-readiness-v1',
+          state: 'ready',
+          summary: 'Deferred MCP readiness passed.',
+          next_action: null,
+          evidence: ['MCP runtime: pass'],
+        }),
+      } as Response;
+    }
     if (!url.includes('/api/usage?')) {
       throw new Error(`Unexpected request: ${url}`);
     }
@@ -63,13 +78,16 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
 
   expect(screen.queryByText('thread-9f3a1c')).not.toBeInTheDocument();
   expect(await screen.findByText('real-live-thread')).toBeInTheDocument();
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
   expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
   expect(String(fetchMock.mock.calls[0][0])).toContain('load_window=all');
   expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText('2 calls analyzed · 1 detail row cached')).toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Analysis scope' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  expect(await screen.findByText('Deferred MCP readiness passed.')).toBeInTheDocument();
+  embedded.remove();
 });
 
 it('loads more all-time evidence without switching to recent rows', async () => {

@@ -63,7 +63,7 @@ from codex_usage_tracker.server.routes import (
     POST_ROUTE_METHODS,
     is_dashboard_shell_path,
 )
-from codex_usage_tracker.server.status import handle_status_request
+from codex_usage_tracker.server.status import handle_readiness_request, handle_status_request
 from codex_usage_tracker.server.summary import handle_summary_request
 from codex_usage_tracker.server.threads import handle_threads_request
 
@@ -221,11 +221,16 @@ class _UsageDashboardHandler(
     def _handle_status(self, query: str) -> None:
         handle_status_request(
             query,
+            codex_home=self._codex_home,
             db_path=self._db_path,
             include_archived_default=self._include_archived,
             send_exception=self._send_exception,
             send_json=self._send_json,
         )
+
+    def _handle_readiness(self, query: str) -> None:
+        del query
+        handle_readiness_request(codex_home=self._codex_home, send_json=self._send_json)
 
     def _handle_health(self, query: str) -> None:
         del query

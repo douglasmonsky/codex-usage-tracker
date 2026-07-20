@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -38,6 +39,9 @@ WHEEL_STEM = "codex_usage_tracking"
 IMPORT_PACKAGE = "codex_usage_tracker"
 CONSOLE_SCRIPT = "codex-usage-tracker"
 DEFAULT_DOCKER_IMAGE = "python:3.14-slim"
+REACT_ASSET_PATTERN = re.compile(
+    r"""(?:src|href)=["'](?P<path>/codex-usage-tracker-assets/react/[^"']+)["']"""
+)
 CLI_HELP_SUBCOMMANDS = [
     "setup",
     "doctor",
@@ -288,10 +292,16 @@ def _resource_check_code() -> str:
     return textwrap.dedent(
         f"""
         import json
+        import re
         from importlib import resources
 
         resource_paths = {RESOURCE_PATHS!r}
         base = resources.files("{IMPORT_PACKAGE}.plugin_data")
+        react_index = base.joinpath("dashboard", "react", "index.html").read_text()
+        referenced_assets = {REACT_ASSET_PATTERN.pattern!r}
+        for match in re.finditer(referenced_assets, react_index):
+            resource_paths.append(match.group("path").replace("/codex-usage-tracker-assets/react/", "dashboard/react/", 1))
+        resource_paths = sorted(set(resource_paths))
         for resource_path in resource_paths:
             resource = base.joinpath(*resource_path.split("/"))
             if not resource.is_file():

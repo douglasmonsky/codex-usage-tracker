@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
 from codex_usage_tracker.cli.mcp_runtime import mcp
+from codex_usage_tracker.core.dashboard_targets import build_dashboard_target
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
+    DEFAULT_CODEX_HOME,
     DEFAULT_DASHBOARD_PATH,
     DEFAULT_DB_PATH,
     DEFAULT_PRICING_PATH,
@@ -17,6 +20,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_THRESHOLDS_PATH,
 )
 from codex_usage_tracker.dashboard.api import generate_dashboard
+from codex_usage_tracker.dashboard_service import DashboardServiceStatus, dashboard_service_status
 from codex_usage_tracker.diagnostics.dedupe import build_dedupe_diagnostics
 from codex_usage_tracker.pricing.allowance import write_allowance_template
 from codex_usage_tracker.pricing.api import (
@@ -96,13 +100,97 @@ def _live_call_rows(
     )
 
 
+def attach_dashboard_targets(
+    payload: dict[str, Any],
+    *,
+    privacy_mode: str = "normal",
+    history: str = "active",
+) -> dict[str, Any]:
+    """Attach additive evidence links without changing the source payload contract."""
+
+    try:
+        service_status: DashboardServiceStatus | None = dashboard_service_status(home=Path.home())
+    except Exception:  # A local annotation failure must not break an MCP result.
+        service_status = None
+
+    def target(*, target_history: str = history, **values: Any) -> dict[str, Any] | None:
+        try:
+            return build_dashboard_target(
+                privacy_mode=privacy_mode,
+                service_status=service_status,
+                history=target_history,
+                **values,
+            )
+        except ValueError:
+            return None
+
+    def attach_row(row: object) -> dict[str, Any] | None:
+        if not isinstance(row, dict):
+            return None
+        record_id = row.get("record_id")
+        thread_key = row.get("thread_key")
+        archived = row.get("is_archived")
+        row_history = (
+            "all" if archived is True or isinstance(archived, int) and archived == 1 else history
+        )
+        row_target = (
+            target(view="call", record_id=record_id, target_history=row_history)
+            if isinstance(record_id, str)
+            else target(view="threads", thread_key=thread_key, target_history=row_history)
+            if isinstance(thread_key, str)
+            else None
+        )
+        if row_target is not None:
+            row["dashboard_target"] = row_target
+        return row_target
+
+    schema = payload.get("schema")
+    if schema == "codex-usage-tracker-status-v1":
+        payload["dashboard_target"] = target(view="overview")
+    elif schema == "codex-usage-tracker-calls-v1":
+        for row in payload.get("rows", []):
+            attach_row(row)
+    elif schema == "codex-usage-tracker-call-v1":
+        record = payload.get("record")
+        detail_target = attach_row(record)
+        for key in ("previous_record", "next_record"):
+            attach_row(payload.get(key))
+        for row in payload.get("adjacent_records", []):
+            attach_row(row)
+        if detail_target is not None:
+            payload["dashboard_target"] = detail_target
+    elif schema == "codex-usage-tracker-threads-v1":
+        for row in payload.get("rows", []):
+            attach_row(row)
+
+    findings = payload.get("findings")
+    if isinstance(findings, list):
+        for finding in findings:
+            if not isinstance(finding, dict):
+                continue
+            evidence = finding.get("evidence")
+            if isinstance(evidence, list):
+                finding_target = None
+                for row in evidence:
+                    evidence_target = attach_row(row)
+                    if finding_target is None and evidence_target is not None:
+                        finding_target = evidence_target
+                if finding_target is not None:
+                    finding["dashboard_target"] = deepcopy(finding_target)
+    return payload
+
+
 @mcp.tool()
 def usage_status(include_archived: bool = False) -> dict[str, Any]:
     """Return live dashboard status counts and parser freshness metadata."""
-    return status_payload(
-        _query_string(include_archived=include_archived),
-        db_path=DEFAULT_DB_PATH,
-        include_archived_default=include_archived,
+    return attach_dashboard_targets(
+        status_payload(
+            _query_string(include_archived=include_archived),
+            codex_home=DEFAULT_CODEX_HOME,
+            db_path=DEFAULT_DB_PATH,
+            include_archived_default=include_archived,
+        ),
+        history="all" if include_archived else "active",
     )
 
 
@@ -147,19 +235,25 @@ def usage_calls(
         limit=limit,
         offset=offset,
     )
-    return calls_payload(
-        query,
-        live_query_params=lambda params: _live_query_params(
-            params,
-            include_archived_default=include_archived,
-            thread_key=thread_key,
+    return attach_dashboard_targets(
+        calls_payload(
+            query,
+            live_query_params=lambda params: _live_query_params(
+                params,
+                include_archived_default=include_archived,
+                thread_key=thread_key,
+            ),
+            live_call_rows=lambda *, query_params, pricing_status, credit_confidence: (
+                _live_call_rows(
+                    query_params=query_params,
+                    pricing_status=pricing_status,
+                    credit_confidence=credit_confidence,
+                    privacy_mode=privacy_mode,
+                )
+            ),
         ),
-        live_call_rows=lambda *, query_params, pricing_status, credit_confidence: _live_call_rows(
-            query_params=query_params,
-            pricing_status=pricing_status,
-            credit_confidence=credit_confidence,
-            privacy_mode=privacy_mode,
-        ),
+        privacy_mode=privacy_mode,
+        history="all" if include_archived else "active",
     )
 
 
@@ -169,13 +263,16 @@ def usage_call_detail(
     privacy_mode: str = "normal",
 ) -> dict[str, Any]:
     """Return dashboard call investigator payload for one aggregate record."""
-    return call_detail_payload(
-        _query_string(record_id=record_id),
-        db_path=DEFAULT_DB_PATH,
-        annotate_rows=lambda rows: _annotate_dashboard_rows(
-            rows,
-            privacy_mode=privacy_mode,
+    return attach_dashboard_targets(
+        call_detail_payload(
+            _query_string(record_id=record_id),
+            db_path=DEFAULT_DB_PATH,
+            annotate_rows=lambda rows: _annotate_dashboard_rows(
+                rows,
+                privacy_mode=privacy_mode,
+            ),
         ),
+        privacy_mode=privacy_mode,
     )
 
 
@@ -187,19 +284,24 @@ def usage_threads(
     direction: str = "desc",
     limit: int | None = 100,
     offset: int = 0,
+    privacy_mode: str = "normal",
 ) -> dict[str, Any]:
     """Return the dashboard Threads API payload as aggregate JSON rows."""
-    return threads_payload(
-        _query_string(
-            search=search,
-            include_archived=include_archived,
-            sort=sort,
-            direction=direction,
-            limit=limit,
-            offset=offset,
+    return attach_dashboard_targets(
+        threads_payload(
+            _query_string(
+                search=search,
+                include_archived=include_archived,
+                sort=sort,
+                direction=direction,
+                limit=limit,
+                offset=offset,
+            ),
+            db_path=DEFAULT_DB_PATH,
+            include_archived_default=include_archived,
         ),
-        db_path=DEFAULT_DB_PATH,
-        include_archived_default=include_archived,
+        privacy_mode=privacy_mode,
+        history="all" if include_archived else "active",
     )
 
 

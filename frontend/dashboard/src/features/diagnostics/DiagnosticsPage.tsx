@@ -9,6 +9,7 @@ import {
 import type { CallRow, ContextRuntime, DashboardModel, DiagnosticSection } from '../../api/types';
 import { LineChart } from '../../charts/LineChart';
 import { Panel } from '../../components/Panel';
+import { FeatureMaturityBanner } from '../../components/FeatureMaturityBanner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PageLoadProgress } from '../../design';
 import { formatCompact, money, pct } from '../shared/format';
@@ -182,6 +183,13 @@ export function DiagnosticsPage({
           <StatusBadge label="Local Only" tone="green" />
         </div>
       </div>
+
+      <FeatureMaturityBanner
+        className="span-all"
+        kind="experimental"
+        title="Highly experimental"
+        description="Useful for technical exploration; methods and presentation may change."
+      />
 
       <PageLoadProgress
         active={canUseLiveFacts && loadingFactModules}

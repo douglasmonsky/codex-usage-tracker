@@ -58,7 +58,55 @@ EXPECTED_KEY_PREFIXES = (
     "language.",
     "effort.",
     "flag.",
+    "settings.",
+    "maturity.",
+    "readiness.",
+    "evidence.",
 )
+
+RELEASE_N_LOCALIZATION_KEYS = {
+    "settings.experimental.title",
+    "settings.experimental.subtitle",
+    "settings.experimental.toggle",
+    "settings.experimental.origin_scope",
+    "maturity.aria",
+    "maturity.highly_experimental",
+    "maturity.highly_experimental_description",
+    "maturity.available_transition",
+    "maturity.transition_description",
+    "readiness.eyebrow",
+    "readiness.title",
+    "readiness.state.ready",
+    "readiness.state.restart_required",
+    "readiness.state.unavailable",
+    "readiness.state.unknown",
+    "readiness.unknown_summary",
+    "readiness.summary.unavailable_not_configured",
+    "readiness.summary.unavailable_failed",
+    "readiness.summary.unknown_local_files",
+    "readiness.summary.ready_local_checks",
+    "readiness.summary.restart_fresh_task",
+    "readiness.guidance.ready",
+    "readiness.guidance.restart_required",
+    "readiness.guidance.unavailable",
+    "readiness.guidance.unknown",
+    "readiness.manual_fallback",
+    "readiness.fallback.calls",
+    "readiness.fallback.threads",
+    "readiness.fallback.limits",
+    "readiness.fallback.diagnostics",
+    "readiness.fallback.advanced",
+    "evidence.actions.aria",
+    "evidence.open",
+    "evidence.copy_prompt",
+    "evidence.prompt_copied",
+    "evidence.prompt_copy_failed",
+    "evidence.launch_guidance",
+    "evidence.question.default",
+    "evidence.aggregate_selection",
+    "evidence.prompt.template",
+    "evidence.prompt.launch",
+}
 
 
 def placeholders(value: str) -> set[str]:
@@ -179,6 +227,18 @@ def test_english_catalog_is_canonical_and_nonempty() -> None:
 @pytest.mark.parametrize("language", SUPPORTED_LANGUAGES)
 def test_catalog_keys_match_english(language: str) -> None:
     assert set(raw_catalog(language)) == set(raw_catalog("en"))
+
+
+@pytest.mark.parametrize("language", SUPPORTED_LANGUAGES)
+def test_release_n_copy_is_complete_for_every_supported_locale(language: str) -> None:
+    current = raw_catalog(language)
+    assert set(current) >= RELEASE_N_LOCALIZATION_KEYS
+    if language != "en":
+        english = raw_catalog("en")
+        untranslated = [
+            key for key in RELEASE_N_LOCALIZATION_KEYS if current[key] == english[key]
+        ]
+        assert not untranslated, f"{language} leaves Release N copy untranslated: {untranslated}"
 
 
 @pytest.mark.parametrize("language", SUPPORTED_LANGUAGES)

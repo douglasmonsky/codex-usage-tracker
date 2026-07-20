@@ -5,6 +5,7 @@ import type { CallRow, ContextRuntime, DashboardModel, HeatmapRow, ThreadRow } f
 import { useShellI18n } from '../../app/i18nContext';
 import { LineChart } from '../../charts/LineChart';
 import { DataTable } from '../../components/DataTable';
+import { FeatureMaturityBanner } from '../../components/FeatureMaturityBanner';
 import { MetricCard } from '../../components/MetricCard';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -77,6 +78,13 @@ return (
           <StatusBadge label="Context safe" tone="blue" />
         </div>
       </div>
+
+      <FeatureMaturityBanner
+        className="span-all"
+        kind="transitioning"
+        title="Available during transition"
+        description="This workspace remains available in Release N while its future placement is prepared."
+      />
 
       <PageLoadProgress
         active={evidence.progress.active}

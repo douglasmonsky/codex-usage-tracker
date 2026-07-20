@@ -1,5 +1,6 @@
 import { act, App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, vi, waitFor } from './test-utils/appTestHarness';
 import { shouldAutoRefreshUsageView } from './App';
+import * as routeCatalogModule from './app/routeCatalog';
 
 describe('React dashboard live refresh and row loading', () => {
   installAppTestHooks();
@@ -11,6 +12,17 @@ it('pauses automatic index refresh on evidence-heavy views', () => {
   expect(shouldAutoRefreshUsageView('compression-lab')).toBe(false);
   expect(shouldAutoRefreshUsageView('diagnostics')).toBe(false);
   expect(shouldAutoRefreshUsageView('investigator')).toBe(false);
+});
+
+it('uses route catalog refresh capability at runtime', () => {
+  const overview = routeCatalogModule.routeDefinition('overview');
+  const routeDefinition = vi.spyOn(routeCatalogModule, 'routeDefinition').mockReturnValue({
+    ...overview,
+    capabilities: { ...overview.capabilities, refresh: false },
+  });
+
+  expect(shouldAutoRefreshUsageView('overview')).toBe(false);
+  routeDefinition.mockRestore();
 });
 
 it('auto refreshes live dashboards immediately and on interval', async () => {

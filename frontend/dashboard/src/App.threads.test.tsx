@@ -58,7 +58,8 @@ describe('React dashboard threads workspace', () => {
     await waitFor(() => {
       const params = new URLSearchParams(window.location.search);
       expect(params.get('view')).toBe('threads');
-      expect(params.get('thread')).toBe('thread-9f3a');
+      expect(params.get('thread_key')).toBe('fixture-thread-key-0');
+      expect(params.has('thread')).toBe(false);
       expect(params.get('detail')).toBeNull();
     });
   });
@@ -109,7 +110,8 @@ describe('React dashboard threads workspace', () => {
 
     await waitFor(() => {
       const params = new URLSearchParams(window.location.search);
-      expect(params.get('thread')).toBe('thread-9f3a');
+      expect(params.get('thread_key')).toBe('fixture-thread-key-0');
+      expect(params.has('thread')).toBe(false);
       expect(params.get('expand')).toBeNull();
     });
   });
@@ -151,7 +153,8 @@ it('expands, switches, and collapses one thread inline', () => {
   fireEvent.click(first);
   expect(first).toHaveAttribute('aria-expanded', 'true');
   expect(screen.getByRole('region', { name: /Calls for thread-9f3a/i })).toBeInTheDocument();
-  expect(window.location.search).toContain('thread=thread-9f3a');
+  expect(window.location.search).toContain('thread_key=fixture-thread-key-0');
+  expect(new URLSearchParams(window.location.search).has('thread')).toBe(false);
 
   fireEvent.click(second);
   expect(second).toHaveAttribute('aria-expanded', 'true');
@@ -186,7 +189,8 @@ it('copies a child call link with the selected thread return state', async () =>
   expect(copied.searchParams.get('view')).toBe('call');
   expect(copied.searchParams.get('record')).toBe('fixture-call-0');
   expect(copied.searchParams.get('return')).toBe('threads');
-  expect(copied.searchParams.get('thread')).toBe('thread-9f3a');
+  expect(copied.searchParams.get('thread_key')).toBe('fixture-thread-key-0');
+  expect(copied.searchParams.has('thread')).toBe(false);
 });
 
 it('shows and sorts all selected thread calls inline', () => {
@@ -372,7 +376,8 @@ expect(row).not.toBeNull();
     fireEvent.click(row as HTMLTableRowElement);
 
 expect(window.location.search).toContain('view=threads');
-    expect(window.location.search).toContain('thread=thread-9f3a');
+    expect(window.location.search).toContain('thread_key=fixture-thread-key-0');
+    expect(new URLSearchParams(window.location.search).has('thread')).toBe(false);
     expect(screen.getByRole('button', { name: /Open investigator for thread call thread-9f3a1c codex-1/i })).toBeInTheDocument();
   });
 

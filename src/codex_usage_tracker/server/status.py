@@ -8,6 +8,7 @@ from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import parse_qs
 
+from codex_usage_tracker.core.conversational_readiness import conversational_readiness
 from codex_usage_tracker.server.utils import (
     first_query_value,
     parse_bool_query_value,
@@ -24,9 +25,15 @@ ExceptionSender = Callable[[str, BaseException], None]
 JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
 
 
+def handle_readiness_request(*, codex_home: Path, send_json: JsonSender) -> None:
+    """Return MCP conversational readiness without querying usage data."""
+    send_json(HTTPStatus.OK, dict(conversational_readiness(codex_home=codex_home)))
+
+
 def handle_status_request(
     query: str,
     *,
+    codex_home: Path,
     db_path: Path,
     include_archived_default: bool,
     send_exception: ExceptionSender,
@@ -36,6 +43,7 @@ def handle_status_request(
     try:
         payload = status_payload(
             query,
+            codex_home=codex_home,
             db_path=db_path,
             include_archived_default=include_archived_default,
         )
@@ -48,6 +56,7 @@ def handle_status_request(
 def status_payload(
     query: str,
     *,
+    codex_home: Path,
     db_path: Path,
     include_archived_default: bool,
 ) -> dict[str, object]:
@@ -83,4 +92,5 @@ def status_payload(
         "dedupe": dedupe,
         "parser_adapter": metadata.get("parser_adapter"),
         "parser_diagnostics": parser_diagnostics,
+        "conversational_analysis": conversational_readiness(codex_home=codex_home),
     }

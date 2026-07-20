@@ -206,6 +206,7 @@ describe('Overview focused evidence flow', () => {
     );
 
     expect(screen.getByRole('progressbar', { name: 'Loading overview evidence' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Analysis readiness' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Focused endpoints')).toBeInTheDocument());
     expect(screen.queryByRole('progressbar', { name: 'Loading overview evidence' })).not.toBeInTheDocument();
     expect(screen.getByText('Total Calls')).toBeInTheDocument();

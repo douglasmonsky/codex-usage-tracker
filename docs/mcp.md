@@ -182,6 +182,37 @@ Dashboard-shaped MCP tools return JSON dictionaries that reuse the same aggregat
 - `usage_report_pack(...)` mirrors `/api/reports/pack`.
 - `usage_dashboard_recommendations(...)` returns dashboard recommendation payloads.
 
+Selected MCP results include an additive `dashboard_target` without changing their
+existing schema name, fields, row order, filters, or query semantics. `usage_status`
+links to Overview; Calls rows and call detail link to Call Investigator; Threads rows
+link only when their producer supplied a canonical `thread_key`; and canonical
+`usage_investigate` evidence rows link to matching Call Investigator or Threads
+evidence. Each finding inherits a copy of its first successfully linked evidence
+target; findings do not encode an ordinal Investigator route. Thread annotation never
+substitutes a display name when `thread_key` is absent. If a canonical identifier is
+not valid for the selected privacy mode, that row simply omits the target.
+
+Targets also preserve the MCP query's history scope. Calls, Threads, status, and
+investigation results requested with `include_archived=true` emit `history="all"` and
+an explicit `history=all` URL parameter. Active-only requests emit `history="active"`.
+Call detail uses a reliable producer `is_archived` flag, when present, to keep an
+archived selected record reachable in all-history scope.
+
+Each tool checks the persistent dashboard service once. A reachable service produces
+a loopback `absolute_url`; an unreachable service or a local status-inspection error
+keeps the MCP result successful and returns a relative target with
+`codex-usage-tracker serve-dashboard --open` fallback guidance. These links are
+navigation metadata only: target presence does not upgrade conversational readiness,
+index freshness, MCP discovery, current-task tool exposure, or access to raw context.
+Use the existing readiness and recovery fields from `usage_status` for those claims.
+
+Clients should present **Open evidence** with `dashboard_target.absolute_url` when
+that value is present. Otherwise they should show `relative_url` together with the
+exact `fallback_instruction`; they must not invent a host or infer that a dashboard
+service is running. A target, installed skill, or healthy persistent service never
+proves task-level MCP tool exposure. Inspect the current task's tool inventory before
+claiming MCP availability.
+
 `refresh_usage_index()` indexes aggregate usage rows plus the local content index by default. Use `refresh_usage_index(aggregate_only=True)` when the user wants the older aggregate-only SQLite posture. Use `include_archived=True` only when the user explicitly wants all history; the dashboard defaults to active sessions so older work does not inflate current usage.
 
 ## Allowance Intelligence

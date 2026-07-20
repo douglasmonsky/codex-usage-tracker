@@ -8,6 +8,17 @@ NoneType = type(None)
 Number = (int, float)
 
 SERVER_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
+    "codex-usage-tracker-dashboard-target-v1": {
+        "required": {
+            "view": str,
+            "filters": dict,
+            "history": str,
+            "privacy_mode": str,
+            "relative_url": str,
+            "absolute_url": (str, NoneType),
+            "fallback_instruction": (str, NoneType),
+        }
+    },
     "codex-usage-tracker-session-v1": {
         "required": {
             "requested_session_id": (str, NoneType),

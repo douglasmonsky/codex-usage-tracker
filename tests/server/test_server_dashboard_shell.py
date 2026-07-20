@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from codex_usage_tracker.cli.plugin_installer import install_plugin
 from codex_usage_tracker.server import dashboard_shell as server_dashboard_shell
 
 
@@ -24,15 +25,28 @@ def test_dashboard_shell_payload_builds_lightweight_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: dict[str, Any] = {}
+    codex_home = tmp_path / ".codex"
+    install_plugin(
+        plugin_dir=codex_home.parent / "plugins" / "codex-usage-tracker",
+        marketplace_path=tmp_path / "marketplace.json",
+    )
+    real_readiness = server_dashboard_shell.conversational_readiness
+    readiness_homes: list[Path] = []
+
+    def capture_readiness(*, codex_home: Path) -> dict[str, object]:
+        readiness_homes.append(codex_home)
+        return real_readiness(codex_home=codex_home)
 
     def dashboard_payload(**kwargs: Any) -> dict[str, object]:
         calls.update(kwargs)
         return {"shell_boot": True}
 
     monkeypatch.setattr(server_dashboard_shell, "dashboard_payload", dashboard_payload)
+    monkeypatch.setattr(server_dashboard_shell, "conversational_readiness", capture_readiness)
 
     payload = server_dashboard_shell.dashboard_shell_payload(
         "history=all&include_archived=false&lang=es",
+        codex_home=codex_home,
         **_paths(tmp_path),
         privacy_mode="strict",
         since="2026-06-01",
@@ -43,7 +57,10 @@ def test_dashboard_shell_payload_builds_lightweight_payload(
         limit_default=5000,
     )
 
-    assert payload == {"shell_boot": True}
+    assert payload["shell_boot"] is True
+    assert payload["conversational_analysis"]["state"] == "ready"
+    assert readiness_homes == [codex_home]
+    assert str(codex_home) not in str(payload["conversational_analysis"])
     assert calls["limit"] == 5000
     assert calls["offset"] == 0
     assert calls["include_rows"] is False
@@ -68,6 +85,7 @@ def test_dashboard_shell_payload_history_scope_controls_default(
 
     server_dashboard_shell.dashboard_shell_payload(
         "history=active",
+        codex_home=tmp_path / ".codex",
         **_paths(tmp_path),
         privacy_mode="normal",
         since=None,

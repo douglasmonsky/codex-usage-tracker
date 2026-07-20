@@ -78,6 +78,7 @@ export type UsageRow = UsageBillingFields & UsageServiceTierFields & {
 };
 
 export type DashboardBootPayload = DashboardDataScope & {
+  conversational_analysis?: ConversationalReadiness;
   api_token?: string;
   context_api_enabled?: boolean;
   refresh_jobs_available?: boolean;
@@ -112,7 +113,15 @@ rows?: UsageRow[];
   dedupe?: DedupeSummary;
   project_metadata_privacy?: ProjectMetadataPrivacy;
   privacy_mode?: string;
-shell_boot?: boolean;
+shell_boot?: boolean; readiness_deferred?: boolean;
+};
+
+export type ConversationalReadiness = {
+  schema: 'codex-usage-tracker-conversational-readiness-v1';
+  state: 'ready' | 'restart-required' | 'unavailable' | 'unknown';
+  summary: string;
+  next_action: string | null;
+  evidence: string[];
 };
 
 type DedupeSummary = {
@@ -355,6 +364,7 @@ export type CallRow = CallBillingFields & CallServiceTierFields & {
 
 export type ThreadRow = {
   name: string;
+  threadKey?: string;
   latestCallId: string;
   latestActivity: string;
   latestActivityRaw: string;

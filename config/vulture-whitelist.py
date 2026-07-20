@@ -78,6 +78,7 @@ _._handle_context_settings
 _._handle_open_investigator
 _._handle_health
 _._handle_status
+_._handle_readiness
 _._handle_dedupe_diagnostics
 _._handle_calls
 _._handle_call

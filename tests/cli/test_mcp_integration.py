@@ -4,8 +4,11 @@ import json
 import os
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
+from codex_usage_tracker.cli.plugin_installer import install_plugin
+from codex_usage_tracker.dashboard_service import DashboardServiceStatus
 from codex_usage_tracker.store.api import query_session_usage
 from tests.store_dashboard_helpers import (
     ARCHIVED_SESSION_ID,
@@ -26,6 +29,10 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
 
     mcp_server = cast(Any, mcp_server)
     codex_home = _make_codex_home(tmp_path)
+    install_plugin(
+        plugin_dir=codex_home.parent / "plugins" / "codex-usage-tracker",
+        marketplace_path=tmp_path / "marketplace.json",
+    )
     db_path = tmp_path / "usage.sqlite3"
     dashboard_path = tmp_path / "dashboard.html"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
@@ -40,8 +47,17 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         monkeypatch.setattr(module, "DEFAULT_ALLOWANCE_PATH", allowance_path)
         monkeypatch.setattr(module, "DEFAULT_PROJECTS_PATH", projects_path)
     monkeypatch.setattr(mcp_dashboard, "DEFAULT_DASHBOARD_PATH", dashboard_path)
+    monkeypatch.setattr(mcp_dashboard, "DEFAULT_CODEX_HOME", codex_home)
     monkeypatch.setattr(mcp_dashboard, "DEFAULT_RATE_CARD_PATH", rate_card_path)
     monkeypatch.setattr(mcp_dashboard, "DEFAULT_THRESHOLDS_PATH", thresholds_path)
+    real_status_payload = mcp_dashboard.status_payload
+    status_homes: list[Path] = []
+
+    def capture_status_payload(query: str, **kwargs: Any) -> dict[str, object]:
+        status_homes.append(kwargs["codex_home"])
+        return real_status_payload(query, **kwargs)
+
+    monkeypatch.setattr(mcp_dashboard, "status_payload", capture_status_payload)
     monkeypatch.setattr(mcp_dashboard, "update_pricing_from_openai_docs", _fake_pricing_update)
 
     refresh = mcp_server.refresh_usage_index()
@@ -309,6 +325,9 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert session_json["resolved_session_id"] == SESSION_ID
     assert session_json["row_count"] == 2
     assert status_json["schema"] == "codex-usage-tracker-status-v1"
+    assert status_json["conversational_analysis"]["state"] == "ready"
+    assert status_homes == [codex_home]
+    assert str(codex_home) not in json.dumps(status_json["conversational_analysis"])
     assert status_json["row_counts"]["active_rows"] >= 2
     assert calls_json["schema"] == "codex-usage-tracker-calls-v1"
     assert calls_json["row_count"] == 1
@@ -341,6 +360,164 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert allowance_path.exists()
     assert "Codex Usage Tracker doctor" in doctor
     assert doctor_json["schema"] == "codex-usage-tracker-doctor-v1"
+
+
+def test_mcp_dashboard_payloads_attach_canonical_targets_once_per_call(monkeypatch) -> None:
+    from codex_usage_tracker.cli import mcp_dashboard
+
+    record_id = "a" * 64
+    session_key = f"session:{SESSION_ID}"
+    status_checks: list[Path] = []
+
+    def unavailable_status(*, home: Path) -> DashboardServiceStatus:
+        status_checks.append(home)
+        return DashboardServiceStatus(True, True, False, 48123, "unreachable")
+
+    monkeypatch.setattr(mcp_dashboard, "dashboard_service_status", unavailable_status)
+    monkeypatch.setattr(
+        mcp_dashboard,
+        "status_payload",
+        lambda *_args, **_kwargs: {"schema": "codex-usage-tracker-status-v1"},
+    )
+    monkeypatch.setattr(
+        mcp_dashboard,
+        "calls_payload",
+        lambda *_args, **_kwargs: {
+            "schema": "codex-usage-tracker-calls-v1",
+            "rows": [{"record_id": record_id}, {"record_id": "unsafe-record"}],
+        },
+    )
+    monkeypatch.setattr(
+        mcp_dashboard,
+        "call_detail_payload",
+        lambda *_args, **_kwargs: {
+            "schema": "codex-usage-tracker-call-v1",
+            "record": {"record_id": record_id, "is_archived": 1},
+            "adjacent_records": [{"record_id": record_id}],
+        },
+    )
+    monkeypatch.setattr(
+        mcp_dashboard,
+        "threads_payload",
+        lambda *_args, **_kwargs: {
+            "schema": "codex-usage-tracker-threads-v1",
+            "rows": [
+                {
+                    "thread_key": session_key,
+                    "thread": "Renamed display",
+                    "active_call_count": 0,
+                    "archived_call_count": 1,
+                },
+                {"thread": "Display name only"},
+                {"thread_key": "thread:private-project"},
+            ],
+        },
+    )
+
+    status = mcp_dashboard.usage_status(include_archived=True)
+    calls = mcp_dashboard.usage_calls(include_archived=True, privacy_mode="strict")
+    detail = mcp_dashboard.usage_call_detail(record_id=record_id, privacy_mode="strict")
+    threads = mcp_dashboard.usage_threads(include_archived=True, privacy_mode="strict")
+
+    assert status["dashboard_target"]["view"] == "overview"
+    assert status["dashboard_target"]["history"] == "all"
+    assert "history=all" in status["dashboard_target"]["relative_url"]
+    assert status["dashboard_target"]["absolute_url"] is None
+    assert calls["rows"][0]["dashboard_target"]["record_id"] == record_id
+    assert calls["rows"][0]["dashboard_target"]["history"] == "all"
+    assert "history=all" in calls["rows"][0]["dashboard_target"]["relative_url"]
+    assert "dashboard_target" not in calls["rows"][1]
+    assert detail["dashboard_target"]["record_id"] == record_id
+    assert detail["dashboard_target"]["history"] == "all"
+    assert "history=all" in detail["dashboard_target"]["relative_url"]
+    assert detail["record"]["dashboard_target"]["record_id"] == record_id
+    assert threads["rows"][0]["dashboard_target"]["thread_key"] == session_key
+    assert threads["rows"][0]["dashboard_target"]["history"] == "all"
+    assert "history=all" in threads["rows"][0]["dashboard_target"]["relative_url"]
+    assert "dashboard_target" not in threads["rows"][1]
+    assert "dashboard_target" not in threads["rows"][2]
+    assert len(status_checks) == 4
+
+
+def test_mcp_target_annotation_survives_status_errors_and_links_finding_evidence(
+    monkeypatch,
+) -> None:
+    from codex_usage_tracker.cli import mcp_dashboard, mcp_investigations
+
+    first_record_id = "b" * 64
+    second_record_id = "c" * 64
+    session_key = f"session:{SESSION_ID}"
+    status_checks = 0
+
+    def failed_status(*, home: Path) -> DashboardServiceStatus:
+        del home
+        nonlocal status_checks
+        status_checks += 1
+        raise RuntimeError("local service inspection failed")
+
+    payload = {
+        "schema": "codex-usage-tracker-agentic-investigation-v1",
+        "findings": [
+            {
+                "finding": "Thread-first synthetic finding",
+                "evidence": [
+                    {"thread_key": session_key, "is_archived": 1},
+                    {"record_id": first_record_id, "is_archived": 1},
+                    {"thread": "Display name only"},
+                ],
+            },
+            {
+                "finding": "Call-first synthetic finding",
+                "evidence": [
+                    {"record_id": second_record_id, "is_archived": 1},
+                    {"thread_key": session_key, "is_archived": 1},
+                ],
+            },
+            {
+                "finding": "No canonical evidence",
+                "evidence": [{"thread": "Display only"}],
+                "dashboard_target": {"producer": "preserved"},
+            },
+        ],
+    }
+    monkeypatch.setattr(mcp_dashboard, "dashboard_service_status", failed_status)
+    monkeypatch.setattr(
+        mcp_investigations,
+        "build_agentic_investigation_report",
+        lambda **_kwargs: SimpleNamespace(payload=payload),
+    )
+
+    result = mcp_investigations.usage_investigate(
+        goal="workflow_churn",
+        detail_mode="full",
+        privacy_mode="strict",
+        include_archived=True,
+    )
+
+    thread_finding, call_finding, empty_finding = result["findings"]
+    assert thread_finding["dashboard_target"]["thread_key"] == session_key
+    assert thread_finding["dashboard_target"] == thread_finding["evidence"][0]["dashboard_target"]
+    assert (
+        thread_finding["dashboard_target"] is not thread_finding["evidence"][0]["dashboard_target"]
+    )
+    assert thread_finding["evidence"][1]["dashboard_target"]["record_id"] == first_record_id
+    assert "dashboard_target" not in thread_finding["evidence"][2]
+    assert call_finding["dashboard_target"]["record_id"] == second_record_id
+    assert call_finding["dashboard_target"] == call_finding["evidence"][0]["dashboard_target"]
+    assert call_finding["dashboard_target"] is not call_finding["evidence"][0]["dashboard_target"]
+    call_finding["dashboard_target"]["filters"]["probe"] = "finding-only"
+    assert call_finding["evidence"][0]["dashboard_target"]["filters"] == {}
+    assert empty_finding["dashboard_target"] == {"producer": "preserved"}
+    for finding in result["findings"][:2]:
+        for target in [
+            finding.get("dashboard_target"),
+            *[row.get("dashboard_target") for row in finding["evidence"]],
+        ]:
+            if target is not None:
+                assert target["history"] == "all"
+                assert "history=all" in target["relative_url"]
+                assert "finding=" not in target["relative_url"]
+    assert status_checks == 1
 
 
 def test_agentic_mcp_reports_default_active_scope_excludes_archived(

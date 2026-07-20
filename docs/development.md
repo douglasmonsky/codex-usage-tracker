@@ -333,6 +333,13 @@ record independent cold samples and warm hits. Thresholds live in
 `config/dashboard-route-budgets.json`; change them only with repeatable synthetic
 evidence. The benchmark never reads local Codex logs.
 
+The packaged React HTML response is deliberately database-free: it embeds only
+the boot token, localization, and data-scope defaults, then the browser hydrates
+through `/api/usage`. The focused server regression test injects a one-second
+aggregate-shell delay and requires the HTML response in under 500 ms, preventing
+whole-history queries or MCP readiness checks from returning to the first-byte
+path.
+
 ## Release Checklist
 
 Use a release branch only for version/changelog/pinning/publish prep. It should include release-specific changes such as version bumps, `CHANGELOG.md`, install/version wording, runtime package pins, publish workflow tweaks, release notes, and final smoke-test fixes. It should not include unrelated features.

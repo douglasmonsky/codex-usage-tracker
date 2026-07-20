@@ -20,6 +20,8 @@ test.describe('React dashboard rewrite smoke', () => {
     await expect(page.getByText('thread-7b2e91 / o4-mini')).toBeVisible();
     await page.getByRole('button', { name: /Back to Calls/i }).click();
     await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/view=calls/);
+    await expect(page).not.toHaveURL(/record=|return=/);
 
     await page.getByRole('button', { name: /^Reports$/i }).click();
     await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
@@ -48,10 +50,13 @@ test.describe('React dashboard rewrite smoke', () => {
     expect(investigatorUrl.searchParams.get('view')).toBe('call');
     expect(investigatorUrl.searchParams.get('record')).toBe('fixture-call-0');
     expect(investigatorUrl.searchParams.get('return')).toBe('threads');
-    expect(investigatorUrl.searchParams.get('thread')).toBe('thread-9f3a');
+    expect(investigatorUrl.searchParams.get('thread_key')).toBe('fixture-thread-key-0');
+    expect(investigatorUrl.searchParams.has('thread')).toBe(false);
     await page.getByRole('button', { name: /Back to Threads/i }).click();
     await expect(page.getByRole('row', { name: /^(Expand|Collapse) calls for thread-9f3a$/i })).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByRole('region', { name: /Calls for thread-9f3a/i })).toBeVisible();
+    await expect(page).toHaveURL(/view=threads/);
+    await expect(page).not.toHaveURL(/record=|return=/);
   });
 
   test('threads expand inline with stacked evidence at 390px', async ({ page }) => {

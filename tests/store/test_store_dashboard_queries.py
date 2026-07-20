@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from codex_usage_tracker.core.models import UsageEvent
+from codex_usage_tracker.store import dashboard_queries
 from codex_usage_tracker.store.api import (
     connect,
     init_db,
@@ -460,3 +461,18 @@ def test_dashboard_query_limit_zero_loads_all_rows(tmp_path: Path) -> None:
     assert len(query_dashboard_events(db_path=db_path, limit=2)) == 2
     assert len(query_dashboard_events(db_path=db_path, limit=0)) == 4
     assert query_dashboard_event_count(db_path=db_path) == 4
+
+
+def test_dashboard_event_counts_are_computed_together(tmp_path: Path) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    _write_archived_log(codex_home)
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=codex_home, db_path=db_path, include_archived=True)
+
+    query = getattr(dashboard_queries, "query_dashboard_event_counts", None)
+
+    assert query is not None, "dashboard count scopes should share one aggregate query"
+    assert query(db_path=db_path) == {
+        "active_available_rows": 4,
+        "all_history_available_rows": 5,
+    }

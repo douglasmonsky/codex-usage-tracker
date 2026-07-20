@@ -10,7 +10,14 @@ import { ExploreWorkspaceSwitcher } from '../explore/ExploreWorkspaceSwitcher';
 import type { EvidenceGridPreferences } from '../explore/useEvidenceGridPreferences';
 import { ThreadAccordionGrid } from './ThreadAccordionGrid';
 import type { ThreadRiskFilter } from './threadFilterSummary';
-import { threadsTablePageSize, type ThreadCallSortDirection, type ThreadCallSortKey } from './threadsUrlState';
+import {
+  threadRowIdentity,
+  threadSelectorFromIdentity,
+  type ThreadCallSortDirection,
+  type ThreadCallSortKey,
+  type ThreadSelector,
+  threadsTablePageSize,
+} from './threadsUrlState';
 import styles from './ThreadsPage.module.css';
 
 export type ThreadEvidenceViewMode = 'table' | 'frontier' | 'lifecycle';
@@ -64,7 +71,7 @@ type ThreadsExplorerViewProps = {
   onRiskFilterChange(value: string): void;
   onViewModeChange: Dispatch<SetStateAction<ThreadEvidenceViewMode>>;
   onSortingChange: OnChangeFn<SortingState>;
-  onToggleThread(threadName: string): void;
+  onToggleThread(selector: ThreadSelector): void;
   onRetryCalls(): void;
   onLoadMoreCalls(): void;
   onLoadMoreThreads(): void;
@@ -211,7 +218,7 @@ export function ThreadsExplorerView({
                 sorting={sorting}
                 onSortingChange={onSortingChange}
                 preferences={gridPreferences}
-                expandedThreadName={selected?.name ?? null}
+                expandedThreadIdentity={selected ? threadRowIdentity(selected) : null}
                 expandedCalls={selectedCalls}
                 totalCallCount={selectedCallsState.count}
                 loadMoreCallCount={callPageSize}
@@ -252,7 +259,11 @@ export function ThreadsExplorerView({
             </>
           ) : null}
           {viewMode === 'frontier' ? (
-            <Visualization spec={frontierSpec} height={520} onSelectionChange={onToggleThread} />
+            <Visualization
+              spec={frontierSpec}
+              height={520}
+              onSelectionChange={value => onToggleThread(threadSelectorFromIdentity(value))}
+            />
           ) : null}
           {viewMode === 'lifecycle' ? (
             <Visualization spec={lifecycleSpec} height={520} />

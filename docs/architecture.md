@@ -47,7 +47,7 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
 - `context.py` is the normal path for explicit selected-call raw context. It reads one selected source file on demand, applies redaction and size limits, omits tool output by default, and keeps full serialized group analysis explicit.
 - `diagnostic_snapshots.py` owns persisted diagnostic snapshot refresh/load orchestration. Snapshot modules should stay synthetic-testable and avoid raw transcript persistence in aggregate diagnostic facts.
 - `dashboard.py` builds aggregate-first static dashboard payloads and writes HTML/assets. `server.py` adds localhost refresh, compatibility `/api/usage`, SQL-backed live API slices, and explicit lazy context loading.
-- `frontend/dashboard/` owns the React dashboard. It should render server/API payloads rather than becoming an independent source of usage calculations.
+- `frontend/dashboard/` owns the React dashboard. The packaged React HTML embeds only a database-free boot payload (authentication, localization, and data-scope defaults), then hydrates aggregate data through the localhost APIs. It should render server/API payloads rather than becoming an independent source of usage calculations.
 - `plugin_installer.py`, `.mcp.json`, `skills/`, `src/codex_usage_tracker/plugin_data/skills/`, and `scripts/check_release.py` own install and packaging behavior.
 - `scripts/benchmark_synthetic_history.py` owns broad generated large-history query timing checks. `scripts/benchmark_dashboard_routes.py` owns deterministic cold/warm route budgets for the query pipeline. Both must stay synthetic-only and must not read real Codex logs.
 

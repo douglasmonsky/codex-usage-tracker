@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import { useMemo, type ReactNode } from 'react';
 
-import type { ContextRuntime, DashboardModel } from '../../api/types';
+import type { ContextRuntime, ConversationalReadiness, DashboardModel } from '../../api/types';
 import type { LoadWindow } from '../../data/dataScope';
 import {
   dashboardModuleProgress,
@@ -18,6 +18,7 @@ import { Visualization } from '../../visualization';
 import { OverviewMetrics } from './OverviewMetrics';
 import styles from './OverviewPage.module.css';
 import { OverviewRecentCalls } from './OverviewRecentCalls';
+import { ConversationalAnalysisStatus } from '../shared/ConversationalAnalysisStatus';
 import { buildOverviewViewModel } from './overviewModel';
 import type { OverviewNavigationTarget } from './overviewNavigation';
 
@@ -33,6 +34,7 @@ type OverviewRuntime = {
 };
 
 type OverviewPageProps = {
+  conversationalAnalysis?: ConversationalReadiness;
   model: DashboardModel;
   contextRuntime: ContextRuntime;
   sourceRevision: string;
@@ -141,6 +143,8 @@ export function OverviewPage(props: OverviewPageProps) {
         modules={modules}
         updating={modules.some(module => module.status === 'updating')}
       />
+
+      <ConversationalAnalysisStatus readiness={props.conversationalAnalysis} />
 
       <OverviewMetrics
         metrics={viewModel.metrics}

@@ -352,6 +352,30 @@ the URL.
 - Evidence rows open the same Call Investigator used by Calls, Threads, Limits,
   and Diagnostics.
 
+## Release-Candidate Route And Readiness Evidence
+
+Release N keeps the existing primary navigation unchanged. The Advanced
+setting stores `Show experimental dashboard features` for this browser origin,
+but the discoverability change is reserved for Release N+1. Direct links remain
+valid throughout the transition, Diagnostics stays visible, and every
+experimental or transitioning workspace carries an explicit maturity banner.
+
+The synthetic screenshot manifest covers each lifecycle category:
+
+- stable primary routes: Overview and Calls
+- experimental routes: Investigate, Compression Lab, and always-visible
+  Diagnostics
+- transitioning routes: Cache And Context Lab and Reports
+- contextual routes: Call Investigator, including its Calls or Threads return
+  target
+
+It also captures the `ready`, `restart-required`, `unavailable`, and `unknown`
+analysis-readiness states. Every state keeps recovery guidance and the manual
+fallback list for Calls, Threads, Limits, Diagnostics, and Advanced experimental
+controls visible. Run `npm run dashboard:screenshots` only against the documented
+synthetic fixture server; never use a dashboard containing real session data for
+documentation images.
+
 ## Settings View
 
 `Settings` is a read-only explanation of the authoritative local configuration,

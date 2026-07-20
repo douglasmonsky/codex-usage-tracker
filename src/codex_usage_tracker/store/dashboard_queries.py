@@ -112,6 +112,31 @@ def query_dashboard_event_count(
         return int(row["row_count"] if row is not None else 0)
 
 
+def query_dashboard_event_counts(
+    db_path: Path = DEFAULT_DB_PATH,
+    since: str | None = None,
+) -> dict[str, int]:
+    """Return active and all-history dashboard counts in one aggregate query."""
+    where_clause, params = usage_where_clause(since=since, include_archived=True)
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            f"""
+            SELECT
+                coalesce(SUM(CASE WHEN is_archived = 0 THEN 1 ELSE 0 END), 0)
+                    AS active_available_rows,
+                COUNT(*) AS all_history_available_rows
+            FROM canonical_usage_events AS usage_events
+            {where_clause}
+            """,
+            params,
+        ).fetchone()
+    return {
+        "active_available_rows": int(row["active_available_rows"] if row else 0),
+        "all_history_available_rows": int(row["all_history_available_rows"] if row else 0),
+    }
+
+
 def query_dashboard_token_summary(
     db_path: Path = DEFAULT_DB_PATH,
     since: str | None = None,

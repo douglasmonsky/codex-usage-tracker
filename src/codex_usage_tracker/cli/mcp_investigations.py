@@ -9,6 +9,7 @@ from codex_usage_tracker.cli.mcp_compression_router import (
     build_compression_investigation_router,
     is_compression_router_goal,
 )
+from codex_usage_tracker.cli.mcp_dashboard import attach_dashboard_targets
 from codex_usage_tracker.cli.mcp_discovery import _pattern_scan_payload
 from codex_usage_tracker.cli.mcp_runtime import mcp
 from codex_usage_tracker.core.paths import (
@@ -65,17 +66,21 @@ def usage_investigate(
 ) -> dict[str, Any]:
     """Run a goal-led aggregate usage investigation."""
     if detail_mode == "compact" and is_compression_router_goal(goal):
-        return build_compression_investigation_router(
-            db_path=DEFAULT_DB_PATH,
-            goal=goal,
-            since=since,
-            until=until,
-            thread=thread,
-            include_archived=include_archived,
-            evidence_limit=evidence_limit,
+        return attach_dashboard_targets(
+            build_compression_investigation_router(
+                db_path=DEFAULT_DB_PATH,
+                goal=goal,
+                since=since,
+                until=until,
+                thread=thread,
+                include_archived=include_archived,
+                evidence_limit=evidence_limit,
+                privacy_mode=privacy_mode,
+            ),
             privacy_mode=privacy_mode,
+            history="all" if include_archived else "active",
         )
-    return build_agentic_investigation_report(
+    payload = build_agentic_investigation_report(
         db_path=DEFAULT_DB_PATH,
         pricing_path=DEFAULT_PRICING_PATH,
         allowance_path=DEFAULT_ALLOWANCE_PATH,
@@ -90,6 +95,11 @@ def usage_investigate(
         privacy_mode=privacy_mode,
         recommendation_report_builder=build_indexed_recommendations_report,
     ).payload
+    return attach_dashboard_targets(
+        payload,
+        privacy_mode=privacy_mode,
+        history="all" if include_archived else "active",
+    )
 
 
 @mcp.tool()

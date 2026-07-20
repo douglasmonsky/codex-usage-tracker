@@ -12,6 +12,9 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+import pytest
+
+from codex_usage_tracker.cli.plugin_installer import install_plugin
 from codex_usage_tracker.dashboard.api import dashboard_payload, generate_dashboard
 from codex_usage_tracker.store.api import (
     connect,
@@ -150,8 +153,21 @@ def test_dashboard_server_forces_dashboard_asset_mime_types(
         assert nosniff == "nosniff"
 
 
-def test_dashboard_server_serves_react_dashboard_alias(tmp_path: Path) -> None:
+def test_dashboard_server_serves_react_dashboard_alias(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from codex_usage_tracker.server import dashboard_pages
     from codex_usage_tracker.server.api import _UsageDashboardHandler
+
+    aggregate_shell = dashboard_pages.dashboard_shell_payload
+
+    def slow_aggregate_shell(*args: object, **kwargs: object) -> dict[str, object]:
+        del args, kwargs
+        time.sleep(1)
+        return {"rows": [], "shell_boot": True}
+
+    monkeypatch.setattr(dashboard_pages, "dashboard_shell_payload", slow_aggregate_shell)
 
     react_dir = tmp_path / "codex-usage-tracker-assets" / "react"
     react_asset_dir = react_dir / "assets"
@@ -196,6 +212,7 @@ def test_dashboard_server_serves_react_dashboard_alias(tmp_path: Path) -> None:
     thread.start()
     try:
         base_url = f"http://127.0.0.1:{server.server_port}"
+        request_started = time.perf_counter()
         with urllib.request.urlopen(  # noqa: S310 - local test server only
             f"{base_url}/react-dashboard.html?view=diagnostics",
             timeout=5,
@@ -203,6 +220,8 @@ def test_dashboard_server_serves_react_dashboard_alias(tmp_path: Path) -> None:
             react_html = response.read().decode("utf-8")
             react_content_type = response.headers.get("Content-Type")
             react_cache_control = response.headers.get("Cache-Control")
+        first_response_seconds = time.perf_counter() - request_started
+        monkeypatch.setattr(dashboard_pages, "dashboard_shell_payload", aggregate_shell)
 
         with urllib.request.urlopen(  # noqa: S310 - local test server only
             f"{base_url}/codex-usage-tracker-assets/react/assets/dashboard-react.js",
@@ -210,12 +229,17 @@ def test_dashboard_server_serves_react_dashboard_alias(tmp_path: Path) -> None:
         ) as response:
             react_asset = response.read().decode("utf-8")
             react_asset_cache_control = response.headers.get("Cache-Control")
-
+        with urllib.request.urlopen(  # noqa: S310 - local test server only
+            f"{base_url}/api/readiness",
+            timeout=5,
+        ) as response:
+            readiness_payload = json.loads(response.read().decode("utf-8"))
         with urllib.request.urlopen(  # noqa: S310 - local test server only
             f"{base_url}/dashboard.html",
             timeout=5,
         ) as response:
             legacy_html = response.read().decode("utf-8")
+
     finally:
         server.shutdown()
         server.server_close()
@@ -224,10 +248,12 @@ def test_dashboard_server_serves_react_dashboard_alias(tmp_path: Path) -> None:
     assert react_content_type is not None
     assert react_content_type.split(";", 1)[0] == "text/html"
     assert react_cache_control == "no-store"
+    assert first_response_seconds < 0.5
     assert "Codex Usage Tracker React Dashboard" in react_html
     assert 'src="/codex-usage-tracker-assets/react/assets/dashboard-react.js"' in react_html
     assert "dashboard-react.js?v=" not in react_html
     assert react_asset_cache_control == "no-cache"
+    assert readiness_payload["schema"] == "codex-usage-tracker-conversational-readiness-v1"
     assert "window.__reactDashboard = true" in react_asset
     assert '<script id="usage-data" type="application/json">' in react_html
     react_payload = json.loads(
@@ -240,6 +266,8 @@ def test_dashboard_server_serves_react_dashboard_alias(tmp_path: Path) -> None:
     assert react_payload["context_api_enabled"] is True
     assert react_payload["rows"] == []
     assert react_payload["loaded_row_count"] == 0
+    assert react_payload["shell_boot"] is True
+    assert react_payload["readiness_deferred"] is True
     assert react_payload["limit"] == 5000
     assert react_payload["limit_label"] == "5000"
     assert "<!doctype html>" in legacy_html
@@ -251,6 +279,10 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     from codex_usage_tracker.server.api import _UsageDashboardHandler
 
     codex_home = _make_codex_home(tmp_path)
+    install_plugin(
+        plugin_dir=codex_home.parent / "plugins" / "codex-usage-tracker",
+        marketplace_path=tmp_path / "marketplace.json",
+    )
     db_path = tmp_path / "usage.sqlite3"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
     (tmp_path / "dashboard.html").write_text(
@@ -391,6 +423,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
             timeout=5,
         ) as response:
             all_payload = json.loads(response.read().decode("utf-8"))
+        status_payload = _read_json(f"http://127.0.0.1:{server.server_port}/api/status")
         with urllib.request.urlopen(  # noqa: S310 - local test server only
             f"http://127.0.0.1:{server.server_port}/api/usage?limit=2&offset=2",
             timeout=5,
@@ -422,6 +455,12 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert dashboard_shell_payload["shell_boot"] is True
     assert dashboard_shell_payload["rows"] == []
     assert dashboard_shell_payload["summary"]["visible_calls"] == 0
+    assert dashboard_shell_payload["conversational_analysis"]["state"] == "ready"
+    assert str(codex_home) not in json.dumps(dashboard_shell_payload["conversational_analysis"])
+    assert (
+        status_payload["conversational_analysis"]
+        == dashboard_shell_payload["conversational_analysis"]
+    )
     assert limited_payload["refresh_result"]["parsed_events"] == 4
     assert limited_payload["refresh_result"]["skipped_events"] == 0
     assert limited_payload["refresh_result"]["parser_diagnostics"] == {}

@@ -1,20 +1,16 @@
 import {
   Activity,
-  BarChart3,
-  BookOpen,
-  BrainCircuit,
   Boxes,
-  Database,
   FileText,
-  FlaskConical,
-  Home,
-  Settings,
-  Table2,
-  TimerReset,
-  Workflow,
   type LucideIcon,
 } from 'lucide-react';
 import { isDashboardViewId, type DashboardViewId } from '../routes/dashboardSearch';
+import {
+  navigationForPhase,
+  type RouteLifecycle,
+  type RouteMaturity,
+  type RoutePlacement,
+} from './routeCatalog';
 
 export type ViewId = DashboardViewId;
 
@@ -25,23 +21,23 @@ export type NavItem = {
   icon: LucideIcon;
 };
 
-export const navItems: NavItem[] = [
-  { id: 'overview', label: 'Overview', description: 'High-level telemetry', icon: Home },
-  { id: 'investigator', label: 'Investigate', description: 'Root-cause evidence', icon: FlaskConical },
-  { id: 'compression-lab', label: 'Compression Lab', description: 'Context savings', icon: BrainCircuit },
-  { id: 'calls', label: 'Calls', description: 'Model-call table', icon: Table2 },
-  { id: 'threads', label: 'Threads', description: 'Thread efficiency', icon: Workflow },
-  { id: 'usage-drain', label: 'Limits', description: 'Allowance intelligence', icon: TimerReset },
-  { id: 'cache-context', label: 'Cache And Context', description: 'Cache and cold resumes', icon: Database },
-  { id: 'diagnostics', label: 'Diagnostics Notebook', description: 'Technical report', icon: BookOpen },
-  { id: 'reports', label: 'Reports', description: 'Generated analyses', icon: BarChart3 },
-  { id: 'settings', label: 'Settings', description: 'Local configuration', icon: Settings },
-];
+export const navItems: NavItem[] = navigationForPhase('foundation').map(({ id, label, description, icon }) => ({
+  id, label, description, icon,
+}));
 
-export const secondaryNavItems: Array<{ label: string; icon: LucideIcon; target: ViewId }> = [
-  { label: 'Files', icon: FileText, target: 'settings' },
-  { label: 'Commands', icon: Activity, target: 'investigator' },
-  { label: 'Models', icon: Boxes, target: 'calls' },
+type SecondaryNavItem = {
+  label: string;
+  icon: LucideIcon;
+  target: ViewId;
+  maturity: RouteMaturity;
+  placement: RoutePlacement;
+  lifecycle: RouteLifecycle;
+};
+
+export const secondaryNavItems: SecondaryNavItem[] = [
+  { label: 'Files', icon: FileText, target: 'settings', maturity: 'stable', placement: 'hidden', lifecycle: 'deprecated' },
+  { label: 'Commands', icon: Activity, target: 'investigator', maturity: 'stable', placement: 'hidden', lifecycle: 'deprecated' },
+  { label: 'Models', icon: Boxes, target: 'calls', maturity: 'stable', placement: 'hidden', lifecycle: 'deprecated' },
 ];
 
 export function isViewId(value: string | null): value is ViewId {

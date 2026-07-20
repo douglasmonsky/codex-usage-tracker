@@ -9,6 +9,7 @@ import {
   type CompressionProfile,
 } from '../../api/compressionLab';
 import type { ContextRuntime } from '../../api/types';
+import { FeatureMaturityBanner } from '../../components/FeatureMaturityBanner';
 import { compressionProfileQueryOptions } from '../../data/compressionQueries';
 import { Button, MetricReadout, ProgressBar, StatusBadge, Surface } from '../../design';
 import { formatCompact, formatNumber } from '../shared/format';
@@ -144,6 +145,12 @@ export function CompressionLabPage({
           </Button>
         </div>
       </header>
+
+      <FeatureMaturityBanner
+        kind="experimental"
+        title="Highly experimental"
+        description="Useful for technical exploration; methods and presentation may change."
+      />
 
       {running && runProgress?.progress ? (
         <Surface tone="subtle" className={styles.progressPanel} aria-live="polite">

@@ -13,7 +13,10 @@ from urllib.parse import parse_qs, urlparse
 from codex_usage_tracker.dashboard.api import render_dashboard_html
 from codex_usage_tracker.server import utils as server_utils
 from codex_usage_tracker.server.context_settings import ContextApiState
-from codex_usage_tracker.server.dashboard_shell import dashboard_shell_payload
+from codex_usage_tracker.server.dashboard_shell import (
+    dashboard_shell_payload,
+    react_dashboard_boot_payload,
+)
 from codex_usage_tracker.server.responses import send_html_response
 
 _first = server_utils.first_query_value
@@ -32,6 +35,7 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
     """Serve dashboard HTML and assets for the configured usage database."""
 
     if TYPE_CHECKING:
+        _codex_home: Path
         _db_path: Path
         _pricing_path: Path
         _allowance_path: Path
@@ -78,9 +82,16 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
         )
 
     def _handle_react_dashboard(self, query: str) -> None:
-        payload = self._dashboard_shell_payload(query)
-        if payload is None:
-            return
+        payload = react_dashboard_boot_payload(
+            query,
+            api_token=self._api_token,
+            context_api_enabled=self._context_api_state.enabled,
+            include_archived_default=self._include_archived,
+            language_default=self._language,
+            limit_default=self._limit,
+            privacy_mode=self._privacy_mode,
+            since=self._since,
+        )
         payload["pricing_snapshot_warning"] = ""
         index_path = Path(self.translate_path(_REACT_DASHBOARD_INDEX_PATH))
         try:
@@ -147,6 +158,7 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
         try:
             return dashboard_shell_payload(
                 query,
+                codex_home=self._codex_home,
                 db_path=self._db_path,
                 pricing_path=self._pricing_path,
                 allowance_path=self._allowance_path,

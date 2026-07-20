@@ -39,13 +39,39 @@ const threadCallSortValues = new Set<string>([
 ]);
 const threadSortKeyValues = new Set(threadColumnChoices.map(choice => choice.id).filter(id => id !== 'investigate'));
 
-function readSelectedThreadParam(href = window.location.href): string | null {
-  return new URL(href).searchParams.get('thread')?.trim() || null;
+export type ThreadSelector = { kind: 'key' | 'name'; value: string };
+
+export function threadRowSelector(thread: ThreadRow): ThreadSelector {
+  return thread.threadKey
+    ? { kind: 'key', value: thread.threadKey }
+    : { kind: 'name', value: thread.name };
+}
+
+export function threadSelectorIdentity(selector: ThreadSelector): string {
+  return `${selector.kind}:${selector.value}`;
+}
+
+export function threadRowIdentity(thread: ThreadRow): string {
+  return threadSelectorIdentity(threadRowSelector(thread));
+}
+
+export function threadSelectorFromIdentity(identity: string): ThreadSelector {
+  if (identity.startsWith('key:')) return { kind: 'key', value: identity.slice(4) };
+  if (identity.startsWith('name:')) return { kind: 'name', value: identity.slice(5) };
+  return { kind: 'name', value: identity };
+}
+
+export function readInitialThreadSelector(href = window.location.href): ThreadSelector | null {
+  const params = new URL(href).searchParams;
+  const threadKey = params.get('thread_key')?.trim();
+  if (threadKey) return { kind: 'key', value: threadKey };
+  const threadName = params.get('thread')?.trim();
+  return threadName ? { kind: 'name', value: threadName } : null;
 }
 
 export function readInitialSelectedThreadParam(href = window.location.href): string | null {
-  const threadName = readSelectedThreadParam(href);
-  if (threadName) return threadName;
+  const selector = readInitialThreadSelector(href);
+  if (selector) return selector.value;
   const expandedThread = readLegacyExpandedThreadParam(href);
   if (expandedThread) return expandedThread;
   return readThreadSearchParam('detail', href) === 'first' ? detailFirstSelectedThreadName : null;
@@ -112,6 +138,7 @@ export type ThreadsViewLinkState = {
   localQuery: string;
   riskFilter: ThreadRiskFilter;
   selectedThreadName: string | null;
+  selectedThreadKey?: string | null;
   sorting: SortingState;
   visibleRowCount: number;
 threadCallSort: ThreadCallSortKey;
@@ -125,21 +152,28 @@ export function buildThreadsViewLink(state: ThreadsViewLinkState, href = window.
   url.searchParams.delete('detail');
   url.searchParams.delete('expand');
   url.searchParams.delete('threads');
+  url.searchParams.delete('thread');
+  url.searchParams.delete('thread_key');
   url.searchParams.delete('thread_call_page');
 
   const activeSort = state.sorting[0];
   const sortKey = activeSort && threadSortKeyValues.has(activeSort.id) ? activeSort.id : '';
   setOptionalThreadParam(url, 'thread_q', state.localQuery.trim(), '');
   setOptionalThreadParam(url, 'risk', state.riskFilter, 'all');
-  setOptionalThreadParam(url, 'thread', state.selectedThreadName ?? '', '');
+  if (state.selectedThreadKey) {
+    url.searchParams.set('thread_key', state.selectedThreadKey);
+  } else {
+    setOptionalThreadParam(url, 'thread', state.selectedThreadName ?? '', '');
+  }
   setOptionalThreadParam(url, 'sort', sortKey, '');
   setOptionalThreadParam(url, 'direction', sortKey ? (activeSort?.desc ? 'desc' : 'asc') : '', '');
 setOptionalThreadParam(url, 'page', String(threadPageNumberFromVisibleRows(state.visibleRowCount, threadsTablePageSize)), '1');
-setOptionalThreadParam(url, 'thread_call_sort', state.selectedThreadName ? state.threadCallSort : '', 'newest');
+const hasSelectedThread = Boolean(state.selectedThreadKey || state.selectedThreadName);
+setOptionalThreadParam(url, 'thread_call_sort', hasSelectedThread ? state.threadCallSort : '', 'newest');
 setOptionalThreadParam(
   url,
   'thread_call_direction',
-  state.selectedThreadName ? state.threadCallSortDirection : '',
+  hasSelectedThread ? state.threadCallSortDirection : '',
   defaultThreadCallSortDirection(state.threadCallSort),
 );
   return url;

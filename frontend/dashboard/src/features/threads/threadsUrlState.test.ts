@@ -54,6 +54,9 @@ describe('threadsUrlState', () => {
   });
 
   it('hydrates selected thread state from current and legacy thread URLs', () => {
+    expect(readInitialSelectedThreadParam(
+      `${baseHref}&thread_key=session%3A019e374d-c19f-7da3-a44f-8de043a7a64e&thread=Private%20project`,
+    )).toBe('session:019e374d-c19f-7da3-a44f-8de043a7a64e');
     expect(readInitialSelectedThreadParam(`${baseHref}&thread=thread-3c5d`)).toBe('thread-3c5d');
     expect(readInitialSelectedThreadParam(`${baseHref}&detail=first`)).toBe(detailFirstSelectedThreadName);
     expect(readInitialSelectedThreadParam(`${baseHref}&expand=all`)).toBe(detailFirstSelectedThreadName);
@@ -118,6 +121,25 @@ expect(url.searchParams.get('thread_call_page')).toBeNull();
     expect(url.searchParams.get('detail')).toBeNull();
     expect(url.searchParams.get('expand')).toBeNull();
     expect(url.searchParams.get('threads')).toBeNull();
+  });
+
+  it('emits a canonical thread key and removes the display-name selector', () => {
+    const url = buildThreadsViewLink(
+      {
+        localQuery: '',
+        riskFilter: 'all',
+        selectedThreadName: 'Private project',
+        selectedThreadKey: 'session:019e374d-c19f-7da3-a44f-8de043a7a64e',
+        sorting: [],
+        visibleRowCount: threadsTablePageSize,
+        threadCallSort: 'newest',
+        threadCallSortDirection: 'desc',
+      },
+      `${baseHref}&thread=stale&thread_key=session%3A019e374d-c19f-7da3-a44f-8de043a7a64f`,
+    );
+
+    expect(url.searchParams.get('thread_key')).toBe('session:019e374d-c19f-7da3-a44f-8de043a7a64e');
+    expect(url.searchParams.has('thread')).toBe(false);
   });
 
   it('omits default thread view link params', () => {

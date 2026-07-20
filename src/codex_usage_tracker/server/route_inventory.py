@@ -101,6 +101,16 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
     ),
     _profile(
         "GET",
+        "/api/readiness",
+        "_handle_readiness",
+        "server.status",
+        "interactive",
+        "Checks local MCP configuration and runtime readiness without usage queries.",
+        "One constant-size readiness payload.",
+        "Computed from local configuration after dashboard hydration.",
+    ),
+    _profile(
+        "GET",
         "/api/diagnostics/dedupe",
         "_handle_dedupe_diagnostics",
         "server.dedupe",

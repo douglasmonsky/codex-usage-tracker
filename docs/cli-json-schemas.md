@@ -88,6 +88,7 @@ Tracked schema ids:
 | `codex-usage-tracker-dashboard-v1` | CLI `dashboard --json`, MCP `generate_usage_dashboard()` |
 | `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
 | `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload, including preferred React `dashboard_url` and legacy `legacy_dashboard_url` fallback |
+| `codex-usage-tracker-dashboard-target-v1` | Privacy-safe agent/dashboard handoff with a cataloged view, normalized reviewed selectors, and deterministic React URL |
 | `codex-usage-tracker-pricing-coverage-v1` | CLI `pricing-coverage --json`, MCP `usage_pricing_coverage(response_format="json")` |
 | `codex-usage-tracker-source-coverage-v1` | CLI `source-coverage --json`, MCP `usage_source_coverage(response_format="json")` |
 | `codex-usage-tracker-content-search-v1` | MCP `usage_content_search(...)`; explicit local content-index search, may include indexed snippets |
@@ -111,6 +112,37 @@ Tracked schema ids:
 | `codex-usage-tracker-init-thresholds-v1` | CLI `init-thresholds --json` |
 | `codex-usage-tracker-init-projects-v1` | CLI `init-projects --json` |
 | `codex-usage-tracker-support-bundle-v1` | CLI `support-bundle --json` |
+
+## Dashboard Targets
+
+`codex-usage-tracker-dashboard-target-v1` is the privacy-safe handoff contract
+for agent-created dashboard links and copied prompts. It accepts only cataloged
+views, canonical route identifiers, the normalized `active` or `all` history
+scope, and filters reviewed for that destination. Unknown search fields, API
+tokens, raw or indexed text, raw-context controls, and local paths are omitted.
+Query parameters are sorted so equivalent targets serialize identically.
+The dashboard route catalog keeps the full supported deep-link parameter set
+separate from the smaller handoff-safe set used by this contract.
+
+```json
+{"schema":"codex-usage-tracker-dashboard-target-v1","view":"call","record_id":"record-123","filters":{},"history":"active","privacy_mode":"strict","relative_url":"/react-dashboard.html?record=record-123&view=call","absolute_url":null,"fallback_instruction":"codex-usage-tracker serve-dashboard --open"}
+```
+
+`absolute_url` is populated only when a healthy persistent dashboard service or
+an explicitly active loopback `serve-dashboard` origin is known. Otherwise,
+clients use `relative_url` and show `fallback_instruction`. `record_id`,
+`thread_key`, `diagnostic_fact`, and `limit_evidence` are optional because each
+is valid only for its corresponding destination.
+Canonical identifiers follow their producer formats: record ids are lowercase
+SHA-256 hex (with `record-<digits>` reserved for documented synthetic examples),
+session thread keys contain a UUID, diagnostic keys contain a cataloged fact
+type plus the parser's structured fact name, and limit evidence is `stable` or
+`decreased`. Normal mode may carry the parser's explicit `thread:<display name>`
+key; redacted and strict modes reject that label-bearing form and require a
+`session:<uuid>` key. Reports accept only the verified dashboard report ids.
+Other string filters use documented enums, while numeric filters use per-key
+ranges and fixed non-scientific serialization. Boolean query values serialize
+as lowercase `true` or `false` in both the Python and TypeScript builders.
 
 ## Shared Error Codes
 

@@ -131,6 +131,7 @@ export const fixtureModel: DashboardModel = {
       callStartedAt: String(eventTimestamp),
       time: String(time),
       thread: String(thread),
+      ...(index === 0 ? { threadKey: 'fixture-thread-key-0' } : {}),
       model: String(model),
       effort: String(effort),
       input: inputTokens,
@@ -220,6 +221,7 @@ efficiencyFlags: uncachedInput > 50_000 ? ['cache-risk'] : [],
     const averageGapSeconds = (index + 1) * 420;
     return {
       name: String(name),
+      ...(index === 0 ? { threadKey: 'fixture-thread-key-0' } : {}),
       latestCallId: `fixture-call-${index}`,
       latestActivity: `Jun ${index + 1}, 10:${String(24 - index).padStart(2, '0')} AM`,
       latestActivityRaw: `2026-06-${String(index + 1).padStart(2, '0')}T10:${String(24 - index).padStart(2, '0')}:00Z`,

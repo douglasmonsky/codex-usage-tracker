@@ -4,6 +4,7 @@ import { callCsvColumns } from '../features/shared/tables';
 import type { ContextRuntime, DashboardModel } from '../api/types';
 import { loadWindowLabel, type LoadWindow } from '../data/dataScope';
 import type { ViewId } from './navigation';
+import { routeDefinition } from './routeCatalog';
 import { rowLimitNoCap } from './rowLimit';
 import type { HistoryScope } from './shellUrl';
 
@@ -34,6 +35,9 @@ export async function currentViewCsvExport(
   globalQuery = '',
   activePreset = '',
 ): Promise<CsvExportSpec> {
+  if (!routeDefinition(activeView).capabilities.export) {
+    throw new Error(`CSV export is not available for ${routeDefinition(activeView).label}.`);
+  }
   const stamp = csvDateStamp();
     switch (activeView) {
       case 'threads': {

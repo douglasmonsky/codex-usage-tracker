@@ -17,7 +17,13 @@ import {
   type InvestigationWalkBranch,
 } from '../../api/investigations';
 import type { CallRow, ContextRuntime, DashboardModel } from '../../api/types';
+import { buildDashboardTarget } from '../../app/dashboardTargets';
 import { useShellI18n } from '../../app/i18nContext';
+import {
+  currentDashboardServiceOrigin,
+  DashboardEvidenceActions,
+} from '../../components/DashboardEvidenceActions';
+import { FeatureMaturityBanner } from '../../components/FeatureMaturityBanner';
 import {
   investigatorWalkQueryOptions,
 } from '../../data/investigatorQueries';
@@ -92,6 +98,16 @@ export function InvestigatorPage({
   const [question, setQuestion] = useState(defaultQuestion);
   const [refreshing, setRefreshing] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Stored diagnostics ready');
+  const selectedRank = Math.max(1, selected ? workspace.findings.indexOf(selected) + 1 : 1);
+  const selectedRecordId = selected?.evidence.find(row => row.recordId)?.recordId;
+  const evidenceTarget = useMemo(
+    () => investigatorEvidenceDashboardTarget(
+      selectedRecordId,
+      includeArchived,
+      currentDashboardServiceOrigin(),
+    ),
+    [includeArchived, selectedRecordId],
+  );
   const walkQuery = useQuery({
     ...investigatorWalkQueryOptions({
       runtime: contextRuntime,
@@ -185,12 +201,23 @@ export function InvestigatorPage({
           <p>Ranked waste signals, linked evidence, and one explicit verification path.</p>
         </div>
         <div className={styles.headerActions}>
+          <DashboardEvidenceActions
+            target={evidenceTarget}
+            question={`Investigate aggregate evidence for finding ${selectedRank}.`}
+            onStatus={setStatusMessage}
+          />
           <Button onClick={exportEvidence}><Download />Export evidence</Button>
           <Button variant="primary" onClick={refreshEvidence} disabled={!canUseLive || refreshing}>
             <RefreshCw />{refreshing ? 'Refreshing' : 'Refresh evidence'}
           </Button>
         </div>
       </header>
+
+      <FeatureMaturityBanner
+        kind="experimental"
+        title="Highly experimental"
+        description="Useful for technical exploration; methods and presentation may change."
+      />
 
       <PageLoadProgress
         active={canUseLive && (refreshing || evidence.modules.some(module => module.status === 'loading' || module.status === 'updating'))}
@@ -318,6 +345,26 @@ export function InvestigatorPage({
       </details>
     </div>
   );
+}
+
+export function investigatorEvidenceDashboardTarget(
+  recordId: string | undefined,
+  includeArchived: boolean,
+  serviceOrigin: string | null,
+) {
+  const common = {
+    history: includeArchived ? 'all' as const : 'active' as const,
+    privacy_mode: 'strict' as const,
+    service_origin: serviceOrigin,
+  };
+  if (recordId) {
+    try {
+      return buildDashboardTarget({ ...common, view: 'call', record_id: recordId });
+    } catch {
+      // Legacy aggregate rows may not yet carry a canonical record ID.
+    }
+  }
+  return buildDashboardTarget({ ...common, view: 'investigator' });
 }
 
 function TraceResults({ branches }: { branches: InvestigationWalkBranch[] }) {
