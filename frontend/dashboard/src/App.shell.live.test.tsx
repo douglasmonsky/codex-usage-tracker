@@ -4,7 +4,17 @@ describe('React dashboard shell live loading', () => {
   installAppTestHooks();
 
 it('auto-loads live rows for shell boot payloads without showing fixture rows', async () => {
-  window.__CODEX_USAGE_BOOT__ = {
+  const embedded = document.createElement('script');
+  embedded.id = 'usage-data';
+  embedded.type = 'application/json';
+  embedded.textContent = JSON.stringify({
+    conversational_analysis: {
+      schema: 'codex-usage-tracker-conversational-readiness-v1',
+      state: 'ready',
+      summary: 'Distinct shell readiness passed.',
+      next_action: null,
+      evidence: ['MCP runtime: pass'],
+    },
     api_token: 'shell-load-token',
     context_api_enabled: true,
     shell_boot: true,
@@ -23,7 +33,8 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
       total_tokens: 1_250,
       estimated_cost_usd: 0.12,
     },
-  };
+  });
+  document.body.append(embedded);
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     void init;
     const url = String(input);
@@ -70,6 +81,9 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
   expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText('2 calls analyzed · 1 detail row cached')).toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Analysis scope' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+  expect(screen.getByText('Distinct shell readiness passed.')).toBeInTheDocument();
+  embedded.remove();
 });
 
 it('loads more all-time evidence without switching to recent rows', async () => {

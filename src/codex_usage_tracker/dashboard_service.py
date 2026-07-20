@@ -46,6 +46,12 @@ class DashboardServiceStatus:
     def url(self) -> str:
         return f"http://{SERVICE_HOST}:{self.port}"
 
+    @property
+    def react_url(self) -> str:
+        """Return the preferred React dashboard entry point."""
+
+        return f"{self.url}/react-dashboard.html"
+
 
 def service_paths(home: Path) -> DashboardServicePaths:
     """Return the LaunchAgent and diagnostic log paths for one user."""

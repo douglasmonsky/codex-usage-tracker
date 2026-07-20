@@ -9,7 +9,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
-import type { DashboardBootPayload, DashboardLanguage, DashboardModel } from '../../api/types';
+import type { ConversationalReadiness, DashboardBootPayload, DashboardLanguage, DashboardModel } from '../../api/types';
+import { useShellI18n } from '../../app/i18nContext';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
 import { loadWindowLabel, type LoadWindow } from '../../data/dataScope';
@@ -21,6 +22,7 @@ import {
   sourceLabel,
 } from './settingsModel';
 import { settingsSections, useSettingsSection } from './useSettingsSection';
+import { ConversationalAnalysisStatus } from '../shared/ConversationalAnalysisStatus';
 import styles from './SettingsPage.module.css';
 
 type HistoryScope = 'active' | 'all';
@@ -32,6 +34,7 @@ type ApplicationI18n = {
 };
 
 type SettingsPageProps = {
+  conversationalAnalysis?: ConversationalReadiness;
   model: DashboardModel;
   payload: DashboardBootPayload | null;
   historyScope: HistoryScope;
@@ -44,6 +47,8 @@ type SettingsPageProps = {
   autoRefreshEnabled: boolean;
   refreshState: string;
   applicationI18n: ApplicationI18n;
+  showExperimental: boolean;
+  setShowExperimental: (showExperimental: boolean) => void;
 };
 
 const sectionCopy = {
@@ -52,6 +57,7 @@ const sectionCopy = {
   content: ['Content Access', 'Privacy boundaries and explicit raw-context gates.'],
   application: ['Application', 'Dashboard refresh, API, and language visibility.'],
   sources: ['Source Health', 'Configuration and parser diagnostics.'],
+  advanced: ['Advanced', 'Local preferences for experimental dashboard surfaces.'],
 } as const;
 
 export function SettingsPage(props: SettingsPageProps) {
@@ -72,6 +78,8 @@ export function SettingsPage(props: SettingsPageProps) {
           <StatusBadge label={contextRuntime.contextApiEnabled ? 'Content access enabled' : 'Content access gated'} tone={contextRuntime.contextApiEnabled ? 'blue' : 'orange'} />
         </div>
       </header>
+
+      <ConversationalAnalysisStatus readiness={props.conversationalAnalysis} />
 
       <nav className={styles.navigator} aria-label="Settings sections">
         {settingsSections.map(section => (
@@ -96,6 +104,7 @@ export function SettingsPage(props: SettingsPageProps) {
         {selectedSection === 'content' && <ContentAccessSection {...props} />}
         {selectedSection === 'application' && <ApplicationSection {...props} />}
         {selectedSection === 'sources' && <SourceHealthSection payload={payload} />}
+        {selectedSection === 'advanced' && <AdvancedSection {...props} />}
       </section>
     </div>
   );
@@ -178,6 +187,36 @@ function SourceHealthSection({ payload }: { payload: DashboardBootPayload | null
         row.value,
         row.issue ? AlertTriangle : ShieldCheck,
       ])} />
+    </div>
+  );
+}
+
+function AdvancedSection({ showExperimental, setShowExperimental }: SettingsPageProps) {
+  const i18n = useShellI18n();
+  return (
+    <div className={styles.grid}>
+      <Panel
+        title={i18n.t('settings.experimental.title', 'Experimental Features')}
+        subtitle={i18n.t('settings.experimental.subtitle', 'Browser-local preference')}
+      >
+        <label className={styles.preference}>
+          <input
+            aria-label={i18n.t('settings.experimental.toggle', 'Show experimental dashboard features')}
+            type="checkbox"
+            checked={showExperimental}
+            onChange={event => setShowExperimental(event.target.checked)}
+          />
+          <span>
+            <strong>{i18n.t('settings.experimental.toggle', 'Show experimental dashboard features')}</strong>
+            <small>
+              {i18n.t(
+                'settings.experimental.origin_scope',
+                'This preference is stored for this browser origin. Experimental workspaces remain available from direct links, and Diagnostics stays visible.',
+              )}
+            </small>
+          </span>
+        </label>
+      </Panel>
     </div>
   );
 }

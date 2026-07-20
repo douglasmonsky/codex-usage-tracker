@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export const settingsSections = ['data', 'estimates', 'content', 'application', 'sources'] as const;
+export const settingsSections = ['data', 'estimates', 'content', 'application', 'sources', 'advanced'] as const;
 export type SettingsSection = (typeof settingsSections)[number];
 export const settingsSectionStorageKey = 'codex-usage-dashboard-settings-section';
 

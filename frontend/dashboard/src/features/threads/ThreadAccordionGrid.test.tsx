@@ -5,6 +5,11 @@ import type { CallRow } from '../../api/types';
 import { fixtureModel } from '../../test-fixtures/dashboardFixture';
 import { threadColumns } from '../shared/tables';
 import { ThreadAccordionGrid, type ThreadAccordionGridProps } from './ThreadAccordionGrid';
+import {
+  threadRowIdentity,
+  threadRowSelector,
+  threadSelectorIdentity,
+} from './threadsUrlState';
 
 const fixtureThread = fixtureModel.threads[0];
 const fixtureCall = fixtureModel.calls[0];
@@ -22,7 +27,7 @@ const defaultProps: ThreadAccordionGridProps = {
     setColumnVisibility: vi.fn(),
     restoreDefaults: vi.fn(),
   },
-  expandedThreadName: null,
+  expandedThreadIdentity: null,
   expandedCalls: [],
   totalCallCount: 0,
   loadMoreCallCount: 100,
@@ -50,7 +55,7 @@ function renderGrid(overrides: Partial<ThreadAccordionGridProps> = {}) {
 it('toggles one inline thread without activating an investigator', () => {
   const onToggleThread = vi.fn();
   const onOpenInvestigator = vi.fn();
-  renderGrid({ expandedThreadName: null, onToggleThread, onOpenInvestigator });
+  renderGrid({ expandedThreadIdentity: null, onToggleThread, onOpenInvestigator });
   const row = screen.getByRole('row', { name: `Expand calls for ${fixtureThread.name}` });
 
   fireEvent.click(row);
@@ -58,7 +63,7 @@ it('toggles one inline thread without activating an investigator', () => {
   fireEvent.keyDown(row, { key: ' ' });
 
   expect(onToggleThread).toHaveBeenCalledTimes(3);
-  expect(onToggleThread).toHaveBeenLastCalledWith(fixtureThread.name);
+  expect(onToggleThread).toHaveBeenLastCalledWith(threadRowSelector(fixtureThread));
   expect(onOpenInvestigator).not.toHaveBeenCalled();
 });
 
@@ -73,8 +78,27 @@ it('treats a real browser double-click sequence as one logical toggle', () => {
   fireEvent.doubleClick(row, { detail: 2 });
 
   expect(onToggleThread).toHaveBeenCalledOnce();
-  expect(onToggleThread).toHaveBeenCalledWith(fixtureThread.name);
+  expect(onToggleThread).toHaveBeenCalledWith(threadRowSelector(fixtureThread));
   expect(onOpenInvestigator).not.toHaveBeenCalled();
+});
+
+it('keeps duplicate display labels distinct and emits canonical row selectors', () => {
+  const onToggleThread = vi.fn();
+  const duplicateThreads = [
+    { ...fixtureThread, threadKey: 'session:019e374d-c19f-7da3-a44f-8de043a7a64e', name: 'Shared label' },
+    { ...fixtureThread, threadKey: 'session:029e374d-c19f-7da3-a44f-8de043a7a64e', name: 'Shared label' },
+  ];
+  renderGrid({
+    threads: duplicateThreads,
+    expandedThreadIdentity: threadRowIdentity(duplicateThreads[1]),
+    onToggleThread,
+  });
+
+  expect(screen.getAllByRole('row', { name: 'Expand calls for Shared label' })).toHaveLength(1);
+  const expanded = screen.getByRole('row', { name: 'Collapse calls for Shared label' });
+  expect(expanded.id).toContain(encodeURIComponent(duplicateThreads[1].threadKey));
+  fireEvent.click(expanded);
+  expect(onToggleThread).toHaveBeenCalledWith(threadRowSelector(duplicateThreads[1]));
 });
 
 it('aligns disclosure inside a truncated identity cell and quiets unloaded metadata', () => {
@@ -104,7 +128,7 @@ it('renders an associated expanded region and explicit child actions', () => {
   const onOpenInvestigator = vi.fn();
   const onCopyCallLink = vi.fn();
   renderGrid({
-    expandedThreadName: fixtureThread.name,
+    expandedThreadIdentity: threadRowIdentity(fixtureThread),
     expandedCalls: [fixtureCall],
     onOpenInvestigator,
     onCopyCallLink,
@@ -129,7 +153,7 @@ it('renders an associated expanded region and explicit child actions', () => {
 it('uses density-specific estimates and rendered spacing for parents and calls', () => {
   const { rerender } = render(<ThreadAccordionGrid
     {...defaultProps}
-    expandedThreadName={fixtureThread.name}
+    expandedThreadIdentity={threadRowIdentity(fixtureThread)}
     expandedCalls={[fixtureCall]}
   />);
   const compactParent = screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` });
@@ -140,7 +164,7 @@ it('uses density-specific estimates and rendered spacing for parents and calls',
   rerender(<ThreadAccordionGrid
     {...defaultProps}
     preferences={{ ...defaultProps.preferences, density: 'comfortable' }}
-    expandedThreadName={fixtureThread.name}
+    expandedThreadIdentity={threadRowIdentity(fixtureThread)}
     expandedCalls={[fixtureCall]}
   />);
   expect(screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` })).toHaveStyle({ minHeight: '56px' });
@@ -149,7 +173,7 @@ it('uses density-specific estimates and rendered spacing for parents and calls',
 
 it('keeps a thousand child calls bounded to one virtual window', () => {
   renderGrid({
-    expandedThreadName: fixtureThread.name,
+    expandedThreadIdentity: threadRowIdentity(fixtureThread),
     expandedCalls: Array.from({ length: 1_000 }, (_, index) => callFixture(`call-${index}`)),
     totalCallCount: 1_000,
   });
@@ -160,7 +184,7 @@ it('keeps a thousand child calls bounded to one virtual window', () => {
 
 it('shows loaded progress and a loading-more state', () => {
   renderGrid({
-    expandedThreadName: fixtureThread.name,
+    expandedThreadIdentity: threadRowIdentity(fixtureThread),
     expandedCalls: [fixtureCall],
     totalCallCount: 3,
     loadingMoreCalls: true,
@@ -172,7 +196,7 @@ it('shows loaded progress and a loading-more state', () => {
 it('shows the concise aggregate summary and explicit collapse action', () => {
   const onToggleThread = vi.fn();
   renderGrid({
-    expandedThreadName: fixtureThread.name,
+    expandedThreadIdentity: threadRowIdentity(fixtureThread),
     expandedCalls: [fixtureCall],
     totalCallCount: fixtureThread.turns,
     onToggleThread,
@@ -187,13 +211,13 @@ it('shows the concise aggregate summary and explicit collapse action', () => {
   expect(region).toHaveTextContent('Duration');
   expect(region).toHaveTextContent('Latest');
   fireEvent.click(within(region).getByRole('button', { name: `Collapse calls for ${fixtureThread.name}` }));
-  expect(onToggleThread).toHaveBeenCalledWith(fixtureThread.name);
+  expect(onToggleThread).toHaveBeenCalledWith(threadRowSelector(fixtureThread));
 });
 
 it('shows a partial error with an explicit retry action', () => {
   const onRetryCalls = vi.fn();
   renderGrid({
-    expandedThreadName: fixtureThread.name,
+    expandedThreadIdentity: threadRowIdentity(fixtureThread),
     partialError: 'The next page could not be loaded.',
     onRetryCalls,
   });
@@ -205,7 +229,7 @@ it('shows a partial error with an explicit retry action', () => {
 
 it('labels boot calls as a stored snapshot after an initial query failure', () => {
   renderGrid({
-    expandedThreadName: fixtureThread.name,
+    expandedThreadIdentity: threadRowIdentity(fixtureThread),
     expandedCalls: [fixtureCall],
     totalCallCount: fixtureThread.turns,
     initialError: 'The focused call request failed.',
@@ -218,18 +242,21 @@ it('labels boot calls as a stored snapshot after an initial query failure', () =
 });
 
 it('uses the approved aggregate empty-state copy', () => {
-  renderGrid({ expandedThreadName: fixtureThread.name });
+  renderGrid({ expandedThreadIdentity: threadRowIdentity(fixtureThread) });
   expect(screen.getByText('No aggregate calls are available for this thread.')).toBeInTheDocument();
 });
 
 it('retains focus on the parent while its inline region opens', () => {
   function FocusHarness() {
-    const [expandedThreadName, setExpandedThreadName] = useState<string | null>(null);
+    const [expandedThreadIdentity, setExpandedThreadIdentity] = useState<string | null>(null);
     return <ThreadAccordionGrid
       {...defaultProps}
-      expandedThreadName={expandedThreadName}
-      expandedCalls={expandedThreadName ? [fixtureCall] : []}
-      onToggleThread={name => setExpandedThreadName(current => current === name ? null : name)}
+      expandedThreadIdentity={expandedThreadIdentity}
+      expandedCalls={expandedThreadIdentity ? [fixtureCall] : []}
+      onToggleThread={selector => setExpandedThreadIdentity(current => {
+        const identity = threadSelectorIdentity(selector);
+        return current === identity ? null : identity;
+      })}
     />;
   }
   render(<FocusHarness />);
@@ -241,7 +268,7 @@ it('retains focus on the parent while its inline region opens', () => {
 });
 
 it('keeps complete call copy in the stacked narrow-screen structure', () => {
-  renderGrid({ expandedThreadName: fixtureThread.name, expandedCalls: [fixtureCall] });
+  renderGrid({ expandedThreadIdentity: threadRowIdentity(fixtureThread), expandedCalls: [fixtureCall] });
   const region = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
 
   expect(region).toHaveTextContent(fixtureCall.model);

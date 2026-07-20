@@ -25,7 +25,7 @@ module.exports = {
       from: { path: '^src/features/' },
       to: {
         path: '^src/app/',
-        pathNot: '^src/app/(i18nContext|shellUrl)\\.tsx?$'
+        pathNot: '^src/app/(dashboardTargets|i18nContext|shellUrl)\\.tsx?$'
       }
     },
     {

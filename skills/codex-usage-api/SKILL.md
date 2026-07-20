@@ -44,6 +44,12 @@ For maintainer dogfood or plugin-quality checks, prefer the MCP polling flow whe
 9. Use `usage_content_search(...)` and `usage_thread_trace(...)` only for explicit local content-index exploration when the user agrees transcript-level indexed snippets are needed.
 10. Use `usage_call_context(...)` only when the user explicitly asks for raw local context and the MCP server has raw context enabled.
 
+## Dashboard Evidence Targets
+
+- When an MCP result includes `dashboard_target.absolute_url`, surface **Open evidence** with that exact loopback URL.
+- When `absolute_url` is absent, show `dashboard_target.relative_url` and the exact `fallback_instruction` launch guidance. Do not invent or infer a service origin.
+- Never infer task-level MCP availability from a dashboard target, local readiness result, installed skill, or healthy service. Verify the current task's exposed tools separately.
+
 ## Tool Stance
 
 - `usage_suggest_investigations` is the front door for ideas. It should return a short, goal-led menu with adjacent safe next options.

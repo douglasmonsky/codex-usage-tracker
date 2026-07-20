@@ -21,6 +21,11 @@
 .facts dt svg { width: 16px; height: 16px; flex: 0 0 auto; color: var(--signal-context); }
 .facts dd { margin: 0; color: var(--ink-strong); font-size: 12px; overflow-wrap: anywhere; text-align: right; }
 .rules { display: grid; gap: 8px; margin: 0; padding-left: 20px; color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
+.preference { display: flex; gap: 10px; align-items: flex-start; color: var(--ink-strong); cursor: pointer; }
+.preference input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--signal-context); }
+.preference span { display: grid; gap: 4px; }
+.preference strong { font-size: 13px; }
+.preference small { max-width: 76ch; color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
 @media (max-width: 760px) {
   .header { flex-direction: column; gap: 12px; }
   .badges { justify-content: flex-start; }

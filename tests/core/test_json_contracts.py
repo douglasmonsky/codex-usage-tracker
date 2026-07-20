@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATTERN = re.compile(r"codex-usage-tracker-[a-z0-9-]+-v[0-9]+")
 RUNTIME_SCHEMA_SOURCE_PATHS = [
     REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "api_payloads.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "dashboard_targets.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "cli" / "main.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "context" / "api.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "pricing" / "costing.py",
@@ -50,6 +51,16 @@ def test_json_contract_validation_accepts_nested_query_contract() -> None:
         "total_matched_rows": 0,
         "truncated": False,
         "rows": [],
+        "dashboard_target": {
+            "schema": "codex-usage-tracker-dashboard-target-v1",
+            "view": "overview",
+            "filters": {},
+            "history": "active",
+            "privacy_mode": "strict",
+            "relative_url": "/react-dashboard.html?view=overview",
+            "absolute_url": None,
+            "fallback_instruction": "codex-usage-tracker serve-dashboard --open",
+        },
     }
 
     assert validate_json_payload_contract(payload) == []
@@ -64,6 +75,21 @@ def test_allowance_v2_contracts_are_tracked() -> None:
         "codex-usage-tracker-allowance-evidence-v2",
         "codex-usage-tracker-allowance-analysis-v2",
     } <= schemas
+
+
+def test_dashboard_target_contract_is_tracked() -> None:
+    payload = {
+        "schema": "codex-usage-tracker-dashboard-target-v1",
+        "view": "overview",
+        "filters": {},
+        "history": "active",
+        "privacy_mode": "strict",
+        "relative_url": "/react-dashboard.html?view=overview",
+        "absolute_url": None,
+        "fallback_instruction": "codex-usage-tracker serve-dashboard --open",
+    }
+
+    assert validate_json_payload_contract(payload) == []
 
 
 def test_json_contract_validation_reports_schema_and_type_errors() -> None:

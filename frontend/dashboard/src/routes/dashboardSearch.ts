@@ -1,4 +1,4 @@
-const dashboardViewIds = [
+export const dashboardViewIds = [
   'overview',
   'investigator',
   'compression-lab',

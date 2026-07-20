@@ -21,12 +21,6 @@ export function sortThreadCalls(
   });
 }
 
-export function threadLabelsMatch(callThread: string, threadName: string): boolean {
-  const callLabel = callThread.trim();
-  const summaryLabel = threadName.trim();
-  return callLabel === summaryLabel || callLabel.startsWith(summaryLabel) || summaryLabel.startsWith(callLabel);
-}
-
 export function formatCredits(value: number): string {
   return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)} credits`;
 }

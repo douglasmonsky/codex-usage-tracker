@@ -1,7 +1,7 @@
 import { lazyRouteComponent } from '@tanstack/react-router';
 import { Suspense, type ReactNode } from 'react';
 
-import type { ContextRuntime, DashboardBootPayload, DashboardLanguage, DashboardModel } from '../api/types';
+import type { ContextRuntime, ConversationalReadiness, DashboardBootPayload, DashboardLanguage, DashboardModel } from '../api/types';
 import type { HistoryScope, LoadWindow } from '../data/dataScope';
 import type { DashboardSourceIdentity } from '../data/queryRuntime';
 import type { DashboardViewId } from './dashboardSearch';
@@ -21,22 +21,27 @@ const DiagnosticsPage = lazyRouteComponent(() => import('../features/diagnostics
 const ReportsPage = lazyRouteComponent(() => import('../features/reports/ReportsPage'), 'ReportsPage');
 const SettingsPage = lazyRouteComponent(() => import('../features/settings/SettingsPage'), 'SettingsPage');
 
-const dashboardRouteComponents = [
-  OverviewPage,
-  InvestigatorPage,
-  CompressionLabPage,
-  ExploreRoutePage,
-  CallInvestigatorPage,
-  ThreadsPage,
-  UsageDrainPage,
-  CacheContextPage,
-  DiagnosticsPage,
-  ReportsPage,
-  SettingsPage,
+const dashboardRouteComponents: Array<{
+  id: DashboardViewId;
+  component: { preload?: () => Promise<unknown> };
+}> = [
+  { id: 'overview', component: OverviewPage },
+  { id: 'investigator', component: InvestigatorPage },
+  { id: 'compression-lab', component: CompressionLabPage },
+  { id: 'calls', component: ExploreRoutePage },
+  { id: 'call', component: CallInvestigatorPage },
+  { id: 'threads', component: ThreadsPage },
+  { id: 'usage-drain', component: UsageDrainPage },
+  { id: 'cache-context', component: CacheContextPage },
+  { id: 'diagnostics', component: DiagnosticsPage },
+  { id: 'reports', component: ReportsPage },
+  { id: 'settings', component: SettingsPage },
 ];
 
+export const dashboardRenderedViewIds: DashboardViewId[] = dashboardRouteComponents.map(route => route.id);
+
 export async function preloadDashboardRouteViews() {
-  await Promise.all(dashboardRouteComponents.map(component => component.preload?.()));
+  await Promise.all(dashboardRouteComponents.map(route => route.component.preload?.()));
 }
 
 type DashboardRouteViewProps = {
@@ -50,6 +55,7 @@ type DashboardRouteViewProps = {
   canLoadAllRows: boolean;
   canUseLiveApi: boolean;
   contextRuntime: ContextRuntime;
+  conversationalAnalysis?: ConversationalReadiness;
   copyCallInvestigatorLink: (recordId: string) => void;
   dashboardPayload: DashboardBootPayload | null;
   globalFilters: ReactNode;
@@ -68,7 +74,9 @@ type DashboardRouteViewProps = {
   openCallInvestigator: (recordId: string) => void;
   refreshing: boolean;
   refreshState: string;
+  setShowExperimental: (showExperimental: boolean) => void;
   setContextApiEnabled: (enabled: boolean) => void;
+  showExperimental: boolean;
   sourceIdentity: DashboardSourceIdentity;
   totalAvailableRows: number;
 };
@@ -93,6 +101,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     canLoadAllRows,
     canUseLiveApi,
     contextRuntime,
+    conversationalAnalysis,
     copyCallInvestigatorLink,
     dashboardPayload,
     globalFilters,
@@ -111,7 +120,9 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     openCallInvestigator,
     refreshing,
     refreshState,
+    setShowExperimental,
     setContextApiEnabled,
+    showExperimental,
     sourceIdentity,
     totalAvailableRows,
   } = props;
@@ -120,6 +131,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     case 'overview':
       return (
         <OverviewPage
+          conversationalAnalysis={conversationalAnalysis}
           model={model}
           contextRuntime={contextRuntime}
           sourceKey={sourceIdentity.sourceKey}
@@ -268,6 +280,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     case 'settings':
       return (
         <SettingsPage
+          conversationalAnalysis={conversationalAnalysis}
           model={model}
           payload={dashboardPayload}
           historyScope={historyScope}
@@ -280,9 +293,17 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           autoRefreshEnabled={autoRefreshEnabled}
           refreshState={refreshState}
           applicationI18n={applicationI18n}
+          showExperimental={showExperimental}
+          setShowExperimental={setShowExperimental}
         />
       );
+    default:
+      return assertNever(activeView);
   }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled dashboard route: ${String(value)}`);
 }
 
 function DashboardViewPending({ activeView }: { activeView: DashboardViewId }) {

@@ -2,23 +2,23 @@
   "exceptions": {
     "frontend/dashboard/src/App.live-refresh.test.tsx": {
       "group": "tests",
-      "nonblank": 543,
-      "physical": 575
+      "nonblank": 553,
+      "physical": 587
     },
     "frontend/dashboard/src/App.tsx": {
       "group": "source",
-      "nonblank": 703,
-      "physical": 747
+      "nonblank": 708,
+      "physical": 751
     },
     "frontend/dashboard/src/api/client.ts": {
       "group": "source",
-      "nonblank": 765,
-      "physical": 825
+      "nonblank": 769,
+      "physical": 829
     },
     "frontend/dashboard/src/api/types.ts": {
       "group": "source",
-      "nonblank": 422,
-      "physical": 448
+      "nonblank": 431,
+      "physical": 458
     },
     "frontend/dashboard/src/app/zh-Hans/advancedPages.ts": {
       "group": "source",
@@ -47,8 +47,8 @@
     },
     "frontend/dashboard/src/features/diagnostics/DiagnosticsPage.tsx": {
       "group": "source",
-      "nonblank": 473,
-      "physical": 502
+      "nonblank": 480,
+      "physical": 510
     },
     "frontend/dashboard/src/features/diagnostics/diagnosticSnapshotCards.ts": {
       "group": "source",
@@ -59,6 +59,11 @@
       "group": "source",
       "nonblank": 639,
       "physical": 683
+    },
+    "frontend/dashboard/src/features/threads/ThreadsPage.tsx": {
+      "group": "source",
+      "nonblank": 450,
+      "physical": 476
     },
     "frontend/dashboard/src/styles/context-evidence.css": {
       "group": "styles",

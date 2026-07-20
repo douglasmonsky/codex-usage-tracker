@@ -460,6 +460,13 @@ def test_dashboard_service_command_is_registered() -> None:
     )
 
 
+def test_dashboard_service_status_exposes_react_url_without_changing_root_url() -> None:
+    status = DashboardServiceStatus(True, True, True, 47821, "healthy")
+
+    assert status.url == "http://127.0.0.1:47821"
+    assert status.react_url == "http://127.0.0.1:47821/react-dashboard.html"
+
+
 def test_dashboard_service_help_is_localized() -> None:
     help_text = build_parser("zh-Hans").format_help()
 

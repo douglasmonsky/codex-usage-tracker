@@ -13,7 +13,13 @@ import type { CallRow, ThreadRow } from '../../api/types';
 import { EvidenceGridControls } from '../explore/EvidenceGridControls';
 import type { EvidenceGridPreferences } from '../explore/useEvidenceGridPreferences';
 import { ThreadCallControls, ThreadCallEvidenceRow } from './ThreadAccordionRows';
-import type { ThreadCallSortDirection, ThreadCallSortKey } from './threadsUrlState';
+import {
+  threadRowIdentity,
+  threadRowSelector,
+  type ThreadCallSortDirection,
+  type ThreadCallSortKey,
+  type ThreadSelector,
+} from './threadsUrlState';
 import styles from './ThreadAccordionGrid.module.css';
 
 export type ThreadAccordionGridProps = {
@@ -23,7 +29,7 @@ export type ThreadAccordionGridProps = {
   sorting: SortingState;
   onSortingChange: OnChangeFn<SortingState>;
   preferences: EvidenceGridPreferences;
-  expandedThreadName: string | null;
+  expandedThreadIdentity: string | null;
   expandedCalls: CallRow[];
   totalCallCount: number;
   loadMoreCallCount: number;
@@ -36,7 +42,7 @@ export type ThreadAccordionGridProps = {
   callSort: ThreadCallSortKey;
   callSortDirection: ThreadCallSortDirection;
   viewportHeight?: number;
-  onToggleThread(threadName: string): void;
+  onToggleThread(selector: ThreadSelector): void;
   onRetryCalls(): void;
   onLoadMoreCalls(): void;
   onCallSortChange(value: string): void;
@@ -53,17 +59,18 @@ type ThreadAccordionItem =
 
 function accordionItems(
   threads: ThreadRow[],
-  expandedThreadName: string | null,
+  expandedThreadIdentity: string | null,
   expandedCalls: CallRow[],
 ): ThreadAccordionItem[] {
   return threads.flatMap(thread => {
-    const parent: ThreadAccordionItem = { key: `thread:${thread.name}`, kind: 'thread', thread };
-    if (thread.name !== expandedThreadName) return [parent];
+    const identity = threadRowIdentity(thread);
+    const parent: ThreadAccordionItem = { key: `thread:${identity}`, kind: 'thread', thread };
+    if (identity !== expandedThreadIdentity) return [parent];
     return [
       parent,
-      { key: `summary:${thread.name}`, kind: 'summary', thread },
+      { key: `summary:${identity}`, kind: 'summary', thread },
       ...expandedCalls.map(call => ({ key: `call:${call.id}`, kind: 'call' as const, call })),
-      { key: `status:${thread.name}`, kind: 'status' as const },
+      { key: `status:${identity}`, kind: 'status' as const },
     ];
   });
 }
@@ -79,7 +86,7 @@ export function ThreadAccordionGrid({
   sorting,
   onSortingChange,
   preferences,
-  expandedThreadName,
+  expandedThreadIdentity,
   expandedCalls,
   totalCallCount,
   loadMoreCallCount,
@@ -109,11 +116,11 @@ export function ThreadAccordionGrid({
     onColumnVisibilityChange: preferences.setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getRowId: row => row.name,
+    getRowId: threadRowIdentity,
     enableSortingRemoval: false,
   });
   const rows = table.getRowModel().rows;
-  const items = accordionItems(rows.map(row => row.original), expandedThreadName, expandedCalls);
+  const items = accordionItems(rows.map(row => row.original), expandedThreadIdentity, expandedCalls);
   const roomy = preferences.density === 'comfortable';
   const estimatedSize = (index: number) => {
     const kind = items[index]?.kind;
@@ -145,8 +152,9 @@ export function ThreadAccordionGrid({
     : estimatedItems.filter(item => item.start < viewportHeight + 896);
   const totalSize = virtualizer.getTotalSize() || estimatedStart;
   const tableWidth = Math.max(table.getTotalSize(), 720);
-  const expandedThreadId = expandedThreadName ? `thread-row-${encodeURIComponent(expandedThreadName)}` : undefined;
-  const regionId = expandedThreadName ? `thread-calls-${encodeURIComponent(expandedThreadName)}` : undefined;
+  const expandedThread = threads.find(thread => threadRowIdentity(thread) === expandedThreadIdentity);
+  const expandedThreadId = expandedThreadIdentity ? `thread-row-${encodeURIComponent(expandedThreadIdentity)}` : undefined;
+  const regionId = expandedThreadIdentity ? `thread-calls-${encodeURIComponent(expandedThreadIdentity)}` : undefined;
   const regionLabelId = regionId ? `${regionId}-label` : undefined;
   const progressMessage = `${expandedCalls.length} of ${totalCallCount} calls loaded`;
   const progressDetail = `${
@@ -156,10 +164,10 @@ export function ThreadAccordionGrid({
           : ''
   }`;
 
-  function toggleKeyDown(event: React.KeyboardEvent<HTMLDivElement>, name: string, itemIndex: number) {
+  function toggleKeyDown(event: React.KeyboardEvent<HTMLDivElement>, selector: ThreadSelector, itemIndex: number) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      onToggleThread(name);
+      onToggleThread(selector);
       return;
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -213,21 +221,22 @@ export function ThreadAccordionGrid({
         </div>
         <section
           className={styles.threadCallsRegion}
-          role={expandedThreadName ? 'region' : undefined}
-          aria-labelledby={expandedThreadName ? regionLabelId : undefined}
-          aria-describedby={expandedThreadName ? expandedThreadId : undefined}
+          role={expandedThreadIdentity ? 'region' : undefined}
+          aria-labelledby={expandedThreadIdentity ? regionLabelId : undefined}
+          aria-describedby={expandedThreadIdentity ? expandedThreadId : undefined}
         >
-          {expandedThreadName ? <span id={regionLabelId} className={styles.visuallyHidden}>Calls for {expandedThreadName}</span> : null}
+          {expandedThread ? <span id={regionLabelId} className={styles.visuallyHidden}>Calls for {expandedThread.name}</span> : null}
           <div className={styles.accordionCanvas} role="rowgroup" style={{ height: totalSize, width: tableWidth }}>
           {virtualItems.map(virtualItem => {
             const item = items[virtualItem.index];
             if (!item) return null;
             const itemStyle = { transform: `translateY(${virtualItem.start}px)`, width: tableWidth } as CSSProperties;
             if (item.kind === 'thread') {
-              const row = rows.find(candidate => candidate.original.name === item.thread.name);
+              const identity = threadRowIdentity(item.thread);
+              const row = rows.find(candidate => threadRowIdentity(candidate.original) === identity);
               if (!row) return null;
-              const expanded = item.thread.name === expandedThreadName;
-              const threadId = `thread-row-${encodeURIComponent(item.thread.name)}`;
+              const expanded = identity === expandedThreadIdentity;
+              const threadId = `thread-row-${encodeURIComponent(identity)}`;
               return <div
                 key={item.key}
                 ref={virtualizer.measureElement}
@@ -244,9 +253,9 @@ export function ThreadAccordionGrid({
                 data-index={virtualItem.index}
                 data-item-index={virtualItem.index}
                 onClick={event => {
-                  if (event.detail < 2) onToggleThread(item.thread.name);
+                  if (event.detail < 2) onToggleThread(threadRowSelector(item.thread));
                 }}
-                onKeyDown={event => toggleKeyDown(event, item.thread.name, virtualItem.index)}
+                onKeyDown={event => toggleKeyDown(event, threadRowSelector(item.thread), virtualItem.index)}
               >
                 {row.getVisibleCells().map(cell => {
                   const identity = cell.column.id === 'name';
@@ -263,7 +272,7 @@ export function ThreadAccordionGrid({
                   <section id={regionId} className={styles.threadExpansionSummary}>
                     <div className={styles.threadExpansionHeader}>
                       <div><strong>{item.thread.name}</strong><span role="status" aria-live="polite"><span>{progressMessage}</span>{progressDetail ? <span className={styles.visuallyHidden}>{progressDetail}</span> : null}</span></div>
-                      <button type="button" className="toolbar-button" onClick={() => onToggleThread(item.thread.name)} aria-label={`Collapse calls for ${item.thread.name}`}>Collapse</button>
+                      <button type="button" className="toolbar-button" onClick={() => onToggleThread(threadRowSelector(item.thread))} aria-label={`Collapse calls for ${item.thread.name}`}>Collapse</button>
                     </div>
                     {storedSnapshot ? <span className={styles.snapshotLabel}>Stored snapshot</span> : null}
                     <dl className={styles.threadSummaryStrip}>

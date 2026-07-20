@@ -674,14 +674,17 @@ function getThreadLabel(row: UsageRow): string {
 export function buildThreads(calls: CallRow[]): ThreadRow[] {
   const grouped = new Map<string, CallRow[]>();
   for (const call of calls) {
-    grouped.set(call.thread, [...(grouped.get(call.thread) ?? []), call]);
+    const identity = call.threadKey ? `key:${call.threadKey}` : `name:${call.thread}`;
+    grouped.set(identity, [...(grouped.get(identity) ?? []), call]);
   }
 
   return [...grouped.entries()]
-    .map(([name, rows]) => {
+    .map(([, rows]) => {
       const turns = rows.length;
       const sortedRows = [...rows].sort((left, right) => callTimestamp(right) - callTimestamp(left));
       const latestCall = sortedRows[0] ?? null;
+      const threadKey = sortedRows.find(row => row.threadKey)?.threadKey;
+      const name = latestCall?.thread ?? rows[0]?.thread ?? 'Untitled thread';
       const latestActivityRaw = latestCall?.rawTime || latestCall?.time || '';
       const totalTokens = rows.reduce((sum, row) => sum + row.totalTokens, 0);
       const cachedInput = rows.reduce((sum, row) => sum + row.cachedInput, 0);
@@ -703,6 +706,7 @@ export function buildThreads(calls: CallRow[]): ThreadRow[] {
       const coldResumeRisk = cachePct < 25 ? 'High' : cachePct < 45 ? 'Medium' : 'Low';
       return {
         name,
+        ...(threadKey ? { threadKey } : {}),
         latestCallId: latestCall?.id ?? '',
         latestActivity: formatShortDate(latestActivityRaw),
         latestActivityRaw,

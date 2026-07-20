@@ -147,6 +147,7 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
         try:
             return dashboard_shell_payload(
                 query,
+                codex_home=self._codex_home,
                 db_path=self._db_path,
                 pricing_path=self._pricing_path,
                 allowance_path=self._allowance_path,

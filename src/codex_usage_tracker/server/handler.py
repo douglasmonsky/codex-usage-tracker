@@ -221,6 +221,7 @@ class _UsageDashboardHandler(
     def _handle_status(self, query: str) -> None:
         handle_status_request(
             query,
+            codex_home=self._codex_home,
             db_path=self._db_path,
             include_archived_default=self._include_archived,
             send_exception=self._send_exception,

@@ -46,14 +46,15 @@ it('maps legacy Insights route params to the renamed Overview workspace', () => 
     expect(activeUrl.searchParams.get('view')).toBe('threads');
   });
 
-  it('labels return views from primary and secondary shell navigation', () => {
+  it('labels return views from the full route catalog', () => {
     expect(callReturnViewLabel('calls')).toBe('Calls');
     expect(callReturnViewLabel('investigator')).toBe('Investigate');
+    expect(callReturnViewLabel('cache-context')).toBe('Cache And Context');
   });
 
 it('clears inactive workspace URL state while preserving shared shell filters', () => {
   const url = new URL(
-    'https://example.test/react-dashboard.html?view=overview&finding=2&thread=thread-a&expand=all&threads=thread-a,thread-b&thread_q=cache&risk=Low&thread_call_sort=total&thread_call_page=2&cache_thread=Thread%20Alpha&report=weekly-credits&usage_plan=Weekly&usage_effort=high&usage_subagents=0&usage_sample=80&usage_confidence=0.55&diagnostic_source=tools&diagnostic_fact=tool:read&record=fixture-call-0&return=calls&mode=full&max_entries=50&max_chars=0&include_tool_output=1&include_compaction_history=true&detail=first&call_q=cache&source=missing&sort=total&direction=asc&density=roomy&page=3&model=gpt-5&effort=high&confidence=cost-estimated&date=last-7-days&history=all&q=cache',
+    'https://example.test/react-dashboard.html?view=overview&finding=2&thread=thread-a&thread_key=thread-key-a&expand=all&threads=thread-a,thread-b&thread_q=cache&risk=Low&thread_call_sort=total&thread_call_page=2&cache_thread=Thread%20Alpha&report=weekly-credits&usage_plan=Weekly&usage_effort=high&usage_subagents=0&usage_sample=80&usage_confidence=0.55&diagnostic_source=tools&diagnostic_fact=tool:read&record=fixture-call-0&return=calls&mode=full&max_entries=50&max_chars=0&include_tool_output=1&include_compaction_history=true&detail=first&call_q=cache&source=missing&sort=total&direction=asc&density=roomy&page=3&model=gpt-5&effort=high&confidence=cost-estimated&date=last-7-days&history=all&q=cache',
   );
 
   clearInactiveViewSearchParams(url, 'overview');
@@ -61,6 +62,7 @@ it('clears inactive workspace URL state while preserving shared shell filters', 
   for (const name of [
     'finding',
     'thread',
+    'thread_key',
     'expand',
     'threads',
     'thread_q',

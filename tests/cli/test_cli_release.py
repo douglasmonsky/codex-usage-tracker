@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import json
 import os
 import shlex
 import subprocess
@@ -57,6 +58,8 @@ STABLE_CLI_COMMANDS = {
 class _ReleaseCheckModule(Protocol):
     REPO_ROOT: Path
     CLI_HELP_SUBCOMMANDS: Iterable[str]
+
+    def _check_dashboard_asset_sync(self) -> list[str]: ...
 
     def _check_package_naming_docs(self) -> list[str]: ...
 
@@ -308,6 +311,55 @@ def test_installed_package_smoke_checks_help_for_stable_commands() -> None:
     assert set(module.CLI_HELP_SUBCOMMANDS) == STABLE_CLI_COMMANDS
 
 
+def test_release_pipeline_rebuilds_dashboard_assets_and_smokes_installed_wheel() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    package = json.loads((repo_root / "package.json").read_text(encoding="utf-8"))
+    assert package["scripts"]["dashboard:assets:check"] == (
+        "npm run dashboard:build && python3 scripts/check_release.py --dashboard-assets"
+    )
+
+    workflow = (repo_root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    package_job = workflow.split("\n  package:\n", maxsplit=1)[1]
+    required_in_order = [
+        "actions/setup-node@v6.4.0",
+        'node-version: "22"',
+        "run: npm ci",
+        "run: npm run dashboard:assets:check",
+        "run: python -m build",
+        "run: python scripts/check_release.py --dist",
+        "run: python scripts/smoke_installed_package.py",
+    ]
+    positions = [package_job.index(item) for item in required_in_order]
+    assert positions == sorted(positions)
+
+    smoke = (repo_root / "scripts/smoke_installed_package.py").read_text(encoding="utf-8")
+    served = (repo_root / "scripts/smoke_dashboard_server.py").read_text(encoding="utf-8")
+    assert "smoke_served_dashboard(" in smoke
+    assert "REACT_ASSET_PATTERN" in smoke
+    assert 'dashboard_path = temp_dir / "dashboard.html"' in smoke
+    for path in ("/react-dashboard.html", "/react/assets/dashboard-react.js", "/react/assets/index.css"):
+        assert path in served
+
+
+def test_dashboard_asset_sync_rejects_untracked_generated_chunk(tmp_path: Path) -> None:
+    module = _load_release_check_module()
+    module.REPO_ROOT = tmp_path
+    asset_dir = tmp_path / "src/codex_usage_tracker/plugin_data/dashboard/react/assets"
+    asset_dir.mkdir(parents=True)
+    (asset_dir / "dashboard-react.js").write_text("tracked", encoding="utf-8")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "--", "."], cwd=tmp_path, check=True)
+    omitted_chunk = asset_dir / "omitted-new-chunk.js"
+    omitted_chunk.write_text("untracked", encoding="utf-8")
+
+    failures = module._check_dashboard_asset_sync()
+
+    assert failures == [
+        "dashboard React assets include untracked generated files: "
+        "src/codex_usage_tracker/plugin_data/dashboard/react/assets/omitted-new-chunk.js"
+    ]
+
+
 def test_mcp_tool_names_remain_documented() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     docs = (repo_root / "docs" / "mcp.md").read_text(encoding="utf-8")
@@ -318,6 +370,40 @@ def test_mcp_tool_names_remain_documented() -> None:
 
     assert actual_tools == MCP_TOOL_NAMES
     assert documented_tools == MCP_TOOL_NAMES
+
+
+def test_mcp_dashboard_evidence_targets_are_documented_as_additive() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    docs = (repo_root / "docs" / "mcp.md").read_text(encoding="utf-8")
+
+    assert "additive `dashboard_target`" in docs
+    assert "Thread annotation never" in docs
+    assert "substitutes a display name" in docs
+    assert "findings do not encode an ordinal Investigator route" in docs
+    assert "history=all" in docs
+    assert "does not upgrade conversational readiness" in docs
+    assert "codex-usage-tracker serve-dashboard --open" in docs
+
+
+def test_usage_skills_are_packaged_byte_for_byte_with_evidence_target_guidance() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    for name in ("codex-usage-tracker", "codex-usage-api"):
+        source = repo_root / "skills" / name / "SKILL.md"
+        packaged = (
+            repo_root
+            / "src"
+            / "codex_usage_tracker"
+            / "plugin_data"
+            / "skills"
+            / name
+            / "SKILL.md"
+        )
+        assert packaged.read_bytes() == source.read_bytes()
+        text = source.read_text(encoding="utf-8")
+        assert "absolute_url" in text
+        assert "relative_url" in text
+        assert "fallback_instruction" in text
+        assert "Never infer task-level MCP availability" in text
 
 
 def test_local_config_schema_docs_reference_stable_fields() -> None:

@@ -1,4 +1,5 @@
-import { isViewId, navItems, secondaryNavItems, type ViewId } from './navigation';
+import { isViewId, type ViewId } from './navigation';
+import { routeDefinition } from './routeCatalog';
 import type { HistoryScope } from '../data/dataScope';
 
 export type { HistoryScope } from '../data/dataScope';
@@ -23,7 +24,7 @@ export function hasCallReturnViewParam(search = window.location.search): boolean
 }
 
 export function callReturnViewLabel(view: ViewId): string {
-  return navItems.find(item => item.id === view)?.label ?? secondaryNavItems.find(item => item.target === view)?.label ?? 'Calls';
+  return routeDefinition(view).label;
 }
 
 export function historyScopeFromUrl(fallback: HistoryScope, search = window.location.search): HistoryScope {
@@ -42,7 +43,7 @@ export function historyScopeUrl(historyScope: HistoryScope, href = window.locati
 
 const inactiveViewSearchParams: Partial<Record<ViewId, string[]>> = {
   investigator: ['finding'],
-  threads: ['thread', 'expand', 'threads', 'thread_q', 'risk', 'thread_call_sort', 'thread_call_page'],
+  threads: ['thread', 'thread_key', 'expand', 'threads', 'thread_q', 'risk', 'thread_call_sort', 'thread_call_page'],
   'cache-context': ['cache_thread'],
   reports: ['report'],
   'usage-drain': [

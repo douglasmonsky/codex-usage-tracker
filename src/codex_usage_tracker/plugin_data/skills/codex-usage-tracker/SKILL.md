@@ -86,6 +86,12 @@ For experiment-style answers, use this structure:
 - `My hypothesis was true/false/inconclusive because...`
 - `Next tool or fix...`
 
+## Dashboard Evidence Targets
+
+- When an MCP result includes `dashboard_target.absolute_url`, surface **Open evidence** with that exact loopback URL.
+- When `absolute_url` is absent, show `dashboard_target.relative_url` and the exact `fallback_instruction` launch guidance. Do not invent or infer a service origin.
+- Never infer task-level MCP availability from a dashboard target, local readiness result, installed skill, or healthy service. Verify the current task's exposed tools separately.
+
 ## Common Workflows
 
 - Refresh the index before answering usage questions.

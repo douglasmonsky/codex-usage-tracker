@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from codex_usage_tracker.cli.plugin_installer import install_plugin
 from codex_usage_tracker.server import status as server_status
 
 
@@ -35,6 +36,7 @@ def test_handle_status_request_sends_payload(
 
     server_status.handle_status_request(
         "include_archived=true",
+        codex_home=tmp_path / ".codex",
         db_path=tmp_path / "usage.sqlite3",
         include_archived_default=False,
         send_exception=senders.send_exception,
@@ -60,6 +62,7 @@ def test_handle_status_request_sends_sqlite_error(
 
     server_status.handle_status_request(
         "",
+        codex_home=tmp_path / ".codex",
         db_path=tmp_path / "usage.sqlite3",
         include_archived_default=True,
         send_exception=senders.send_exception,
@@ -76,6 +79,17 @@ def test_status_payload_normalizes_include_archived_and_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: dict[str, Any] = {}
+    codex_home = tmp_path / ".codex"
+    install_plugin(
+        plugin_dir=codex_home.parent / "plugins" / "codex-usage-tracker",
+        marketplace_path=tmp_path / "marketplace.json",
+    )
+    real_readiness = server_status.conversational_readiness
+    readiness_homes: list[Path] = []
+
+    def capture_readiness(*, codex_home: Path) -> dict[str, object]:
+        readiness_homes.append(codex_home)
+        return real_readiness(codex_home=codex_home)
 
     def query_status(**kwargs: Any) -> dict[str, object]:
         calls["status"] = kwargs
@@ -86,6 +100,7 @@ def test_status_payload_normalizes_include_archived_and_metadata(
         return {"weekly_percent": 37}
 
     monkeypatch.setattr(server_status, "query_usage_status", query_status)
+    monkeypatch.setattr(server_status, "conversational_readiness", capture_readiness)
     monkeypatch.setattr(server_status, "query_latest_observed_usage", query_observed)
     monkeypatch.setattr(
         server_status,
@@ -105,6 +120,7 @@ def test_status_payload_normalizes_include_archived_and_metadata(
 
     payload = server_status.status_payload(
         "include_archived=true",
+        codex_home=codex_home,
         db_path=tmp_path / "usage.sqlite3",
         include_archived_default=False,
     )
@@ -118,6 +134,9 @@ def test_status_payload_normalizes_include_archived_and_metadata(
     assert payload["parser_adapter"] == "jsonl"
     assert payload["parser_diagnostics"] == {"skipped_events": 3}
     assert payload["dedupe"] == {"excluded_copied_rows": 2}
+    assert payload["conversational_analysis"]["state"] == "ready"
+    assert readiness_homes == [codex_home]
+    assert str(codex_home) not in str(payload["conversational_analysis"])
 
 
 def test_status_payload_uses_include_archived_default(
@@ -141,6 +160,7 @@ def test_status_payload_uses_include_archived_default(
 
     payload = server_status.status_payload(
         "",
+        codex_home=tmp_path / ".codex",
         db_path=tmp_path / "usage.sqlite3",
         include_archived_default=True,
     )

@@ -242,7 +242,21 @@ def main() -> int:
         action="store_true",
         help="Require and inspect the built wheel in dist/.",
     )
+    parser.add_argument(
+        "--dashboard-assets",
+        action="store_true",
+        help="Check only that generated React dashboard assets match Git.",
+    )
     args = parser.parse_args()
+
+    if args.dashboard_assets:
+        failures = _check_dashboard_asset_sync()
+        if failures:
+            for failure in failures:
+                print(f"FAIL: {failure}", file=sys.stderr)
+            return 1
+        print("Dashboard React assets are synchronized.")
+        return 0
 
     failures: list[str] = []
     failures.extend(_check_required_files())
@@ -262,6 +276,35 @@ def main() -> int:
         return 1
     print("Release readiness checks passed.")
     return 0
+
+
+def _check_dashboard_asset_sync() -> list[str]:
+    relative_path = "src/codex_usage_tracker/plugin_data/dashboard/react"
+    failures: list[str] = []
+    tracked = subprocess.run(
+        ["git", "diff", "--exit-code", "--", relative_path],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if tracked.returncode != 0:
+        failures.append("dashboard React assets differ from the Git index after rebuild")
+
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "--", relative_path],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if untracked.returncode != 0:
+        failures.append("could not inspect untracked dashboard React assets")
+    else:
+        paths = sorted(path for path in untracked.stdout.splitlines() if path)
+        if paths:
+            failures.append(
+                "dashboard React assets include untracked generated files: " + ", ".join(paths)
+            )
+    return failures
 
 
 def _check_required_files() -> list[str]:
@@ -570,15 +613,39 @@ def _check_ci_workflow() -> list[str]:
     if not workflow_path.exists():
         return ["missing CI workflow: .github/workflows/ci.yml"]
     workflow = workflow_path.read_text(encoding="utf-8")
-    failures: list[str] = []
-    for required in [
+    package_job = _workflow_job_block(workflow, "package")
+    if package_job is None:
+        return ["CI workflow is missing package job"]
+    required_in_order = [
         "name: Build package",
-        "python -m build",
-        "python -m twine check dist/*",
-        "python scripts/check_release.py --dist",
-    ]:
-        if required not in workflow:
+        "actions/setup-node@v6.4.0",
+        'node-version: "22"',
+        "run: npm ci",
+        "run: npm run dashboard:assets:check",
+        "run: python -m build",
+        "run: python -m twine check dist/*",
+        "run: python scripts/check_release.py --dist",
+        "run: python scripts/smoke_installed_package.py",
+    ]
+    failures: list[str] = []
+    positions: list[int] = []
+    for required in required_in_order:
+        position = package_job.find(required)
+        if position < 0:
             failures.append(f"CI package job is missing required build check: {required}")
+        else:
+            positions.append(position)
+    if len(positions) == len(required_in_order) and positions != sorted(positions):
+        failures.append(
+            "CI package job must build React assets before Python distributions and smoke the installed wheel last"
+        )
+
+    package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
+    expected_asset_check = (
+        "npm run dashboard:build && python3 scripts/check_release.py --dashboard-assets"
+    )
+    if package.get("scripts", {}).get("dashboard:assets:check") != expected_asset_check:
+        failures.append("package.json must define deterministic dashboard:assets:check")
     return failures
 
 

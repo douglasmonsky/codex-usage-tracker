@@ -8,6 +8,8 @@ import { createShellI18n, initialDashboardLanguage, storeDashboardLanguage } fro
 import { LocalizedShellI18nProvider } from './app/DocumentLocalizationBridge';
 import { modelWithLegacyShellFilters } from './app/legacyShellFilters';
 import { navItems, secondaryNavItems, type ViewId } from './app/navigation';
+import { routeDefinition } from './app/routeCatalog';
+import { useExperimentalDashboardFeatures } from './app/useExperimentalDashboardFeatures';
 import { RowLimitControl } from './app/RowLimitControl';
 import { ShellGlobalFilters } from './app/ShellGlobalFilters';
 import {
@@ -59,10 +61,8 @@ const keyboardShortcutViews: Record<string, ViewId> = {
   '3': 'threads',
   '4': 'diagnostics',
 };
-const autoRefreshSkippedViews = new Set<ViewId>(['call', 'compression-lab', 'diagnostics', 'investigator']);
-
 export function shouldAutoRefreshUsageView(view: ViewId): boolean {
-  return !autoRefreshSkippedViews.has(view);
+  return routeDefinition(view).capabilities.refresh;
 }
 
 function isKeyboardShortcutTarget(target: EventTarget | null) {
@@ -71,6 +71,7 @@ function isKeyboardShortcutTarget(target: EventTarget | null) {
 }
 
 export function App() {
+  const { showExperimental, setShowExperimental } = useExperimentalDashboardFeatures();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const initialPayload = useMemo(() => readBootPayload(), []);
   const [dashboardPayload, setDashboardPayload] = useState<DashboardBootPayload | null>(initialPayload);
@@ -699,6 +700,7 @@ aria-label="History scope"
         }
         backFromCallInvestigator={backFromCallInvestigator}
         dashboardPayload={dashboardPayload}
+        conversationalAnalysis={initialPayload?.conversational_analysis}
         sourceIdentity={sourceIdentity}
         historyScope={historyScope}
         loadWindow={loadWindow}
@@ -708,6 +710,8 @@ aria-label="History scope"
         totalAvailableRows={totalAvailableRows}
         canUseLiveApi={canUseLiveApi}
         autoRefreshEnabled={autoRefreshEnabled} applicationI18n={shellI18n}
+        showExperimental={showExperimental}
+        setShowExperimental={setShowExperimental}
         refreshing={refreshing}
         hasMoreRows={hasMoreRows}
         canLoadAllRows={canLoadAllRows}

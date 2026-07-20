@@ -12,6 +12,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+from codex_usage_tracker.cli.plugin_installer import install_plugin
 from codex_usage_tracker.dashboard.api import dashboard_payload, generate_dashboard
 from codex_usage_tracker.store.api import (
     connect,
@@ -251,6 +252,10 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     from codex_usage_tracker.server.api import _UsageDashboardHandler
 
     codex_home = _make_codex_home(tmp_path)
+    install_plugin(
+        plugin_dir=codex_home.parent / "plugins" / "codex-usage-tracker",
+        marketplace_path=tmp_path / "marketplace.json",
+    )
     db_path = tmp_path / "usage.sqlite3"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
     (tmp_path / "dashboard.html").write_text(
@@ -391,6 +396,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
             timeout=5,
         ) as response:
             all_payload = json.loads(response.read().decode("utf-8"))
+        status_payload = _read_json(f"http://127.0.0.1:{server.server_port}/api/status")
         with urllib.request.urlopen(  # noqa: S310 - local test server only
             f"http://127.0.0.1:{server.server_port}/api/usage?limit=2&offset=2",
             timeout=5,
@@ -422,6 +428,9 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     assert dashboard_shell_payload["shell_boot"] is True
     assert dashboard_shell_payload["rows"] == []
     assert dashboard_shell_payload["summary"]["visible_calls"] == 0
+    assert dashboard_shell_payload["conversational_analysis"]["state"] == "ready"
+    assert str(codex_home) not in json.dumps(dashboard_shell_payload["conversational_analysis"])
+    assert status_payload["conversational_analysis"] == dashboard_shell_payload["conversational_analysis"]
     assert limited_payload["refresh_result"]["parsed_events"] == 4
     assert limited_payload["refresh_result"]["skipped_events"] == 0
     assert limited_payload["refresh_result"]["parser_diagnostics"] == {}

@@ -3,7 +3,12 @@ import { Download, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import type { CallRow, DashboardModel } from '../../api/types';
+import { buildDashboardTarget } from '../../app/dashboardTargets';
 import { useShellI18n } from '../../app/i18nContext';
+import {
+  currentDashboardServiceOrigin,
+  DashboardEvidenceActions,
+} from '../../components/DashboardEvidenceActions';
 import type { LoadWindow } from '../../data/dataScope';
 import {
   dashboardModuleProgress,
@@ -11,6 +16,7 @@ import {
 } from '../../data/dashboardQueryRegistry';
 import { reportsQueryOptions } from '../../data/reportsQueries';
 import { Panel } from '../../components/Panel';
+import { FeatureMaturityBanner } from '../../components/FeatureMaturityBanner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PageLoadProgress } from '../../design';
 import { Visualization } from '../../visualization';
@@ -79,6 +85,13 @@ export function ReportsPage({
     const liveRows = active && pack ? pack.evidence[reportKey(active)] : undefined;
     return liveRows === undefined ? reportEvidenceCalls(active, model.calls) : liveRows;
   }, [active, model.calls, pack]);
+  const evidenceTarget = useMemo(() => buildDashboardTarget({
+    view: 'reports',
+    filters: active ? { report: reportKey(active) } : {},
+    history: includeArchived ? 'all' : 'active',
+    privacy_mode: 'strict',
+    service_origin: currentDashboardServiceOrigin(),
+  }), [active, includeArchived]);
   const details = reportDetails(active, evidenceCalls);
   const source = pack ? 'Live localhost report pack' : 'Loaded dashboard aggregates';
   const generated = pack?.generatedAt || (pack ? 'Server timestamp unavailable' : 'Current dashboard snapshot');
@@ -138,6 +151,11 @@ export function ReportsPage({
           <p>Focused local research snapshots with their methods, limits, and investigator-linked evidence.</p>
         </div>
         <div className={styles.actions}>
+          <DashboardEvidenceActions
+            target={evidenceTarget}
+            question="Investigate the selected aggregate usage report."
+            onStatus={setActionStatus}
+          />
           <button className={styles.action} type="button" onClick={exportSelectedReport} disabled={!active}>
             <Download size={16} aria-hidden="true" />Export selected
           </button>
@@ -154,6 +172,12 @@ export function ReportsPage({
           </button>
         </div>
       </header>
+
+      <FeatureMaturityBanner
+        kind="transitioning"
+        title="Available during transition"
+        description="This workspace remains available in Release N while its future placement is prepared."
+      />
 
       <PageLoadProgress
         active={canUseLive && reportQuery.isFetching}

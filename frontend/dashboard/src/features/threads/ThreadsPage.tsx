@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useShellI18n } from '../../app/i18nContext';
 import type { CallRow, ContextRuntime, DashboardModel, ThreadRow } from '../../api/types';
 import { threadCallsInfiniteQueryOptions, threadsInfiniteQueryOptions } from '../../data/exploreQueries';
@@ -12,16 +12,21 @@ import {
   buildThreadsViewLink,
   detailFirstSelectedThreadName,
   filterThreads,
+  readInitialThreadSelector,
   readThreadRiskParam,
   readThreadSearchParam,
   readThreadSortingParam,
   sortThreads,
+  threadRowSelector,
+  threadRowIdentity,
+  threadSelectorIdentity,
   threadsTablePageSize,
+  type ThreadSelector,
 } from './threadsUrlState';
-import { threadSummaryToRow, type ExploreThreadRow } from './threadSummaryAdapter';
+import { threadSummaryToRow } from './threadSummaryAdapter';
 import { threadsEndpointState } from './threadsEndpointState';
 import { buildCacheFrontierSpec, buildThreadLifecycleSpec } from './threadVisualizations';
-import { compareCallTimeDescending, sortThreadCalls, threadLabelsMatch } from './threadAnalysis';
+import { compareCallTimeDescending, sortThreadCalls } from './threadAnalysis';
 import { dedupeThreadCallPages } from './threadCallLoading';
 import { ThreadsExplorerView } from './ThreadsExplorerView';
 import { useThreadsPageControls } from './useThreadsPageControls';
@@ -71,7 +76,7 @@ export function threadCallsForCurrentUrl(model: DashboardModel, globalQuery = ''
 }
 
 function callsForThreadRows(calls: CallRow[], threads: ThreadRow[]): CallRow[] {
-  const threadOrder = new Map(threads.map((thread, index) => [thread.name, index]));
+  const threadOrder = new Map(threads.map((thread, index) => [threadSelectorIdentity(threadRowSelector(thread)), index]));
   const latestCallOrder = new Map(
     threads
       .filter(thread => thread.latestCallId)
@@ -79,11 +84,11 @@ function callsForThreadRows(calls: CallRow[], threads: ThreadRow[]): CallRow[] {
   );
   const callOrder = new Map(calls.map((call, index) => [call.id, index]));
   return calls
-    .filter(call => threadOrder.has(call.thread) || latestCallOrder.has(call.id))
+    .filter(call => threadOrder.has(callIdentity(call)) || latestCallOrder.has(call.id))
     .sort(
       (left, right) =>
-        (threadOrder.get(left.thread) ?? latestCallOrder.get(left.id) ?? 0) -
-          (threadOrder.get(right.thread) ?? latestCallOrder.get(right.id) ?? 0) ||
+        (threadOrder.get(callIdentity(left)) ?? latestCallOrder.get(left.id) ?? 0) -
+          (threadOrder.get(callIdentity(right)) ?? latestCallOrder.get(right.id) ?? 0) ||
         (callOrder.get(left.id) ?? 0) - (callOrder.get(right.id) ?? 0),
     );
 }
@@ -107,8 +112,11 @@ export function ThreadsPage({
     threadCallSort, threadCallSortDirection, exportStatus, filterStatus, viewMode,
     setSelectedThreadName, setVisibleThreadRows, setExportStatus, setViewMode,
     updateLocalQuery, updateRiskFilter, updateThreadSorting, clearThreadFilters,
-    toggleThread, updateThreadCallSort, updateThreadCallSortDirection,
+    updateThreadCallSort, updateThreadCallSortDirection,
   } = useThreadsPageControls(globalQuery);
+  const selectedThreadKind = useRef<ThreadSelector['kind']>(
+    readInitialThreadSelector()?.kind ?? 'name',
+  );
   const gridPreferences = useEvidenceGridPreferences('codexUsageThreadsEvidenceGridV2', {
     density: 'compact',
     columnVisibility: threadDefaultColumnVisibility,
@@ -139,12 +147,19 @@ export function ThreadsPage({
     enabled: endpointState.enabled,
     placeholderData: previous => previous,
   });
-  const loadedThreadsByName = useMemo(() => new Map(model.threads.map(thread => [thread.name, thread])), [model.threads]);
+  const loadedThreadsByIdentity = useMemo(() => new Map(model.threads.flatMap(thread => [
+    [threadSelectorIdentity(threadRowSelector(thread)), thread] as const,
+    [`name:${thread.name}`, thread] as const,
+  ])), [model.threads]);
   const focusedThreads = useMemo(
     () => focusedThreadsQuery.data?.pages.flatMap(page => page.rows.map(summary =>
-      threadSummaryToRow(summary, loadedThreadsByName.get(summary.threadLabel) ?? loadedThreadsByName.get(summary.threadKey)),
+      threadSummaryToRow(
+        summary,
+        loadedThreadsByIdentity.get(`key:${summary.threadKey}`)
+          ?? loadedThreadsByIdentity.get(`name:${summary.threadLabel}`),
+      ),
     )) ?? [],
-    [focusedThreadsQuery.data, loadedThreadsByName],
+    [focusedThreadsQuery.data, loadedThreadsByIdentity],
   );
   const usingFocusedThreads = endpointState.enabled && Boolean(focusedThreadsQuery.data);
   const sourceThreads = usingFocusedThreads ? focusedThreads : model.threads;
@@ -158,6 +173,13 @@ export function ThreadsPage({
   const totalMatchedThreads = usingFocusedThreads
     ? focusedThreadsQuery.data?.pages[0]?.totalMatchedRows ?? sortedThreads.length
     : model.threads.length;
+  const selected =
+    selectedThreadName === detailFirstSelectedThreadName
+      ? sortedThreads[0] ?? null
+      : resolveSelectedThread(
+        sortedThreads,
+        selectedThreadName ? { kind: selectedThreadKind.current, value: selectedThreadName } : null,
+      );
   const tableSubtitle = useMemo(
     () =>
       buildThreadsFilterSummary({
@@ -166,27 +188,23 @@ export function ThreadsPage({
         localQuery,
         globalQuery,
         riskFilter,
-        selectedThreadName,
+        selectedThreadName: selected?.name ?? selectedThreadName,
       }),
-    [globalQuery, localQuery, riskFilter, selectedThreadName, sortedThreads.length, totalMatchedThreads],
+    [globalQuery, localQuery, riskFilter, selected, selectedThreadName, sortedThreads.length, totalMatchedThreads],
   );
   const threadLeaderboardTitle = shellI18n.t('dashboard.top_threads_by_attention', 'Thread Leaderboard');
   const threadLeaderboardTableLabel = shellI18n.t('dashboard.top_threads_by_attention', 'Thread leaderboard');
-  const selected =
-    selectedThreadName === detailFirstSelectedThreadName
-      ? sortedThreads[0] ?? null
-      : sortedThreads.find(thread => thread.name === selectedThreadName) ?? null;
-  const selectedThreadNameForUrl =
-    selectedThreadName === detailFirstSelectedThreadName ? (selected?.name ?? null) : selectedThreadName;
+  const selectedThreadNameForUrl = selected?.name
+    ?? (selectedThreadName === detailFirstSelectedThreadName ? null : selectedThreadName);
   const localSelectedCalls = useMemo(() => {
     if (!selected) return [];
     return sortThreadCalls(
-      model.calls.filter(call => threadLabelsMatch(call.thread, selected.name)),
+      callsForThreadRow(model.calls, selected),
       threadCallSort,
       threadCallSortDirection,
     );
   }, [model.calls, selected, threadCallSort, threadCallSortDirection]);
-  const selectedThreadKey = (selected as ExploreThreadRow | null)?.threadKey || localSelectedCalls[0]?.threadKey || selected?.name || '';
+  const selectedThreadKey = selected?.threadKey || localSelectedCalls[0]?.threadKey || '';
   const selectedThreadQueryEnabled = focusedEndpointsEnabled
     && !contextRuntime.fileMode
     && Boolean(contextRuntime.apiToken)
@@ -211,13 +229,22 @@ export function ThreadsPage({
   );
   const selectedCallCount = selectedThreadCallsQuery.data?.pages[0]?.totalMatchedRows ?? selectedCalls.length;
   const threadTableColumns = threadColumns;
-  const frontierSpec = useMemo(
-    () => buildCacheFrontierSpec(sortedThreads, includeArchived ? 'all' : 'active', sourceRevision),
-    [includeArchived, sortedThreads, sourceRevision],
-  );
+  const frontierSpec = useMemo(() => {
+    const spec = buildCacheFrontierSpec(sortedThreads, includeArchived ? 'all' : 'active', sourceRevision);
+    return {
+      ...spec,
+      data: {
+        ...spec.data,
+        rows: spec.data.rows.map((row, index) => ({
+          ...row,
+          id: sortedThreads[index] ? threadRowIdentity(sortedThreads[index]) : row.id,
+        })),
+      },
+    };
+  }, [includeArchived, sortedThreads, sourceRevision]);
   const lifecycleThread = selected ?? sortedThreads[0] ?? null;
   const lifecycleCalls = selected ? selectedCalls : lifecycleThread
-    ? model.calls.filter(call => threadLabelsMatch(call.thread, lifecycleThread.name)).sort(compareCallTimeDescending)
+    ? callsForThreadRow(model.calls, lifecycleThread).sort(compareCallTimeDescending)
     : [];
   const lifecycleSpec = useMemo(
     () => buildThreadLifecycleSpec(lifecycleCalls, lifecycleThread?.name ?? '', includeArchived ? 'all' : 'active', sourceRevision),
@@ -225,16 +252,19 @@ export function ThreadsPage({
   );
 
   useEffect(() => {
-    if (selectedThreadName === detailFirstSelectedThreadName && selectedThreadNameForUrl) {
-      setSelectedThreadName(selectedThreadNameForUrl);
-    }
-  }, [selectedThreadName, selectedThreadNameForUrl]);
+    if (!selected) return;
+    const canonical = canonicalThreadSelector(selected);
+    if (selectedThreadKind.current === canonical.kind && selectedThreadName === canonical.value) return;
+    selectedThreadKind.current = canonical.kind;
+    setSelectedThreadName(canonical.value);
+  }, [selected, selectedThreadName, setSelectedThreadName]);
 
   useEffect(() => {
     const url = buildThreadsViewLink({
       localQuery,
       riskFilter,
       selectedThreadName: selectedThreadNameForUrl,
+      selectedThreadKey: selectedThreadKey || null,
       sorting: threadSorting,
       visibleRowCount: visibleThreadRows,
 threadCallSort,
@@ -243,7 +273,7 @@ threadCallSortDirection,
     if (url.toString() !== window.location.href) {
       window.history.replaceState(null, '', url);
     }
-}, [localQuery, riskFilter, selectedThreadNameForUrl, threadCallSort, threadCallSortDirection, threadSorting, visibleThreadRows]);
+}, [localQuery, riskFilter, selectedThreadKey, selectedThreadNameForUrl, threadCallSort, threadCallSortDirection, threadSorting, visibleThreadRows]);
 
   function exportThreads() {
     const exportRows = callsForThreadRows(model.calls, sortThreads(filteredThreads, threadSorting));
@@ -253,7 +283,7 @@ threadCallSortDirection,
 
   function selectExploreWorkspace(workspace: ExploreWorkspaceId) {
     if (workspace === 'threads') return;
-    window.history.replaceState(null, '', exploreWorkspaceUrl(workspace));
+    window.history.replaceState(null, '', buildThreadsDepartureUrl(workspace));
     onNavigateView('calls');
   }
 
@@ -290,7 +320,7 @@ threadCallSortDirection,
       || focusedThreadsQuery.hasNextPage
     )) return;
     if (selectedThreadName && selectedThreadName !== detailFirstSelectedThreadName
-      && !displayedThreads.some(thread => thread.name === selectedThreadName)) {
+      && !selected) {
       setSelectedThreadName(null);
     }
   }, [
@@ -301,7 +331,18 @@ threadCallSortDirection,
     focusedThreadsQuery.isFetching,
     focusedThreadsQuery.isFetchingNextPage,
     selectedThreadName,
+    selected,
   ]);
+
+  function toggleSelectedThread(selector: ThreadSelector) {
+    const nextSelection = nextThreadSelection(selected, selector);
+    if (!nextSelection) {
+      setSelectedThreadName(null);
+      return;
+    }
+    selectedThreadKind.current = nextSelection.kind;
+    setSelectedThreadName(nextSelection.value);
+  }
 
   function loadMoreThreads() {
     if (usingFocusedThreads && focusedThreadsQuery.hasNextPage) {
@@ -376,7 +417,7 @@ threadCallSortDirection,
       onRiskFilterChange={updateRiskFilter}
       onViewModeChange={setViewMode}
       onSortingChange={updateThreadSorting}
-      onToggleThread={toggleThread}
+      onToggleThread={toggleSelectedThread}
       onRetryCalls={retrySelectedThreadCalls}
       onLoadMoreCalls={loadMoreSelectedThreadCalls}
       onLoadMoreThreads={loadMoreThreads}
@@ -386,6 +427,48 @@ threadCallSortDirection,
       onCopyCallLink={onCopyCallLink}
     />
   );
+}
+
+export function resolveSelectedThread(threads: ThreadRow[], selector: ThreadSelector | null): ThreadRow | null {
+  if (!selector) return null;
+  return selector.kind === 'key'
+    ? threads.find(thread => thread.threadKey === selector.value) ?? null
+    : threads.find(thread => thread.name === selector.value) ?? null;
+}
+
+export function canonicalThreadSelector(thread: ThreadRow): ThreadSelector {
+  return threadRowSelector(thread);
+}
+
+export function callsForThreadRow(calls: CallRow[], thread: ThreadRow): CallRow[] {
+  const identity = threadSelectorIdentity(threadRowSelector(thread));
+  return calls.filter(call => callIdentity(call) === identity);
+}
+
+export function nextThreadSelection(
+  selected: ThreadRow | null,
+  activated: ThreadSelector,
+): ThreadSelector | null {
+  return selected
+    && threadSelectorIdentity(threadRowSelector(selected)) === threadSelectorIdentity(activated)
+    ? null
+    : activated;
+}
+
+function callIdentity(call: CallRow): string {
+  return threadSelectorIdentity(call.threadKey
+    ? { kind: 'key', value: call.threadKey }
+    : { kind: 'name', value: call.thread });
+}
+
+export function buildThreadsDepartureUrl(
+  workspace: Exclude<ExploreWorkspaceId, 'threads'>,
+  href = window.location.href,
+): URL {
+  const url = exploreWorkspaceUrl(workspace, href);
+  url.searchParams.delete('thread_key');
+  url.searchParams.delete('thread');
+  return url;
 }
 
 function queryErrorMessage(error: unknown): string {

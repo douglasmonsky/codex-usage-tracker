@@ -16,11 +16,12 @@ describe('SettingsPage', () => {
   it('shows all categories and their focused content', () => {
     renderPage();
     const navigation = screen.getByRole('navigation', { name: 'Settings sections' });
-    for (const label of ['Data', 'Estimates', 'Content Access', 'Application', 'Source Health']) {
+    for (const label of ['Data', 'Estimates', 'Content Access', 'Application', 'Source Health', 'Advanced']) {
       expect(navigation).toHaveTextContent(label);
     }
     expect(screen.getByText('Data window')).toBeInTheDocument();
     expect(screen.getByText('Evidence rows')).toBeInTheDocument();
+    expect(screen.getByText('Local checks passed.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Estimates' }));
     expect(screen.getByText('custom-pricing.json')).toBeInTheDocument();
@@ -63,11 +64,31 @@ describe('SettingsPage', () => {
     renderPage({ language: 'en', direction: 'ltr', languages: [] });
     expect(screen.getByText('English (en)')).toBeInTheDocument();
   });
+
+  it('controls experimental features from Advanced with the complete scope explanation', () => {
+    const setShowExperimental = vi.fn();
+    window.localStorage.setItem(settingsSectionStorageKey, '"advanced"');
+    renderPage(undefined, false, setShowExperimental);
+
+    const checkbox = screen.getByRole('checkbox', { name: 'Show experimental dashboard features' });
+    expect(checkbox).not.toBeChecked();
+    expect(screen.getByText(
+      'This preference is stored for this browser origin. Experimental workspaces remain available from direct links, and Diagnostics stays visible.',
+    )).toBeInTheDocument();
+
+    fireEvent.click(checkbox);
+    expect(setShowExperimental).toHaveBeenCalledWith(true);
+  });
 });
 
-function renderPage(applicationI18n = { language: 'en', direction: 'ltr' as const, languages: [{ code: 'en' }, { code: 'es' }] }) {
+function renderPage(
+  applicationI18n = { language: 'en', direction: 'ltr' as const, languages: [{ code: 'en' }, { code: 'es' }] },
+  showExperimental = false,
+  setShowExperimental = vi.fn(),
+) {
   return render(
     <SettingsPage
+      conversationalAnalysis={payload.conversational_analysis}
       model={fixtureModel}
       payload={payload}
       historyScope="all"
@@ -80,11 +101,20 @@ function renderPage(applicationI18n = { language: 'en', direction: 'ltr' as cons
       autoRefreshEnabled={false}
       refreshState="Refresh idle"
       applicationI18n={applicationI18n}
+      showExperimental={showExperimental}
+      setShowExperimental={setShowExperimental}
     />,
   );
 }
 
 const payload: DashboardBootPayload = {
+  conversational_analysis: {
+    schema: 'codex-usage-tracker-conversational-readiness-v1',
+    state: 'ready',
+    summary: 'Local checks passed.',
+    next_action: null,
+    evidence: ['MCP config: pass'],
+  },
   shell_boot: true,
   language: 'en',
   language_direction: 'ltr',
