@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
+import subprocess  # nosec B404 - bounded local runtime probe; no shell is invoked.
 from pathlib import Path
 from typing import Literal, TypedDict
 
@@ -143,7 +143,7 @@ def _bootstrap_runtime_ready(*, plugin_root: Path, codex_home: Path) -> tuple[bo
     try:
         probe_env = os.environ.copy()
         probe_env.update(env)
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 - fixed argv and bounded local runtime probe.
             [str(runtime_python), "-c", MODULE_CHECK],
             cwd=plugin_root,
             env=probe_env,
