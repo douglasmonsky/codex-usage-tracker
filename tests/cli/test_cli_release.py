@@ -364,15 +364,22 @@ def test_release_pipeline_rebuilds_dashboard_assets_and_smokes_installed_wheel()
     workflow = (repo_root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     package_job = workflow.split("\n  package:\n", maxsplit=1)[1]
     required_in_order = [
-        "actions/setup-node@v6.4.0",
-        'node-version: "22"',
-        "run: npm ci",
-        "run: npm run dashboard:assets:check",
-        "run: python -m build",
-        "run: python scripts/check_release.py --dist",
-        "run: python scripts/smoke_installed_package.py",
+        ("actions/setup-node@v6.4.0", "actions/setup-node@v7.0.0"),
+        ('node-version: "22"',),
+        ("run: npm ci",),
+        ("run: npm run dashboard:assets:check",),
+        ("run: python -m build",),
+        ("run: python scripts/check_release.py --dist",),
+        ("run: python scripts/smoke_installed_package.py",),
     ]
-    positions = [package_job.index(item) for item in required_in_order]
+    positions = [
+        next(
+            (package_job.find(item) for item in alternatives if item in package_job),
+            -1,
+        )
+        for alternatives in required_in_order
+    ]
+    assert -1 not in positions
     assert positions == sorted(positions)
 
     smoke = (repo_root / "scripts/smoke_installed_package.py").read_text(encoding="utf-8")
