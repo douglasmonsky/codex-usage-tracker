@@ -30,6 +30,19 @@ def _add_summary_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     summary.add_argument("--json", action="store_true", dest="as_json")
 
 
+def _add_subagents_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subparsers.add_parser("subagents", help="Analyze observed subagent spawns and usage")
+    parser.add_argument("--since", help="Only include calls at or after this ISO date/time")
+    parser.add_argument("--parent-thread")
+    parser.add_argument("--agent-role")
+    parser.add_argument("--subagent-type")
+    parser.add_argument("--include-archived", action="store_true")
+    parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument("--json", action="store_true", dest="as_json")
+
+
 def _add_query_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     query = subparsers.add_parser(
         "query",

@@ -14,45 +14,7 @@ from typing import Protocol, cast
 from codex_usage_tracker import __version__
 from codex_usage_tracker.cli.main import _COMMAND_HANDLERS
 from codex_usage_tracker.core.json_contracts import known_json_schemas
-
-STABLE_CLI_COMMANDS = {
-    "setup",
-    "doctor",
-    "install-plugin",
-    "upgrade-plugin",
-    "uninstall-plugin",
-    "refresh",
-    "inspect-log",
-    "rebuild-index",
-    "reset-db",
-    "summary",
-    "query",
-    "recommendations",
-    "action-brief",
-    "diagnostics",
-    "session",
-    "context",
-    "dashboard",
-    "open-dashboard",
-    "serve-dashboard",
-    "dashboard-service",
-    "expensive",
-    "pricing-coverage",
-    "source-coverage",
-    "allowance-history",
-    "allowance-diagnostics",
-    "allowance-export",
-    "export",
-    "init-pricing",
-    "update-pricing",
-    "pin-pricing",
-    "init-allowance",
-    "parse-allowance",
-    "update-rate-card",
-    "init-thresholds",
-    "init-projects",
-    "support-bundle",
-}
+from tests.release_catalog import MCP_TOOL_NAMES, STABLE_CLI_COMMANDS
 
 
 class _ReleaseCheckModule(Protocol):
@@ -70,66 +32,6 @@ class _ReleaseCheckModule(Protocol):
     def _check_ci_workflow(self) -> list[str]: ...
 
     def _check_tracked_files_for_secrets(self) -> list[str]: ...
-
-
-MCP_TOOL_NAMES = {
-    "refresh_usage_index",
-    "usage_refresh_start",
-    "usage_refresh_status",
-    "usage_doctor",
-    "usage_summary",
-    "usage_query",
-    "usage_status",
-    "usage_dedupe_diagnostics",
-    "usage_calls",
-    "usage_call_detail",
-    "usage_threads",
-    "usage_report_pack",
-    "usage_dashboard_recommendations",
-    "usage_allowance_history",
-    "usage_allowance_diagnostics",
-    "usage_allowance_export",
-    "usage_allowance_status",
-    "usage_allowance_series",
-    "usage_allowance_evidence",
-    "usage_allowance_analysis",
-    "usage_allowance_analysis_status",
-    "usage_compression_start",
-    "usage_compression_status",
-    "usage_compression_profile",
-    "usage_compression_candidates",
-    "usage_compression_candidate_detail",
-    "usage_compression_simulate",
-    "usage_recommendations",
-    "session_usage",
-    "usage_call_context",
-    "most_expensive_usage_calls",
-    "usage_pricing_coverage",
-    "usage_source_coverage",
-    "usage_content_search",
-    "usage_thread_trace",
-    "usage_repetition_scan",
-    "usage_command_loop_scan",
-    "usage_file_churn_scan",
-    "usage_repeated_file_rediscovery",
-    "usage_shell_churn",
-    "usage_large_low_output_calls",
-    "usage_suggest_investigations",
-    "usage_investigate",
-    "usage_action_brief",
-    "usage_dogfood_start",
-    "usage_dogfood_status",
-    "usage_dogfood_result",
-    "usage_test_hypotheses",
-    "usage_context_bloat_scan",
-    "usage_investigation_walk",
-    "usage_local_evidence_export",
-    "generate_usage_dashboard",
-    "export_usage_csv",
-    "init_usage_pricing_config",
-    "update_usage_pricing_config",
-    "init_usage_allowance_config",
-} | {"usage_visualization_suggest", "usage_visualization_render"}
 
 
 def test_module_cli_version() -> None:
@@ -387,7 +289,11 @@ def test_release_pipeline_rebuilds_dashboard_assets_and_smokes_installed_wheel()
     assert "smoke_served_dashboard(" in smoke
     assert "REACT_ASSET_PATTERN" in smoke
     assert 'dashboard_path = temp_dir / "dashboard.html"' in smoke
-    for path in ("/react-dashboard.html", "/react/assets/dashboard-react.js", "/react/assets/index.css"):
+    for path in (
+        "/react-dashboard.html",
+        "/react/assets/dashboard-react.js",
+        "/react/assets/index.css",
+    ):
         assert path in served
 
 
@@ -440,13 +346,7 @@ def test_usage_skills_are_packaged_byte_for_byte_with_evidence_target_guidance()
     for name in ("codex-usage-tracker", "codex-usage-api"):
         source = repo_root / "skills" / name / "SKILL.md"
         packaged = (
-            repo_root
-            / "src"
-            / "codex_usage_tracker"
-            / "plugin_data"
-            / "skills"
-            / name
-            / "SKILL.md"
+            repo_root / "src" / "codex_usage_tracker" / "plugin_data" / "skills" / name / "SKILL.md"
         )
         assert packaged.read_bytes() == source.read_bytes()
         text = source.read_text(encoding="utf-8")

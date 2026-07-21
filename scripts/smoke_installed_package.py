@@ -53,6 +53,7 @@ CLI_HELP_SUBCOMMANDS = [
     "rebuild-index",
     "reset-db",
     "summary",
+    "subagents",
     "query",
     "recommendations",
     "action-brief",

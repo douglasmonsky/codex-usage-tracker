@@ -34,6 +34,7 @@ from codex_usage_tracker.cli.commands_reports import (
     _run_recommendations,
     _run_session,
     _run_source_coverage,
+    _run_subagents,
     _run_summary,
 )
 from codex_usage_tracker.cli.config import (
@@ -112,6 +113,7 @@ _COMMAND_HANDLERS = {
     "dogfood-agentic": _run_dogfood_agentic,
     "reset-db": _run_reset_db,
     "summary": _run_summary,
+    "subagents": _run_subagents,
     "query": _run_query,
     "recommendations": _run_recommendations,
     "action-brief": _run_action_brief,

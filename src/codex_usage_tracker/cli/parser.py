@@ -42,6 +42,7 @@ from codex_usage_tracker.cli.parser_reports import (
     _add_query_parser,
     _add_recommendations_parser,
     _add_session_parser,
+    _add_subagents_parser,
     _add_summary_parser,
 )
 from codex_usage_tracker.core.paths import (
@@ -94,6 +95,7 @@ def build_parser(language: str | None = None) -> argparse.ArgumentParser:
     _add_dogfood_agentic_parser(subparsers)
     _add_reset_db_parser(subparsers)
     _add_summary_parser(subparsers)
+    _add_subagents_parser(subparsers)
     _add_query_parser(subparsers)
     _add_recommendations_parser(subparsers)
     _add_action_brief_parser(subparsers)
