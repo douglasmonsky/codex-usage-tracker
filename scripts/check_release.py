@@ -23,6 +23,11 @@ DIST_FILE_STEM = "codex_usage_tracking"
 IMPORT_PACKAGE = "codex_usage_tracker"
 CONSOLE_SCRIPT = "codex-usage-tracker"
 SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
+
+SUPPORTED_SETUP_NODE_ACTIONS = (
+    "actions/setup-node@v6.4.0",
+    "actions/setup-node@v7.0.0",
+)
 OLD_PYPI_DISTRIBUTION_NAME = "codex-usage-tracker"
 DASHBOARD_LOCALE_CODES = [
     "en",
@@ -616,9 +621,9 @@ def _check_ci_workflow() -> list[str]:
     package_job = _workflow_job_block(workflow, "package")
     if package_job is None:
         return ["CI workflow is missing package job"]
-    required_in_order = [
+    required_in_order: list[str | tuple[str, ...]] = [
         "name: Build package",
-        "actions/setup-node@v6.4.0",
+        SUPPORTED_SETUP_NODE_ACTIONS,
         'node-version: "22"',
         "run: npm ci",
         "run: npm run dashboard:assets:check",
@@ -630,11 +635,20 @@ def _check_ci_workflow() -> list[str]:
     failures: list[str] = []
     positions: list[int] = []
     for required in required_in_order:
-        position = package_job.find(required)
-        if position < 0:
-            failures.append(f"CI package job is missing required build check: {required}")
+        alternatives = (required,) if isinstance(required, str) else required
+        matched = next(
+            (candidate for candidate in alternatives if candidate in package_job),
+            None,
+        )
+        if matched is None:
+            label = (
+                required
+                if isinstance(required, str)
+                else "one of " + ", ".join(required)
+            )
+            failures.append(f"CI package job is missing required build check: {label}")
         else:
-            positions.append(position)
+            positions.append(package_job.find(matched))
     if len(positions) == len(required_in_order) and positions != sorted(positions):
         failures.append(
             "CI package job must build React assets before Python distributions and smoke the installed wheel last"
