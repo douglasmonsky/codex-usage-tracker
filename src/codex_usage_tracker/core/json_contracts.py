@@ -5,6 +5,7 @@ from __future__ import annotations
 from codex_usage_tracker.core.json_contract_cli import CLI_JSON_PAYLOAD_CONTRACTS
 from codex_usage_tracker.core.json_contract_diagnostics import DIAGNOSTIC_JSON_PAYLOAD_CONTRACTS
 from codex_usage_tracker.core.json_contract_server import SERVER_JSON_PAYLOAD_CONTRACTS
+from codex_usage_tracker.core.json_contract_subagent import SUBAGENT_JSON_PAYLOAD_CONTRACTS
 from codex_usage_tracker.core.json_contract_validation import (
     validate_json_payload_contract as _validate_json_payload_contract,
 )
@@ -16,6 +17,7 @@ JSON_PAYLOAD_CONTRACTS = {
     **CLI_JSON_PAYLOAD_CONTRACTS,
     **DIAGNOSTIC_JSON_PAYLOAD_CONTRACTS,
     **SERVER_JSON_PAYLOAD_CONTRACTS,
+    **SUBAGENT_JSON_PAYLOAD_CONTRACTS,
     **VISUALIZATION_JSON_PAYLOAD_CONTRACTS,
 }
 

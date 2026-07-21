@@ -55,32 +55,6 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
         }
     },
     **SUMMARY_JSON_PAYLOAD_CONTRACTS,
-    "codex-usage-tracker.subagent-usage.v1": {
-        "required": {
-            "schema_id": str,
-            "generated_at": str,
-            "filters": dict,
-            "definitions": dict,
-            "summary": dict,
-            "comparison": dict,
-            "by_role": list,
-            "by_type": list,
-            "top_parent_threads": list,
-            "coverage": dict,
-            "warnings": list,
-        },
-        "nested": {
-            "filters": {
-                "since": (str, NoneType),
-                "parent_thread": (str, NoneType),
-                "agent_role": (str, NoneType),
-                "subagent_type": (str, NoneType),
-                "include_archived": bool,
-                "limit": int,
-                "privacy_mode": str,
-            }
-        },
-    },
     "codex-usage-tracker-query-v1": {
         "required": {
             "filters": dict,
