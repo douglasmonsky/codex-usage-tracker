@@ -26,6 +26,7 @@ STABLE_CLI_COMMANDS = {
     "rebuild-index",
     "reset-db",
     "summary",
+    "subagents",
     "query",
     "recommendations",
     "action-brief",
@@ -73,6 +74,7 @@ class _ReleaseCheckModule(Protocol):
 
 
 MCP_TOOL_NAMES = {
+    "subagent_usage",
     "refresh_usage_index",
     "usage_refresh_start",
     "usage_refresh_status",
@@ -387,7 +389,11 @@ def test_release_pipeline_rebuilds_dashboard_assets_and_smokes_installed_wheel()
     assert "smoke_served_dashboard(" in smoke
     assert "REACT_ASSET_PATTERN" in smoke
     assert 'dashboard_path = temp_dir / "dashboard.html"' in smoke
-    for path in ("/react-dashboard.html", "/react/assets/dashboard-react.js", "/react/assets/index.css"):
+    for path in (
+        "/react-dashboard.html",
+        "/react/assets/dashboard-react.js",
+        "/react/assets/index.css",
+    ):
         assert path in served
 
 
@@ -440,13 +446,7 @@ def test_usage_skills_are_packaged_byte_for_byte_with_evidence_target_guidance()
     for name in ("codex-usage-tracker", "codex-usage-api"):
         source = repo_root / "skills" / name / "SKILL.md"
         packaged = (
-            repo_root
-            / "src"
-            / "codex_usage_tracker"
-            / "plugin_data"
-            / "skills"
-            / name
-            / "SKILL.md"
+            repo_root / "src" / "codex_usage_tracker" / "plugin_data" / "skills" / name / "SKILL.md"
         )
         assert packaged.read_bytes() == source.read_bytes()
         text = source.read_text(encoding="utf-8")

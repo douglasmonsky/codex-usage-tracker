@@ -122,6 +122,7 @@ codex-usage-tracker summary --preset today
 codex-usage-tracker summary --preset last-7-days
 codex-usage-tracker summary --preset expensive
 codex-usage-tracker summary --preset by-subagent-role
+codex-usage-tracker subagents --json
 codex-usage-tracker expensive --limit 10
 codex-usage-tracker recommendations --limit 10
 codex-usage-tracker action-brief --goal token_waste --json
@@ -138,6 +139,7 @@ Useful investigations:
 - Sort by `Context` to find calls approaching the model context window.
 - Filter by model or reasoning effort to compare usage patterns across model choices.
 - Use `summary --preset by-subagent-role` to see whether delegated work is driving a large share of usage.
+- Use `subagents --json` for aggregate observed-subagent cohorts and role, type, and parent breakdowns.
 - Use `expensive --limit 10` for a quick list of the highest-cost calls.
 - Use `recommendations --json` for ranked action rows and thread rollups with severity score, primary recommendation, and secondary signals.
 - Use `action-brief --json` for a compact remediation brief with likely waste pattern, workflow change, existing/custom tool ideas, and verification tools.

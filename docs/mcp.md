@@ -114,6 +114,7 @@ the highest-token thread summaries instead.
 - `usage_refresh_status`
 - `usage_doctor`
 - `usage_summary`
+- `subagent_usage`
 - `usage_query`
 - `usage_status`
 - `usage_dedupe_diagnostics`
@@ -171,6 +172,8 @@ the highest-token thread summaries instead.
 ## Tool Notes
 
 `usage_doctor`, `usage_summary`, `usage_recommendations`, `session_usage`, `most_expensive_usage_calls`, `usage_pricing_coverage`, and `usage_source_coverage` accept `response_format="json"` when an agent needs stable structured output instead of markdown.
+
+`subagent_usage` returns aggregate-only observed-subagent cohorts and role, type, and parent breakdowns in Markdown or JSON.
 
 Dashboard-shaped MCP tools return JSON dictionaries that reuse the same aggregate schemas as the local React dashboard API:
 

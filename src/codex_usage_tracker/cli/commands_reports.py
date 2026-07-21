@@ -23,6 +23,7 @@ from codex_usage_tracker.reports.api import (
     build_source_coverage_report,
     build_summary_report,
 )
+from codex_usage_tracker.reports.subagent_usage import build_subagent_usage_report
 from codex_usage_tracker.store.api import (
     query_session_usage,
 )
@@ -43,6 +44,25 @@ def _run_summary(args: argparse.Namespace) -> int:
         print_json(report.payload())
         return 0
     print(report.render())
+    return 0
+
+
+def _run_subagents(args: argparse.Namespace) -> int:
+    report = build_subagent_usage_report(
+        db_path=args.db,
+        pricing_path=args.pricing,
+        since=args.since,
+        parent_thread=args.parent_thread,
+        agent_role=args.agent_role,
+        subagent_type=args.subagent_type,
+        include_archived=args.include_archived,
+        limit=args.limit,
+        privacy_mode=args.privacy_mode,
+    )
+    if args.as_json:
+        print_json(report.payload())
+    else:
+        print(report.render())
     return 0
 
 
