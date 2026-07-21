@@ -97,6 +97,8 @@ For experiment-style answers, use this structure:
 - Refresh the index before answering usage questions.
 - Use `usage_doctor` when setup, plugin discovery, MCP launch, dashboard output, or pricing estimates look wrong.
 - Use `usage_summary` for high-level totals by date, model, effort, cwd, thread, or session.
+- Use `subagent_usage(response_format="json")` for observed subagent spawn counts, role/type mix, parent-thread fan-out, subagent usage share, per-spawn usage, and descriptive direct-versus-subagent comparisons.
+- An observed spawn is a distinct persisted subagent session. Agents that produced no usage event are not visible, and comparison results are descriptive rather than causal.
 - Use `usage_query` for stable JSON rows filtered by date, project, model, effort, thread, pricing status, token minimums, or Codex credit minimums.
 - Use `usage_status` for dashboard/index freshness, active/scoped/total row counts, latest refresh timestamp, and observed allowance windows.
 - Use `usage_allowance_status` as the default Limits polling entry point. It is canonical/deduped, constant-size, reports copied clone rows excluded, and returns the next refresh or polling action.

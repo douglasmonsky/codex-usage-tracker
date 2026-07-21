@@ -15,6 +15,7 @@ The installed `codex-usage-api` skill is the recommended conversational entrypoi
 | What is estimated or unpriced? | `usage_pricing_coverage(response_format="json")`, `usage_query(pricing_status="unpriced")`, or `usage_query(credit_confidence="estimated")` |
 | How does this affect my allowance? | `usage_query(...)` rows with `usage_credits`, `usage_credit_confidence`, and allowance annotations |
 | What happened in one session? | `session_usage(session_id=..., response_format="json")` |
+| How much usage came from subagents? | `subagent_usage(response_format="json")`, or CLI `subagents --json` |
 
 The skill should separate exact facts from estimates. Remaining allowance is not native account data; it is only copied local state from `~/.codex-usage-tracker/allowance.json` when configured.
 
@@ -22,7 +23,7 @@ Use the global `--privacy-mode redacted` or `--privacy-mode strict` option, or t
 
 ## Contract Validation
 
-Stable payload contracts are tracked in `codex_usage_tracker.json_contracts` and covered by tests. Every stable payload includes a top-level `schema` string so agents can distinguish compatible responses from markdown, disabled-context responses, or future versions.
+Stable payload contracts are tracked in `codex_usage_tracker.json_contracts` and covered by tests. Every tracked payload includes a top-level `schema` string so agents can distinguish compatible responses from markdown, disabled-context responses, or future versions. The observed-subagent report documents its dedicated `schema_id` contract separately below.
 
 Compatibility rules before 1.0:
 
@@ -187,6 +188,90 @@ Schema: `codex-usage-tracker-summary-v1`
 existing all-history default; the dashboard `/api/summary` endpoint defaults to active history and
 accepts `include_archived=true` when the user selects all history.
 Summary and expensive-call reports treat `limit=0` as no finite row cap.
+
+## Observed Subagent Usage
+
+Command:
+
+```bash
+codex-usage-tracker subagents --since 2026-07-01 --json
+```
+
+MCP:
+
+- `subagent_usage(response_format="json")`
+
+Schema ID: `codex-usage-tracker.subagent-usage.v1`
+
+The complete top-level key list is `schema_id`, `generated_at`, `filters`, `definitions`, `summary`, `comparison`, `by_role`, `by_type`, `top_parent_threads`, `coverage`, and `warnings`.
+
+```json
+{
+  "schema_id": "codex-usage-tracker.subagent-usage.v1",
+  "generated_at": "2026-07-21T12:00:00+00:00",
+  "filters": {
+    "since": "2026-07-01",
+    "parent_thread": null,
+    "agent_role": null,
+    "subagent_type": null,
+    "include_archived": false,
+    "limit": 10,
+    "privacy_mode": "normal"
+  },
+  "definitions": {
+    "observed_spawn": "A distinct subagent session present in aggregate usage rows.",
+    "per_spawn_usage": "Uses only subagent usage attributable to an observed spawn.",
+    "observed_comparison_not_causal": true
+  },
+  "summary": {
+    "calls": 4,
+    "turns": 3,
+    "observed_spawns": 2,
+    "input_tokens": 240,
+    "cached_input_tokens": 120,
+    "uncached_input_tokens": 120,
+    "output_tokens": 60,
+    "reasoning_output_tokens": 20,
+    "total_tokens": 300,
+    "latest_event": "2026-07-21T11:59:00Z",
+    "estimated_cost_usd": 0.0024,
+    "pricing_coverage": {
+      "priced_model_count": 1,
+      "estimated_model_count": 0,
+      "unpriced_model_count": 0,
+      "priced_tokens": 300,
+      "estimated_tokens": 0,
+      "unpriced_tokens": 0
+    },
+    "total_tokens_per_observed_spawn": 150.0,
+    "calls_per_observed_spawn": 2.0,
+    "turns_per_observed_spawn": 1.5,
+    "estimated_cost_usd_per_observed_spawn": 0.0012,
+    "subagent_token_share": 0.3333333333
+  },
+  "comparison": {"direct": {}, "subagent": {}},
+  "by_role": [],
+  "by_type": [],
+  "top_parent_threads": [],
+  "coverage": {
+    "missing_session_rows": 0,
+    "missing_session_tokens": 0,
+    "missing_role_spawns": 0,
+    "missing_type_spawns": 0
+  },
+  "warnings": []
+}
+```
+
+`summary` contains the subagent cohort totals, local estimated cost and pricing coverage, observed-spawn ratios, and subagent token share. The per-spawn ratios and token share are `null` when their denominators are zero; estimated-cost fields are also `null` when local pricing is unavailable.
+
+`comparison.direct` and `comparison.subagent` each contain parallel call, turn, spawn, token, latest-event, estimated-cost, and pricing-coverage metrics. The comparison is descriptive: it does not establish that delegation caused any difference.
+
+`by_role`, `by_type`, and `top_parent_threads` are bounded breakdown arrays. Each row has `group_key` plus the same aggregate metrics, cost, and pricing coverage. `coverage` reports usage missing session attribution and observed spawns missing role or type metadata. `warnings` is a list of pricing or attribution caveats.
+
+`observed_spawns` counts distinct persisted subagent sessions. Agents that produced no usage event are not visible.
+
+Subagent analytics never returns raw session identifiers, agent nicknames, prompts, responses, or context. Parent-thread labels are preserved only in normal privacy mode and are pseudonymized in redacted and strict modes.
 
 ## Query
 
