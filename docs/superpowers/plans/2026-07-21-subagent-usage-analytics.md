@@ -46,10 +46,10 @@
 - `src/codex_usage_tracker/cli/main.py` — register the command handler.
 - `src/codex_usage_tracker/cli/mcp_server.py` — import/re-export the modular MCP tool.
 - `tests/cli/test_cli_release.py` — add the public CLI command and MCP tool to release expectations.
+- `scripts/smoke_installed_package.py` — add the CLI command to installed-package help coverage.
 - `docs/mcp.md` — document MCP behavior and example questions.
 - `docs/cli-reference.md` — document the `subagents` command.
 - `docs/cli-json-schemas.md` — document the v1 response fields.
-- `docs/privacy.md` — document aggregate-only parent labels and invisible zero-usage spawns.
 - `skills/codex-usage-api/SKILL.md` and packaged copy — route conversational subagent questions to the new tool.
 - `skills/codex-usage-tracker/SKILL.md` and packaged copy — add the operational tool guidance.
 
@@ -456,6 +456,9 @@ git commit -m "feat: build subagent usage report"
 - Modify: `src/codex_usage_tracker/cli/main.py`
 - Modify: `src/codex_usage_tracker/cli/mcp_server.py`
 - Modify: `tests/cli/test_cli_release.py`
+- Modify: `scripts/smoke_installed_package.py`
+- Modify: `docs/mcp.md`
+- Modify: `docs/cli-reference.md`
 
 **Interfaces:**
 
@@ -547,6 +550,8 @@ def _run_subagents(args: argparse.Namespace) -> int:
 
 Import `_run_subagents` and add `"subagents": _run_subagents` to `_COMMAND_HANDLERS` in `cli/main.py`.
 
+Add `"subagents"` to `CLI_HELP_SUBCOMMANDS` in `scripts/smoke_installed_package.py` and add the command name plus one-line synopsis to the stable command catalog in `docs/cli-reference.md`. This keeps the release registry test green in the same task that registers the CLI surface.
+
 - [ ] **Step 4: Add the modular MCP adapter**
 
 Create `cli/mcp_subagents.py`:
@@ -593,6 +598,8 @@ from codex_usage_tracker.cli.mcp_subagents import subagent_usage as subagent_usa
 
 Keep all tool logic out of the already-large `cli/mcp_server.py`.
 
+Add `subagent_usage` plus its one-line aggregate-only description to the stable MCP tool catalog in `docs/mcp.md`. Full examples and limitations remain in Task 4.
+
 - [ ] **Step 5: Run interface and regression tests**
 
 Run:
@@ -609,7 +616,7 @@ Expected: tests/checks pass, and help lists all approved filters.
 - [ ] **Step 6: Commit the interface slice**
 
 ```bash
-git add -- src/codex_usage_tracker/cli/mcp_subagents.py src/codex_usage_tracker/cli/parser_reports.py src/codex_usage_tracker/cli/parser.py src/codex_usage_tracker/cli/commands_reports.py src/codex_usage_tracker/cli/main.py src/codex_usage_tracker/cli/mcp_server.py tests/cli/test_subagent_usage_interfaces.py tests/cli/test_cli_release.py
+git add -- src/codex_usage_tracker/cli/mcp_subagents.py src/codex_usage_tracker/cli/parser_reports.py src/codex_usage_tracker/cli/parser.py src/codex_usage_tracker/cli/commands_reports.py src/codex_usage_tracker/cli/main.py src/codex_usage_tracker/cli/mcp_server.py tests/cli/test_subagent_usage_interfaces.py tests/cli/test_cli_release.py scripts/smoke_installed_package.py docs/mcp.md docs/cli-reference.md
 git commit -m "feat: expose subagent usage through CLI and MCP"
 ```
 
@@ -622,7 +629,6 @@ git commit -m "feat: expose subagent usage through CLI and MCP"
 - Modify: `docs/mcp.md`
 - Modify: `docs/cli-reference.md`
 - Modify: `docs/cli-json-schemas.md`
-- Modify: `docs/privacy.md`
 - Modify: `skills/codex-usage-api/SKILL.md`
 - Modify: `src/codex_usage_tracker/plugin_data/skills/codex-usage-api/SKILL.md`
 - Modify: `skills/codex-usage-tracker/SKILL.md`
@@ -683,7 +689,7 @@ State beside both examples: `observed_spawns` counts distinct persisted subagent
 
 In `docs/cli-json-schemas.md`, add the complete top-level v1 key list and document `summary`, `comparison`, `by_role`, `by_type`, `top_parent_threads`, `coverage`, and `warnings`, including nullable ratios.
 
-In `docs/privacy.md`, add:
+In `docs/mcp.md` and `docs/cli-json-schemas.md`, add:
 
 ```markdown
 Subagent analytics never returns raw session identifiers, agent nicknames, prompts, responses, or context. Parent-thread labels are preserved only in normal privacy mode and are pseudonymized in redacted and strict modes.
@@ -740,7 +746,7 @@ Confirm exactly these conditions before staging:
 - [ ] **Step 8: Commit documentation and packaging guidance**
 
 ```bash
-git add -- docs/mcp.md docs/cli-reference.md docs/cli-json-schemas.md docs/privacy.md skills/codex-usage-api/SKILL.md src/codex_usage_tracker/plugin_data/skills/codex-usage-api/SKILL.md skills/codex-usage-tracker/SKILL.md src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/SKILL.md
+git add -- docs/mcp.md docs/cli-reference.md docs/cli-json-schemas.md skills/codex-usage-api/SKILL.md src/codex_usage_tracker/plugin_data/skills/codex-usage-api/SKILL.md skills/codex-usage-tracker/SKILL.md src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/SKILL.md
 git commit -m "docs: document subagent usage analytics"
 ```
 
