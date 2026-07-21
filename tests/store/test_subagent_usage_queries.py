@@ -46,7 +46,28 @@ def test_query_counts_one_spawn_for_multiple_subagent_calls(tmp_path: Path) -> N
     assert result["cohorts"]["subagent"]["metrics"]["calls"] == 2
     assert result["breakdowns"]["role"][0]["group_key"] == "test_runner"
     assert result["breakdowns"]["type"][0]["group_key"] == "thread_spawn"
+    assert result["breakdowns"]["parent"][0]["role_mix"] == [
+        {
+            "agent_role": "test_runner",
+            "observed_spawns": 1,
+            "calls": 2,
+            "total_tokens": 100,
+        }
+    ]
     assert all("session_id" not in row for row in result["cohorts"]["subagent"]["model_buckets"])
+
+
+def test_query_excludes_duplicate_subagent_rows_from_canonical_totals(tmp_path: Path) -> None:
+    db_path = _indexed_fixture(tmp_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE usage_events SET is_duplicate = 1 WHERE agent_role = 'test_runner'")
+
+    result = query_subagent_usage_buckets(db_path, agent_role="test_runner")
+
+    assert result["cohorts"]["subagent"]["metrics"]["calls"] == 0
+    assert result["cohorts"]["subagent"]["metrics"]["total_tokens"] == 0
+    assert result["breakdowns"]["role"] == []
+    assert result["coverage"]["missing_session_rows"] == 0
 
 
 def test_role_filter_keeps_direct_baseline_in_base_scope(tmp_path: Path) -> None:

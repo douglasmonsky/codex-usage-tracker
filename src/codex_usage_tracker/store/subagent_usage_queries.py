@@ -24,6 +24,8 @@ BREAKDOWN_EXPRESSIONS = {
     "parent": ("coalesce(nullif(trim(usage_events.parent_thread_name), ''), 'unknown parent')"),
 }
 
+_CANONICAL_SOURCE = "canonical_usage_events AS usage_events"
+
 _METRIC_EXPRESSIONS = """
     COUNT(*) AS calls,
     COUNT(DISTINCT session_id || ':' || coalesce(turn_id, '')) AS turns,
@@ -94,6 +96,7 @@ def query_subagent_usage_buckets(
                 subagent_where,
                 subagent_params,
                 limit,
+                include_role_mix=dimension == "parent",
             )
             for dimension, expression in BREAKDOWN_EXPRESSIONS.items()
         }
@@ -141,14 +144,14 @@ def _usage_bucket(
 ) -> dict[str, Any]:
     metrics = row_to_dict(
         conn.execute(
-            f"SELECT {_METRIC_EXPRESSIONS} FROM usage_events {where_sql}",  # nosec B608
+            f"SELECT {_METRIC_EXPRESSIONS} FROM {_CANONICAL_SOURCE} {where_sql}",  # nosec B608
             params,
         ).fetchone()
     )
     model_rows = conn.execute(
         f"""
         SELECT model, service_tier, {_MODEL_METRIC_EXPRESSIONS}
-        FROM usage_events
+        FROM {_CANONICAL_SOURCE}
         {where_sql}
         GROUP BY model, service_tier
         ORDER BY total_tokens DESC, model ASC, service_tier ASC
@@ -167,11 +170,13 @@ def _breakdown_buckets(
     where_sql: str,
     params: list[Any],
     limit: int,
+    *,
+    include_role_mix: bool = False,
 ) -> list[dict[str, Any]]:
     group_rows = conn.execute(
         f"""
         SELECT {expression} AS group_key, {_METRIC_EXPRESSIONS}
-        FROM usage_events
+        FROM {_CANONICAL_SOURCE}
         {where_sql}
         GROUP BY group_key
         ORDER BY total_tokens DESC, group_key ASC
@@ -179,16 +184,23 @@ def _breakdown_buckets(
         """,  # nosec B608
         [*params, limit],
     ).fetchall()
+    group_keys = [str(row["group_key"]) for row in group_rows]
+    if not group_keys:
+        return []
+
+    placeholders = ", ".join("?" for _ in group_keys)
+    selected_where = _append_clause(where_sql, f"{expression} IN ({placeholders})")
+    selected_params = [*params, *group_keys]
     model_rows = conn.execute(
         f"""
         SELECT {expression} AS group_key, model, service_tier,
                {_MODEL_METRIC_EXPRESSIONS}
-        FROM usage_events
-        {where_sql}
+        FROM {_CANONICAL_SOURCE}
+        {selected_where}
         GROUP BY group_key, model, service_tier
         ORDER BY total_tokens DESC, group_key ASC, model ASC, service_tier ASC
         """,  # nosec B608
-        params,
+        selected_params,
     ).fetchall()
     models_by_group: dict[str, list[dict[str, Any]]] = {}
     for row in model_rows:
@@ -196,16 +208,60 @@ def _breakdown_buckets(
         group_key = str(model_bucket.pop("group_key"))
         models_by_group.setdefault(group_key, []).append(model_bucket)
 
-    return [
-        {
+    role_mix_by_group = (
+        _parent_role_mix(conn, where_sql, params, group_keys) if include_role_mix else {}
+    )
+    result: list[dict[str, Any]] = []
+    for row in group_rows:
+        group_key = str(row["group_key"])
+        bucket = {
             "group_key": str(row["group_key"]),
             "metrics": {
                 key: value for key, value in row_to_dict(row).items() if key != "group_key"
             },
-            "model_buckets": models_by_group.get(str(row["group_key"]), []),
+            "model_buckets": models_by_group.get(group_key, []),
         }
-        for row in group_rows
-    ]
+        if include_role_mix:
+            bucket["role_mix"] = role_mix_by_group.get(group_key, [])
+        result.append(bucket)
+    return result
+
+
+def _parent_role_mix(
+    conn: sqlite3.Connection,
+    where_sql: str,
+    params: list[Any],
+    parent_keys: list[str],
+) -> dict[str, list[dict[str, Any]]]:
+    parent_expression = BREAKDOWN_EXPRESSIONS["parent"]
+    role_expression = BREAKDOWN_EXPRESSIONS["role"]
+    placeholders = ", ".join("?" for _ in parent_keys)
+    selected_where = _append_clause(
+        where_sql,
+        f"{parent_expression} IN ({placeholders})",
+    )
+    rows = conn.execute(
+        f"""
+        SELECT {parent_expression} AS group_key,
+               {role_expression} AS agent_role,
+               COUNT(DISTINCT CASE
+                 WHEN nullif(trim(session_id), '') IS NOT NULL THEN session_id
+               END) AS observed_spawns,
+               COUNT(*) AS calls,
+               coalesce(SUM(total_tokens), 0) AS total_tokens
+        FROM {_CANONICAL_SOURCE}
+        {selected_where}
+        GROUP BY group_key, agent_role
+        ORDER BY group_key ASC, total_tokens DESC, agent_role ASC
+        """,  # nosec B608
+        [*params, *parent_keys],
+    ).fetchall()
+    result: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        role = row_to_dict(row)
+        group_key = str(role.pop("group_key"))
+        result.setdefault(group_key, []).append(role)
+    return result
 
 
 def _coverage(
@@ -230,7 +286,7 @@ def _coverage(
               WHEN nullif(trim(session_id), '') IS NOT NULL
                AND nullif(trim(subagent_type), '') IS NULL THEN session_id
             END) AS missing_type_spawns
-        FROM usage_events
+        FROM {_CANONICAL_SOURCE}
         {where_sql}
         """,  # nosec B608
         params,

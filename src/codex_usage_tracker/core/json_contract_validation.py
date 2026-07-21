@@ -16,13 +16,17 @@ def validate_json_payload_contract(
     if not isinstance(payload, Mapping):
         return ["payload must be a JSON object"]
 
-    schema = payload.get("schema")
+    schema_field = "schema"
+    schema = payload.get(schema_field)
+    if not isinstance(schema, str) or not schema:
+        schema_field = "schema_id"
+        schema = payload.get(schema_field)
     if not isinstance(schema, str) or not schema:
         return ["payload.schema must be non-empty string"]
 
     contract = contracts.get(schema)
     if contract is None:
-        return [f"payload.schema is not tracked: {schema}"]
+        return [f"payload.{schema_field} is not tracked: {schema}"]
 
     return [
         *_validate_required_contract_fields(payload, schema=schema, contract=contract),

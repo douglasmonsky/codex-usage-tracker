@@ -42,7 +42,20 @@ def query_fixture() -> dict[str, Any]:
         "breakdowns": {
             "role": [{"group_key": "worker", **subagent}],
             "type": [{"group_key": "thread_spawn", **subagent}],
-            "parent": [{"group_key": "Synthetic parent", **subagent}],
+            "parent": [
+                {
+                    "group_key": "Synthetic parent",
+                    "role_mix": [
+                        {
+                            "agent_role": "worker",
+                            "observed_spawns": 2,
+                            "calls": 4,
+                            "total_tokens": 300,
+                        }
+                    ],
+                    **subagent,
+                }
+            ],
         },
         "coverage": {
             "missing_session_rows": 0,
@@ -95,10 +108,59 @@ def test_report_builds_v1_spawn_and_comparison_metrics(
     assert report["schema_id"] == "codex-usage-tracker.subagent-usage.v1"
     assert report["definitions"]["observed_comparison_not_causal"] is True
     assert report["summary"]["observed_spawns"] == 2
+    assert report["summary"]["subagent_calls"] == 4
+    assert report["summary"]["subagent_turns"] == 3
     assert report["summary"]["total_tokens_per_observed_spawn"] == 150.0
     assert report["comparison"]["subagent"]["total_tokens"] == 300
     assert report["comparison"]["direct"]["total_tokens"] == 600
     assert report["summary"]["subagent_token_share"] == pytest.approx(1 / 3)
+    assert report["summary"]["subagent_call_share"] == pytest.approx(4 / 9)
+    assert report["summary"]["subagent_turn_share"] == pytest.approx(3 / 7)
+    assert report["summary"]["subagent_estimated_cost_share"] is not None
+    assert report["by_role"][0]["subagent_token_share"] == 1.0
+    assert report["by_role"][0]["observed_spawn_share"] == 1.0
+    assert report["top_parent_threads"][0]["role_mix"][0]["agent_role"] == "worker"
+    assert report["coverage"]["pricing"] == report["summary"]["pricing_coverage"]
+    assert "subagent type" in report["definitions"]["subagent_cohort"]
+    assert "not matching" in report["definitions"]["direct_cohort"]
+
+
+def test_comparison_includes_null_safe_efficiency_metrics_and_deltas(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fixture = query_fixture()
+    fixture["cohorts"]["subagent"]["metrics"].update(
+        {
+            "input_tokens": 240,
+            "cached_input_tokens": 120,
+            "uncached_input_tokens": 120,
+            "output_tokens": 60,
+            "reasoning_output_tokens": 20,
+        }
+    )
+    fixture["cohorts"]["direct"]["metrics"].update(
+        {
+            "input_tokens": 500,
+            "cached_input_tokens": 100,
+            "uncached_input_tokens": 400,
+            "output_tokens": 100,
+            "reasoning_output_tokens": 10,
+        }
+    )
+    _patch_query(monkeypatch, fixture)
+
+    comparison = build_subagent_usage_report(
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=_write_pricing(tmp_path / "pricing.json"),
+    ).payload()["comparison"]
+
+    assert comparison["subagent"]["tokens_per_call"] == 75.0
+    assert comparison["direct"]["tokens_per_turn"] == 150.0
+    assert comparison["subagent"]["cache_ratio"] == 0.5
+    assert comparison["direct"]["output_token_ratio"] == pytest.approx(1 / 6)
+    assert comparison["subagent"]["reasoning_output_ratio"] == pytest.approx(1 / 3)
+    assert comparison["deltas"]["tokens_per_call"] == -45.0
+    assert comparison["deltas"]["cache_ratio"] == 0.3
 
 
 def test_report_uses_only_attributable_usage_for_per_spawn_metrics(
@@ -137,6 +199,9 @@ def test_zero_denominators_render_as_none(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert summary["turns_per_observed_spawn"] is None
     assert summary["estimated_cost_usd_per_observed_spawn"] is None
     assert summary["subagent_token_share"] is None
+    assert summary["subagent_call_share"] is None
+    assert summary["subagent_turn_share"] is None
+    assert summary["subagent_estimated_cost_share"] is None
 
 
 def test_pricing_coverage_separates_priced_estimated_and_unpriced(
@@ -218,6 +283,25 @@ def test_normal_mode_preserves_parent_labels(
     ).payload()
 
     assert payload["top_parent_threads"][0]["group_key"] == "Synthetic parent"
+
+
+@pytest.mark.parametrize("privacy_mode", ["normal", "redacted", "strict"])
+def test_unknown_parent_sentinel_is_preserved_in_every_privacy_mode(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    privacy_mode: str,
+) -> None:
+    fixture = query_fixture()
+    fixture["breakdowns"]["parent"][0]["group_key"] = "unknown parent"
+    _patch_query(monkeypatch, fixture)
+
+    payload = build_subagent_usage_report(
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=_write_pricing(tmp_path / "pricing.json"),
+        privacy_mode=privacy_mode,
+    ).payload()
+
+    assert payload["top_parent_threads"][0]["group_key"] == "unknown parent"
 
 
 def test_empty_report_keeps_stable_v1_shape(

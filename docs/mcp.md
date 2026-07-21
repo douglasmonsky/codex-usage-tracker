@@ -181,7 +181,7 @@ subagent_usage(agent_role="worker", limit=5, response_format="json")
 subagent_usage(parent_thread="Investigate usage spike")
 ```
 
-`observed_spawns` counts distinct persisted subagent sessions. A spawn that produced no persisted usage event is not visible, and direct-versus-subagent comparisons are descriptive rather than causal.
+`observed_spawns` counts distinct persisted subagent sessions from canonical, deduplicated usage rows. A spawn that produced no persisted usage event is not visible, and direct-versus-subagent comparisons are descriptive rather than causal.
 
 Subagent analytics never returns raw session identifiers, agent nicknames, prompts, responses, or context. Parent-thread labels are preserved only in normal privacy mode and are pseudonymized in redacted and strict modes.
 

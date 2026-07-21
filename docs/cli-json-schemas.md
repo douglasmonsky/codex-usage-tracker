@@ -23,7 +23,7 @@ Use the global `--privacy-mode redacted` or `--privacy-mode strict` option, or t
 
 ## Contract Validation
 
-Stable payload contracts are tracked in `codex_usage_tracker.json_contracts` and covered by tests. Every tracked payload includes a top-level `schema` string so agents can distinguish compatible responses from markdown, disabled-context responses, or future versions. The observed-subagent report documents its dedicated `schema_id` contract separately below.
+Stable payload contracts are tracked in `codex_usage_tracker.json_contracts` and covered by tests. Every tracked payload includes a top-level `schema` or `schema_id` string so agents can distinguish compatible responses from markdown, disabled-context responses, or future versions.
 
 Compatibility rules before 1.0:
 
@@ -46,6 +46,7 @@ Tracked schema ids:
 | `codex-usage-tracker-rebuild-index-v1` | CLI `rebuild-index --json` |
 | `codex-usage-tracker-reset-db-v1` | CLI `reset-db --yes --json` |
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
+| `codex-usage-tracker.subagent-usage.v1` | CLI `subagents --json`, MCP `subagent_usage(response_format="json")` |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")`, MCP `usage_dashboard_recommendations(...)` |
 | `codex-usage-tracker-action-brief-v1` | CLI `action-brief --json`, MCP `usage_action_brief(...)`; compact aggregate remediation brief |
@@ -220,6 +221,8 @@ The complete top-level key list is `schema_id`, `generated_at`, `filters`, `defi
   },
   "definitions": {
     "observed_spawn": "A distinct subagent session present in aggregate usage rows.",
+    "subagent_cohort": "Rows explicitly marked as subagent or carrying non-empty subagent type or parent linkage metadata.",
+    "direct_cohort": "Rows in the matching base scope not matching the subagent cohort.",
     "per_spawn_usage": "Uses only subagent usage attributable to an observed spawn.",
     "observed_comparison_not_causal": true
   },
@@ -227,6 +230,8 @@ The complete top-level key list is `schema_id`, `generated_at`, `filters`, `defi
     "calls": 4,
     "turns": 3,
     "observed_spawns": 2,
+    "subagent_calls": 4,
+    "subagent_turns": 3,
     "input_tokens": 240,
     "cached_input_tokens": 120,
     "uncached_input_tokens": 120,
@@ -247,9 +252,34 @@ The complete top-level key list is `schema_id`, `generated_at`, `filters`, `defi
     "calls_per_observed_spawn": 2.0,
     "turns_per_observed_spawn": 1.5,
     "estimated_cost_usd_per_observed_spawn": 0.0012,
-    "subagent_token_share": 0.3333333333
+    "subagent_call_share": 0.4444444444,
+    "subagent_turn_share": 0.4285714286,
+    "subagent_token_share": 0.3333333333,
+    "subagent_estimated_cost_share": 0.3333333333
   },
-  "comparison": {"direct": {}, "subagent": {}},
+  "comparison": {
+    "direct": {
+      "tokens_per_call": 120.0,
+      "tokens_per_turn": 150.0,
+      "cache_ratio": 0.2,
+      "output_token_ratio": 0.1666666667,
+      "reasoning_output_ratio": 0.1
+    },
+    "subagent": {
+      "tokens_per_call": 75.0,
+      "tokens_per_turn": 100.0,
+      "cache_ratio": 0.5,
+      "output_token_ratio": 0.2,
+      "reasoning_output_ratio": 0.3333333333
+    },
+    "deltas": {
+      "tokens_per_call": -45.0,
+      "tokens_per_turn": -50.0,
+      "cache_ratio": 0.3,
+      "output_token_ratio": 0.0333333333,
+      "reasoning_output_ratio": 0.2333333333
+    }
+  },
   "by_role": [],
   "by_type": [],
   "top_parent_threads": [],
@@ -257,19 +287,27 @@ The complete top-level key list is `schema_id`, `generated_at`, `filters`, `defi
     "missing_session_rows": 0,
     "missing_session_tokens": 0,
     "missing_role_spawns": 0,
-    "missing_type_spawns": 0
+    "missing_type_spawns": 0,
+    "pricing": {
+      "priced_model_count": 1,
+      "estimated_model_count": 0,
+      "unpriced_model_count": 0,
+      "priced_tokens": 300,
+      "estimated_tokens": 0,
+      "unpriced_tokens": 0
+    }
   },
   "warnings": []
 }
 ```
 
-`summary` contains the subagent cohort totals, local estimated cost and pricing coverage, observed-spawn ratios, and subagent token share. The per-spawn ratios and token share are `null` when their denominators are zero; estimated-cost fields are also `null` when local pricing is unavailable.
+`summary` contains subagent calls, turns, token components, local estimated cost and pricing coverage, call/turn/token/covered-cost shares, and attributable per-spawn metrics. Shares and per-spawn ratios are `null` when their denominators are zero; estimated-cost fields are also `null` when local pricing is unavailable.
 
-`comparison.direct` and `comparison.subagent` each contain parallel call, turn, spawn, token, latest-event, estimated-cost, and pricing-coverage metrics. The comparison is descriptive: it does not establish that delegation caused any difference.
+`comparison.direct` and `comparison.subagent` each contain parallel call, turn, spawn, token, latest-event, estimated-cost, pricing-coverage, tokens-per-call, tokens-per-turn, cache, output-token, and reasoning-output metrics. `comparison.deltas` is subagent minus direct for the five derived metrics. Undefined values and their deltas are `null`. The comparison is descriptive: it does not establish that delegation caused any difference.
 
-`by_role`, `by_type`, and `top_parent_threads` are bounded breakdown arrays. Each row has `group_key` plus the same aggregate metrics, cost, and pricing coverage. `coverage` reports usage missing session attribution and observed spawns missing role or type metadata. `warnings` is a list of pricing or attribution caveats.
+`by_role`, `by_type`, and `top_parent_threads` are bounded breakdown arrays. Each row has `group_key`, aggregate metrics, cost, pricing coverage, subagent-token share, and observed-spawn share. Parent rows also contain `role_mix`. `coverage` reports usage missing session attribution, observed spawns missing role or type metadata, and priced/estimated/unpriced token coverage. `warnings` is a list of pricing or attribution caveats.
 
-`observed_spawns` counts distinct persisted subagent sessions. Agents that produced no usage event are not visible.
+`observed_spawns` counts distinct persisted subagent sessions from canonical, deduplicated usage rows. Agents that produced no usage event are not visible.
 
 Subagent analytics never returns raw session identifiers, agent nicknames, prompts, responses, or context. Parent-thread labels are preserved only in normal privacy mode and are pseudonymized in redacted and strict modes.
 

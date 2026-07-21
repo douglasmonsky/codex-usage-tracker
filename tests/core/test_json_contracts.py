@@ -11,7 +11,7 @@ from codex_usage_tracker.core.json_contracts import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATTERN = re.compile(r"codex-usage-tracker-[a-z0-9-]+-v[0-9]+")
+SCHEMA_PATTERN = re.compile(r"codex-usage-tracker(?:-[a-z0-9-]+-v[0-9]+|\.[a-z0-9-]+\.v[0-9]+)")
 RUNTIME_SCHEMA_SOURCE_PATHS = [
     REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "api_payloads.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "dashboard_targets.py",
@@ -90,6 +90,33 @@ def test_dashboard_target_contract_is_tracked() -> None:
     }
 
     assert validate_json_payload_contract(payload) == []
+
+
+def test_subagent_usage_schema_id_contract_is_tracked() -> None:
+    payload = {
+        "schema_id": "codex-usage-tracker.subagent-usage.v1",
+        "generated_at": "2026-07-21T12:00:00+00:00",
+        "filters": {
+            "since": None,
+            "parent_thread": None,
+            "agent_role": None,
+            "subagent_type": None,
+            "include_archived": False,
+            "limit": 10,
+            "privacy_mode": "normal",
+        },
+        "definitions": {},
+        "summary": {},
+        "comparison": {},
+        "by_role": [],
+        "by_type": [],
+        "top_parent_threads": [],
+        "coverage": {},
+        "warnings": [],
+    }
+
+    assert validate_json_payload_contract(payload) == []
+    assert payload["schema_id"] in known_json_schemas()
 
 
 def test_json_contract_validation_reports_schema_and_type_errors() -> None:
