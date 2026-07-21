@@ -253,6 +253,24 @@ def test_empty_report_keeps_stable_v1_shape(
     assert "No observed subagent usage matched these filters." in report.render()
 
 
+def test_zero_token_matched_usage_does_not_render_as_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fixture = query_fixture()
+    matched = _bucket(0, 1, 1, 1)
+    fixture["cohorts"]["subagent"] = matched
+    fixture["cohorts"]["attributable_subagent"] = matched
+    _patch_query(monkeypatch, fixture)
+
+    markdown = build_subagent_usage_report(
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=_write_pricing(tmp_path / "pricing.json"),
+    ).render()
+
+    assert "Observed 1 spawns across 1 calls using 0 tokens" in markdown
+    assert "No observed subagent usage matched these filters." not in markdown
+
+
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [

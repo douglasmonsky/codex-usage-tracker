@@ -144,7 +144,7 @@ def render_subagent_usage(data: dict[str, Any]) -> str:
 
     summary = data["summary"]
     lines = ["# Observed subagent usage"]
-    if not _number(summary["total_tokens"]):
+    if not _number(summary["calls"]):
         lines.extend(["", "No observed subagent usage matched these filters."])
         return "\n".join(lines)
 
