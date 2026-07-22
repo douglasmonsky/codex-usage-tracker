@@ -1,3 +1,5 @@
+import hashlib
+
 from codex_usage_tracker.analytics.analysis_models import (
     ANALYSIS_GOALS,
     AnalysisGoal,
@@ -31,7 +33,7 @@ def synthetic_analysis_report(goal: AnalysisGoal, context: RequestContext) -> An
                 evidence_id,
                 "call",
                 "Synthetic canonical call",
-                {"record_id": f"canonical-{goal}"},
+                {"record_id": _canonical_record_id(goal)},
                 {"tokens": 10},
                 "codex-usage-tracker.query.v2",
                 None,
@@ -49,4 +51,8 @@ def synthetic_analysis_report(goal: AnalysisGoal, context: RequestContext) -> An
     )
 
 
-ANALYSIS_CASES = tuple((goal, f"canonical-{goal}") for goal in ANALYSIS_GOALS)
+def _canonical_record_id(goal: AnalysisGoal) -> str:
+    return hashlib.sha256(f"synthetic:{goal}".encode()).hexdigest()
+
+
+ANALYSIS_CASES = tuple((goal, _canonical_record_id(goal)) for goal in ANALYSIS_GOALS)

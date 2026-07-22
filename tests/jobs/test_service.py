@@ -150,6 +150,44 @@ def test_unknown_job_is_truthful_bounded_failure() -> None:
     assert serialized_size(status.to_payload()) <= 16 * 1024
 
 
+def test_completed_results_are_bounded_deterministic_and_schema_scoped() -> None:
+    service = JobService()
+    for job_id in ("analysis-b", "analysis-a"):
+        raw = {
+            "job_id": job_id,
+            "status": "completed",
+            "stage": "complete",
+            "source_revision": "generation:1",
+            "created_at": "2026-07-22T12:00:00Z",
+            "updated_at": "2026-07-22T12:01:00Z",
+            "progress": {"percent": 100},
+            "result": {"analysis_id": job_id},
+        }
+        service.register(
+            kind="analysis",
+            job_id=job_id,
+            adapter=AnalysisJobAdapter(
+                _reader(raw),
+                kind="analysis",
+                request_hash=request_hash(job_id),
+                result_schema="codex-usage-tracker.analysis.v2",
+            ),
+        )
+    results = service.completed_results(
+        kind="analysis",
+        result_schema="codex-usage-tracker.analysis.v2",
+        source_revision="generation:1",
+        limit=2,
+    )
+    assert [result["analysis_id"] for result in results] == ["analysis-a", "analysis-b"]
+    assert (
+        service.completed_results(
+            kind="analysis", result_schema="other.v1", source_revision="generation:1"
+        )
+        == ()
+    )
+
+
 def test_polling_preserves_monotonic_state_and_progress() -> None:
     payload: dict[str, object] = {
         "job_id": "analysis-1",

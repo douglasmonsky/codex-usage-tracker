@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import threading
 from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import replace
 from typing import cast
 
@@ -91,6 +92,35 @@ class JobService:
             self._handles.pop(job_id, None)
             self._versions.pop(job_id, None)
             self._last.pop(job_id, None)
+
+    def completed_results(
+        self,
+        *,
+        kind: JobKind,
+        result_schema: str,
+        source_revision: str | None,
+        limit: int = MAX_SEMANTIC_JOBS,
+    ) -> tuple[Mapping[str, object], ...]:
+        """Enumerate compatible completed results deterministically through a bounded read seam."""
+        if type(limit) is not int or not 1 <= limit <= MAX_SEMANTIC_JOBS:
+            raise ValueError(f"limit must be between 1 and {MAX_SEMANTIC_JOBS}")
+        with self._lock:
+            job_ids = sorted(
+                job_id for job_id, handle in self._handles.items() if handle.kind == kind
+            )[:limit]
+        results: list[Mapping[str, object]] = []
+        for job_id in job_ids:
+            status = self.status(job_id, include_result=True)
+            result = status.result
+            if (
+                status.state != "completed"
+                or status.source_revision != source_revision
+                or status.result_schema != result_schema
+                or not isinstance(result, Mapping)
+            ):
+                continue
+            results.append(result)
+        return tuple(results)
 
     def status(self, job_id: str, *, include_result: bool = False) -> JobStatusV1:
         for _attempt in range(3):

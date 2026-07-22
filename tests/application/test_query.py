@@ -120,6 +120,23 @@ def test_query_rejects_scope_mismatched_and_stale_cursors(tmp_path: Path) -> Non
         query_usage(replace(request, cursor=first.next_cursor), db_path=db_path)
 
 
+def test_query_thread_key_filter_is_exact_and_supports_session_fallback(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    _seed(db_path)
+    exact = query_usage(
+        QueryRequest("call", ("tokens",), QueryFilters(thread_key="thread:alpha")),
+        db_path=db_path,
+    )
+    assert [row["record_id"] for row in exact.rows] == ["call-0"]
+    with connect(db_path) as connection:
+        connection.execute("UPDATE usage_events SET thread_key=NULL WHERE record_id='call-3'")
+    fallback = query_usage(
+        QueryRequest("call", ("tokens",), QueryFilters(thread_key="session:session-3")),
+        db_path=db_path,
+    )
+    assert [row["record_id"] for row in fallback.rows] == ["call-3"]
+
+
 def test_subagent_grouping_and_unpriced_estimates_remain_unknown(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     _seed(db_path)

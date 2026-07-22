@@ -220,6 +220,29 @@ def query_thread_summaries(
     return [row_to_dict(row) for row in rows]
 
 
+def query_thread_summary(
+    db_path: Path = DEFAULT_DB_PATH,
+    *,
+    thread_key: str,
+    include_archived: bool = False,
+) -> dict[str, Any] | None:
+    """Return one exact aggregate thread summary in the selected history scope."""
+    scope = "all-history" if include_archived else "active"
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            """
+            SELECT t.*
+            FROM thread_summaries AS t
+            WHERE t.thread_key = ?
+              AND t.is_archived_scope = ?
+            LIMIT 1
+            """,  # nosec B608 - fixed archive predicate only.
+            (thread_key, scope),
+        ).fetchone()
+    return row_to_dict(row) if row is not None else None
+
+
 def _thread_summary_sort_column(sort: str) -> str:
     sort_map = {
         "tokens": "total_tokens",

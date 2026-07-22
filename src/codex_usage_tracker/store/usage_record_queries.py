@@ -57,6 +57,8 @@ def query_session_usage(
 def query_usage_record(
     db_path: Path = DEFAULT_DB_PATH,
     record_id: str | None = None,
+    *,
+    include_archived: bool = True,
 ) -> dict[str, Any] | None:
     """Return one aggregate usage row by stable record id."""
 
@@ -72,9 +74,10 @@ def query_usage_record(
             FROM canonical_usage_events AS usage_events
             {USAGE_TIMING_JOIN_SQL}
             WHERE usage_events.record_id = ?
+                AND (? OR coalesce(usage_events.is_archived, 0) = 0)
             LIMIT 1
             """,
-            (record_id,),
+            (record_id, include_archived),
         ).fetchone()
     return usage_row_to_dict(row) if row is not None else None
 

@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+import inspect
+from pathlib import Path
+
+import pytest
+
+from codex_usage_tracker.application.evidence import get_evidence
+from codex_usage_tracker.core.contracts import serialized_size
+from codex_usage_tracker.evidence.models import EvidenceNotFoundError, EvidenceRequest
+from codex_usage_tracker.interfaces.mcp.core_tools import build_usage_evidence, usage_evidence
+from tests.evidence.test_service import seed_evidence
+
+
+def test_application_facade_builds_matching_context(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    seed_evidence(db_path)
+    result = get_evidence(EvidenceRequest("call", "record-1"), db_path=db_path)
+    assert result.selector == {"kind": "call", "id": "record-1", "section": "summary"}
+    assert result.dashboard_target["target_id"].startswith("evidence:")
+
+
+def test_core_transport_returns_bounded_versioned_envelope(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    seed_evidence(db_path)
+    payload = build_usage_evidence(
+        selector_kind="call",
+        selector_id="record-1",
+        db_path=db_path,
+        pricing_path=tmp_path / "pricing.json",
+    )
+    assert payload["schema"] == "codex-usage-tracker.mcp-envelope.v1"
+    assert payload["result_schema"] == "codex-usage-tracker.evidence-result.v1"
+    assert payload["data_class"] == "aggregate"
+    assert payload["dashboard_targets"][0]["schema"] == (  # type: ignore[index]
+        "codex-usage-tracker-dashboard-target-v2"
+    )
+    assert serialized_size(payload) <= 128 * 1024
+    assert tuple(inspect.signature(usage_evidence).parameters) == (
+        "selector_kind",
+        "selector_id",
+        "section",
+        "limit",
+        "cursor",
+        "history",
+    )
+    with pytest.raises(ValueError, match="selector_id"):
+        build_usage_evidence(selector_kind="call", selector_id="../bad", db_path=db_path)
+    with pytest.raises(EvidenceNotFoundError):
+        build_usage_evidence(selector_kind="call", selector_id="record-999", db_path=db_path)
