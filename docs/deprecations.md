@@ -66,7 +66,7 @@ stdout is never used for deprecation text.
 | `serve-dashboard` | `service serve` |
 | Pricing, allowance, rate-card, projects, and thresholds commands | The matching `config` namespace |
 | Index repair, source coverage, support bundle, and dogfood commands | The matching `admin` namespace |
-| Manual MCP process | `admin mcp serve --profile core|full|developer` |
+| Manual MCP process | `admin mcp serve --profile core\|full\|developer` |
 
 The stable `query` spelling keeps its old-only filters and unbounded `--limit 0`
 form as a v1 compatibility mode. New bounded query options return

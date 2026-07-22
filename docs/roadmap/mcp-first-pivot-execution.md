@@ -678,8 +678,63 @@ commit as each roadmap task.
   adapter into the application package without changing contracts. Historical
   aliases and legacy query mode remain removal-blocked until `0.25.0`.
 
+## Task 27 - Gate and Prepare Release 0.23.0
+
+- Status: blocked; the complete local release candidate is prepared, but
+  publication remains blocked on a stable passing 100,000-row route-budget
+  run. No tag, push, or package publication was performed.
+- Branch: `pivot/27-release-0.23.0`
+- Commits: `6441076` (`chore: prepare 0.23 release contracts`), `f67a647`
+  (`docs: explain the 0.23 Evidence Console`), `a84b10e` (`docs: add core
+  Evidence Console screenshots`), `b775d3c` (`test: capture responsive
+  Evidence Console release evidence`), `460d1e5` (`fix: localize the service
+  namespace`), `893d2f9` (`perf: index all-history allowance observations`),
+  and `1813169` (`chore: refresh Evidence Console assets`), plus this
+  documentation commit.
+- Product inventory: 15 browser routes comprise five Evidence Console routes
+  and ten direct-only legacy routes. Default analytical navigation is Home,
+  Explore, and Limits; Settings is a utility action and Evidence is contextual.
+  Explore provides Calls and Threads modes. All four Evidence selector kinds
+  render, stable old URLs normalize, and Home performs no hidden heavy scan.
+  MCP profiles expose 7 core, 59 full, and 64 developer tools. Primary CLI help
+  exposes 11 commands and retains 34 hidden compatibility aliases. The shared
+  JSON inventory contains 95 schemas.
+- Focused verification: 381 Python acceptance tests passed. The frontend suite
+  passed 607 tests across 115 files. The port-isolated Playwright release
+  candidate passed 14 scenarios, including Explore Calls and Threads parity,
+  stable URL normalization, all Evidence selectors, and the Home scan guard.
+  Twelve synthetic screenshots cover Home, Explore Calls, Explore Threads,
+  Limits, Evidence, Settings, a legacy route, tablet, mobile, 200% zoom,
+  reduced motion, and keyboard use without private user data.
+- Full verification: all 1,880 Python tests passed and coverage measured 88%.
+  Ruff, mypy, Pyright (zero errors and seven inherited lazy-export warnings),
+  TypeScript, ESLint, dependency boundaries, dead-code detection, stylelint,
+  source budgets, dashboard asset parity, release checks, installed-package
+  smoke, and `git diff --check` passed. Initial dashboard payloads measure
+  60.02 KiB JavaScript and 9.66 KiB CSS. The largest visualization chunk is the
+  documented 112.00 KiB gzip exception under its 113.00 KiB ADR limit. The
+  recorded candidate wheel and sdist measure 6,956,865 and 31,909,932 bytes,
+  respectively, and both pass Twine and distribution release checks.
+- Performance evidence: migration 32 added the global newest-first allowance
+  observation index. Pre-index all-history allowance runs measured 0.818 to
+  1.426 seconds; the route measured 0.155 seconds p95 after the index. The latest
+  enforced run still exceeded unrelated cold-route limits: recommendations
+  0.521 > 0.500 seconds, thread calls 0.369 > 0.250, diagnostics facts 0.850 >
+  0.800, and allowance diagnostics 1.485 > 0.750. Population time varied from
+  46.7 to 65.5 seconds across otherwise identical runs, while warm medians and
+  the repaired allowance-history route remained healthy.
+- Deviations from plan: release preparation is complete, but Task 27 is not
+  marked complete because its named performance gate is red under the current
+  variable host load. The additive database index and its schema documentation
+  were necessary to correct a real query-plan issue revealed by the gate. No
+  threshold was loosened and no failing result was hidden.
+- Follow-up risks: rerun the named route-budget gate on a stable host or CI
+  runner before publication. If the same cold-route violations reproduce under
+  stable load, profile and optimize them before tagging 0.23.0. The local
+  release artifacts are candidates only until that gate passes.
+
 ## Remaining Planned Tasks
 
-Tasks 27 through 45 remain planned in the approved implementation roadmap. Add
+Tasks 28 through 45 remain planned in the approved implementation roadmap. Add
 a full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

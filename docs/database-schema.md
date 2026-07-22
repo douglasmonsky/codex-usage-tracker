@@ -69,7 +69,9 @@ staging tables and their source cursors along with the other tracker-owned rows.
 
 `allowance_observations` stores normalized structured weekly and 5-hour snapshots,
 their cohort/reset identity, canonical/physical linkage, conflicts, and source
-revision.
+revision. Schema migration 32 adds the newest-first all-history index used by
+bounded allowance evidence reads; the migration is additive and does not
+rewrite observation rows.
 
 `allowance_cycles` stores one reset-aware cycle summary: window/cohort identity,
 normalized reset, observed range, latest/peak percentage, canonical token/credit
