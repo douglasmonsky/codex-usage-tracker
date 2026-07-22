@@ -10,6 +10,15 @@ CANONICAL_DATA_POSTURE = (
     "shareable outputs follow existing behavior."
 )
 
+FORBIDDEN_DASHBOARD_DEPENDENCIES = {"three", "@types/three"}
+FORBIDDEN_CONSTELLATION_PATHS = {
+    "frontend/dashboard/src/features/overview/usageConstellationModel.ts",
+    "frontend/dashboard/src/features/overview/usageConstellationModel.test.ts",
+    "frontend/dashboard/src/visualization/three",
+    "tests/playwright/dashboard-constellation.spec.mjs",
+}
+MAX_INITIAL_DASHBOARD_JS_KIB = 67
+
 CORE_MCP_TOOL_NAMES = (
     "usage_status",
     "usage_refresh",

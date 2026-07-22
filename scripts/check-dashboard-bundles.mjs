@@ -4,15 +4,13 @@ import { readFile, readdir } from 'node:fs/promises';
 const outputDir = new URL('../src/codex_usage_tracker/plugin_data/dashboard/react/', import.meta.url);
 const budgets = {
   // Equivalent bundles vary slightly across zlib builds; retain bounded platform headroom.
-  currentInitialJs: 170 * 1024,
+  currentInitialJs: 67 * 1024,
   currentInitialCss: 10 * 1024,
   targetInitialJs: 85 * 1024,
   targetInitialCss: 12 * 1024,
-  routeJs: 65 * 1024,
-  // ADR 0006 keeps 110 kB as the target and permits 114 kB of measured headroom.
-  visualizationRouteJs: 114 * 1024,
-  // ADR 0008 isolates the optional Three.js constellation behind a 140 kB hard ceiling.
-  constellationRouteJs: 140 * 1024,
+  routeJs: 55 * 1024,
+  // ADR 0006 keeps 110 kB as the target and permits 113 kB of measured headroom.
+  visualizationRouteJs: 113 * 1024,
   routeCss: 20 * 1024
 };
 
@@ -32,7 +30,6 @@ for (const file of assets) {
     gzipBytes: gzipSync(content, { level: 9, mtime: 0 }).byteLength,
     kind: initialFiles.has(outputPath) ? 'initial' : 'route',
     visualizationCore: content.includes('ZRender, a high performance 2d drawing library'),
-    constellationRenderer: file === 'UsageConstellationCanvas.js'
   });
 }
 
@@ -61,9 +58,7 @@ if (initialCssBytes > budgets.currentInitialCss) {
   failures.push(`initial css ${kib(initialCssBytes)} exceeds ${kib(budgets.currentInitialCss)}`);
 }
 for (const row of rows.filter((item) => item.kind === 'route' && item.file.endsWith('.js'))) {
-  const limit = row.constellationRenderer
-    ? budgets.constellationRouteJs
-    : row.visualizationCore || /visualization|chart/i.test(row.file)
+  const limit = row.visualizationCore || /visualization|chart/i.test(row.file)
       ? budgets.visualizationRouteJs
       : budgets.routeJs;
   if (row.gzipBytes > limit) failures.push(`${row.file} ${kib(row.gzipBytes)} exceeds ${kib(limit)}`);

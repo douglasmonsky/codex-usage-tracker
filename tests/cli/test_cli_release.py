@@ -4,6 +4,7 @@ import ast
 import importlib.util
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -14,7 +15,14 @@ from typing import Protocol, cast
 from codex_usage_tracker import __version__
 from codex_usage_tracker.cli.main import _COMMAND_HANDLERS
 from codex_usage_tracker.core.json_contracts import known_json_schemas
-from tests.release_catalog import ALL_MCP_TOOL_NAMES, MCP_TOOL_NAMES, STABLE_CLI_COMMANDS
+from tests.release_catalog import (
+    ALL_MCP_TOOL_NAMES,
+    FORBIDDEN_CONSTELLATION_PATHS,
+    FORBIDDEN_DASHBOARD_DEPENDENCIES,
+    MAX_INITIAL_DASHBOARD_JS_KIB,
+    MCP_TOOL_NAMES,
+    STABLE_CLI_COMMANDS,
+)
 
 
 class _ReleaseCheckModule(Protocol):
@@ -60,6 +68,34 @@ def test_release_check_script_passes() -> None:
     )
 
     assert "Release readiness checks passed." in result.stdout
+
+
+def test_dashboard_release_excludes_three_and_constellation_artifacts() -> None:
+    root = Path(__file__).resolve().parents[2]
+    dashboard_package = json.loads(
+        (root / "frontend" / "dashboard" / "package.json").read_text(encoding="utf-8")
+    )
+    declared = set(dashboard_package["dependencies"]) | set(dashboard_package["devDependencies"])
+    assert declared.isdisjoint(FORBIDDEN_DASHBOARD_DEPENDENCIES)
+
+    lock_packages = json.loads((root / "package-lock.json").read_text(encoding="utf-8"))["packages"]
+    assert not any(
+        package.removeprefix("node_modules/") in FORBIDDEN_DASHBOARD_DEPENDENCIES
+        for package in lock_packages
+    )
+    assert not any((root / path).exists() for path in FORBIDDEN_CONSTELLATION_PATHS)
+
+    assets = root / "src" / "codex_usage_tracker" / "plugin_data" / "dashboard" / "react" / "assets"
+    assert not any("UsageConstellation" in path.name for path in assets.iterdir())
+
+
+def test_dashboard_main_bundle_budget_is_ratcheted_after_constellation_removal() -> None:
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts" / "check-dashboard-bundles.mjs"
+    ).read_text(encoding="utf-8")
+    match = re.search(r"currentInitialJs:\s*(\d+)\s*\*\s*1024", script)
+    assert match is not None
+    assert int(match.group(1)) <= MAX_INITIAL_DASHBOARD_JS_KIB
 
 
 def test_release_check_accepts_setup_node_v7(tmp_path: Path) -> None:

@@ -104,6 +104,14 @@ REACT_DASHBOARD_PRIVACY_PATTERNS = {
         r'"role"\s*:\s*"user"\s*,\s*"content"\s*:\s*\[',
     ),
 }
+DASHBOARD_FORBIDDEN_DEPENDENCIES = {"three", "@types/three"}
+DASHBOARD_REMOVED_VISUALIZATION_PATHS = (
+    "frontend/dashboard/src/features/overview/usageConstellationModel.ts",
+    "frontend/dashboard/src/features/overview/usageConstellationModel.test.ts",
+    "frontend/dashboard/src/visualization/three",
+    "tests/playwright/dashboard-constellation.spec.mjs",
+)
+DASHBOARD_THREE_IMPORT = re.compile(r'''(?:from\s+|import\s*\()\s*["']three(?:/|["'])''')
 REQUIRED_FILES = [
     "README.md",
     "LICENSE",
@@ -277,6 +285,7 @@ def main() -> int:
     failures.extend(_check_packaging_metadata())
     failures.extend(_check_tracked_files_for_secrets())
     failures.extend(_check_react_dashboard_privacy_artifacts())
+    failures.extend(_check_removed_dashboard_visualization())
     if args.dist:
         failures.extend(_check_sdist())
         failures.extend(_check_wheel())
@@ -314,6 +323,53 @@ def _check_dashboard_asset_sync() -> list[str]:
         if paths:
             failures.append(
                 "dashboard React assets include untracked generated files: " + ", ".join(paths)
+            )
+    return failures
+
+
+def _check_removed_dashboard_visualization() -> list[str]:
+    failures: list[str] = []
+    dashboard_package = json.loads(
+        (REPO_ROOT / "frontend/dashboard/package.json").read_text(encoding="utf-8")
+    )
+    declared = set(dashboard_package.get("dependencies", {})) | set(
+        dashboard_package.get("devDependencies", {})
+    )
+    for dependency in sorted(declared & DASHBOARD_FORBIDDEN_DEPENDENCIES):
+        failures.append(f"removed dashboard dependency remains declared: {dependency}")
+
+    lock_packages = json.loads((REPO_ROOT / "package-lock.json").read_text(encoding="utf-8"))[
+        "packages"
+    ]
+    for package in sorted(lock_packages):
+        dependency = package.removeprefix("node_modules/")
+        if dependency in DASHBOARD_FORBIDDEN_DEPENDENCIES:
+            failures.append(f"removed dashboard dependency remains locked: {dependency}")
+
+    for relative_path in DASHBOARD_REMOVED_VISUALIZATION_PATHS:
+        if (REPO_ROOT / relative_path).exists():
+            failures.append(f"removed dashboard visualization path remains: {relative_path}")
+
+    source_root = REPO_ROOT / "frontend/dashboard/src"
+    for path in sorted((*source_root.rglob("*.ts"), *source_root.rglob("*.tsx"))):
+        if DASHBOARD_THREE_IMPORT.search(path.read_text(encoding="utf-8")):
+            failures.append(
+                "removed Three.js import remains: " + path.relative_to(REPO_ROOT).as_posix()
+            )
+
+    assets_root = REPO_ROOT / "src/codex_usage_tracker/plugin_data/dashboard/react"
+    for path in sorted(assets_root.rglob("*")):
+        if (
+            path.is_file()
+            and path.suffix in {".html", ".js"}
+            and (
+                "UsageConstellation" in path.name
+                or "UsageConstellation" in path.read_text(encoding="utf-8")
+            )
+        ):
+            failures.append(
+                "removed constellation reference remains in packaged asset: "
+                + path.relative_to(REPO_ROOT).as_posix()
             )
     return failures
 

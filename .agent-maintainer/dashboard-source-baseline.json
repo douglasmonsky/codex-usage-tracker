@@ -27,8 +27,8 @@
     },
     "frontend/dashboard/src/app/zh-Hans/corePages.ts": {
       "group": "source",
-      "nonblank": 716,
-      "physical": 733
+      "nonblank": 713,
+      "physical": 730
     },
     "frontend/dashboard/src/app/zh-Hans/diagnosticsReports.ts": {
       "group": "source",
