@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from functools import lru_cache
+from functools import cache, lru_cache
 
 from codex_usage_tracker.interfaces.mcp.models import McpProfile, ToolDataClass, ToolSpec
 
@@ -255,10 +255,20 @@ def _legacy_handlers() -> dict[str, Callable[..., object]]:
     return handlers
 
 
+@cache
+def _lazy_legacy_handler(name: str) -> Callable[..., object]:
+    """Return a callable proxy without importing legacy handler modules."""
+
+    def invoke(*args: object, **kwargs: object) -> object:
+        return _legacy_handlers()[name](*args, **kwargs)
+
+    invoke.__name__ = name
+    return invoke
+
+
 @lru_cache(maxsize=1)
 def tool_specs() -> tuple[ToolSpec, ...]:
     """Return the validated immutable tool catalog in registration order."""
-    handlers = _legacy_handlers()
     specs = tuple(
         ToolSpec(
             name=name,
@@ -276,7 +286,7 @@ def tool_specs() -> tuple[ToolSpec, ...]:
             maturity="beta",
             lifecycle="deprecated",
             data_class=_data_class(name),
-            handler=handlers[name],
+            handler=_lazy_legacy_handler(name),
             replacement=_replacement(name),
             deprecated_since="0.22.0",
             remove_after="0.25.0",
@@ -289,7 +299,7 @@ def tool_specs() -> tuple[ToolSpec, ...]:
             maturity="experimental",
             lifecycle="active",
             data_class=_data_class(name),
-            handler=handlers[name],
+            handler=_lazy_legacy_handler(name),
         )
         for name in _DEVELOPER_TOOL_NAMES
     )
@@ -299,6 +309,8 @@ def tool_specs() -> tuple[ToolSpec, ...]:
 
 def handler_for_profile(spec: ToolSpec, profile: McpProfile) -> Callable[..., object]:
     """Preserve existing overlapping handlers outside the core-only server."""
-    if profile != "core" and spec.name in {"usage_status", "usage_query"}:
+    if profile != "core" and (
+        spec.minimum_profile != "core" or spec.name in {"usage_status", "usage_query"}
+    ):
         return _legacy_handlers()[spec.name]
     return spec.handler
