@@ -26,12 +26,29 @@ def decode_json_object(body: bytes, *, content_type: str, max_bytes: int) -> dic
     if len(body) > max_bytes:
         raise HttpRequestError(413, "request_too_large", f"request body exceeds {max_bytes} bytes")
     try:
-        payload = json.loads(body.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        payload = json.loads(
+            body.decode("utf-8"),
+            object_pairs_hook=_unique_object,
+            parse_constant=_reject_non_finite,
+        )
+    except (UnicodeDecodeError, ValueError) as exc:
         raise HttpRequestError(400, "invalid_json", "request body must be valid JSON") from exc
     if not isinstance(payload, dict):
         raise HttpRequestError(400, "invalid_request", "request body must be a JSON object")
     return payload
+
+
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON field: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_non_finite(value: str) -> None:
+    raise ValueError(f"non-finite JSON number: {value}")
 
 
 def read_bounded_body(

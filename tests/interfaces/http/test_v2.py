@@ -167,6 +167,12 @@ def test_json_decoder_rejects_wrong_content_type_malformed_and_oversized_bodies(
         decode_json_object(b'{"value":"too large"}', content_type="application/json", max_bytes=16)
 
 
+@pytest.mark.parametrize("body", [b'{"value":NaN}', b'{"value":1,"value":2}'])
+def test_json_decoder_rejects_non_standard_numbers_and_duplicate_fields(body: bytes) -> None:
+    with pytest.raises(HttpRequestError, match="valid JSON"):
+        decode_json_object(body, content_type="application/json", max_bytes=64)
+
+
 @pytest.mark.parametrize(
     "path",
     ["/api/v2/refresh", "/api/v2/analyze", "/api/v2/allowance"],
