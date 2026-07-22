@@ -22,7 +22,7 @@ commit as each roadmap task.
 - Status: complete
 - Branch: `pivot/1-establish-program`
 - Commits: `3488d7a` (`docs: add MCP-first pivot design and roadmap`);
-  `docs: establish MCP-first pivot program` (this commit)
+  `9a0d6ce` (`docs: establish MCP-first pivot program`)
 - Focused verification: `python -m pytest tests/packaging/test_public_docs.py tests/cli/test_cli_release.py -q`
 - Full verification: `npx markdownlint-cli2 README.md "docs/**/*.md" ".agent-maintainer/change-plans/*.md"`; `git diff --check`
 - Deviations from plan: Approved design and implementation roadmap were adopted

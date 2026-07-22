@@ -102,7 +102,7 @@ For each task:
 
 **Interfaces:**
 
-- Produces the normative release sequence, compatibility dates, execution ledger format, and prohibition on unplanned product-surface growth.
+- Produces the normative release sequence, compatibility release windows, execution ledger format, and prohibition on unplanned product-surface growth.
 - Later tasks consume `docs/deprecations.md` and `docs/roadmap/mcp-first-pivot-execution.md`.
 
 **Required execution-ledger entry:**

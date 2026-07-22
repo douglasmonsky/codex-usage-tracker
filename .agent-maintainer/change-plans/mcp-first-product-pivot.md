@@ -35,7 +35,7 @@ or product-surface changes.
 ## Scope
 
 - Adopt the approved design and implementation roadmap without adding features.
-- Record releases `0.22.0` through `0.26.0`, bounded compatibility dates, and
+- Record releases `0.22.0` through `0.26.0`, bounded release windows, and
   the surface-growth freeze.
 - Establish the execution and deprecation ledgers consumed by later tasks.
 - Add focused tests for the public program contracts.

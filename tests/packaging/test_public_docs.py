@@ -21,6 +21,7 @@ def test_deprecation_ledger_has_required_compatibility_columns() -> None:
     for column in (
         "Public name or route",
         "Replacement",
+        "Owner",
         "Deprecated release",
         "Final supported release",
         "Removal release",
@@ -28,6 +29,15 @@ def test_deprecation_ledger_has_required_compatibility_columns() -> None:
         "Migration example",
     ):
         assert f"| {column} " in deprecations
+
+
+def test_agent_branch_prefixes_allow_the_required_pivot_branches() -> None:
+    guidance = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    allowed_prefixes = next(
+        line for line in guidance.splitlines() if line.startswith("- Use branch prefixes ")
+    )
+
+    assert "`pivot/`" in allowed_prefixes
 
 
 def test_architecture_declares_mcp_primary_and_evidence_console_supporting() -> None:
