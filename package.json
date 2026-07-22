@@ -19,7 +19,7 @@
     "dashboard:governance": "npm run dashboard:boundaries && npm run dashboard:dead-code && npm run dashboard:stylelint && npm run dashboard:source-budget",
     "dashboard:bundle-report": "npm run dashboard:build && node scripts/check-dashboard-bundles.mjs && npm run dashboard:visualization-bundle",
     "dashboard:visualization-bundle": "node scripts/check-visualization-renderer-bundle.mjs",
-    "dashboard:verify": "npm run dashboard:lint && npm run dashboard:typecheck && npm run dashboard:test && npm run dashboard:governance && npm run dashboard:bundle-report",
+    "dashboard:verify": "npm run dashboard:lint && npm run dashboard:typecheck && npm run dashboard:test && npm run dashboard:governance && npm run dashboard:bundle-report && python3 scripts/check_release.py",
     "dashboard:release-candidate": "REACT_DASHBOARD_WEB_SERVER=1 playwright test tests/playwright/dashboard-release-candidate.spec.mjs --project=chromium-desktop",
     "dashboard:smoke": "REACT_DASHBOARD_WEB_SERVER=1 playwright test tests/playwright/dashboard-react.spec.mjs",
     "dashboard:visualization-smoke": "REACT_DASHBOARD_WEB_SERVER=1 DASHBOARD_BASE_URL=http://127.0.0.1:5173/codex-usage-tracker-assets/react/ playwright test tests/playwright/dashboard-visualization.spec.mjs --project=chromium-desktop",
