@@ -8,15 +8,11 @@ import AxeBuilder from '@axe-core/playwright';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 const workspaces = [
-  ['Overview', '/?view=overview&qa=r11-accessibility'],
-  ['Investigate', '/?view=investigator&qa=r11-accessibility'],
-  ['Calls', '/?view=calls&qa=r11-accessibility'],
-  ['Call Investigator', '/?view=call&record=fixture-call-2&qa=r11-accessibility'],
-  ['Threads', '/?view=threads&thread=thread-9f3a1c&qa=r11-accessibility'],
-  ['Limits', '/?view=usage-drain&qa=r11-accessibility'],
-  ['Cache And Context Lab', '/?view=cache-context&qa=r11-accessibility'],
-  ['Diagnostics Notebook', '/?view=diagnostics&qa=r11-accessibility'],
-  ['Reports', '/?view=reports&qa=r11-accessibility'],
+  ['Home', '/?view=home&qa=r11-accessibility'],
+  ['Calls', '/?view=explore&mode=calls&qa=r11-accessibility'],
+  ['Threads', '/?view=explore&mode=threads&thread=thread-9f3a1c&qa=r11-accessibility'],
+  ['Call Investigator', '/?view=evidence&kind=call&record=fixture-call-2&qa=r11-accessibility'],
+  ['Limits', '/?view=limits&qa=r11-accessibility'],
   ['Settings', '/?view=settings&qa=r11-accessibility'],
 ];
 
@@ -30,7 +26,7 @@ test.describe('R11 dashboard release candidate', () => {
   test('defines and gates the release-candidate command in one Chromium CI job', async () => {
     const packageJson = JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8'));
     expect(packageJson.scripts['dashboard:release-candidate']).toBe(
-      'REACT_DASHBOARD_WEB_SERVER=1 DASHBOARD_BASE_URL=http://127.0.0.1:5173 playwright test tests/playwright/dashboard-release-candidate.spec.mjs --project=chromium-desktop',
+      'REACT_DASHBOARD_WEB_SERVER=1 playwright test tests/playwright/dashboard-release-candidate.spec.mjs --project=chromium-desktop',
     );
 
     const workflow = await readFile(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8');
@@ -82,7 +78,7 @@ test.describe('R11 dashboard release candidate', () => {
   test('keeps the dense toolbar and Threads controls compact without wrapping commands', async ({ page }) => {
     for (const viewport of [{ width: 2048, height: 900 }, { width: 1280, height: 720 }]) {
       await page.setViewportSize(viewport);
-      await openWorkspace(page, 'Threads', '/?view=threads&thread=thread-9f3a1c&qa=r11-toolbar-density');
+      await openWorkspace(page, 'Threads', '/?view=explore&mode=threads&thread=thread-9f3a1c&qa=r11-toolbar-density');
 
       const geometry = await page.evaluate(() => {
         const box = element => {
@@ -217,15 +213,13 @@ test.describe('R11 dashboard release candidate', () => {
     }
   });
 
-  test('preserves baseline navigation and the browser-local experimental preference', async ({ page }) => {
-    await openWorkspace(page, 'Overview', '/?view=overview&qa=release-n-preference');
+  test('keeps simplified navigation stable while preserving the browser-local preference', async ({ page }) => {
+    await openWorkspace(page, 'Home', '/?view=home&qa=release-n-preference');
     const primary = page.getByRole('navigation', { name: 'Primary' });
-    for (const label of [
-      'Overview', 'Investigate', 'Compression Lab', 'Calls', 'Threads',
-      'Limits', 'Cache And Context', 'Diagnostics Notebook', 'Reports', 'Settings',
-    ]) {
+    for (const label of ['Home', 'Explore', 'Limits']) {
       await expect(primary.getByRole('button', { name: label, exact: true }), `${label} baseline navigation`).toBeVisible();
     }
+    await expect(page.getByRole('group', { name: 'Utility' }).getByRole('button', { name: 'Settings' })).toBeVisible();
 
     await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference');
     await page.getByRole('button', { name: 'Advanced', exact: true }).click();
@@ -235,15 +229,15 @@ test.describe('R11 dashboard release candidate', () => {
     await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference-reload');
     await page.getByRole('button', { name: 'Advanced', exact: true }).click();
     await expect(page.getByRole('checkbox', { name: 'Show experimental dashboard features' })).toBeChecked();
-    await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();
-    await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toBeVisible();
+    await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toHaveCount(0);
+    await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toHaveCount(0);
 
     await page.getByRole('checkbox', { name: 'Show experimental dashboard features' }).uncheck();
     await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference-reset');
     await page.getByRole('button', { name: 'Advanced', exact: true }).click();
     await expect(page.getByRole('checkbox', { name: 'Show experimental dashboard features' })).not.toBeChecked();
-    await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();
-    await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toBeVisible();
+    await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toHaveCount(0);
+    await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toHaveCount(0);
   });
 
   test('keeps direct lifecycle routes reachable with their maturity banners', async ({ page }) => {
@@ -261,29 +255,30 @@ test.describe('R11 dashboard release candidate', () => {
     }
     await expect(
       page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Diagnostics Notebook', exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(0);
   });
 
   test('preserves the Call Investigator return route and thread context', async ({ page }) => {
     await openWorkspace(
       page,
       'Call Investigator',
-      '/?view=call&record=fixture-call-2&return=threads&thread=thread-9f3a1c&qa=release-n-return',
+      '/?view=evidence&kind=call&record=fixture-call-2&return=explore&return_mode=threads&thread=thread-9f3a1c&qa=release-n-return',
     );
-    await page.getByRole('button', { name: 'Back to Threads' }).click();
+    await page.getByRole('button', { name: 'Back to Explore' }).click();
     await expect(page.getByRole('heading', { name: 'Threads', exact: true })).toBeVisible();
-    await expect(page).toHaveURL(/view=threads/);
-    await expect(page).not.toHaveURL(/record=|return=/);
+    await expect(page).toHaveURL(/view=explore/);
+    await expect(page).toHaveURL(/mode=threads/);
+    await expect(page).not.toHaveURL(/record=|return=|kind=call/);
   });
 
-  test('renders every readiness state with recovery guidance and manual fallbacks', async ({ browser }, testInfo) => {
+  test('renders every conversational readiness state on Home', async ({ browser }, testInfo) => {
     const states = [
-      ['ready', 'Ready', /current task loaded MCP tools/i],
-      ['restart-required', 'Restart required', /Restart Codex and open a fresh task/i],
-      ['unavailable', 'Unavailable', /setup|doctor/i],
-      ['unknown', 'Unknown', /could not be determined/i],
+      ['ready', 'Ready'],
+      ['restart-required', 'Restart required'],
+      ['unavailable', 'Unavailable'],
+      ['unknown', 'Checking'],
     ];
-    for (const [state, label, guidance] of states) {
+    for (const [state, label] of states) {
       const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL });
       const statePage = await context.newPage();
       const browserIssues = collectBrowserIssues(statePage);
@@ -303,14 +298,12 @@ test.describe('R11 dashboard release candidate', () => {
         next_action: null,
         evidence: [],
       });
-      await openWorkspace(statePage, 'Overview', '/?view=overview&qa=release-n-readiness');
-      const readiness = statePage.getByRole('heading', { name: 'Analysis readiness' }).locator('xpath=ancestor::section');
-      await expect(readiness.getByText(label, { exact: true })).toBeVisible();
-      await expect(readiness.getByText(guidance)).toBeVisible();
-      await expect(readiness.getByText('Manual fallback', { exact: true })).toBeVisible();
-      for (const fallback of ['Calls', 'Threads', 'Limits', 'Diagnostics', 'Advanced experimental controls']) {
-        await expect(readiness.getByText(fallback, { exact: true })).toBeVisible();
-      }
+      await openWorkspace(statePage, 'Home', '/?view=home&qa=release-n-readiness');
+      const readiness = statePage.getByRole('region', { name: 'Home status' })
+        .getByRole('article')
+        .filter({ hasText: 'Conversational analysis' });
+      await expect(readiness.getByText(label, { exact: true }).first()).toBeVisible();
+      await expect(readiness).toContainText('profile');
       expect(browserIssues, `${state} readiness console/page errors`).toEqual([]);
       await context.close();
     }
