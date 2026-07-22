@@ -808,7 +808,9 @@ git commit -m "feat: orchestrate evidence-backed usage analysis"
 
 **Files:**
 
+- Modify: `src/codex_usage_tracker/application/query.py`
 - Modify: `src/codex_usage_tracker/interfaces/mcp/core_tools.py`
+- Create: `src/codex_usage_tracker/interfaces/mcp/query_analysis_tools.py`
 - Modify: `src/codex_usage_tracker/interfaces/mcp/registry.py`
 - Create: `tests/mcp/test_core_query_tool.py`
 - Create: `tests/mcp/test_core_analyze_tool.py`
@@ -852,17 +854,17 @@ def usage_analyze_tool(
 - The tool descriptions contain examples and explain when to choose query versus analyze.
 - No tool accepts arbitrary text intended to be interpreted as a query language.
 
-- [ ] **Step 1: Write failing tool-profile tests.** Assert both names exist in `core`, each has a single registration, and compatibility imports cannot register a duplicate.
+- [x] **Step 1: Write failing tool-profile tests.** Assert both names exist in `core`, each has a single registration, and compatibility imports cannot register a duplicate.
 
-- [ ] **Step 2: Write tool contract tests.** Use the application layer with injected temporary paths. Cover a completed analysis and an asynchronous job response.
+- [x] **Step 2: Write tool contract tests.** Use the application layer with injected temporary paths. Cover a completed analysis and an asynchronous job response.
 
-- [ ] **Step 3: Implement thin transport adapters.** Parse transport values into request dataclasses, call application services, and serialize typed results. Keep functions under 60 physical lines.
+- [x] **Step 3: Implement thin transport adapters.** Parse transport values into request dataclasses, call application services, and serialize typed results. Keep functions under 60 physical lines.
 
-- [ ] **Step 4: Rewrite the API skill's routing guidance.** Broad diagnostic questions use `usage_analyze`; precise tabular questions use `usage_query`; raw-context tools are not part of the default flow.
+- [x] **Step 4: Rewrite the API skill's routing guidance.** Broad diagnostic questions use `usage_analyze`; precise tabular questions use `usage_query`; raw-context tools are not part of the default flow.
 
-- [ ] **Step 5: Synchronize packaged skill bytes.** `scripts/check_release.py` must verify exact equality.
+- [x] **Step 5: Synchronize packaged skill bytes.** `scripts/check_release.py` must verify exact equality.
 
-- [ ] **Step 6: Verify.**
+- [x] **Step 6: Verify.**
 
 ```bash
 python -m pytest tests/mcp/test_core_query_tool.py tests/mcp/test_core_analyze_tool.py tests/mcp/test_tool_profiles.py tests/cli/test_mcp_integration.py -q

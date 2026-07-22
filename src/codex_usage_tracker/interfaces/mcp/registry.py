@@ -6,7 +6,9 @@ from collections.abc import Callable, Iterable
 from functools import cache, lru_cache
 
 from codex_usage_tracker.interfaces.mcp.core_tools import (
+    usage_analyze,
     usage_job_status,
+    usage_query,
     usage_refresh,
     usage_status,
 )
@@ -94,16 +96,6 @@ class ToolCatalogError(ValueError):
 
 class CoreToolNotImplemented(NotImplementedError):
     """Raised when a later roadmap task has not supplied a core service yet."""
-
-
-def usage_analyze() -> object:
-    """Placeholder for the core analysis contract."""
-    raise CoreToolNotImplemented("usage_analyze is implemented by a later roadmap task")
-
-
-def usage_query() -> object:
-    """Placeholder for the core query contract."""
-    raise CoreToolNotImplemented("usage_query is implemented by a later roadmap task")
 
 
 def usage_evidence() -> object:

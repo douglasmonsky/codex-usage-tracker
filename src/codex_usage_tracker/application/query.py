@@ -8,7 +8,8 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from codex_usage_tracker.application.context import build_request_context
+from codex_usage_tracker.application.context import RequestContext, build_request_context
+from codex_usage_tracker.application.errors import RequestContextError
 from codex_usage_tracker.application.query_models import (
     DashboardTargetV2,
     QueryRequest,
@@ -37,6 +38,7 @@ def query_usage(
     db_path: Path = DEFAULT_DB_PATH,
     pricing_path: Path = DEFAULT_PRICING_PATH,
     allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+    context: RequestContext | None = None,
 ) -> QueryResult:
     """Execute one validated canonical query with revision-bound keyset pagination."""
     normalized = validate_query_request(request)
@@ -49,7 +51,11 @@ def query_usage(
         model=normalized.filters.model,
         effort=normalized.filters.effort,
     )
-    context = build_request_context(db_path=db_path, pricing_path=pricing_path, scope=scope)
+    context = context or build_request_context(
+        db_path=db_path, pricing_path=pricing_path, scope=scope
+    )
+    if context.scope != scope.to_contract():
+        raise RequestContextError("query context scope does not match the normalized request")
     fingerprint = _query_fingerprint(normalized)
     cursor_sort: object | None = None
     cursor_identity: str | None = None

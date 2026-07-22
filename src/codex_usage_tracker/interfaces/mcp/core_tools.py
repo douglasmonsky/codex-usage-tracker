@@ -25,6 +25,18 @@ from codex_usage_tracker.core.contracts import (
 )
 from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH, DEFAULT_PRICING_PATH
 from codex_usage_tracker.interfaces.mcp.models import McpProfile
+from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
+    build_usage_analyze as build_usage_analyze,
+)
+from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
+    build_usage_query as build_usage_query,
+)
+from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
+    usage_analyze as usage_analyze,
+)
+from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
+    usage_query as usage_query,
+)
 
 MAX_STATUS_PAYLOAD_BYTES = 16 * 1024
 MAX_REFRESH_PAYLOAD_BYTES = 64 * 1024

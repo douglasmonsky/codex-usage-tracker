@@ -33,15 +33,15 @@ For maintainer dogfood or plugin-quality checks, prefer the MCP polling flow whe
 
 ## Router
 
-1. If the user asks what to inspect, wants suggestions, or is unsure where to start, call `usage_suggest_investigations(goal=...)`.
-2. If the user asks broadly to look through usage, find waste, explain expensive usage, improve efficiency, compress context, or recommend changes, use the Compression Lab lifecycle first. If you need a single compatibility entrypoint, call `usage_investigate(goal="token_waste")` or `usage_action_brief(goal="token_waste")`, then follow `compression_lab.next`.
+1. If the user asks a broad diagnostic or explanatory question, call `usage_analyze(goal=...)`; for example, use `goal="token_waste"` to explain waste or `goal="usage_spike"` to explain a surge.
+2. If the user asks an exact tabular, filtered, or grouped question, call `usage_query(entity=..., measures=[...], filters=..., group_by=...)`; for example, group token totals by model and effort.
 3. If the user frames the work as hypotheses, asks for true/false/partial decisions, or wants "I'd like to / I will use / I'm missing / hypothesis result" output, call `usage_test_hypotheses(question=..., hypotheses=...)`.
 4. If the user asks about limits, allowance, throttling, weekly movement, or the 5-hour counter, start with canonical `usage_allowance_status()`. Use bounded `usage_allowance_series(...)` and `usage_allowance_evidence(...)` for detail. Use `usage_allowance_analysis(...)`, poll `usage_allowance_analysis_status(job_id)` when needed, then reload the analysis. Reserve `usage_allowance_diagnostics` and `usage_allowance_export` for explicit compatibility or offline evidence requests.
 5. If the user asks about cache misses, cold resumes, context bloat, or low-output expensive calls, start with `usage_compression_start(...)`; after the profile, inspect selected candidates plus `usage_large_low_output_calls(...)`, `usage_calls(...)`, `usage_report_pack(...)`, or `usage_context_bloat_scan(...)` when useful.
 6. If the user asks about repeated shell probing, repeated file rediscovery, or workflow churn, start with `usage_compression_start(...)`; after the profile, inspect selected candidates plus `usage_shell_churn(...)`, `usage_repeated_file_rediscovery(...)`, or `usage_investigation_walk(question=...)` when useful.
-7. If the user asks a precise dashboard/API question, use the direct tool: `usage_calls`, `usage_call_detail`, `usage_threads`, `usage_summary`, `usage_query`, `session_usage`, `usage_report_pack`, `usage_dashboard_recommendations`, `usage_recommendations`, `most_expensive_usage_calls`, `usage_pricing_coverage`, or `usage_source_coverage`.
+7. Use older direct diagnostic tools only when the core query/analysis contracts cannot answer the request or compatibility behavior is explicit.
 8. If the user asks to visualize, chart, plot, or show a usage pattern, call `usage_visualization_suggest(question=...)` when the intent is unclear, then `usage_visualization_render(kind=..., format="spec")`. Use the returned narrative and synchronized evidence table even when the client cannot render the spec.
-9. Use `usage_content_search(...)` and `usage_thread_trace(...)` only for explicit local content-index exploration when the user agrees transcript-level indexed snippets are needed.
+9. Raw-context tools are not part of the default flow. Use `usage_content_search(...)` and `usage_thread_trace(...)` only for explicit local content-index exploration when the user agrees transcript-level indexed snippets are needed.
 10. Use `usage_call_context(...)` only when the user explicitly asks for raw local context and the MCP server has raw context enabled.
 
 ## Dashboard Evidence Targets

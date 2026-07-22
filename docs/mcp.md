@@ -119,6 +119,13 @@ the highest-token thread summaries instead.
 
 ## Tools
 
+The default `core` profile uses `usage_analyze` for broad diagnostic or
+explanatory questions (for example, `goal="token_waste"`) and `usage_query`
+for exact tabular or grouped questions (for example, tokens grouped by model
+and effort). Both return bounded versioned envelopes. An asynchronous analysis
+returns an analysis-job handle; poll its `job_id` with `usage_job_status`.
+Raw-context compatibility tools are not part of this default flow.
+
 - `refresh_usage_index`
 - `usage_refresh_start`
 - `usage_refresh_status`
@@ -126,6 +133,7 @@ the highest-token thread summaries instead.
 - `usage_summary`
 - `subagent_usage`
 - `usage_query`
+- `usage_analyze`
 - `usage_status`
 - `usage_dedupe_diagnostics`
 - `usage_calls`

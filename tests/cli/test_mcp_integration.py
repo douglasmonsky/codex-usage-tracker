@@ -797,3 +797,13 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     assert disk_cached["status"] == "completed"
     assert disk_cached["result_cache"]["hit"] is True
     assert disk_cached["result_cache"]["source"] == "disk"
+
+
+def test_core_query_adapter_does_not_replace_legacy_cli_handler() -> None:
+    from codex_usage_tracker import mcp_server
+    from codex_usage_tracker.interfaces.mcp.registry import handler_for_profile, tool_specs
+
+    query_spec = next(spec for spec in tool_specs() if spec.name == "usage_query")
+    assert handler_for_profile(query_spec, "core") is query_spec.handler
+    assert handler_for_profile(query_spec, "full") is mcp_server.usage_query
+    assert handler_for_profile(query_spec, "developer") is mcp_server.usage_query
