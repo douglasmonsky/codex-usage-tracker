@@ -149,8 +149,31 @@ commit as each roadmap task.
   roadmap tasks own durable recovery/retention; this task adds no persistence,
   schema, dependency, or legacy payload change.
 
+## Task 9 - Implement the canonical query request and application service
+
+- Status: complete
+- Branch: `pivot/9-canonical-query`
+- Commits: `feat: add canonical usage query service` (this commit)
+- Focused verification: `python -m pytest -p no:cacheprovider -p no:tach tests/application/test_query.py tests/application/test_query_validation.py tests/core/test_json_contracts.py tests/store/test_store_dashboard_queries.py -q` (46 passed)
+- Full verification: focused verification plus
+  `tests/application/test_requests.py tests/reports/test_query_exports.py tests/cli/test_mcp_integration.py`
+  (71 passed); Pyright on the three canonical query application modules (0
+  errors); Ruff check and format check on all touched Python files;
+  `git diff --check`.
+- Deviations from plan: The authoritative typed `QueryRequest` lives in
+  `application.query_models` and is re-exported from `application.requests`.
+  Estimate-only queries use truthful entity-identity ordering because cost and
+  credit estimates are attached through established pricing helpers after the
+  bounded canonical SQL query; explicit sorting by those derived estimates is
+  rejected. `reports/api.py` required no change because legacy
+  `build_query_report()` behavior remains intact.
+- Follow-up risks: Aggregates containing multiple pricing models or service
+  tiers report cost and credit as unknown with zero coverage rather than
+  presenting a misleading blended estimate. A later task may add per-model
+  pre-aggregation when partial mixed-group coverage is needed.
+
 ## Remaining Planned Tasks
 
-Tasks 9 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 10 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

@@ -15,6 +15,19 @@ from codex_usage_tracker.core.json_contract_visualization import (
 
 NoneType = type(None)
 
+QUERY_JSON_PAYLOAD_CONTRACTS = {
+    "codex-usage-tracker.query.v2": {
+        "required": {
+            "entity": str,
+            "columns": (list, tuple),
+            "rows": (list, tuple),
+            "next_cursor": (str, NoneType),
+            "total_matched": (int, NoneType),
+            "dashboard_target": (dict, NoneType),
+        }
+    }
+}
+
 MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS = {
     "codex-usage-tracker.scope.v1": {
         "required": {
@@ -120,6 +133,7 @@ MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS = {
 MCP_EVIDENCE_SCHEMA_IDS = tuple(MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS)
 
 JSON_PAYLOAD_CONTRACTS = {
+    **QUERY_JSON_PAYLOAD_CONTRACTS,
     **CLI_JSON_PAYLOAD_CONTRACTS,
     **DIAGNOSTIC_JSON_PAYLOAD_CONTRACTS,
     **SERVER_JSON_PAYLOAD_CONTRACTS,

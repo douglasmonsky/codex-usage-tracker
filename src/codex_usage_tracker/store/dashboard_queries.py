@@ -439,3 +439,224 @@ def observed_usage_window_label(window_minutes: object) -> str:
     if minutes % 60 == 0:
         return f"{minutes // 60}h"
     return f"{minutes}m"
+
+
+_QUERY_IDENTITIES = {
+    "call": "usage_events.record_id",
+    "thread": "coalesce(usage_events.thread_key, 'session:' || usage_events.session_id)",
+    "project": "coalesce(usage_events.cwd, 'unknown')",
+    "model": "coalesce(usage_events.model, 'unknown')",
+    "effort": "coalesce(usage_events.effort, 'unknown')",
+    "origin": "coalesce(usage_events.call_initiator, 'unknown')",
+    "service_tier": "coalesce(usage_events.service_tier, 'unknown')",
+    "subagent": "coalesce(usage_events.agent_role, usage_events.subagent_type, 'not-subagent')",
+}
+_QUERY_DIMENSIONS = {
+    "model": "coalesce(usage_events.model, 'unknown')",
+    "effort": "coalesce(usage_events.effort, 'unknown')",
+    "origin": "coalesce(usage_events.call_initiator, 'unknown')",
+    "service_tier": "coalesce(usage_events.service_tier, 'unknown')",
+    "subagent_type": "coalesce(usage_events.subagent_type, 'not-subagent')",
+    "subagent": "coalesce(usage_events.agent_role, usage_events.subagent_type, 'not-subagent')",
+}
+_QUERY_FILTERS = frozenset(
+    {
+        "since",
+        "until",
+        "model",
+        "effort",
+        "thread_key",
+        "project",
+        "origin",
+        "service_tier",
+        "subagent_role",
+        "subagent_type",
+        "parent_thread_key",
+    }
+)
+
+
+def query_canonical_usage_v2(
+    *,
+    db_path: Path,
+    entity: str,
+    measures: tuple[str, ...],
+    filters: dict[str, object],
+    group_by: tuple[str, ...],
+    order_by: str,
+    order: str,
+    include_archived: bool,
+    limit: int,
+    cursor_sort: object | None,
+    cursor_identity: str | None,
+) -> list[dict[str, Any]]:
+    """Run one bounded allowlisted canonical query with stable keyset ordering."""
+    if entity not in _QUERY_IDENTITIES:
+        raise ValueError("unsupported canonical query entity")
+    if any(name not in _QUERY_DIMENSIONS for name in group_by):
+        raise ValueError("unsupported canonical query dimension")
+    if any(name not in _QUERY_FILTERS for name, value in filters.items() if value is not None):
+        raise ValueError("unsupported canonical query filter")
+    if order not in {"asc", "desc"}:
+        raise ValueError("unsupported canonical query order")
+    if type(limit) is not int or not 1 <= limit <= 200:
+        raise ValueError("canonical query limit must be between 1 and 200")
+    identity_expression = _QUERY_IDENTITIES[entity]
+    dimension_expressions = [_QUERY_DIMENSIONS[name] for name in group_by]
+    grouped = entity != "call" or bool(group_by)
+    measure_expressions = _query_measure_expressions(grouped)
+    if any(name not in measure_expressions for name in measures):
+        raise ValueError("unsupported canonical query measure")
+    selected_measures = [f"{measure_expressions[name]} AS {name}" for name in measures]
+    dimensions = [f"{identity_expression} AS {entity}"] + [
+        f"{expression} AS {name}"
+        for name, expression in zip(group_by, dimension_expressions, strict=True)
+    ]
+    identity_alias = "record_id" if entity == "call" else entity
+    if order_by in {"estimated_cost", "estimated_credits"}:
+        raise ValueError("estimated measures cannot be used as canonical query order_by")
+    if order_by not in {identity_alias, *group_by, *measures}:
+        raise ValueError("unsupported canonical query order_by")
+    if entity == "call":
+        dimensions[0] = f"{identity_expression} AS record_id"
+    where, params = _canonical_query_where(entity, filters, include_archived=include_archived)
+    grouping = ""
+    if grouped:
+        grouping = "GROUP BY " + ", ".join([identity_expression, *dimension_expressions])
+    direction = "ASC" if order == "asc" else "DESC"
+    cursor_where, cursor_params = _canonical_cursor_where(
+        order_by, direction, identity_alias, cursor_sort, cursor_identity
+    )
+    sql = f"""
+        WITH result_rows AS (
+            SELECT {", ".join([*dimensions, *selected_measures, *_pricing_selects(grouped)])}
+            FROM canonical_usage_events AS usage_events
+            {USAGE_TIMING_JOIN_SQL}
+            {where}
+            {grouping}
+        ), counted AS (
+            SELECT result_rows.*, COUNT(*) OVER () AS _total_matched FROM result_rows
+        )
+        SELECT * FROM counted
+        {cursor_where}
+        ORDER BY ({order_by} IS NULL) ASC, {order_by} {direction}, {identity_alias} ASC
+        LIMIT ?
+    """
+    with connect(db_path) as conn:
+        init_db(conn)
+        rows = conn.execute(sql, [*params, *cursor_params, limit + 1]).fetchall()
+    return [row_to_dict(row) for row in rows]
+
+
+def _query_measure_expressions(grouped: bool) -> dict[str, str]:
+    aggregate = "SUM" if grouped else ""
+
+    def value(column: str) -> str:
+        return f"{aggregate}(usage_events.{column})" if grouped else f"usage_events.{column}"
+
+    cache_ratio = (
+        "CAST(SUM(usage_events.cached_input_tokens) AS REAL) / "
+        "NULLIF(SUM(usage_events.input_tokens), 0)"
+        if grouped
+        else "usage_events.cache_ratio"
+    )
+    context_pressure = (
+        "MAX(usage_events.context_window_percent)"
+        if grouped
+        else "usage_events.context_window_percent"
+    )
+    duration_value = (
+        "MAX((julianday(usage_events.event_timestamp) - "
+        "julianday(coalesce(previous_usage.event_timestamp, usage_events.turn_timestamp))) "
+        "* 86400.0, 0.0)"
+    )
+    duration = f"SUM({duration_value})" if grouped else duration_value
+    return {
+        "tokens": value("total_tokens"),
+        "uncached_tokens": value("uncached_input_tokens"),
+        "cached_tokens": value("cached_input_tokens"),
+        "output_tokens": value("output_tokens"),
+        "reasoning_tokens": value("reasoning_output_tokens"),
+        "estimated_cost": "NULL",
+        "estimated_credits": "NULL",
+        "call_count": "COUNT(*)" if grouped else "1",
+        "duration": duration,
+        "cache_ratio": cache_ratio,
+        "context_pressure": context_pressure,
+    }
+
+
+def _pricing_selects(grouped: bool) -> list[str]:
+    if not grouped:
+        return [
+            "usage_events.model AS _pricing_model",
+            "1 AS _pricing_model_count",
+            "usage_events.service_tier AS _pricing_service_tier",
+            "usage_events.input_tokens AS _pricing_input_tokens",
+            "usage_events.cached_input_tokens AS _pricing_cached_input_tokens",
+            "usage_events.uncached_input_tokens AS _pricing_uncached_input_tokens",
+            "usage_events.output_tokens AS _pricing_output_tokens",
+        ]
+    return [
+        "MIN(usage_events.model) AS _pricing_model",
+        "COUNT(DISTINCT coalesce(usage_events.model, '')) AS _pricing_model_count",
+        "MIN(usage_events.service_tier) AS _pricing_service_tier",
+        "COUNT(DISTINCT coalesce(usage_events.service_tier, '')) AS _pricing_tier_count",
+        "SUM(usage_events.input_tokens) AS _pricing_input_tokens",
+        "SUM(usage_events.cached_input_tokens) AS _pricing_cached_input_tokens",
+        "SUM(usage_events.uncached_input_tokens) AS _pricing_uncached_input_tokens",
+        "SUM(usage_events.output_tokens) AS _pricing_output_tokens",
+    ]
+
+
+def _canonical_query_where(
+    entity: str, filters: dict[str, object], *, include_archived: bool
+) -> tuple[str, list[object]]:
+    where, params = usage_where_clause(
+        since=filters.get("since") if isinstance(filters.get("since"), str) else None,
+        until=filters.get("until") if isinstance(filters.get("until"), str) else None,
+        model=filters.get("model") if isinstance(filters.get("model"), str) else None,
+        effort=filters.get("effort") if isinstance(filters.get("effort"), str) else None,
+        thread=filters.get("thread_key") if isinstance(filters.get("thread_key"), str) else None,
+        table_alias="usage_events",
+        include_archived=include_archived,
+    )
+    clauses = [where.removeprefix("WHERE ")] if where else []
+    if entity == "subagent":
+        clauses.append(
+            "(usage_events.agent_role IS NOT NULL "
+            "OR usage_events.subagent_type IS NOT NULL "
+            "OR usage_events.parent_session_id IS NOT NULL)"
+        )
+    for key, column in (
+        ("project", "usage_events.cwd"),
+        ("origin", "usage_events.call_initiator"),
+        ("service_tier", "usage_events.service_tier"),
+        ("subagent_role", "usage_events.agent_role"),
+        ("subagent_type", "usage_events.subagent_type"),
+        ("parent_thread_key", "usage_events.parent_session_id"),
+    ):
+        value = filters.get(key)
+        if isinstance(value, str):
+            clauses.append(f"{column} = ?")
+            params.append(value)
+    return ("WHERE " + " AND ".join(clauses) if clauses else "", list(params))
+
+
+def _canonical_cursor_where(
+    order_by: str,
+    direction: str,
+    identity: str,
+    cursor_sort: object | None,
+    cursor_identity: str | None,
+) -> tuple[str, list[object]]:
+    if cursor_identity is None:
+        return "", []
+    if cursor_sort is None:
+        return f"WHERE {order_by} IS NULL AND {identity} > ?", [cursor_identity]
+    comparison = ">" if direction == "ASC" else "<"
+    return (
+        f"WHERE ({order_by} {comparison} ? OR "
+        f"({order_by} = ? AND {identity} > ?) OR {order_by} IS NULL)",
+        [cursor_sort, cursor_sort, cursor_identity],
+    )

@@ -48,6 +48,7 @@ Tracked schema ids:
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
 | `codex-usage-tracker.subagent-usage.v1` | CLI `subagents --json`, MCP `subagent_usage(response_format="json")` |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
+| `codex-usage-tracker.query.v2` | Canonical bounded application query result with deterministic cursor continuation |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")`, MCP `usage_dashboard_recommendations(...)` |
 | `codex-usage-tracker-action-brief-v1` | CLI `action-brief --json`, MCP `usage_action_brief(...)`; compact aggregate remediation brief |
 | `codex-usage-tracker-async-job-status-v1` | MCP `usage_dogfood_start(...)`, `usage_dogfood_status(...)`; async in-process job progress/status payload |

@@ -16,6 +16,7 @@ SCHEMA_PATTERN = re.compile(r"codex-usage-tracker(?:-[a-z0-9-]+-v[0-9]+|\.[a-z0-
 RUNTIME_SCHEMA_SOURCE_PATHS = [
     REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "api_payloads.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "dashboard_targets.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "application" / "query_models.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "cli" / "main.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "context" / "api.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "pricing" / "costing.py",
@@ -91,6 +92,35 @@ def test_dashboard_target_contract_is_tracked() -> None:
     }
 
     assert validate_json_payload_contract(payload) == []
+
+
+def test_query_v2_contract_is_exactly_tracked() -> None:
+    expected = {
+        "required": {
+            "entity": str,
+            "columns": (list, tuple),
+            "rows": (list, tuple),
+            "next_cursor": (str, type(None)),
+            "total_matched": (int, type(None)),
+            "dashboard_target": (dict, type(None)),
+        }
+    }
+
+    assert JSON_PAYLOAD_CONTRACTS["codex-usage-tracker.query.v2"] == expected
+    assert (
+        validate_json_payload_contract(
+            {
+                "schema": "codex-usage-tracker.query.v2",
+                "entity": "model",
+                "columns": ["model", "tokens"],
+                "rows": [],
+                "next_cursor": None,
+                "total_matched": 0,
+                "dashboard_target": None,
+            }
+        )
+        == []
+    )
 
 
 def test_subagent_usage_schema_id_contract_is_tracked() -> None:

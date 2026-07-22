@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Literal, TypeAlias, cast
 
 from codex_usage_tracker.application.errors import RequestValidationError
+from codex_usage_tracker.application.query_models import QueryRequest as QueryRequest
 from codex_usage_tracker.core.contracts import ScopeV1
 from codex_usage_tracker.core.contracts.common import immutable_snapshot
 from codex_usage_tracker.core.contracts.serialization import payload_mapping
@@ -194,33 +195,6 @@ class AnalysisRequest:
         object.__setattr__(self, "filters", _mapping_snapshot(self.filters))
         if self.comparison is not None:
             object.__setattr__(self, "comparison", _mapping_snapshot(self.comparison))
-
-
-@dataclass(frozen=True)
-class QueryRequest:
-    entity: str
-    measures: tuple[str, ...]
-    filters: Mapping[str, object] = field(default_factory=dict)
-    group_by: tuple[str, ...] = ()
-    order_by: str | None = None
-    order: Literal["asc", "desc"] = "desc"
-    limit: int = 20
-    cursor: str | None = None
-    history: HistoryScope = "active"
-
-    def __post_init__(self) -> None:
-        if not self.entity.strip():
-            raise RequestValidationError("entity must not be empty")
-        if not self.measures:
-            raise RequestValidationError("measures must not be empty")
-        _choice(self.order, {"asc", "desc"}, "order")
-        _choice(self.history, _HISTORY_VALUES, "history")
-        _bounded_limit(self.limit)
-        object.__setattr__(self, "entity", self.entity.strip())
-        object.__setattr__(self, "measures", tuple(self.measures))
-        object.__setattr__(self, "filters", _mapping_snapshot(self.filters))
-        object.__setattr__(self, "group_by", tuple(self.group_by))
-        object.__setattr__(self, "order_by", _optional_text(self.order_by))
 
 
 @dataclass(frozen=True)

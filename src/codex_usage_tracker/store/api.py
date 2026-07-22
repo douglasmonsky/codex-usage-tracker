@@ -46,6 +46,9 @@ from codex_usage_tracker.store.content_index import (
 )
 from codex_usage_tracker.store.content_patterns import query_local_pattern_scan
 from codex_usage_tracker.store.dashboard_queries import (
+    query_canonical_usage_v2 as query_canonical_usage_v2,
+)
+from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_event_count as query_dashboard_event_count,
 )
 from codex_usage_tracker.store.dashboard_queries import (
