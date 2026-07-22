@@ -1,3 +1,5 @@
+"""Temporary import-compatible legacy tools and full-profile entrypoint."""
+
 from __future__ import annotations
 
 import json
@@ -8,6 +10,7 @@ from typing import Any
 
 from codex_usage_tracker.cli import mcp_allowance as _mcp_allowance
 from codex_usage_tracker.cli import mcp_compression as mcp_compression
+from codex_usage_tracker.cli import mcp_dogfood as _mcp_dogfood
 from codex_usage_tracker.cli import mcp_visualization as mcp_visualization
 from codex_usage_tracker.cli.mcp_dashboard import (
     export_usage_csv as export_usage_csv,
@@ -81,33 +84,6 @@ from codex_usage_tracker.cli.mcp_discovery import (
 from codex_usage_tracker.cli.mcp_discovery import (
     usage_thread_trace as usage_thread_trace,
 )
-from codex_usage_tracker.cli.mcp_dogfood import (
-    DOGFOOD_JOB_LOCK as _DOGFOOD_JOB_LOCK,
-)
-from codex_usage_tracker.cli.mcp_dogfood import (
-    DOGFOOD_JOBS as _DOGFOOD_JOBS,
-)
-from codex_usage_tracker.cli.mcp_dogfood import (
-    cache_key as _dogfood_cache_key,
-)
-from codex_usage_tracker.cli.mcp_dogfood import (
-    job_status_payload as _dogfood_job_status_payload,
-)
-from codex_usage_tracker.cli.mcp_dogfood import (
-    load_cached_result as _load_cached_dogfood_result,
-)
-from codex_usage_tracker.cli.mcp_dogfood import (
-    prune_jobs as _prune_dogfood_jobs,
-)
-from codex_usage_tracker.cli.mcp_dogfood import (
-    register_job as _register_dogfood_job,
-)
-from codex_usage_tracker.cli.mcp_dogfood import (
-    run_job as _run_dogfood_job,
-)
-from codex_usage_tracker.cli.mcp_dogfood import (
-    utc_now as _utc_now,
-)
 from codex_usage_tracker.cli.mcp_investigations import (
     usage_action_brief as usage_action_brief,
 )
@@ -158,6 +134,15 @@ from codex_usage_tracker.server.usage_refresh import RefreshJobRegistry
 from codex_usage_tracker.store import api as store_api
 
 _REFRESH_JOB_REGISTRY, _REFRESH_JOB_LOCK = RefreshJobRegistry(), threading.Lock()
+_DOGFOOD_JOB_LOCK = _mcp_dogfood.DOGFOOD_JOB_LOCK
+_DOGFOOD_JOBS = _mcp_dogfood.DOGFOOD_JOBS
+_dogfood_cache_key = _mcp_dogfood.cache_key
+_dogfood_job_status_payload = _mcp_dogfood.job_status_payload
+_load_cached_dogfood_result = _mcp_dogfood.load_cached_result
+_prune_dogfood_jobs = _mcp_dogfood.prune_jobs
+_register_dogfood_job = _mcp_dogfood.register_job
+_run_dogfood_job = _mcp_dogfood.run_job
+_utc_now = _mcp_dogfood.utc_now
 usage_allowance_diagnostics = _mcp_allowance.usage_allowance_diagnostics
 usage_allowance_export = _mcp_allowance.usage_allowance_export
 usage_allowance_history = _mcp_allowance.usage_allowance_history
@@ -485,5 +470,12 @@ def usage_dogfood_result(job_id: str) -> dict[str, Any]:
     return result if isinstance(result, dict) else status
 
 
+def main() -> None:
+    """Run the compatibility profile through the selected-profile server."""
+    from codex_usage_tracker.interfaces.mcp.server import main as run_server
+
+    run_server("full")
+
+
 if __name__ == "__main__":
-    mcp.run()
+    main()

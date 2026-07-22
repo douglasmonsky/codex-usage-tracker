@@ -5,6 +5,12 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from functools import cache, lru_cache
 
+from codex_usage_tracker.interfaces.mcp.compatibility_tools import (
+    ADVANCED_TOOL_NAMES,
+    COMPATIBILITY_TOOL_NAMES,
+    OVERLAPPING_CORE_TOOL_NAMES,
+    compatibility_handler,
+)
 from codex_usage_tracker.interfaces.mcp.core_tools import (
     usage_allowance,
     usage_analyze,
@@ -13,6 +19,10 @@ from codex_usage_tracker.interfaces.mcp.core_tools import (
     usage_query,
     usage_refresh,
     usage_status,
+)
+from codex_usage_tracker.interfaces.mcp.developer_tools import (
+    DEVELOPER_TOOL_NAMES,
+    developer_handler,
 )
 from codex_usage_tracker.interfaces.mcp.models import McpProfile, ToolDataClass, ToolSpec
 
@@ -26,69 +36,6 @@ CORE_TOOL_NAMES = (
     "usage_evidence",
     "usage_allowance",
     "usage_job_status",
-)
-
-_FULL_TOOL_NAMES = (
-    "subagent_usage",
-    "refresh_usage_index",
-    "usage_refresh_start",
-    "usage_refresh_status",
-    "usage_doctor",
-    "usage_summary",
-    "usage_dedupe_diagnostics",
-    "usage_calls",
-    "usage_call_detail",
-    "usage_threads",
-    "usage_report_pack",
-    "usage_dashboard_recommendations",
-    "usage_allowance_history",
-    "usage_allowance_diagnostics",
-    "usage_allowance_export",
-    "usage_allowance_status",
-    "usage_allowance_series",
-    "usage_allowance_evidence",
-    "usage_allowance_analysis",
-    "usage_allowance_analysis_status",
-    "usage_compression_start",
-    "usage_compression_status",
-    "usage_compression_profile",
-    "usage_compression_candidates",
-    "usage_compression_candidate_detail",
-    "usage_compression_simulate",
-    "usage_recommendations",
-    "session_usage",
-    "usage_call_context",
-    "most_expensive_usage_calls",
-    "usage_pricing_coverage",
-    "usage_source_coverage",
-    "usage_content_search",
-    "usage_thread_trace",
-    "usage_repetition_scan",
-    "usage_command_loop_scan",
-    "usage_file_churn_scan",
-    "usage_repeated_file_rediscovery",
-    "usage_shell_churn",
-    "usage_large_low_output_calls",
-    "usage_suggest_investigations",
-    "usage_investigate",
-    "usage_action_brief",
-    "usage_test_hypotheses",
-    "usage_context_bloat_scan",
-    "usage_investigation_walk",
-    "usage_local_evidence_export",
-    "generate_usage_dashboard",
-    "export_usage_csv",
-    "init_usage_pricing_config",
-    "update_usage_pricing_config",
-    "init_usage_allowance_config",
-)
-
-_DEVELOPER_TOOL_NAMES = (
-    "usage_dogfood_start",
-    "usage_dogfood_status",
-    "usage_dogfood_result",
-    "usage_visualization_suggest",
-    "usage_visualization_render",
 )
 
 
@@ -132,11 +79,19 @@ def validate_tool_specs(specs: Iterable[ToolSpec]) -> None:
             raise ToolCatalogError(f"invalid minimum-profile order: {spec.name}")
         previous_rank = rank
 
+        if spec.minimum_profile == "core":
+            if spec.disposition != "core":
+                raise ToolCatalogError(f"invalid core disposition: {spec.name}")
+        elif spec.disposition not in {"compatibility", "advanced", "developer", "deprecated"}:
+            raise ToolCatalogError(f"missing catalog disposition: {spec.name}")
+        if spec.disposition == "developer" and spec.minimum_profile != "developer":
+            raise ToolCatalogError(f"invalid developer disposition: {spec.name}")
+
         if spec.lifecycle != "deprecated":
             continue
         if not spec.replacement:
             raise ToolCatalogError(f"missing replacement: {spec.name}")
-        if not spec.deprecated_since or not spec.remove_after:
+        if not spec.deprecated_since or not spec.final_supported or not spec.remove_after:
             raise ToolCatalogError(f"missing deprecation release: {spec.name}")
         if _release_tuple(spec.remove_after) < _release_tuple(spec.deprecated_since):
             raise ToolCatalogError(f"removal release precedes deprecation release: {spec.name}")
@@ -170,11 +125,17 @@ def _data_class(name: str) -> ToolDataClass:
 
 
 def _replacement(name: str) -> str:
+    if name in {
+        "usage_refresh_status",
+        "usage_allowance_analysis_status",
+        "usage_compression_status",
+    }:
+        return "usage_job_status"
     if "allowance" in name:
         return "usage_allowance"
     if "refresh" in name:
         return "usage_refresh"
-    if name.endswith("status") or name == "usage_doctor":
+    if name == "usage_doctor" or name.endswith("status"):
         return "usage_status"
     if any(marker in name for marker in ("detail", "context", "evidence")):
         return "usage_evidence"
@@ -194,44 +155,14 @@ def _replacement(name: str) -> str:
     return "usage_query"
 
 
-@lru_cache(maxsize=1)
-def _legacy_handlers() -> dict[str, Callable[..., object]]:
-    from codex_usage_tracker.cli import (
-        mcp_allowance,
-        mcp_compression,
-        mcp_dashboard,
-        mcp_discovery,
-        mcp_investigations,
-        mcp_server,
-        mcp_subagents,
-        mcp_visualization,
-    )
-
-    modules = (
-        mcp_server,
-        mcp_allowance,
-        mcp_compression,
-        mcp_dashboard,
-        mcp_discovery,
-        mcp_investigations,
-        mcp_subagents,
-        mcp_visualization,
-    )
-    handlers: dict[str, Callable[..., object]] = {}
-    for name in (*_FULL_TOOL_NAMES, *_DEVELOPER_TOOL_NAMES, "usage_status", "usage_query"):
-        handler = next((getattr(module, name) for module in modules if hasattr(module, name)), None)
-        if not callable(handler):
-            raise ToolCatalogError(f"missing existing handler: {name}")
-        handlers[name] = handler
-    return handlers
-
-
 @cache
-def _lazy_legacy_handler(name: str) -> Callable[..., object]:
-    """Return a callable proxy without importing legacy handler modules."""
+def _lazy_profile_handler(name: str) -> Callable[..., object]:
+    """Return a callable proxy without importing non-core handler modules."""
 
     def invoke(*args: object, **kwargs: object) -> object:
-        return _legacy_handlers()[name](*args, **kwargs)
+        if name in DEVELOPER_TOOL_NAMES:
+            return developer_handler(name)(*args, **kwargs)
+        return compatibility_handler(name)(*args, **kwargs)
 
     invoke.__name__ = name
     return invoke
@@ -247,37 +178,28 @@ def tool_specs() -> tuple[ToolSpec, ...]:
                 minimum_profile="core",
                 maturity="stable",
                 lifecycle="active",
+                disposition="core",
                 data_class=(
-                    "administrative" if name in {"usage_status", "usage_refresh"} else "aggregate"
+                    "administrative"
+                    if name in {"usage_status", "usage_refresh", "usage_job_status"}
+                    else "aggregate"
                 ),
                 handler=_CORE_HANDLERS[name],
             )
             for name in CORE_TOOL_NAMES
         )
-        + tuple(
-            ToolSpec(
-                name=name,
-                minimum_profile="full",
-                maturity="beta",
-                lifecycle="deprecated",
-                data_class=_data_class(name),
-                handler=_lazy_legacy_handler(name),
-                replacement=_replacement(name),
-                deprecated_since="0.22.0",
-                remove_after="0.25.0",
-            )
-            for name in _FULL_TOOL_NAMES
-        )
+        + tuple(_full_tool_spec(name) for name in COMPATIBILITY_TOOL_NAMES)
         + tuple(
             ToolSpec(
                 name=name,
                 minimum_profile="developer",
                 maturity="experimental",
                 lifecycle="active",
+                disposition="developer",
                 data_class=_data_class(name),
-                handler=_lazy_legacy_handler(name),
+                handler=_lazy_profile_handler(name),
             )
-            for name in _DEVELOPER_TOOL_NAMES
+            for name in DEVELOPER_TOOL_NAMES
         )
     )
     validate_tool_specs(specs)
@@ -286,8 +208,27 @@ def tool_specs() -> tuple[ToolSpec, ...]:
 
 def handler_for_profile(spec: ToolSpec, profile: McpProfile) -> Callable[..., object]:
     """Preserve existing overlapping handlers outside the core-only server."""
-    if profile != "core" and (
-        spec.minimum_profile != "core" or spec.name in {"usage_status", "usage_query"}
-    ):
-        return _legacy_handlers()[spec.name]
+    if profile == "core":
+        return spec.handler
+    if spec.name in OVERLAPPING_CORE_TOOL_NAMES or spec.minimum_profile == "full":
+        return compatibility_handler(spec.name)
+    if spec.minimum_profile == "developer":
+        return developer_handler(spec.name)
     return spec.handler
+
+
+def _full_tool_spec(name: str) -> ToolSpec:
+    advanced = name in ADVANCED_TOOL_NAMES
+    return ToolSpec(
+        name=name,
+        minimum_profile="full",
+        maturity="beta",
+        lifecycle="active" if advanced else "deprecated",
+        disposition="advanced" if advanced else "compatibility",
+        data_class=_data_class(name),
+        handler=_lazy_profile_handler(name),
+        replacement=None if advanced else _replacement(name),
+        deprecated_since=None if advanced else "0.22.0",
+        final_supported=None if advanced else "0.24.x",
+        remove_after=None if advanced else "0.25.0",
+    )

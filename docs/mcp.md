@@ -127,14 +127,32 @@ returns an analysis-job handle; poll its `job_id` with `usage_job_status`.
 Allowance questions use `usage_allowance(operation=...)`. Raw-context and
 individual allowance compatibility tools are not part of this default flow.
 
+A server process registers one selected profile; it never registers every tool
+and relies on documentation to hide the others.
+
+| Profile | Registered surface |
+| --- | --- |
+| `core` | Exactly `usage_status`, `usage_refresh`, `usage_analyze`, `usage_query`, `usage_evidence`, `usage_allowance`, and `usage_job_status`, in that order. |
+| `full` | Core plus the 0.21 compatibility names, except the five explicit developer experiments. Deprecated schemas and names remain unchanged through 0.24.x. |
+| `developer` | Full plus dogfood and visualization experiments. These tools are excluded from `core` and `full`. |
+
+Deprecated tool descriptions name the stable replacement and `0.25.0` as the
+earliest removal release. Seven local operations without one-call core parity
+remain active, advanced `full` tools; see [Deprecations](deprecations.md).
+
+The complete catalog across all three profiles is:
+
 - `refresh_usage_index`
+- `usage_refresh`
 - `usage_refresh_start`
 - `usage_refresh_status`
+- `usage_job_status`
 - `usage_doctor`
 - `usage_summary`
 - `subagent_usage`
 - `usage_query`
 - `usage_analyze`
+- `usage_evidence`
 - `usage_allowance`
 - `usage_status`
 - `usage_dedupe_diagnostics`

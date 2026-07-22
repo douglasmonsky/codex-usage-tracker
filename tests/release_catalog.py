@@ -127,3 +127,16 @@ MCP_TOOL_NAMES = {
     "update_usage_pricing_config",
     "init_usage_allowance_config",
 } | {"usage_visualization_suggest", "usage_visualization_render"}
+
+ADVANCED_MCP_TOOL_NAMES = {
+    "usage_dedupe_diagnostics",
+    "usage_allowance_export",
+    "usage_call_context",
+    "usage_content_search",
+    "usage_thread_trace",
+    "usage_local_evidence_export",
+    "export_usage_csv",
+}
+
+FULL_MCP_TOOL_NAMES = (MCP_TOOL_NAMES - DEVELOPER_MCP_TOOL_NAMES) | set(CORE_MCP_TOOL_NAMES)
+ALL_MCP_TOOL_NAMES = MCP_TOOL_NAMES | set(CORE_MCP_TOOL_NAMES)

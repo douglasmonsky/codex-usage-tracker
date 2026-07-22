@@ -11,7 +11,7 @@ from typing import Any, cast
 from codex_usage_tracker.cli.plugin_installer import install_plugin
 from codex_usage_tracker.dashboard_service import DashboardServiceStatus
 from codex_usage_tracker.store.api import query_session_usage
-from tests.release_catalog import MCP_TOOL_NAMES
+from tests.release_catalog import ALL_MCP_TOOL_NAMES
 from tests.store_dashboard_helpers import (
     ARCHIVED_SESSION_ID,
     SESSION_ID,
@@ -25,15 +25,16 @@ from tests.store_dashboard_helpers import (
 )
 
 
-def test_mcp_runtime_reexports_the_compatibility_server() -> None:
-    from codex_usage_tracker.cli.mcp_runtime import mcp
-    from codex_usage_tracker.interfaces.mcp.runtime import compatibility_mcp
-
-    assert mcp is compatibility_mcp
-
+def test_legacy_imports_do_not_register_a_hidden_compatibility_server() -> None:
     from codex_usage_tracker import mcp_server
+    from codex_usage_tracker.cli.mcp_runtime import mcp
+    from codex_usage_tracker.interfaces.mcp.runtime import build_mcp_server, compatibility_mcp
 
-    assert {tool.name for tool in asyncio.run(mcp_server.mcp.list_tools())} == MCP_TOOL_NAMES
+    assert callable(mcp.tool)
+    assert asyncio.run(compatibility_mcp.list_tools()) == []
+    developer = {tool.name for tool in asyncio.run(build_mcp_server("developer").list_tools())}
+    assert developer == ALL_MCP_TOOL_NAMES
+    assert callable(mcp_server.main)
 
 
 def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:

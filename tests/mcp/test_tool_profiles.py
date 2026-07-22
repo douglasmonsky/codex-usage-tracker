@@ -8,7 +8,12 @@ import pytest
 from codex_usage_tracker.interfaces.mcp import registry
 from codex_usage_tracker.interfaces.mcp.profiles import tools_for_profile
 from codex_usage_tracker.interfaces.mcp.runtime import build_mcp_server, compatibility_mcp
-from tests.release_catalog import CORE_MCP_TOOL_NAMES, DEVELOPER_MCP_TOOL_NAMES, MCP_TOOL_NAMES
+from tests.release_catalog import (
+    ADVANCED_MCP_TOOL_NAMES,
+    ALL_MCP_TOOL_NAMES,
+    CORE_MCP_TOOL_NAMES,
+    FULL_MCP_TOOL_NAMES,
+)
 
 
 def test_core_profile_has_exact_names_and_order() -> None:
@@ -21,8 +26,17 @@ def test_profiles_are_strict_ordered_supersets() -> None:
     developer = {tool.name for tool in tools_for_profile("developer")}
 
     assert core < full < developer
-    assert full == (MCP_TOOL_NAMES - DEVELOPER_MCP_TOOL_NAMES) | set(CORE_MCP_TOOL_NAMES)
-    assert developer == full | DEVELOPER_MCP_TOOL_NAMES
+    assert full == FULL_MCP_TOOL_NAMES
+    assert developer == ALL_MCP_TOOL_NAMES
+
+
+def test_advanced_full_profile_tools_are_explicit_and_active() -> None:
+    advanced = {tool.name for tool in tools_for_profile("full") if tool.disposition == "advanced"}
+
+    assert advanced == ADVANCED_MCP_TOOL_NAMES
+    assert all(
+        tool.lifecycle == "active" for tool in tools_for_profile("full") if tool.name in advanced
+    )
 
 
 def test_built_servers_expose_only_the_selected_profile() -> None:
@@ -39,11 +53,12 @@ def test_building_core_does_not_resolve_or_mutate_legacy_registration(
     compatibility_tools = compatibility_mcp._tool_manager._tools
     before = dict(compatibility_tools)
 
-    def fail_legacy_resolution() -> dict[str, object]:
+    def fail_legacy_resolution(_name: str) -> object:
         raise AssertionError("core construction resolved legacy handlers")
 
     registry.tool_specs.cache_clear()
-    monkeypatch.setattr(registry, "_legacy_handlers", fail_legacy_resolution)
+    monkeypatch.setattr(registry, "compatibility_handler", fail_legacy_resolution)
+    monkeypatch.setattr(registry, "developer_handler", fail_legacy_resolution)
 
     server = build_mcp_server("core")
 

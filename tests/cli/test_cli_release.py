@@ -14,7 +14,7 @@ from typing import Protocol, cast
 from codex_usage_tracker import __version__
 from codex_usage_tracker.cli.main import _COMMAND_HANDLERS
 from codex_usage_tracker.core.json_contracts import known_json_schemas
-from tests.release_catalog import MCP_TOOL_NAMES, STABLE_CLI_COMMANDS
+from tests.release_catalog import ALL_MCP_TOOL_NAMES, MCP_TOOL_NAMES, STABLE_CLI_COMMANDS
 
 
 class _ReleaseCheckModule(Protocol):
@@ -333,7 +333,7 @@ def test_mcp_tool_names_remain_documented() -> None:
     documented_tools = _documented_mcp_tools(docs)
 
     assert actual_tools == MCP_TOOL_NAMES
-    assert documented_tools == MCP_TOOL_NAMES
+    assert documented_tools == ALL_MCP_TOOL_NAMES
 
 
 def test_mcp_dashboard_evidence_targets_are_documented_as_additive() -> None:
@@ -494,9 +494,14 @@ def test_dashboard_launch_commands_refresh_by_default() -> None:
     assert parser.parse_args(["serve-dashboard", "--no-refresh"]).refresh is False
 
 
-def test_cli_json_schema_doc_lists_tracked_contracts() -> None:
+def test_public_schema_docs_list_tracked_contracts() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    docs = (repo_root / "docs" / "cli-json-schemas.md").read_text(encoding="utf-8")
+    docs = "\n".join(
+        [
+            (repo_root / "docs" / "cli-json-schemas.md").read_text(encoding="utf-8"),
+            (repo_root / "docs" / "contracts.md").read_text(encoding="utf-8"),
+        ]
+    )
 
     missing = [schema for schema in known_json_schemas() if schema not in docs]
 

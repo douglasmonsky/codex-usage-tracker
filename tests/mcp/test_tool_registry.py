@@ -27,6 +27,7 @@ def _spec(
     lifecycle: str = "active",
     replacement: str | None = None,
     deprecated_since: str | None = None,
+    final_supported: str | None = None,
     remove_after: str | None = None,
 ) -> ToolSpec:
     return ToolSpec(
@@ -34,10 +35,18 @@ def _spec(
         minimum_profile=minimum_profile,  # type: ignore[arg-type]
         maturity="stable",
         lifecycle=lifecycle,  # type: ignore[arg-type]
+        disposition=(
+            "core"
+            if minimum_profile == "core"
+            else "developer"
+            if minimum_profile == "developer"
+            else "compatibility"
+        ),
         data_class="aggregate",
         handler=_handler,
         replacement=replacement,
         deprecated_since=deprecated_since,
+        final_supported=final_supported,
         remove_after=remove_after,
     )
 
@@ -59,6 +68,7 @@ def test_deprecated_specs_have_complete_migration_metadata() -> None:
         if spec.lifecycle == "deprecated":
             assert spec.replacement
             assert spec.deprecated_since
+            assert spec.final_supported
             assert spec.remove_after
 
 
@@ -85,6 +95,7 @@ def test_all_seven_core_handlers_are_concrete_stable_adapters() -> None:
                     lifecycle="deprecated",
                     replacement="usage_query",
                     deprecated_since="0.24.0",
+                    final_supported="0.24.x",
                     remove_after="0.23.0",
                 ),
             ),

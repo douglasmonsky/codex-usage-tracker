@@ -3,6 +3,7 @@
 from codex_usage_tracker.interfaces.mcp.models import (
     McpProfile,
     ToolDataClass,
+    ToolDisposition,
     ToolLifecycle,
     ToolMaturity,
     ToolSpec,
@@ -20,6 +21,7 @@ __all__ = [
     "McpProfile",
     "ToolCatalogError",
     "ToolDataClass",
+    "ToolDisposition",
     "ToolLifecycle",
     "ToolMaturity",
     "ToolSpec",
