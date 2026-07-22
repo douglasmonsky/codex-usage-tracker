@@ -1056,12 +1056,18 @@ git commit -m "feat: consolidate allowance MCP operations"
 
 - Create: `src/codex_usage_tracker/interfaces/mcp/compatibility_tools.py`
 - Create: `src/codex_usage_tracker/interfaces/mcp/developer_tools.py`
+- Create: `src/codex_usage_tracker/interfaces/mcp/server.py`
 - Create: `tests/mcp/test_compatibility_tools.py`
 - Create: `tests/mcp/test_developer_tools.py`
+- Create: `tests/mcp/fixtures/tool_names_021.json`
+- Modify: `src/codex_usage_tracker/interfaces/mcp/models.py`
 - Modify: `src/codex_usage_tracker/interfaces/mcp/registry.py`
+- Modify: `src/codex_usage_tracker/interfaces/mcp/runtime.py`
 - Modify: `src/codex_usage_tracker/cli/mcp_server.py`
 - Modify: `src/codex_usage_tracker/cli/mcp_runtime.py`
+- Modify: `src/codex_usage_tracker/mcp_server.py`
 - Modify: `tests/cli/test_mcp_integration.py`
+- Modify: `tests/cli/test_cli_release.py`
 - Modify: `tests/release_catalog.py`
 - Modify: `docs/deprecations.md`
 - Modify: `docs/mcp.md`
@@ -1080,17 +1086,17 @@ git commit -m "feat: consolidate allowance MCP operations"
 - Compatibility tool schemas and names remain unchanged.
 - A process exposes one selected profile only; it does not register all profiles and hide them through documentation.
 
-- [ ] **Step 1: Build a complete expected-name fixture from the 0.21/PR290 baseline.** Store it in `tests/mcp/fixtures/tool_names_021.json`. The test must fail if a tool disappears unintentionally.
+- [x] **Step 1: Build a complete expected-name fixture from the 0.21/PR290 baseline.** Store it in `tests/mcp/fixtures/tool_names_021.json`. The test must fail if a tool disappears unintentionally.
 
-- [ ] **Step 2: Classify every current tool in `MCP_TOOL_CATALOG`.** The catalog must cover all names found by FastMCP registration and reject uncataloged tools.
+- [x] **Step 2: Classify every current tool in `MCP_TOOL_CATALOG`.** The catalog must cover all names found by FastMCP registration and reject uncataloged tools.
 
-- [ ] **Step 3: Refactor registration.** `cli/mcp_server.py` becomes a temporary import-compatible module that calls `codex_usage_tracker.interfaces.mcp.server.main()`. Tool implementation modules no longer register themselves as an import side effect; registry code registers selected callables.
+- [x] **Step 3: Refactor registration.** `cli/mcp_server.py` becomes a temporary import-compatible module that calls `codex_usage_tracker.interfaces.mcp.server.main()`. Tool implementation modules no longer register themselves as an import side effect; registry code registers selected callables.
 
-- [ ] **Step 4: Add profile-isolation tests.** Start the MCP server in-process or inspect its tool registry for each profile. Verify exactly seven core names and complete legacy names in full/developer.
+- [x] **Step 4: Add profile-isolation tests.** Start the MCP server in-process or inspect its tool registry for each profile. Verify exactly seven core names and complete legacy names in full/developer.
 
-- [ ] **Step 5: Update deprecations.** Record replacement, warning start, direct removal release, and retained CLI/HTTP alternatives.
+- [x] **Step 5: Update deprecations.** Record replacement, warning start, direct removal release, and retained CLI/HTTP alternatives.
 
-- [ ] **Step 6: Verify.**
+- [x] **Step 6: Verify.**
 
 ```bash
 python -m pytest tests/mcp/test_compatibility_tools.py tests/mcp/test_developer_tools.py tests/mcp/test_tool_profiles.py tests/cli/test_mcp_integration.py tests/cli/test_cli_release.py -q
@@ -1099,7 +1105,7 @@ python scripts/check_release.py
 
 Expected: PASS; default profile exposes seven tools and full profile preserves baseline tools.
 
-- [ ] **Step 7: Commit.**
+- [x] **Step 7: Commit.**
 
 ```bash
 git add src/codex_usage_tracker/interfaces/mcp src/codex_usage_tracker/cli/mcp_server.py src/codex_usage_tracker/cli/mcp_runtime.py tests/mcp tests/cli/test_mcp_integration.py tests/cli/test_cli_release.py tests/release_catalog.py docs/deprecations.md docs/mcp.md

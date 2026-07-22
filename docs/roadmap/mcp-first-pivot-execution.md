@@ -247,8 +247,26 @@ commit as each roadmap task.
 - Follow-up risks: analysis jobs remain process-local, five-hour analysis is not
   supported, and individual allowance tools remain compatibility surfaces through 0.24.
 
+## Task 15 - Move legacy MCP tools into explicit compatibility and developer profiles
+
+- Status: complete
+- Branch: `pivot/15-mcp-profiles`
+- Commits: `b2a3b58`, plus this checklist/ledger commit.
+- Focused verification: complete MCP/profile/CLI-release suite; 74 tests passed.
+  The Task 14 allowance regression gate passed 442 tests after registration changed.
+- Full verification: targeted source Pyright; Ruff check and format check; release
+  checker; staged diff, source-size, and privacy review; independent review clean.
+- Deviations from plan: PR290 already exposed the five dogfood/visualization names.
+  The explicit developer-only invariant takes precedence: all 59 baseline names remain
+  in `developer`, while `full` preserves the 54 non-developer baseline names. The
+  legacy CLI module retains import-compatible implementations, but its decorators are
+  inert and its process entrypoint delegates to the selected-profile server.
+- Follow-up risks: Task 16 still owns installed-launcher selection of `core`. The
+  temporary empty `compatibility_mcp` import sentinel remains for compatibility but
+  cannot register or run hidden tools.
+
 ## Remaining Planned Tasks
 
-Tasks 15 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 16 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
