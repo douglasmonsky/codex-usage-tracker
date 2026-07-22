@@ -2,6 +2,10 @@
 
 Codex Usage Tracker is local-first. It reads Codex logs already written on your machine and, by default, stores aggregate usage metrics plus bounded local content snippets in SQLite so local MCP tools can support deeper investigation. The tracker does not upload usage data, logs, snippets, or reports.
 
+The concise product-wide storage and output contract is documented in
+[Data Posture](data-posture.md). This guide provides the detailed field,
+selected-context, server, privacy-mode, and sharing rules behind that summary.
+
 Use `codex-usage-tracker refresh --aggregate-only` or `codex-usage-tracker rebuild-index --aggregate-only` when you want the older aggregate-only SQLite posture.
 
 ## Stored In SQLite

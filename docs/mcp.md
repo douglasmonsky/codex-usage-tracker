@@ -1,6 +1,16 @@
 # MCP And Codex Skills
 
-Codex Usage Tracker can be installed as a local Codex plugin. It exposes MCP tools for local usage analysis, dashboard-shaped aggregate payloads, allowance diagnostics, source coverage, and opt-in local content-index investigations.
+MCP is the primary analysis interface for Codex Usage Tracker. The local Codex
+plugin exposes deterministic tools for usage analysis, bounded queries,
+allowance diagnostics, source coverage, and explicit local content-index
+investigations. Material conclusions can link to the supporting
+[Evidence Console](evidence-console.md); the browser does not perform or invent
+the analysis.
+
+Normal refresh indexes aggregate counters and the existing bounded local
+content/event index. Aggregate-only commands retain the older posture, and
+shareable outputs follow existing behavior. See [Data Posture](data-posture.md)
+and [Privacy](privacy.md) for the exact local-storage and output boundaries.
 
 ## Local Plugin
 

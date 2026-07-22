@@ -1,6 +1,7 @@
 # First Five Minutes
 
-This is the shortest path from a fresh machine to a working local dashboard.
+This is the shortest path from a fresh machine to a grounded MCP answer with
+optional local evidence.
 
 ## 1. Install
 
@@ -12,7 +13,10 @@ python -m pipx ensurepath
 pipx install codex-usage-tracking
 ```
 
-Use `python3` on macOS/Linux if that is your normal launcher. On Windows, `py -m pip install --user pipx` and `py -m pipx ensurepath` may be the right form. If `codex-usage-tracker` is not found after install, open a new terminal or add the path printed by `pipx ensurepath`.
+Use `python3` on macOS/Linux if that is your normal launcher. On Windows,
+`py -m pip install --user pipx` and `py -m pipx ensurepath` may be the right
+form. If `codex-usage-tracker` is not found, open a new terminal or add the path
+printed by `pipx ensurepath`.
 
 ## 2. Set Up
 
@@ -20,63 +24,60 @@ Use `python3` on macOS/Linux if that is your normal launcher. On Windows, `py -m
 codex-usage-tracker setup
 ```
 
-`setup` installs the local Codex plugin wrapper, initializes local config templates, refreshes the aggregate SQLite index from local Codex logs, and runs `doctor`. Restart Codex after setup if you want the companion MCP tools and skills to appear in new Codex sessions.
+`setup` installs the local Codex plugin wrapper, initializes local config
+templates, performs the normal refresh of aggregate counters and the bounded
+local content/event index, and runs `doctor`.
 
-## 3. Launch
+## 3. Restart Or Open A Fresh Task
+
+Follow the setup result. Restart Codex or open a fresh task when instructed so
+the plugin and MCP tools can be discovered. A healthy local installation does
+not prove that a task created earlier exposes those tools.
+
+## 4. Ask A Starter Question
+
+In the fresh task, ask:
+
+```text
+What drove my Codex usage this week? State the scope and limitations, and link
+the evidence behind each material conclusion.
+```
+
+The agent should use MCP tools for deterministic local analysis. If MCP is not
+available in the current task, run:
+
+```bash
+codex-usage-tracker doctor --suggest-repair
+```
+
+Then follow its recovery guidance. CLI JSON commands remain available for local
+automation and recovery.
+
+## 5. Optionally Open Evidence
+
+When an MCP result includes an Evidence Console target, open its absolute
+localhost URL when present. If it includes only a relative target and launch
+guidance, run:
 
 ```bash
 codex-usage-tracker serve-dashboard --open
 ```
 
-This starts a localhost dashboard and refreshes active-session usage first. Keep the terminal running while using the live dashboard.
+Then follow the relative target. The Evidence Console supports verification; it
+is not required to receive the first useful answer.
 
-## 4. Verify
+## If There Is No Usage Yet
 
-The first healthy state usually looks like this:
-
-- Browser opens a `127.0.0.1` dashboard URL.
-- The top badge says `Live`, not only `Static`.
-- `Visible Calls` is greater than zero if local Codex logs exist.
-- `doctor` does not report a `fail` status:
-
-```bash
-codex-usage-tracker doctor --suggest-repair
-```
-
-## If The Dashboard Is Empty
-
-Run these checks in order:
+No result may simply mean that the machine has no local Codex logs. Confirm the
+configured paths and refresh state:
 
 ```bash
 codex-usage-tracker doctor --suggest-repair
 codex-usage-tracker refresh
-codex-usage-tracker serve-dashboard --open --refresh
 ```
 
-Common causes:
-
-- No local Codex logs exist yet on that machine.
-- Codex logs are somewhere other than `~/.codex`; use `--codex-home <path>` with `setup`, `refresh`, or `serve-dashboard`.
-- You are looking only at active sessions while the data is archived; use the dashboard `History` selector or run with `--include-archived`.
-- Browser cached an old static file; reload the `serve-dashboard` URL.
-- On Windows, use a recent version if JavaScript files fail to load. Older releases could inherit a `.js` MIME type from the Windows registry.
-
-## If The Plugin Does Not Show In Codex
-
-The dashboard can work even when plugin discovery is not active. For plugin discovery:
-
-```bash
-codex-usage-tracker doctor --suggest-repair
-codex-usage-tracker install-plugin
-```
-
-Then restart Codex and start a fresh Codex session.
-
-A healthy local installation or dashboard service does not prove that the current
-Codex task loaded MCP tools. Check the tools exposed to the current task. When an MCP
-result includes a dashboard evidence target, open its absolute localhost URL when
-present; otherwise use the relative target only after following its launch guidance
-(`codex-usage-tracker serve-dashboard --open`).
+If logs are outside `~/.codex`, pass `--codex-home <path>` to `setup` or
+`refresh`. Use `--include-archived` only when older archived history is relevant.
 
 ## What To Attach To Issues
 
@@ -86,14 +87,10 @@ For public GitHub issues, prefer a strict support bundle:
 codex-usage-tracker --privacy-mode strict support-bundle --output ~/.codex-usage-tracker/support-bundle.json
 ```
 
-Review the JSON before posting it. The bundle's `issue_report.safe_fields` lists the safest fields to paste. Do not add raw Codex JSONL logs, prompts, assistant messages, tool output, command text, patch text, full local paths, secrets, credentials, or private config values.
+Review the JSON before posting it. Do not attach raw Codex JSONL logs, prompts,
+assistant messages, tool output, command text, patch text, full local paths,
+secrets, credentials, or private config values.
 
-## Next Useful Commands
-
-```bash
-codex-usage-tracker summary --preset last-7-days
-codex-usage-tracker query --min-tokens 100000
-codex-usage-tracker diagnostics overview --refresh
-```
-
-For deeper details, see the [Install Guide](install.md), [Dashboard Guide](dashboard-guide.md), and [CLI Reference](cli-reference.md).
+For deeper details, see the [Install Guide](install.md),
+[MCP And Codex Skills](mcp.md), [Evidence Console](evidence-console.md),
+[Data Posture](data-posture.md), and [CLI Reference](cli-reference.md).

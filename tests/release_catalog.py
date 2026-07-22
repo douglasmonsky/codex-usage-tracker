@@ -1,5 +1,15 @@
 """Stable CLI and MCP catalogs shared by release-contract tests."""
 
+CANONICAL_PACKAGE_DESCRIPTION = (
+    "Local, evidence-backed Codex usage analyst with MCP tools and an Evidence Console."
+)
+
+CANONICAL_DATA_POSTURE = (
+    "Normal refresh indexes aggregate counters and the existing bounded local "
+    "content/event index; aggregate-only commands retain the older posture; "
+    "shareable outputs follow existing behavior."
+)
+
 STABLE_CLI_COMMANDS = {
     "setup",
     "doctor",

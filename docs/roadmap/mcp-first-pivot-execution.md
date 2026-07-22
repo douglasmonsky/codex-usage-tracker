@@ -31,8 +31,20 @@ commit as each roadmap task.
 - Follow-up risks: The release sequence assumes the published baseline remains
   `0.21.0`; shift all planned minors together if that changes before execution.
 
-## Planned Tasks
+## Task 2 - Make public product and storage statements internally consistent
 
-Tasks 2 through 45 remain planned in the approved implementation roadmap. Add a
+- Status: complete
+- Branch: `pivot/2-position-product`
+- Commits: `docs: position MCP as the primary product` (this commit)
+- Focused verification: `python -m pytest tests/packaging/test_public_docs.py tests/cli/test_cli_release.py -q`; `python scripts/check_release.py`
+- Full verification: `npx markdownlint-cli2 README.md "docs/**/*.md"`; `git diff --check`
+- Deviations from plan: The local Task 2 branch is intentionally stacked on the
+  reviewed Task 1 commits because pushing and merging are outside this task.
+- Follow-up risks: Rebase or recreate the branch from updated `main` after Task 1
+  merges; do not drop the Task 1 baseline and review-fix commits.
+
+## Remaining Planned Tasks
+
+Tasks 3 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
