@@ -1,4 +1,4 @@
-"""Application refresh entry points with recommendation fact maintenance."""
+"""Recommendation query and refresh entry points."""
 
 from __future__ import annotations
 
@@ -16,6 +16,9 @@ from codex_usage_tracker.core.paths import (
 )
 from codex_usage_tracker.recommendation_engine.materialization import (
     sync_refresh_recommendation_facts,
+)
+from codex_usage_tracker.recommendation_engine.query import (
+    build_recommendations_report as build_recommendations_report,
 )
 from codex_usage_tracker.store.api import rebuild_usage_index as _rebuild_usage_index
 from codex_usage_tracker.store.api import refresh_usage_index as _refresh_usage_index

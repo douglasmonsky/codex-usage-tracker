@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, TypeAlias, cast
 
+from codex_usage_tracker.analytics.analysis_models import AnalysisRequest as AnalysisRequest
 from codex_usage_tracker.application.errors import RequestValidationError
 from codex_usage_tracker.application.query_models import QueryRequest as QueryRequest
 from codex_usage_tracker.core.contracts import ScopeV1
@@ -174,27 +175,6 @@ class RefreshRequest:
     def __post_init__(self) -> None:
         _choice(self.history, _HISTORY_VALUES, "history")
         _choice(self.execution, _EXECUTION_VALUES, "execution")
-
-
-@dataclass(frozen=True)
-class AnalysisRequest:
-    goal: str
-    filters: Mapping[str, object] = field(default_factory=dict)
-    history: HistoryScope = "active"
-    evidence_limit: int = 8
-    comparison: Mapping[str, object] | None = None
-    execution: ExecutionMode = "auto"
-
-    def __post_init__(self) -> None:
-        if not self.goal.strip():
-            raise RequestValidationError("goal must not be empty")
-        _choice(self.history, _HISTORY_VALUES, "history")
-        _choice(self.execution, _EXECUTION_VALUES, "execution")
-        _bounded_limit(self.evidence_limit, field_name="evidence_limit")
-        object.__setattr__(self, "goal", self.goal.strip())
-        object.__setattr__(self, "filters", _mapping_snapshot(self.filters))
-        if self.comparison is not None:
-            object.__setattr__(self, "comparison", _mapping_snapshot(self.comparison))
 
 
 @dataclass(frozen=True)

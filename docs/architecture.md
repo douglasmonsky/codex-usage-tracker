@@ -25,6 +25,12 @@ The current storage model has three layers:
 - Canonical/materialized intelligence: physical usage provenance plus logical usage fingerprints and canonical pointers, reset-aware allowance observations/cycles/intervals, source revisions, and persisted analysis snapshots/jobs. Default totals read canonical rows; physical rows remain available for bounded local diagnostics.
 - Local content index: normalized conversation turns, bounded content fragments, tool calls, command runs, file events, persisted investigation run summaries, and source provenance for explicit local MCP/API investigation.
 
+Analysis ownership follows the MCP-first product layers: `analytics/` owns
+calculation contracts and strategy selection, `application/` owns orchestration,
+and `interfaces/` owns transport. Existing `reports/` builders remain private
+compatibility delegates until their algorithms move behind analytics contracts;
+they do not own canonical strategy selection.
+
 The aggregate index preserves every parsed row in `usage_events` for source provenance. A versioned strict fingerprint links exact copies of the same logged model call, and the `canonical_usage_events` view selects one physical representative for default totals. Only high-confidence fingerprint matches are excluded; ambiguous or merely similar calls remain canonical. If the original source disappears, the surviving physical copy is promoted without changing the logical call identity.
 
 Materialized facts may retain physical rows so source replacement and local evidence remain auditable. Unscoped aggregate and compression-fact reads join the canonical view, while explicit deduplication diagnostics report physical, canonical, and excluded counts separately.

@@ -175,8 +175,23 @@ commit as each roadmap task.
   presenting a misleading blended estimate. A later task may add per-model
   pre-aggregation when partial mixed-group coverage is needed.
 
+## Task 10 - Define the analysis-goal catalog and strategy protocol
+
+- Status: complete
+- Branch: `pivot/10-analysis-catalog`
+- Commits: `refactor: catalog usage analysis strategies` (this commit)
+- Focused verification: analytics catalog/protocol tests plus existing agentic,
+  evidence, recommendation, and subagent report regressions.
+- Full verification: Pyright on `analytics/`; Ruff check and format on touched
+  files; diff/privacy review.
+- Deviations from plan: Compatibility strategies retain existing algorithms at
+  existing boundaries, use default paths only in `analyze()`, and preserve legacy
+  summary/schema provenance without reinterpreting incompatible evidence.
+- Follow-up risks: Task 11 owns canonical execution/job orchestration and fuller
+  conversion of compatibility evidence into the analysis-v2 result contract.
+
 ## Remaining Planned Tasks
 
-Tasks 10 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 11 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
