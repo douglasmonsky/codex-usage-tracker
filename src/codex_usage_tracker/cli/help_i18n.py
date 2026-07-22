@@ -88,6 +88,7 @@ _ZH_HANS_HELP: dict[str, str] = {
     "Generate static dashboard": "生成静态仪表盘",
     "Generate the default dashboard and open it": "生成并打开默认仪表盘",
     "Serve dashboard with lazy localhost context loading": "启动仪表盘服务，并按需从本机加载上下文",
+    "Manage the local dashboard service": "管理本地仪表盘服务",
     "Manage the persistent dashboard service": "管理常驻仪表盘服务",
     "Install and start the dashboard service": "安装并启动常驻仪表盘服务",
     "Show dashboard service health": "显示常驻仪表盘服务状态",
