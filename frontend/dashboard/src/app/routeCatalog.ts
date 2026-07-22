@@ -36,6 +36,7 @@ export type DashboardRouteDefinition = {
   capabilities: { refresh: boolean; export: boolean; copyLink: boolean };
   safeParams: readonly string[];
   handoffParams: readonly string[];
+  replacementMcpOperation?: string;
 };
 
 const capabilities = (refresh: boolean) => ({ refresh, export: true, copyLink: true });
@@ -50,11 +51,13 @@ const legacyRouteCatalog = [
     id: 'investigator', label: 'Investigate', description: 'Root-cause evidence', icon: FlaskConical,
     maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(false), safeParams: ['finding'], handoffParams: ['finding'],
+    replacementMcpOperation: 'usage_analyze + usage_evidence',
   },
   {
     id: 'compression-lab', label: 'Compression Lab', description: 'Context savings', icon: BrainCircuit,
     maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(false), safeParams: [], handoffParams: [],
+    replacementMcpOperation: 'usage_analyze(goal="token_waste")',
   },
   {
     id: 'calls', label: 'Calls', description: 'Model-call table', icon: Table2,
@@ -88,6 +91,7 @@ const legacyRouteCatalog = [
     id: 'cache-context', label: 'Cache And Context', description: 'Cache and cold resumes', icon: Database,
     maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(true), safeParams: ['cache_thread'], handoffParams: [],
+    replacementMcpOperation: 'usage_analyze(goal="cache_failure")',
   },
   {
     id: 'diagnostics', label: 'Diagnostics Notebook', description: 'Technical report', icon: BookOpen,
@@ -95,11 +99,13 @@ const legacyRouteCatalog = [
     experimentalNavigationEligible: false, capabilities: capabilities(false),
     safeParams: ['diagnostic_source', 'diagnostic_fact'],
     handoffParams: ['diagnostic_source', 'diagnostic_fact'],
+    replacementMcpOperation: 'usage_query + usage_evidence',
   },
   {
     id: 'reports', label: 'Reports', description: 'Generated analyses', icon: BarChart3,
     maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(true), safeParams: ['report'], handoffParams: ['report'],
+    replacementMcpOperation: 'usage_analyze or usage_query',
   },
 ] as const satisfies readonly DashboardRouteDefinition[];
 
@@ -115,6 +121,23 @@ export const routeCatalog: readonly DashboardRouteDefinition[] = [
   ...targetRouteCatalog,
   ...legacyRouteCatalog,
 ];
+
+export type CompatibilityLabRoute = Pick<
+  DashboardRouteDefinition,
+  'id' | 'label' | 'maturity' | 'lifecycle'
+> & { replacementMcpOperation: string };
+
+export const compatibilityLabRoutes: readonly CompatibilityLabRoute[] = legacyRouteCatalog.flatMap(route => (
+  'replacementMcpOperation' in route && route.replacementMcpOperation
+    ? [{
+        id: route.id,
+        label: route.label,
+        maturity: route.maturity,
+        lifecycle: route.lifecycle,
+        replacementMcpOperation: route.replacementMcpOperation,
+      }]
+    : []
+));
 
 const foundationRouteIds: readonly DashboardViewId[] = [
   'overview', 'investigator', 'compression-lab', 'calls', 'threads',

@@ -33,9 +33,18 @@
 }
 
 .capacityStatusLabel > span:first-child {
+  display: grid;
+  gap: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.capacityStatusLabel small {
+  color: var(--ink-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .02em;
 }
 
 .capacityStatusCell strong {
@@ -127,6 +136,34 @@
   font-variant-numeric: tabular-nums;
 }
 
+.capacityChangeDetail {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.capacityChangeType {
+  display: inline-flex;
+  margin-bottom: 4px;
+  color: var(--signal-context);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.capacityEvidenceLink {
+  flex: 0 0 auto;
+  color: var(--signal-context);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.capacityEvidenceLink:hover { text-decoration: underline; }
+.capacityEvidenceLink:focus-visible { outline: 2px solid var(--signal-context); outline-offset: 3px; }
+
 .capacityChangeMeta {
   display: flex;
   gap: 22px;
@@ -190,4 +227,6 @@
     grid-template-columns: 1fr;
     gap: 5px;
   }
+
+  .capacityChangeDetail { align-items: flex-start; flex-direction: column; }
 }

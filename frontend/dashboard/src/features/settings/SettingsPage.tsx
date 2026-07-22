@@ -2,6 +2,7 @@ import {
   Activity,
   AlertTriangle,
   Database,
+  ExternalLink,
   Gauge,
   Languages,
   LockKeyhole,
@@ -47,8 +48,17 @@ type SettingsPageProps = {
   autoRefreshEnabled: boolean;
   refreshState: string;
   applicationI18n: ApplicationI18n;
+  compatibilityLabs: readonly CompatibilityLab[];
   showExperimental: boolean;
   setShowExperimental: (showExperimental: boolean) => void;
+};
+
+export type CompatibilityLab = {
+  id: string;
+  label: string;
+  maturity: string;
+  lifecycle: string;
+  replacementMcpOperation: string;
 };
 
 const sectionCopy = {
@@ -57,7 +67,7 @@ const sectionCopy = {
   content: ['Content Access', 'Privacy boundaries and explicit raw-context gates.'],
   application: ['Application', 'Dashboard refresh, API, and language visibility.'],
   sources: ['Source Health', 'Configuration and parser diagnostics.'],
-  advanced: ['Advanced', 'Local preferences for experimental dashboard surfaces.'],
+  advanced: ['Advanced', 'Browser-local compatibility controls and temporary Labs links.'],
 } as const;
 
 export function SettingsPage(props: SettingsPageProps) {
@@ -118,7 +128,9 @@ function DataSection({ payload, historyScope, loadWindow, loadLimit, loadedRowCo
         ['Data window', loadWindowLabel(loadWindow, loadLimit), Gauge],
         ['Evidence rows', loadedLabel, Database],
         ['Session scope', historyScope === 'all' ? 'Include archived' : 'Active sessions', Activity],
-        ['Usage index', payload?.shell_boot ? 'served shell' : 'embedded payload', Database],
+        ['Payload source', payload?.shell_boot ? 'served shell' : 'embedded payload', Database],
+        ['Source path', 'Local Codex session logs', Database],
+        ['Data path', 'Local SQLite usage index', Database],
       ]} />
     </div>
   );
@@ -165,12 +177,22 @@ function ApplicationSection({
   autoRefreshEnabled,
   refreshState,
   applicationI18n,
+  conversationalAnalysis,
+  historyScope,
 }: SettingsPageProps) {
+  const runtimeStatus = conversationalAnalysis?.runtime_version_matches === true
+    ? 'Installed version matches launcher'
+    : conversationalAnalysis?.runtime_version_matches === false
+      ? 'Launcher/runtime version mismatch'
+      : 'Not reported';
   return (
     <div className={styles.grid}>
       <FactPanel title="Dashboard Runtime" subtitle={refreshState} facts={[
-        ['Data connection', canUseLiveApi ? 'Local API token present' : 'Static embedded snapshot', Database],
+        ['Service status', canUseLiveApi ? 'Local service available' : 'Static snapshot only', Database],
+        ['MCP profile', conversationalAnalysis?.configured_profile || 'Not reported', Activity],
+        ['Launcher runtime', runtimeStatus, ShieldCheck],
         ['Auto refresh', autoRefreshEnabled ? 'Enabled' : 'Paused', RefreshCw],
+        ['History default', historyScope === 'all' ? 'Include archived' : 'Active sessions', Database],
         ['Interface language', applicationI18n.language, Languages],
         ['Available languages', applicationI18n.languages.map(item => item.code).join(', ') || 'English (en)', Languages],
         ['Text direction', applicationI18n.direction, Languages],
@@ -191,33 +213,63 @@ function SourceHealthSection({ payload }: { payload: DashboardBootPayload | null
   );
 }
 
-function AdvancedSection({ showExperimental, setShowExperimental }: SettingsPageProps) {
+function AdvancedSection({ compatibilityLabs, showExperimental, setShowExperimental }: SettingsPageProps) {
   const i18n = useShellI18n();
+  const toggleLabel = i18n.t('settings.compatibility.toggle', 'Show compatibility and Labs links');
   return (
     <div className={styles.grid}>
       <Panel
-        title={i18n.t('settings.experimental.title', 'Experimental Features')}
-        subtitle={i18n.t('settings.experimental.subtitle', 'Browser-local preference')}
+        title={i18n.t('settings.compatibility.title', 'Compatibility and Labs')}
+        subtitle={i18n.t('settings.compatibility.subtitle', 'Advanced browser-local preference')}
       >
         <label className={styles.preference}>
           <input
-            aria-label={i18n.t('settings.experimental.toggle', 'Show experimental dashboard features')}
+            aria-label={toggleLabel}
             type="checkbox"
             checked={showExperimental}
             onChange={event => setShowExperimental(event.target.checked)}
           />
           <span>
-            <strong>{i18n.t('settings.experimental.toggle', 'Show experimental dashboard features')}</strong>
-            <small>
-              {i18n.t(
-                'settings.experimental.origin_scope',
-                'This preference is stored for this browser origin. Experimental workspaces remain available from direct links, and Diagnostics stays visible.',
-              )}
-            </small>
+            <strong>{toggleLabel}</strong>
+            <small>{i18n.t(
+              'settings.compatibility.origin_scope',
+              'This browser-local preference reveals temporary direct links. Labs never join primary navigation.',
+            )}</small>
           </span>
         </label>
       </Panel>
+      {showExperimental ? <CompatibilityLabs routes={compatibilityLabs} i18n={i18n} /> : null}
     </div>
+  );
+}
+
+function CompatibilityLabs({
+  routes,
+  i18n,
+}: {
+  routes: readonly CompatibilityLab[];
+  i18n: ReturnType<typeof useShellI18n>;
+}) {
+  return (
+    <Panel
+      title={i18n.t('settings.compatibility.labs_title', 'Compatibility Labs')}
+      subtitle={i18n.t('settings.compatibility.labs_subtitle', 'Direct-only routes during the migration window')}
+    >
+      <ul className={styles.labs}>
+        {routes.map(route => (
+          <li key={route.id}>
+            <div>
+              <strong>{route.label}</strong>
+              <span className={styles.lifecycle}><span>{route.maturity}</span><span>{route.lifecycle}</span></span>
+            </div>
+            <code>{route.replacementMcpOperation}</code>
+            <a href={`?view=${encodeURIComponent(route.id)}`} aria-label={`Open ${route.label}`}>
+              Open <ExternalLink aria-hidden="true" />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </Panel>
   );
 }
 

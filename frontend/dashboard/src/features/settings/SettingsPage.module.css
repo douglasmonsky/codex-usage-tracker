@@ -26,10 +26,23 @@
 .preference span { display: grid; gap: 4px; }
 .preference strong { font-size: 13px; }
 .preference small { max-width: 76ch; color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
+.labs { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.labs li { display: grid; grid-template-columns: minmax(160px, .8fr) minmax(220px, 1fr) auto; gap: 14px; align-items: center; min-height: 52px; padding: 8px 0; border-bottom: 1px solid var(--line-subtle); }
+.labs li:last-child { border-bottom: 0; }
+.labs li > div { display: grid; gap: 4px; }
+.labs strong { color: var(--ink-strong); font-size: 13px; }
+.lifecycle { display: flex; gap: 5px; color: var(--ink-muted); font-size: 10px; text-transform: uppercase; }
+.lifecycle span { padding: 2px 5px; background: var(--surface-subtle); border: 1px solid var(--line-subtle); border-radius: 4px; }
+.labs code { color: var(--ink-muted); font-size: 11px; overflow-wrap: anywhere; }
+.labs a { display: inline-flex; gap: 5px; align-items: center; color: var(--signal-context); font-size: 12px; font-weight: 700; text-decoration: none; }
+.labs a:hover { text-decoration: underline; }
+.labs a:focus-visible { outline: 2px solid var(--signal-context); outline-offset: 3px; }
+.labs a svg { width: 14px; height: 14px; }
 @media (max-width: 760px) {
   .header { flex-direction: column; gap: 12px; }
   .badges { justify-content: flex-start; }
   .grid { grid-template-columns: 1fr; }
   .facts > div { grid-template-columns: 1fr; gap: 3px; }
   .facts dd { padding-left: 24px; text-align: left; }
+  .labs li { grid-template-columns: 1fr; gap: 7px; padding: 12px 0; }
 }

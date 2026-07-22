@@ -30,6 +30,23 @@ Targets preserve the analytical scope and use reviewed selectors. Opening a
 target must not broaden a date range, switch from active sessions to all
 history, or silently reveal indexed or raw content.
 
+Limits labels observed facts, descriptive estimates, and statistically
+supported changes explicitly. Persisted allowance intervals and supported
+change rows link to the contextual Evidence route when the matching persisted
+analysis and interval identifiers are available. The default history controls
+remain bounded; all-history, custom-range, granularity, and legacy static
+controls sit under an Advanced disclosure. These presentation changes do not
+alter allowance calculations or introduce another detector.
+
+Settings reports the local installation and launcher state without claiming
+that MCP tools are exposed in the current Codex task. It also shows the
+configured MCP profile, local source/index roles, pricing and rate-card status,
+language and history defaults, and localhost service state. Temporary Labs
+routes are off by default and appear only in Settings → Advanced after enabling
+the browser-local **Show compatibility and Labs links** preference. Each Labs
+entry identifies its maturity, lifecycle, replacement MCP operation, and
+direct compatibility link; Labs never join persistent navigation.
+
 ## Migration Status
 
 The current release can still expose legacy dashboard workspaces during the

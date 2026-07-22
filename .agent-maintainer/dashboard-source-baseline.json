@@ -57,8 +57,8 @@
     },
     "frontend/dashboard/src/features/limits/LimitsPage.tsx": {
       "group": "source",
-      "nonblank": 639,
-      "physical": 683
+      "nonblank": 638,
+      "physical": 681
     },
     "frontend/dashboard/src/features/threads/ThreadsPage.tsx": {
       "group": "source",

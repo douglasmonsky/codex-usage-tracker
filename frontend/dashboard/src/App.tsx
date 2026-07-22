@@ -8,7 +8,7 @@ import { createShellI18n, initialDashboardLanguage, storeDashboardLanguage } fro
 import { LocalizedShellI18nProvider } from './app/DocumentLocalizationBridge';
 import { modelWithLegacyShellFilters } from './app/legacyShellFilters';
 import { navItems, settingsNavItem, type ViewId } from './app/navigation';
-import { routeDefinition } from './app/routeCatalog';
+import { compatibilityLabRoutes, routeDefinition } from './app/routeCatalog';
 import { useConversationalReadiness, useExperimentalDashboardFeatures } from './app/dashboardHooks';
 import { RowLimitControl } from './app/RowLimitControl';
 import { ShellGlobalFilters } from './app/ShellGlobalFilters';
@@ -707,7 +707,7 @@ aria-label="History scope"
         loadedRowCount={loadedRowCount}
         totalAvailableRows={totalAvailableRows}
         canUseLiveApi={canUseLiveApi}
-        autoRefreshEnabled={autoRefreshEnabled} applicationI18n={shellI18n}
+        autoRefreshEnabled={autoRefreshEnabled} applicationI18n={shellI18n} compatibilityLabs={compatibilityLabRoutes}
         showExperimental={showExperimental}
         setShowExperimental={setShowExperimental}
         refreshing={refreshing}

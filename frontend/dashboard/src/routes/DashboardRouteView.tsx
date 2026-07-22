@@ -61,6 +61,13 @@ type DashboardRouteViewProps = {
   callBackLabel: string;
   canLoadAllRows: boolean;
   canUseLiveApi: boolean;
+  compatibilityLabs: readonly {
+    id: string;
+    label: string;
+    maturity: string;
+    lifecycle: string;
+    replacementMcpOperation: string;
+  }[];
   contextRuntime: ContextRuntime;
   conversationalAnalysis?: ConversationalReadiness;
   copyCallInvestigatorLink: (recordId: string) => void;
@@ -109,6 +116,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     callBackLabel,
     canLoadAllRows,
     canUseLiveApi,
+    compatibilityLabs,
     contextRuntime,
     conversationalAnalysis,
     copyCallInvestigatorLink,
@@ -297,6 +305,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           autoRefreshEnabled={autoRefreshEnabled}
           refreshState={refreshState}
           applicationI18n={applicationI18n}
+          compatibilityLabs={compatibilityLabs}
           showExperimental={showExperimental}
           setShowExperimental={setShowExperimental}
         />
