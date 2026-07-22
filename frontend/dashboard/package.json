@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json --pretty false",
     "test": "vitest run",
     "lint": "eslint .",
-    "smoke": "REACT_DASHBOARD_WEB_SERVER=1 DASHBOARD_BASE_URL=http://127.0.0.1:5173 playwright test ../../tests/playwright/dashboard-react.spec.mjs"
+    "smoke": "REACT_DASHBOARD_WEB_SERVER=1 playwright test ../../tests/playwright/dashboard-react.spec.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.2",

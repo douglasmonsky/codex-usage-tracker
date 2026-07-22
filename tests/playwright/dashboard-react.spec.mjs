@@ -1,12 +1,22 @@
 import { expect, test } from '@playwright/test';
 
+async function navigateDirectRoute(page, search) {
+  await page.evaluate(nextSearch => {
+    const url = new URL(window.location.href);
+    url.search = nextSearch;
+    window.history.pushState(null, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, search);
+}
+
 test.describe('React dashboard rewrite smoke', () => {
-  test('renders and navigates the experimental dashboard', async ({ page }) => {
+  test('renders Home and returns from call Evidence to Explore', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await expect(page.getByText('Local data only').first()).toBeVisible();
 
-    await page.getByRole('button', { name: /^Calls$/i }).click();
+    await page.getByRole('button', { name: /^Explore$/i }).click();
+    await expect(page.getByRole('tab', { name: 'Calls' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
  await expect(page.getByRole('heading', { name: 'Call Drill-Down' })).toHaveCount(0);
     await expect(page.getByRole('table', { name: 'Model calls' })
@@ -14,24 +24,16 @@ test.describe('React dashboard rewrite smoke', () => {
 
     await page.getByRole('button', { name: /Open (?:call row in )?investigator for thread-9f3a1c codex-1/i }).click();
     await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
-    await expect(page).toHaveURL(/view=call/);
+    await expect(page).toHaveURL(/view=evidence/);
+    await expect(page).toHaveURL(/kind=call/);
     await expect(page).toHaveURL(/record=fixture-call-0/);
     await page.getByRole('button', { name: /Next/i }).click();
     await expect(page.getByText('thread-7b2e91 / o4-mini')).toBeVisible();
-    await page.getByRole('button', { name: /Back to Calls/i }).click();
+    await page.getByRole('button', { name: /Back to Explore/i }).click();
     await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
-    await expect(page).toHaveURL(/view=calls/);
-    await expect(page).not.toHaveURL(/record=|return=/);
-
-    await page.getByRole('button', { name: /^Reports$/i }).click();
-    await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
-    await expect(page.getByText('Weekly Credits').first()).toBeVisible();
-
-    await page.getByRole('button', { name: /Cache And Context/i }).click();
-    await expect(page.getByRole('heading', { name: 'Cache And Context Lab' })).toBeVisible();
-    await page.getByRole('button', { name: /^Reports$/i }).click();
-    await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
-    await expect(page.getByText('Weekly Credits').first()).toBeVisible();
+    await expect(page).toHaveURL(/view=explore/);
+    await expect(page).toHaveURL(/mode=calls/);
+    await expect(page).not.toHaveURL(/return=/);
   });
 
   test('threads expand inline before an explicit child call opens', async ({ page }) => {
@@ -40,23 +42,27 @@ test.describe('React dashboard rewrite smoke', () => {
     await threadRow.click();
 
     await expect(threadRow).toHaveAttribute('aria-expanded', 'true');
-    await expect(page).toHaveURL(/view=threads/);
-    await expect(page).not.toHaveURL(/view=call/);
+    await expect(page).toHaveURL(/view=explore/);
+    await expect(page).toHaveURL(/mode=threads/);
+    await expect(page).not.toHaveURL(/view=evidence/);
     const region = page.getByRole('region', { name: /Calls for thread-9f3a/i });
     await expect(region).toBeVisible();
     await page.getByRole('button', { name: /Open investigator for thread call/i }).first().click();
     await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
     const investigatorUrl = new URL(page.url());
-    expect(investigatorUrl.searchParams.get('view')).toBe('call');
+    expect(investigatorUrl.searchParams.get('view')).toBe('evidence');
+    expect(investigatorUrl.searchParams.get('kind')).toBe('call');
     expect(investigatorUrl.searchParams.get('record')).toBe('fixture-call-0');
-    expect(investigatorUrl.searchParams.get('return')).toBe('threads');
+    expect(investigatorUrl.searchParams.get('return')).toBe('explore');
+    expect(investigatorUrl.searchParams.get('return_mode')).toBe('threads');
     expect(investigatorUrl.searchParams.get('thread_key')).toBe('fixture-thread-key-0');
     expect(investigatorUrl.searchParams.has('thread')).toBe(false);
-    await page.getByRole('button', { name: /Back to Threads/i }).click();
+    await page.getByRole('button', { name: /Back to Explore/i }).click();
     await expect(page.getByRole('row', { name: /^(Expand|Collapse) calls for thread-9f3a$/i })).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByRole('region', { name: /Calls for thread-9f3a/i })).toBeVisible();
-    await expect(page).toHaveURL(/view=threads/);
-    await expect(page).not.toHaveURL(/record=|return=/);
+    await expect(page).toHaveURL(/view=explore/);
+    await expect(page).toHaveURL(/mode=threads/);
+    await expect(page).not.toHaveURL(/return=/);
   });
 
   test('threads expand inline with stacked evidence at 390px', async ({ page }) => {
@@ -82,6 +88,28 @@ test.describe('React dashboard rewrite smoke', () => {
     expect(signalsBox.y).toBeGreaterThan(identityBox.y);
     expect(actionBox.height).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  });
+
+  test('restores Explore modes through browser history without duplicate calls requests', async ({ page }) => {
+    let callsRequests = 0;
+    page.on('request', request => {
+      if (new URL(request.url()).pathname === '/api/calls') callsRequests += 1;
+    });
+    await page.goto('/?view=explore&mode=calls&call_q=thread-9f3a');
+    await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
+    const initialCallsRequests = callsRequests;
+
+    await page.getByRole('tab', { name: 'Threads' }).click();
+    await expect(page.getByRole('heading', { name: 'Threads', exact: true })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/mode=calls/);
+    await page.waitForTimeout(250);
+    expect(callsRequests).toBe(initialCallsRequests);
+
+    await page.goForward();
+    await expect(page.getByRole('heading', { name: 'Threads', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/mode=threads/);
   });
 
   test('filters, sorts, drills into calls, and exports aggregate CSV', async ({ page }) => {
@@ -131,7 +159,7 @@ if (tabularPresentation) {
   }
   await expect(page.getByText('Raw context is gated')).toBeVisible();
   if (!tabularPresentation) {
-    await page.getByRole('button', { name: /Back to Calls/i }).click();
+    await page.getByRole('button', { name: /Back to Explore/i }).click();
     await expect(page.getByRole('heading', { name: 'Calls', exact: true })).toBeVisible();
   }
 
@@ -215,9 +243,9 @@ if (tabularPresentation) {
     await expect(page.getByRole('heading', { name: 'Return Navigation Report' })).toBeVisible();
     await expect.poll(() => reportRequests).toBeGreaterThan(0);
     const initialReportRequests = reportRequests;
-    await page.getByRole('button', { name: /Cache And Context/i }).click();
+    await navigateDirectRoute(page, '?view=cache-context');
     await expect(page.getByRole('heading', { name: 'Cache And Context Lab' })).toBeVisible();
-    await page.getByRole('button', { name: /^Reports$/i }).click();
+    await navigateDirectRoute(page, '?view=reports');
     await expect(page.getByRole('heading', { name: 'Return Navigation Report' })).toBeVisible();
     await page.waitForTimeout(250);
     expect(reportRequests).toBe(initialReportRequests);
@@ -287,9 +315,9 @@ if (tabularPresentation) {
     await expect.poll(() => requestCounts.size).toBe(11);
     const initialCounts = Object.fromEntries(requestCounts);
 
-    await page.getByRole('button', { name: /^Settings$/i }).click();
+    await navigateDirectRoute(page, '?view=settings');
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-    await page.getByRole('button', { name: /^Investigate$/i }).click();
+    await navigateDirectRoute(page, '?view=investigator');
     await expect(page.getByRole('heading', { name: 'Investigate' })).toBeVisible();
     await page.waitForTimeout(250);
     expect(Object.fromEntries(requestCounts)).toEqual(initialCounts);
@@ -364,9 +392,9 @@ if (tabularPresentation) {
     const completedOverviewRequests = requestCounts.get('/api/diagnostics/overview');
     const pendingCommandRequests = requestCounts.get('/api/diagnostics/commands');
 
-    await page.getByRole('button', { name: /^Settings$/i }).click();
+    await navigateDirectRoute(page, '?view=settings');
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-    await page.getByRole('button', { name: /Diagnostics Notebook/i }).click();
+    await navigateDirectRoute(page, '?view=diagnostics');
     await expect.poll(() => requestCounts.get('/api/diagnostics/commands')).toBeGreaterThan(pendingCommandRequests);
 
     expect(requestCounts.get('/api/diagnostics/overview')).toBe(completedOverviewRequests);
@@ -379,7 +407,7 @@ if (tabularPresentation) {
     await page.goto('/?view=call&record=fixture-call-2');
     await expect(page.getByRole('heading', { name: 'Call Investigator' })).toBeVisible();
     await expect(page.getByText('thread-3c8d4e / o3')).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Calls$/i })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /^Explore$/i })).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('hydrates direct call investigator URLs through the live call API', async ({ page }) => {
