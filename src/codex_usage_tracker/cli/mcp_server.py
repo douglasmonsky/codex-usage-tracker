@@ -126,7 +126,7 @@ from codex_usage_tracker.cli.mcp_investigations import (
 from codex_usage_tracker.cli.mcp_investigations import (
     usage_test_hypotheses as usage_test_hypotheses,
 )
-from codex_usage_tracker.cli.mcp_subagents import mcp as mcp
+from codex_usage_tracker.cli.mcp_runtime import mcp as mcp
 from codex_usage_tracker.cli.mcp_subagents import subagent_usage as subagent_usage
 from codex_usage_tracker.context.api import (
     DEFAULT_CONTEXT_CHARS,

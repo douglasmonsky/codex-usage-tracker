@@ -1,5 +1,5 @@
-"""Shared MCP registration runtime."""
+"""Compatibility import for the shared legacy MCP registration server."""
 
-from mcp.server.fastmcp import FastMCP
+from codex_usage_tracker.interfaces.mcp.runtime import compatibility_mcp as mcp
 
-mcp = FastMCP("codex-usage-tracker")
+__all__ = ["mcp"]

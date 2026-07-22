@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -10,6 +11,7 @@ from typing import Any, cast
 from codex_usage_tracker.cli.plugin_installer import install_plugin
 from codex_usage_tracker.dashboard_service import DashboardServiceStatus
 from codex_usage_tracker.store.api import query_session_usage
+from tests.release_catalog import MCP_TOOL_NAMES
 from tests.store_dashboard_helpers import (
     ARCHIVED_SESSION_ID,
     SESSION_ID,
@@ -21,6 +23,17 @@ from tests.store_dashboard_helpers import (
     _write_jsonl,
     _write_pricing,
 )
+
+
+def test_mcp_runtime_reexports_the_compatibility_server() -> None:
+    from codex_usage_tracker.cli.mcp_runtime import mcp
+    from codex_usage_tracker.interfaces.mcp.runtime import compatibility_mcp
+
+    assert mcp is compatibility_mcp
+
+    from codex_usage_tracker import mcp_server
+
+    assert {tool.name for tool in asyncio.run(mcp_server.mcp.list_tools())} == MCP_TOOL_NAMES
 
 
 def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:

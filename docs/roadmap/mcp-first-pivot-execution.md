@@ -43,8 +43,23 @@ commit as each roadmap task.
 - Follow-up risks: Rebase or recreate the branch from updated `main` after Task 1
   merges; do not drop the Task 1 baseline and review-fix commits.
 
+## Task 3 - Introduce a declarative MCP tool catalog and profiles
+
+- Status: complete
+- Branch: `pivot/3-mcp-tool-catalog`
+- Commits: `refactor: catalog MCP tools by profile` (this commit)
+- Focused verification: `python -m pytest tests/mcp/test_tool_registry.py tests/mcp/test_tool_profiles.py tests/cli/test_mcp_integration.py -q`
+- Full verification: `python -m pyright --pythonpath "$(command -v python)" src/codex_usage_tracker/interfaces/mcp src/codex_usage_tracker/cli/mcp_runtime.py`; `python -m ruff check src/codex_usage_tracker/interfaces/mcp tests/mcp`; `git diff --check`
+- Deviations from plan: The local Task 3 branch is intentionally stacked on the
+  reviewed Task 1 and Task 2 commits because pushing and merging are outside
+  this task. The installed compatibility server remains the active legacy
+  runtime; profile-selected server activation is deferred to its roadmap task.
+- Follow-up risks: Rebase or recreate the branch from updated `main` after the
+  preceding tasks merge. Core tools intentionally raise
+  `CoreToolNotImplemented` until their service tasks land.
+
 ## Remaining Planned Tasks
 
-Tasks 3 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 4 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

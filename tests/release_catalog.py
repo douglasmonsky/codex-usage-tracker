@@ -10,6 +10,24 @@ CANONICAL_DATA_POSTURE = (
     "shareable outputs follow existing behavior."
 )
 
+CORE_MCP_TOOL_NAMES = (
+    "usage_status",
+    "usage_refresh",
+    "usage_analyze",
+    "usage_query",
+    "usage_evidence",
+    "usage_allowance",
+    "usage_job_status",
+)
+
+DEVELOPER_MCP_TOOL_NAMES = {
+    "usage_dogfood_start",
+    "usage_dogfood_status",
+    "usage_dogfood_result",
+    "usage_visualization_suggest",
+    "usage_visualization_render",
+}
+
 STABLE_CLI_COMMANDS = {
     "setup",
     "doctor",
