@@ -69,9 +69,7 @@ def test_route_inventory_has_decision_ready_execution_metadata() -> None:
     }
     assert all(profile.output_limit_bytes is not None for profile in stable_v2)
     assert all(
-        profile.input_limit_bytes is not None
-        for profile in stable_v2
-        if profile.method == "POST"
+        profile.input_limit_bytes is not None for profile in stable_v2 if profile.method == "POST"
     )
 
     compression = {

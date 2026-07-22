@@ -22,7 +22,9 @@ class HttpRequestError(ValueError):
 def decode_json_object(body: bytes, *, content_type: str, max_bytes: int) -> dict[str, object]:
     """Decode one bounded JSON object without accepting transport ambiguity."""
     if content_type.split(";", 1)[0].strip().lower() != "application/json":
-        raise HttpRequestError(415, "unsupported_media_type", "Content-Type must be application/json")
+        raise HttpRequestError(
+            415, "unsupported_media_type", "Content-Type must be application/json"
+        )
     if len(body) > max_bytes:
         raise HttpRequestError(413, "request_too_large", f"request body exceeds {max_bytes} bytes")
     try:

@@ -94,22 +94,28 @@ def test_http_v2_contracts_are_tracked_and_validate() -> None:
         "codex-usage-tracker.capabilities.v2",
         "codex-usage-tracker.error.v1",
     } <= schemas
-    assert validate_json_payload_contract(
-        {
-            "schema": "codex-usage-tracker.capabilities.v2",
-            "analysis_goals": [],
-            "query_entities": {},
-            "query_measures": [],
-            "allowance_operations": [],
-            "evidence_selector_kinds": [],
-        }
-    ) == []
-    assert validate_json_payload_contract(
-        {
-            "schema": "codex-usage-tracker.error.v1",
-            "error": {"code": "invalid_request", "message": "invalid"},
-        }
-    ) == []
+    assert (
+        validate_json_payload_contract(
+            {
+                "schema": "codex-usage-tracker.capabilities.v2",
+                "analysis_goals": [],
+                "query_entities": {},
+                "query_measures": [],
+                "allowance_operations": [],
+                "evidence_selector_kinds": [],
+            }
+        )
+        == []
+    )
+    assert (
+        validate_json_payload_contract(
+            {
+                "schema": "codex-usage-tracker.error.v1",
+                "error": {"code": "invalid_request", "message": "invalid"},
+            }
+        )
+        == []
+    )
 
 
 def test_dashboard_target_contract_is_tracked() -> None:

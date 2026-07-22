@@ -299,7 +299,11 @@ class HttpV2Facade:
         encoded_size = len(json.dumps(payload, separators=(",", ":")).encode())
         if encoded_size > _OUTPUT_LIMITS[route_path]:
             return _error(500, "response_too_large", "Response exceeds the route output limit")
-        status = 202 if method == "POST" and payload.get("schema") == "codex-usage-tracker.job.v1" else 200
+        status = (
+            202
+            if method == "POST" and payload.get("schema") == "codex-usage-tracker.job.v1"
+            else 200
+        )
         return HttpV2Response(status, payload, {})
 
     def _get(self, route_path: str, path: str, query: str) -> object:
@@ -307,15 +311,21 @@ class HttpV2Facade:
         if route_path == "/api/v2/status":
             _reject_unknown(params, {"history", "freshness_threshold_seconds"})
             scope = RequestScope(history=cast(Any, _one(params, "history", "active")))
-            threshold = _integer(_one(params, "freshness_threshold_seconds", "300"), "freshness_threshold_seconds")
-            return self.services.status(StatusRequest(scope=scope, freshness_threshold_seconds=threshold))
+            threshold = _integer(
+                _one(params, "freshness_threshold_seconds", "300"), "freshness_threshold_seconds"
+            )
+            return self.services.status(
+                StatusRequest(scope=scope, freshness_threshold_seconds=threshold)
+            )
         if route_path == "/api/v2/capabilities":
             _reject_unknown(params, set())
             return self.services.capabilities()
         _reject_unknown(params, {"include_result"})
         job_id = unquote(path.removeprefix("/api/v2/jobs/"))
         return self.services.job_status(
-            JobStatusRequest(job_id=job_id, include_result=_boolean(_one(params, "include_result", "0")))
+            JobStatusRequest(
+                job_id=job_id, include_result=_boolean(_one(params, "include_result", "0"))
+            )
         )
 
     def _post(self, path: str, payload: dict[str, object]) -> object:
@@ -427,9 +437,7 @@ def _boolean(value: str) -> bool:
     raise ValueError("boolean query parameters must be 0, 1, false, or true")
 
 
-def _reject_unknown(
-    payload: Mapping[str, object], allowed: set[str], *, prefix: str = ""
-) -> None:
+def _reject_unknown(payload: Mapping[str, object], allowed: set[str], *, prefix: str = "") -> None:
     unknown = sorted(set(payload) - allowed)
     if unknown:
         raise HttpRequestError(400, "invalid_request", f"unsupported field: {prefix}{unknown[0]}")

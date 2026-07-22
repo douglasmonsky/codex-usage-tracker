@@ -146,7 +146,10 @@ class _UsageDashboardHandler(
             return
         route_method = get_route_method(parsed.path)
         if route_method is not None:
-            getattr(self, route_method)(parsed.query)
+            if route_method == "_handle_http_v2":
+                self._handle_http_v2(parsed.query)
+            else:
+                getattr(self, route_method)(parsed.query)
             return
         fact_filters = GET_DIAGNOSTIC_FACT_ROUTES.get(parsed.path)
         if fact_filters is not None:
@@ -174,7 +177,10 @@ class _UsageDashboardHandler(
             return
         route_method = post_route_method(parsed.path)
         if route_method is not None:
-            getattr(self, route_method)(parsed.query)
+            if route_method == "_handle_http_v2":
+                self._handle_http_v2(parsed.query)
+            else:
+                getattr(self, route_method)(parsed.query)
             return
         self._send_error(HTTPStatus.NOT_FOUND, "Unknown API endpoint")
 

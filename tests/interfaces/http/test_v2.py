@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
+from codex_usage_tracker.application.requests import JobStatusRequest, StatusRequest
 from codex_usage_tracker.interfaces.http.serialization import HttpRequestError, decode_json_object
 from codex_usage_tracker.interfaces.http.v2 import HTTP_V2_ROUTES, HttpV2Facade, HttpV2Response
 
@@ -126,9 +127,11 @@ def test_get_routes_decode_query_and_path_parameters() -> None:
         "job_status",
         "capabilities",
     ]
-    assert services.calls[0][1].scope.history == "all"
-    assert services.calls[1][1].job_id == "job_123"
-    assert services.calls[1][1].include_result is True
+    status_request = cast(StatusRequest, services.calls[0][1])
+    job_request = cast(JobStatusRequest, services.calls[1][1])
+    assert status_request.scope.history == "all"
+    assert job_request.job_id == "job_123"
+    assert job_request.include_result is True
 
 
 @pytest.mark.parametrize(
@@ -144,15 +147,13 @@ def test_get_routes_decode_query_and_path_parameters() -> None:
         ("/api/v2/allowance", {"operation": "status", "surprise": True}),
     ],
 )
-def test_post_routes_reject_unknown_top_level_fields(
-    path: str, payload: dict[str, object]
-) -> None:
+def test_post_routes_reject_unknown_top_level_fields(path: str, payload: dict[str, object]) -> None:
     response = _request(HttpV2Facade(RecordingServices()), "POST", path, payload)
 
     assert response.status == 400
     assert response.payload == {
         "schema": "codex-usage-tracker.error.v1",
-        "error": {"code": "invalid_request", "message": "unsupported field: surprise"}
+        "error": {"code": "invalid_request", "message": "unsupported field: surprise"},
     }
 
 
