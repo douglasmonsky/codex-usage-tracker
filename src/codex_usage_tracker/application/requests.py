@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Literal, TypeAlias, cast
 
 from codex_usage_tracker.analytics.analysis_models import AnalysisRequest as AnalysisRequest
+from codex_usage_tracker.application.allowance_models import AllowanceRequest as AllowanceRequest
 from codex_usage_tracker.application.errors import RequestValidationError
 from codex_usage_tracker.application.query_models import QueryRequest as QueryRequest
 from codex_usage_tracker.core.contracts import ScopeV1
@@ -176,30 +177,6 @@ class RefreshRequest:
     def __post_init__(self) -> None:
         _choice(self.history, _HISTORY_VALUES, "history")
         _choice(self.execution, _EXECUTION_VALUES, "execution")
-
-
-@dataclass(frozen=True)
-class AllowanceRequest:
-    operation: Literal["status", "series", "evidence", "analysis"]
-    window: Literal["weekly", "five_hour"] = "weekly"
-    range: str = "8w"
-    cursor: str | None = None
-    limit: int = 50
-    analysis_id: str | None = None
-    execution: ExecutionMode = "auto"
-
-    def __post_init__(self) -> None:
-        _choice(self.operation, {"status", "series", "evidence", "analysis"}, "operation")
-        _choice(self.window, {"weekly", "five_hour"}, "window")
-        _choice(self.execution, _EXECUTION_VALUES, "execution")
-        _bounded_limit(self.limit)
-        object.__setattr__(self, "range", _safe_identifier(self.range, "range"))
-        if self.analysis_id is not None:
-            object.__setattr__(
-                self,
-                "analysis_id",
-                _safe_identifier(self.analysis_id, "analysis_id"),
-            )
 
 
 @dataclass(frozen=True)
