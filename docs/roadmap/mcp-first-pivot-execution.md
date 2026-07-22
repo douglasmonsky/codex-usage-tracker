@@ -74,8 +74,25 @@ commit as each roadmap task.
   preceding tasks merge. Later core tools must use the registered envelope and
   evidence schemas without weakening finite-number or payload-budget checks.
 
+## Task 5 - Add request models and shared source/accounting context builders
+
+- Status: complete
+- Branch: `pivot/5-request-context`
+- Commits: `feat: build shared analysis request context` (this commit)
+- Focused verification: `python -m pytest tests/application/test_requests.py tests/application/test_context.py tests/store/test_store_dashboard_queries.py -q`
+- Full verification: `python scripts/benchmark_dashboard_routes.py --sizes 100000 --iterations 3 --skip-compression --enforce-thresholds --output-dir /private/tmp/pivot-context-after-final`; `python -m pyright src/codex_usage_tracker/application src/codex_usage_tracker/store/api.py`; `python -m ruff check src/codex_usage_tracker/application src/codex_usage_tracker/store/api.py tests/application tests/store/test_store_dashboard_queries.py`; `git diff --check`
+- Deviations from plan: The local Task 5 branch is intentionally stacked on
+  the reviewed Tasks 1-4 commits because pushing and merging are outside this
+  task. The shared context query opens the existing database in read-only mode
+  and computes all scoped physical, canonical, coverage, revision, and freshness
+  facts in one explicit transaction and one aggregate SQL statement.
+- Follow-up risks: Rebase or recreate the branch from updated `main` after the
+  preceding tasks merge. Later interface adapters may accept `record` as a
+  compatibility alias, but application `EvidenceRequest` remains canonical on
+  `record_id`.
+
 ## Remaining Planned Tasks
 
-Tasks 5 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 6 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

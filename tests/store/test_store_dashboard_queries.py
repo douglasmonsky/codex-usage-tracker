@@ -5,13 +5,17 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from codex_usage_tracker.core.models import UsageEvent
+from codex_usage_tracker.store import api as store_api
 from codex_usage_tracker.store import dashboard_queries
 from codex_usage_tracker.store.api import (
     connect,
     init_db,
     query_dashboard_event_count,
     query_dashboard_events,
+    query_request_context_facts,
     query_thread_summaries,
     query_usage_api_event_count,
     query_usage_api_events,
@@ -476,3 +480,48 @@ def test_dashboard_event_counts_are_computed_together(tmp_path: Path) -> None:
         "active_available_rows": 4,
         "all_history_available_rows": 5,
     }
+
+
+def test_request_context_facts_use_one_read_transaction_and_canonical_totals(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=_make_codex_home(tmp_path), db_path=db_path)
+    with connect(db_path) as connection:
+        record_ids = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT record_id FROM usage_events ORDER BY record_id LIMIT 2"
+            )
+        ]
+        connection.execute(
+            "UPDATE usage_events SET is_duplicate = 1, canonical_record_id = ? WHERE record_id = ?",
+            (record_ids[0], record_ids[1]),
+        )
+
+    statements: list[str] = []
+    original_connect = store_api.sqlite3.connect
+
+    def traced_connect(*args: object, **kwargs: object) -> object:
+        connection = original_connect(*args, **kwargs)
+        connection.set_trace_callback(statements.append)
+        return connection
+
+    monkeypatch.setattr("codex_usage_tracker.store.api.sqlite3.connect", traced_connect)
+    facts = query_request_context_facts(
+        db_path=db_path,
+        scope={"history": "all"},
+        priced_models={"gpt-5.5"},
+        credit_models={"gpt-5.5"},
+    )
+
+    assert facts["physical_rows"] == 4
+    assert facts["canonical_rows"] == 3
+    assert facts["copied_rows_excluded"] == 1
+    assert facts["pricing_coverage"] == 1.0
+    assert facts["credit_coverage"] == 1.0
+    assert sum(statement.strip().upper() == "BEGIN" for statement in statements) == 1
+    assert (
+        sum(statement.lstrip().upper().startswith(("SELECT", "WITH")) for statement in statements)
+        == 1
+    )
