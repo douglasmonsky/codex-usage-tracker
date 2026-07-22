@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -353,3 +355,290 @@ def test_adapter_exception_is_stable_and_does_not_leak_text() -> None:
     assert status.error.code == "job.adapter_failed"
     assert "SYNTHETIC_SENSITIVE_EXCEPTION_TEXT" not in encoded
     assert "RuntimeError" not in encoded
+
+
+def test_blocking_adapter_does_not_block_unrelated_status_or_registration() -> None:
+    entered = threading.Event()
+    release = threading.Event()
+
+    def blocked(_job_id: str, *, include_result: bool = False) -> dict[str, object]:
+        entered.set()
+        assert release.wait(timeout=2)
+        return _analysis_payload("blocked", 10)
+
+    service = JobService()
+    service.register(
+        kind="analysis",
+        job_id="blocked",
+        adapter=AnalysisJobAdapter(blocked, kind="analysis", request_hash=request_hash("blocked")),
+    )
+    service.register(
+        kind="analysis",
+        job_id="quick",
+        adapter=AnalysisJobAdapter(
+            _reader(_analysis_payload("quick", 20)),
+            kind="analysis",
+            request_hash=request_hash("quick"),
+        ),
+    )
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        blocked_future = pool.submit(service.status, "blocked")
+        assert entered.wait(timeout=1)
+        quick_future = pool.submit(service.status, "quick")
+        assert quick_future.result(timeout=1).progress_percent == 20
+        service.register(
+            kind="analysis",
+            job_id="new",
+            adapter=AnalysisJobAdapter(
+                _reader(_analysis_payload("new", 1)),
+                kind="analysis",
+                request_hash=request_hash("new"),
+            ),
+        )
+        release.set()
+        assert blocked_future.result(timeout=1).job_id == "blocked"
+
+
+def test_reentrant_adapter_can_poll_another_job_without_deadlock() -> None:
+    service = JobService()
+    service.register(
+        kind="analysis",
+        job_id="inner",
+        adapter=AnalysisJobAdapter(
+            _reader(_analysis_payload("inner", 50)),
+            kind="analysis",
+            request_hash=request_hash("inner"),
+        ),
+    )
+
+    def reentrant(_job_id: str, *, include_result: bool = False) -> dict[str, object]:
+        assert service.status("inner").progress_percent == 50
+        return _analysis_payload("outer", 60)
+
+    service.register(
+        kind="analysis",
+        job_id="outer",
+        adapter=AnalysisJobAdapter(reentrant, kind="analysis", request_hash=request_hash("outer")),
+    )
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        assert pool.submit(service.status, "outer").result(timeout=1).progress_percent == 60
+
+
+def test_concurrent_polls_commit_monotonic_progress() -> None:
+    first_entered = threading.Event()
+    release_first = threading.Event()
+    calls = 0
+
+    def reader(_job_id: str, *, include_result: bool = False) -> dict[str, object]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            first_entered.set()
+            assert release_first.wait(timeout=2)
+            return _analysis_payload("race", 20)
+        return _analysis_payload("race", 80)
+
+    service = JobService()
+    service.register(
+        kind="analysis",
+        job_id="race",
+        adapter=AnalysisJobAdapter(reader, kind="analysis", request_hash=request_hash("race")),
+    )
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        slow = pool.submit(service.status, "race")
+        assert first_entered.wait(timeout=1)
+        fast = pool.submit(service.status, "race")
+        assert fast.result(timeout=1).progress_percent == 80
+        release_first.set()
+        assert slow.result(timeout=1).progress_percent == 80
+
+
+def test_same_kind_reregistration_discards_blocked_stale_poll() -> None:
+    entered = threading.Event()
+    release = threading.Event()
+
+    def old(_job_id: str, *, include_result: bool = False) -> dict[str, object]:
+        entered.set()
+        assert release.wait(timeout=2)
+        return _analysis_payload("replace", 10)
+
+    service = JobService()
+    service.register(
+        kind="analysis",
+        job_id="replace",
+        adapter=AnalysisJobAdapter(old, kind="analysis", request_hash=request_hash("old")),
+    )
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(service.status, "replace")
+        assert entered.wait(timeout=1)
+        service.register(
+            kind="analysis",
+            job_id="replace",
+            adapter=AnalysisJobAdapter(
+                _reader(_analysis_payload("replace", 90)),
+                kind="analysis",
+                request_hash=request_hash("new"),
+            ),
+        )
+        release.set()
+        status = future.result(timeout=1)
+
+    assert status.progress_percent == 90
+    assert status.request_hash == request_hash("new")
+
+
+def test_compact_first_adapter_reads_are_ordered_and_state_gated() -> None:
+    running_calls: list[bool] = []
+    completed_calls: list[bool] = []
+
+    def running(_job_id: str, *, include_result: bool = False) -> dict[str, object]:
+        running_calls.append(include_result)
+        return _analysis_payload("running", 30)
+
+    def completed(_job_id: str, *, include_result: bool = False) -> dict[str, object]:
+        completed_calls.append(include_result)
+        payload = _analysis_payload("completed", 100, state="completed")
+        if include_result:
+            payload["result"] = {"safe_total": 3}
+        return payload
+
+    service = JobService()
+    service.register(
+        kind="analysis",
+        job_id="running",
+        adapter=AnalysisJobAdapter(running, kind="analysis", request_hash=request_hash("running")),
+    )
+    service.register(
+        kind="analysis",
+        job_id="completed",
+        adapter=AnalysisJobAdapter(
+            completed, kind="analysis", request_hash=request_hash("completed")
+        ),
+    )
+
+    assert service.status("running", include_result=True).result is None
+    assert service.status("completed", include_result=True).result == {"safe_total": 3}
+    assert running_calls == [False]
+    assert completed_calls == [False, True]
+
+
+def test_adversarial_nested_result_is_projected_without_private_values() -> None:
+    legacy = {
+        "safe_total": 7,
+        "ok": True,
+        "nested": [
+            {"note": "prefix /Users/Alice/secret.json suffix", "safe_count": 2},
+            "file:///private/tmp/report.json",
+            "~/Library/Application Support/private.db",
+            r"C:\\Users\\Alice\\secret.txt",
+            r"\\server\\share\\secret.txt",
+            object(),
+        ],
+        "artifact_id": "artifact-secret",
+        "worker_internal": "worker-secret",
+        "request_key": "request-secret",
+        "/tmp/path-key": "value",
+        "traceback": "Traceback: private exception",
+    }
+    payload = _analysis_payload("privacy", 100, state="completed")
+    payload["result"] = legacy
+    before_safe_total = legacy["safe_total"]
+    service = JobService()
+    service.register(
+        kind="analysis",
+        job_id="privacy",
+        adapter=AnalysisJobAdapter(
+            _reader(payload), kind="analysis", request_hash=request_hash("privacy")
+        ),
+    )
+
+    status = service.status("privacy", include_result=True)
+    encoded = json.dumps(status.to_payload())
+
+    assert status.result is not None
+    assert status.result["safe_total"] == 7  # type: ignore[index]
+    assert status.result["ok"] is True  # type: ignore[index]
+    assert "safe_count" in encoded
+    for private in (
+        "/Users/",
+        "file://",
+        "~/",
+        "C:\\\\",
+        "\\\\server",
+        "artifact-secret",
+        "worker-secret",
+        "request-secret",
+        "Traceback",
+    ):
+        assert private not in encoded
+    assert before_safe_total == legacy["safe_total"]
+
+
+def test_whole_status_budget_and_unsafe_result_fail_stably() -> None:
+    payload = _analysis_payload("budget", 100, state="completed")
+    payload["result"] = {"safe": "x"}
+    service = JobService()
+    service.register(
+        kind="analysis",
+        job_id="budget",
+        adapter=AnalysisJobAdapter(
+            _reader(payload),
+            kind="analysis",
+            request_hash=request_hash("budget"),
+            result_budget=100,
+        ),
+    )
+    budgeted = service.status("budget", include_result=True)
+    assert budgeted.result is None
+    assert budgeted.error is not None
+    assert budgeted.error.code == "job.result_too_large"
+    assert serialized_size(budgeted.to_payload()) <= 16 * 1024
+
+    class UnsafeAdapter:
+        result_schema = "analysis.result.v1"
+        result_budget = 4096
+        request_hash = request_hash("unsafe")
+
+        def status(self, job_id: str, *, include_result: bool = False) -> dict[str, object]:
+            return {
+                "job_id": job_id,
+                "kind": "analysis",
+                "state": "completed",
+                "progress_percent": 100,
+                "stage": "complete",
+                "request_hash": self.request_hash,
+                "source_revision": None,
+                "created_at": "2026-07-21T12:00:00Z",
+                "updated_at": "2026-07-21T12:01:00Z",
+                "completed_at": "2026-07-21T12:01:00Z",
+                "retryable": False,
+                "error": None,
+                "result_schema": self.result_schema,
+                "result": {"unsafe": object()} if include_result else None,
+            }
+
+    unsafe_service = JobService()
+    unsafe_service.register(kind="analysis", job_id="unsafe", adapter=UnsafeAdapter())
+    unsafe = unsafe_service.status("unsafe", include_result=True)
+    assert unsafe.result is None
+    assert unsafe.error is not None
+    assert unsafe.error.code == "job.result_unsafe"
+
+
+def test_unknown_job_does_not_echo_arbitrary_input() -> None:
+    requested = "../private/user-controlled\njob"
+    status = JobService().status(requested)
+    assert requested not in status.job_id
+    assert status.job_id.startswith("unknown-")
+
+
+def _analysis_payload(job_id: str, progress: int, *, state: str = "running") -> dict[str, object]:
+    return {
+        "job_id": job_id,
+        "status": state,
+        "stage": "complete" if state == "completed" else "working",
+        "created_at": "2026-07-21T12:00:00Z",
+        "updated_at": "2026-07-21T12:01:00Z",
+        "progress": {"percent": progress},
+    }

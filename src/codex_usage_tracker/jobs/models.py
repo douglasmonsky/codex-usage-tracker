@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Literal, Protocol, TypeAlias, cast
 
 from codex_usage_tracker.core.contracts import MessageV1, payload_mapping
@@ -14,6 +15,9 @@ JobKind: TypeAlias = Literal["refresh", "analysis", "allowance", "compression", 
 JobState: TypeAlias = Literal["queued", "running", "completed", "failed", "cancelled"]
 _REQUEST_HASH = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _SAFE_STAGE = re.compile(r"[a-z0-9][a-z0-9_.-]{0,63}\Z")
+_SAFE_JOB_ID = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9_.:-]{0,255}\Z")
+_SAFE_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@+-]{0,255}\Z")
+MAX_RESULT_BUDGET_BYTES = 1024 * 1024
 
 
 class JobAdapter(Protocol):
@@ -45,10 +49,8 @@ class JobStatusV1:
     result: object | None
 
     def __post_init__(self) -> None:
-        if not self.job_id:
-            raise ValueError("job_id must not be empty")
-        if len(self.job_id) > 256:
-            raise ValueError("job_id must not exceed 256 characters")
+        if not _SAFE_JOB_ID.fullmatch(self.job_id):
+            raise ValueError("job_id must be a safe identifier")
         if self.kind not in {"refresh", "analysis", "allowance", "compression", "diagnostic"}:
             raise ValueError("kind is invalid")
         if self.state not in {"queued", "running", "completed", "failed", "cancelled"}:
@@ -61,6 +63,22 @@ class JobStatusV1:
             raise ValueError("request_hash must be a sha256 fingerprint")
         if self.error is not None and not isinstance(self.error, MessageV1):
             raise TypeError("error must be a MessageV1")
+        if type(self.retryable) is not bool:
+            raise TypeError("retryable must be a bool")
+        if self.source_revision is not None and not _SAFE_IDENTIFIER.fullmatch(
+            self.source_revision
+        ):
+            raise ValueError("source_revision must be a safe identifier")
+        if self.result_schema is not None and not _SAFE_IDENTIFIER.fullmatch(self.result_schema):
+            raise ValueError("result_schema must be a safe identifier")
+        object.__setattr__(self, "created_at", _canonical_timestamp(self.created_at, "created_at"))
+        object.__setattr__(self, "updated_at", _canonical_timestamp(self.updated_at, "updated_at"))
+        if self.completed_at is not None:
+            object.__setattr__(
+                self,
+                "completed_at",
+                _canonical_timestamp(self.completed_at, "completed_at"),
+            )
         object.__setattr__(self, "result", immutable_snapshot(self.result))
 
     def to_payload(self) -> dict[str, object]:
@@ -99,9 +117,23 @@ class JobHandle:
     def __post_init__(self) -> None:
         if self.kind not in {"refresh", "analysis", "allowance", "compression", "diagnostic"}:
             raise ValueError("kind is invalid")
-        if not self.job_id:
-            raise ValueError("job_id must not be empty")
-        if len(self.job_id) > 256:
-            raise ValueError("job_id must not exceed 256 characters")
-        if self.result_budget <= 0:
-            raise ValueError("result_budget must be positive")
+        if not _SAFE_JOB_ID.fullmatch(self.job_id):
+            raise ValueError("job_id must be a safe identifier")
+        if (
+            type(self.result_budget) is not int
+            or self.result_budget <= 0
+            or self.result_budget > MAX_RESULT_BUDGET_BYTES
+        ):
+            raise ValueError(
+                f"result_budget must be an integer from 1 through {MAX_RESULT_BUDGET_BYTES}"
+            )
+
+
+def _canonical_timestamp(value: str, field_name: str) -> str:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (AttributeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be a canonical timestamp") from exc
+    if parsed.tzinfo is None:
+        raise ValueError(f"{field_name} must be a canonical timestamp")
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")

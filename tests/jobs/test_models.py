@@ -66,11 +66,11 @@ def test_job_status_rejects_out_of_range_progress(progress: int) -> None:
 
 
 def test_job_handle_requires_explicit_positive_result_budget() -> None:
-    with pytest.raises(ValueError, match="result_budget must be positive"):
+    with pytest.raises(ValueError, match="result_budget"):
         JobHandle(
             kind="diagnostic",
             job_id="job-1",
-            adapter=lambda _job_id, include_result=False: {},
+            adapter=lambda _job_id, include_result=False: {},  # type: ignore[arg-type]
             result_budget=0,
         )
 
@@ -78,3 +78,70 @@ def test_job_handle_requires_explicit_positive_result_budget() -> None:
 def test_job_error_uses_stable_message_contract() -> None:
     error = MessageV1(code="job.failed", severity="blocking", message="The job failed.")
     assert payload_mapping(error)["code"] == "job.failed"
+
+
+def test_job_status_normalizes_utc_timestamps() -> None:
+    status = JobStatusV1(
+        job_id="job-utc",
+        kind="analysis",
+        state="completed",
+        progress_percent=100,
+        stage="complete",
+        source_revision="generation:7",
+        request_hash=f"sha256:{'a' * 64}",
+        created_at="2026-07-21T08:00:00-04:00",
+        updated_at="2026-07-21T12:01:00+00:00",
+        completed_at="2026-07-21T12:01:00Z",
+        retryable=False,
+        error=None,
+        result_schema="analysis.result.v1",
+        result=None,
+    )
+
+    assert status.created_at == "2026-07-21T12:00:00Z"
+    assert status.updated_at == "2026-07-21T12:01:00Z"
+    assert status.completed_at == "2026-07-21T12:01:00Z"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("retryable", 1, "retryable must be a bool"),
+        ("created_at", "not-a-time", "created_at must be a canonical timestamp"),
+        ("source_revision", "/private/source", "source_revision must be a safe identifier"),
+        ("result_schema", "bad schema\n", "result_schema must be a safe identifier"),
+        ("job_id", "../private/job", "job_id must be a safe identifier"),
+    ],
+)
+def test_job_status_rejects_unsafe_contract_fields(field: str, value: object, message: str) -> None:
+    values: dict[str, object] = {
+        "job_id": "job-safe",
+        "kind": "analysis",
+        "state": "running",
+        "progress_percent": 1,
+        "stage": "running",
+        "source_revision": "generation:7",
+        "request_hash": f"sha256:{'a' * 64}",
+        "created_at": "2026-07-21T12:00:00Z",
+        "updated_at": "2026-07-21T12:00:01Z",
+        "completed_at": None,
+        "retryable": False,
+        "error": None,
+        "result_schema": None,
+        "result": None,
+    }
+    values[field] = value
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        JobStatusV1(**values)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("budget", [True, 1.5, 0, 1024 * 1024 + 1])
+def test_job_handle_validates_bounded_exact_integer_budget(budget: object) -> None:
+    with pytest.raises(ValueError, match="result_budget"):
+        JobHandle(
+            kind="diagnostic",
+            job_id="job-budget",
+            adapter=lambda _job_id, include_result=False: {},  # type: ignore[arg-type]
+            result_budget=budget,  # type: ignore[arg-type]
+        )

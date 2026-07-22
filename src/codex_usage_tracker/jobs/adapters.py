@@ -7,6 +7,7 @@ import math
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from codex_usage_tracker.core.contracts import MessageV1
 from codex_usage_tracker.jobs.models import JobKind, JobState
@@ -14,6 +15,14 @@ from codex_usage_tracker.jobs.models import JobKind, JobState
 StatusReader = Callable[..., Mapping[str, object]]
 _EPOCH = "1970-01-01T00:00:00Z"
 _STAGE_UNSAFE = re.compile(r"[^a-z0-9_.-]+")
+_SAFE_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@+-]{0,255}\Z")
+_PRIVATE_TEXT = re.compile(
+    r"file://|~/|/(?:Users|private|tmp|var/folders|home|Volumes)/|"
+    r"(?<![:/\w])/(?:[^/\s]+/)+[^/\s]+|"
+    r"[A-Za-z]:[\\/]|\\\\[^\\\s]+[\\/]",
+    re.IGNORECASE,
+)
+_EXCEPTION_TEXT = re.compile(r"traceback|(?:exception|error)(?:\s*:|\b)", re.IGNORECASE)
 
 
 def request_hash(value: object) -> str:
@@ -208,7 +217,15 @@ def _safe_stage(payload: Mapping[str, object], *, family: str, state: JobState) 
 
 
 def _timestamp(value: object, fallback: str = _EPOCH) -> str:
-    return value[:64] if isinstance(value, str) and value else fallback
+    if not isinstance(value, str) or not value or _PRIVATE_TEXT.search(value):
+        return fallback
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return fallback
+    if parsed.tzinfo is None:
+        return fallback
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _terminal_timestamp(
@@ -229,22 +246,40 @@ def _safe_result(value: object) -> object:
         return {
             str(key): _safe_result(item)
             for key, item in value.items()
-            if not _private_result_key(str(key))
+            if isinstance(key, str) and not _private_result_key(key)
         }
     if isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
         return [_safe_result(item) for item in value]
-    if isinstance(value, str) and (value.startswith("/") or re.match(r"^[A-Za-z]:[\\/]", value)):
-        return "[redacted-local-path]"
-    return value
+    if isinstance(value, str):
+        if _PRIVATE_TEXT.search(value) or _EXCEPTION_TEXT.search(value):
+            return "[redacted-private-text]"
+        return value[:4096]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if value is None or type(value) in {bool, int, float}:
+        return value
+    return "[redacted-unsupported]"
 
 
 def _private_result_key(key: str) -> bool:
     normalized = key.lower()
+    if _PRIVATE_TEXT.search(key) or "/" in key or "\\" in key:
+        return True
     return any(
         marker in normalized
-        for marker in ("path", "artifact", "request_key", "worker", "exception", "traceback")
+        for marker in (
+            "path",
+            "artifact",
+            "request_key",
+            "worker",
+            "exception",
+            "traceback",
+            "source_file",
+        )
     )
 
 
 def _optional_string(value: object) -> str | None:
-    return value[:256] if isinstance(value, str) and value else None
+    if not isinstance(value, str) or not _SAFE_IDENTIFIER.fullmatch(value):
+        return None
+    return value
