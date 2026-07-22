@@ -17,6 +17,7 @@ from codex_usage_tracker.compression.api import (
 from codex_usage_tracker.compression.jobs import CompressionJobRegistry
 from codex_usage_tracker.compression.models import CompressionScope
 from codex_usage_tracker.compression.payloads import compression_error_payload
+from codex_usage_tracker.jobs import CompressionJobAdapter, JobService, request_hash
 from codex_usage_tracker.server.utils import (
     first_query_value,
     parse_bool_query_value,
@@ -113,6 +114,7 @@ def handle_compression_start_request(
     send_error: ErrorSender,
     send_exception: ExceptionSender,
     send_json: JsonSender,
+    job_service: JobService | None = None,
 ) -> None:
     """Start or reuse one persistent Compression Lab run."""
     params = parse_qs(query)
@@ -151,6 +153,23 @@ def handle_compression_start_request(
             return
         send_exception("Database error while starting Compression Lab", exc)
         return
+    run_id = payload.get("run_id")
+    if isinstance(run_id, str) and run_id:
+        service = job_service or _compression_job_service(registry)
+        service.register(
+            kind="compression",
+            job_id=run_id,
+            adapter=CompressionJobAdapter(
+                lambda registered_id, *, include_result=False: compression_status(
+                    db_path,
+                    run_id=registered_id,
+                    registry=registry,
+                ),
+                request_hash=request_hash(
+                    payload.get("scope_hash") or payload.get("source_revision") or run_id
+                ),
+            ),
+        )
     send_json(HTTPStatus.ACCEPTED, payload)
 
 
@@ -239,6 +258,15 @@ def _compression_http_status(payload: dict[str, object]) -> HTTPStatus:
     if code in {"compression_run_not_found", "compression_run_not_complete"}:
         return HTTPStatus.OK
     return HTTPStatus.BAD_REQUEST
+
+
+def _compression_job_service(registry: CompressionJobRegistry) -> JobService:
+    service = getattr(registry, "generic_job_service", None)
+    if isinstance(service, JobService):
+        return service
+    service = JobService()
+    registry.generic_job_service = service  # type: ignore[attr-defined]
+    return service
 
 
 def _database_is_busy(exc: sqlite3.Error) -> bool:

@@ -10,11 +10,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from codex_usage_tracker.jobs import DogfoodJobAdapter, JobService, request_hash
 from codex_usage_tracker.reports.agentic_dogfood import build_agentic_dogfood_report
 
 DOGFOOD_JOBS: dict[str, dict[str, Any]] = {}
 DOGFOOD_RESULT_CACHE: dict[str, dict[str, Any]] = {}
 DOGFOOD_JOB_LOCK = threading.Lock()
+DOGFOOD_JOB_SERVICE = JobService()
 _MAX_JOBS = 25
 _MAX_RESULT_CACHE = 25
 
@@ -270,6 +272,29 @@ def job_status_payload(
         if include_result and job.get("result") is not None:
             payload["result"] = job["result"]
         return _copy_jsonable(payload)
+
+
+def register_job(job_id: str, request_key: str, *, service: JobService | None = None) -> None:
+    """Register one existing dogfood job with the observational facade."""
+    target = service or DOGFOOD_JOB_SERVICE
+    target.register(
+        kind="diagnostic",
+        job_id=job_id,
+        adapter=DogfoodJobAdapter(
+            lambda registered_id, *, include_result=False: job_status_payload(
+                registered_id,
+                include_result=include_result,
+            ),
+            request_hash=request_hash(request_key),
+        ),
+    )
+
+
+def reset_job_service() -> JobService:
+    """Reset the compatibility facade for isolated tests or server lifecycle setup."""
+    global DOGFOOD_JOB_SERVICE
+    DOGFOOD_JOB_SERVICE = JobService()
+    return DOGFOOD_JOB_SERVICE
 
 
 def _update_job(job_id: str, **updates: Any) -> None:

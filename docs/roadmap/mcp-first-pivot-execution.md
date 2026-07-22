@@ -114,8 +114,25 @@ commit as each roadmap task.
   preceding tasks merge. Status reports existing readiness and persistent
   service probes but deliberately does not claim current-task MCP exposure.
 
+## Task 7 - Introduce the generic job facade over existing registries
+
+- Status: complete
+- Branch: `pivot/7-job-facade`
+- Commits: `refactor: unify usage job status` (this commit)
+- Focused verification: `python -m pytest tests/jobs tests/server/test_analysis_jobs.py tests/server/test_diagnostic_jobs.py tests/server/test_refresh_jobs.py tests/server/test_server_usage_refresh.py tests/server/test_server_allowance_v2.py tests/server/test_compression_routes.py tests/compression/test_jobs.py tests/cli/test_mcp_integration.py -q`; existing-only baseline comparison: `python -m pytest tests/server/test_analysis_jobs.py tests/server/test_refresh_jobs.py tests/server/test_server_usage_refresh.py tests/server/test_diagnostic_jobs.py tests/server/test_compression_routes.py tests/compression/test_jobs.py tests/cli/test_mcp_integration.py -q`
+- Full verification: `python -m pyright --pythonpath "$(command -v python)" src/codex_usage_tracker/jobs src/codex_usage_tracker/server/usage_refresh.py src/codex_usage_tracker/server/analysis_jobs.py src/codex_usage_tracker/server/compression_routes.py src/codex_usage_tracker/cli/mcp_dogfood.py src/codex_usage_tracker/cli/mcp_server.py`; `python -m ruff check --no-cache` and `python -m ruff format --check --no-cache` over all touched Python source and tests; `git diff --check`
+- Deviations from plan: Dogfood job records are created in
+  `cli/mcp_server.py`, not `cli/mcp_dogfood.py`, so the creation point received
+  one additive registration call while lifecycle and historical payloads stayed
+  in the existing helper module. Compression registration remains route-local
+  because its registry lives in the pre-existing compression package, which
+  was outside this task's declared mutation list.
+- Follow-up risks: The facade is intentionally observational and process-local;
+  later roadmap tasks own launch policy, unified persistence, recovery, TTL,
+  cleanup, and the public core job-status adapter.
+
 ## Remaining Planned Tasks
 
-Tasks 7 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 8 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

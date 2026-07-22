@@ -100,6 +100,9 @@ from codex_usage_tracker.cli.mcp_dogfood import (
     prune_jobs as _prune_dogfood_jobs,
 )
 from codex_usage_tracker.cli.mcp_dogfood import (
+    register_job as _register_dogfood_job,
+)
+from codex_usage_tracker.cli.mcp_dogfood import (
     run_job as _run_dogfood_job,
 )
 from codex_usage_tracker.cli.mcp_dogfood import (
@@ -453,6 +456,7 @@ def usage_dogfood_start(
                 "result": None,
             }
         _prune_dogfood_jobs()
+    _register_dogfood_job(job_id, cache_key)
     if cache_hit_payload is not None:
         return _dogfood_job_status_payload(job_id)
     worker = threading.Thread(

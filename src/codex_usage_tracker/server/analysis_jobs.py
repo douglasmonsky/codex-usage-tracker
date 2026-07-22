@@ -8,6 +8,8 @@ import threading
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 
+from codex_usage_tracker.jobs import AnalysisJobAdapter, JobKind, JobService, request_hash
+
 ProgressReporter = Callable[..., None]
 AnalysisWork = Callable[[ProgressReporter], Mapping[str, object] | None]
 _ACTIVE_STATUSES = frozenset({"pending", "running"})
@@ -16,10 +18,11 @@ _ACTIVE_STATUSES = frozenset({"pending", "running"})
 class AnalysisJobRegistry:
     """Run one background worker per semantic request and expose compact polling."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, job_service: JobService | None = None) -> None:
         self._lock = threading.Lock()
         self._jobs: dict[str, dict[str, object]] = {}
         self._active_by_request: dict[str, str] = {}
+        self.job_service = job_service or JobService()
 
     def start(
         self,
@@ -54,6 +57,18 @@ class AnalysisJobRegistry:
             }
             self._jobs[job_id] = job
             self._active_by_request[request_key] = job_id
+        kind = _generic_kind(job_kind)
+        self.job_service.register(
+            kind=kind,
+            job_id=job_id,
+            adapter=AnalysisJobAdapter(
+                lambda registered_id, *, include_result=False: self.status(registered_id),
+                kind=kind,
+                request_hash=request_hash(request_key),
+                result_schema=_result_schema(kind),
+                result_budget=_result_budget(kind),
+            ),
+        )
         thread = threading.Thread(
             target=self._run,
             kwargs={
@@ -250,3 +265,19 @@ def _missing_job(job_id: str) -> dict[str, object]:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _generic_kind(job_kind: str) -> JobKind:
+    if job_kind.startswith("allowance"):
+        return "allowance"
+    if job_kind.startswith("diagnostic"):
+        return "diagnostic"
+    return "analysis"
+
+
+def _result_schema(kind: JobKind) -> str:
+    return f"codex-usage-tracker.{kind}-result.v1"
+
+
+def _result_budget(kind: JobKind) -> int:
+    return 128 * 1024 if kind == "allowance" else 64 * 1024

@@ -159,6 +159,10 @@ def test_analysis_job_is_token_protected_deduplicated_and_persisted(
         "action": "reload_persisted_results",
         "endpoint": "/api/allowance/analysis",
     }
+    generic = registry.job_service.status(job_id, include_result=True)
+    assert generic.kind == "allowance"
+    assert generic.state == "completed"
+    assert generic.result == completed["result"]
 
 
 def test_analysis_job_start_and_status_require_token(tmp_path: Path) -> None:

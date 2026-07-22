@@ -725,6 +725,7 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     with mcp_server._DOGFOOD_JOB_LOCK:
         mcp_server._DOGFOOD_JOBS.clear()
         mcp_dogfood.DOGFOOD_RESULT_CACHE.clear()
+    dogfood_job_service = mcp_dogfood.reset_job_service()
 
     started = mcp_server.usage_dogfood_start(
         evidence_limit=1,
@@ -749,6 +750,10 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     assert status["cache"]["cache_keys"]
     assert status["stages"][-1]["stage"] == "write_artifacts"
     assert Path(status["artifacts"]["summary_json_path"]).exists()
+    generic = dogfood_job_service.status(str(job_id))
+    assert generic.kind == "diagnostic"
+    assert generic.state == "completed"
+    assert generic.result is None
 
     result = mcp_server.usage_dogfood_result(job_id)
     assert result["schema"] == "codex-usage-tracker-agentic-dogfood-v1"
