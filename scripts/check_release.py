@@ -112,6 +112,20 @@ DASHBOARD_REMOVED_VISUALIZATION_PATHS = (
     "tests/playwright/dashboard-constellation.spec.mjs",
 )
 DASHBOARD_THREE_IMPORT = re.compile(r'''(?:from\s+|import\s*\()\s*["']three(?:/|["'])''')
+EVIDENCE_CONSOLE_SCREENSHOTS = (
+    "evidence-console-home.png",
+    "evidence-console-explore-calls.png",
+    "evidence-console-explore-threads.png",
+    "evidence-console-limits.png",
+    "evidence-console-evidence-call.png",
+    "evidence-console-settings.png",
+    "evidence-console-legacy-reports.png",
+    "evidence-console-home-tablet.png",
+    "evidence-console-home-mobile.png",
+    "evidence-console-home-zoom-200.png",
+    "evidence-console-home-reduced-motion.png",
+    "evidence-console-home-keyboard.png",
+)
 REQUIRED_FILES = [
     "README.md",
     "LICENSE",
@@ -126,6 +140,9 @@ REQUIRED_FILES = [
     "docs/one-dot-oh-readiness.md",
     "docs/releases/0.22.0.md",
     "docs/upgrading-to-0.22.0.md",
+    "docs/releases/0.23.0.md",
+    "docs/upgrading-to-0.23.0.md",
+    "docs/evidence-console-route-migration.md",
     "docs/assets/dashboard-insights.png",
     "docs/assets/dashboard-calls.png",
     "docs/assets/dashboard-calls-preview.png",
@@ -136,6 +153,7 @@ REQUIRED_FILES = [
     "docs/assets/dashboard-call-investigator.png",
     "docs/assets/dashboard-call-investigator-preview.png",
     "docs/assets/dashboard-call-investigator-evidence.png",
+    *(f"docs/assets/{name}" for name in EVIDENCE_CONSOLE_SCREENSHOTS),
     "docs/assets/plugin-prompts.png",
     "docs/assets/plugin-thread-leaderboard.png",
     "scripts/check_release.py",
@@ -189,6 +207,10 @@ REQUIRED_FILES = [
     "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator.png",
     "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-preview.png",
     "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-evidence.png",
+    *(
+        f"src/codex_usage_tracker/plugin_data/docs/assets/{name}"
+        for name in EVIDENCE_CONSOLE_SCREENSHOTS
+    ),
     "src/codex_usage_tracker/plugin_data/docs/assets/plugin-prompts.png",
     "src/codex_usage_tracker/plugin_data/docs/assets/plugin-thread-leaderboard.png",
     "src/codex_usage_tracker/plugin_data/skills/codex-usage-api/SKILL.md",
@@ -236,6 +258,10 @@ WHEEL_REQUIRED_MEMBERS = {
     "codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator.png",
     "codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-preview.png",
     "codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-evidence.png",
+    *(
+        f"codex_usage_tracker/plugin_data/docs/assets/{name}"
+        for name in EVIDENCE_CONSOLE_SCREENSHOTS
+    ),
     "codex_usage_tracker/plugin_data/docs/assets/plugin-prompts.png",
     "codex_usage_tracker/plugin_data/docs/assets/plugin-thread-leaderboard.png",
     "codex_usage_tracker/plugin_data/skills/codex-usage-api/SKILL.md",
@@ -246,6 +272,9 @@ SDIST_REQUIRED_MEMBERS = {
     "docs/cli-json-schemas.md",
     "docs/releases/0.22.0.md",
     "docs/upgrading-to-0.22.0.md",
+    "docs/releases/0.23.0.md",
+    "docs/upgrading-to-0.23.0.md",
+    "docs/evidence-console-route-migration.md",
     "scripts/benchmark_synthetic_history.py",
     "skills/codex-usage-api/SKILL.md",
     "skills/codex-usage-tracker/SKILL.md",

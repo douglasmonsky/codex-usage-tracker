@@ -100,6 +100,29 @@ def test_022_release_and_upgrade_docs_define_the_profile_transition() -> None:
     assert all(f"`{schema}`" in release for schema in RELEASE_022_SCHEMA_IDS)
 
 
+def test_023_release_docs_define_the_evidence_console_and_cli_transition() -> None:
+    release = (REPO_ROOT / "docs/releases/0.23.0.md").read_text(encoding="utf-8")
+    upgrade = (REPO_ROOT / "docs/upgrading-to-0.23.0.md").read_text(encoding="utf-8")
+    routes = (REPO_ROOT / "docs/evidence-console-route-migration.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Release 0.23.0" in release
+    assert "Home, Explore, and Limits" in release
+    assert "exactly 11" in release
+    assert "codex-usage-tracker-dashboard-target-v2" in release
+    assert "codex-usage-tracker open" in upgrade
+    assert "through 0.24.x" in upgrade
+    for legacy, replacement in (
+        ("view=overview", "view=home"),
+        ("view=calls", "view=explore&mode=calls"),
+        ("view=threads", "view=explore&mode=threads"),
+        ("view=call", "view=evidence&kind=call"),
+    ):
+        assert legacy in routes
+        assert replacement in routes
+
+
 def test_data_posture_and_evidence_console_docs_define_the_stable_product() -> None:
     data_posture = (REPO_ROOT / "docs/data-posture.md").read_text(encoding="utf-8")
     evidence_console = (REPO_ROOT / "docs/evidence-console.md").read_text(encoding="utf-8")

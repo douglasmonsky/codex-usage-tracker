@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.23.0 - 2026-07-22
+
+- Focus the Evidence Console on Home, unified Calls/Threads Explore, Limits,
+  utility Settings, and contextual call/thread/finding/allowance Evidence.
+- Keep five legacy workbenches directly routable with explicit transition
+  guidance while removing them from primary navigation.
+- Add eight bounded HTTP API v2 routes backed by the same application services
+  and contracts as the seven-tool MCP core.
+- Remove the experimental Usage Constellation, Three.js dependencies, tests,
+  and packaged assets.
+- Introduce the exact 11-command primary CLI with `config`, `service`, and
+  `admin` namespaces while preserving historical aliases through 0.24.x.
+
 ## 0.22.0 - 2026-07-22
 
 - Establish the MCP-first product pivot program, including the `0.22.0` through

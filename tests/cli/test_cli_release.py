@@ -166,12 +166,18 @@ def test_release_check_rejects_stale_public_package_version_claims(tmp_path: Pat
     assert all("does not match pyproject.toml 0.4.1" in failure for failure in failures)
 
 
-def test_release_check_requires_022_release_docs_and_packaged_launcher() -> None:
+def test_release_check_requires_current_release_docs_and_packaged_launcher() -> None:
     module = _load_release_check_module()
     wheel_launcher = "codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py"
     sdist_launcher = f"src/{wheel_launcher}"
 
-    assert {"docs/releases/0.22.0.md", "docs/upgrading-to-0.22.0.md"} <= set(module.REQUIRED_FILES)
+    assert {
+        "docs/releases/0.22.0.md",
+        "docs/upgrading-to-0.22.0.md",
+        "docs/releases/0.23.0.md",
+        "docs/upgrading-to-0.23.0.md",
+        "docs/evidence-console-route-migration.md",
+    } <= set(module.REQUIRED_FILES)
     assert wheel_launcher in module.WHEEL_REQUIRED_MEMBERS
     assert sdist_launcher in module.SDIST_REQUIRED_MEMBERS
 
@@ -262,14 +268,13 @@ def test_readme_codex_usage_tracker_commands_reference_known_subcommands() -> No
     assert not unresolved
     assert {
         "setup",
-        "serve-dashboard",
-        "dashboard",
+        "analyze",
         "query",
-        "summary",
-        "session",
+        "open",
         "export",
-        "support-bundle",
-        "parse-allowance",
+        "config",
+        "service",
+        "admin",
     } <= documented
 
 
