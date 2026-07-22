@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Establish the MCP-first product pivot program, including the `0.22.0` through
+  `0.26.0` release sequence, bounded compatibility and deprecation ledgers, an
+  execution ledger, and a freeze on unplanned dashboard and public-surface
+  growth.
+
 ## 0.21.0 - 2026-07-17
 
 - Keep the macOS dashboard available at a stable, localhost-only URL with a

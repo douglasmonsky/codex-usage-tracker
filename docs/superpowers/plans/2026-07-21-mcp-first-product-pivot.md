@@ -1543,7 +1543,7 @@ git commit -m "refactor: focus Limits and Settings"
 | --- | --- | --- |
 | Diagnose usage drivers | `usage_analyze(goal="usage_spike")` | Finding/Call/Thread Evidence |
 | Broad token waste | `usage_analyze(goal="token_waste")` | Finding Evidence + Explore |
-| Context/cache analysis | `usage_analyze(goal="context_bloat"|"cache_failure")` | Call/Thread Evidence |
+| Context/cache analysis | `usage_analyze(goal="context_bloat")` or `usage_analyze(goal="cache_failure")` | Call/Thread Evidence |
 | Repeated command/file churn | `usage_analyze(goal="workflow_churn")` | Finding Evidence |
 | Report selection and explanation | `usage_analyze` or `usage_query` | Evidence/Explore |
 | Compression candidate ranking | compatibility full-profile tools through 0.24 | direct Labs route during transition |
@@ -3136,7 +3136,6 @@ git commit -m "chore: prepare 0.26.0 contract-stabilization release"
 ```
 
 ---
-
 
 ## Design-to-task traceability
 

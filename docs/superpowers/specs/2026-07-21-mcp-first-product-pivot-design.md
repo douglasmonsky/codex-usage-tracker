@@ -665,8 +665,6 @@ Normal users need only `setup`, `status`, `doctor`, `refresh`, `open`, `analyze`
 - `dedupe-diagnostics`;
 - `source-coverage`.
 
-
-
 Old top-level commands remain aliases for two minor releases. Human output includes one deprecation line on stderr. JSON output remains unchanged except for an additive `deprecation` object where the historical schema permits it; otherwise the warning is stderr-only.
 
 ## 16. Storage and integrity changes

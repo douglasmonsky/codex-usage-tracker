@@ -2,6 +2,23 @@
 
 Codex Usage Tracker is a local sidecar app. It reads Codex session JSONL logs, stores tracker-owned indexes in SQLite, and exposes usage data through CLI commands, MCP tools, CSV export, generated dashboards, and the localhost React dashboard.
 
+## MCP-First Product Layers
+
+MCP is the primary analysis interface. The conversational agent selects bounded
+tools and explains results, while deterministic application services remain the
+source of accounting, classification, ranking, pricing, allowance, and evidence
+selection.
+
+The Evidence Console is the supporting verification interface. It displays
+exact supporting records and time-series evidence and manages local setup; it
+does not independently invent analytical conclusions. The CLI remains the
+interface for setup, automation, scripting, recovery, export, and compatibility.
+
+The [MCP-first roadmap](roadmap/mcp-first-pivot.md) freezes unplanned surface
+growth during the pivot. New dashboard workspaces, top-level MCP concepts,
+top-level CLI commands, runtime dependencies, and SQLite tables require an
+approved roadmap task or design amendment.
+
 The current storage model has three layers:
 
 - Aggregate usage index: token counters, model/effort metadata, call origins, diagnostic labels, thread summaries, pricing/credit estimates, allowance snapshots, and safe report payloads.

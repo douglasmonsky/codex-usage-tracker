@@ -244,6 +244,14 @@ def test_stable_cli_commands_are_not_removed_without_a_deprecation_plan() -> Non
     assert documented == STABLE_CLI_COMMANDS
 
 
+def test_cli_deprecations_use_the_program_compatibility_ledger() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    deprecations = (repo_root / "docs" / "deprecations.md").read_text(encoding="utf-8")
+
+    assert "CLI command or alias" in deprecations
+    assert "No CLI compatibility surface may be removed before its removal release" in deprecations
+
+
 def test_installed_package_smoke_checks_help_for_stable_commands() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "smoke_installed_package.py"
