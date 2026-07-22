@@ -7,6 +7,7 @@ from codex_usage_tracker.core.json_contracts import known_json_schemas
 from codex_usage_tracker.server.route_inventory import DASHBOARD_ROUTE_PROFILES
 from codex_usage_tracker.server.routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
+    GET_DYNAMIC_ROUTE_METHODS,
     GET_ROUTE_METHODS,
     POST_ROUTE_METHODS,
 )
@@ -21,6 +22,7 @@ def test_route_inventory_covers_every_registered_api_route_once() -> None:
     expected = {
         *(("GET", path) for path in GET_ROUTE_METHODS),
         *(("GET", path) for path in GET_DIAGNOSTIC_FACT_ROUTES),
+        *(("GET", path) for path in GET_DYNAMIC_ROUTE_METHODS),
         *(("POST", path) for path in POST_ROUTE_METHODS),
     }
     actual = [(profile.method, profile.path) for profile in DASHBOARD_ROUTE_PROFILES]
@@ -33,7 +35,7 @@ def test_route_inventory_has_decision_ready_execution_metadata() -> None:
     for profile in DASHBOARD_ROUTE_PROFILES:
         assert profile.path.startswith("/api/")
         assert profile.handler.startswith("_handle_")
-        assert profile.owner.startswith("server.")
+        assert profile.owner.startswith(("server.", "interfaces.http."))
         assert profile.scope_behavior
         assert profile.result_bound
         assert profile.cache_behavior
@@ -52,6 +54,24 @@ def test_route_inventory_has_decision_ready_execution_metadata() -> None:
     assert not any(
         profile.execution == "synchronous" and profile.workload == "heavy_analysis"
         for profile in DASHBOARD_ROUTE_PROFILES
+    )
+
+    stable_v2 = [profile for profile in DASHBOARD_ROUTE_PROFILES if profile.exposure == "stable"]
+    assert {(profile.method, profile.path) for profile in stable_v2} == {
+        ("GET", "/api/v2/status"),
+        ("POST", "/api/v2/refresh"),
+        ("GET", "/api/v2/jobs/{job_id}"),
+        ("POST", "/api/v2/analyze"),
+        ("POST", "/api/v2/query"),
+        ("POST", "/api/v2/evidence"),
+        ("POST", "/api/v2/allowance"),
+        ("GET", "/api/v2/capabilities"),
+    }
+    assert all(profile.output_limit_bytes is not None for profile in stable_v2)
+    assert all(
+        profile.input_limit_bytes is not None
+        for profile in stable_v2
+        if profile.method == "POST"
     )
 
     compression = {

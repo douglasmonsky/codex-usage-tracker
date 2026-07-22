@@ -15,7 +15,6 @@ from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.core.paths import DEFAULT_RATE_CARD_PATH
 from codex_usage_tracker.server import allowance, allowance_v2, compression_routes
 from codex_usage_tracker.server import context as server_context
-from codex_usage_tracker.server import evidence as server_evidence
 from codex_usage_tracker.server import usage_refresh as server_usage_refresh
 from codex_usage_tracker.server.analysis_jobs import AnalysisJobRegistry
 from codex_usage_tracker.server.call_detail import (
@@ -35,6 +34,7 @@ from codex_usage_tracker.server.dashboard_pages import (
 )
 from codex_usage_tracker.server.dedupe import DedupeRouteMixin
 from codex_usage_tracker.server.diagnostic_routes import DiagnosticRouteMixin
+from codex_usage_tracker.server.http_v2 import HttpV2RouteMixin
 from codex_usage_tracker.server.investigations import (
     InvestigationKind,
     handle_investigation_request,
@@ -60,9 +60,9 @@ from codex_usage_tracker.server.responses import (
 )
 from codex_usage_tracker.server.routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
-    GET_ROUTE_METHODS,
-    POST_ROUTE_METHODS,
+    get_route_method,
     is_dashboard_shell_path,
+    post_route_method,
 )
 from codex_usage_tracker.server.status import handle_readiness_request, handle_status_request
 from codex_usage_tracker.server.summary import handle_summary_request
@@ -73,6 +73,7 @@ class _UsageDashboardHandler(
     compression_routes.CompressionRouteMixin,
     DiagnosticRouteMixin,
     DedupeRouteMixin,
+    HttpV2RouteMixin,
     DashboardPageMixin,
 ):
     def __init__(
@@ -131,6 +132,7 @@ class _UsageDashboardHandler(
         self._compression_jobs = compression_jobs or compression_routes.CompressionJobRegistry()
         self._query_cache = query_cache or AggregateQueryCache()
         self._allowance_query_cache = allowance_query_cache or allowance.new_query_cache()
+        self._configure_http_v2()
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name
@@ -142,7 +144,7 @@ class _UsageDashboardHandler(
                 "Request host or origin is not allowed",
             )
             return
-        route_method = GET_ROUTE_METHODS.get(parsed.path)
+        route_method = get_route_method(parsed.path)
         if route_method is not None:
             getattr(self, route_method)(parsed.query)
             return
@@ -170,7 +172,7 @@ class _UsageDashboardHandler(
                 "Request host or origin is not allowed",
             )
             return
-        route_method = POST_ROUTE_METHODS.get(parsed.path)
+        route_method = post_route_method(parsed.path)
         if route_method is not None:
             getattr(self, route_method)(parsed.query)
             return
@@ -314,17 +316,6 @@ class _UsageDashboardHandler(
 
     def _handle_allowance_history(self, query: str) -> None:
         self._handle_allowance_report(query, diagnostics=False)
-
-    def _handle_evidence_v2(self, query: str) -> None:
-        server_evidence.handle_evidence_request(
-            query,
-            db_path=self._db_path,
-            pricing_path=self._pricing_path,
-            history_default="all" if self._include_archived else "active",
-            send_error=self._send_error,
-            send_exception=self._send_exception,
-            send_json=self._send_json,
-        )
 
     def _handle_allowance_status_v2(self, query: str) -> None:
         allowance_v2.handle_allowance_status_request(

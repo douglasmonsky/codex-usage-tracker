@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from codex_usage_tracker.server.routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
+    GET_DYNAMIC_ROUTE_METHODS,
     GET_ROUTE_METHODS,
     POST_ROUTE_METHODS,
+    get_route_method,
     is_dashboard_shell_path,
 )
 
@@ -25,7 +27,7 @@ def test_server_route_tables_cover_dashboard_api_paths() -> None:
     assert POST_ROUTE_METHODS["/api/allowance/analysis/jobs"] == (
         "_handle_allowance_analysis_job_start_v2"
     )
-    assert POST_ROUTE_METHODS["/api/v2/evidence"] == "_handle_evidence_v2"
+    assert POST_ROUTE_METHODS["/api/v2/evidence"] == "_handle_http_v2"
     assert GET_ROUTE_METHODS["/api/investigations/agentic"] == "_handle_investigation_agentic"
     assert GET_ROUTE_METHODS["/api/investigations/repeated-files"] == (
         "_handle_investigation_repeated_file_rediscovery"
@@ -41,6 +43,23 @@ def test_server_route_tables_cover_dashboard_api_paths() -> None:
     assert GET_DIAGNOSTIC_FACT_ROUTES == {
         "/api/diagnostics/compactions": {"fact_type": "compaction"},
         "/api/diagnostics/tools": {"fact_group": "tools"},
+    }
+
+
+def test_server_route_tables_cover_stable_http_v2_paths() -> None:
+    assert GET_ROUTE_METHODS["/api/v2/status"] == "_handle_http_v2"
+    assert GET_ROUTE_METHODS["/api/v2/capabilities"] == "_handle_http_v2"
+    assert GET_DYNAMIC_ROUTE_METHODS["/api/v2/jobs/{job_id}"] == "_handle_http_v2"
+    assert get_route_method("/api/v2/jobs/job_123") == "_handle_http_v2"
+    assert get_route_method("/api/v2/jobs/") == "_handle_http_v2"
+    assert {
+        path for path, handler in POST_ROUTE_METHODS.items() if handler == "_handle_http_v2"
+    } == {
+        "/api/v2/refresh",
+        "/api/v2/analyze",
+        "/api/v2/query",
+        "/api/v2/evidence",
+        "/api/v2/allowance",
     }
 
 
