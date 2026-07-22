@@ -64,7 +64,7 @@ def test_v2_evidence_target_is_deterministic_and_v1_remains_compatible() -> None
     assert first["surface"] == "evidence"
     assert first["selectors"] == {"record_id": "record-123"}
     assert first["relative_url"].endswith(
-        "history=all&kind=call&record_id=record-123&view=evidence"
+        "history=all&kind=call&record=record-123&view=evidence"
     )
     assert build_dashboard_target(view="call", record_id="record-123")["schema"] == (
         "codex-usage-tracker-dashboard-target-v1"
@@ -73,6 +73,20 @@ def test_v2_evidence_target_is_deterministic_and_v1_remains_compatible() -> None
         evidence_kind="finding", selector_id="finding-1", analysis_id="analysis-1"
     )
     assert finding["selectors"] == {"finding_id": "finding-1", "analysis_id": "analysis-1"}
+
+    thread = build_dashboard_target_v2(
+        evidence_kind="thread",
+        selector_id="session:019e374d-c19f-7da3-a44f-8de043a7a64e",
+        target_purpose="explore",
+    )
+    assert thread["surface"] == "explore"
+    assert thread["relative_url"].endswith(
+        "mode=threads&thread_key=session%3A019e374d-c19f-7da3-a44f-8de043a7a64e&view=explore"
+    )
+    with pytest.raises(ValueError, match="require thread evidence"):
+        build_dashboard_target_v2(
+            evidence_kind="call", selector_id="record-123", target_purpose="explore"
+        )
 
 
 def test_build_dashboard_target_rejects_uncataloged_inputs() -> None:

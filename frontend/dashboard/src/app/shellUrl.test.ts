@@ -12,21 +12,28 @@ import {
 } from './shellUrl';
 
 describe('shell URL compatibility helpers', () => {
-it('maps legacy Insights route params to the renamed Overview workspace', () => {
-  expect(viewFromUrlParam('insights')).toBe('overview');
-  expect(callReturnViewFromSearch('?return=insights')).toBe('overview');
-    expect(callReturnViewFromSearch('?return=call')).toBe('calls');
-    expect(callReturnViewFromSearch('?return=unknown&view=call', 'threads')).toBe('threads');
+it('maps legacy route params to Evidence Console targets', () => {
+  expect(viewFromUrlParam('insights')).toBe('home');
+  expect(viewFromUrlParam('overview')).toBe('home');
+  expect(viewFromUrlParam('calls')).toBe('explore');
+  expect(viewFromUrlParam('threads')).toBe('explore');
+  expect(viewFromUrlParam('call')).toBe('evidence');
+  expect(viewFromUrlParam('usage-drain')).toBe('limits');
+  expect(callReturnViewFromSearch('?return=insights')).toBe('home');
+    expect(callReturnViewFromSearch('?return=call')).toBe('explore');
+    expect(callReturnViewFromSearch('?return=unknown&view=call', 'diagnostics')).toBe('diagnostics');
     expect(hasCallReturnViewParam('?view=call&return=insights')).toBe(true);
     expect(hasCallReturnViewParam('?view=call')).toBe(false);
   });
 
   it('normalizes legacy copied links in place while preserving other query params', () => {
-    const url = new URL('https://example.test/react-dashboard.html?view=insights&return=insights&record=abc&q=cache');
+    const url = new URL('https://example.test/react-dashboard.html?view=threads&return=calls&record=abc&q=cache');
 
     expect(normalizeLegacyShellUrl(url)).toBe(true);
-  expect(url.searchParams.get('view')).toBe('overview');
-  expect(url.searchParams.get('return')).toBe('overview');
+  expect(url.searchParams.get('view')).toBe('explore');
+  expect(url.searchParams.get('mode')).toBe('threads');
+  expect(url.searchParams.get('return')).toBe('explore');
+  expect(url.searchParams.get('return_mode')).toBe('calls');
     expect(url.searchParams.get('record')).toBe('abc');
     expect(url.searchParams.get('q')).toBe('cache');
     expect(normalizeLegacyShellUrl(url)).toBe(false);
@@ -47,7 +54,7 @@ it('maps legacy Insights route params to the renamed Overview workspace', () => 
   });
 
   it('labels return views from the full route catalog', () => {
-    expect(callReturnViewLabel('calls')).toBe('Calls');
+    expect(callReturnViewLabel('explore')).toBe('Explore');
     expect(callReturnViewLabel('investigator')).toBe('Investigate');
     expect(callReturnViewLabel('cache-context')).toBe('Cache And Context');
   });

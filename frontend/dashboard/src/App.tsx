@@ -7,7 +7,7 @@ import { historyScopeFromPayload, historyScopeStatusLabel } from './app/historyS
 import { createShellI18n, initialDashboardLanguage, storeDashboardLanguage } from './app/i18n';
 import { LocalizedShellI18nProvider } from './app/DocumentLocalizationBridge';
 import { modelWithLegacyShellFilters } from './app/legacyShellFilters';
-import { navItems, secondaryNavItems, type ViewId } from './app/navigation';
+import { navItems, settingsNavItem, type ViewId } from './app/navigation';
 import { routeDefinition } from './app/routeCatalog';
 import { useConversationalReadiness, useExperimentalDashboardFeatures } from './app/dashboardHooks';
 import { RowLimitControl } from './app/RowLimitControl';
@@ -38,6 +38,8 @@ import {
   type HistoryScope,
   viewFromUrlParam,
 } from './app/shellUrl';
+import { exploreModeFromSearch } from './routes/dashboardSearch';
+import { normalizeDashboardRouteInput } from './routes/legacyRouteAliases';
 import { modelFromBootPayload, readBootPayload, type RefreshProgressPayload } from './api/client';
 import { clearDiagnosticApiCache } from './api/diagnostics';
 import type { ContextRuntime, DashboardBootPayload, DashboardModel } from './api/types';
@@ -56,11 +58,12 @@ import { DashboardRouteView } from './routes/DashboardRouteView';
 
 const autoRefreshIntervalMs = 10_000;
 const keyboardShortcutViews: Record<string, ViewId> = {
-  '1': 'overview',
-  '2': 'calls',
-  '3': 'threads',
-  '4': 'diagnostics',
+  '1': 'home',
+  '2': 'explore',
+  '3': 'limits',
+  '4': 'settings',
 };
+const SettingsNavIcon = settingsNavItem.icon;
 export function shouldAutoRefreshUsageView(view: ViewId): boolean {
   return routeDefinition(view).capabilities.refresh;
 }
@@ -111,7 +114,9 @@ const legacyShellFilteredModel = useMemo(
 () => modelWithLegacyShellFilters(model, historyScope, locationSearch),
 [historyScope, locationSearch, model],
 );
-const scopedModel = activeView === 'calls' || activeView === 'call' ? model : legacyShellFilteredModel;
+const scopedModel = ['calls', 'call', 'explore', 'evidence'].includes(activeView)
+  ? model
+  : legacyShellFilteredModel;
 const canAutoRefreshUsageRows = shouldAutoRefreshUsageView(activeView);
   const finitePendingLoadLimit = finiteRowLimitFallback(pendingLoadLimit, loadLimit, 500);
   const loadedRowCount = Math.max(0, Number(dashboardPayload?.loaded_row_count ?? dashboardPayload?.rows?.length ?? model.calls.length ?? 0));
@@ -151,14 +156,19 @@ allRows: dashboardPayload?.all_history_available_rows,
     archivedRows: dashboardPayload?.archived_available_rows,
   });
 
-function setView(view: ViewId) {
-    setActiveView(view);
+function setView(view: ViewId, routeParams: Record<string, string> = {}) {
+  const normalized = normalizeDashboardRouteInput(view) ?? { view: 'home' as const, params: {} };
+  const targetView = normalized.view;
+    setActiveView(targetView);
     setActivePreset('');
   const url = new URL(window.location.href);
-  url.searchParams.set('view', view);
+  url.searchParams.set('view', targetView);
+  Object.entries({ ...normalized.params, ...routeParams }).forEach(([name, value]) => {
+    url.searchParams.set(name, value);
+  });
   url.searchParams.delete('preset');
-  clearInactiveViewSearchParams(url, view);
-  if (view !== 'call') {
+  clearInactiveViewSearchParams(url, targetView);
+  if (targetView !== 'evidence') {
     setActiveRecordId('');
   }
   pushShellUrl(url);
@@ -183,7 +193,11 @@ useEffect(() => {
 
 useEffect(() => {
   function hydrateShellFromLocation() {
-    const search = window.location.search;
+    const url = new URL(window.location.href);
+    if (normalizeLegacyShellUrl(url)) {
+      window.history.replaceState(null, '', url);
+    }
+    const search = url.search;
     const params = new URLSearchParams(search);
     setActiveView(viewFromUrlParam(params.get('view')));
     setActiveRecordId(params.get('record') ?? '');
@@ -231,21 +245,35 @@ useEffect(() => {
   }, []);
 
 function openCallInvestigator(recordId: string) {
-const returnView = activeView === 'call' ? callReturnView : activeView;
+const returnView = activeView === 'evidence' || activeView === 'call' ? callReturnView : activeView;
 setCallReturnView(returnView);
-setCallReturnViewExplicit(activeView === 'call' ? callReturnViewExplicit : true);
-setActiveView('call');
+setCallReturnViewExplicit(activeView === 'evidence' || activeView === 'call' ? callReturnViewExplicit : true);
+setActiveView('evidence');
 setActiveRecordId(recordId);
 const url = new URL(window.location.href);
-clearInactiveViewSearchParams(url, activeView, activeView === 'call' ? callReturnView : []);
-url.searchParams.set('view', 'call');
+clearInactiveViewSearchParams(
+  url,
+  'evidence',
+  activeView === 'evidence' || activeView === 'call' ? callReturnView : activeView,
+);
+url.searchParams.set('view', 'evidence');
+url.searchParams.set('kind', 'call');
 url.searchParams.set('record', recordId);
 url.searchParams.set('return', returnView);
+if (returnView === 'explore') {
+  url.searchParams.set('return_mode', activeView === 'explore' ? exploreModeFromSearch() : 'calls');
+}
 pushShellUrl(url);
 }
 
 function backFromCallInvestigator() {
-setView(callReturnView);
+const returnMode = new URLSearchParams(window.location.search).get('return_mode');
+setView(
+  callReturnView,
+  callReturnView === 'explore' && (returnMode === 'calls' || returnMode === 'threads')
+    ? { mode: returnMode }
+    : {},
+);
 }
 
   function updateGlobalQuery(value: string) {
@@ -457,7 +485,11 @@ function handleLanguageChange(nextLanguage: string) {
     try {
       const url = new URL(window.location.href);
       normalizeLegacyShellUrl(url);
-      clearInactiveViewSearchParams(url, activeView, activeView === 'call' ? callReturnView : []);
+      clearInactiveViewSearchParams(
+        url,
+        activeView,
+        activeView === 'call' || activeView === 'evidence' ? callReturnView : [],
+      );
       const copied = await copyText(url.toString());
       if (!copied) {
         throw new Error('Clipboard unavailable');
@@ -471,11 +503,21 @@ function handleLanguageChange(nextLanguage: string) {
   async function copyCallInvestigatorLink(recordId: string) {
     try {
       const url = new URL(window.location.href);
-      clearInactiveViewSearchParams(url, activeView, activeView === 'call' ? callReturnView : []);
-      const returnView = activeView === 'call' ? callReturnView : activeView;
-      url.searchParams.set('view', 'call');
+      clearInactiveViewSearchParams(
+        url,
+        'evidence',
+        activeView === 'call' || activeView === 'evidence' ? callReturnView : activeView,
+      );
+      const returnView = activeView === 'call' || activeView === 'evidence'
+        ? callReturnView
+        : activeView;
+      url.searchParams.set('view', 'evidence');
+      url.searchParams.set('kind', 'call');
       url.searchParams.set('record', recordId);
 url.searchParams.set('return', returnView);
+if (returnView === 'explore') {
+  url.searchParams.set('return_mode', activeView === 'explore' ? exploreModeFromSearch() : 'calls');
+}
 const copied = await copyText(url.toString());
 if (!copied) {
 throw new Error('Clipboard unavailable');
@@ -546,7 +588,8 @@ Local data only
 <nav className="primary-nav" aria-label="Primary">
           {navItems.map(item => {
             const Icon = item.icon;
-const selected = activeView === item.id || (activeView === 'call' && item.id === 'calls');
+const selected = activeView === item.id
+  || ((activeView === 'call' || activeView === 'evidence') && item.id === 'explore');
 return (
               <button
                 type="button"
@@ -561,17 +604,12 @@ return (
 );
           })}
         </nav>
-        <div className="secondary-block" role="group" aria-label="Quick Links">
-          <span>Quick Links</span>
-          {secondaryNavItems.map(item => {
-            const Icon = item.icon;
-            return (
-              <button type="button" key={item.label} onClick={() => setView(item.target)}>
-                <Icon size={16} />
-                {item.label}
-              </button>
-            );
-          })}
+        <div className="secondary-block" role="group" aria-label="Utility">
+          <span>Utility</span>
+          <button type="button" onClick={() => setView(settingsNavItem.id)}>
+            <SettingsNavIcon size={16} />
+            {settingsNavItem.label}
+          </button>
         </div>
       </aside>
       <main className="workspace">

@@ -6,7 +6,6 @@ import {
   FlaskConical,
   Home,
   Search,
-  Settings,
   Table2,
   TimerReset,
   Workflow,
@@ -14,9 +13,13 @@ import {
 } from 'lucide-react';
 
 import type { DashboardViewId } from '../routes/dashboardSearch';
+import {
+  evidenceConsolePrimaryRoutes,
+  evidenceConsoleRoutes,
+} from './evidenceConsoleRoutes';
 
 export type RouteMaturity = 'stable' | 'experimental';
-export type RoutePlacement = 'primary' | 'contextual' | 'hidden';
+export type RoutePlacement = 'primary' | 'contextual' | 'utility' | 'hidden';
 export type RouteLifecycle = 'active' | 'transitioning' | 'deprecated';
 export type DashboardExposurePhase = 'foundation' | 'simplified';
 
@@ -37,73 +40,81 @@ export type DashboardRouteDefinition = {
 
 const capabilities = (refresh: boolean) => ({ refresh, export: true, copyLink: true });
 
-export const routeCatalog = [
+const legacyRouteCatalog = [
   {
     id: 'overview', label: 'Overview', description: 'High-level telemetry', icon: Home,
-    maturity: 'stable', placement: 'primary', lifecycle: 'active', navigationGroup: 'primary',
+    maturity: 'stable', placement: 'hidden', lifecycle: 'transitioning', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(true), safeParams: [], handoffParams: [],
   },
   {
     id: 'investigator', label: 'Investigate', description: 'Root-cause evidence', icon: FlaskConical,
-    maturity: 'experimental', placement: 'hidden', lifecycle: 'active', navigationGroup: 'experimental',
-    experimentalNavigationEligible: true, capabilities: capabilities(false), safeParams: ['finding'], handoffParams: ['finding'],
+    maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated', navigationGroup: null,
+    experimentalNavigationEligible: false, capabilities: capabilities(false), safeParams: ['finding'], handoffParams: ['finding'],
   },
   {
     id: 'compression-lab', label: 'Compression Lab', description: 'Context savings', icon: BrainCircuit,
-    maturity: 'experimental', placement: 'hidden', lifecycle: 'active', navigationGroup: 'experimental',
-    experimentalNavigationEligible: true, capabilities: capabilities(false), safeParams: [], handoffParams: [],
+    maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated', navigationGroup: null,
+    experimentalNavigationEligible: false, capabilities: capabilities(false), safeParams: [], handoffParams: [],
   },
   {
     id: 'calls', label: 'Calls', description: 'Model-call table', icon: Table2,
-    maturity: 'stable', placement: 'primary', lifecycle: 'active', navigationGroup: 'primary',
+    maturity: 'stable', placement: 'hidden', lifecycle: 'transitioning', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(true),
     safeParams: ['explore', 'detail', 'call_q', 'source', 'sort', 'direction', 'density', 'page'],
     handoffParams: ['explore', 'detail', 'source', 'sort', 'direction', 'density', 'page'],
   },
   {
     id: 'call', label: 'Call Investigator', description: 'Selected call evidence', icon: Search,
-    maturity: 'stable', placement: 'contextual', lifecycle: 'active', navigationGroup: null,
+    maturity: 'stable', placement: 'hidden', lifecycle: 'transitioning', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(false),
     safeParams: ['record', 'return', 'mode', 'max_entries', 'max_chars', 'include_tool_output', 'include_compaction_history'],
     handoffParams: ['record', 'return', 'mode'],
   },
   {
     id: 'threads', label: 'Threads', description: 'Thread efficiency', icon: Workflow,
-    maturity: 'stable', placement: 'primary', lifecycle: 'active', navigationGroup: 'primary',
+    maturity: 'stable', placement: 'hidden', lifecycle: 'transitioning', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(true),
     safeParams: ['thread', 'thread_key', 'expand', 'threads', 'thread_q', 'risk', 'thread_call_sort', 'thread_call_page'],
     handoffParams: ['thread_key', 'expand', 'risk', 'thread_call_sort', 'thread_call_page'],
   },
   {
-    id: 'usage-drain', label: 'Limits', description: 'Allowance intelligence', icon: TimerReset,
-    maturity: 'stable', placement: 'primary', lifecycle: 'active', navigationGroup: 'primary',
+    id: 'usage-drain', label: 'Legacy Limits', description: 'Allowance intelligence', icon: TimerReset,
+    maturity: 'stable', placement: 'hidden', lifecycle: 'transitioning', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(true),
     safeParams: ['usage_plan', 'usage_effort', 'usage_subagents', 'usage_sample', 'usage_confidence', 'limit_window', 'limit_hypothesis'],
     handoffParams: ['usage_plan', 'usage_effort', 'usage_subagents', 'usage_sample', 'usage_confidence', 'limit_window', 'limit_hypothesis'],
   },
   {
     id: 'cache-context', label: 'Cache And Context', description: 'Cache and cold resumes', icon: Database,
-    maturity: 'experimental', placement: 'hidden', lifecycle: 'transitioning', navigationGroup: null,
+    maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(true), safeParams: ['cache_thread'], handoffParams: [],
   },
   {
     id: 'diagnostics', label: 'Diagnostics Notebook', description: 'Technical report', icon: BookOpen,
-    maturity: 'experimental', placement: 'primary', lifecycle: 'active', navigationGroup: 'experimental',
+    maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(false),
     safeParams: ['diagnostic_source', 'diagnostic_fact'],
     handoffParams: ['diagnostic_source', 'diagnostic_fact'],
   },
   {
     id: 'reports', label: 'Reports', description: 'Generated analyses', icon: BarChart3,
-    maturity: 'experimental', placement: 'hidden', lifecycle: 'transitioning', navigationGroup: null,
+    maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated', navigationGroup: null,
     experimentalNavigationEligible: false, capabilities: capabilities(true), safeParams: ['report'], handoffParams: ['report'],
   },
-  {
-    id: 'settings', label: 'Settings', description: 'Local configuration', icon: Settings,
-    maturity: 'stable', placement: 'primary', lifecycle: 'active', navigationGroup: 'primary',
-    experimentalNavigationEligible: false, capabilities: capabilities(true), safeParams: [], handoffParams: [],
-  },
 ] as const satisfies readonly DashboardRouteDefinition[];
+
+const targetRouteCatalog: DashboardRouteDefinition[] = evidenceConsoleRoutes.map(route => ({
+  ...route,
+  maturity: 'stable',
+  lifecycle: 'active',
+  navigationGroup: route.placement === 'primary' ? 'primary' : null,
+  experimentalNavigationEligible: false,
+}));
+
+export const routeCatalog: readonly DashboardRouteDefinition[] = [
+  ...targetRouteCatalog,
+  ...legacyRouteCatalog,
+];
 
 const foundationRouteIds: readonly DashboardViewId[] = [
   'overview', 'investigator', 'compression-lab', 'calls', 'threads',
@@ -118,5 +129,5 @@ export function routeDefinition(view: DashboardViewId): DashboardRouteDefinition
 
 export function navigationForPhase(phase: DashboardExposurePhase): DashboardRouteDefinition[] {
   if (phase === 'foundation') return foundationRouteIds.map(routeDefinition);
-  return routeCatalog.filter(route => route.placement === 'primary').map(route => routeDefinition(route.id));
+  return evidenceConsolePrimaryRoutes.map(route => routeDefinition(route.id));
 }

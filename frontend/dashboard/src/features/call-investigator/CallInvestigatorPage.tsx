@@ -1,7 +1,11 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, Copy, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useShellI18n } from '../../app/i18nContext';
-import { callReturnViewFromSearch, clearInactiveViewSearchParams } from '../../app/shellUrl';
+import {
+  callReturnViewFromSearch,
+  clearInactiveViewSearchParams,
+  normalizeLegacyShellUrl,
+} from '../../app/shellUrl';
 import { loadCallDetail, type CallDetailResult } from '../../api/calls';
 import { enableContextApi, loadCallContext, type ContextRequestOptions } from '../../api/context';
 import type { CallContextEntry, CallContextPayload, CallRow, ContextRuntime, DashboardModel } from '../../api/types';
@@ -149,10 +153,16 @@ export function CallInvestigatorPage({
     );
   }
 
+const selectedCallId = call.id;
+
 async function copyLink() {
 try {
 const url = new URL(window.location.href);
-clearInactiveViewSearchParams(url, 'call', callReturnViewFromSearch(url.search));
+normalizeLegacyShellUrl(url);
+clearInactiveViewSearchParams(url, 'evidence', callReturnViewFromSearch(url.search));
+url.searchParams.set('view', 'evidence');
+url.searchParams.set('kind', 'call');
+url.searchParams.set('record', selectedCallId);
 const copied = await copyText(url.toString());
 if (!copied) {
 throw new Error('Clipboard unavailable');

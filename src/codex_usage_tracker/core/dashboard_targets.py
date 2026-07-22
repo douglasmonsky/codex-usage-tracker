@@ -193,12 +193,17 @@ def build_dashboard_target_v2(
     selector_id: str,
     history: str = "active",
     analysis_id: str | None = None,
+    target_purpose: str = "evidence",
     service_origin: str | None = None,
     service_status: DashboardServiceStatus | None = None,
 ) -> dict[str, Any]:
     """Build a deterministic evidence handoff without changing the v1 compatibility shape."""
     if evidence_kind not in {"finding", "call", "thread", "allowance", "analysis"}:
         raise ValueError(f"unsupported evidence kind: {evidence_kind}")
+    if target_purpose not in {"evidence", "explore"}:
+        raise ValueError(f"unsupported dashboard target purpose: {target_purpose}")
+    if target_purpose == "explore" and evidence_kind != "thread":
+        raise ValueError("explore targets require thread evidence")
     safe_id = (
         isinstance(selector_id, str)
         and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:@+ -]{0,255}", selector_id) is not None
@@ -223,26 +228,33 @@ def build_dashboard_target_v2(
         "analysis": "analysis_id",
         "finding": "finding_id",
     }
+    query_keys = {**selector_keys, "call": "record"}
     target_kind = "none" if evidence_kind == "analysis" else evidence_kind
-    query_key = selector_keys[evidence_kind]
-    query = {"view": "evidence", "kind": target_kind, query_key: selector_id}
+    selector_key = selector_keys[evidence_kind]
+    query_key = query_keys[evidence_kind]
+    surface = "explore" if target_purpose == "explore" else "evidence"
+    query = (
+        {"view": "explore", "mode": "threads", "thread_key": selector_id}
+        if surface == "explore"
+        else {"view": "evidence", "kind": target_kind, query_key: selector_id}
+    )
     if history != "active":
         query["history"] = history
     if analysis_id is not None and evidence_kind == "finding":
         query["analysis_id"] = analysis_id
     relative_url = f"/react-dashboard.html?{urlencode(sorted(query.items()))}"
     origin = _active_origin(service_origin, service_status)
-    selectors = {query_key: selector_id}
+    selectors = {selector_key: selector_id}
     if evidence_kind == "finding" and analysis_id is not None:
         selectors["analysis_id"] = analysis_id
     return {
         "schema": "codex-usage-tracker-dashboard-target-v2",
-        "target_id": f"evidence:{evidence_kind}:{selector_id}:{history}",
-        "surface": "evidence",
+        "target_id": f"{surface}:{evidence_kind}:{selector_id}:{history}",
+        "surface": surface,
         "evidence_kind": target_kind,
         "analysis_id": analysis_id,
         "expires_at": None,
-        "view": "evidence",
+        "view": surface,
         "selectors": selectors,
         "scope": {
             "since": None,

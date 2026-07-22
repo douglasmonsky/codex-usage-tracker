@@ -4,7 +4,11 @@ import { Suspense, type ReactNode } from 'react';
 import type { ContextRuntime, ConversationalReadiness, DashboardBootPayload, DashboardLanguage, DashboardModel } from '../api/types';
 import type { HistoryScope, LoadWindow } from '../data/dataScope';
 import type { DashboardSourceIdentity } from '../data/queryRuntime';
-import type { DashboardViewId } from './dashboardSearch';
+import {
+  evidenceKindFromSearch,
+  exploreModeFromSearch,
+  type DashboardViewId,
+} from './dashboardSearch';
 
 const OverviewPage = lazyRouteComponent(() => import('../features/overview/OverviewPage'), 'OverviewPage');
 const InvestigatorPage = lazyRouteComponent(() => import('../features/investigator/InvestigatorPage'), 'InvestigatorPage');
@@ -25,6 +29,10 @@ const dashboardRouteComponents: Array<{
   id: DashboardViewId;
   component: { preload?: () => Promise<unknown> };
 }> = [
+  { id: 'home', component: OverviewPage },
+  { id: 'explore', component: ExploreRoutePage },
+  { id: 'limits', component: UsageDrainPage },
+  { id: 'evidence', component: CallInvestigatorPage },
   { id: 'overview', component: OverviewPage },
   { id: 'investigator', component: InvestigatorPage },
   { id: 'compression-lab', component: CompressionLabPage },
@@ -127,7 +135,8 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     totalAvailableRows,
   } = props;
 
-  switch (activeView) {
+  const renderedView = renderedDashboardView(activeView);
+  switch (renderedView) {
     case 'overview':
       return (
         <OverviewPage
@@ -298,8 +307,25 @@ function renderDashboardView(props: DashboardRouteViewProps) {
         />
       );
     default:
-      return assertNever(activeView);
+      return assertNever(renderedView);
   }
+}
+
+type RenderedDashboardViewId = Exclude<
+  DashboardViewId,
+  'home' | 'explore' | 'limits' | 'evidence'
+>;
+
+function renderedDashboardView(activeView: DashboardViewId): RenderedDashboardViewId {
+  if (activeView === 'home') return 'overview';
+  if (activeView === 'explore') return exploreModeFromSearch() === 'threads' ? 'threads' : 'calls';
+  if (activeView === 'limits') return 'usage-drain';
+  if (activeView !== 'evidence') return activeView;
+  const evidenceKind = evidenceKindFromSearch();
+  if (evidenceKind === 'thread') return 'threads';
+  if (evidenceKind === 'allowance') return 'usage-drain';
+  if (evidenceKind === 'finding' || evidenceKind === 'analysis') return 'investigator';
+  return 'call';
 }
 
 function assertNever(value: never): never {
