@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tests.release_catalog import CANONICAL_DATA_POSTURE, CANONICAL_PACKAGE_DESCRIPTION
-
+from codex_usage_tracker.core.json_contracts import known_json_schemas
+from tests.release_catalog import (
+    CANONICAL_DATA_POSTURE,
+    CANONICAL_PACKAGE_DESCRIPTION,
+    CORE_MCP_TOOL_NAMES,
+    FULL_MCP_TOOL_NAMES,
+    MCP_PROFILE_TOOL_COUNTS,
+    RELEASE_022_SCHEMA_IDS,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -52,7 +59,9 @@ def test_architecture_declares_mcp_primary_and_evidence_console_supporting() -> 
 def test_package_and_readme_position_mcp_before_the_evidence_console() -> None:
     metadata = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    title_paragraph = readme.split("# Codex Usage Tracker\n", maxsplit=1)[1].split("\n\n", maxsplit=1)[0]
+    title_paragraph = readme.split("# Codex Usage Tracker\n", maxsplit=1)[1].split(
+        "\n\n", maxsplit=1
+    )[0]
 
     assert f'description = "{CANONICAL_PACKAGE_DESCRIPTION}"' in metadata
     assert "MCP conversational analysis" in title_paragraph
@@ -73,6 +82,22 @@ def test_public_docs_do_not_claim_dashboard_first_or_aggregate_only_storage() ->
 
     assert "The dashboard is the core product surface" not in combined
     assert "SQLite stores aggregate metrics only" not in combined
+
+
+def test_022_release_and_upgrade_docs_define_the_profile_transition() -> None:
+    release = (REPO_ROOT / "docs/releases/0.22.0.md").read_text(encoding="utf-8")
+    upgrade = (REPO_ROOT / "docs/upgrading-to-0.22.0.md").read_text(encoding="utf-8")
+
+    assert "Release 0.22.0" in release
+    assert f"exactly {MCP_PROFILE_TOOL_COUNTS['core']}" in release
+    assert f"{MCP_PROFILE_TOOL_COUNTS['full']} tools" in release
+    assert "CODEX_USAGE_TRACKER_MCP_PROFILE=full" in upgrade
+    assert "No dashboard navigation changed" in release
+    assert len(CORE_MCP_TOOL_NAMES) == MCP_PROFILE_TOOL_COUNTS["core"]
+    assert len(FULL_MCP_TOOL_NAMES) == MCP_PROFILE_TOOL_COUNTS["full"]
+    assert f"tracks {len(known_json_schemas())} JSON schema identifiers" in release
+    assert set(known_json_schemas()) >= RELEASE_022_SCHEMA_IDS
+    assert all(f"`{schema}`" in release for schema in RELEASE_022_SCHEMA_IDS)
 
 
 def test_data_posture_and_evidence_console_docs_define_the_stable_product() -> None:

@@ -37,9 +37,9 @@ def test_install_plugin_writes_generated_wrapper_and_marketplace(tmp_path: Path)
     assert manifest["name"] == "codex-usage-tracker"
     assert manifest["version"] == __version__
     assert manifest["interface"]["defaultPrompt"][:3] == [
-        "Open dashboard",
+        "What drove my Codex usage this week?",
         "Look through my usage for token waste",
-        "Suggest usage investigations",
+        "Compare model and effort usage",
     ]
     assert (plugin_dir / "assets" / "icon.svg").exists()
     assert (plugin_dir / "skills" / "codex-usage-api" / "SKILL.md").exists()

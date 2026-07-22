@@ -43,6 +43,10 @@ First install? Start with the [First Five Minutes guide](docs/first-five-minutes
 for setup, MCP verification, a starter analysis question, optional evidence, and
 safe issue diagnostics.
 
+Upgrading from 0.21? Read [Upgrading to 0.22.0](docs/upgrading-to-0.22.0.md) and
+the [0.22.0 release note](docs/releases/0.22.0.md) for the new default core
+profile and compatibility options.
+
 The first useful workflow is:
 
 1. Install and run `codex-usage-tracker setup`.
@@ -156,7 +160,10 @@ The core app is not macOS-only. The CLI, SQLite index, dashboard generator, and 
 
 ## Why This Exists
 
-Codex can quietly burn usage through long-running chats, low cache reuse, reasoning spikes, spawned subagents, and auto-review passes. This tool turns the aggregate counters already on your machine into an insight-first dashboard and scriptable local APIs.
+Codex can quietly burn usage through long-running chats, low cache reuse,
+reasoning spikes, spawned subagents, and auto-review passes. This tool turns
+the local usage evidence already on your machine into deterministic MCP
+analysis, scriptable local APIs, and optional Evidence Console targets.
 
 Use it to answer:
 

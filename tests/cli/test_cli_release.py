@@ -20,6 +20,9 @@ from tests.release_catalog import ALL_MCP_TOOL_NAMES, MCP_TOOL_NAMES, STABLE_CLI
 class _ReleaseCheckModule(Protocol):
     REPO_ROOT: Path
     CLI_HELP_SUBCOMMANDS: Iterable[str]
+    REQUIRED_FILES: Iterable[str]
+    SDIST_REQUIRED_MEMBERS: Iterable[str]
+    WHEEL_REQUIRED_MEMBERS: Iterable[str]
 
     def _check_dashboard_asset_sync(self) -> list[str]: ...
 
@@ -121,8 +124,19 @@ def test_release_check_rejects_stale_public_package_version_claims(tmp_path: Pat
     finally:
         module.REPO_ROOT = original_root
 
-    assert len(failures) == 4
+    assert len(failures) == 1
+    assert failures[0].startswith("docs/development.md public release version 0.4.0")
     assert all("does not match pyproject.toml 0.4.1" in failure for failure in failures)
+
+
+def test_release_check_requires_022_release_docs_and_packaged_launcher() -> None:
+    module = _load_release_check_module()
+    wheel_launcher = "codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py"
+    sdist_launcher = f"src/{wheel_launcher}"
+
+    assert {"docs/releases/0.22.0.md", "docs/upgrading-to-0.22.0.md"} <= set(module.REQUIRED_FILES)
+    assert wheel_launcher in module.WHEEL_REQUIRED_MEMBERS
+    assert sdist_launcher in module.SDIST_REQUIRED_MEMBERS
 
 
 def test_release_check_rejects_old_pypi_package_install_docs(tmp_path: Path) -> None:

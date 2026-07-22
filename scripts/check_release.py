@@ -52,7 +52,6 @@ DASHBOARD_LOCALE_WHEEL_MEMBERS = {
     for code in DASHBOARD_LOCALE_CODES
 }
 PUBLIC_RELEASE_DOCS = [
-    "docs/one-dot-oh-readiness.md",
     "docs/development.md",
 ]
 PACKAGE_NAMING_DOCS = [
@@ -117,6 +116,8 @@ REQUIRED_FILES = [
     "docs/dashboard-guide.md",
     "docs/cli-json-schemas.md",
     "docs/one-dot-oh-readiness.md",
+    "docs/releases/0.22.0.md",
+    "docs/upgrading-to-0.22.0.md",
     "docs/assets/dashboard-insights.png",
     "docs/assets/dashboard-calls.png",
     "docs/assets/dashboard-calls-preview.png",
@@ -184,6 +185,7 @@ REQUIRED_FILES = [
     "src/codex_usage_tracker/plugin_data/docs/assets/plugin-thread-leaderboard.png",
     "src/codex_usage_tracker/plugin_data/skills/codex-usage-api/SKILL.md",
     "src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/SKILL.md",
+    "src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py",
 ]
 WHEEL_REQUIRED_MEMBERS = {
     "codex_usage_tracker/plugin_data/assets/icon.svg",
@@ -230,13 +232,17 @@ WHEEL_REQUIRED_MEMBERS = {
     "codex_usage_tracker/plugin_data/docs/assets/plugin-thread-leaderboard.png",
     "codex_usage_tracker/plugin_data/skills/codex-usage-api/SKILL.md",
     "codex_usage_tracker/plugin_data/skills/codex-usage-tracker/SKILL.md",
+    "codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py",
 }
 SDIST_REQUIRED_MEMBERS = {
     "docs/cli-json-schemas.md",
+    "docs/releases/0.22.0.md",
+    "docs/upgrading-to-0.22.0.md",
     "scripts/benchmark_synthetic_history.py",
     "skills/codex-usage-api/SKILL.md",
     "skills/codex-usage-tracker/SKILL.md",
     "skills/codex-usage-tracker/scripts/run_mcp.py",
+    "src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py",
 }
 
 
@@ -479,6 +485,8 @@ def _check_packaging_metadata() -> list[str]:
         failures.append(
             ".mcp.json should allow enough startup time for first-run runtime bootstrap"
         )
+    if mcp_server.get("env") != {"CODEX_USAGE_TRACKER_MCP_PROFILE": "core"}:
+        failures.append(".mcp.json should configure the core MCP profile")
     manifest = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
     if "recursive-include skills *.md *.py" not in manifest:
         failures.append("MANIFEST.in should include Codex skill scripts in the source distribution")
@@ -486,6 +494,11 @@ def _check_packaging_metadata() -> list[str]:
     launcher = (REPO_ROOT / "skills/codex-usage-tracker/scripts/run_mcp.py").read_text(
         encoding="utf-8"
     )
+    packaged_launcher = REPO_ROOT / (
+        "src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py"
+    )
+    if launcher.encode() != packaged_launcher.read_bytes():
+        failures.append("source and packaged MCP runtime launchers must be byte-identical")
     if "codex-usage-tracker.git@main" in launcher:
         failures.append("MCP runtime launcher must pin the package spec instead of tracking main")
     git_package_spec = re.search(r"codex-usage-tracker\.git@([0-9a-f]{40})", launcher)
@@ -501,6 +514,9 @@ def _check_packaging_metadata() -> list[str]:
             "MCP runtime launcher must pin an exact codex-usage-tracking version or a "
             "40-character GitHub commit SHA"
         )
+    runtime_version = re.search(r'^RUNTIME_VERSION = "([0-9]+(?:\.[0-9]+){2})"$', launcher, re.M)
+    if runtime_version is None or runtime_version.group(1) != str(project.get("version")):
+        failures.append("MCP runtime launcher cache version does not match project.version")
     if "importlib.metadata.version('codex-usage-tracking')" not in launcher:
         failures.append("MCP runtime launcher must check the codex-usage-tracking distribution")
     if "PACKAGE_SPEC_MARKER" not in launcher:
@@ -641,11 +657,7 @@ def _check_ci_workflow() -> list[str]:
             None,
         )
         if matched is None:
-            label = (
-                required
-                if isinstance(required, str)
-                else "one of " + ", ".join(required)
-            )
+            label = required if isinstance(required, str) else "one of " + ", ".join(required)
             failures.append(f"CI package job is missing required build check: {label}")
         else:
             positions.append(package_job.find(matched))

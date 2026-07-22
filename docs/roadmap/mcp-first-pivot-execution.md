@@ -285,8 +285,54 @@ commit as each roadmap task.
 - Follow-up risks: Task 17 must bump both byte-identical launcher copies' pinned
   runtime version and package spec together with the 0.22.0 release metadata.
 
+## Task 17 - Gate Release 0.22.0
+
+- Status: release candidate complete; publication and public qualification are
+  deferred pending explicit authorization.
+- Branch: `pivot/17-release-022`
+- Commits: `7f4e50b` (`test: add core MCP golden questions`), `ba6fd3d`
+  (`fix: harden release gate compatibility`), plus
+  `chore: prepare 0.22.0 MCP core release` (this commit).
+- Focused verification: ten synthetic golden-question fixtures and their
+  deterministic routing evaluator passed 11 tests; release, plugin-installer,
+  launcher, public-doc, canonical-query, SQL-filter, and JSON-contract
+  regressions passed. The installed-wheel smoke reported version `0.22.0`, 59
+  packaged resources, and the exact ordered seven-tool core profile.
+- Full verification: 1,820 Python tests passed in 101.74 seconds; the coverage
+  pass also ran 1,820 tests in 102.01 seconds and reported
+  88.31270245256826% combined coverage, 90.99716960592205% statement
+  coverage, and 77.77144485608436% branch
+  coverage. Pyright reported 0 errors and 7 existing lazy-export warnings;
+  Ruff and mypy passed. Dashboard verification passed 109 files / 571 tests,
+  lint, type checking, governance, source budgets, and bundle budgets. The
+  100,000-row route benchmark reported no budget violations (46.478998-second
+  population and 10.183382-second recommendation materialization). Release
+  checks, build, Twine, distribution inspection, installed-package smoke, and
+  diff checks passed.
+- Release inventory: `core` exposes 7 tools, `full` exposes 59, and `developer`
+  exposes 64. The tracked JSON schema inventory contains 90 identifiers,
+  including 14 additive MCP-core/application schemas listed in the release
+  note. The local wheel is 5,320,724 bytes with SHA-256
+  `bd828aaad0fe0af7ad93c423f265a0b6dc5412c562341254c43ce922de699318`;
+  the local sdist is 28,493,191 bytes with SHA-256
+  `fae196b193c79a4b7e969a53a32beb56c58dd903518c152f36637aa350015027`.
+- Deviations from plan: public historical 0.21 readiness evidence is no longer
+  treated as a current-version claim by the release checker. The full-suite
+  command now uses pytest importlib collection so duplicate test filenames in
+  separate directories collect deterministically. The full gate also exposed
+  and fixed a prior regression that replaced raw session-ID filtering with the
+  canonical `session:` form; both forms are now additive and covered. TestPyPI,
+  public PyPI, tags, pushes, and public-package smoke tests were not run because
+  they require explicit publication authorization. The Task 15 developer-only
+  invariant remains authoritative: `developer` preserves all 59 baseline
+  0.21/PR290 names, while `full` preserves the 54 non-developer baseline names.
+- Follow-up risks: the recorded hashes identify the local Step 3 artifacts;
+  evidence text was appended to tracked docs afterward as required by the
+  plan, so an authorized rebuild would need fresh hashes and qualification.
+  The coverage run emitted 71 non-failing pre-existing resource warnings.
+
 ## Remaining Planned Tasks
 
-Tasks 17 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 18 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

@@ -140,3 +140,26 @@ ADVANCED_MCP_TOOL_NAMES = {
 
 FULL_MCP_TOOL_NAMES = (MCP_TOOL_NAMES - DEVELOPER_MCP_TOOL_NAMES) | set(CORE_MCP_TOOL_NAMES)
 ALL_MCP_TOOL_NAMES = MCP_TOOL_NAMES | set(CORE_MCP_TOOL_NAMES)
+
+MCP_PROFILE_TOOL_COUNTS = {
+    "core": len(CORE_MCP_TOOL_NAMES),
+    "full": len(FULL_MCP_TOOL_NAMES),
+    "developer": len(ALL_MCP_TOOL_NAMES),
+}
+
+RELEASE_022_SCHEMA_IDS = {
+    "codex-usage-tracker-dashboard-target-v2",
+    "codex-usage-tracker.accounting-context.v1",
+    "codex-usage-tracker.analysis-job.v1",
+    "codex-usage-tracker.analysis.v2",
+    "codex-usage-tracker.evidence-result.v1",
+    "codex-usage-tracker.evidence.v1",
+    "codex-usage-tracker.finding.v1",
+    "codex-usage-tracker.freshness.v1",
+    "codex-usage-tracker.mcp-envelope.v1",
+    "codex-usage-tracker.message.v1",
+    "codex-usage-tracker.next-action.v1",
+    "codex-usage-tracker.query.v2",
+    "codex-usage-tracker.recommendation.v1",
+    "codex-usage-tracker.scope.v1",
+}
