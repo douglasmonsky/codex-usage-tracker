@@ -1,7 +1,7 @@
 import {
   isEvidenceConsoleRouteId,
   type EvidenceConsoleRouteId,
-} from '../app/evidenceConsoleRoutes';
+} from './evidenceConsoleRoutes';
 
 export const legacyDirectRouteIds = [
   'investigator',
@@ -11,7 +11,7 @@ export const legacyDirectRouteIds = [
   'reports',
 ] as const;
 
-export type LegacyDirectRouteId = (typeof legacyDirectRouteIds)[number];
+type LegacyDirectRouteId = (typeof legacyDirectRouteIds)[number];
 
 export const legacyCompatibilityRouteIds = [
   'overview',
@@ -36,7 +36,7 @@ export const legacyRouteAliases = {
   reports: null,
 } as const;
 
-export type LegacyRouteId = keyof typeof legacyRouteAliases;
+type LegacyRouteId = keyof typeof legacyRouteAliases;
 export type NormalizedDashboardRoute = {
   view: EvidenceConsoleRouteId | LegacyDirectRouteId;
   params: Record<string, string>;
@@ -44,7 +44,7 @@ export type NormalizedDashboardRoute = {
 
 const legacyDirectRouteIdSet = new Set<string>(legacyDirectRouteIds);
 
-export function isLegacyDirectRouteId(value: unknown): value is LegacyDirectRouteId {
+function isLegacyDirectRouteId(value: unknown): value is LegacyDirectRouteId {
   return typeof value === 'string' && legacyDirectRouteIdSet.has(value);
 }
 

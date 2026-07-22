@@ -18,9 +18,9 @@ import {
   evidenceConsoleRoutes,
 } from './evidenceConsoleRoutes';
 
-export type RouteMaturity = 'stable' | 'experimental';
-export type RoutePlacement = 'primary' | 'contextual' | 'utility' | 'hidden';
-export type RouteLifecycle = 'active' | 'transitioning' | 'deprecated';
+type RouteMaturity = 'stable' | 'experimental';
+type RoutePlacement = 'primary' | 'contextual' | 'utility' | 'hidden';
+type RouteLifecycle = 'active' | 'transitioning' | 'deprecated';
 export type DashboardExposurePhase = 'foundation' | 'simplified';
 
 export type DashboardRouteDefinition = {

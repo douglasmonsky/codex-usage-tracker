@@ -1,4 +1,4 @@
-import { evidenceConsoleRouteIds, exploreModes, type ExploreMode } from '../app/evidenceConsoleRoutes';
+import { evidenceConsoleRouteIds, exploreModes, type ExploreMode } from './evidenceConsoleRoutes';
 import {
   legacyCompatibilityRouteIds,
   normalizeDashboardRouteInput,
