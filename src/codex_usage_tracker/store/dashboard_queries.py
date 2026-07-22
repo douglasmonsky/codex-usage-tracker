@@ -15,6 +15,7 @@ from codex_usage_tracker.store.query_sql import (
 )
 from codex_usage_tracker.store.rows import row_to_dict, usage_row_to_dict
 from codex_usage_tracker.store.schema import init_db
+from codex_usage_tracker.store.subagent_usage_queries import SUBAGENT_PREDICATE
 from codex_usage_tracker.store.usage_timing import (
     USAGE_TIMING_JOIN_SQL,
     USAGE_TIMING_SELECT_SQL,
@@ -22,6 +23,15 @@ from codex_usage_tracker.store.usage_timing import (
 )
 
 OBSERVED_USAGE_RECONCILIATION_THRESHOLD = 3
+
+_SUBAGENT_LABEL_EXPRESSION = (
+    "coalesce(nullif(trim(usage_events.agent_role), ''), "
+    "nullif(trim(usage_events.subagent_type), ''), 'subagent')"
+)
+_SUBAGENT_DIMENSION_EXPRESSION = (
+    f"CASE WHEN coalesce({SUBAGENT_PREDICATE}, 0) "
+    f"THEN {_SUBAGENT_LABEL_EXPRESSION} ELSE 'not-subagent' END"
+)
 
 
 def query_dashboard_events(
@@ -449,7 +459,7 @@ _QUERY_IDENTITIES = {
     "effort": "coalesce(usage_events.effort, 'unknown')",
     "origin": "coalesce(usage_events.call_initiator, 'unknown')",
     "service_tier": "coalesce(usage_events.service_tier, 'unknown')",
-    "subagent": "coalesce(usage_events.agent_role, usage_events.subagent_type, 'not-subagent')",
+    "subagent": _SUBAGENT_LABEL_EXPRESSION,
 }
 _QUERY_DIMENSIONS = {
     "model": "coalesce(usage_events.model, 'unknown')",
@@ -457,7 +467,7 @@ _QUERY_DIMENSIONS = {
     "origin": "coalesce(usage_events.call_initiator, 'unknown')",
     "service_tier": "coalesce(usage_events.service_tier, 'unknown')",
     "subagent_type": "coalesce(usage_events.subagent_type, 'not-subagent')",
-    "subagent": "coalesce(usage_events.agent_role, usage_events.subagent_type, 'not-subagent')",
+    "subagent": _SUBAGENT_DIMENSION_EXPRESSION,
 }
 _QUERY_FILTERS = frozenset(
     {
@@ -623,18 +633,14 @@ def _canonical_query_where(
     )
     clauses = [where.removeprefix("WHERE ")] if where else []
     if entity == "subagent":
-        clauses.append(
-            "(usage_events.agent_role IS NOT NULL "
-            "OR usage_events.subagent_type IS NOT NULL "
-            "OR usage_events.parent_session_id IS NOT NULL)"
-        )
+        clauses.append(SUBAGENT_PREDICATE)
     for key, column in (
         ("project", "usage_events.cwd"),
         ("origin", "usage_events.call_initiator"),
         ("service_tier", "usage_events.service_tier"),
         ("subagent_role", "usage_events.agent_role"),
         ("subagent_type", "usage_events.subagent_type"),
-        ("parent_thread_key", "usage_events.parent_session_id"),
+        ("parent_thread_key", "usage_events.parent_thread_name"),
     ):
         value = filters.get(key)
         if isinstance(value, str):

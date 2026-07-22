@@ -148,6 +148,87 @@ def test_subagent_grouping_and_unpriced_estimates_remain_unknown(tmp_path: Path)
     assert unpriced.rows[0]["estimated_credits"] is None
 
 
+def test_parent_thread_filter_uses_parent_thread_name_not_session_id(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        replace(
+            _usage_event(
+                record_id="matching-parent-name",
+                session_id="child-a",
+                thread_key="thread:child-a",
+                event_timestamp="2026-07-20T12:00:00Z",
+                cumulative_total_tokens=110,
+            ),
+            parent_thread_name="parent-alpha",
+            parent_session_id="parent-session-other",
+        ),
+        replace(
+            _usage_event(
+                record_id="matching-session-only",
+                session_id="child-b",
+                thread_key="thread:child-b",
+                event_timestamp="2026-07-21T12:00:00Z",
+                cumulative_total_tokens=110,
+            ),
+            parent_thread_name="parent-beta",
+            parent_session_id="parent-alpha",
+        ),
+    ]
+    upsert_usage_events(events, db_path)
+
+    result = query_usage(
+        QueryRequest(
+            entity="call",
+            measures=("tokens",),
+            filters=QueryFilters(parent_thread_key="parent-alpha"),
+        ),
+        db_path=db_path,
+    )
+
+    assert [row["record_id"] for row in result.rows] == ["matching-parent-name"]
+
+
+def test_subagent_entity_includes_thread_source_only_rows(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id="ordinary-call",
+            session_id="direct",
+            thread_key="thread:direct",
+            event_timestamp="2026-07-20T12:00:00Z",
+            cumulative_total_tokens=110,
+        ),
+        replace(
+            _usage_event(
+                record_id="source-only-subagent",
+                session_id="child",
+                thread_key="thread:child",
+                event_timestamp="2026-07-21T12:00:00Z",
+                cumulative_total_tokens=110,
+            ),
+            thread_source="subagent",
+        ),
+    ]
+    upsert_usage_events(events, db_path)
+
+    result = query_usage(
+        QueryRequest(entity="subagent", measures=("tokens",), filters=QueryFilters()),
+        db_path=db_path,
+    )
+    grouped = query_usage(
+        QueryRequest(
+            entity="thread",
+            measures=("tokens",),
+            filters=QueryFilters(),
+            group_by=("subagent",),
+        ),
+        db_path=db_path,
+    )
+
+    assert result.rows == ({"subagent": "subagent", "tokens": 110},)
+    assert {row["subagent"] for row in grouped.rows} == {"not-subagent", "subagent"}
+
+
 def test_query_supports_subagent_grouping_dimension(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     _seed(db_path)

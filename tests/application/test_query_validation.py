@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 from dataclasses import FrozenInstanceError
 from types import MappingProxyType
 from typing import cast
@@ -126,6 +128,81 @@ def test_query_rejects_unimplemented_named_range() -> None:
                 entity="call",
                 measures=("tokens",),
                 filters=QueryFilters(range="last_7_days"),
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    ("payload", "field"),
+    [
+        ({"v": 1, "f": "a" * 64, "r": None, "s": 1}, "structure"),
+        ({"v": 1, "f": "a" * 64, "r": None, "s": 1, "i": "x", "extra": 1}, "structure"),
+        ({"v": True, "f": "a" * 64, "r": None, "s": 1, "i": "x"}, "v"),
+        ({"v": 1, "f": "short", "r": None, "s": 1, "i": "x"}, "f"),
+        ({"v": 1, "f": "a" * 64, "r": {"bad": True}, "s": 1, "i": "x"}, "r"),
+        ({"v": 1, "f": "a" * 64, "r": "x" * 257, "s": 1, "i": "x"}, "r"),
+        ({"v": 1, "f": "a" * 64, "r": None, "s": [1], "i": "x"}, "s"),
+        ({"v": 1, "f": "a" * 64, "r": None, "s": {"bad": True}, "i": "x"}, "s"),
+        ({"v": 1, "f": "a" * 64, "r": None, "s": 2**63, "i": "x"}, "s"),
+        ({"v": 1, "f": "a" * 64, "r": None, "s": "x" * 1025, "i": "x"}, "s"),
+        ({"v": 1, "f": "a" * 64, "r": None, "s": 1, "i": ""}, "i"),
+        ({"v": 1, "f": "a" * 64, "r": None, "s": 1, "i": "x" * 1025}, "i"),
+    ],
+)
+def test_query_rejects_structurally_malformed_cursor_fields(
+    payload: dict[str, object], field: str
+) -> None:
+    token = (
+        base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+        .decode("ascii")
+        .rstrip("=")
+    )
+
+    with pytest.raises(QueryValidationError, match=rf"cursor\.{field}"):
+        validate_query_request(
+            QueryRequest(
+                entity="call",
+                measures=("tokens",),
+                filters=QueryFilters(),
+                cursor=token,
+            )
+        )
+
+
+def test_query_rejects_non_text_cursor_token() -> None:
+    with pytest.raises(QueryValidationError, match=r"cursor\.encoding"):
+        validate_query_request(
+            QueryRequest(
+                entity="call",
+                measures=("tokens",),
+                filters=QueryFilters(),
+                cursor=cast(str, 123),
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    ("order_by", "sort_value"),
+    [("tokens", "110"), ("record_id", 110)],
+)
+def test_query_rejects_cursor_sort_incompatible_with_ordering(
+    order_by: str, sort_value: object
+) -> None:
+    payload = {"v": 1, "f": "a" * 64, "r": None, "s": sort_value, "i": "call-1"}
+    token = (
+        base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+        .decode("ascii")
+        .rstrip("=")
+    )
+
+    with pytest.raises(QueryValidationError, match=r"cursor\.s"):
+        validate_query_request(
+            QueryRequest(
+                entity="call",
+                measures=("tokens",),
+                filters=QueryFilters(),
+                order_by=order_by,
+                cursor=token,
             )
         )
 

@@ -153,11 +153,14 @@ commit as each roadmap task.
 
 - Status: complete
 - Branch: `pivot/9-canonical-query`
-- Commits: `feat: add canonical usage query service` (this commit)
-- Focused verification: `python -m pytest -p no:cacheprovider -p no:tach tests/application/test_query.py tests/application/test_query_validation.py tests/core/test_json_contracts.py tests/store/test_store_dashboard_queries.py -q` (46 passed)
+- Commits: `7449ec2` (`feat: add canonical usage query service`);
+  `fix: harden canonical query semantics` (this commit)
+- Focused verification: `python -m pytest -p no:cacheprovider -p no:tach tests/application/test_query.py tests/application/test_query_validation.py tests/core/test_json_contracts.py tests/store/test_store_dashboard_queries.py -q` (63 passed)
 - Full verification: focused verification plus
   `tests/application/test_requests.py tests/reports/test_query_exports.py tests/cli/test_mcp_integration.py`
-  (71 passed); Pyright on the three canonical query application modules (0
+  (88 passed); shared subagent-predicate regression
+  `tests/store/test_subagent_usage_queries.py` (10 passed); Pyright on the three
+  canonical query application modules (0
   errors); Ruff check and format check on all touched Python files;
   `git diff --check`.
 - Deviations from plan: The authoritative typed `QueryRequest` lives in

@@ -5,6 +5,8 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import math
+import re
 from dataclasses import replace
 from datetime import datetime, timezone
 from typing import cast
@@ -20,6 +22,12 @@ from codex_usage_tracker.application.query_models import (
 )
 
 MAX_CURSOR_CHARS = 2048
+MAX_CURSOR_IDENTITY_CHARS = 1024
+MAX_CURSOR_REVISION_CHARS = 256
+MAX_CURSOR_SORT_TEXT_CHARS = 1024
+_CURSOR_KEYS = {"v", "f", "r", "s", "i"}
+_FINGERPRINT_PATTERN = re.compile(r"[0-9a-f]{64}")
+_REVISION_PATTERN = re.compile(r"[!-~]{1,256}")
 
 
 class QueryValidationError(RequestValidationError):
@@ -59,7 +67,8 @@ def validate_query_request(request: QueryRequest) -> QueryRequest:
         raise QueryValidationError("limit must be between 1 and 200")
     filters = _normalized_filters(request)
     if request.cursor is not None:
-        decode_cursor(request.cursor)
+        cursor = decode_cursor(request.cursor)
+        _validate_cursor_sort_for_order(cursor["s"], order_by, request.measures)
     return replace(
         request,
         entity=cast(QueryEntity, request.entity),
@@ -119,14 +128,56 @@ def _text(value: str | None) -> str | None:
 
 
 def decode_cursor(token: str) -> dict[str, object]:
-    if not token or len(token) > MAX_CURSOR_CHARS:
-        raise QueryValidationError("cursor is malformed")
+    if not isinstance(token, str) or not token or len(token) > MAX_CURSOR_CHARS:
+        raise QueryValidationError("cursor.encoding is malformed")
     try:
         padding = "=" * (-len(token) % 4)
         decoded = base64.b64decode(token + padding, altchars=b"-_", validate=True)
         payload = json.loads(decoded)
     except (binascii.Error, ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise QueryValidationError("cursor is malformed") from exc
-    if not isinstance(payload, dict) or payload.get("v") != 1:
-        raise QueryValidationError("cursor is malformed")
+        raise QueryValidationError("cursor.encoding is malformed") from exc
+    if not isinstance(payload, dict) or set(payload) != _CURSOR_KEYS:
+        raise QueryValidationError("cursor.structure is malformed")
+    if type(payload["v"]) is not int or payload["v"] != 1:
+        raise QueryValidationError("cursor.v is malformed")
+    fingerprint = payload["f"]
+    if not isinstance(fingerprint, str) or _FINGERPRINT_PATTERN.fullmatch(fingerprint) is None:
+        raise QueryValidationError("cursor.f is malformed")
+    revision = payload["r"]
+    if revision is not None and (
+        not isinstance(revision, str)
+        or len(revision) > MAX_CURSOR_REVISION_CHARS
+        or _REVISION_PATTERN.fullmatch(revision) is None
+    ):
+        raise QueryValidationError("cursor.r is malformed")
+    if not _valid_cursor_sort(payload["s"]):
+        raise QueryValidationError("cursor.s is malformed")
+    identity = payload["i"]
+    if not isinstance(identity, str) or not identity or len(identity) > MAX_CURSOR_IDENTITY_CHARS:
+        raise QueryValidationError("cursor.i is malformed")
     return payload
+
+
+def _valid_cursor_sort(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return -(2**63) <= value <= 2**63 - 1
+    if isinstance(value, float):
+        return math.isfinite(value)
+    return isinstance(value, str) and len(value) <= MAX_CURSOR_SORT_TEXT_CHARS
+
+
+def _validate_cursor_sort_for_order(
+    value: object, order_by: str, measures: tuple[QueryMeasure, ...]
+) -> None:
+    if value is None:
+        return
+    if order_by in measures:
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            raise QueryValidationError("cursor.s is malformed for numeric ordering")
+        return
+    if not isinstance(value, str):
+        raise QueryValidationError("cursor.s is malformed for text ordering")
