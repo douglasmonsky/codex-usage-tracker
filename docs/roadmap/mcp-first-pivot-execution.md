@@ -131,8 +131,26 @@ commit as each roadmap task.
   later roadmap tasks own launch policy, unified persistence, recovery, TTL,
   cleanup, and the public core job-status adapter.
 
+## Task 8 - Implement core refresh and generic job-status tools
+
+- Status: complete
+- Branch: `pivot/8-core-refresh-jobs`
+- Commits: `feat: add core refresh and job tools` (this commit)
+- Focused verification: `python -m pytest tests/application/test_refresh.py tests/application/test_job_status.py tests/mcp/test_tool_profiles.py tests/cli/test_mcp_integration.py tests/store/test_store_large_batches.py -q`
+- Full verification: Task 7 facade regression plus
+  `tests/store/test_store_sources.py tests/store/test_store_dashboard_mcp.py`;
+  Pyright on the new application services and core adapter; Ruff check/format
+  on all touched Python files; `git diff --check`.
+- Deviations from plan: The application owns a small process-local async
+  coordinator rather than importing the legacy server registry. Coordinators
+  are weakly shared per injected `JobService`, so active equivalent requests
+  deduplicate without retaining test services or contaminating later tests.
+- Follow-up risks: Refresh jobs remain intentionally process-local. Later
+  roadmap tasks own durable recovery/retention; this task adds no persistence,
+  schema, dependency, or legacy payload change.
+
 ## Remaining Planned Tasks
 
-Tasks 8 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 9 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

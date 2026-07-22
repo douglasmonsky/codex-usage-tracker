@@ -52,13 +52,19 @@ def test_building_core_does_not_resolve_or_mutate_legacy_registration(
 
 
 def test_core_status_binds_stable_administrative_adapter() -> None:
-    from codex_usage_tracker.interfaces.mcp.core_tools import usage_status
+    from codex_usage_tracker.interfaces.mcp.core_tools import (
+        usage_job_status,
+        usage_refresh,
+        usage_status,
+    )
 
     server = build_mcp_server("core")
     registered = server._tool_manager._tools
     status_spec = next(tool for tool in tools_for_profile("core") if tool.name == "usage_status")
 
     assert registered["usage_status"].fn is usage_status
+    assert registered["usage_refresh"].fn is usage_refresh
+    assert registered["usage_job_status"].fn is usage_job_status
     assert status_spec.data_class == "administrative"
 
 
@@ -101,12 +107,72 @@ def test_core_status_returns_bounded_v2_envelope(
     assert serialized_size(payload) <= 16 * 1024
 
 
+def test_core_job_status_returns_bounded_administrative_envelope(tmp_path: Path) -> None:
+    from codex_usage_tracker.core.contracts import serialized_size
+    from codex_usage_tracker.interfaces.mcp.core_tools import build_usage_job_status
+    from codex_usage_tracker.jobs.service import JobService
+
+    payload = build_usage_job_status(
+        job_id="missing-job",
+        db_path=tmp_path / "missing.sqlite3",
+        pricing_path=tmp_path / "missing-pricing.json",
+        job_service=JobService(),
+    )
+
+    assert payload["schema"] == "codex-usage-tracker.mcp-envelope.v1"
+    assert payload["result_schema"] == "codex-usage-tracker.job.v1"
+    assert payload["data_class"] == "administrative"
+    assert serialized_size(payload) <= 16 * 1024
+
+
+def test_core_job_result_budget_includes_envelope_overhead(tmp_path: Path) -> None:
+    from codex_usage_tracker.core.contracts import serialized_size
+    from codex_usage_tracker.interfaces.mcp.core_tools import build_usage_job_status
+    from codex_usage_tracker.jobs.adapters import AnalysisJobAdapter, request_hash
+    from codex_usage_tracker.jobs.service import JobService
+
+    raw = {
+        "status": "completed",
+        "stage": "completed",
+        "created_at": "2026-07-22T12:00:00Z",
+        "updated_at": "2026-07-22T12:01:00Z",
+        "result": {"aggregate": "x" * 40_000},
+    }
+    service = JobService()
+    adapter = AnalysisJobAdapter(
+        lambda _job_id, include_result=False: raw,
+        kind="analysis",
+        request_hash=request_hash("bounded-result"),
+        result_budget=48 * 1024,
+    )
+    service.register(kind="analysis", job_id="bounded-result", adapter=adapter)
+    payload = build_usage_job_status(
+        job_id="bounded-result",
+        include_result=True,
+        db_path=tmp_path / "missing.sqlite3",
+        pricing_path=tmp_path / "missing-pricing.json",
+        job_service=service,
+    )
+
+    assert payload["result"]["result"] is not None  # type: ignore[index]
+    assert serialized_size(payload) <= 64 * 1024
+
+
 @pytest.mark.parametrize("profile", ["full", "developer"])
 def test_permissive_profiles_bind_historical_overlapping_handlers(profile: str) -> None:
-    from codex_usage_tracker.cli.mcp_server import usage_query, usage_status
+    from codex_usage_tracker.cli.mcp_server import (
+        refresh_usage_index,
+        usage_query,
+        usage_refresh_start,
+        usage_refresh_status,
+        usage_status,
+    )
 
     server = build_mcp_server(profile)  # type: ignore[arg-type]
     registered = server._tool_manager._tools
 
     assert registered["usage_status"].fn is usage_status
     assert registered["usage_query"].fn is usage_query
+    assert registered["refresh_usage_index"].fn is refresh_usage_index
+    assert registered["usage_refresh_start"].fn is usage_refresh_start
+    assert registered["usage_refresh_status"].fn is usage_refresh_status

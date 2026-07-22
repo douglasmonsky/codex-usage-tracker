@@ -5,7 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from codex_usage_tracker.application.requests import StatusRequest
+from codex_usage_tracker.application.context import build_request_context
+from codex_usage_tracker.application.job_status import JobStatusService, get_job_status
+from codex_usage_tracker.application.refresh import REFRESH_SCHEMA, refresh_usage
+from codex_usage_tracker.application.requests import (
+    ExecutionMode,
+    HistoryScope,
+    JobStatusRequest,
+    RefreshRequest,
+    RequestScope,
+    StatusRequest,
+)
 from codex_usage_tracker.application.status import STATUS_SCHEMA, _build_status
 from codex_usage_tracker.core.contracts import (
     MessageV1,
@@ -17,11 +27,30 @@ from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH, 
 from codex_usage_tracker.interfaces.mcp.models import McpProfile
 
 MAX_STATUS_PAYLOAD_BYTES = 16 * 1024
+MAX_REFRESH_PAYLOAD_BYTES = 64 * 1024
 
 
 def usage_status() -> dict[str, object]:
     """Return McpEnvelopeV1 containing status.v2."""
     return build_usage_status()
+
+
+def usage_refresh(
+    history: str = "active",
+    aggregate_only: bool = True,
+    execution: str = "auto",
+) -> dict[str, object]:
+    """Refresh bounded work synchronously or return a generic refresh job."""
+    return build_usage_refresh(
+        history=history,
+        aggregate_only=aggregate_only,
+        execution=execution,
+    )
+
+
+def usage_job_status(job_id: str, include_result: bool = False) -> dict[str, object]:
+    """Poll one registered generic job through the shared core service."""
+    return build_usage_job_status(job_id=job_id, include_result=include_result)
 
 
 def build_usage_status(
@@ -67,4 +96,103 @@ def build_usage_status(
         ),
     )
     enforce_payload_budget(payload, MAX_STATUS_PAYLOAD_BYTES, "usage_status")
+    return payload
+
+
+def build_usage_refresh(
+    *,
+    history: str = "active",
+    aggregate_only: bool = True,
+    execution: str = "auto",
+    db_path: Path = DEFAULT_DB_PATH,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    codex_home: Path = DEFAULT_CODEX_HOME,
+) -> dict[str, object]:
+    request = RefreshRequest(
+        history=cast(HistoryScope, history),
+        aggregate_only=aggregate_only,
+        execution=cast(ExecutionMode, execution),
+    )
+    outcome = refresh_usage(
+        request,
+        db_path=db_path,
+        pricing_path=pricing_path,
+        codex_home=codex_home,
+    )
+    context = build_request_context(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        scope=RequestScope(history=request.history),
+    )
+    if outcome.result is not None:
+        result_schema = REFRESH_SCHEMA
+        result: object = outcome.result
+        next_actions: tuple[NextActionV1, ...] = ()
+    else:
+        assert outcome.job is not None
+        result_schema = "codex-usage-tracker.job.v1"
+        result = outcome.job.to_payload()
+        next_actions = (
+            NextActionV1(
+                code="job.poll",
+                label="Poll refresh job",
+                tool="usage_job_status",
+                arguments={"job_id": outcome.job.job_id},
+            ),
+        )
+    payload = envelope_payload(
+        tool="usage_refresh",
+        result_schema=result_schema,
+        result=result,
+        scope=context.scope,
+        freshness=context.freshness,
+        accounting=context.accounting,
+        data_class="administrative",
+        next_actions=next_actions,
+    )
+    enforce_payload_budget(payload, MAX_REFRESH_PAYLOAD_BYTES, "usage_refresh")
+    return payload
+
+
+def build_usage_job_status(
+    *,
+    job_id: str,
+    include_result: bool = False,
+    db_path: Path = DEFAULT_DB_PATH,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    job_service: JobStatusService | None = None,
+) -> dict[str, object]:
+    request = JobStatusRequest(job_id=job_id, include_result=include_result)
+    status = get_job_status(request, job_service=job_service)
+    context = build_request_context(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        scope=RequestScope(),
+    )
+    payload = envelope_payload(
+        tool="usage_job_status",
+        result_schema="codex-usage-tracker.job.v1",
+        result=status.to_payload(),
+        scope=context.scope,
+        freshness=context.freshness,
+        accounting=context.accounting,
+        data_class="administrative",
+        next_actions=(
+            ()
+            if status.state in {"completed", "failed", "cancelled"}
+            else (
+                NextActionV1(
+                    code="job.poll",
+                    label="Poll job again",
+                    tool="usage_job_status",
+                    arguments={"job_id": status.job_id, "include_result": include_result},
+                ),
+            )
+        ),
+    )
+    enforce_payload_budget(
+        payload,
+        MAX_REFRESH_PAYLOAD_BYTES if include_result else MAX_STATUS_PAYLOAD_BYTES,
+        "usage_job_status",
+    )
     return payload
