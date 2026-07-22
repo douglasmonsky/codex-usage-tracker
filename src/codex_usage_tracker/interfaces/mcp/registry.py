@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterable
 from functools import cache, lru_cache
 
 from codex_usage_tracker.interfaces.mcp.core_tools import (
+    usage_allowance,
     usage_analyze,
     usage_evidence,
     usage_job_status,
@@ -96,12 +97,7 @@ class ToolCatalogError(ValueError):
 
 
 class CoreToolNotImplemented(NotImplementedError):
-    """Raised when a later roadmap task has not supplied a core service yet."""
-
-
-def usage_allowance() -> object:
-    """Placeholder for the core allowance contract."""
-    raise CoreToolNotImplemented("usage_allowance is implemented by a later roadmap task")
+    """Compatibility exception retained for callers importing the old placeholder type."""
 
 
 _CORE_HANDLERS: dict[str, Callable[..., object]] = {

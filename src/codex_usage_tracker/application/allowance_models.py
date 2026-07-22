@@ -57,6 +57,7 @@ class AllowanceResult:
     result_schema: str
     range_start: str | None
     range_end: str | None
+    dashboard_target: Mapping[str, object]
     analysis_id: str | None = None
 
 

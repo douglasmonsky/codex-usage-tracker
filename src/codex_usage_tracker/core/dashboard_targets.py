@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode, urlsplit
 
@@ -255,6 +256,91 @@ def build_dashboard_target_v2(
         "absolute_url": f"{origin}{relative_url}" if origin else None,
         "fallback_instruction": None if origin else DASHBOARD_TARGET_FALLBACK,
     }
+
+
+def build_limits_target_v2(
+    *,
+    operation: str,
+    window: str,
+    range_preset: str,
+    since: str | None,
+    until: str | None,
+    analysis_id: str | None = None,
+    service_origin: str | None = None,
+    service_status: DashboardServiceStatus | None = None,
+) -> dict[str, Any]:
+    """Build an allowlisted v2 handoff to the current Limits dashboard surface."""
+    if operation not in {"status", "series", "evidence", "analysis"}:
+        raise ValueError(f"unsupported allowance operation: {operation}")
+    if window not in {"weekly", "five_hour"}:
+        raise ValueError(f"unsupported allowance window: {window}")
+    if range_preset not in {"24h", "7d", "8w", "6m"}:
+        raise ValueError(f"unsupported allowance range: {range_preset}")
+    if (
+        analysis_id is not None
+        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:@+-]{0,255}", analysis_id) is None
+    ):
+        raise ValueError("analysis_id is invalid")
+    normalized_since = _limits_timestamp(since, "since")
+    normalized_until = _limits_timestamp(until, "until")
+    if (
+        normalized_since is not None
+        and normalized_until is not None
+        and datetime.fromisoformat(normalized_since) > datetime.fromisoformat(normalized_until)
+    ):
+        raise ValueError("since must not be after until")
+    query = {
+        "view": "limits",
+        "operation": operation,
+        "window": window,
+        "range": range_preset,
+    }
+    if analysis_id is not None:
+        query["analysis_id"] = analysis_id
+    relative_url = f"/react-dashboard.html?{urlencode(sorted(query.items()))}"
+    origin = _active_origin(service_origin, service_status)
+    selectors = {
+        "operation": operation,
+        "window_kind": window,
+        "range": range_preset,
+    }
+    if analysis_id is not None:
+        selectors["analysis_id"] = analysis_id
+    return {
+        "schema": "codex-usage-tracker-dashboard-target-v2",
+        "target_id": f"limits:{operation}:{window}:{range_preset}:{analysis_id or 'current'}",
+        "surface": "limits",
+        "evidence_kind": "allowance",
+        "analysis_id": analysis_id,
+        "expires_at": None,
+        "view": "limits",
+        "selectors": selectors,
+        "scope": {
+            "since": normalized_since,
+            "until": normalized_until,
+            "history": "active",
+            "privacy_mode": "strict",
+            "filters": {"window_kind": window},
+        },
+        "history": "active",
+        "relative_url": relative_url,
+        "absolute_url": f"{origin}{relative_url}" if origin else None,
+        "fallback_instruction": None if origin else DASHBOARD_TARGET_FALLBACK,
+    }
+
+
+def _limits_timestamp(value: str | None, field_name: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a timezone-aware ISO-8601 timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be a timezone-aware ISO-8601 timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{field_name} must be a timezone-aware ISO-8601 timestamp")
+    return parsed.astimezone(timezone.utc).isoformat()
 
 
 def _normalize_filters(view: str, filters: Mapping[str, object]) -> dict[str, object]:

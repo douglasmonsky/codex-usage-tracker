@@ -5,10 +5,11 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from codex_usage_tracker.core.contracts.common import ToolDataClass as CoreToolDataClass
+from codex_usage_tracker.interfaces.mcp import core_tools
 from codex_usage_tracker.interfaces.mcp.models import ToolDataClass as InterfaceToolDataClass
 from codex_usage_tracker.interfaces.mcp.models import ToolSpec
 from codex_usage_tracker.interfaces.mcp.registry import (
-    CoreToolNotImplemented,
+    CORE_TOOL_NAMES,
     ToolCatalogError,
     tool_specs,
     validate_tool_specs,
@@ -61,13 +62,13 @@ def test_deprecated_specs_have_complete_migration_metadata() -> None:
             assert spec.remove_after
 
 
-def test_all_seven_core_handlers_are_explicit_stubs() -> None:
+def test_all_seven_core_handlers_are_concrete_stable_adapters() -> None:
     core_specs = [spec for spec in tool_specs() if spec.minimum_profile == "core"]
 
     assert len(core_specs) == 7
-    for spec in core_specs:
-        with pytest.raises(CoreToolNotImplemented, match=spec.name):
-            spec.handler()
+    assert [spec.name for spec in core_specs] == list(CORE_TOOL_NAMES)
+    assert all(callable(spec.handler) for spec in core_specs)
+    assert all(spec.handler is getattr(core_tools, spec.name) for spec in core_specs)
 
 
 @pytest.mark.parametrize(

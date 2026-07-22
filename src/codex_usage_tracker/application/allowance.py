@@ -26,6 +26,7 @@ from codex_usage_tracker.allowance_intelligence.service import (
 )
 from codex_usage_tracker.application.allowance_models import AllowanceRequest, AllowanceResult
 from codex_usage_tracker.application.errors import RequestContextError, RequestValidationError
+from codex_usage_tracker.core.dashboard_targets import build_limits_target_v2
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
 from codex_usage_tracker.jobs.adapters import AnalysisJobAdapter, request_hash
 from codex_usage_tracker.jobs.models import JobStatusV1
@@ -165,7 +166,7 @@ def get_allowance(
         start_at, end_at = _range_bounds(connection, request.range)
         if request.operation == "status":
             payload = _status(connection, now=resolved_now)
-            return _result(payload, start_at=None, end_at=end_at)
+            return _result(request, payload, start_at=None, end_at=end_at)
         if request.operation == "series":
             payload = build_allowance_series(
                 connection,
@@ -176,7 +177,7 @@ def get_allowance(
                 window_kind=request.window,
                 include_archived=False,
             )
-            return _result(payload, start_at=start_at, end_at=end_at)
+            return _result(request, payload, start_at=start_at, end_at=end_at)
         if request.operation == "evidence":
             payload = build_allowance_evidence(
                 connection,
@@ -191,7 +192,7 @@ def get_allowance(
                 order="desc",
                 include_archived=False,
             )
-            return _result(payload, start_at=start_at, end_at=end_at)
+            return _result(request, payload, start_at=start_at, end_at=end_at)
         identity = _analysis_identity(connection)
         snapshot_id = str(identity["snapshot_id"])
         if request.analysis_id is not None and request.analysis_id != snapshot_id:
@@ -201,6 +202,7 @@ def get_allowance(
         completed = _read_analysis(connection)
         if completed is not None:
             return _result(
+                request,
                 completed,
                 start_at=None,
                 end_at=end_at,
@@ -208,7 +210,7 @@ def get_allowance(
             )
         if request.execution == "sync":
             built = _build_analysis_in_connection(connection)
-            return _result(built, start_at=None, end_at=end_at, analysis_id=snapshot_id)
+            return _result(request, built, start_at=None, end_at=end_at, analysis_id=snapshot_id)
 
     if runtime is not None and job_service is not None and runtime.job_service is not job_service:
         raise RequestValidationError("runtime and polling JobService must be the same instance")
@@ -228,6 +230,7 @@ def get_allowance(
         range_start=None,
         range_end=end_at.isoformat(),
         analysis_id=snapshot_id,
+        dashboard_target=_target(request, None, end_at, snapshot_id),
     )
 
 
@@ -252,6 +255,7 @@ def _status(connection: sqlite3.Connection, *, now: datetime) -> dict[str, objec
 
 
 def _result(
+    request: AllowanceRequest,
     payload: Mapping[str, object],
     *,
     start_at: datetime | None,
@@ -263,6 +267,23 @@ def _result(
         result_schema=str(payload["schema"]),
         range_start=start_at.isoformat() if start_at is not None else None,
         range_end=end_at.isoformat() if end_at is not None else None,
+        analysis_id=analysis_id,
+        dashboard_target=_target(request, start_at, end_at, analysis_id),
+    )
+
+
+def _target(
+    request: AllowanceRequest,
+    start_at: datetime | None,
+    end_at: datetime | None,
+    analysis_id: str | None,
+) -> Mapping[str, object]:
+    return build_limits_target_v2(
+        operation=request.operation,
+        window=request.window,
+        range_preset=request.range,
+        since=start_at.isoformat() if start_at is not None else None,
+        until=end_at.isoformat() if end_at is not None else None,
         analysis_id=analysis_id,
     )
 

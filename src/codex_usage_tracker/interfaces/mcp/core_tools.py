@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+from codex_usage_tracker.application.allowance import AllowanceAnalysisRuntime, get_allowance
+from codex_usage_tracker.application.allowance_models import AllowanceRequest
 from codex_usage_tracker.application.context import build_request_context
 from codex_usage_tracker.application.evidence import get_evidence
 from codex_usage_tracker.application.job_status import JobStatusService, get_job_status
@@ -44,6 +47,7 @@ from codex_usage_tracker.jobs.service import JobService
 MAX_STATUS_PAYLOAD_BYTES = 16 * 1024
 MAX_REFRESH_PAYLOAD_BYTES = 64 * 1024
 MAX_EVIDENCE_PAYLOAD_BYTES = 128 * 1024
+MAX_ALLOWANCE_PAYLOAD_BYTES = 128 * 1024
 
 
 def usage_status() -> dict[str, object]:
@@ -88,6 +92,94 @@ def usage_evidence(
         history=history,
         analysis_id=analysis_id,
     )
+
+
+def usage_allowance(
+    operation: str,
+    window: str = "weekly",
+    range: str = "8w",  # noqa: A002 - public roadmap field name.
+    cursor: str | None = None,
+    limit: int = 50,
+    analysis_id: str | None = None,
+    execution: str = "auto",
+) -> dict[str, object]:
+    """Read bounded allowance state or run its persisted aggregate analysis."""
+    return build_usage_allowance(
+        operation=operation,
+        window=window,
+        range_preset=range,
+        cursor=cursor,
+        limit=limit,
+        analysis_id=analysis_id,
+        execution=execution,
+    )
+
+
+def build_usage_allowance(
+    *,
+    operation: str,
+    window: str = "weekly",
+    range_preset: str = "8w",
+    cursor: str | None = None,
+    limit: int = 50,
+    analysis_id: str | None = None,
+    execution: str = "auto",
+    db_path: Path = DEFAULT_DB_PATH,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    now: datetime | None = None,
+    job_service: JobService | None = None,
+    runtime: AllowanceAnalysisRuntime | None = None,
+) -> dict[str, object]:
+    request = AllowanceRequest(
+        operation=cast(Any, operation),
+        window=cast(Any, window),
+        range=range_preset,
+        cursor=cursor,
+        limit=limit,
+        analysis_id=analysis_id,
+        execution=cast(Any, execution),
+    )
+    result = get_allowance(
+        request,
+        db_path=db_path,
+        now=now,
+        job_service=job_service,
+        runtime=runtime,
+    )
+    context = build_request_context(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        scope=RequestScope(privacy_mode="strict"),
+    )
+    state = result.payload.get("state")
+    job_id = result.payload.get("job_id")
+    next_actions = ()
+    if (
+        result.result_schema == "codex-usage-tracker.job.v1"
+        and state in {"queued", "running"}
+        and isinstance(job_id, str)
+    ):
+        next_actions = (
+            NextActionV1(
+                code="job.poll",
+                label="Poll allowance analysis job",
+                tool="usage_job_status",
+                arguments={"job_id": job_id, "include_result": True},
+            ),
+        )
+    payload = envelope_payload(
+        tool="usage_allowance",
+        result_schema=result.result_schema,
+        result=result.payload,
+        scope=context.scope,
+        freshness=context.freshness,
+        accounting=context.accounting,
+        data_class="aggregate",
+        dashboard_targets=(result.dashboard_target,),
+        next_actions=next_actions,
+    )
+    enforce_payload_budget(payload, MAX_ALLOWANCE_PAYLOAD_BYTES, "usage_allowance")
+    return payload
 
 
 def build_usage_evidence(

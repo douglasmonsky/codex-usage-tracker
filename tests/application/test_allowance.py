@@ -150,6 +150,12 @@ def test_series_uses_finite_source_anchored_range_and_limits_target(tmp_path: Pa
     }
     assert result.range_start == "2026-05-27T11:00:00+00:00"
     assert result.range_end == "2026-07-22T11:00:00+00:00"
+    assert result.dashboard_target is not None
+    assert result.dashboard_target["surface"] == "limits"
+    assert (
+        result.dashboard_target
+        == get_allowance(AllowanceRequest("series"), db_path=db_path, now=NOW).dashboard_target
+    )
 
 
 def test_evidence_cursor_binds_revision_window_and_source_anchored_range(
@@ -263,6 +269,8 @@ def test_analysis_execution_modes_reuse_one_generic_semantic_job(
     )
     assert first.payload["job_id"] == second.payload["job_id"]
     assert first.payload["kind"] == "allowance"
+    assert first.dashboard_target is not None
+    assert first.dashboard_target["analysis_id"] == identity["snapshot_id"]
     deadline = time.monotonic() + 2
     while jobs.status(str(first.payload["job_id"])).state != "completed":
         assert time.monotonic() < deadline

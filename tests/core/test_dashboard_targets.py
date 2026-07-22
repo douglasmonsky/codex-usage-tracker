@@ -7,6 +7,7 @@ import pytest
 from codex_usage_tracker.core.dashboard_targets import (
     build_dashboard_target,
     build_dashboard_target_v2,
+    build_limits_target_v2,
 )
 from codex_usage_tracker.dashboard_service import DashboardServiceStatus
 
@@ -336,3 +337,51 @@ def test_numeric_filter_rejects_non_finite_or_out_of_range_values(value: float) 
 def test_service_origin_requires_valid_non_privileged_port(origin: str) -> None:
     with pytest.raises(ValueError):
         build_dashboard_target(view="overview", service_origin=origin)
+
+
+def test_limits_target_v2_is_deterministic_and_allowlisted() -> None:
+    arguments = {
+        "operation": "evidence",
+        "window": "weekly",
+        "range_preset": "8w",
+        "since": "2026-05-27T11:00:00+00:00",
+        "until": "2026-07-22T11:00:00+00:00",
+        "analysis_id": None,
+    }
+    first = build_limits_target_v2(**arguments)
+    second = build_limits_target_v2(**arguments)
+
+    assert first == second
+    assert first["schema"] == "codex-usage-tracker-dashboard-target-v2"
+    assert first["surface"] == "limits"
+    assert first["evidence_kind"] == "allowance"
+    assert first["selectors"] == {
+        "operation": "evidence",
+        "window_kind": "weekly",
+        "range": "8w",
+    }
+    assert first["scope"]["since"] == arguments["since"]
+    assert first["view"] == "limits"
+    assert first["relative_url"] == (
+        "/react-dashboard.html?operation=evidence&range=8w&view=limits&window=weekly"
+    )
+    assert first["absolute_url"] is None
+
+
+def test_limits_target_v2_rejects_unreviewed_values() -> None:
+    with pytest.raises(ValueError, match="operation"):
+        build_limits_target_v2(
+            operation="https://example.invalid",
+            window="weekly",
+            range_preset="8w",
+            since=None,
+            until=None,
+        )
+    with pytest.raises(ValueError, match="timezone-aware"):
+        build_limits_target_v2(
+            operation="series",
+            window="weekly",
+            range_preset="8w",
+            since="2026-07-22T11:00:00",
+            until=None,
+        )
