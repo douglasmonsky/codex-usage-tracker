@@ -60,6 +60,13 @@ from codex_usage_tracker.cli.parser import build_parser
 from codex_usage_tracker.core.api_payloads import (
     error_code,
 )
+from codex_usage_tracker.interfaces.cli.commands import (
+    run_analyze,
+    run_open,
+    run_status,
+    warn_legacy_alias,
+)
+from codex_usage_tracker.interfaces.mcp.server import main as run_mcp_server
 from codex_usage_tracker.parser.api import inspect_log, load_session_index
 
 
@@ -85,11 +92,17 @@ def _main() -> int:
     language = requested_cli_language(sys.argv[1:])
     parser = build_parser(language)
     args = parser.parse_args()
-    handler = _COMMAND_HANDLERS.get(args.command)
+    warn_legacy_alias(args)
+    handler = _handler_for(args)
     if handler is None:
         parser.error("未知命令" if language == "zh-Hans" else "unknown command")
         return 2
     return handler(args)
+
+
+def _handler_for(args: argparse.Namespace):
+    command_path = getattr(args, "command_path", (args.command,))
+    return _NAMESPACED_COMMAND_HANDLERS.get(command_path, _COMMAND_HANDLERS.get(args.command))
 
 
 def _run_inspect_log(args: argparse.Namespace) -> int:
@@ -101,13 +114,21 @@ def _run_inspect_log(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_mcp(args: argparse.Namespace) -> int:
+    run_mcp_server(profile=args.profile)
+    return 0
+
+
 _COMMAND_HANDLERS = {
     "setup": _run_setup,
+    "status": run_status,
     "doctor": _run_doctor,
     "install-plugin": _run_install_plugin,
     "upgrade-plugin": _run_upgrade_plugin,
     "uninstall-plugin": _run_uninstall_plugin,
     "refresh": _run_refresh,
+    "analyze": run_analyze,
+    "open": run_open,
     "inspect-log": _run_inspect_log,
     "rebuild-index": _run_rebuild_index,
     "dogfood-agentic": _run_dogfood_agentic,
@@ -141,6 +162,32 @@ _COMMAND_HANDLERS = {
     "init-thresholds": run_init_thresholds,
     "init-projects": run_init_projects,
     "support-bundle": _run_support_bundle,
+}
+
+_NAMESPACED_COMMAND_HANDLERS = {
+    ("config", "pricing", "init"): run_init_pricing,
+    ("config", "pricing", "update"): run_update_pricing,
+    ("config", "pricing", "pin"): run_pin_pricing,
+    ("config", "allowance", "init"): run_init_allowance,
+    ("config", "allowance", "parse"): run_parse_allowance,
+    ("config", "allowance", "history"): _run_allowance_history,
+    ("config", "allowance", "diagnostics"): _run_allowance_diagnostics,
+    ("config", "allowance", "export"): _run_allowance_export,
+    ("config", "rate-card", "update"): run_update_rate_card,
+    ("config", "projects", "init"): run_init_projects,
+    ("config", "thresholds", "init"): run_init_thresholds,
+    ("service", "install"): run_dashboard_service,
+    ("service", "status"): run_dashboard_service,
+    ("service", "uninstall"): run_dashboard_service,
+    ("service", "serve"): run_serve_dashboard,
+    ("admin", "inspect-log"): _run_inspect_log,
+    ("admin", "rebuild-index"): _run_rebuild_index,
+    ("admin", "reset-db"): _run_reset_db,
+    ("admin", "dedupe-diagnostics"): _run_dedupe_diagnostics,
+    ("admin", "source-coverage"): _run_source_coverage,
+    ("admin", "support-bundle"): _run_support_bundle,
+    ("admin", "dogfood"): _run_dogfood_agentic,
+    ("admin", "mcp", "serve"): _run_mcp,
 }
 
 if __name__ == "__main__":

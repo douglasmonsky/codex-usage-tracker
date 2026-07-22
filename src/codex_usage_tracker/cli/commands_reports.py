@@ -14,6 +14,7 @@ from codex_usage_tracker.core.formatting import (
     format_session,
 )
 from codex_usage_tracker.core.projects import apply_project_privacy_to_rows
+from codex_usage_tracker.interfaces.cli.commands import run_query
 from codex_usage_tracker.recommendation_engine.query import build_recommendations_report
 from codex_usage_tracker.reports.api import (
     build_action_brief_report,
@@ -67,26 +68,35 @@ def _run_subagents(args: argparse.Namespace) -> int:
 
 
 def _run_query(args: argparse.Namespace) -> int:
-    report = build_query_report(
-        db_path=args.db,
-        pricing_path=args.pricing,
-        allowance_path=args.allowance,
-        projects_path=args.projects,
-        since=args.since,
-        until=args.until,
-        model=args.model,
-        effort=args.effort,
-        thread=args.thread,
-        project=args.project,
-        pricing_status=args.pricing_status,
-        credit_confidence=args.credit_confidence,
-        min_tokens=args.min_tokens,
-        min_credits=args.min_credits,
-        limit=args.limit,
-        privacy_mode=args.privacy_mode,
+    """Run v2 queries, retaining old-only filters through the compatibility window."""
+    legacy_only = (
+        args.pricing_status,
+        args.credit_confidence,
+        args.min_tokens,
+        args.min_credits,
     )
-    print_json(report.payload)
-    return 0
+    if any(value is not None for value in legacy_only) or args.limit == 0:
+        report = build_query_report(
+            db_path=args.db,
+            pricing_path=args.pricing,
+            allowance_path=args.allowance,
+            projects_path=args.projects,
+            since=args.since,
+            until=args.until,
+            model=args.model,
+            effort=args.effort,
+            thread=args.thread,
+            project=args.project,
+            pricing_status=args.pricing_status,
+            credit_confidence=args.credit_confidence,
+            min_tokens=args.min_tokens,
+            min_credits=args.min_credits,
+            limit=args.limit,
+            privacy_mode=args.privacy_mode,
+        )
+        print_json(report.payload)
+        return 0
+    return run_query(args)
 
 
 def _run_recommendations(args: argparse.Namespace) -> int:
