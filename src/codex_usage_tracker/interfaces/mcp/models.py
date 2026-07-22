@@ -6,10 +6,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
+from codex_usage_tracker.core.contracts.common import ToolDataClass
+
 McpProfile = Literal["core", "full", "developer"]
 ToolMaturity = Literal["stable", "beta", "experimental"]
 ToolLifecycle = Literal["active", "deprecated"]
-ToolDataClass = Literal["aggregate", "local_index", "raw_context", "administrative"]
 
 
 @dataclass(frozen=True)

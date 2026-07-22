@@ -4,6 +4,8 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
+from codex_usage_tracker.core.contracts.common import ToolDataClass as CoreToolDataClass
+from codex_usage_tracker.interfaces.mcp.models import ToolDataClass as InterfaceToolDataClass
 from codex_usage_tracker.interfaces.mcp.models import ToolSpec
 from codex_usage_tracker.interfaces.mcp.registry import (
     CoreToolNotImplemented,
@@ -45,6 +47,10 @@ def test_tool_specs_are_frozen_and_catalog_names_are_unique() -> None:
     assert len({spec.name for spec in specs}) == len(specs)
     with pytest.raises(FrozenInstanceError):
         specs[0].name = "changed"  # type: ignore[misc]
+
+
+def test_tool_data_class_is_reexported_from_the_core_contract() -> None:
+    assert InterfaceToolDataClass is CoreToolDataClass
 
 
 def test_deprecated_specs_have_complete_migration_metadata() -> None:

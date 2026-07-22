@@ -58,8 +58,24 @@ commit as each roadmap task.
   preceding tasks merge. Core tools intentionally raise
   `CoreToolNotImplemented` until their service tasks land.
 
+## Task 4 - Define shared MCP evidence contracts
+
+- Status: complete
+- Branch: `pivot/4-mcp-evidence-contracts`
+- Commits: `feat: define MCP evidence contracts` (this commit)
+- Focused verification: `python -m pytest tests/core/contracts tests/core/test_json_contracts.py -q`; `python -m pytest tests/mcp/test_tool_registry.py tests/mcp/test_tool_profiles.py tests/cli/test_mcp_integration.py -q`
+- Full verification: `python -m pyright --pythonpath "$(command -v python)" src/codex_usage_tracker/core/contracts`; `python -m ruff check src/codex_usage_tracker/core/contracts tests/core/contracts`; `git diff --check`
+- Deviations from plan: The local Task 4 branch is intentionally stacked on the
+  reviewed Tasks 1-3 commits because pushing and merging are outside this task.
+  `ToolDataClass` moved to the core contract layer and is re-exported downward
+  by the MCP interface model so core never imports `interfaces` and the alias
+  cannot drift.
+- Follow-up risks: Rebase or recreate the branch from updated `main` after the
+  preceding tasks merge. Later core tools must use the registered envelope and
+  evidence schemas without weakening finite-number or payload-budget checks.
+
 ## Remaining Planned Tasks
 
-Tasks 4 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 5 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

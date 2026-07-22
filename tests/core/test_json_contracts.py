@@ -6,6 +6,7 @@ from pathlib import Path
 
 from codex_usage_tracker.core.json_contracts import (
     JSON_PAYLOAD_CONTRACTS,
+    MCP_EVIDENCE_SCHEMA_IDS,
     known_json_schemas,
     validate_json_payload_contract,
 )
@@ -163,9 +164,10 @@ def test_json_contract_validation_reports_schema_and_type_errors() -> None:
 
 
 def test_documented_schema_table_matches_tracked_contracts() -> None:
-    documented = _documented_schema_ids()
+    documented = _documented_schema_ids() | _documented_mcp_schema_ids()
 
     assert documented == set(known_json_schemas())
+    assert _documented_mcp_schema_ids() == set(MCP_EVIDENCE_SCHEMA_IDS)
 
 
 def test_runtime_schema_ids_emitted_by_code_are_tracked() -> None:
@@ -224,6 +226,11 @@ def _documented_schema_ids() -> set[str]:
         if match:
             schemas.add(match.group(0))
     return schemas
+
+
+def _documented_mcp_schema_ids() -> set[str]:
+    docs = (REPO_ROOT / "docs" / "contracts.md").read_text(encoding="utf-8")
+    return set(SCHEMA_PATTERN.findall(docs))
 
 
 def _example_value(expected: object) -> object:
