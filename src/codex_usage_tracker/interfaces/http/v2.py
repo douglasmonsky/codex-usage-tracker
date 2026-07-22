@@ -78,7 +78,7 @@ _BODY_LIMITS = {
     "/api/v2/evidence": 16 * 1024,
     "/api/v2/allowance": 16 * 1024,
 }
-_TOKEN_REQUIRED = {"/api/v2/refresh", "/api/v2/analyze"}
+_TOKEN_REQUIRED = {"/api/v2/refresh", "/api/v2/analyze", "/api/v2/allowance"}
 _OUTPUT_LIMITS = {
     "/api/v2/status": 64 * 1024,
     "/api/v2/refresh": 128 * 1024,

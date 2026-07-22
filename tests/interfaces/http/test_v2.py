@@ -167,16 +167,21 @@ def test_json_decoder_rejects_wrong_content_type_malformed_and_oversized_bodies(
         decode_json_object(b'{"value":"too large"}', content_type="application/json", max_bytes=16)
 
 
-@pytest.mark.parametrize("path", ["/api/v2/refresh", "/api/v2/analyze"])
+@pytest.mark.parametrize(
+    "path",
+    ["/api/v2/refresh", "/api/v2/analyze", "/api/v2/allowance"],
+)
 def test_mutating_or_expensive_routes_require_the_local_api_token(path: str) -> None:
-    payload: dict[str, Any] = (
-        {"history": "active"} if path.endswith("refresh") else {"goal": "token_waste"}
-    )
+    payloads: dict[str, dict[str, Any]] = {
+        "/api/v2/refresh": {"history": "active"},
+        "/api/v2/analyze": {"goal": "token_waste"},
+        "/api/v2/allowance": {"operation": "analysis"},
+    }
     response = _request(
         HttpV2Facade(RecordingServices()),
         "POST",
         path,
-        payload,
+        payloads[path],
         authorized=False,
     )
 
