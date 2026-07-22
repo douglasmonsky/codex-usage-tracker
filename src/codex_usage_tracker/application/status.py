@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 
 from codex_usage_tracker.application.context import RequestContext, build_request_context
@@ -39,6 +40,7 @@ def _build_status(request: StatusRequest) -> tuple[dict[str, object], RequestCon
         scope=request.scope,
     )
     freshness = _freshness_for_threshold(context.freshness, request.freshness_threshold_seconds)
+    context = replace(context, freshness=freshness)
     pricing_config = load_pricing_config(request.pricing_path)
     readiness = conversational_readiness(codex_home=request.codex_home)
     service = _service_status(request)

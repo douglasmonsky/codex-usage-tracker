@@ -99,14 +99,17 @@ commit as each roadmap task.
 
 - Status: complete
 - Branch: `pivot/6-stable-status`
-- Commits: `feat: add stable MCP usage status` (this commit)
+- Commits: `f39e152` (`feat: add stable MCP usage status`);
+  `fix: report exact status freshness thresholds` (this commit)
 - Focused verification: `python -m pytest tests/application/test_status.py tests/mcp/test_tool_profiles.py tests/cli/test_mcp_integration.py tests/core/test_conversational_readiness.py -q`; `python -m pytest tests/application/test_requests.py tests/application/test_context.py tests/store/test_store_dashboard_queries.py -q`
 - Full verification: `python -m pyright --pythonpath "$(command -v python)" src/codex_usage_tracker/application/status.py src/codex_usage_tracker/interfaces/mcp/core_tools.py`; `python -m ruff check src/codex_usage_tracker/application/status.py src/codex_usage_tracker/application/requests.py src/codex_usage_tracker/interfaces/mcp/core_tools.py src/codex_usage_tracker/interfaces/mcp/registry.py tests/application/test_status.py tests/mcp/test_tool_profiles.py`; `git diff --check`
 - Deviations from plan: The historical full/developer `usage_status` already
   delegated to dashboard status behavior through the profile registry, so no
   compatibility-module change was needed. `StatusRequest` gained additive
   local path and profile fields to keep the application and adapter seams
-  deterministic and testable.
+  deterministic and testable. Review follow-up restricted freshness thresholds
+  to whole seconds and made the returned context use the exact adjusted
+  freshness contract emitted in the result.
 - Follow-up risks: Rebase or recreate the branch from updated `main` after the
   preceding tasks merge. Status reports existing readiness and persistent
   service probes but deliberately does not claim current-task MCP exposure.

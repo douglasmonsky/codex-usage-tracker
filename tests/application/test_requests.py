@@ -50,6 +50,21 @@ def test_status_rejects_boolean_freshness_threshold() -> None:
         StatusRequest(freshness_threshold_seconds=True)
 
 
+def test_status_rejects_fractional_freshness_threshold() -> None:
+    with pytest.raises(
+        RequestValidationError,
+        match="freshness_threshold_seconds must be a whole number",
+    ):
+        StatusRequest(freshness_threshold_seconds=0.5)
+
+
+def test_status_normalizes_integral_numeric_freshness_threshold() -> None:
+    request = StatusRequest(freshness_threshold_seconds=12.0)
+
+    assert request.freshness_threshold_seconds == 12
+    assert type(request.freshness_threshold_seconds) is int
+
+
 @pytest.mark.parametrize("thread_key", ("thread:safe\nsecond-line", "../../outside"))
 def test_scope_rejects_unsafe_thread_identifier(thread_key: str) -> None:
     with pytest.raises(RequestValidationError, match="thread_key contains unsafe characters"):

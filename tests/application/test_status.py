@@ -74,7 +74,9 @@ def _install_dependencies(
     )
 
 
-def _request(tmp_path: Path, *, profile: str = "core") -> StatusRequest:
+def _request(
+    tmp_path: Path, *, profile: str = "core", threshold_seconds: int = 300
+) -> StatusRequest:
     pricing_path = tmp_path / "pricing.json"
     pricing_path.write_text(
         json.dumps({"models": {}, "billing_basis": "unknown"}), encoding="utf-8"
@@ -85,6 +87,7 @@ def _request(tmp_path: Path, *, profile: str = "core") -> StatusRequest:
         codex_home=tmp_path / ".codex",
         home=tmp_path,
         mcp_profile=profile,  # type: ignore[arg-type]
+        freshness_threshold_seconds=threshold_seconds,
     )
 
 
@@ -115,9 +118,28 @@ def test_index_freshness_is_preserved(
     assert result["index"]["recommended_refresh_action"] == expected  # type: ignore[index]
 
 
-def test_unavailable_pricing_is_explicit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("threshold_seconds", "expected_state"),
+    [(5, "stale"), (900, "fresh")],
+)
+def test_custom_whole_second_threshold_controls_result_and_returned_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    threshold_seconds: int,
+    expected_state: str,
 ) -> None:
+    _install_dependencies(monkeypatch, context=_context(state="stale"))
+
+    result, context = status._build_status(_request(tmp_path, threshold_seconds=threshold_seconds))
+
+    assert result["index"]["state"] == expected_state  # type: ignore[index]
+    assert result["index"]["threshold_seconds"] == threshold_seconds  # type: ignore[index]
+    assert context.freshness.state == expected_state
+    assert context.freshness.threshold_seconds == threshold_seconds
+    assert result["index"] == status.payload_mapping(context.freshness)
+
+
+def test_unavailable_pricing_is_explicit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _install_dependencies(monkeypatch, context=_context(state="fresh"))
     request = _request(tmp_path)
     request.pricing_path.unlink()

@@ -143,7 +143,7 @@ class RequestScope:
 @dataclass(frozen=True)
 class StatusRequest:
     scope: RequestScope = field(default_factory=RequestScope)
-    freshness_threshold_seconds: float = 300.0
+    freshness_threshold_seconds: int | float = 300
     db_path: Path = DEFAULT_DB_PATH
     pricing_path: Path = DEFAULT_PRICING_PATH
     codex_home: Path = DEFAULT_CODEX_HOME
@@ -158,6 +158,9 @@ class StatusRequest:
             raise RequestValidationError("freshness_threshold_seconds must be finite")
         if threshold < 0:
             raise RequestValidationError("freshness_threshold_seconds must be non-negative")
+        if threshold != int(threshold):
+            raise RequestValidationError("freshness_threshold_seconds must be a whole number")
+        object.__setattr__(self, "freshness_threshold_seconds", int(threshold))
         _choice(self.mcp_profile, _MCP_PROFILE_VALUES, "mcp_profile")
 
 
