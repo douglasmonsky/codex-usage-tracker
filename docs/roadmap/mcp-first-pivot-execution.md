@@ -470,8 +470,48 @@ commit as each roadmap task.
   Legacy unit assertions that still demand retired top-level route IDs remain
   diagnostic until their owning parity tasks land.
 
+## Task 22 - Refocus Limits and Settings for the Evidence Console
+
+- Status: complete; Limits now leads with observed reset state, marks observed
+  facts, descriptive estimates, and supported changes explicitly, and opens
+  matching persisted allowance evidence through the contextual Evidence route.
+  Settings now presents local runtime readiness and keeps direct compatibility
+  Labs behind an off-by-default Advanced preference.
+- Branch: `pivot/22-focus-limits-settings`
+- Commits: `45fa34c` (`refactor: focus Limits and Settings`) and `aef37bf`
+  (`fix: localize compatibility Labs controls`), plus this documentation
+  commit.
+- Focused verification: 32 frontend tests passed across Limits, Settings, the
+  browser-local preference hook, conversational readiness, and the route
+  catalog. All 148 locale-catalog tests passed, including equal key sets,
+  placeholder parity, and non-English Task 22 copy.
+- Full verification: dashboard type checking, ESLint, stylelint, dependency
+  boundaries, dead-code detection, source-budget enforcement, bundle budgets,
+  privacy-pattern scanning, and `git diff --check` passed. The isolated
+  port-5195 release candidate passed all 11 Chromium checks, including visible
+  chart/table parity, immediate and restored Labs preference state, simplified
+  navigation, and Spanish copy. A diagnostic full-dashboard run passed 554 of
+  622 tests; its 68 failures are the same legacy navigation and pre-pivot route
+  assertions deferred from Tasks 20 and 21.
+- Review: the final local review found no critical or important correctness,
+  privacy, evidence-link, storage-migration, localization, or compatibility
+  issue. The task-level child-agent allowance had already been used for the
+  pivot review and bounded backend/frontend reconnaissance, so no additional
+  review child was created.
+- Deviations from plan: the roadmap's former `usage-drain` page already lived
+  at `features/limits/LimitsPage.tsx`. History controls were extracted to keep
+  the source ratchet green, and App injects the route-catalog Labs inventory to
+  preserve dependency direction. The browser gate and all twelve locale
+  catalogs landed in a second focused commit to keep each commit within the
+  20-file limit. No allowance calculation, detector, API, or publication
+  behavior changed.
+- Follow-up risks: five compatibility workbenches remain directly routable
+  until Tasks 23 and 24 prove job parity and retire their duplicate navigation
+  paths. Their legacy unit assertions remain diagnostic until those owning
+  tasks land.
+
 ## Remaining Planned Tasks
 
-Tasks 22 through 45 remain planned in the approved implementation roadmap. Add
+Tasks 23 through 45 remain planned in the approved implementation roadmap. Add
 a full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
