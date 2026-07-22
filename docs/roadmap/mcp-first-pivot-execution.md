@@ -428,8 +428,50 @@ commit as each roadmap task.
   remaining contextual Evidence and legacy-parity migrations land. The full
   dashboard inventory remains diagnostic until those owning tasks complete.
 
+## Task 21 - Build One Contextual Evidence Route
+
+- Status: complete; one contextual route now resolves exact call, thread,
+  finding, and allowance-transition selectors without label fallback. Calls
+  retain the gated Call Investigator, while the other kinds render bounded
+  aggregate records from the shared evidence contract.
+- Branch: `pivot/21-contextual-evidence`
+- Commits: `44f6308` (`feat: expose bounded contextual evidence`), `c489482`
+  (`feat: define canonical Evidence links`), `b9da403` (`feat: render contextual
+  Evidence views`), `20cecf6` (`test: cover contextual Evidence views`), and
+  `dccea7c` (`test: align release gate with pivot routes`), plus this
+  documentation commit.
+- Focused verification: 39 Python tests passed across the roadmap-named server,
+  application, service, compatibility, and route-inventory suites. Twenty-nine
+  frontend tests passed across the Evidence API, URL contract, all four
+  renderers, route catalog, and Call Investigator compatibility.
+- Full verification: dashboard type checking, lint, dependency boundaries,
+  dead-code detection, stylelint, source-budget enforcement, touched-file Ruff,
+  Ruff formatting, privacy-pattern scanning, and `git diff --check` passed. The
+  port-isolated release-candidate passed all 11 Chromium checks covering
+  accessibility, responsive layout, reduced motion, chart/table parity,
+  simplified navigation, direct-route compatibility, return state, readiness,
+  and localization. A diagnostic full-dashboard run passed 551 of 619 tests;
+  its 68 failures are the unchanged legacy navigation and pre-pivot route-ID
+  assertions already deferred from Task 20.
+- Review: the final local review found no critical or important correctness,
+  privacy, security, pagination, selector, or compatibility issue. The three
+  task-level child-agent slots had already supplied the Task 20 review and the
+  bounded Task 21 backend/frontend reconnaissance, so no fourth child was
+  created.
+- Deviations from plan: `CallEvidence` delegates to the existing Call
+  Investigator instead of moving its 807-line implementation during the 0.23
+  compatibility window. The early HTTP adapter accepts validated query fields
+  on POST; Task 25 still owns the unified JSON-body v2 facade. The
+  release-candidate command now derives its base URL from the configurable
+  strict Playwright port, preserving the 5173 CI default while allowing safe
+  isolated local runs. No publication action was taken.
+- Follow-up risks: the full JSON HTTP facade, payload-budget conformance matrix,
+  and compatibility-removal decision remain owned by Tasks 25, 27, and 45.
+  Legacy unit assertions that still demand retired top-level route IDs remain
+  diagnostic until their owning parity tasks land.
+
 ## Remaining Planned Tasks
 
-Tasks 21 through 45 remain planned in the approved implementation roadmap. Add
+Tasks 22 through 45 remain planned in the approved implementation roadmap. Add
 a full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
