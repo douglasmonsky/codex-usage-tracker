@@ -591,8 +591,55 @@ commit as each roadmap task.
   compatibility workbenches and static dashboard are still governed by their
   documented two-release sunset and later roadmap tasks.
 
+## Task 25 - Add the Versioned HTTP API v2 Application Facade
+
+- Status: complete; eight stable `/api/v2/` endpoints now decode bounded strict
+  requests, invoke the same application services as the core MCP tools, and
+  serialize their shared result contracts without calling MCP handlers. The
+  Evidence Console's contextual Evidence client now posts a typed JSON body and
+  consumes `evidence-result.v1` directly.
+- Branch: `pivot/25-http-api-v2`
+- Commits: `8f54acb` (`feat: add HTTP API v2 facade`), `d4a9d86`
+  (`feat: serve stable HTTP API v2 routes`), `6e32622` (`feat: migrate Evidence
+  Console to HTTP v2`), `ab2d307` (`fix: guard expensive allowance requests`),
+  `bcafa59` (`fix: enforce strict JSON request bodies`), `9cdc103` (`chore:
+  satisfy HTTP v2 quality gates`), and `c0f643f` (`docs: update tracked schema
+  count`), plus this documentation commit.
+- Focused verification: 60 Python tests passed across the pure decoder/facade,
+  body and output limits, live localhost server, route inventory, shared JSON
+  contracts, and the full dashboard-server suite. The roadmap's four-file
+  frontend command passed 23 tests across the client and Home, Explore, and
+  Evidence pages. The public documentation/contract check passed 21 tests.
+- Performance and quality verification: the repository-defined 100,000-row
+  dashboard route budget passed in 65.984 seconds with enforced thresholds.
+  TypeScript type checking and ESLint passed; targeted Ruff lint and formatting,
+  isolated mypy, project-interpreter Pyright, `git diff --check`, and the
+  Task 25 route-handler dead-code recheck passed.
+- Broad verifier: the repository-wide `full` profile ran for 4 minutes 13
+  seconds and exposed existing pivot-branch debt in legacy file lengths,
+  allowance exports/types, Tach boundaries, optional frontend tool discovery,
+  and dependency audit. Its only Task 25-local findings were formatting,
+  test-only type narrowing, dynamic route-handler discovery, and the public
+  schema count; all four were repaired and rechecked. The raw repository-wide
+  profile remains red on the unrelated inherited findings and is not represented
+  as a passing gate.
+- Review: POST bodies require `Content-Length`, enforce per-route byte budgets,
+  reject wrong media types, malformed/non-object JSON, duplicate keys,
+  non-finite numbers, and unknown top-level/nested fields. Responses enforce
+  route budgets, async starts return `202`, all v2 errors are JSON, and Host,
+  Origin, refresh/analyze/allowance token guards remain active. HTTP status and
+  MCP status results have equal schema identifiers and field sets.
+- Deviations from plan: the stable server integration lives in a small
+  `HttpV2RouteMixin` so the legacy request handler becomes smaller rather than
+  growing further. `request_guards.py` required no behavior change; live-server
+  coverage proves the existing Origin and token guards remain in force. No v1
+  route or publication state changed.
+- Follow-up risks: compatibility routes remain intentionally available through
+  their documented window. The repository-wide inherited verifier debt remains
+  owned by later architecture, CI, and release-hardening roadmap tasks.
+
 ## Remaining Planned Tasks
 
-Tasks 25 through 45 remain planned in the approved implementation roadmap. Add
+Tasks 26 through 45 remain planned in the approved implementation roadmap. Add
 a full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
