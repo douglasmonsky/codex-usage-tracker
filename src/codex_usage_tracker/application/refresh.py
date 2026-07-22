@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import secrets
 import sqlite3
@@ -255,7 +257,12 @@ def refresh_usage(
             if observed.execution == "sync":
                 return CompletedOrJob(result=execute(observed))
 
-    key = f"{request.history}:{int(request.aggregate_only)}"
+    key = _refresh_request_identity(
+        request,
+        codex_home=codex_home,
+        db_path=db_path,
+        pricing_path=pricing_path,
+    )
 
     def worker() -> dict[str, object]:
         with lock:
@@ -303,6 +310,29 @@ def _refresh_lock(db_path: Path) -> threading.Lock:
     key = str(db_path.resolve())
     with _REFRESH_LOCKS_GUARD:
         return _REFRESH_LOCKS.setdefault(key, threading.Lock())
+
+
+def _refresh_request_identity(
+    request: RefreshRequest,
+    *,
+    codex_home: Path,
+    db_path: Path,
+    pricing_path: Path,
+) -> str:
+    payload = {
+        "aggregate_only": request.aggregate_only,
+        "codex_home": _normalized_path(codex_home),
+        "db_path": _normalized_path(db_path),
+        "execution": request.execution,
+        "history": request.history,
+        "pricing_path": _normalized_path(pricing_path),
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return f"refresh-v1:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _normalized_path(path: Path) -> str:
+    return os.path.normcase(str(path.expanduser().resolve(strict=False)))
 
 
 def _coordinator_for_service(job_service: JobService) -> RefreshCoordinator:

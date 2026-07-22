@@ -94,6 +94,57 @@ def test_same_injected_service_reuses_active_equivalent_async_job(tmp_path: Path
     assert second.job.job_id == first.job.job_id
 
 
+@pytest.mark.parametrize("changed_path", ["db_path", "codex_home", "pricing_path"])
+def test_active_async_jobs_do_not_reuse_across_operational_paths(
+    tmp_path: Path, changed_path: str
+) -> None:
+    release = threading.Event()
+    service = JobService()
+
+    def refresh(**_kwargs: object) -> RefreshResult:
+        assert release.wait(timeout=2)
+        return RefreshResult(0, 0, 0, str(tmp_path / "usage.sqlite3"))
+
+    base = {
+        "codex_home": tmp_path / "home-a",
+        "db_path": tmp_path / "db-a.sqlite3",
+        "pricing_path": tmp_path / "pricing-a.json",
+        "job_service": service,
+        "refresh_fn": refresh,
+        "planner": lambda *_args, **_kwargs: RefreshPlan("async", "synthetic", 1, 1),
+    }
+    changed = dict(base)
+    changed[changed_path] = tmp_path / f"changed-{changed_path}"
+    first = refresh_usage(RefreshRequest(execution="async"), **base)  # type: ignore[arg-type]
+    second = refresh_usage(RefreshRequest(execution="async"), **changed)  # type: ignore[arg-type]
+    release.set()
+
+    assert first.job is not None
+    assert second.job is not None
+    assert second.job.job_id != first.job.job_id
+    encoded = json.dumps([first.job.to_payload(), second.job.to_payload()])
+    assert str(base["db_path"]) not in encoded
+    assert str(base["codex_home"]) not in encoded
+    assert str(base["pricing_path"]) not in encoded
+
+
+def test_internal_refresh_identity_includes_every_request_field_and_execution(
+    tmp_path: Path,
+) -> None:
+    paths = (tmp_path / "home", tmp_path / "db.sqlite3", tmp_path / "pricing.json")
+
+    def identity(request: RefreshRequest) -> str:
+        return refresh_module._refresh_request_identity(  # type: ignore[attr-defined]
+            request, codex_home=paths[0], db_path=paths[1], pricing_path=paths[2]
+        )
+
+    baseline = identity(RefreshRequest(execution="async"))
+
+    assert identity(RefreshRequest(history="all", execution="async")) != baseline
+    assert identity(RefreshRequest(aggregate_only=False, execution="async")) != baseline
+    assert identity(RefreshRequest(execution="auto")) != baseline
+
+
 def _planner_db(path: Path, tracked: list[tuple[str, int]] | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(path) as conn:
@@ -213,6 +264,7 @@ def test_auto_async_replans_in_worker_and_failure_is_privacy_safe(tmp_path: Path
         planner=planner,
     )
     assert outcome.job is not None
+    status = service.status(outcome.job.job_id)
     for _attempt in range(100):
         status = service.status(outcome.job.job_id)
         if status.state == "failed":
