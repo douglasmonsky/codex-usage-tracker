@@ -30,6 +30,11 @@ Targets preserve the analytical scope and use reviewed selectors. Opening a
 target must not broaden a date range, switch from active sessions to all
 history, or silently reveal indexed or raw content.
 
+Use `codex-usage-tracker open --target-json '<dashboard-target-v2 JSON>'` when
+an MCP result supplies only structured target data. Exact historical bookmark
+normalization and all four selector forms are documented in
+[Evidence Console Route Migration](evidence-console-route-migration.md).
+
 Limits labels observed facts, descriptive estimates, and statistically
 supported changes explicitly. Persisted allowance intervals and supported
 change rows link to the contextual Evidence route when the matching persisted

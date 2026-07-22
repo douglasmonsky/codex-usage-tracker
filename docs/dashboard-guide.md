@@ -18,11 +18,14 @@ window, those surfaces remain compatibility entry points only:
 - the legacy static dashboard receives no new features;
 - no new dashboard workspace is added during the pivot.
 
-Use the current compatibility dashboard when an existing workflow requires it:
+Open the current Evidence Console for a new workflow with:
 
 ```bash
-codex-usage-tracker serve-dashboard --open
+codex-usage-tracker open
 ```
+
+Use `codex-usage-tracker service serve --open` when the persistent service is
+not installed and you intentionally want a foreground server.
 
 Generated static output remains available during its recorded compatibility
 window:
@@ -33,5 +36,7 @@ codex-usage-tracker dashboard --output usage-dashboard.html
 
 For new workflows, begin with [MCP And Codex Skills](mcp.md) and open an
 Evidence Console target only when you want to inspect the supporting records.
+Exact bookmark mappings are in
+[Evidence Console Route Migration](evidence-console-route-migration.md).
 See [Data Posture](data-posture.md) and [Privacy](privacy.md) before sharing any
 generated output or screenshot.

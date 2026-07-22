@@ -56,15 +56,14 @@ automation and recovery.
 ## 5. Optionally Open Evidence
 
 When an MCP result includes an Evidence Console target, open its absolute
-localhost URL when present. If it includes only a relative target and launch
-guidance, run:
+localhost URL when present. Otherwise pass the structured target to:
 
 ```bash
-codex-usage-tracker serve-dashboard --open
+codex-usage-tracker open --target-json '<dashboard-target-v2 JSON>'
 ```
 
-Then follow the relative target. The Evidence Console supports verification; it
-is not required to receive the first useful answer.
+The Evidence Console supports verification; it is not required to receive the
+first useful answer. `codex-usage-tracker open` without a selector opens Home.
 
 ## If There Is No Usage Yet
 
@@ -84,7 +83,7 @@ If logs are outside `~/.codex`, pass `--codex-home <path>` to `setup` or
 For public GitHub issues, prefer a strict support bundle:
 
 ```bash
-codex-usage-tracker --privacy-mode strict support-bundle --output ~/.codex-usage-tracker/support-bundle.json
+codex-usage-tracker --privacy-mode strict admin support-bundle --output ~/.codex-usage-tracker/support-bundle.json
 ```
 
 Review the JSON before posting it. Do not attach raw Codex JSONL logs, prompts,

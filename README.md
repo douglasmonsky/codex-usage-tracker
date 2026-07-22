@@ -19,7 +19,7 @@ commands retain the older posture; shareable outputs follow existing behavior.
 The index stays on your machine, and the Evidence Console lets you inspect
 supporting records without making the browser the source of analytical claims.
 
-Cloned Codex tasks can copy historical usage rows into a new local log. The tracker preserves those physical rows for provenance but excludes only strict, high-confidence fingerprint matches from default dashboard, API, MCP, summary, recommendation, allowance, and export totals. New calls made inside the clone remain billable. Inspect the exclusion count with `codex-usage-tracker dedupe-diagnostics --json`, MCP `usage_dedupe_diagnostics()`, or `/api/diagnostics/dedupe`.
+Cloned Codex tasks can copy historical usage rows into a new local log. The tracker preserves those physical rows for provenance but excludes only strict, high-confidence fingerprint matches from default dashboard, API, MCP, summary, recommendation, allowance, and export totals. New calls made inside the clone remain billable. Inspect the exclusion count with `codex-usage-tracker admin dedupe-diagnostics --json`, MCP `usage_dedupe_diagnostics()`, or `/api/diagnostics/dedupe`.
 
 Built for developers using Codex locally who want to know which threads, models, subagents, and long chats are driving usage without uploading logs anywhere. The public PyPI package is [`codex-usage-tracking`](https://pypi.org/project/codex-usage-tracking/), and it installs the `codex-usage-tracker` command.
 
@@ -43,18 +43,17 @@ First install? Start with the [First Five Minutes guide](docs/first-five-minutes
 for setup, MCP verification, a starter analysis question, optional evidence, and
 safe issue diagnostics.
 
-Upgrading from 0.21? Read [Upgrading to 0.22.0](docs/upgrading-to-0.22.0.md) and
-the [0.22.0 release note](docs/releases/0.22.0.md) for the new default core
-profile and compatibility options.
+Upgrading from 0.22? Read [Upgrading to 0.23.0](docs/upgrading-to-0.23.0.md) and
+the [0.23.0 release note](docs/releases/0.23.0.md) for the focused Evidence
+Console, simplified CLI, and compatibility options.
 
 The first useful workflow is:
 
 1. Install and run `codex-usage-tracker setup`.
 2. Restart Codex or open a fresh task when setup asks you to.
 3. Ask: "What drove my Codex usage this week?"
-4. Optionally open the evidence target returned by the analysis. If no absolute
-   URL is available, run `codex-usage-tracker serve-dashboard --open` and follow
-   the returned relative target.
+4. Optionally open the evidence target returned by the analysis with
+   `codex-usage-tracker open --target-json '<dashboard-target-v2 JSON>'`.
 
 Package naming: the PyPI distribution is `codex-usage-tracking`; the installed command is `codex-usage-tracker`; the GitHub repository remains `douglasmonsky/codex-usage-tracker`. The `codex-usage-tracker` PyPI name is not this project, so avoid similarly named packages when following these docs.
 
@@ -86,46 +85,42 @@ Compare model and effort usage, then suggest safer defaults.
 Open the evidence behind your strongest recommendation.
 ```
 
-The companion skill treats waste discovery as diagnosis plus remediation: it can point to Calls, Threads, Call Investigator, Diagnostics Notebook, Allowance Intelligence, Headroom when available, or a custom local command/skill/report preset Codex can build to stop repeating the same waste pattern.
+The companion skill treats waste discovery as diagnosis plus remediation: it
+can point to exact call, thread, finding, or allowance evidence and suggest a
+local command, skill, or workflow change to stop repeating the same waste
+pattern.
 
 Example conversation docs:
 
 - [Token Waste Review](docs/examples/token-waste-conversation.md)
 - [Remediation Planning](docs/examples/remediation-conversation.md)
 
-## Legacy Dashboard Compatibility Preview
+## Evidence Console Preview
 
-These synthetic screenshots document the dashboard available during the
-bounded compatibility window. New workflows should use MCP analysis first and
-open an Evidence Console target only to verify supporting records.
+These synthetic screenshots document the focused local verification surface.
+New workflows use MCP analysis first and open an Evidence Console target only
+to verify supporting records.
 
-Overview is the dashboard landing workspace: it shows recent aggregate usage, weekly remaining usage context, row loading controls, and charts that open on recent dates.
+Home shows readiness, freshness, bounded findings, recent evidence, and starter
+questions without running a hidden heavy scan.
 
-![Overview view showing high-level metrics, row loading controls, time-series charts, and recent aggregate calls.](docs/assets/dashboard-insights.png?v=readme-final-20260711)
+![Evidence Console Home showing readiness, freshness, bounded findings, and recent evidence from synthetic data.](docs/assets/evidence-console-home.png?v=release-023)
 
-Calls is the high-density investigation surface: filter, sort, inspect details, and export the exact aggregate rows you are looking at.
+Explore keeps Calls and Threads in one bounded browser with shared scope.
 
-![Calls view showing the expanded model-call table with sticky thread rows and detail controls.](docs/assets/dashboard-calls.png?v=readme-final-20260711)
+![Evidence Console Explore in Calls mode with synthetic aggregate records.](docs/assets/evidence-console-explore-calls.png?v=release-023)
 
-The details rail stays beside the model-call table, so you can inspect aggregate call accounting before opening a full investigator route.
+![Evidence Console Explore in Threads mode with synthetic grouped usage.](docs/assets/evidence-console-explore-threads.png?v=release-023)
 
-![Calls view showing the expanded model-call table beside the Call Drill-Down detail rail.](docs/assets/dashboard-details.png?v=readme-final-20260711)
+Limits separates observed allowance facts, descriptive estimates, supported
+changes, caveats, and exact evidence links.
 
-Click a call row to open the dedicated investigator for exact token accounting, cache/accounting deltas, local serialized evidence buckets, and runtime-only evidence controls.
+![Evidence Console Limits showing synthetic allowance status and evidence.](docs/assets/evidence-console-limits.png?v=release-023)
 
-![Call investigator showing token accounting, cache diagnostics, serialized evidence groups, and evidence controls.](docs/assets/dashboard-call-investigator.png?v=readme-final-20260711)
+Contextual Evidence opens the exact selected call, thread, finding, or allowance
+claim and preserves a canonical return target.
 
-The lower investigator view keeps local JSONL context gated behind explicit localhost actions; raw context is not embedded in generated dashboard HTML.
-
-![Lower call investigator view showing context estimates and the explicit raw-context evidence gate.](docs/assets/dashboard-call-investigator-evidence.png?v=readme-final-20260711)
-
-Threads view groups related calls so long chats, subagents, and auto-review passes are easier to reason about as one work session.
-
-![Threads view with one expanded thread and its calls.](docs/assets/dashboard-threads.png?v=readme-final-20260711)
-
-Diagnostics Notebook surfaces on-demand snapshot reports for usage drain, tool output, commands, Git interactions, file reads, file modifications, read productivity, and concentration without tying them to the normal live refresh loop.
-
-![Diagnostics Notebook view showing diagnostic snapshot modules and usage-drain reporting.](docs/assets/dashboard-diagnostics.png?v=readme-final-20260711)
+![Contextual call Evidence showing synthetic token accounting and explicit local context controls.](docs/assets/evidence-console-evidence-call.png?v=release-023)
 
 Dashboard screenshots use synthetic aggregate fixture data, and companion prompt/chat previews are synthetic. They do not contain prompts, local logs, assistant responses, real tool output, real thread names, real usage totals, or real Codex session content. See the [Dashboard Guide](docs/dashboard-guide.md) for the compatibility window and migration links.
 
@@ -192,8 +187,8 @@ Practical takeaway: when old context is no longer useful, starting a fresh threa
 ## First Useful Workflow
 
 ```bash
-codex-usage-tracker update-pricing
-codex-usage-tracker update-rate-card
+codex-usage-tracker config pricing update
+codex-usage-tracker config rate-card update
 codex-usage-tracker setup
 ```
 
@@ -211,7 +206,7 @@ Then:
 Optional allowance context:
 
 ```bash
-codex-usage-tracker parse-allowance "5h 79% 6:50 PM Weekly 33% Jun 7"
+codex-usage-tracker config allowance parse "5h 79% 6:50 PM Weekly 33% Jun 7"
 ```
 
 The tracker cannot read your logged-in ChatGPT plan or live remaining usage automatically. When local Codex logs include `token_count.rate_limits`, the dashboard can show the latest observed 5-hour and weekly remaining percentages from those logs. Otherwise, allowance values are only as accurate as the values you manually copy from Codex Settings, `/status`, or another trusted usage display. Details: [Pricing, Credits, And Allowance](docs/pricing-and-credits.md).
@@ -220,7 +215,8 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 
 - Local SQLite index at `~/.codex-usage-tracker/usage.sqlite3`.
 - Static dashboard generation plus localhost live refresh.
-- `Overview`, `Investigate`, `Calls`, `Threads`, `Limits`, and `Diagnostics` dashboard views, including responsive token-flow visualization, evidence-graded weekly allowance analysis, and on-demand usage-drain report runs.
+- Focused Evidence Console with Home, Calls/Threads Explore, Limits, utility
+  Settings, and contextual Evidence.
 - Active-only dashboards by default, with an explicit `All history` toggle for archived sessions.
 - CLI summaries, queries, CSV export, dashboard generation, doctor checks, and support bundles.
 - MCP tools for Codex sessions that want to query local usage data.
@@ -234,13 +230,13 @@ The dashboard supports localized UI text. English is the canonical catalog, and 
 Set the initial dashboard language with `--lang`:
 
 ```bash
-codex-usage-tracker --lang vi serve-dashboard --open
+codex-usage-tracker --lang vi service serve --open
 ```
 
 Or set a default with:
 
 ```bash
-CODEX_USAGE_TRACKER_LANG=vi codex-usage-tracker serve-dashboard --open
+CODEX_USAGE_TRACKER_LANG=vi codex-usage-tracker service serve --open
 ```
 
 The dashboard also includes a language selector. Browser selections are stored locally and can override the generated default for that browser.
@@ -258,26 +254,28 @@ Supported dashboard locales include English, Vietnamese, Spanish, French, German
 ## Common Commands
 
 ```bash
-codex-usage-tracker summary --preset last-7-days
-codex-usage-tracker query --since 2026-06-01 --min-credits 1
-codex-usage-tracker session <session-id>
+codex-usage-tracker analyze --goal token_waste --json
+codex-usage-tracker query --entity model --measure tokens,call_count --json
 codex-usage-tracker export --output usage.csv
-codex-usage-tracker open-dashboard
-codex-usage-tracker support-bundle --output ~/.codex-usage-tracker/support-bundle.json
+codex-usage-tracker open
+codex-usage-tracker admin support-bundle --output ~/.codex-usage-tracker/support-bundle.json
 ```
 
 Full command reference: [CLI Reference](docs/cli-reference.md).
 
 ## Data Privacy
 
-The tracker stores aggregate metrics only: session ids, timestamps, local source paths, thread labels, cwd/project metadata, model labels, reasoning effort, token counters, pricing/credit annotations, and derived ratios.
+The local SQLite database stores aggregate usage facts and the bounded local
+content/event index used by explicit investigation tools. Shareable defaults
+remain aggregate-first: CSV, generated HTML, screenshots, and support bundles
+do not expose indexed snippets or selected raw context.
 
 It does **not** store prompts, assistant messages, tool output, pasted secrets, raw transcript snippets, or raw context in SQLite, CSV exports, generated dashboard HTML, or synthetic screenshots.
 
 On-demand context loading reads a single original local JSONL file only after an explicit row action, redacts common secret patterns, caps returned text size, and can start off until you enable it from the details panel:
 
 ```bash
-codex-usage-tracker serve-dashboard --no-context-api --open
+codex-usage-tracker service serve --no-context-api --open
 ```
 
 For shared artifacts, use:
@@ -311,8 +309,8 @@ Open a Codex session on your machine and paste this:
 Install and configure Codex Usage Tracker.
 Install the PyPI distribution codex-usage-tracking with pipx. The installed command should be codex-usage-tracker. Use pipx install "git+https://github.com/douglasmonsky/codex-usage-tracker.git" only for branch testing or if PyPI is temporarily unavailable.
 If pipx is missing, install it with the platform's Python launcher or use a local virtual environment.
-After installation, run codex-usage-tracker setup and serve-dashboard --open.
-Verify the dashboard opens locally and tell me the dashboard URL plus whether I need to restart Codex for plugin discovery.
+After installation, run codex-usage-tracker setup and open.
+Verify the Evidence Console opens locally and tell me its URL plus whether I need to restart Codex for plugin discovery.
 ```
 
 This is optional. The normal shell install above is the fastest trusted path for most users.
