@@ -550,8 +550,49 @@ commit as each roadmap task.
   ranking and direct route bookmarks remain supported only through `0.24.x`,
   with the signed record blocking removal if parity later regresses.
 
+## Task 24 - Remove the Usage Constellation and Frontend Dependencies
+
+- Status: complete; the experimental Usage Constellation, its Three.js renderer
+  and models, its browser and unit coverage, and all packaged constellation
+  assets are removed. `three` and `@types/three` are absent from both manifests
+  and the lockfile, and release validation now rejects their reintroduction.
+- Branch: `pivot/24-remove-usage-constellation`
+- Commits: `b34066e` (`refactor: remove non-core dashboard visualization`),
+  `064f83b` (`test: enforce dashboard visualization sunset`), `7c279b1`,
+  `e9f7ea7`, `a3a4dd2`, and `726e1f8` (bounded packaged-asset refreshes),
+  `c1761f7` (`test: align dashboard coverage with core routes`), plus this
+  documentation commit.
+- Focused verification: the release suite passed 26 tests; the migrated route,
+  Evidence, diagnostics, live-refresh, export, filter, source-identity, and
+  compatibility subset passed 85 tests. `npm ls three --all` returned empty,
+  asset synchronization was byte-for-byte clean, the initial bundle measured
+  60.02 KiB under its 67 KiB ceiling, and the largest visualization route
+  measured 112 KiB under its 113 KiB ceiling with no Three.js inputs.
+- Full verification: the repository-defined `dashboard-verify` gate passed all
+  607 frontend tests, TypeScript, ESLint, dependency boundaries, dead-code
+  detection, stylelint, the refreshed source ratchet, production build, asset
+  parity, bundle budgets, and `scripts/check_release.py`. The port-isolated
+  release candidate passed all 11 Chromium checks. `npm ci`, governance,
+  `git diff --check`, and the final staged-file review also passed.
+- Review: the final diff contains 193 additions and 628 deletions across the
+  compatibility-test cleanup, with no secret-bearing paths or unexpected
+  worktree changes. The task-level child-agent allowance had already been used
+  by prior pivot slices, so no additional review child was created.
+- Deviations from plan: three obsolete top-level shell suites and two retired
+  Overview-only load-more cases were deleted instead of being rewritten to
+  assert navigation that no longer exists. Direct-route compatibility remains
+  covered through canonical Home, Explore, Evidence, diagnostics, reports,
+  investigator, and cache tests. The generated asset refresh was split into
+  four commits to respect the 20-file commit cap. The release documentation's
+  Tools catalog boundary was corrected so its parser does not consume the
+  following workbench-replacement section. No publication action was taken.
+- Follow-up risks: `npm ci` reports four existing audit findings (two moderate
+  and two high); no automatic dependency rewrite was attempted. The remaining
+  compatibility workbenches and static dashboard are still governed by their
+  documented two-release sunset and later roadmap tasks.
+
 ## Remaining Planned Tasks
 
-Tasks 24 through 45 remain planned in the approved implementation roadmap. Add
+Tasks 25 through 45 remain planned in the approved implementation roadmap. Add
 a full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
