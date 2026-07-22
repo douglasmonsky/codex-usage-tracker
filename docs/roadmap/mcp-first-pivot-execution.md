@@ -510,8 +510,48 @@ commit as each roadmap task.
   paths. Their legacy unit assertions remain diagnostic until those owning
   tasks land.
 
+## Task 23 - Prove Job Parity and Hide Legacy Workbenches
+
+- Status: complete; all eight sunset jobs have an executable signed parity
+  record covering canonical evidence IDs, history scope, accounting context,
+  caveats, replacement requests, destinations, ownership, and removal timing.
+  The five legacy workbenches stay directly routable but are absent from the
+  default Home, Explore, and Limits navigation and now name a core replacement.
+- Branch: `pivot/23-dashboard-sunset-parity`
+- Commits: `78934d3` (`feat: simplify the default dashboard surface`), plus this
+  documentation commit.
+- Focused verification: 69 Python tests passed across the analysis catalog,
+  signed sunset parity, analyze, query, and evidence contracts. The roadmap's
+  four-file frontend command passed 31 tests across the shell, route catalog,
+  transition banner, and Diagnostics lifecycle; the final affected-component
+  recheck passed 12 tests.
+- Full verification: dashboard type checking, ESLint, dependency boundaries,
+  dead-code detection, stylelint, source-budget enforcement, touched-file Ruff,
+  bundle budgets, privacy-pattern scanning, and `git diff --check` passed. The
+  port-isolated release candidate passed all 11 Chromium checks, including the
+  five direct legacy routes and Spanish transition copy. A diagnostic named
+  full-dashboard run passed 556 of 624 tests; its 68 failures are the unchanged
+  retired-navigation and pre-pivot route-ID assertions already deferred from
+  Tasks 20 through 22.
+- Review: the final local diff review found no critical or important
+  correctness, privacy, selector, accounting, accessibility, localization, or
+  compatibility issue. The task-level child-agent allowance had already been
+  used by prior pivot slices, so no additional review child was created.
+- Deviations from plan: `analysis_catalog.py` changed because it is the source
+  that overwrites strategy destinations in public analysis results; leaving it
+  untouched would preserve links to retired workbenches. `navigation.ts`
+  required no edit because Task 18 already enforced exactly Home, Explore, and
+  Limits plus the Settings utility. The release-candidate used port 5197 because
+  an unrelated listener owned 5173. Verification-only generated dashboard
+  assets were restored to their clean pre-build state; Task 29 owns artifact
+  synchronization. No publication action was taken.
+- Follow-up risks: the 68 legacy unit assertions remain diagnostic until Task
+  24 removes their obsolete workbench assumptions. Full-profile compression
+  ranking and direct route bookmarks remain supported only through `0.24.x`,
+  with the signed record blocking removal if parity later regresses.
+
 ## Remaining Planned Tasks
 
-Tasks 23 through 45 remain planned in the approved implementation roadmap. Add
+Tasks 24 through 45 remain planned in the approved implementation roadmap. Add
 a full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
