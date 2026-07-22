@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EvidenceApiError, loadEvidence, type EvidenceEnvelope } from '../../api/evidence';
+import { EvidenceApiError, loadEvidence, type EvidenceResult } from '../../api/evidence';
 import { fixtureModel } from '../../test-fixtures/dashboardFixture';
 import { EvidencePage } from './EvidencePage';
 
@@ -31,26 +31,16 @@ function evidenceRecord(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function envelope(overrides: Record<string, unknown> = {}): EvidenceEnvelope {
+function evidence(overrides: Record<string, unknown> = {}): EvidenceResult {
   return {
-    schema: 'codex-usage-tracker.mcp-envelope.v1',
-    tool: 'usage_evidence',
-    request_id: 'req-00000000000000000000000000000000',
-    generated_at: '2026-07-21T12:00:00Z',
-    source_revision: 'generation:7',
-    data_class: 'aggregate',
-    scope: { history: 'active', privacy_mode: 'normal', filters: {} },
-    result_schema: 'codex-usage-tracker.evidence-result.v1',
-    result: {
-      schema: 'codex-usage-tracker.evidence-result.v1',
-      selector: { kind: 'thread', id: 'thread:alpha', section: 'summary' },
-      records: [evidenceRecord({ kind: 'thread', label: 'Thread alpha' })],
-      next_cursor: null,
-      dashboard_target: {},
-      subject: null,
-    },
+    schema: 'codex-usage-tracker.evidence-result.v1',
+    selector: { kind: 'thread', id: 'thread:alpha', section: 'summary' },
+    records: [evidenceRecord({ kind: 'thread', label: 'Thread alpha' })],
+    next_cursor: null,
+    dashboard_target: {},
+    subject: null,
     ...overrides,
-  } as EvidenceEnvelope;
+  } as EvidenceResult;
 }
 
 function renderPage(search: string) {
@@ -85,16 +75,14 @@ describe('EvidencePage', () => {
 
   it('renders a thread summary and its bounded first page of calls', async () => {
     mockedLoadEvidence
-      .mockResolvedValueOnce(envelope())
-      .mockResolvedValueOnce(envelope({
-        result: {
+      .mockResolvedValueOnce(evidence())
+      .mockResolvedValueOnce(evidence({
           schema: 'codex-usage-tracker.evidence-result.v1',
           selector: { kind: 'thread', id: 'thread:alpha', section: 'calls' },
           records: [evidenceRecord({ evidence_id: 'call-1', label: 'Call one' })],
           next_cursor: 'next-page',
           dashboard_target: {},
           subject: null,
-        },
       }));
 
     renderPage('?view=evidence&kind=thread&thread_key=thread%3Aalpha');
@@ -109,8 +97,7 @@ describe('EvidencePage', () => {
   });
 
   it('renders persisted finding language, scope, confidence, limitations, and linked evidence', async () => {
-    mockedLoadEvidence.mockResolvedValue(envelope({
-      result: {
+    mockedLoadEvidence.mockResolvedValue(evidence({
         schema: 'codex-usage-tracker.evidence-result.v1',
         selector: { kind: 'finding', id: 'finding-3', section: 'summary', analysis_id: 'analysis-7' },
         records: [evidenceRecord({ label: 'Linked call 7' })],
@@ -126,7 +113,6 @@ describe('EvidencePage', () => {
           caveat_codes: ['bounded-history'],
           analysis_id: 'analysis-7',
         },
-      },
     }));
 
     renderPage('?view=evidence&kind=finding&analysis=analysis-7&finding=finding-3');
@@ -139,8 +125,7 @@ describe('EvidencePage', () => {
   });
 
   it('renders an allowance transition only from persisted evidence facts', async () => {
-    mockedLoadEvidence.mockResolvedValue(envelope({
-      result: {
+    mockedLoadEvidence.mockResolvedValue(evidence({
         schema: 'codex-usage-tracker.evidence-result.v1',
         selector: { kind: 'allowance', id: 'interval-3', section: 'summary' },
         records: [evidenceRecord({
@@ -151,7 +136,6 @@ describe('EvidencePage', () => {
         next_cursor: null,
         dashboard_target: {},
         subject: null,
-      },
     }));
 
     renderPage('?view=evidence&kind=allowance&analysis=allowance-7&evidence=interval-3');
@@ -188,7 +172,7 @@ describe('EvidencePage', () => {
   });
 
   it('copies the normalized evidence URL', async () => {
-    mockedLoadEvidence.mockResolvedValue(envelope());
+    mockedLoadEvidence.mockResolvedValue(evidence());
     renderPage('?view=evidence&kind=thread&thread_key=thread%3Aalpha&analysis_id=compat');
     await screen.findByRole('heading', { name: 'Thread evidence' });
 

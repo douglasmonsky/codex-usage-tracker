@@ -17,6 +17,59 @@ from codex_usage_tracker.core.json_contract_visualization import (
 
 NoneType = type(None)
 
+HTTP_V2_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
+    "codex-usage-tracker.status.v2": {
+        "required": {
+            "index": dict,
+            "parser": dict,
+            "sources": dict,
+            "pricing": dict,
+            "accounting": dict,
+            "conversational_readiness": dict,
+            "mcp": dict,
+            "persistent_service": dict,
+            "next_action": dict,
+        }
+    },
+    "codex-usage-tracker.refresh.v2": {
+        "required": {
+            "refresh": dict,
+            "planner": dict,
+            "scope": dict,
+            "freshness": dict,
+            "accounting": dict,
+        }
+    },
+    "codex-usage-tracker.job.v1": {
+        "required": {
+            "job_id": str,
+            "kind": str,
+            "state": str,
+            "progress_percent": int,
+            "stage": str,
+            "source_revision": (str, NoneType),
+            "request_hash": str,
+            "created_at": str,
+            "updated_at": str,
+            "completed_at": (str, NoneType),
+            "retryable": bool,
+            "error": (dict, NoneType),
+            "result_schema": (str, NoneType),
+            "result": (dict, NoneType),
+        }
+    },
+    "codex-usage-tracker.capabilities.v2": {
+        "required": {
+            "analysis_goals": list,
+            "query_entities": dict,
+            "query_measures": list,
+            "allowance_operations": list,
+            "evidence_selector_kinds": list,
+        }
+    },
+    "codex-usage-tracker.error.v1": {"required": {"error": dict}},
+}
+
 QUERY_JSON_PAYLOAD_CONTRACTS = {
     "codex-usage-tracker.query.v2": {
         "required": {
@@ -199,6 +252,7 @@ MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
 MCP_EVIDENCE_SCHEMA_IDS = tuple(MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS)
 
 JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
+    **HTTP_V2_JSON_PAYLOAD_CONTRACTS,
     **QUERY_JSON_PAYLOAD_CONTRACTS,
     **EVIDENCE_RESULT_JSON_PAYLOAD_CONTRACTS,
     **ANALYSIS_JSON_PAYLOAD_CONTRACTS,

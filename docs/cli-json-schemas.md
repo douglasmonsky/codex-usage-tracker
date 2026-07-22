@@ -48,6 +48,11 @@ Tracked schema ids:
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
 | `codex-usage-tracker.subagent-usage.v1` | CLI `subagents --json`, MCP `subagent_usage(response_format="json")` |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
+| `codex-usage-tracker.status.v2` | HTTP `GET /api/v2/status`; bounded application status and freshness contract |
+| `codex-usage-tracker.refresh.v2` | HTTP `POST /api/v2/refresh`; completed refresh result |
+| `codex-usage-tracker.job.v1` | HTTP `GET /api/v2/jobs/{job_id}` and asynchronous v2 starts; generic process-local job status |
+| `codex-usage-tracker.capabilities.v2` | HTTP `GET /api/v2/capabilities`; immutable analysis, query, allowance, and evidence allowlists |
+| `codex-usage-tracker.error.v1` | Stable HTTP v2 error envelope with machine-readable code and message |
 | `codex-usage-tracker.query.v2` | Canonical bounded application query result with deterministic cursor continuation |
 | `codex-usage-tracker.analysis.v2` | Bounded evidence-backed analysis with strategy provenance, limitations, accounting, and dashboard destinations |
 | `codex-usage-tracker.analysis-job.v1` | Process-local semantic analysis job status; active and compatible completed work may be reused |

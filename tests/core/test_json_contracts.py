@@ -19,6 +19,10 @@ RUNTIME_SCHEMA_SOURCE_PATHS = [
     REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "dashboard_targets.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "application" / "query_models.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "application" / "analyze.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "application" / "status.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "application" / "refresh.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "jobs" / "models.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "interfaces" / "http" / "v2.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "cli" / "main.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "context" / "api.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "pricing" / "costing.py",
@@ -79,6 +83,33 @@ def test_allowance_v2_contracts_are_tracked() -> None:
         "codex-usage-tracker-allowance-evidence-v2",
         "codex-usage-tracker-allowance-analysis-v2",
     } <= schemas
+
+
+def test_http_v2_contracts_are_tracked_and_validate() -> None:
+    schemas = set(known_json_schemas())
+    assert {
+        "codex-usage-tracker.status.v2",
+        "codex-usage-tracker.refresh.v2",
+        "codex-usage-tracker.job.v1",
+        "codex-usage-tracker.capabilities.v2",
+        "codex-usage-tracker.error.v1",
+    } <= schemas
+    assert validate_json_payload_contract(
+        {
+            "schema": "codex-usage-tracker.capabilities.v2",
+            "analysis_goals": [],
+            "query_entities": {},
+            "query_measures": [],
+            "allowance_operations": [],
+            "evidence_selector_kinds": [],
+        }
+    ) == []
+    assert validate_json_payload_contract(
+        {
+            "schema": "codex-usage-tracker.error.v1",
+            "error": {"code": "invalid_request", "message": "invalid"},
+        }
+    ) == []
 
 
 def test_dashboard_target_contract_is_tracked() -> None:

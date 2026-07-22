@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 
-import { loadEvidence, type EvidenceEnvelope, type EvidenceRecord } from '../../api/evidence';
+import { loadEvidence, type EvidenceRecord, type EvidenceResult } from '../../api/evidence';
 import type { ContextRuntime } from '../../api/types';
 import styles from './EvidencePage.module.css';
 
 type ThreadEvidenceProps = {
-  envelope: EvidenceEnvelope;
+  evidence: EvidenceResult;
   runtime: ContextRuntime;
   history: 'active' | 'all';
   onOpenCall: (recordId: string) => void;
 };
 
-export function ThreadEvidence({ envelope, runtime, history, onOpenCall }: ThreadEvidenceProps) {
-  const selectorId = envelope.result.selector.id;
+export function ThreadEvidence({ evidence, runtime, history, onOpenCall }: ThreadEvidenceProps) {
+  const selectorId = evidence.selector.id;
   const [calls, setCalls] = useState<EvidenceRecord[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -25,8 +25,8 @@ export function ThreadEvidence({ envelope, runtime, history, onOpenCall }: Threa
     loadEvidence({ kind: 'thread', selectorId, section: 'calls', limit: 20, history }, runtime)
       .then(page => {
         if (cancelled) return;
-        setCalls(page.result.records);
-        setCursor(page.result.next_cursor);
+        setCalls(page.records);
+        setCursor(page.next_cursor);
         setStatus('ready');
       })
       .catch(error => {
@@ -45,8 +45,8 @@ export function ThreadEvidence({ envelope, runtime, history, onOpenCall }: Threa
         { kind: 'thread', selectorId, section: 'calls', limit: 20, history, cursor },
         runtime,
       );
-      setCalls(current => [...current, ...page.result.records]);
-      setCursor(page.result.next_cursor);
+      setCalls(current => [...current, ...page.records]);
+      setCursor(page.next_cursor);
       setStatus('ready');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'More thread calls are unavailable.');
@@ -54,7 +54,7 @@ export function ThreadEvidence({ envelope, runtime, history, onOpenCall }: Threa
     }
   }
 
-  const summary = envelope.result.records[0];
+  const summary = evidence.records[0];
   return (
     <section className={styles.content} aria-labelledby="thread-evidence-title">
       <div>

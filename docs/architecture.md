@@ -65,6 +65,7 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
   revision-keyed persisted results.
 - `reports.py` is the application-service layer for summaries, expensive-call reports, recommendations, pricing coverage, source coverage, allowance reports, and filtered query payloads. CLI and MCP wrappers should call this layer instead of duplicating report assembly.
 - `api_payloads.py` owns stable JSON payload helpers shared by CLI and MCP. `json_contracts.py` owns lightweight contract checks for schema-versioned CLI/MCP payloads and localhost live API payloads.
+- `interfaces/http/v2.py` is the stable localhost HTTP adapter. It decodes bounded strict requests and serializes shared application contracts; it calls `application/` services directly and never routes through MCP handlers. `server/handler.py` retains Host, Origin, and local-token enforcement at the transport boundary, while `server/route_inventory.py` records exposure, execution, history, cache, and byte budgets.
 - `costing.py`, `pricing_config.py`, `pricing_openai.py`, `pricing_estimates.py`, and `allowance.py` own cost, credit, rate-card, and allowance annotation. Keep estimate confidence and source metadata attached to rows.
 - `projects.py`, `threads.py`, and `recommendations.py` annotate aggregate rows with project identity, thread relationships, and actionable signals. Project privacy redaction belongs in `projects.py` so CLI, MCP, dashboard, CSV, and support-bundle surfaces share behavior.
 - `context.py` is the normal path for explicit selected-call raw context. It reads one selected source file on demand, applies redaction and size limits, omits tool output by default, and keeps full serialized group analysis explicit.
@@ -87,6 +88,7 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
 9. Diagnostic snapshot refresh must remain explicit on demand. Normal usage refresh paths may load stored snapshots, but must not rescan source logs for diagnostic sections unless the user calls diagnostics `--refresh` or a `/api/diagnostics/<section>/refresh` endpoint.
 10. Register each new dashboard query in `dashboardQueryContracts.json` with one stable identity, endpoint, data class, and response schema. Query keys must include source, source revision, scope, and every payload-changing option.
 11. Register each dashboard route in `server.route_inventory`. Interactive routes must be bounded and index-backed; unavoidable all-history detector work uses the shared asynchronous job lifecycle.
+    New stable Evidence Console requests use `/api/v2/`; compatibility routes remain available only for their documented migration window.
 12. Cache only immutable aggregate responses. Server keys include source generation and semantic/configuration inputs; browser persistence rejects raw or indexed content.
 13. Add or change a route budget only from repeatable synthetic evidence. Database indexes require an additive migration, query-plan or timing evidence, and focused migration coverage.
 14. Preserve physical usage rows for provenance, but route default dashboard,

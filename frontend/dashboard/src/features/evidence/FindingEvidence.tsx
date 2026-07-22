@@ -1,14 +1,14 @@
-import type { EvidenceEnvelope, EvidenceRecord } from '../../api/evidence';
+import type { EvidenceRecord, EvidenceResult } from '../../api/evidence';
 import styles from './EvidencePage.module.css';
 
-export function FindingEvidence({ envelope }: { envelope: EvidenceEnvelope }) {
-  const subject = envelope.result.subject ?? {};
+export function FindingEvidence({ evidence, history }: { evidence: EvidenceResult; history: 'active' | 'all' }) {
+  const subject = evidence.subject ?? {};
   const title = text(subject.title) ?? 'Finding evidence';
   const limitations = list(subject.caveat_codes);
   return (
     <section className={styles.content} aria-labelledby="finding-evidence-title">
       <div>
-        <p className={styles.eyebrow}>Persisted finding · {envelope.result.selector.id}</p>
+        <p className={styles.eyebrow}>Persisted finding · {evidence.selector.id}</p>
         <h1 id="finding-evidence-title">{title}</h1>
         {text(subject.statement) ? <p className={styles.claim}>{text(subject.statement)}</p> : null}
       </div>
@@ -17,9 +17,7 @@ export function FindingEvidence({ envelope }: { envelope: EvidenceEnvelope }) {
         <Fact label="Confidence" value={text(subject.confidence)} />
         <Fact label="Severity" value={text(subject.severity)} />
         <Fact label="Analysis" value={text(subject.analysis_id)} />
-        <Fact label="History scope" value={envelope.scope.history} />
-        <Fact label="Privacy scope" value={envelope.scope.privacy_mode} />
-        <Fact label="Filters" value={scopeFilters(envelope.scope.filters)} />
+        <Fact label="History scope" value={history} />
       </dl>
       <div>
         <h2>Limitations</h2>
@@ -27,7 +25,7 @@ export function FindingEvidence({ envelope }: { envelope: EvidenceEnvelope }) {
           <ul className={styles.chipList}>{limitations.map(value => <li key={value}>{value}</li>)}</ul>
         ) : <p>No persisted limitation codes were supplied.</p>}
       </div>
-      <LinkedEvidence records={envelope.result.records} />
+      <LinkedEvidence records={evidence.records} />
     </section>
   );
 }
@@ -60,9 +58,4 @@ function text(value: unknown): string | null {
 
 function list(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
-}
-
-function scopeFilters(filters: Record<string, unknown>): string {
-  const values = Object.entries(filters).map(([key, value]) => `${key}: ${String(value)}`);
-  return values.length ? values.join(', ') : 'None';
 }

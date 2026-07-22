@@ -1,7 +1,7 @@
 import { ArrowLeft, Copy } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { EvidenceApiError, loadEvidence, type EvidenceEnvelope } from '../../api/evidence';
+import { EvidenceApiError, loadEvidence, type EvidenceResult } from '../../api/evidence';
 import type { ContextRuntime, DashboardModel } from '../../api/types';
 import { copyText } from '../shared/copyText';
 import { AllowanceEvidence } from './AllowanceEvidence';
@@ -28,7 +28,7 @@ type EvidencePageProps = {
 type RemoteState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'loaded'; envelope: EvidenceEnvelope }
+  | { status: 'loaded'; evidence: EvidenceResult }
   | { status: 'error'; message: string; code: string | null };
 
 export function EvidencePage(props: EvidencePageProps) {
@@ -64,7 +64,7 @@ export function EvidencePage(props: EvidencePageProps) {
       analysisId: route.analysisId,
       history,
     }, props.contextRuntime)
-      .then(envelope => { if (!cancelled) setRemote({ status: 'loaded', envelope }); })
+      .then(evidence => { if (!cancelled) setRemote({ status: 'loaded', evidence }); })
       .catch(error => {
         if (cancelled) return;
         setRemote({
@@ -138,15 +138,15 @@ export function EvidencePage(props: EvidencePageProps) {
       </div>
       {route.kind === 'thread' ? (
         <ThreadEvidence
-          envelope={remote.envelope}
+          evidence={remote.evidence}
           runtime={props.contextRuntime}
           history={history}
           onOpenCall={props.onNavigateRecord}
         />
       ) : null}
-      {route.kind === 'finding' ? <FindingEvidence envelope={remote.envelope} /> : null}
+      {route.kind === 'finding' ? <FindingEvidence evidence={remote.evidence} history={history} /> : null}
       {route.kind === 'allowance' ? (
-        <AllowanceEvidence envelope={remote.envelope} analysisId={route.analysisId} />
+        <AllowanceEvidence evidence={remote.evidence} analysisId={route.analysisId} history={history} />
       ) : null}
     </div>
   );

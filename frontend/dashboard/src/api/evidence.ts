@@ -14,25 +14,13 @@ export type EvidenceRecord = {
   dashboard_target: Record<string, unknown> | null;
 };
 
-type EvidenceResult = {
+export type EvidenceResult = {
   schema: 'codex-usage-tracker.evidence-result.v1';
   selector: { kind: string; id: string; section: string; analysis_id?: string };
   records: EvidenceRecord[];
   next_cursor: string | null;
   dashboard_target: Record<string, unknown>;
   subject: Record<string, unknown> | null;
-};
-
-export type EvidenceEnvelope = {
-  schema: 'codex-usage-tracker.mcp-envelope.v1';
-  tool: 'usage_evidence';
-  request_id: string;
-  generated_at: string;
-  source_revision: string | null;
-  data_class: 'aggregate';
-  scope: { history: string; privacy_mode: string; filters: Record<string, unknown> };
-  result_schema: 'codex-usage-tracker.evidence-result.v1';
-  result: EvidenceResult;
 };
 
 export type EvidenceApiRequest = {
@@ -59,51 +47,53 @@ export class EvidenceApiError extends Error {
 export async function loadEvidence(
   request: EvidenceApiRequest,
   runtime: ContextRuntime,
-): Promise<EvidenceEnvelope> {
+): Promise<EvidenceResult> {
   if (runtime.fileMode) {
     throw new EvidenceApiError('Evidence hydration requires the localhost dashboard server.', 0, 'file_mode');
   }
-  if (!runtime.apiToken) {
-    throw new EvidenceApiError('Evidence hydration requires a localhost dashboard API token.', 0, 'missing_token');
-  }
-  const params = new URLSearchParams({
+  const payload = {
     selector_kind: request.kind,
     selector_id: request.selectorId,
     section: request.section ?? 'summary',
-    limit: String(request.limit ?? 20),
+    limit: request.limit ?? 20,
     history: request.history ?? 'active',
-  });
-  if (request.cursor) params.set('cursor', request.cursor);
-  if (request.kind === 'finding' && request.analysisId) {
-    params.set('analysis_id', request.analysisId);
-  }
-  const response = await fetch(`/api/v2/evidence?${params.toString()}`, {
+    ...(request.cursor ? { cursor: request.cursor } : {}),
+    ...(request.kind === 'finding' && request.analysisId
+      ? { analysis_id: request.analysisId }
+      : {}),
+  };
+  const response = await fetch('/api/v2/evidence', {
     method: 'POST',
     headers: {
       Accept: 'application/json',
-      'X-Codex-Usage-Token': runtime.apiToken,
+      'Content-Type': 'application/json',
+      ...(runtime.apiToken ? { 'X-Codex-Usage-Token': runtime.apiToken } : {}),
     },
+    body: JSON.stringify(payload),
     cache: 'no-store',
   });
-  const payload = await readPayload(response);
+  const responsePayload = await readPayload(response);
   if (!response.ok) {
-    const message = typeof payload.error === 'string'
-      ? payload.error
-      : `Evidence request failed (${response.status})`;
+    const error = readError(responsePayload);
+    const message = error?.message ?? `Evidence request failed (${response.status})`;
     throw new EvidenceApiError(
       message,
       response.status,
-      typeof payload.code === 'string' ? payload.code : null,
+      error?.code ?? null,
     );
   }
-  if (
-    payload.schema !== 'codex-usage-tracker.mcp-envelope.v1'
-    || payload.result_schema !== 'codex-usage-tracker.evidence-result.v1'
-    || !isEvidenceResult(payload.result)
-  ) {
+  if (!isEvidenceResult(responsePayload)) {
     throw new EvidenceApiError('Evidence response did not match the shared evidence contract.', 502, 'invalid_contract');
   }
-  return payload as EvidenceEnvelope;
+  return responsePayload;
+}
+
+function readError(payload: Record<string, unknown>): { code: string; message: string } | null {
+  if (!payload.error || typeof payload.error !== 'object') return null;
+  const error = payload.error as Record<string, unknown>;
+  return typeof error.code === 'string' && typeof error.message === 'string'
+    ? { code: error.code, message: error.message }
+    : null;
 }
 
 async function readPayload(response: Response): Promise<Record<string, unknown>> {
