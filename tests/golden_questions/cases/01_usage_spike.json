@@ -1,0 +1,13 @@
+{
+  "id": "usage_spike",
+  "question": "Why did synthetic-project usage spike this week?",
+  "guidance_terms": ["broad diagnostic", "usage_analyze"],
+  "expected_envelope_schema": "codex-usage-tracker.mcp-envelope.v1",
+  "expected_core_tool_sequence": [
+    {
+      "tool": "usage_analyze",
+      "arguments": {"goal": "usage_spike", "execution": "sync"},
+      "result_schema": "codex-usage-tracker.analysis.v2"
+    }
+  ]
+}

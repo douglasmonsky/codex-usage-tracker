@@ -1,0 +1,22 @@
+{
+  "id": "evidence_follow_up",
+  "question": "Explain synthetic token waste, then open the exact aggregate evidence for the selected finding.",
+  "guidance_terms": ["structured evidence", "aggregate/shareable"],
+  "expected_envelope_schema": "codex-usage-tracker.mcp-envelope.v1",
+  "expected_core_tool_sequence": [
+    {
+      "tool": "usage_analyze",
+      "arguments": {"goal": "token_waste", "execution": "sync"},
+      "result_schema": "codex-usage-tracker.analysis.v2"
+    },
+    {
+      "tool": "usage_evidence",
+      "arguments": {
+        "selector_kind": "finding",
+        "selector_id": "finding-from-prior-result",
+        "analysis_id": "analysis-from-prior-result"
+      },
+      "result_schema": "codex-usage-tracker.evidence-result.v1"
+    }
+  ]
+}

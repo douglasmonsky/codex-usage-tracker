@@ -1,0 +1,18 @@
+{
+  "id": "precise_model_query",
+  "question": "Show synthetic-model token totals and call counts grouped by effort.",
+  "guidance_terms": ["exact tabular", "usage_query"],
+  "expected_envelope_schema": "codex-usage-tracker.mcp-envelope.v1",
+  "expected_core_tool_sequence": [
+    {
+      "tool": "usage_query",
+      "arguments": {
+        "entity": "model",
+        "measures": ["tokens", "call_count"],
+        "filters": {"model": "synthetic-model"},
+        "group_by": ["effort"]
+      },
+      "result_schema": "codex-usage-tracker.query.v2"
+    }
+  ]
+}

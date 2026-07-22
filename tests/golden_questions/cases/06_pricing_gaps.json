@@ -1,0 +1,13 @@
+{
+  "id": "pricing_gaps",
+  "question": "Which synthetic usage rows have missing or estimated pricing coverage?",
+  "guidance_terms": ["pricing_estimated", "pricing_model"],
+  "expected_envelope_schema": "codex-usage-tracker.mcp-envelope.v1",
+  "expected_core_tool_sequence": [
+    {
+      "tool": "usage_analyze",
+      "arguments": {"goal": "pricing_gaps", "execution": "sync"},
+      "result_schema": "codex-usage-tracker.analysis.v2"
+    }
+  ]
+}

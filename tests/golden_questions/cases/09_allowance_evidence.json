@@ -1,0 +1,18 @@
+{
+  "id": "allowance_evidence",
+  "question": "Show bounded synthetic weekly allowance evidence for the last eight weeks.",
+  "guidance_terms": ["operation=\"evidence\"", "limit=50"],
+  "expected_envelope_schema": "codex-usage-tracker.mcp-envelope.v1",
+  "expected_core_tool_sequence": [
+    {
+      "tool": "usage_allowance",
+      "arguments": {
+        "operation": "evidence",
+        "window": "weekly",
+        "range": "8w",
+        "limit": 50
+      },
+      "result_schema": "codex-usage-tracker-allowance-evidence-v2"
+    }
+  ]
+}

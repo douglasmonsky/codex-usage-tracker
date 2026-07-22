@@ -1,0 +1,25 @@
+{
+  "id": "thread_comparison",
+  "question": "Compare synthetic-thread usage this week with the previous week.",
+  "guidance_terms": ["broad diagnostic", "comparison"],
+  "expected_envelope_schema": "codex-usage-tracker.mcp-envelope.v1",
+  "expected_core_tool_sequence": [
+    {
+      "tool": "usage_analyze",
+      "arguments": {
+        "goal": "thread_comparison",
+        "filters": {
+          "thread_key": "synthetic-thread",
+          "since": "2026-07-13T00:00:00Z",
+          "until": "2026-07-20T00:00:00Z"
+        },
+        "comparison": {
+          "since": "2026-07-06T00:00:00Z",
+          "until": "2026-07-13T00:00:00Z"
+        },
+        "execution": "sync"
+      },
+      "result_schema": "codex-usage-tracker.analysis.v2"
+    }
+  ]
+}
