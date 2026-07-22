@@ -19,7 +19,7 @@ def test_schema_migration_creates_otel_sidecar_tables(tmp_path: Path) -> None:
             for row in conn.execute("PRAGMA table_info(otel_completion_events)")
         }
 
-    assert SCHEMA_VERSION == 31
+    assert SCHEMA_VERSION == 32
     assert {
         "source_path",
         "device",
