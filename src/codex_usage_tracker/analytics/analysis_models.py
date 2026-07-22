@@ -37,8 +37,15 @@ class ComparisonWindow:
     until: str
 
     def __post_init__(self) -> None:
-        if not self.since.strip() or not self.until.strip():
-            raise _request_validation_error("comparison window bounds must not be empty")
+        if not isinstance(self.since, str) or not isinstance(self.until, str):
+            raise _request_validation_error("comparison window bounds must be strings")
+        from codex_usage_tracker.application.query_validation import normalize_timestamp_window
+
+        since, until = normalize_timestamp_window(
+            self.since, self.until, field_prefix="comparison."
+        )
+        object.__setattr__(self, "since", cast(str, since))
+        object.__setattr__(self, "until", cast(str, until))
 
 
 def _query_filters_factory() -> QueryFilters:

@@ -82,14 +82,11 @@ def _normalized_filters(request: QueryRequest) -> QueryFilters:
     filters = request.filters
     if filters.range is not None:
         raise QueryValidationError("range filters are not supported")
-    since = _timestamp(filters.since, "since")
-    until = _timestamp(filters.until, "until")
-    if since is not None and until is not None and since > until:
-        raise QueryValidationError("since must not be after until")
+    since, until = normalize_timestamp_window(filters.since, filters.until)
     return replace(
         filters,
-        since=_canonical_timestamp(since),
-        until=_canonical_timestamp(until),
+        since=since,
+        until=until,
         model=_text(filters.model),
         effort=_text(filters.effort),
         thread_key=_text(filters.thread_key),
@@ -100,6 +97,17 @@ def _normalized_filters(request: QueryRequest) -> QueryFilters:
         subagent_type=_text(filters.subagent_type),
         parent_thread_key=_text(filters.parent_thread_key),
     )
+
+
+def normalize_timestamp_window(
+    since: str | None, until: str | None, *, field_prefix: str = ""
+) -> tuple[str | None, str | None]:
+    """Validate, order, and UTC-normalize a bounded timestamp window."""
+    since_value = _timestamp(since, f"{field_prefix}since")
+    until_value = _timestamp(until, f"{field_prefix}until")
+    if since_value is not None and until_value is not None and since_value > until_value:
+        raise QueryValidationError(f"{field_prefix}since must not be after {field_prefix}until")
+    return _canonical_timestamp(since_value), _canonical_timestamp(until_value)
 
 
 def _timestamp(value: str | None, field_name: str) -> datetime | None:

@@ -7,7 +7,7 @@ import pytest
 
 from codex_usage_tracker.analytics import analysis_catalog as catalog_module
 from codex_usage_tracker.analytics.analysis_catalog import ANALYSIS_CATALOG
-from codex_usage_tracker.analytics.analysis_models import AnalysisRequest
+from codex_usage_tracker.analytics.analysis_models import AnalysisRequest, ComparisonWindow
 from codex_usage_tracker.analytics.strategies.protocol import AnalysisStrategy
 from codex_usage_tracker.application.context import RequestContext
 from codex_usage_tracker.application.query_models import QueryFilters
@@ -147,3 +147,26 @@ def test_missing_or_stale_facts_return_documented_nonfabricated_fallback(
     assert report.evidence == ()
     assert report.messages[0].code == "analysis_facts_unavailable"
     assert report.messages[0].severity == "warning"
+
+
+@pytest.mark.parametrize("goal", ["usage_spike", "thread_comparison"])
+def test_compatibility_comparisons_fail_closed_without_two_window_algorithm(
+    monkeypatch: pytest.MonkeyPatch, goal: str
+) -> None:
+    def unexpected(**_kwargs: object) -> object:
+        raise AssertionError("comparison fallback invoked a one-window builder")
+
+    monkeypatch.setattr(catalog_module.report_api, "build_hypothesis_test_report", unexpected)
+    report = ANALYSIS_CATALOG[goal].strategy.analyze(
+        AnalysisRequest(
+            goal=goal,  # type: ignore[arg-type]
+            filters=QueryFilters(since="2026-07-09T00:00:00Z", until="2026-07-15T00:00:00Z"),
+            comparison=ComparisonWindow(since="2026-07-01T00:00:00Z", until="2026-07-07T00:00:00Z"),
+        ),
+        _context(),
+    )
+
+    assert report.findings == ()
+    assert report.evidence == ()
+    assert report.messages[0].code == "analysis_facts_unavailable"
+    assert "comparison_algorithm" in report.messages[0].message

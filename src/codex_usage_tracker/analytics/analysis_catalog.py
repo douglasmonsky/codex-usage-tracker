@@ -136,7 +136,7 @@ def _entry(
 
 
 _CANONICAL = ("canonical_usage",)
-_COMPARISON = ("canonical_usage", "comparison_window")
+_COMPARISON = ("canonical_usage", "comparison_window", "comparison_algorithm")
 _DIAGNOSTIC = ("diagnostic_facts",)
 _PRICING = ("pricing_coverage",)
 
@@ -244,6 +244,7 @@ def _missing_facts(
     facts = {
         "canonical_usage": context.canonical_rows > 0,
         "comparison_window": request.comparison is not None,
+        "comparison_algorithm": False,
         "pricing_coverage": context.pricing_coverage is not None,
         "credit_coverage": context.credit_coverage is not None,
         "service_tier_coverage": (

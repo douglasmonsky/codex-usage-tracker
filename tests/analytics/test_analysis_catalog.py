@@ -87,3 +87,35 @@ def test_analysis_request_is_authoritative_typed_and_frozen() -> None:
         )
     with pytest.raises(ValueError, match="evidence_limit"):
         AnalysisRequest(goal="usage_spike", filters=QueryFilters(), evidence_limit=0)
+
+
+def test_comparison_window_canonicalizes_timestamps() -> None:
+    window = ComparisonWindow(since="2026-07-01T01:00:00+01:00", until="2026-07-08T01:00:00+01:00")
+
+    assert window.since == "2026-07-01T00:00:00Z"
+    assert window.until == "2026-07-08T00:00:00Z"
+
+
+@pytest.mark.parametrize(
+    ("since", "until", "message"),
+    [
+        ("yesterday", "2026-07-08T00:00:00Z", "comparison.since must be ISO-8601"),
+        ("2026-07-01T00:00:00", "2026-07-08T00:00:00Z", "must include a timezone"),
+        (
+            "2026-07-09T00:00:00Z",
+            "2026-07-08T00:00:00Z",
+            "comparison.since must not be after comparison.until",
+        ),
+    ],
+)
+def test_comparison_window_rejects_invalid_or_reversed_bounds(
+    since: str, until: str, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        ComparisonWindow(since=since, until=until)
+
+
+@pytest.mark.parametrize("since", [None, 1])
+def test_comparison_window_rejects_runtime_non_string_bounds(since: object) -> None:
+    with pytest.raises(ValueError, match="comparison window bounds must be strings"):
+        ComparisonWindow(since=since, until="2026-07-08T00:00:00Z")  # type: ignore[arg-type]

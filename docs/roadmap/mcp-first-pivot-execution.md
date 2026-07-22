@@ -189,6 +189,8 @@ commit as each roadmap task.
   summary/schema provenance without reinterpreting incompatible evidence.
 - Follow-up risks: Task 11 owns canonical execution/job orchestration and fuller
   conversion of compatibility evidence into the analysis-v2 result contract.
+  Comparison goals fail closed with `comparison_algorithm` unavailable until a
+  Task 11 strategy explicitly consumes both canonical timestamp windows.
 
 ## Remaining Planned Tasks
 
