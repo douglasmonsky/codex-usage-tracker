@@ -642,6 +642,36 @@ def test_benign_error_rate_text_survives_result_projection() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("job_id", "private_text"),
+    [
+        ("runtime-repr", "RuntimeError('private detail')"),
+        ("value-repr", 'ValueError("private detail")'),
+        ("lower-error", "error: private detail"),
+    ],
+)
+def test_nested_exception_representations_are_redacted(job_id: str, private_text: str) -> None:
+    legacy = {"safe_total": 3, "nested": [private_text]}
+    payload = _analysis_payload(job_id, 100, state="completed")
+    payload["result"] = legacy
+    service = JobService()
+    service.register(
+        kind="analysis",
+        job_id=job_id,
+        adapter=AnalysisJobAdapter(
+            _reader(payload), kind="analysis", request_hash=request_hash(job_id)
+        ),
+    )
+
+    status = service.status(job_id, include_result=True)
+
+    assert status.result == {
+        "safe_total": 3,
+        "nested": ("[redacted-private-text]",),
+    }
+    assert legacy == {"safe_total": 3, "nested": [private_text]}
+
+
 def test_whole_status_budget_and_unsafe_result_fail_stably() -> None:
     payload = _analysis_payload("budget", 100, state="completed")
     payload["result"] = {"safe": "x"}

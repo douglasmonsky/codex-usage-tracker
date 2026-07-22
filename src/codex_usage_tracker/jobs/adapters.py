@@ -23,7 +23,9 @@ _PRIVATE_TEXT = re.compile(
     re.IGNORECASE,
 )
 _EXCEPTION_TEXT = re.compile(
-    r"\b[Tt]raceback\b|\b(?:[A-Z][A-Za-z0-9_.]*(?:Exception|Error)|Exception|Error)\s*:"
+    r"\b[Tt]raceback\b|"
+    r"\b(?:[A-Za-z_]\w*\.)*(?:[A-Z]\w*(?:Exception|Error)|Exception|Error)\s*[:(]|"
+    r"\b(?:[Ee]rror|[Ee]xception)\s*:"
 )
 
 
