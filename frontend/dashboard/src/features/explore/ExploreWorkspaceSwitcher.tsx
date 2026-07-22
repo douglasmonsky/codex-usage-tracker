@@ -36,7 +36,8 @@ export function exploreWorkspaceUrl(
   href = window.location.href,
 ): URL {
   const url = new URL(href);
-  url.searchParams.set('view', 'calls');
+  url.searchParams.set('view', 'explore');
+  url.searchParams.set('mode', 'calls');
   if (workspace === 'calls') url.searchParams.delete('explore');
   else url.searchParams.set('explore', workspace);
   return url;

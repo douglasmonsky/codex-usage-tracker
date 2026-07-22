@@ -357,16 +357,16 @@ function CacheMiniChart({ call }: { call: CallRow }) {
 
 async function copyInvestigatorLink(call: CallRow, setCopyStatus: (status: string) => void) {
   try {
-const url = new URL(window.location.href);
-url.searchParams.set('view', 'call');
-url.searchParams.set('record', call.id);
-url.searchParams.set('return', 'calls');
-const copied = await copyText(url.toString());
-if (!copied) {
-throw new Error('Clipboard unavailable');
-}
-setCopyStatus('Copied investigator link');
-} catch {
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'evidence');
+    url.searchParams.set('kind', 'call');
+    url.searchParams.set('record', call.id);
+    url.searchParams.set('return', 'explore');
+    url.searchParams.set('return_mode', 'calls');
+    const copied = await copyText(url.toString());
+    if (!copied) throw new Error('Clipboard unavailable');
+    setCopyStatus('Copied investigator link');
+  } catch {
     setCopyStatus('Copy unavailable in this browser');
   }
 }

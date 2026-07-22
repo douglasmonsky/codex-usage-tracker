@@ -107,7 +107,8 @@ threadCallSortDirection: 'asc',
       `${baseHref}&record=stale&detail=first&expand=all&threads=legacy-a,legacy-b`,
     );
 
-    expect(url.searchParams.get('view')).toBe('threads');
+    expect(url.searchParams.get('view')).toBe('explore');
+    expect(url.searchParams.get('mode')).toBe('threads');
     expect(url.searchParams.get('thread_q')).toBe('thread');
     expect(url.searchParams.get('risk')).toBe('Medium');
     expect(url.searchParams.get('thread')).toBe('thread-3c5d');
@@ -156,7 +157,8 @@ threadCallSortDirection: 'desc',
       `${baseHref}&thread_q=old&risk=High&thread=old&sort=totalTokens&direction=desc&page=4&thread_call_sort=cache&thread_call_page=2`,
     );
 
-    expect(url.searchParams.get('view')).toBe('threads');
+    expect(url.searchParams.get('view')).toBe('explore');
+    expect(url.searchParams.get('mode')).toBe('threads');
     expect(url.searchParams.get('thread_q')).toBeNull();
     expect(url.searchParams.get('risk')).toBeNull();
     expect(url.searchParams.get('thread')).toBeNull();

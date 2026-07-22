@@ -331,8 +331,38 @@ commit as each roadmap task.
   plan, so an authorized rebuild would need fresh hashes and qualification.
   The coverage run emitted 71 non-failing pre-existing resource warnings.
 
+## Task 18 - Introduce the Evidence Console Route Model
+
+- Status: complete; legacy direct workbenches remain renderable for the 0.23
+  compatibility window but are absent from persistent navigation.
+- Branch: `pivot/18-evidence-console-routes`
+- Commits: `d30dd48` (`refactor: define Evidence Console routes`) plus
+  `fix: preserve canonical Evidence Console links` (this commit).
+- Focused verification: the six-file route, alias, shell, and target acceptance
+  suite passed 70 tests. Canonical calls, threads, and investigator URL-builder
+  regressions passed another 20 tests. The Python v2 dashboard-target suite
+  passed all 307 tests, including call `record` selectors and both contextual
+  and Explore thread targets.
+- Full verification: dashboard type checking and lint passed; touched Python
+  files passed Ruff; `git diff --check` passed. One diagnostic full-dashboard
+  run passed 505 of 576 tests. Its 71 remaining failures are legacy assertions
+  that navigate with workbench buttons intentionally removed by this task or
+  assert pre-pivot output IDs; Tasks 19 through 23 own those parity migrations.
+- Review: an independent read-only review reported no critical or important
+  findings in canonical routes, compatibility normalization, contextual
+  Evidence behavior, navigation exactness, or Python v2 targets.
+- Deviations from plan: `App.tsx` and the page-level calls, threads, Explore,
+  and investigator URL emitters also changed because they are the direct shell
+  consumers that otherwise rewrote canonical links back to legacy IDs. Call
+  URLs use the roadmap's `record` query key while preserving the design
+  contract's `record_id` selector field. No publication action was taken.
+- Follow-up risks: legacy navigation-heavy dashboard tests remain intentionally
+  red until their owning Home, Explore, Evidence, Limits, and parity tasks land.
+  Target Evidence kinds other than call still render through compatibility
+  pages until Task 21 supplies the unified contextual renderer.
+
 ## Remaining Planned Tasks
 
-Tasks 18 through 45 remain planned in the approved implementation roadmap. Add a
-full entry using the format above when each task becomes active; do not mark a
+Tasks 19 through 45 remain planned in the approved implementation roadmap. Add
+a full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

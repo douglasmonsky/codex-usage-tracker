@@ -69,7 +69,8 @@ describe('Calls URL state helpers', () => {
       'https://example.test/react-dashboard.html?view=calls&detail=first&pricing=cost-unpriced',
     );
 
-    expect(url.searchParams.get('view')).toBe('calls');
+    expect(url.searchParams.get('view')).toBe('explore');
+    expect(url.searchParams.get('mode')).toBe('calls');
     expect(url.searchParams.get('detail')).toBeNull();
     expect(url.searchParams.get('pricing')).toBeNull();
     expect(url.searchParams.get('call_q')).toBe('thread-9f3a');
