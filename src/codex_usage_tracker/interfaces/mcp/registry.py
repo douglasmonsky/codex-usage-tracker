@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from functools import cache, lru_cache
 
+from codex_usage_tracker.interfaces.mcp.core_tools import usage_status
 from codex_usage_tracker.interfaces.mcp.models import McpProfile, ToolDataClass, ToolSpec
 
 PROFILE_ORDER: dict[McpProfile, int] = {"core": 0, "full": 1, "developer": 2}
@@ -89,11 +90,6 @@ class ToolCatalogError(ValueError):
 
 class CoreToolNotImplemented(NotImplementedError):
     """Raised when a later roadmap task has not supplied a core service yet."""
-
-
-def usage_status() -> object:
-    """Placeholder for the core status contract."""
-    raise CoreToolNotImplemented("usage_status is implemented by a later roadmap task")
 
 
 def usage_refresh() -> object:
@@ -275,7 +271,9 @@ def tool_specs() -> tuple[ToolSpec, ...]:
             minimum_profile="core",
             maturity="stable",
             lifecycle="active",
-            data_class="aggregate" if name != "usage_refresh" else "administrative",
+            data_class=(
+                "administrative" if name in {"usage_status", "usage_refresh"} else "aggregate"
+            ),
             handler=_CORE_HANDLERS[name],
         )
         for name in CORE_TOOL_NAMES

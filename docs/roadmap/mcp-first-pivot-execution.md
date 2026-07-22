@@ -95,8 +95,24 @@ commit as each roadmap task.
   compatibility alias, but application `EvidenceRequest` remains canonical on
   `record_id`.
 
+## Task 6 - Implement stable status and capabilities use case
+
+- Status: complete
+- Branch: `pivot/6-stable-status`
+- Commits: `feat: add stable MCP usage status` (this commit)
+- Focused verification: `python -m pytest tests/application/test_status.py tests/mcp/test_tool_profiles.py tests/cli/test_mcp_integration.py tests/core/test_conversational_readiness.py -q`; `python -m pytest tests/application/test_requests.py tests/application/test_context.py tests/store/test_store_dashboard_queries.py -q`
+- Full verification: `python -m pyright --pythonpath "$(command -v python)" src/codex_usage_tracker/application/status.py src/codex_usage_tracker/interfaces/mcp/core_tools.py`; `python -m ruff check src/codex_usage_tracker/application/status.py src/codex_usage_tracker/application/requests.py src/codex_usage_tracker/interfaces/mcp/core_tools.py src/codex_usage_tracker/interfaces/mcp/registry.py tests/application/test_status.py tests/mcp/test_tool_profiles.py`; `git diff --check`
+- Deviations from plan: The historical full/developer `usage_status` already
+  delegated to dashboard status behavior through the profile registry, so no
+  compatibility-module change was needed. `StatusRequest` gained additive
+  local path and profile fields to keep the application and adapter seams
+  deterministic and testable.
+- Follow-up risks: Rebase or recreate the branch from updated `main` after the
+  preceding tasks merge. Status reports existing readiness and persistent
+  service probes but deliberately does not claim current-task MCP exposure.
+
 ## Remaining Planned Tasks
 
-Tasks 6 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 7 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

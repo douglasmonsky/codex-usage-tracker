@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import pytest
 
@@ -48,6 +49,56 @@ def test_building_core_does_not_resolve_or_mutate_legacy_registration(
 
     assert [tool.name for tool in asyncio.run(server.list_tools())] == list(CORE_MCP_TOOL_NAMES)
     assert compatibility_tools == before
+
+
+def test_core_status_binds_stable_administrative_adapter() -> None:
+    from codex_usage_tracker.interfaces.mcp.core_tools import usage_status
+
+    server = build_mcp_server("core")
+    registered = server._tool_manager._tools
+    status_spec = next(tool for tool in tools_for_profile("core") if tool.name == "usage_status")
+
+    assert registered["usage_status"].fn is usage_status
+    assert status_spec.data_class == "administrative"
+
+
+def test_core_status_returns_bounded_v2_envelope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from codex_usage_tracker.application import status
+    from codex_usage_tracker.core.contracts import serialized_size
+    from codex_usage_tracker.dashboard_service import DashboardServiceStatus
+    from codex_usage_tracker.interfaces.mcp.core_tools import build_usage_status
+
+    monkeypatch.setattr(
+        status,
+        "conversational_readiness",
+        lambda **_kwargs: {
+            "schema": "codex-usage-tracker-conversational-readiness-v1",
+            "state": "unavailable",
+            "summary": "Not configured; current task tool exposure is not verified.",
+            "next_action": "Configure the plugin.",
+            "evidence": [],
+        },
+    )
+    monkeypatch.setattr(
+        status,
+        "dashboard_service_status",
+        lambda **_kwargs: DashboardServiceStatus(False, False, False, 47821, "not installed"),
+    )
+
+    payload = build_usage_status(
+        db_path=tmp_path / "missing.sqlite3",
+        pricing_path=tmp_path / "missing-pricing.json",
+        codex_home=tmp_path / ".codex",
+        home=tmp_path,
+    )
+
+    assert payload["schema"] == "codex-usage-tracker.mcp-envelope.v1"
+    assert payload["result_schema"] == "codex-usage-tracker.status.v2"
+    assert payload["data_class"] == "administrative"
+    assert payload["result"]["mcp"]["core_tools"] == list(CORE_MCP_TOOL_NAMES)  # type: ignore[index]
+    assert serialized_size(payload) <= 16 * 1024
 
 
 @pytest.mark.parametrize("profile", ["full", "developer"])

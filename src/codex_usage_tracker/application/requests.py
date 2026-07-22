@@ -6,21 +6,25 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal, TypeAlias, cast
 
 from codex_usage_tracker.application.errors import RequestValidationError
 from codex_usage_tracker.core.contracts import ScopeV1
 from codex_usage_tracker.core.contracts.common import immutable_snapshot
 from codex_usage_tracker.core.contracts.serialization import payload_mapping
+from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH, DEFAULT_PRICING_PATH
 
 HistoryScope: TypeAlias = Literal["active", "all"]
 PrivacyMode: TypeAlias = Literal["normal", "redacted", "strict"]
 ExecutionMode: TypeAlias = Literal["auto", "sync", "async"]
+McpProfile: TypeAlias = Literal["core", "full", "developer"]
 
 MAX_INTERACTIVE_LIMIT = 200
 _HISTORY_VALUES = {"active", "all"}
 _PRIVACY_VALUES = {"normal", "redacted", "strict"}
 _EXECUTION_VALUES = {"auto", "sync", "async"}
+_MCP_PROFILE_VALUES = {"core", "full", "developer"}
 
 
 def _choice(value: str, choices: set[str], field_name: str) -> None:
@@ -140,6 +144,11 @@ class RequestScope:
 class StatusRequest:
     scope: RequestScope = field(default_factory=RequestScope)
     freshness_threshold_seconds: float = 300.0
+    db_path: Path = DEFAULT_DB_PATH
+    pricing_path: Path = DEFAULT_PRICING_PATH
+    codex_home: Path = DEFAULT_CODEX_HOME
+    home: Path = field(default_factory=Path.home)
+    mcp_profile: McpProfile = "core"
 
     def __post_init__(self) -> None:
         threshold = self.freshness_threshold_seconds
@@ -149,6 +158,7 @@ class StatusRequest:
             raise RequestValidationError("freshness_threshold_seconds must be finite")
         if threshold < 0:
             raise RequestValidationError("freshness_threshold_seconds must be non-negative")
+        _choice(self.mcp_profile, _MCP_PROFILE_VALUES, "mcp_profile")
 
 
 @dataclass(frozen=True)
