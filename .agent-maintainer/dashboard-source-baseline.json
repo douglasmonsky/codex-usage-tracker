@@ -62,8 +62,8 @@
     },
     "frontend/dashboard/src/features/threads/ThreadsPage.tsx": {
       "group": "source",
-      "nonblank": 450,
-      "physical": 476
+      "nonblank": 433,
+      "physical": 457
     },
     "frontend/dashboard/src/styles/context-evidence.css": {
       "group": "styles",

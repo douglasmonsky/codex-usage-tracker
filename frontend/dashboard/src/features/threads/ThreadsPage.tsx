@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useShellI18n } from '../../app/i18nContext';
 import type { CallRow, ContextRuntime, DashboardModel, ThreadRow } from '../../api/types';
 import { threadCallsInfiniteQueryOptions, threadsInfiniteQueryOptions } from '../../data/exploreQueries';
-import { exploreWorkspaceUrl, type ExploreWorkspaceId } from '../explore/ExploreWorkspaceSwitcher';
 import { useEvidenceGridPreferences } from '../explore/useEvidenceGridPreferences';
 import { csvDateStamp, downloadCsv, rowsToCsv } from '../shared/exportCsv';
 import { callCsvColumns, threadColumns } from '../shared/tables';
@@ -42,7 +41,7 @@ type ThreadsPageProps = {
   sourceKey?: string;
   sourceRevision?: string;
   focusedEndpointsEnabled?: boolean;
-  onNavigateView: (view: 'calls' | 'threads') => void;
+  onNavigateView?: (view: 'calls' | 'threads') => void;
 };
 
 const threadCallsPageSize = 100;
@@ -104,7 +103,6 @@ export function ThreadsPage({
   sourceKey,
   sourceRevision = '',
   focusedEndpointsEnabled = import.meta.env.MODE !== 'test',
-  onNavigateView,
 }: ThreadsPageProps) {
   const shellI18n = useShellI18n();
   const {
@@ -281,12 +279,6 @@ threadCallSortDirection,
     setExportStatus(`Exported ${exportRows.length} calls`);
   }
 
-  function selectExploreWorkspace(workspace: ExploreWorkspaceId) {
-    if (workspace === 'threads') return;
-    window.history.replaceState(null, '', buildThreadsDepartureUrl(workspace));
-    onNavigateView('calls');
-  }
-
   const displayedThreads = usingFocusedThreads ? sortedThreads : sortedThreads.slice(0, visibleThreadRows);
   const canLoadMoreThreads = usingFocusedThreads
     ? Boolean(focusedThreadsQuery.hasNextPage)
@@ -410,7 +402,6 @@ threadCallSortDirection,
       lifecycleSpec={lifecycleSpec}
       callSort={threadCallSort}
       callSortDirection={threadCallSortDirection}
-      onWorkspaceChange={selectExploreWorkspace}
       onExport={exportThreads}
       onClearFilters={clearThreadFilters}
       onLocalQueryChange={updateLocalQuery}
@@ -459,16 +450,6 @@ function callIdentity(call: CallRow): string {
   return threadSelectorIdentity(call.threadKey
     ? { kind: 'key', value: call.threadKey }
     : { kind: 'name', value: call.thread });
-}
-
-export function buildThreadsDepartureUrl(
-  workspace: Exclude<ExploreWorkspaceId, 'threads'>,
-  href = window.location.href,
-): URL {
-  const url = exploreWorkspaceUrl(workspace, href);
-  url.searchParams.delete('thread_key');
-  url.searchParams.delete('thread');
-  return url;
 }
 
 function queryErrorMessage(error: unknown): string {

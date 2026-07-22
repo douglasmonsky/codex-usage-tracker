@@ -93,7 +93,7 @@ expect(readThreadCallSortDirectionParam('cache', `${baseHref}&thread_call_sort=c
     expect(readThreadCallSortParam(href)).toBe('newest');
   });
 
-  it('builds normalized thread view links and clears stale legacy params', () => {
+  it('builds normalized thread view links while preserving inactive call selection', () => {
     const url = buildThreadsViewLink(
       {
         localQuery: ' thread ',
@@ -118,7 +118,7 @@ expect(url.searchParams.get('page')).toBe('3');
 expect(url.searchParams.get('thread_call_sort')).toBe('tokens');
 expect(url.searchParams.get('thread_call_direction')).toBe('asc');
 expect(url.searchParams.get('thread_call_page')).toBeNull();
-    expect(url.searchParams.get('record')).toBeNull();
+    expect(url.searchParams.get('record')).toBe('stale');
     expect(url.searchParams.get('detail')).toBeNull();
     expect(url.searchParams.get('expand')).toBeNull();
     expect(url.searchParams.get('threads')).toBeNull();

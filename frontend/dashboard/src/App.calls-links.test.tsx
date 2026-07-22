@@ -177,7 +177,7 @@ describe('React dashboard call investigator link URL state', () => {
     };
 
     render(<App />);
-    fireEvent.click(screen.getByRole('tab', { name: /Thread/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Thread$/i }));
 
     expect(screen.getByText('Context 82.0%')).toBeInTheDocument();
     expect(screen.getByText('Best-guess estimate')).toBeInTheDocument();

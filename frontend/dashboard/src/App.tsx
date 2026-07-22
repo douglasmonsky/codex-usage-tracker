@@ -490,7 +490,7 @@ setRefreshState('Copy unavailable in browser');
 async function exportCurrentViewCsv() {
 const exportSpec = await currentViewCsvExport(
 activeView,
-scopedModel,
+activeView === 'explore' && new URLSearchParams(window.location.search).get('mode') === 'threads' ? legacyShellFilteredModel : scopedModel,
       {
         contextRuntime,
         historyScope,
@@ -680,7 +680,7 @@ aria-label="History scope"
       <p className="sr-only" role="status" aria-live="polite">{refreshState}</p>
       <DashboardRouteView
         activeView={activeView}
-        model={scopedModel} navigateView={setView}
+        model={scopedModel} threadsModel={legacyShellFilteredModel} navigateView={setView}
         onRefresh={onRefresh}
         refreshState={refreshState}
         globalQuery={globalQuery}

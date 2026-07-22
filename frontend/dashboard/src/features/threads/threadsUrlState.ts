@@ -149,7 +149,6 @@ export function buildThreadsViewLink(state: ThreadsViewLinkState, href = window.
   const url = new URL(href);
   url.searchParams.set('view', 'explore');
   url.searchParams.set('mode', 'threads');
-  url.searchParams.delete('record');
   url.searchParams.delete('detail');
   url.searchParams.delete('expand');
   url.searchParams.delete('threads');

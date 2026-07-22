@@ -56,11 +56,14 @@ export const evidenceConsoleRoutes = [
     safeParams: [
       'mode', 'explore', 'detail', 'call_q', 'source', 'sort', 'direction', 'density', 'page',
       'thread', 'thread_key', 'expand', 'threads', 'thread_q', 'risk', 'thread_call_sort',
-      'thread_call_page',
+      'thread_call_page', 'calls_sort', 'calls_direction', 'calls_page', 'threads_sort',
+      'threads_direction', 'threads_page',
     ],
     handoffParams: [
       'mode', 'explore', 'detail', 'source', 'sort', 'direction', 'density', 'page',
       'thread_key', 'expand', 'risk', 'thread_call_sort', 'thread_call_page',
+      'calls_sort', 'calls_direction', 'calls_page', 'threads_sort', 'threads_direction',
+      'threads_page',
     ],
   },
   {

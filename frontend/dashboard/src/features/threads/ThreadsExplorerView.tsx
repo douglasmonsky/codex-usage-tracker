@@ -6,7 +6,6 @@ import { useShellI18n } from '../../app/i18nContext';
 import { StatusBadge } from '../../components/StatusBadge';
 import { PageLoadProgress, SegmentedControl } from '../../design';
 import { Visualization, type VisualizationSpecV1 } from '../../visualization';
-import { ExploreWorkspaceSwitcher } from '../explore/ExploreWorkspaceSwitcher';
 import type { EvidenceGridPreferences } from '../explore/useEvidenceGridPreferences';
 import { ThreadAccordionGrid } from './ThreadAccordionGrid';
 import type { ThreadRiskFilter } from './threadFilterSummary';
@@ -64,7 +63,6 @@ type ThreadsExplorerViewProps = {
   lifecycleSpec: VisualizationSpecV1;
   callSort: ThreadCallSortKey;
   callSortDirection: ThreadCallSortDirection;
-  onWorkspaceChange(workspace: 'calls' | 'tools' | 'files'): void;
   onExport(): void;
   onClearFilters(): void;
   onLocalQueryChange(value: string): void;
@@ -107,7 +105,6 @@ export function ThreadsExplorerView({
   lifecycleSpec,
   callSort,
   callSortDirection,
-  onWorkspaceChange,
   onExport,
   onClearFilters,
   onLocalQueryChange,
@@ -133,9 +130,6 @@ export function ThreadsExplorerView({
           <p>Compare work units, follow lifecycle pressure, and open supporting calls without leaving the evidence surface.</p>
         </div>
         <div className={styles.headerActions}>
-          <ExploreWorkspaceSwitcher current="threads" onValueChange={workspace => {
-            if (workspace !== 'threads') onWorkspaceChange(workspace);
-          }} />
           <button className="toolbar-button" type="button" onClick={onExport} disabled={exportDisabled}>
             <Download size={16} />
             Export thread calls

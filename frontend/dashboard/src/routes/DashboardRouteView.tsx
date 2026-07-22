@@ -6,19 +6,17 @@ import type { HistoryScope, LoadWindow } from '../data/dataScope';
 import type { DashboardSourceIdentity } from '../data/queryRuntime';
 import {
   evidenceKindFromSearch,
-  exploreModeFromSearch,
   type DashboardViewId,
 } from './dashboardSearch';
 
 const HomePage = lazyRouteComponent(() => import('../features/home/HomePage'), 'HomePage');
 const InvestigatorPage = lazyRouteComponent(() => import('../features/investigator/InvestigatorPage'), 'InvestigatorPage');
 const CompressionLabPage = lazyRouteComponent(() => import('../features/compression-lab/CompressionLabPage'), 'CompressionLabPage');
-const ExploreRoutePage = lazyRouteComponent(() => import('../features/explore/ExploreRoutePage'), 'ExploreRoutePage');
+const ExplorePage = lazyRouteComponent(() => import('../features/explore/ExplorePage'), 'ExplorePage');
 const CallInvestigatorPage = lazyRouteComponent(
   () => import('../features/call-investigator/CallInvestigatorPage'),
   'CallInvestigatorPage',
 );
-const ThreadsPage = lazyRouteComponent(() => import('../features/threads/ThreadsPage'), 'ThreadsPage');
 const UsageDrainPage = lazyRouteComponent(() => import('../features/usage-drain/UsageDrainPage'), 'UsageDrainPage');
 const CacheContextPage = lazyRouteComponent(() => import('../features/cache-context/CacheContextPage'), 'CacheContextPage');
 const DiagnosticsPage = lazyRouteComponent(() => import('../features/diagnostics/DiagnosticsPage'), 'DiagnosticsPage');
@@ -30,15 +28,15 @@ const dashboardRouteComponents: Array<{
   component: { preload?: () => Promise<unknown> };
 }> = [
   { id: 'home', component: HomePage },
-  { id: 'explore', component: ExploreRoutePage },
+  { id: 'explore', component: ExplorePage },
   { id: 'limits', component: UsageDrainPage },
   { id: 'evidence', component: CallInvestigatorPage },
   { id: 'overview', component: HomePage },
   { id: 'investigator', component: InvestigatorPage },
   { id: 'compression-lab', component: CompressionLabPage },
-  { id: 'calls', component: ExploreRoutePage },
+  { id: 'calls', component: ExplorePage },
   { id: 'call', component: CallInvestigatorPage },
-  { id: 'threads', component: ThreadsPage },
+  { id: 'threads', component: ExplorePage },
   { id: 'usage-drain', component: UsageDrainPage },
   { id: 'cache-context', component: CacheContextPage },
   { id: 'diagnostics', component: DiagnosticsPage },
@@ -87,6 +85,7 @@ type DashboardRouteViewProps = {
   setContextApiEnabled: (enabled: boolean) => void;
   showExperimental: boolean;
   sourceIdentity: DashboardSourceIdentity;
+  threadsModel: DashboardModel;
   totalAvailableRows: number;
 };
 
@@ -134,6 +133,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     setContextApiEnabled,
     showExperimental,
     sourceIdentity,
+    threadsModel,
     totalAvailableRows,
   } = props;
 
@@ -174,9 +174,11 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           sourceRevision={sourceIdentity.sourceRevision}
         />
       );
+    case 'explore':
     case 'calls':
+    case 'threads':
       return (
-        <ExploreRoutePage
+        <ExplorePage
           model={model}
           globalQuery={globalQuery}
           activePreset={activePreset}
@@ -189,7 +191,8 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           onContextApiEnabledChange={setContextApiEnabled}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
-          onNavigateView={navigateView}
+          globalFilters={globalFilters}
+          threadsModel={threadsModel}
         />
       );
     case 'call':
@@ -203,21 +206,6 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           onCopyCallLink={copyCallInvestigatorLink}
           onBackToCalls={backFromCallInvestigator}
           backLabel={callBackLabel}
-        />
-      );
-    case 'threads':
-      return (
-        <ThreadsPage
-          model={model}
-          globalQuery={globalQuery}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          globalFilters={globalFilters}
-          contextRuntime={contextRuntime}
-          includeArchived={historyScope === 'all'}
-          sourceKey={sourceIdentity.sourceKey}
-          sourceRevision={sourceIdentity.sourceRevision}
-          onNavigateView={navigateView}
         />
       );
     case 'usage-drain':
@@ -307,12 +295,12 @@ function renderDashboardView(props: DashboardRouteViewProps) {
 
 type RenderedDashboardViewId = Exclude<
   DashboardViewId,
-  'home' | 'explore' | 'limits' | 'evidence'
+  'home' | 'limits' | 'evidence'
 >;
 
 function renderedDashboardView(activeView: DashboardViewId): RenderedDashboardViewId {
   if (activeView === 'home') return 'overview';
-  if (activeView === 'explore') return exploreModeFromSearch() === 'threads' ? 'threads' : 'calls';
+  if (activeView === 'explore') return 'explore';
   if (activeView === 'limits') return 'usage-drain';
   if (activeView !== 'evidence') return activeView;
   const evidenceKind = evidenceKindFromSearch();
