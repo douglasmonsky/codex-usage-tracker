@@ -158,9 +158,9 @@ def _extend_thread_filter(
         return
     clauses.append(
         f"({prefix}thread_key = ? OR {prefix}thread_name = ? OR {prefix}parent_thread_name = ? "
-        f"OR 'session:' || {prefix}session_id = ?)"
+        f"OR {prefix}session_id = ? OR 'session:' || {prefix}session_id = ?)"
     )
-    params.extend([thread, thread, thread, thread])
+    params.extend([thread, thread, thread, thread, thread])
 
 
 def _extend_min_tokens_filter(

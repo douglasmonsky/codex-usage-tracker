@@ -622,12 +622,13 @@ def _pricing_selects(grouped: bool) -> list[str]:
 def _canonical_query_where(
     entity: str, filters: dict[str, object], *, include_archived: bool
 ) -> tuple[str, list[object]]:
+    string_filters = {key: value for key, value in filters.items() if isinstance(value, str)}
     where, params = usage_where_clause(
-        since=filters.get("since") if isinstance(filters.get("since"), str) else None,
-        until=filters.get("until") if isinstance(filters.get("until"), str) else None,
-        model=filters.get("model") if isinstance(filters.get("model"), str) else None,
-        effort=filters.get("effort") if isinstance(filters.get("effort"), str) else None,
-        thread=filters.get("thread_key") if isinstance(filters.get("thread_key"), str) else None,
+        since=string_filters.get("since"),
+        until=string_filters.get("until"),
+        model=string_filters.get("model"),
+        effort=string_filters.get("effort"),
+        thread=string_filters.get("thread_key"),
         table_alias="usage_events",
         include_archived=include_archived,
     )

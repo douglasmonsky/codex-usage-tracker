@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from codex_usage_tracker.core.json_contract_cli import CLI_JSON_PAYLOAD_CONTRACTS
 from codex_usage_tracker.core.json_contract_diagnostics import DIAGNOSTIC_JSON_PAYLOAD_CONTRACTS
 from codex_usage_tracker.core.json_contract_server import SERVER_JSON_PAYLOAD_CONTRACTS
@@ -92,7 +94,7 @@ ANALYSIS_JSON_PAYLOAD_CONTRACTS = {
     },
 }
 
-MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS = {
+MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
     "codex-usage-tracker.scope.v1": {
         "required": {
             "since": (str, NoneType),
@@ -196,7 +198,7 @@ MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS = {
 
 MCP_EVIDENCE_SCHEMA_IDS = tuple(MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS)
 
-JSON_PAYLOAD_CONTRACTS = {
+JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
     **QUERY_JSON_PAYLOAD_CONTRACTS,
     **EVIDENCE_RESULT_JSON_PAYLOAD_CONTRACTS,
     **ANALYSIS_JSON_PAYLOAD_CONTRACTS,

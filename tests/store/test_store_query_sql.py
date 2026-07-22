@@ -19,9 +19,11 @@ def test_usage_where_clause_builds_filters_in_stable_order() -> None:
         "AND usage_events.event_timestamp <= ? "
         "AND usage_events.model = ? "
         "AND usage_events.effort = ? "
-        "AND (usage_events.thread_name = ? "
+        "AND (usage_events.thread_key = ? "
+        "OR usage_events.thread_name = ? "
         "OR usage_events.parent_thread_name = ? "
-        "OR usage_events.session_id = ?) "
+        "OR usage_events.session_id = ? "
+        "OR 'session:' || usage_events.session_id = ?) "
         "AND usage_events.total_tokens >= ?"
     )
     assert params == [
@@ -29,6 +31,8 @@ def test_usage_where_clause_builds_filters_in_stable_order() -> None:
         "2026-06-02T00:00:00Z",
         "gpt-test",
         "high",
+        "Thread A",
+        "Thread A",
         "Thread A",
         "Thread A",
         "Thread A",
