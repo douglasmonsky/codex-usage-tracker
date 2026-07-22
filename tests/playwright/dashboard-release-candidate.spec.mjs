@@ -22,7 +22,7 @@ const viewports = [
   ['mobile', { width: 390, height: 844 }],
 ];
 
-test.describe('R11 dashboard release candidate', () => {
+test.describe('0.23 Evidence Console release candidate', () => {
   test('defines and gates the release-candidate command in one Chromium CI job', async () => {
     const packageJson = JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8'));
     expect(packageJson.scripts['dashboard:release-candidate']).toBe(
@@ -259,6 +259,87 @@ test.describe('R11 dashboard release candidate', () => {
     await expect(
       page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Diagnostics Notebook', exact: true }),
     ).toHaveCount(0);
+  });
+
+  test('normalizes every old stable URL to its canonical 0.23 route', async ({ page }) => {
+    const routes = [
+      ['Home', '/?view=overview&qa=release-023-alias', /view=home/],
+      ['Calls', '/?view=calls&qa=release-023-alias', /view=explore.*mode=calls|mode=calls.*view=explore/],
+      ['Threads', '/?view=threads&qa=release-023-alias', /view=explore.*mode=threads|mode=threads.*view=explore/],
+      [
+        'Call Investigator',
+        '/?view=call&record=fixture-call-2&qa=release-023-alias',
+        /view=evidence.*kind=call|kind=call.*view=evidence/,
+      ],
+    ];
+
+    for (const [heading, route, canonical] of routes) {
+      await openWorkspace(page, heading, route);
+      await expect(page).toHaveURL(canonical);
+    }
+  });
+
+  test('renders every contextual Evidence selector kind', async ({ page }) => {
+    await page.route('**/api/v2/evidence', async route => {
+      const request = route.request().postDataJSON();
+      const kind = request.selector_kind;
+      const selector = {
+        kind,
+        id: request.selector_id,
+        section: request.section ?? 'summary',
+        ...(request.analysis_id ? { analysis_id: request.analysis_id } : {}),
+      };
+      const record = {
+        schema: 'codex-usage-tracker.evidence.v1',
+        evidence_id: `${kind}-record`,
+        kind: kind === 'allowance' ? 'allowance_cycle' : kind,
+        label: `${kind} release evidence`,
+        selectors: {},
+        metrics: kind === 'allowance' ? { percent_delta: 8, credits_delta: 1200, quality_grade: 'A' } : {},
+        source_schema: 'release-candidate.synthetic.v1',
+        dashboard_target: null,
+      };
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          schema: 'codex-usage-tracker.evidence-result.v1',
+          selector,
+          records: [record],
+          next_cursor: null,
+          dashboard_target: {},
+          subject: kind === 'finding' ? {
+            finding_id: request.selector_id,
+            title: 'Synthetic release finding',
+            statement: 'Synthetic evidence verifies this release route.',
+            claim_type: 'observed-pattern',
+            confidence: 'high',
+            severity: 'medium',
+            caveat_codes: [],
+            analysis_id: request.analysis_id,
+          } : null,
+        }),
+      });
+    });
+
+    const routes = [
+      ['Call Investigator', '/?view=evidence&kind=call&record=fixture-call-2'],
+      ['Thread evidence', '/?view=evidence&kind=thread&thread_key=thread%3Aalpha'],
+      ['Synthetic release finding', '/?view=evidence&kind=finding&analysis=analysis-7&finding=finding-3'],
+      ['Allowance evidence', '/?view=evidence&kind=allowance&analysis=allowance-7&evidence=interval-3'],
+    ];
+    for (const [heading, route] of routes) await openWorkspace(page, heading, route);
+  });
+
+  test('loads Home without starting hidden heavy analysis', async ({ page }) => {
+    const heavyRequests = [];
+    page.on('request', request => {
+      if (/\/api\/v2\/analyze|compression|diagnostics\/run|usage-drain/.test(request.url())) {
+        heavyRequests.push(request.url());
+      }
+    });
+
+    await openWorkspace(page, 'Home', '/?view=home&qa=release-023-no-heavy-scan');
+    expect(heavyRequests).toEqual([]);
   });
 
   test('preserves the Call Investigator return route and thread context', async ({ page }) => {
