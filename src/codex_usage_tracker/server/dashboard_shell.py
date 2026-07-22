@@ -9,6 +9,7 @@ from codex_usage_tracker.core.conversational_readiness import conversational_rea
 from codex_usage_tracker.core.i18n import dashboard_i18n_payload, normalize_language
 from codex_usage_tracker.dashboard.api import dashboard_payload
 from codex_usage_tracker.dashboard.load_window import dashboard_load_window_payload
+from codex_usage_tracker.server.status import home_summary_payload
 from codex_usage_tracker.server.utils import first_query_value, parse_bool_query_value
 
 
@@ -55,6 +56,12 @@ def dashboard_shell_payload(
         include_rows=False,
     )
     payload["conversational_analysis"] = conversational_readiness(codex_home=codex_home)
+    payload["home_summary"] = home_summary_payload(
+        db_path=db_path,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+    )
     return payload
 
 
@@ -82,6 +89,7 @@ def react_dashboard_boot_payload(
         "summary": {},
         "shell_boot": True,
         "readiness_deferred": True,
+        "home_summary_deferred": True,
         "loaded_row_count": 0,
         "include_archived": include_archived,
         "history_scope": "all-history" if include_archived else "active",
