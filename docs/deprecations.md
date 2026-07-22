@@ -50,3 +50,24 @@ No CLI compatibility surface may be removed before its removal release. The
 same rule applies to MCP tools, dashboard routes, static output, and HTTP APIs.
 If semantic equivalence cannot be proven, preserve the old behavior through its
 final supported release or publish a documented breaking-change notice.
+
+## CLI compatibility mapping
+
+The primary CLI help lists only `setup`, `status`, `doctor`, `refresh`,
+`analyze`, `query`, `open`, `export`, `config`, `service`, and `admin`.
+Historical top-level names remain accepted through `0.24.x`. When stderr is an
+interactive terminal, an alias prints one concise migration notice to stderr;
+stdout is never used for deprecation text.
+
+| Historical operation | Stable replacement |
+| --- | --- |
+| Static dashboard and report entry points | `open`, `analyze`, `query`, or `export` |
+| `dashboard-service install/status/uninstall` | `service install/status/uninstall` |
+| `serve-dashboard` | `service serve` |
+| Pricing, allowance, rate-card, projects, and thresholds commands | The matching `config` namespace |
+| Index repair, source coverage, support bundle, and dogfood commands | The matching `admin` namespace |
+| Manual MCP process | `admin mcp serve --profile core|full|developer` |
+
+The stable `query` spelling keeps its old-only filters and unbounded `--limit 0`
+form as a v1 compatibility mode. New bounded query options return
+`codex-usage-tracker.query.v2`.

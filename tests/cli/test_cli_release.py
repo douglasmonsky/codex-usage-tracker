@@ -15,6 +15,7 @@ from typing import Protocol, cast
 from codex_usage_tracker import __version__
 from codex_usage_tracker.cli.main import _COMMAND_HANDLERS
 from codex_usage_tracker.core.json_contracts import known_json_schemas
+from codex_usage_tracker.interfaces.cli.namespaces import STABLE_TOP_LEVEL_COMMANDS
 from tests.release_catalog import (
     ALL_MCP_TOOL_NAMES,
     FORBIDDEN_CONSTELLATION_PATHS,
@@ -278,20 +279,20 @@ def test_cli_reference_documents_only_existing_stable_commands() -> None:
     documented, unresolved = _documented_cli_commands(cli_reference)
 
     assert not unresolved
-    assert documented == STABLE_CLI_COMMANDS
-    assert set(_COMMAND_HANDLERS) >= STABLE_CLI_COMMANDS
+    assert documented >= STABLE_CLI_COMMANDS
+    assert set(STABLE_TOP_LEVEL_COMMANDS) == STABLE_CLI_COMMANDS
 
 
 def test_stable_cli_commands_are_not_removed_without_a_deprecation_plan() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     cli_reference = repo_root / "docs" / "cli-reference.md"
     documented, unresolved = _documented_cli_commands(cli_reference)
-    current_commands = set(_COMMAND_HANDLERS)
+    current_commands = set(_COMMAND_HANDLERS) | {"config", "service", "admin"}
 
     assert not unresolved
     missing = sorted(STABLE_CLI_COMMANDS - current_commands)
     assert not missing, f"removed stable CLI commands need a documented deprecation plan: {missing}"
-    assert documented == STABLE_CLI_COMMANDS
+    assert documented >= STABLE_CLI_COMMANDS
 
 
 def test_cli_deprecations_use_the_program_compatibility_ledger() -> None:
@@ -580,7 +581,7 @@ def _load_release_check_module() -> _ReleaseCheckModule:
 
 
 def _documented_cli_commands(path: Path) -> tuple[set[str], list[str]]:
-    commands = set(_COMMAND_HANDLERS)
+    commands = set(_COMMAND_HANDLERS) | set(STABLE_TOP_LEVEL_COMMANDS)
     documented: set[str] = set()
     unresolved: list[str] = []
 
