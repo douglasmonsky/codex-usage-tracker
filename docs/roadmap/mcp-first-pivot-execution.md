@@ -395,8 +395,41 @@ commit as each roadmap task.
   shell receives an embedded Home summary, while the React path intentionally
   marks that summary deferred and loads the live bounded status endpoint.
 
+## Task 20 - Consolidate Calls and Threads into Explore
+
+- Status: complete; Explore now owns one accessible Calls/Threads mode switch,
+  mounts only the active evidence surface, and canonicalizes legacy Calls and
+  Threads URLs without losing mode-specific state.
+- Branch: `pivot/20-explore-workspace`
+- Commits: `cabaa0b` (`feat: unify calls and threads in Explore`), `15d6f5c`
+  (`refactor: remove obsolete Explore diagnostics`), and `3175e82` (`test:
+  migrate Explore browser journeys`), plus this documentation commit.
+- Focused verification: the roadmap-named Explore, Calls, Threads, and URL-state
+  command passed 23 tests. The expanded eight-file integration suite passed 56
+  tests, including legacy route normalization, inactive-mode non-mounting,
+  filter preservation, Evidence return state, and Calls/Threads regressions.
+  The isolated browser smoke suite passed all 22 desktop and mobile journeys.
+- Full verification: dashboard type checking, lint, dependency boundaries,
+  dead-code detection, stylelint, source-budget enforcement, and
+  `git diff --check` passed. A diagnostic full-dashboard run passed 528 of 596
+  tests; its 68 remaining failures assert retired top-level navigation and
+  pre-pivot route IDs that Tasks 21 through 24 continue to migrate.
+- Review: an independent read-only review reported no critical or important
+  findings in active-mode mounting, URL-state preservation, legacy route
+  normalization, Evidence returns, query scoping, accessibility, privacy, or
+  security.
+- Deviations from plan: the obsolete Tools and Files sub-modes and their orphaned
+  diagnostic adapters were removed rather than allowlisted after the two-mode
+  contract made them dead code. The Playwright web server now derives its URL
+  from a configurable strict port and never reuses an unrelated listener; the
+  verified run used port 5187 because another local application owned 5173. No
+  publication action was taken.
+- Follow-up risks: compatibility workbenches remain directly routable while the
+  remaining contextual Evidence and legacy-parity migrations land. The full
+  dashboard inventory remains diagnostic until those owning tasks complete.
+
 ## Remaining Planned Tasks
 
-Tasks 20 through 45 remain planned in the approved implementation roadmap. Add
+Tasks 21 through 45 remain planned in the approved implementation roadmap. Add
 a full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
