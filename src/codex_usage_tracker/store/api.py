@@ -174,6 +174,10 @@ SQLITE_VARIABLE_BATCH_SIZE = 500
 RefreshProgressCallback = Callable[[dict[str, object]], None]
 
 
+class InvalidDatabasePathError(ValueError):
+    """Raised when a read-only database target is present but unusable."""
+
+
 def refresh_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
@@ -428,14 +432,21 @@ def query_request_context_facts(
     credit_models: Collection[str] = (),
 ) -> dict[str, object]:
     """Read scoped source and accounting facts in one read-only transaction."""
-    if not db_path.is_file():
+    if not db_path.exists() and not db_path.is_symlink():
         return _empty_request_context_facts()
+    if not db_path.is_file():
+        raise InvalidDatabasePathError(f"database path must be a regular file: {db_path}")
     physical_where, physical_params = _request_context_where(scope, alias="physical")
     canonical_where, canonical_params = _request_context_where(scope, alias="canonical")
     pricing_sql, pricing_params = _model_coverage_sql("canonical", priced_models)
     credit_sql, credit_params = _model_coverage_sql("canonical", credit_models)
     uri = f"{db_path.resolve().as_uri()}?mode=ro"
-    connection = sqlite3.connect(uri, uri=True, timeout=1.0)
+    try:
+        connection = sqlite3.connect(uri, uri=True, timeout=1.0)
+    except sqlite3.Error as exc:
+        raise InvalidDatabasePathError(
+            f"database path could not be opened read-only: {db_path}"
+        ) from exc
     connection.row_factory = sqlite3.Row
     try:
         connection.execute("PRAGMA query_only = ON")

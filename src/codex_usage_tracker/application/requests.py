@@ -28,8 +28,10 @@ def _choice(value: str, choices: set[str], field_name: str) -> None:
         raise RequestValidationError(f"unsupported {field_name}: {value}")
 
 
-def _bounded_limit(value: int, *, field_name: str = "limit") -> None:
-    if isinstance(value, bool) or not 1 <= value <= MAX_INTERACTIVE_LIMIT:
+def _bounded_limit(value: object, *, field_name: str = "limit") -> None:
+    if type(value) is not int:
+        raise RequestValidationError(f"{field_name} must be an integer")
+    if not 1 <= cast(int, value) <= MAX_INTERACTIVE_LIMIT:
         raise RequestValidationError(f"{field_name} must be between 1 and {MAX_INTERACTIVE_LIMIT}")
 
 
@@ -141,7 +143,9 @@ class StatusRequest:
 
     def __post_init__(self) -> None:
         threshold = self.freshness_threshold_seconds
-        if not isinstance(threshold, int | float) or not math.isfinite(threshold):
+        if type(threshold) not in (int, float):
+            raise RequestValidationError("freshness_threshold_seconds must be a number")
+        if not math.isfinite(threshold):
             raise RequestValidationError("freshness_threshold_seconds must be finite")
         if threshold < 0:
             raise RequestValidationError("freshness_threshold_seconds must be non-negative")

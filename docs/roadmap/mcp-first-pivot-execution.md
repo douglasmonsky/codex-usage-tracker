@@ -78,14 +78,17 @@ commit as each roadmap task.
 
 - Status: complete
 - Branch: `pivot/5-request-context`
-- Commits: `feat: build shared analysis request context` (this commit)
+- Commits: `feat: build shared analysis request context`;
+  `fix: harden analysis request context validation` (this commit)
 - Focused verification: `python -m pytest tests/application/test_requests.py tests/application/test_context.py tests/store/test_store_dashboard_queries.py -q`
 - Full verification: `python scripts/benchmark_dashboard_routes.py --sizes 100000 --iterations 3 --skip-compression --enforce-thresholds --output-dir /private/tmp/pivot-context-after-final`; `python -m pyright src/codex_usage_tracker/application src/codex_usage_tracker/store/api.py`; `python -m ruff check src/codex_usage_tracker/application src/codex_usage_tracker/store/api.py tests/application tests/store/test_store_dashboard_queries.py`; `git diff --check`
 - Deviations from plan: The local Task 5 branch is intentionally stacked on
   the reviewed Tasks 1-4 commits because pushing and merging are outside this
   task. The shared context query opens the existing database in read-only mode
   and computes all scoped physical, canonical, coverage, revision, and freshness
-  facts in one explicit transaction and one aggregate SQL statement.
+  facts in one explicit transaction and one aggregate SQL statement. The route
+  benchmark was not repeated for the review fix because its SQL body and every
+  valid-file execution path remained byte-for-byte unchanged.
 - Follow-up risks: Rebase or recreate the branch from updated `main` after the
   preceding tasks merge. Later interface adapters may accept `record` as a
   compatibility alias, but application `EvidenceRequest` remains canonical on

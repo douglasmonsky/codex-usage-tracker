@@ -7,3 +7,7 @@ class ApplicationError(Exception):
 
 class RequestValidationError(ApplicationError, ValueError):
     """Raised when a typed application request violates its contract."""
+
+
+class RequestContextError(ApplicationError):
+    """Raised when request context cannot safely read its configured source."""

@@ -11,6 +11,7 @@ from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.store import api as store_api
 from codex_usage_tracker.store import dashboard_queries
 from codex_usage_tracker.store.api import (
+    InvalidDatabasePathError,
     connect,
     init_db,
     query_dashboard_event_count,
@@ -525,3 +526,87 @@ def test_request_context_facts_use_one_read_transaction_and_canonical_totals(
         sum(statement.lstrip().upper().startswith(("SELECT", "WITH")) for statement in statements)
         == 1
     )
+
+
+def test_request_context_facts_reject_existing_non_file_target(tmp_path: Path) -> None:
+    db_path = tmp_path / "database-target"
+    db_path.mkdir()
+
+    with pytest.raises(InvalidDatabasePathError, match="database path must be a regular file"):
+        query_request_context_facts(db_path=db_path, scope={})
+
+    assert db_path.is_dir()
+    assert list(db_path.iterdir()) == []
+
+
+def test_request_context_facts_apply_all_scope_filters_to_physical_and_canonical_rows(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    matching = replace(
+        _usage_event(
+            record_id="matching",
+            session_id="session-matching",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-07-21T12:00:00Z",
+            cumulative_total_tokens=110,
+        ),
+        cwd="/tmp/project-a",
+        model="model-a",
+        effort="high",
+    )
+
+    def variant(record_id: str, timestamp: str, **changes: object) -> UsageEvent:
+        return replace(
+            matching,
+            record_id=record_id,
+            session_id=f"session-{record_id}",
+            source_file=f"/tmp/synthetic/{record_id}.jsonl",
+            turn_id=f"turn-{record_id}",
+            event_timestamp=timestamp,
+            turn_timestamp=timestamp,
+            **changes,
+        )
+
+    events = [
+        matching,
+        variant("copied", "2026-07-21T12:01:00Z"),
+        variant("archived", "2026-07-21T12:02:00Z", is_archived=1),
+        variant("other-project", "2026-07-21T12:03:00Z", cwd="/tmp/project-b"),
+        variant("other-thread", "2026-07-21T12:04:00Z", thread_key="thread:Beta"),
+        variant("other-model", "2026-07-21T12:05:00Z", model="model-b"),
+        variant("other-effort", "2026-07-21T12:06:00Z", effort="low"),
+        variant("before-window", "2026-07-21T10:00:00Z"),
+        variant("after-window", "2026-07-21T14:00:00Z"),
+    ]
+    upsert_usage_events(events, db_path=db_path)
+    with connect(db_path) as connection:
+        connection.execute("UPDATE usage_events SET is_duplicate = 0")
+        connection.execute(
+            "UPDATE usage_events SET is_duplicate = 1, canonical_record_id = ? WHERE record_id = ?",
+            ("matching", "copied"),
+        )
+
+    scope = {
+        "history": "active",
+        "since": "2026-07-21T11:30:00Z",
+        "until": "2026-07-21T12:30:00Z",
+        "filters": {
+            "project": "/tmp/project-a",
+            "thread_key": "thread:Alpha",
+            "model": "model-a",
+            "effort": "high",
+        },
+    }
+    active = query_request_context_facts(db_path=db_path, scope=scope)
+    all_history = query_request_context_facts(
+        db_path=db_path,
+        scope={**scope, "history": "all"},
+    )
+
+    assert active["physical_rows"] == 2
+    assert active["canonical_rows"] == 1
+    assert active["copied_rows_excluded"] == 1
+    assert all_history["physical_rows"] == 3
+    assert all_history["canonical_rows"] == 2
+    assert all_history["copied_rows_excluded"] == 1

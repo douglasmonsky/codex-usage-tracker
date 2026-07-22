@@ -4,7 +4,10 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from codex_usage_tracker.application.context import build_request_context
+from codex_usage_tracker.application.errors import RequestContextError
 from codex_usage_tracker.application.requests import RequestScope
 from codex_usage_tracker.store.api import connect, upsert_usage_events
 from tests.store_dashboard_helpers import _usage_event
@@ -91,3 +94,20 @@ def test_missing_database_returns_unknown_context_without_creating_files(tmp_pat
     assert not db_path.exists()
     assert not db_path.parent.exists()
     assert not pricing_path.exists()
+
+
+def test_existing_non_file_database_target_fails_without_side_effects(tmp_path: Path) -> None:
+    db_path = tmp_path / "database-target"
+    db_path.mkdir()
+    pricing_path = tmp_path / "pricing-parent" / "pricing.json"
+
+    with pytest.raises(RequestContextError, match="database path must be a regular file"):
+        build_request_context(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            scope=RequestScope(),
+        )
+
+    assert db_path.is_dir()
+    assert list(db_path.iterdir()) == []
+    assert not pricing_path.parent.exists()

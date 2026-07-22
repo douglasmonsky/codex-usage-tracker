@@ -1,7 +1,11 @@
 """Transport-independent request and orchestration layer."""
 
 from codex_usage_tracker.application.context import RequestContext, build_request_context
-from codex_usage_tracker.application.errors import ApplicationError, RequestValidationError
+from codex_usage_tracker.application.errors import (
+    ApplicationError,
+    RequestContextError,
+    RequestValidationError,
+)
 from codex_usage_tracker.application.requests import (
     AllowanceRequest,
     AnalysisRequest,
@@ -22,6 +26,7 @@ __all__ = (
     "QueryRequest",
     "RefreshRequest",
     "RequestContext",
+    "RequestContextError",
     "RequestScope",
     "RequestValidationError",
     "StatusRequest",

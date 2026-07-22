@@ -36,9 +36,18 @@ def test_scope_rejects_unsupported_modes(field: str, value: str, message: str) -
         RequestScope(**kwargs)  # type: ignore[arg-type]
 
 
-def test_status_rejects_nonfinite_freshness_threshold() -> None:
+@pytest.mark.parametrize("threshold", (float("nan"), float("inf"), float("-inf")))
+def test_status_rejects_nonfinite_freshness_threshold(threshold: float) -> None:
     with pytest.raises(RequestValidationError, match="freshness_threshold_seconds must be finite"):
-        StatusRequest(freshness_threshold_seconds=float("nan"))
+        StatusRequest(freshness_threshold_seconds=threshold)
+
+
+def test_status_rejects_boolean_freshness_threshold() -> None:
+    with pytest.raises(
+        RequestValidationError,
+        match="freshness_threshold_seconds must be a number",
+    ):
+        StatusRequest(freshness_threshold_seconds=True)
 
 
 @pytest.mark.parametrize("thread_key", ("thread:safe\nsecond-line", "../../outside"))
@@ -52,6 +61,16 @@ def test_interactive_request_limits_are_bounded() -> None:
         QueryRequest(entity="call", measures=("tokens",), limit=201)
     with pytest.raises(RequestValidationError, match="limit must be between 1 and 200"):
         EvidenceRequest(record_id="record-1", limit=201)
+
+
+@pytest.mark.parametrize("limit", (True, 20.0, 20.5, "20"))
+def test_interactive_request_limits_require_exact_integers(limit: object) -> None:
+    with pytest.raises(RequestValidationError, match="limit must be an integer"):
+        QueryRequest(
+            entity="call",
+            measures=("tokens",),
+            limit=limit,  # type: ignore[arg-type]
+        )
 
 
 def test_scope_serialization_is_normalized_and_deterministic() -> None:

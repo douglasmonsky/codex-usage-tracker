@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from codex_usage_tracker.application.errors import RequestContextError
 from codex_usage_tracker.application.requests import RequestScope
 from codex_usage_tracker.core.contracts import AccountingContextV1, FreshnessV1, ScopeV1
 from codex_usage_tracker.pricing.allowance_rate_card import (
@@ -16,7 +17,7 @@ from codex_usage_tracker.pricing.allowance_rate_card import (
     parse_aliases as parse_credit_aliases,
 )
 from codex_usage_tracker.pricing.config import PricingConfig, load_pricing_config
-from codex_usage_tracker.store.api import query_request_context_facts
+from codex_usage_tracker.store.api import InvalidDatabasePathError, query_request_context_facts
 
 _FRESHNESS_THRESHOLD_SECONDS = 300
 
@@ -54,17 +55,22 @@ def build_request_context(
 ) -> RequestContext:
     """Build bounded context without reports, database creation, or migrations."""
     scope_contract = scope.to_contract()
-    if not db_path.is_file():
+    if not db_path.exists() and not db_path.is_symlink():
         return _empty_context(scope_contract)
+    if not db_path.is_file():
+        raise RequestContextError(f"database path must be a regular file: {db_path}")
 
     pricing = load_pricing_config(pricing_path)
     credit_card = load_bundled_rate_card()
-    facts = query_request_context_facts(
-        db_path=db_path,
-        scope=scope.to_payload(),
-        priced_models=_priced_model_names(pricing),
-        credit_models=_credit_model_names(credit_card),
-    )
+    try:
+        facts = query_request_context_facts(
+            db_path=db_path,
+            scope=scope.to_payload(),
+            priced_models=_priced_model_names(pricing),
+            credit_models=_credit_model_names(credit_card),
+        )
+    except InvalidDatabasePathError as exc:
+        raise RequestContextError(str(exc)) from exc
     source_revision = _optional_string(facts.get("source_revision"))
     return RequestContext(
         source_revision=source_revision,
