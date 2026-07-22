@@ -16,6 +16,7 @@ from codex_usage_tracker.core.contracts import ScopeV1
 from codex_usage_tracker.core.contracts.common import immutable_snapshot
 from codex_usage_tracker.core.contracts.serialization import payload_mapping
 from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH, DEFAULT_PRICING_PATH
+from codex_usage_tracker.evidence.models import EvidenceRequest as EvidenceRequest
 
 HistoryScope: TypeAlias = Literal["active", "all"]
 PrivacyMode: TypeAlias = Literal["normal", "redacted", "strict"]
@@ -175,21 +176,6 @@ class RefreshRequest:
     def __post_init__(self) -> None:
         _choice(self.history, _HISTORY_VALUES, "history")
         _choice(self.execution, _EXECUTION_VALUES, "execution")
-
-
-@dataclass(frozen=True)
-class EvidenceRequest:
-    record_id: str
-    section: str = "summary"
-    limit: int = 20
-    cursor: str | None = None
-    history: HistoryScope = "active"
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "record_id", _safe_identifier(self.record_id, "record_id"))
-        object.__setattr__(self, "section", _safe_identifier(self.section, "section"))
-        _bounded_limit(self.limit)
-        _choice(self.history, _HISTORY_VALUES, "history")
 
 
 @dataclass(frozen=True)

@@ -28,6 +28,31 @@ QUERY_JSON_PAYLOAD_CONTRACTS = {
     }
 }
 
+EVIDENCE_RESULT_JSON_PAYLOAD_CONTRACTS = {
+    "codex-usage-tracker.evidence-result.v1": {
+        "required": {
+            "selector": dict,
+            "records": (list, tuple),
+            "next_cursor": (str, NoneType),
+            "dashboard_target": dict,
+        }
+    },
+    "codex-usage-tracker-dashboard-target-v2": {
+        "required": {
+            "target_id": str,
+            "surface": str,
+            "evidence_kind": str,
+            "analysis_id": (str, NoneType),
+            "expires_at": (str, NoneType),
+            "selectors": dict,
+            "scope": dict,
+            "relative_url": str,
+            "absolute_url": (str, NoneType),
+            "fallback_instruction": (str, NoneType),
+        }
+    },
+}
+
 ANALYSIS_JSON_PAYLOAD_CONTRACTS = {
     "codex-usage-tracker.analysis.v2": {
         "required": {
@@ -173,6 +198,7 @@ MCP_EVIDENCE_SCHEMA_IDS = tuple(MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS)
 
 JSON_PAYLOAD_CONTRACTS = {
     **QUERY_JSON_PAYLOAD_CONTRACTS,
+    **EVIDENCE_RESULT_JSON_PAYLOAD_CONTRACTS,
     **ANALYSIS_JSON_PAYLOAD_CONTRACTS,
     **CLI_JSON_PAYLOAD_CONTRACTS,
     **DIAGNOSTIC_JSON_PAYLOAD_CONTRACTS,

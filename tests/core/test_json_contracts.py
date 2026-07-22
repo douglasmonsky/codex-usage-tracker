@@ -139,6 +139,14 @@ def test_analysis_v2_and_analysis_job_contracts_are_exactly_tracked() -> None:
     )
 
 
+def test_evidence_result_and_dashboard_v2_contracts_are_non_colliding() -> None:
+    result = JSON_PAYLOAD_CONTRACTS["codex-usage-tracker.evidence-result.v1"]["required"]
+    target = JSON_PAYLOAD_CONTRACTS["codex-usage-tracker-dashboard-target-v2"]["required"]
+    assert set(result) == {"selector", "records", "next_cursor", "dashboard_target"}
+    assert {"target_id", "surface", "evidence_kind", "selectors", "scope"} <= set(target)
+    assert "codex-usage-tracker.evidence.v1" in JSON_PAYLOAD_CONTRACTS
+
+
 def test_subagent_usage_schema_id_contract_is_tracked() -> None:
     payload = {
         "schema_id": "codex-usage-tracker.subagent-usage.v1",

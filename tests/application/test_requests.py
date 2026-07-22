@@ -74,8 +74,8 @@ def test_scope_rejects_unsafe_thread_identifier(thread_key: str) -> None:
 def test_interactive_request_limits_are_bounded() -> None:
     with pytest.raises(RequestValidationError, match="limit must be between 1 and 200"):
         QueryRequest(entity="call", measures=("tokens",), limit=201)
-    with pytest.raises(RequestValidationError, match="limit must be between 1 and 200"):
-        EvidenceRequest(record_id="record-1", limit=201)
+    with pytest.raises(ValueError, match="limit must be between 1 and 200"):
+        EvidenceRequest("call", "record-1", limit=201)
 
 
 @pytest.mark.parametrize("limit", (True, 20.0, 20.5, "20"))

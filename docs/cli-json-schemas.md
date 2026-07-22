@@ -51,6 +51,8 @@ Tracked schema ids:
 | `codex-usage-tracker.query.v2` | Canonical bounded application query result with deterministic cursor continuation |
 | `codex-usage-tracker.analysis.v2` | Bounded evidence-backed analysis with strategy provenance, limitations, accounting, and dashboard destinations |
 | `codex-usage-tracker.analysis-job.v1` | Process-local semantic analysis job status; active and compatible completed work may be reused |
+| `codex-usage-tracker.evidence-result.v1` | Bounded canonical evidence page with exact selector, immutable records, and revision-bound continuation |
+| `codex-usage-tracker-dashboard-target-v2` | Deterministic evidence-surface handoff with canonical selectors and scope |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")`, MCP `usage_dashboard_recommendations(...)` |
 | `codex-usage-tracker-action-brief-v1` | CLI `action-brief --json`, MCP `usage_action_brief(...)`; compact aggregate remediation brief |
 | `codex-usage-tracker-async-job-status-v1` | MCP `usage_dogfood_start(...)`, `usage_dogfood_status(...)`; async in-process job progress/status payload |
