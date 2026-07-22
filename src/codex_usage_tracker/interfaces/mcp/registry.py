@@ -7,6 +7,7 @@ from functools import cache, lru_cache
 
 from codex_usage_tracker.interfaces.mcp.core_tools import (
     usage_analyze,
+    usage_evidence,
     usage_job_status,
     usage_query,
     usage_refresh,
@@ -96,11 +97,6 @@ class ToolCatalogError(ValueError):
 
 class CoreToolNotImplemented(NotImplementedError):
     """Raised when a later roadmap task has not supplied a core service yet."""
-
-
-def usage_evidence() -> object:
-    """Placeholder for the core evidence contract."""
-    raise CoreToolNotImplemented("usage_evidence is implemented by a later roadmap task")
 
 
 def usage_allowance() -> object:

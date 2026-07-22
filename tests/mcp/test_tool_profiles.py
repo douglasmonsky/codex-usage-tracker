@@ -54,6 +54,7 @@ def test_building_core_does_not_resolve_or_mutate_legacy_registration(
 def test_core_binds_stable_adapters_once() -> None:
     from codex_usage_tracker.interfaces.mcp.core_tools import (
         usage_analyze,
+        usage_evidence,
         usage_job_status,
         usage_query,
         usage_refresh,
@@ -67,9 +68,11 @@ def test_core_binds_stable_adapters_once() -> None:
     assert registered["usage_status"].fn is usage_status
     assert registered["usage_refresh"].fn is usage_refresh
     assert registered["usage_analyze"].fn is usage_analyze
+    assert registered["usage_evidence"].fn is usage_evidence
     assert registered["usage_query"].fn is usage_query
     assert registered["usage_job_status"].fn is usage_job_status
     assert list(registered).count("usage_analyze") == list(registered).count("usage_query") == 1
+    assert list(registered).count("usage_evidence") == 1
     assert status_spec.data_class == "administrative"
 
 

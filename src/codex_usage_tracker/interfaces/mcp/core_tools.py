@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from codex_usage_tracker.application.context import build_request_context
+from codex_usage_tracker.application.evidence import get_evidence
 from codex_usage_tracker.application.job_status import JobStatusService, get_job_status
 from codex_usage_tracker.application.refresh import REFRESH_SCHEMA, refresh_usage
 from codex_usage_tracker.application.requests import (
@@ -24,6 +25,7 @@ from codex_usage_tracker.core.contracts import (
     envelope_payload,
 )
 from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH, DEFAULT_PRICING_PATH
+from codex_usage_tracker.evidence.models import EvidenceRequest
 from codex_usage_tracker.interfaces.mcp.models import McpProfile
 from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
     build_usage_analyze as build_usage_analyze,
@@ -37,9 +39,11 @@ from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
 from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
     usage_query as usage_query,
 )
+from codex_usage_tracker.jobs.service import JobService
 
 MAX_STATUS_PAYLOAD_BYTES = 16 * 1024
 MAX_REFRESH_PAYLOAD_BYTES = 64 * 1024
+MAX_EVIDENCE_PAYLOAD_BYTES = 128 * 1024
 
 
 def usage_status() -> dict[str, object]:
@@ -63,6 +67,66 @@ def usage_refresh(
 def usage_job_status(job_id: str, include_result: bool = False) -> dict[str, object]:
     """Poll one registered generic job through the shared core service."""
     return build_usage_job_status(job_id=job_id, include_result=include_result)
+
+
+def usage_evidence(
+    selector_kind: str,
+    selector_id: str,
+    section: str = "summary",
+    limit: int = 20,
+    cursor: str | None = None,
+    history: str = "active",
+) -> dict[str, object]:
+    """Open exact canonical aggregate evidence selected by a prior tool result."""
+    return build_usage_evidence(
+        selector_kind=selector_kind,
+        selector_id=selector_id,
+        section=section,
+        limit=limit,
+        cursor=cursor,
+        history=history,
+    )
+
+
+def build_usage_evidence(
+    *,
+    selector_kind: str,
+    selector_id: str,
+    section: str = "summary",
+    limit: int = 20,
+    cursor: str | None = None,
+    history: str = "active",
+    db_path: Path = DEFAULT_DB_PATH,
+    pricing_path: Path = DEFAULT_PRICING_PATH,
+    job_service: JobService | None = None,
+) -> dict[str, object]:
+    request = EvidenceRequest(
+        cast(Any, selector_kind), selector_id, section, limit, cursor, cast(Any, history)
+    )
+    scope = RequestScope(
+        history=cast(HistoryScope, request.history),
+        thread_key=request.selector_id if request.selector_kind == "thread" else None,
+    )
+    context = build_request_context(db_path=db_path, pricing_path=pricing_path, scope=scope)
+    result = get_evidence(
+        request,
+        db_path=db_path,
+        pricing_path=pricing_path,
+        job_service=job_service,
+        context=context,
+    )
+    payload = envelope_payload(
+        tool="usage_evidence",
+        result_schema=result.schema,
+        result=result,
+        scope=context.scope,
+        freshness=context.freshness,
+        accounting=context.accounting,
+        data_class="aggregate",
+        dashboard_targets=(result.dashboard_target,),
+    )
+    enforce_payload_budget(payload, MAX_EVIDENCE_PAYLOAD_BYTES, "usage_evidence")
+    return payload
 
 
 def build_usage_status(

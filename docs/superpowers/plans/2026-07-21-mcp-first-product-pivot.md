@@ -889,6 +889,12 @@ git commit -m "feat: expose core query and analysis tools"
 - Create: `src/codex_usage_tracker/evidence/service.py`
 - Create: `src/codex_usage_tracker/evidence/selectors.py`
 - Create: `src/codex_usage_tracker/application/evidence.py`
+- Modify: `src/codex_usage_tracker/application/requests.py`
+- Modify: `src/codex_usage_tracker/jobs/service.py`
+- Modify: `src/codex_usage_tracker/store/usage_record_queries.py`
+- Modify: `src/codex_usage_tracker/store/thread_summaries.py`
+- Modify: `src/codex_usage_tracker/store/query_sql.py`
+- Modify: `src/codex_usage_tracker/store/allowance_intelligence.py`
 - Create: `tests/evidence/test_service.py`
 - Create: `tests/evidence/test_selectors.py`
 - Create: `tests/application/test_evidence.py`
@@ -897,6 +903,12 @@ git commit -m "feat: expose core query and analysis tools"
 - Modify: `src/codex_usage_tracker/core/json_contracts.py`
 - Modify: `tests/core/test_dashboard_targets.py`
 - Modify: `tests/core/test_json_contracts.py`
+- Modify: `tests/application/test_query.py`
+- Modify: `tests/application/test_requests.py`
+- Modify: `tests/application/fixtures/analysis_cases.py`
+- Modify: `tests/jobs/test_service.py`
+- Modify: `tests/mcp/test_tool_profiles.py`
+- Modify: `docs/cli-json-schemas.md`
 
 **Interfaces:**
 
@@ -914,7 +926,7 @@ class EvidenceRequest:
 
 @dataclass(frozen=True)
 class EvidenceResult:
-    schema: Literal["codex-usage-tracker.evidence.v1"]
+    schema: Literal["codex-usage-tracker.evidence-result.v1"]
     selector: dict[str, str]
     records: tuple[EvidenceV1, ...]
     next_cursor: str | None
@@ -923,7 +935,7 @@ class EvidenceResult:
 
 **Evidence rules:**
 
-- Finding IDs resolve only against a compatible persisted/completed analysis result.
+- Finding IDs resolve only against a compatible completed in-process analysis result.
 - Call and thread selectors use canonical IDs.
 - Allowance selectors point to persisted analysis/evidence keys.
 - `section="summary"` is aggregate only. Other sections are allowlisted and must already exist in current application services.
@@ -931,13 +943,13 @@ class EvidenceResult:
 - Missing selectors produce a typed not-found error, not an empty successful result.
 - Evidence ordering is stable and pagination is keyset-based where the repository already supports it.
 
-- [ ] **Step 1: Write failing selector tests.** Cover valid and invalid record IDs, thread keys, finding IDs, analysis IDs, history mismatches, stale analysis revisions, and malformed cursors.
+- [x] **Step 1: Write failing selector tests.** Cover valid and invalid record IDs, thread keys, finding IDs, analysis IDs, history mismatches, stale analysis revisions, and malformed cursors.
 
-- [ ] **Step 2: Implement typed selectors and repository reads.** Reuse call detail, thread calls, allowance evidence, and analysis persistence; do not create duplicate analytical calculations.
+- [x] **Step 2: Implement typed selectors and repository reads.** Reuse call detail, thread calls, allowance evidence, and compatible completed analysis results; do not create duplicate analytical calculations or persistence.
 
-- [ ] **Step 3: Upgrade dashboard target schema to v2.** Add `target_id`, `evidence_kind`, optional `analysis_id`, and `expires_at=None` while preserving a v1 compatibility builder. All URLs remain deterministic and allowlisted.
+- [x] **Step 3: Upgrade dashboard target schema to v2.** Add `target_id`, `evidence_kind`, optional `analysis_id`, and `expires_at=None` while preserving a v1 compatibility builder. All URLs remain deterministic and allowlisted.
 
-- [ ] **Step 4: Add the core tool.**
+- [x] **Step 4: Add the core tool.**
 
 ```python
 @mcp.tool(name="usage_evidence")
@@ -951,7 +963,7 @@ def usage_evidence_tool(
 ) -> dict[str, object]: ...
 ```
 
-- [ ] **Step 5: Verify.**
+- [x] **Step 5: Verify.**
 
 ```bash
 python -m pytest tests/evidence tests/application/test_evidence.py tests/core/test_dashboard_targets.py tests/core/test_json_contracts.py tests/mcp/test_tool_profiles.py -q
@@ -960,7 +972,7 @@ python -m pyright --pythonpath "$(command -v python)" src/codex_usage_tracker/ev
 
 Expected: PASS; every finding in the synthetic analysis fixtures opens at least one exact evidence selector.
 
-- [ ] **Step 6: Commit.**
+- [x] **Step 6: Commit in focused hook-safe commits.**
 
 ```bash
 git add src/codex_usage_tracker/evidence src/codex_usage_tracker/application/evidence.py src/codex_usage_tracker/core/dashboard_targets.py src/codex_usage_tracker/interfaces/mcp/core_tools.py src/codex_usage_tracker/core/json_contracts.py tests/evidence tests/application/test_evidence.py tests/core/test_dashboard_targets.py tests/core/test_json_contracts.py
