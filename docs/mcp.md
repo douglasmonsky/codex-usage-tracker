@@ -124,7 +124,8 @@ explanatory questions (for example, `goal="token_waste"`) and `usage_query`
 for exact tabular or grouped questions (for example, tokens grouped by model
 and effort). Both return bounded versioned envelopes. An asynchronous analysis
 returns an analysis-job handle; poll its `job_id` with `usage_job_status`.
-Raw-context compatibility tools are not part of this default flow.
+Allowance questions use `usage_allowance(operation=...)`. Raw-context and
+individual allowance compatibility tools are not part of this default flow.
 
 - `refresh_usage_index`
 - `usage_refresh_start`
@@ -134,6 +135,7 @@ Raw-context compatibility tools are not part of this default flow.
 - `subagent_usage`
 - `usage_query`
 - `usage_analyze`
+- `usage_allowance`
 - `usage_status`
 - `usage_dedupe_diagnostics`
 - `usage_calls`
@@ -248,52 +250,49 @@ claiming MCP availability.
 
 ## Allowance Intelligence
 
-- `usage_allowance_status(...)` is the default polling entry point. It reads a
-  constant-size canonical snapshot, reports copied clone rows excluded, and
-  directs stale or empty indexes through `usage_refresh_start` and
-  `usage_refresh_status` without running full diagnostics. Pass the last
-  `revision` as `since_revision`; an unchanged response stays compact.
-- `usage_allowance_series(...)` returns canonical observed context plus weekly
-  completed-cycle `credits / 1%` capacity history, robust rolling summaries,
-  regimes, and every supported boundary. It accepts bounded presets, bounded
-  custom ranges, or `all` aggregate cycles without scanning raw transcripts.
-- `usage_allowance_evidence(...)` returns latest-first canonical transitions in
-  pages of at most 500 rows; 50 is the normal first page. Pass `next_cursor` back
-  as `cursor`. Strict and normal modes return aggregate provenance; local mode
-  explicitly opts into bounded physical record identifiers for debugging.
-- `usage_allowance_analysis(...)` reads the exact persisted multi-change result
-  for the current source/model/rate-card key or starts one deduplicated background job.
-  Poll active work with `usage_allowance_analysis_status(job_id)`, then reload
-  `usage_allowance_analysis(...)` after completion.
+- `usage_allowance(operation="status")` is the default polling entry point. It
+  returns a constant-size canonical snapshot, reports copied clone rows excluded,
+  and distinguishes fresh, stale, and empty indexes without running full diagnostics.
+- `usage_allowance(operation="series", window="weekly", range="8w")` returns a
+  finite canonical timeline. Valid ranges are `24h`, `7d`, `8w`, and `6m`; the
+  interactive core tool rejects `all`.
+- `usage_allowance(operation="evidence", window="weekly", range="8w", limit=50)`
+  returns latest-first canonical transitions. Pass `next_cursor` back as `cursor`;
+  limits are 1–200 and the cursor remains bound to the selected window and range.
+- `usage_allowance(operation="analysis", execution="auto")` returns an exact
+  compatible persisted analysis or a generic job handle. Poll a returned handle
+  with `usage_job_status(job_id, include_result=True)`. Analysis currently supports
+  the weekly window.
 - `usage_allowance_history(...)` returns normalized observed weekly and 5-hour allowance snapshots.
 - `usage_allowance_diagnostics(...)` returns evidence grades comparing observed usage movement against estimated local credits. Weekly windows are the primary long-range signal; 5-hour windows are noisy rolling-window context.
 - `usage_allowance_export(...)` returns strict-privacy evidence bundles for manual sharing.
 
-The v2 status, series, evidence, and analysis tools are the normal MCP/plugin
-surface. History, diagnostics, and export remain compatibility and explicit
-offline-diagnostic tools. Use allowance tools when users ask whether limits
-changed, whether weekly allowance behavior shifted, why the 5-hour counter
-looks noisy, or how to share aggregate allowance evidence safely. The tracker
-cannot read the user's logged-in Codex account plan, native remaining
-allowance, or usage from other agentic surfaces. Remaining allowance context is
-only as accurate as values manually copied into
+The consolidated tool is the normal MCP/plugin surface and each successful
+operation includes a bounded Limits v2 dashboard target. The individual
+`usage_allowance_status`, `usage_allowance_series`, `usage_allowance_evidence`,
+`usage_allowance_analysis`, and `usage_allowance_analysis_status` tools remain
+full-profile compatibility surfaces through 0.24. History, diagnostics, and
+export remain compatibility and explicit offline-diagnostic tools. Use allowance
+operations when users ask whether limits changed, whether weekly allowance
+behavior shifted, why the 5-hour counter looks noisy, or how to share aggregate
+allowance evidence safely. The tracker cannot read the user's logged-in Codex
+account plan, native remaining allowance, or usage from other agentic surfaces.
+Remaining allowance context is only as accurate as values manually copied into
 `~/.codex-usage-tracker/allowance.json`.
 
 Recommended polling flow:
 
 ```text
-usage_allowance_status()
-usage_allowance_status(since_revision="r-example")
-usage_allowance_series(range_preset="8w", granularity="cycle")
-usage_allowance_evidence(limit=50)
-usage_allowance_analysis()
-usage_allowance_analysis_status(job_id="allowance-analysis-example")
+usage_allowance(operation="status")
+usage_allowance(operation="series", window="weekly", range="8w")
+usage_allowance(operation="evidence", window="weekly", range="8w", limit=50)
+usage_allowance(operation="analysis", execution="auto")
+usage_job_status(job_id="allowance-analysis-example", include_result=True)
 ```
 
-Poll status after the returned interval (30 seconds for fresh/aging data, 60
-seconds for stale/empty/unchanged data). Poll an analysis job every 500
-milliseconds only while it is pending, queued, or running. Do not pass `limit=0`
-to v2 evidence. See
+Follow the returned next action for refresh or polling cadence. Poll an analysis
+job only while it is pending, queued, or running. Do not pass `limit=0` or
+`range="all"` to interactive evidence. See
 [Allowance Intelligence](allowance-intelligence.md) for model gates and
 [CLI, MCP, and Dashboard JSON Schemas](cli-json-schemas.md) for synthetic payloads.
 

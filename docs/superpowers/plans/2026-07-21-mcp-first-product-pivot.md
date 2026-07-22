@@ -985,14 +985,22 @@ git commit -m "feat: add canonical evidence retrieval"
 
 - Create: `src/codex_usage_tracker/application/allowance.py`
 - Create: `src/codex_usage_tracker/application/allowance_models.py`
+- Modify: `src/codex_usage_tracker/application/requests.py`
 - Create: `tests/application/test_allowance.py`
+- Create: `tests/application/test_allowance_models.py`
 - Modify: `src/codex_usage_tracker/interfaces/mcp/core_tools.py`
 - Modify: `src/codex_usage_tracker/interfaces/mcp/registry.py`
+- Modify: `src/codex_usage_tracker/core/dashboard_targets.py`
 - Modify: `src/codex_usage_tracker/cli/mcp_allowance.py`
 - Modify: `tests/cli/test_mcp_allowance.py`
+- Create: `tests/mcp/test_core_allowance_tool.py`
 - Modify: `tests/mcp/test_tool_profiles.py`
+- Modify: `tests/mcp/test_tool_registry.py`
+- Modify: `tests/core/test_dashboard_targets.py`
 - Modify: `docs/allowance-intelligence.md`
 - Modify: `docs/mcp.md`
+- Modify: `skills/codex-usage-tracker/SKILL.md` and packaged mirror
+- Modify: `skills/codex-usage-api/SKILL.md` and packaged mirror
 
 **Interfaces:**
 
@@ -1016,17 +1024,17 @@ class AllowanceRequest:
 - `analysis` returns a compatible completed result or a generic job handle.
 - Existing allowance tools remain full-profile compatibility tools through 0.24.
 
-- [ ] **Step 1: Write failing application tests for every operation.** Cover empty index, stale status, finite ranges, invalid `all` use in interactive evidence, cursor conflicts, analysis reuse, insufficient evidence, and multiple supported changes.
+- [x] **Step 1: Write failing application tests for every operation.** Cover empty index, stale status, finite ranges, invalid `all` use in interactive evidence, cursor conflicts, analysis reuse, insufficient evidence, and multiple supported changes.
 
-- [ ] **Step 2: Implement the application facade.** Delegate to existing allowance v2 services and generic jobs. Remove no old code in this task.
+- [x] **Step 2: Implement the application facade.** Delegate to existing allowance v2 services and generic jobs. Remove no old code in this task.
 
-- [ ] **Step 3: Add the core tool.** Return one envelope schema whose `result_schema` varies by operation. Include a Limits dashboard target for each successful result.
+- [x] **Step 3: Add the core tool.** Return one envelope schema whose `result_schema` varies by operation. Include a Limits dashboard target for each successful result.
 
-- [ ] **Step 4: Add compatibility equivalence tests.** For identical fixtures, old `usage_allowance_status/series/evidence/analysis` payload semantics must equal the corresponding new operation after envelope removal.
+- [x] **Step 4: Add compatibility equivalence tests.** For identical fixtures, old `usage_allowance_status/series/evidence/analysis` payload semantics must equal the corresponding new operation after envelope removal.
 
-- [ ] **Step 5: Update docs and skills to prefer the consolidated tool.**
+- [x] **Step 5: Update docs and skills to prefer the consolidated tool.**
 
-- [ ] **Step 6: Verify.**
+- [x] **Step 6: Verify.**
 
 ```bash
 python -m pytest tests/application/test_allowance.py tests/cli/test_mcp_allowance.py tests/mcp/test_tool_profiles.py tests/allowance_intelligence -q
@@ -1035,7 +1043,7 @@ python scripts/check_release.py
 
 Expected: PASS; allowance calculations are unchanged.
 
-- [ ] **Step 7: Commit.**
+- [x] **Step 7: Commit.**
 
 ```bash
 git add src/codex_usage_tracker/application/allowance.py src/codex_usage_tracker/application/allowance_models.py src/codex_usage_tracker/interfaces/mcp/core_tools.py src/codex_usage_tracker/interfaces/mcp/registry.py src/codex_usage_tracker/cli/mcp_allowance.py tests/application/test_allowance.py tests/cli/test_mcp_allowance.py tests/mcp/test_tool_profiles.py docs/allowance-intelligence.md docs/mcp.md

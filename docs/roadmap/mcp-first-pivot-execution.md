@@ -202,8 +202,53 @@ commit as each roadmap task.
 - Deviations from plan: Jobs use a bounded process-local semantic index; comparison goals remain fail-closed.
 - Follow-up risks: Task 12 owns transport serialization; job persistence remains out of scope.
 
+## Task 12 - Add the core query and analysis MCP tools
+
+- Status: complete
+- Branch: `pivot/12-core-query-analysis`
+- Commits: `4dcbeb7`, `2f11833`
+- Focused verification: core query/analysis transports, default profile identity,
+  CLI compatibility, and application regressions; 69 tests passed.
+- Full verification: targeted Pyright and Ruff; format check; release checker;
+  skill-mirror byte comparison; diff/privacy review.
+- Deviations from plan: transport implementation lives in a focused private module
+  and is re-exported from `core_tools.py` so both files remain within source limits.
+- Follow-up risks: analysis jobs remain process-local; durable persistence is deferred.
+
+## Task 13 - Implement canonical evidence retrieval and `usage_evidence`
+
+- Status: complete
+- Branch: `pivot/13-canonical-evidence`
+- Commits: `319230e`, `bf8a5b5`, `981d8b6`, `ae58abc`
+- Focused verification: evidence contracts, all selector types, pagination,
+  dashboard targets, default profile registration, and Task 9/11/12 regressions;
+  353 primary tests, 74 application/job regressions, and 24 Task 12 regressions passed.
+- Full verification: targeted Pyright and Ruff; format check; release checker;
+  diff/privacy review; independent re-review after the ambiguity fix.
+- Deviations from plan: finding selectors accept an optional `analysis_id` so
+  report-local finding IDs cannot resolve ambiguously across compatible analyses.
+- Follow-up risks: analysis and finding evidence remains process-local until
+  durable analysis persistence is implemented.
+
+## Task 14 - Consolidate allowance operations behind `usage_allowance`
+
+- Status: complete
+- Branch: `pivot/14-allowance`
+- Commits: `d58242f`, `33dda26`, `58a44c6`, `2ebfe46`, plus this documentation commit.
+- Focused verification: every application operation, legacy payload equivalence,
+  MCP envelope/target/budget behavior, tool registration, allowance intelligence,
+  and server regressions; 441 tests passed. A combined Task 12/13 regression
+  superset passed 369 tests.
+- Full verification: targeted source Pyright; Ruff check and format check on all
+  touched Python files; release checker; skill-mirror retrieval tests; diff/privacy review.
+- Deviations from plan: result targets use the richer Limits v2 descriptor and
+  generic job polling. The public roadmap field remains `range`; the internal
+  builder uses `range_preset` to avoid shadowing the built-in.
+- Follow-up risks: analysis jobs remain process-local, five-hour analysis is not
+  supported, and individual allowance tools remain compatibility surfaces through 0.24.
+
 ## Remaining Planned Tasks
 
-Tasks 12 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 15 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
