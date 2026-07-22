@@ -361,8 +361,42 @@ commit as each roadmap task.
   Target Evidence kinds other than call still render through compatibility
   pages until Task 21 supplies the unified contextual renderer.
 
+## Task 19 - Build the Focused Evidence Console Home
+
+- Status: complete; the canonical Home route and its legacy Overview alias now
+  render the same focused operational summary instead of the broad legacy
+  dashboard.
+- Branch: `pivot/19-home-status`
+- Commits: `ff5dc7b` (`fix: restore Evidence Console route boundaries`),
+  `5847bc3` (`feat: add bounded Home status payload`), `879faae`
+  (`feat: load focused Home status`), `c90daac` (`feat: add focused Evidence
+  Console home`), plus this documentation commit.
+- Focused verification: 51 frontend tests passed across the Home view/model,
+  readiness refresh lifecycle, shell, canonical-link, and route contracts. The
+  Home store/status/shell and CLI integration targets passed 17 Python tests.
+- Full verification: dashboard type checking, lint, stylelint, the named
+  dashboard-governance gate, targeted Pyright, touched-file Ruff, and
+  `git diff --check` passed. A diagnostic full-dashboard run passed 499 of 588
+  tests; its 89 legacy Overview/workbench assertions are owned by Tasks 20
+  through 24 and no Task 19 named acceptance check remains failing.
+- Review: an independent review initially found four boundedness/scope issues:
+  an unbounded recommendation count, missing pricing and allowance data in the
+  fast payload, archived rows affecting active Home freshness, and overly wide
+  recent-evidence materialization. All four were fixed, and the narrow
+  independent re-review passed.
+- Deviations from plan: a narrow store-query module owns the hard three-finding
+  and five-evidence caps. The fast status payload carries pricing and allowance
+  coverage so Home does not need a report scan. The route contract moved to its
+  governance-approved feature boundary, and the three existing oversized
+  source files touched by this task were ratcheted downward. No publication
+  action was taken.
+- Follow-up risks: legacy Overview and workbench tests remain intentionally red
+  until Tasks 20 through 24 complete their parity migration. The static legacy
+  shell receives an embedded Home summary, while the React path intentionally
+  marks that summary deferred and loads the live bounded status endpoint.
+
 ## Remaining Planned Tasks
 
-Tasks 19 through 45 remain planned in the approved implementation roadmap. Add
+Tasks 20 through 45 remain planned in the approved implementation roadmap. Add
 a full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
