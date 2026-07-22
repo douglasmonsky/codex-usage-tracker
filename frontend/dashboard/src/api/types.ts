@@ -1,6 +1,9 @@
 import type { CallBillingFields, UsageBillingFields } from './billing';
 import type { DashboardDataScope, DashboardModelScope } from './dashboardDataScope';
+import type { ConversationalReadiness, HomeSummaryPayload, PricingSnapshot } from './homeTypes';
 import type { CallServiceTierFields, UsageServiceTierFields } from './serviceTier';
+
+export type { ConversationalReadiness, HomeFindingPayload, HomeRecentEvidencePayload, HomeStatusPayload, HomeSummaryPayload } from './homeTypes';
 
 export type UsageRow = UsageBillingFields & UsageServiceTierFields & {
   id?: string;
@@ -79,6 +82,8 @@ export type UsageRow = UsageBillingFields & UsageServiceTierFields & {
 
 export type DashboardBootPayload = DashboardDataScope & {
   conversational_analysis?: ConversationalReadiness;
+  home_summary?: HomeSummaryPayload;
+  home_summary_deferred?: boolean;
   api_token?: string;
   context_api_enabled?: boolean;
   refresh_jobs_available?: boolean;
@@ -102,6 +107,7 @@ rows?: UsageRow[];
   archived_available_rows?: number;
   pricing_configured?: boolean;
   pricing_source?: string | Record<string, unknown>;
+  pricing_snapshot?: PricingSnapshot;
   pricing_snapshot_warning?: string;
   allowance_configured?: boolean;
   allowance_source?: string | Record<string, unknown>;
@@ -114,14 +120,6 @@ rows?: UsageRow[];
   project_metadata_privacy?: ProjectMetadataPrivacy;
   privacy_mode?: string;
 shell_boot?: boolean; readiness_deferred?: boolean;
-};
-
-export type ConversationalReadiness = {
-  schema: 'codex-usage-tracker-conversational-readiness-v1';
-  state: 'ready' | 'restart-required' | 'unavailable' | 'unknown';
-  summary: string;
-  next_action: string | null;
-  evidence: string[];
 };
 
 type DedupeSummary = {
