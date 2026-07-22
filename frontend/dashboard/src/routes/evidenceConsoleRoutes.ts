@@ -90,12 +90,13 @@ export const evidenceConsoleRoutes = [
     placement: 'contextual',
     capabilities: capabilities(false),
     safeParams: [
-      'kind', 'record', 'record_id', 'thread_key', 'analysis_id', 'finding_id', 'evidence_id',
+      'kind', 'record', 'record_id', 'thread_key', 'analysis', 'analysis_id', 'finding',
+      'finding_id', 'evidence', 'evidence_id',
       'return', 'return_mode', 'mode', 'max_entries', 'max_chars', 'include_tool_output',
       'include_compaction_history',
     ],
     handoffParams: [
-      'kind', 'record', 'thread_key', 'analysis_id', 'finding_id', 'evidence_id', 'return',
+      'kind', 'record', 'thread_key', 'analysis', 'finding', 'evidence', 'return',
       'return_mode', 'mode',
     ],
   },

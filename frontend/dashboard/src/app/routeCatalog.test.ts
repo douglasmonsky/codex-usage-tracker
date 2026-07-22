@@ -49,7 +49,7 @@ describe('dashboard route catalog', () => {
     }
     expect(routeDefinition('explore').handoffParams).toContain('mode');
     expect(routeDefinition('evidence').handoffParams).toEqual([
-      'kind', 'record', 'thread_key', 'analysis_id', 'finding_id', 'evidence_id', 'return',
+      'kind', 'record', 'thread_key', 'analysis', 'finding', 'evidence', 'return',
       'return_mode', 'mode',
     ]);
     expect(routeDefinition('limits').handoffParams).toContain('window');
