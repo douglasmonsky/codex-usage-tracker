@@ -84,6 +84,10 @@ return (
         kind="transitioning"
         title="Available during transition"
         description="This workspace remains available in Release N while its future placement is prepared."
+        replacement={{
+          operation: 'usage_analyze(goal="context_bloat") or usage_analyze(goal="cache_failure")',
+          href: '?view=explore&mode=calls',
+        }}
       />
 
       <PageLoadProgress

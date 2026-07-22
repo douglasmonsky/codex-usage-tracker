@@ -32,6 +32,7 @@ EXPECTED_GOALS = {
     "model_effort_mix",
     "workflow_churn",
 }
+CANONICAL_DASHBOARD_DESTINATIONS = {"home", "explore", "limits", "evidence"}
 
 
 def test_catalog_is_exact_exhaustive_and_import_explicit() -> None:
@@ -58,6 +59,11 @@ def test_catalog_metadata_is_bounded_immutable_and_documented() -> None:
         assert entry.strategy.strategy_version == "1.0.0"
         with pytest.raises(FrozenInstanceError):
             entry.max_evidence_records = 0  # type: ignore[misc]
+
+
+def test_catalog_points_only_to_the_simplified_evidence_console() -> None:
+    for entry in ANALYSIS_CATALOG.values():
+        assert set(entry.dashboard_destinations) <= CANONICAL_DASHBOARD_DESTINATIONS
 
 
 def test_registration_rejects_duplicate_and_missing_goals() -> None:

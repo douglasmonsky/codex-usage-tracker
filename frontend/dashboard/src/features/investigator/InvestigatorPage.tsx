@@ -214,9 +214,13 @@ export function InvestigatorPage({
       </header>
 
       <FeatureMaturityBanner
-        kind="experimental"
-        title="Highly experimental"
-        description="Useful for technical exploration; methods and presentation may change."
+        kind="transitioning"
+        title="Available during transition"
+        description="This workspace remains available in Release N while its future placement is prepared."
+        replacement={{
+          operation: 'usage_analyze(goal="usage_spike") → usage_evidence',
+          href: '?view=explore&mode=calls',
+        }}
       />
 
       <PageLoadProgress

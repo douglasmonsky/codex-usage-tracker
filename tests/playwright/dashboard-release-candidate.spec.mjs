@@ -246,11 +246,11 @@ test.describe('R11 dashboard release candidate', () => {
   test('keeps direct lifecycle routes reachable with their maturity banners', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('codex-usage-dashboard-show-compatibility-labs-v1', 'false'));
     const routes = [
-      ['Investigate', '/?view=investigator&qa=release-n-direct', 'Feature maturity: Highly experimental'],
-      ['Compression Lab', '/?view=compression-lab&qa=release-n-direct', 'Feature maturity: Highly experimental'],
+      ['Investigate', '/?view=investigator&qa=release-n-direct', 'Feature maturity: Available during transition'],
+      ['Compression Lab', '/?view=compression-lab&qa=release-n-direct', 'Feature maturity: Available during transition'],
       ['Cache And Context Lab', '/?view=cache-context&qa=release-n-direct', 'Feature maturity: Available during transition'],
       ['Reports', '/?view=reports&qa=release-n-direct', 'Feature maturity: Available during transition'],
-      ['Diagnostics Notebook', '/?view=diagnostics&qa=release-n-direct', 'Feature maturity: Highly experimental'],
+      ['Diagnostics Notebook', '/?view=diagnostics&qa=release-n-direct', 'Feature maturity: Available during transition'],
     ];
     for (const [workspace, route, banner] of routes) {
       await openWorkspace(page, workspace, route);
@@ -347,8 +347,8 @@ test.describe('R11 dashboard release candidate', () => {
     )).toBeVisible();
 
     await page.goto('/?view=diagnostics&qa=release-n-locale');
-    await expect(page.getByRole('note', { name: 'Madurez de la función: Altamente experimental' })).toBeVisible();
-    await expect(page.getByText('Altamente experimental', { exact: true })).toBeVisible();
+    await expect(page.getByRole('note', { name: 'Madurez de la función: Disponible durante la transición' })).toBeVisible();
+    await expect(page.getByText('Disponible durante la transición', { exact: true })).toBeVisible();
     await expect(page.getByText('Highly experimental', { exact: true })).toHaveCount(0);
   });
 });

@@ -147,9 +147,13 @@ export function CompressionLabPage({
       </header>
 
       <FeatureMaturityBanner
-        kind="experimental"
-        title="Highly experimental"
-        description="Useful for technical exploration; methods and presentation may change."
+        kind="transitioning"
+        title="Available during transition"
+        description="This workspace remains available in Release N while its future placement is prepared."
+        replacement={{
+          operation: 'usage_analyze(goal="token_waste"); full-profile compression tools through 0.24.x',
+          href: '?view=explore&mode=calls',
+        }}
       />
 
       {running && runProgress?.progress ? (

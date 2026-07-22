@@ -26,6 +26,7 @@
 .copy { display: grid; gap: var(--space-1); min-width: 0; }
 .copy strong { font-size: 13px; }
 .copy p { margin: 0; color: var(--ink-muted); font-size: 12px; line-height: 1.45; }
+.copy code { color: var(--ink-strong); font-size: 11px; overflow-wrap: anywhere; }
 
 .action {
   display: inline-flex;
@@ -40,6 +41,7 @@
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-control);
   cursor: pointer;
+  text-decoration: none;
 }
 
 .action:hover { border-color: var(--signal-context); }

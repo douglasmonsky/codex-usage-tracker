@@ -33,6 +33,25 @@ describe('dashboard route catalog', () => {
     expect(routeCatalog.filter(route => route.experimentalNavigationEligible)).toEqual([]);
   });
 
+  it('keeps every deprecated workbench direct-only with a concrete replacement', () => {
+    const deprecatedWorkbenches = {
+      investigator: 'usage_analyze(goal="usage_spike") → usage_evidence',
+      'compression-lab': 'usage_analyze(goal="token_waste"); full-profile compression tools through 0.24.x',
+      'cache-context': 'usage_analyze(goal="context_bloat") or usage_analyze(goal="cache_failure")',
+      diagnostics: 'usage_query(entity="call", measures=["tokens"]) → usage_evidence',
+      reports: 'usage_analyze(goal="usage_spike") or usage_query(...)',
+    } as const;
+
+    for (const id of Object.keys(deprecatedWorkbenches) as Array<keyof typeof deprecatedWorkbenches>) {
+      expect(routeDefinition(id)).toMatchObject({
+        placement: 'hidden',
+        lifecycle: 'deprecated',
+        replacementMcpOperation: deprecatedWorkbenches[id],
+        replacementHref: '?view=explore&mode=calls',
+      });
+    }
+  });
+
   it('exposes exactly three analytical destinations and Settings as a utility', () => {
     expect(navigationForPhase('simplified').map(route => route.id)).toEqual([
       'home', 'explore', 'limits',

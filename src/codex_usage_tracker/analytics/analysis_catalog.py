@@ -32,14 +32,10 @@ from codex_usage_tracker.reports import subagent_usage as subagent_reports
 
 SUPPORTED_DASHBOARD_DESTINATIONS = frozenset(
     {
-        "overview",
-        "investigator",
-        "calls",
-        "threads",
-        "usage-drain",
-        "cache-context",
-        "diagnostics",
-        "reports",
+        "home",
+        "explore",
+        "limits",
+        "evidence",
     }
 )
 CompatibilityDelegate = Literal["agentic", "hypothesis", "subagent", "recommendations"]
@@ -146,7 +142,7 @@ _CATALOG_ENTRIES = (
         "hypothesis",
         _COMPARISON,
         ("pricing_coverage", "subagent_facts"),
-        ("overview", "threads"),
+        ("evidence", "explore"),
         10,
         18,
     ),
@@ -155,16 +151,16 @@ _CATALOG_ENTRIES = (
         "agentic",
         _CANONICAL,
         ("recommendation_facts", "diagnostic_facts"),
-        ("investigator", "calls"),
+        ("evidence", "explore"),
     ),
-    _entry("context_bloat", "agentic", _CANONICAL, _DIAGNOSTIC, ("cache-context", "calls")),
-    _entry("cache_failure", "agentic", _CANONICAL, _DIAGNOSTIC, ("cache-context", "calls")),
+    _entry("context_bloat", "agentic", _CANONICAL, _DIAGNOSTIC, ("evidence", "explore")),
+    _entry("cache_failure", "agentic", _CANONICAL, _DIAGNOSTIC, ("evidence", "explore")),
     _entry(
         "subagent_cost",
         "subagent",
         _CANONICAL,
         ("pricing_coverage", "credit_coverage"),
-        ("threads", "overview"),
+        ("explore", "evidence"),
         10,
         18,
     ),
@@ -173,26 +169,26 @@ _CATALOG_ENTRIES = (
         "hypothesis",
         ("canonical_usage", "service_tier_coverage"),
         _PRICING,
-        ("usage-drain", "calls"),
+        ("limits", "evidence"),
     ),
     _entry(
         "pricing_gaps",
         "recommendations",
         ("canonical_usage", "pricing_coverage"),
         ("credit_coverage", "recommendation_facts"),
-        ("reports", "calls"),
+        ("home", "explore"),
     ),
     _entry(
-        "thread_comparison", "hypothesis", _COMPARISON, _PRICING, ("threads", "overview"), 10, 18
+        "thread_comparison", "hypothesis", _COMPARISON, _PRICING, ("explore", "evidence"), 10, 18
     ),
     _entry(
         "model_effort_mix",
         "hypothesis",
         _CANONICAL,
         ("pricing_coverage", "service_tier_coverage"),
-        ("overview", "reports"),
+        ("home", "explore"),
     ),
-    _entry("workflow_churn", "agentic", _CANONICAL, _DIAGNOSTIC, ("investigator", "diagnostics")),
+    _entry("workflow_churn", "agentic", _CANONICAL, _DIAGNOSTIC, ("evidence", "explore")),
 )
 
 

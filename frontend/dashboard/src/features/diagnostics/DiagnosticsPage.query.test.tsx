@@ -45,8 +45,8 @@ describe('DiagnosticsPage query lifecycle', () => {
     const client = createDashboardQueryClient();
 
     const first = renderDiagnostics(client);
-    expect(screen.getByRole('note', { name: 'Feature maturity: Highly experimental' })).toHaveTextContent(
-      'Useful for technical exploration; methods and presentation may change.',
+    expect(screen.getByRole('note', { name: 'Feature maturity: Available during transition' })).toHaveTextContent(
+      'usage_query(entity="call", measures=["tokens"]) → usage_evidence',
     );
     const modules = await screen.findByLabelText('Loading diagnostic snapshots modules');
     await waitFor(() => {

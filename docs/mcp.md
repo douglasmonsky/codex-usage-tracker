@@ -148,6 +148,26 @@ Deprecated tool descriptions name the stable replacement and `0.25.0` as the
 earliest removal release. Seven local operations without one-call core parity
 remain active, advanced `full` tools; see [Deprecations](deprecations.md).
 
+## Dashboard workbench replacements
+
+The default dashboard contains Home, Explore, and Limits, with Settings as a
+utility and Evidence opened contextually. Legacy analytical workbench URLs stay
+directly reachable through `0.24.x`, but new investigations should use these
+core requests:
+
+| Job | Core request | Evidence surface |
+| --- | --- | --- |
+| Usage drivers | `usage_analyze(goal="usage_spike")` | Finding, Call, or Thread Evidence |
+| Token waste | `usage_analyze(goal="token_waste")` | Finding Evidence and Explore |
+| Context/cache | `usage_analyze(goal="context_bloat")` or `usage_analyze(goal="cache_failure")` | Call or Thread Evidence |
+| Command/file churn | `usage_analyze(goal="workflow_churn")` | Finding Evidence |
+| Diagnostic facts | `usage_query(...)`, then `usage_evidence(...)` | Explore and contextual Evidence |
+| Subagents | `usage_query(entity="subagent")` or `usage_analyze(goal="subagent_cost")` | Explore and contextual Evidence |
+
+Compression candidate ranking remains available through the full profile until
+`0.25.0`. The executable fixture, accounting, scope, caveat, and canonical-ID
+record is [Dashboard Sunset Job Parity V2](dashboard-sunset-job-parity-v2.md).
+
 The complete catalog across all three profiles is:
 
 - `refresh_usage_index`
