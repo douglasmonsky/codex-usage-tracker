@@ -17,12 +17,14 @@ _EPOCH = "1970-01-01T00:00:00Z"
 _STAGE_UNSAFE = re.compile(r"[^a-z0-9_.-]+")
 _SAFE_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@+-]{0,255}\Z")
 _PRIVATE_TEXT = re.compile(
-    r"file://|~/|/(?:Users|private|tmp|var/folders|home|Volumes)/|"
+    r"[A-Za-z][A-Za-z0-9+.-]*://|~/|/(?:Users|private|tmp|var/folders|home|Volumes)/|"
     r"(?<![:/\w])/(?:[^/\s]+/)+[^/\s]+|"
     r"[A-Za-z]:[\\/]|\\\\[^\\\s]+[\\/]",
     re.IGNORECASE,
 )
-_EXCEPTION_TEXT = re.compile(r"traceback|(?:exception|error)(?:\s*:|\b)", re.IGNORECASE)
+_EXCEPTION_TEXT = re.compile(
+    r"\b[Tt]raceback\b|\b(?:[A-Z][A-Za-z0-9_.]*(?:Exception|Error)|Exception|Error)\s*:"
+)
 
 
 def request_hash(value: object) -> str:
@@ -262,7 +264,7 @@ def _safe_result(value: object) -> object:
 
 
 def _private_result_key(key: str) -> bool:
-    normalized = key.lower()
+    normalized = re.sub(r"[^a-z0-9]+", "", key.lower())
     if _PRIVATE_TEXT.search(key) or "/" in key or "\\" in key:
         return True
     return any(
@@ -270,11 +272,11 @@ def _private_result_key(key: str) -> bool:
         for marker in (
             "path",
             "artifact",
-            "request_key",
+            "requestkey",
             "worker",
             "exception",
             "traceback",
-            "source_file",
+            "sourcefile",
         )
     )
 

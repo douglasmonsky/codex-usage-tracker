@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import threading
 from dataclasses import replace
 from typing import cast
@@ -13,6 +14,7 @@ from codex_usage_tracker.jobs.models import JobAdapter, JobHandle, JobKind, JobS
 MAX_COMPACT_STATUS_BYTES = 16 * 1024
 _STATE_RANK = {"queued": 0, "running": 1, "completed": 2, "failed": 2, "cancelled": 2}
 _EPOCH = "1970-01-01T00:00:00Z"
+_REQUEST_HASH = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
 class JobService:
@@ -202,7 +204,11 @@ def _registration_changed(job_id: str) -> JobStatusV1:
 
 def _adapter_failed(handle: JobHandle) -> JobStatusV1:
     fingerprint = getattr(handle.adapter, "request_hash", None)
-    safe_hash = fingerprint if isinstance(fingerprint, str) else request_hash(handle.job_id)
+    safe_hash = (
+        fingerprint
+        if isinstance(fingerprint, str) and _REQUEST_HASH.fullmatch(fingerprint)
+        else request_hash(handle.job_id)
+    )
     return JobStatusV1(
         job_id=handle.job_id,
         kind=handle.kind,

@@ -357,6 +357,28 @@ def test_adapter_exception_is_stable_and_does_not_leak_text() -> None:
     assert "RuntimeError" not in encoded
 
 
+def test_broken_adapter_request_hash_is_recomputed_without_leaking() -> None:
+    class BrokenAdapter:
+        request_hash = "raw/private/request-key"
+        result_schema = "analysis.result.v1"
+        result_budget = 4096
+
+        def status(self, job_id: str, *, include_result: bool = False) -> dict[str, object]:
+            raise RuntimeError("SYNTHETIC_PRIVATE_ADAPTER_FAILURE")
+
+    service = JobService()
+    service.register(kind="analysis", job_id="broken-hash", adapter=BrokenAdapter())
+
+    status = service.status("broken-hash")
+    encoded = json.dumps(status.to_payload())
+
+    assert status.error is not None
+    assert status.error.code == "job.adapter_failed"
+    assert status.request_hash == request_hash("broken-hash")
+    assert "raw/private" not in encoded
+    assert "SYNTHETIC_PRIVATE_ADAPTER_FAILURE" not in encoded
+
+
 def test_blocking_adapter_does_not_block_unrelated_status_or_registration() -> None:
     entered = threading.Event()
     release = threading.Event()
@@ -533,16 +555,26 @@ def test_adversarial_nested_result_is_projected_without_private_values() -> None
             "~/Library/Application Support/private.db",
             r"C:\\Users\\Alice\\secret.txt",
             r"\\server\\share\\secret.txt",
+            "s3://private-bucket/report.json",
+            "custom+private://opaque-host/report.json",
             object(),
         ],
         "artifact_id": "artifact-secret",
         "worker_internal": "worker-secret",
         "request_key": "request-secret",
+        "request-key": "request-dash-secret",
+        "request.key": "request-dot-secret",
+        "requestKey": "request-camel-secret",
+        "source-file": "source-file-secret",
+        "sourcePath": "source-path-secret",
+        "exception.message": "exception-secret",
         "/tmp/path-key": "value",
         "traceback": "Traceback: private exception",
     }
     payload = _analysis_payload("privacy", 100, state="completed")
     payload["result"] = legacy
+    original_keys = set(legacy)
+    original_nested = list(legacy["nested"])
     before_safe_total = legacy["safe_total"]
     service = JobService()
     service.register(
@@ -566,13 +598,48 @@ def test_adversarial_nested_result_is_projected_without_private_values() -> None
         "~/",
         "C:\\\\",
         "\\\\server",
+        "s3://",
+        "custom+private://",
         "artifact-secret",
         "worker-secret",
         "request-secret",
+        "request-dash-secret",
+        "request-dot-secret",
+        "request-camel-secret",
+        "source-file-secret",
+        "source-path-secret",
+        "exception-secret",
         "Traceback",
     ):
         assert private not in encoded
     assert before_safe_total == legacy["safe_total"]
+    assert set(legacy) == original_keys
+    assert legacy["nested"] == original_nested
+
+
+def test_benign_error_rate_text_survives_result_projection() -> None:
+    payload = _analysis_payload("benign-text", 100, state="completed")
+    payload["result"] = {
+        "safe_total": 3,
+        "summary": "model error rate is 2%",
+        "label": "no exception occurred",
+    }
+    service = JobService()
+    service.register(
+        kind="analysis",
+        job_id="benign-text",
+        adapter=AnalysisJobAdapter(
+            _reader(payload), kind="analysis", request_hash=request_hash("benign-text")
+        ),
+    )
+
+    status = service.status("benign-text", include_result=True)
+
+    assert status.result == {
+        "safe_total": 3,
+        "summary": "model error rate is 2%",
+        "label": "no exception occurred",
+    }
 
 
 def test_whole_status_budget_and_unsafe_result_fail_stably() -> None:
