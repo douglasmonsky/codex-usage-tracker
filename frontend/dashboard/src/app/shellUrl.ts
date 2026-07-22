@@ -1,6 +1,7 @@
 import { isViewId, type ViewId } from './navigation';
 import { routeCatalog, routeDefinition } from './routeCatalog';
 import type { HistoryScope } from '../data/dataScope';
+import { exploreModeFromSearch } from '../routes/dashboardSearch';
 import { normalizeDashboardRouteInput } from '../routes/legacyRouteAliases';
 
 export type { HistoryScope } from '../data/dataScope';
@@ -61,6 +62,51 @@ export function normalizeLegacyShellUrl(url: URL): boolean {
   const viewChanged = normalizeRouteParam(url, 'view');
   const returnChanged = normalizeRouteParam(url, 'return');
   return viewChanged || returnChanged;
+}
+
+export function callEvidenceUrl({
+  currentUrl,
+  activeView,
+  returnView: configuredReturnView,
+  recordId,
+}: {
+  currentUrl: URL;
+  activeView: ViewId;
+  returnView: ViewId;
+  recordId: string;
+}): { url: URL; returnView: ViewId; returningFromEvidence: boolean } {
+  const url = new URL(currentUrl);
+  normalizeLegacyShellUrl(url);
+  const returningFromEvidence = activeView === 'evidence' || activeView === 'call';
+  const returnView = returningFromEvidence ? configuredReturnView : activeView;
+  clearInactiveViewSearchParams(url, 'evidence', returnView);
+  url.searchParams.set('view', 'evidence');
+  url.searchParams.set('kind', 'call');
+  url.searchParams.set('record', recordId);
+  url.searchParams.set('return', returnView);
+  if (returnView === 'explore') {
+    url.searchParams.set(
+      'return_mode',
+      activeView === 'explore' ? exploreModeFromSearch(currentUrl.search) : 'calls',
+    );
+  }
+  return { url, returnView, returningFromEvidence };
+}
+
+export function callEvidenceReturnParams(search: string, returnView: ViewId): Record<string, string> {
+  const returnMode = new URLSearchParams(search).get('return_mode');
+  return returnView === 'explore' && (returnMode === 'calls' || returnMode === 'threads')
+    ? { mode: returnMode }
+    : {};
+}
+
+export function currentCallEvidenceUrl(currentUrl: URL, recordId: string): URL {
+  return callEvidenceUrl({
+    currentUrl,
+    activeView: 'evidence',
+    returnView: callReturnViewFromSearch(currentUrl.search),
+    recordId,
+  }).url;
 }
 
 function normalizeRouteParam(url: URL, key: 'view' | 'return'): boolean {

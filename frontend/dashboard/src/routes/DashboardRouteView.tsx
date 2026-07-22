@@ -1,7 +1,7 @@
 import { lazyRouteComponent } from '@tanstack/react-router';
 import { Suspense, type ReactNode } from 'react';
 
-import type { ContextRuntime, ConversationalReadiness, DashboardBootPayload, DashboardLanguage, DashboardModel } from '../api/types';
+import type { ContextRuntime, ConversationalReadiness, DashboardBootPayload, DashboardLanguage, DashboardModel, HomeSummaryPayload } from '../api/types';
 import type { HistoryScope, LoadWindow } from '../data/dataScope';
 import type { DashboardSourceIdentity } from '../data/queryRuntime';
 import {
@@ -10,7 +10,7 @@ import {
   type DashboardViewId,
 } from './dashboardSearch';
 
-const OverviewPage = lazyRouteComponent(() => import('../features/overview/OverviewPage'), 'OverviewPage');
+const HomePage = lazyRouteComponent(() => import('../features/home/HomePage'), 'HomePage');
 const InvestigatorPage = lazyRouteComponent(() => import('../features/investigator/InvestigatorPage'), 'InvestigatorPage');
 const CompressionLabPage = lazyRouteComponent(() => import('../features/compression-lab/CompressionLabPage'), 'CompressionLabPage');
 const ExploreRoutePage = lazyRouteComponent(() => import('../features/explore/ExploreRoutePage'), 'ExploreRoutePage');
@@ -29,11 +29,11 @@ const dashboardRouteComponents: Array<{
   id: DashboardViewId;
   component: { preload?: () => Promise<unknown> };
 }> = [
-  { id: 'home', component: OverviewPage },
+  { id: 'home', component: HomePage },
   { id: 'explore', component: ExploreRoutePage },
   { id: 'limits', component: UsageDrainPage },
   { id: 'evidence', component: CallInvestigatorPage },
-  { id: 'overview', component: OverviewPage },
+  { id: 'overview', component: HomePage },
   { id: 'investigator', component: InvestigatorPage },
   { id: 'compression-lab', component: CompressionLabPage },
   { id: 'calls', component: ExploreRoutePage },
@@ -70,6 +70,7 @@ type DashboardRouteViewProps = {
   globalQuery: string;
   hasMoreRows: boolean;
   historyScope: HistoryScope;
+  homeSummary?: HomeSummaryPayload;
   loadWindow: LoadWindow;
   loadAllRows: () => void;
   loadedRowCount: number;
@@ -116,6 +117,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     globalQuery,
     hasMoreRows,
     historyScope,
+    homeSummary,
     loadWindow,
     loadAllRows,
     loadedRowCount,
@@ -139,22 +141,14 @@ function renderDashboardView(props: DashboardRouteViewProps) {
   switch (renderedView) {
     case 'overview':
       return (
-        <OverviewPage
-          conversationalAnalysis={conversationalAnalysis}
-          model={model}
-          contextRuntime={contextRuntime}
-          sourceKey={sourceIdentity.sourceKey}
-          sourceRevision={sourceIdentity.sourceRevision}
-          onRefresh={onRefresh}
-          globalQuery={globalQuery}
-          runtime={{ historyScope, loadLimit, loadWindow, loadedRowCount, scopeSince, totalAvailableRows }}
+        <HomePage
+          payload={dashboardPayload}
+          summary={homeSummary}
+          readiness={conversationalAnalysis}
           refreshing={refreshing}
-          canLoadMoreRows={canUseLiveApi && hasMoreRows}
-          onLoadMoreRows={loadMoreRows}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          onNavigateView={navigateView}
-          globalFilters={globalFilters}
+          onRefresh={onRefresh}
+          onNavigate={navigateView}
+          onOpenCall={openCallInvestigator}
         />
       );
     case 'investigator':

@@ -9,13 +9,13 @@ describe('React dashboard call investigator link URL state', () => {
         configurable: true,
         value: { writeText },
       });
-      window.history.replaceState(null, '', '/?view=overview&qa=row-copy');
+      window.history.replaceState(null, '', '/?view=explore&mode=calls&qa=row-copy');
 
  render(<App />);
  const copyButton = screen.getByRole('button', { name: /Copy link for thread-9f3a1c codex-1/i });
  fireEvent.keyDown(copyButton, { key: 'Enter' });
  expect(screen.queryByRole('heading', { name: 'Call Investigator' })).not.toBeInTheDocument();
- expect(window.location.search).toContain('view=home');
+ expect(window.location.search).toContain('view=explore');
  fireEvent.click(copyButton);
 
       await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
@@ -23,9 +23,10 @@ describe('React dashboard call investigator link URL state', () => {
       expect(copiedUrl.searchParams.get('view')).toBe('evidence');
       expect(copiedUrl.searchParams.get('kind')).toBe('call');
       expect(copiedUrl.searchParams.get('record')).toBe('fixture-call-0');
-      expect(copiedUrl.searchParams.get('return')).toBe('home');
+      expect(copiedUrl.searchParams.get('return')).toBe('explore');
+      expect(copiedUrl.searchParams.get('return_mode')).toBe('calls');
       expect(copiedUrl.searchParams.get('qa')).toBe('row-copy');
-  expect(window.location.search).toContain('view=home');
+  expect(window.location.search).toContain('view=explore');
   expect(await screen.findByText('Copied call investigator link')).toBeInTheDocument();
   });
 
@@ -197,7 +198,8 @@ describe('React dashboard call investigator link URL state', () => {
     expect(await screen.findByText('Copied call investigator link')).toBeInTheDocument();
   });
 
-  it('opens the full-page call investigator from a single overview recent-call row click', () => {
+  it('opens the full-page call investigator from a single Explore call row click', () => {
+      window.history.replaceState(null, '', '/?view=explore&mode=calls');
       render(<App />);
 
     fireEvent.click(screen.getByText('thread-9f3a1c'));

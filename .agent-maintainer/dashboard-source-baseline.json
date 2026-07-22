@@ -7,8 +7,8 @@
     },
     "frontend/dashboard/src/App.tsx": {
       "group": "source",
-      "nonblank": 708,
-      "physical": 751
+      "nonblank": 706,
+      "physical": 749
     },
     "frontend/dashboard/src/api/client.ts": {
       "group": "source",
@@ -17,8 +17,8 @@
     },
     "frontend/dashboard/src/api/types.ts": {
       "group": "source",
-      "nonblank": 431,
-      "physical": 458
+      "nonblank": 429,
+      "physical": 456
     },
     "frontend/dashboard/src/app/zh-Hans/advancedPages.ts": {
       "group": "source",
@@ -37,8 +37,8 @@
     },
     "frontend/dashboard/src/features/call-investigator/CallInvestigatorPage.tsx": {
       "group": "source",
-      "nonblank": 762,
-      "physical": 808
+      "nonblank": 761,
+      "physical": 807
     },
     "frontend/dashboard/src/features/diagnostics/DiagnosticFactsPanels.tsx": {
       "group": "source",

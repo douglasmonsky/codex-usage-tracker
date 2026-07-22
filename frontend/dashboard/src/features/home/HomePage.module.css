@@ -1,0 +1,178 @@
+.page {
+  display: grid;
+  gap: var(--space-6, 1.5rem);
+}
+
+.header {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--space-5, 1.25rem);
+  justify-content: space-between;
+}
+
+.header h1,
+.sectionHeading h2 {
+  margin: 0;
+}
+
+.header > div:first-child > p:last-child {
+  color: var(--text-muted);
+  margin: 0.5rem 0 0;
+  max-width: 46rem;
+}
+
+.eyebrow {
+  color: var(--accent-strong, #2563eb);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+}
+
+.actions,
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.copyStatus {
+  color: var(--text-muted);
+  margin: -1rem 0 0;
+  min-height: 1.25rem;
+}
+
+.statusGrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.statusCard,
+.finding,
+.section {
+  background: var(--surface-raised, #fff);
+  border: 1px solid var(--border-subtle, #d9dee8);
+  border-radius: var(--radius-lg, 0.75rem);
+}
+
+.statusCard {
+  min-width: 0;
+  padding: 1rem;
+}
+
+.statusCard > strong {
+  display: block;
+  font-size: 1.25rem;
+  margin-top: 0.8rem;
+}
+
+.statusCard p,
+.finding p {
+  color: var(--text-muted);
+  margin: 0.45rem 0 0;
+}
+
+.cardHeading,
+.sectionHeading {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.cardHeading > span:first-child {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.section {
+  padding: 1.1rem;
+}
+
+.sectionHeading {
+  margin-bottom: 1rem;
+}
+
+.sectionHeading > span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.findings {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.finding {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.finding h3,
+.finding strong,
+.finding p {
+  margin: 0;
+}
+
+.evidenceList {
+  display: grid;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.evidenceList li {
+  align-items: center;
+  border-top: 1px solid var(--border-subtle, #d9dee8);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.8rem 0;
+}
+
+.evidenceList li:first-child {
+  border-top: 0;
+}
+
+.evidenceList li div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.evidenceList span,
+.empty {
+  color: var(--text-muted);
+}
+
+.empty {
+  margin: 0;
+  padding: 0.75rem 0;
+}
+
+@media (max-width: 1100px) {
+  .statusGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .findings {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .header,
+  .evidenceList li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .statusGrid {
+    grid-template-columns: 1fr;
+  }
+}

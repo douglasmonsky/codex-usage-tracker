@@ -28,8 +28,8 @@ import {
   type LoadWindow,
 } from './app/rowLimit';
 import {
-  callReturnViewFromSearch,
-  callReturnViewLabel,
+  callEvidenceReturnParams, callEvidenceUrl,
+  callReturnViewFromSearch, callReturnViewLabel,
   clearInactiveViewSearchParams,
   hasCallReturnViewParam,
   historyScopeFromUrl,
@@ -38,7 +38,6 @@ import {
   type HistoryScope,
   viewFromUrlParam,
 } from './app/shellUrl';
-import { exploreModeFromSearch } from './routes/dashboardSearch';
 import { normalizeDashboardRouteInput } from './routes/legacyRouteAliases';
 import { modelFromBootPayload, readBootPayload, type RefreshProgressPayload } from './api/client';
 import { clearDiagnosticApiCache } from './api/diagnostics';
@@ -103,7 +102,7 @@ const initialLiveLoadAttempted = useRef(false);
   const [loadWindow, setLoadWindow] = useState<LoadWindow>(() => initialLoadWindowFromPayload(initialPayload));
   const [historyScope, setHistoryScope] = useState<HistoryScope>(() => historyScopeFromUrl(historyScopeFromPayload(initialPayload)));
   const [contextApiEnabled, setContextApiEnabled] = useState(model.contextRuntime.contextApiEnabled);
-const { canUseLiveApi, conversationalAnalysis } = useConversationalReadiness(initialPayload, dashboardPayload);
+const { canUseLiveApi, conversationalAnalysis, homeSummary } = useConversationalReadiness(initialPayload, dashboardPayload);
 const sourceIdentity = useMemo(() => dashboardSourceIdentityFromPayload(dashboardPayload), [dashboardPayload]);
 const shellI18n = useMemo(() => createShellI18n(dashboardPayload, language), [dashboardPayload, language]);
 const contextRuntime = useMemo<ContextRuntime>(
@@ -114,9 +113,7 @@ const legacyShellFilteredModel = useMemo(
 () => modelWithLegacyShellFilters(model, historyScope, locationSearch),
 [historyScope, locationSearch, model],
 );
-const scopedModel = ['calls', 'call', 'explore', 'evidence'].includes(activeView)
-  ? model
-  : legacyShellFilteredModel;
+const scopedModel = ['calls', 'call', 'explore', 'evidence'].includes(activeView) ? model : legacyShellFilteredModel;
 const canAutoRefreshUsageRows = shouldAutoRefreshUsageView(activeView);
   const finitePendingLoadLimit = finiteRowLimitFallback(pendingLoadLimit, loadLimit, 500);
   const loadedRowCount = Math.max(0, Number(dashboardPayload?.loaded_row_count ?? dashboardPayload?.rows?.length ?? model.calls.length ?? 0));
@@ -163,9 +160,7 @@ function setView(view: ViewId, routeParams: Record<string, string> = {}) {
     setActivePreset('');
   const url = new URL(window.location.href);
   url.searchParams.set('view', targetView);
-  Object.entries({ ...normalized.params, ...routeParams }).forEach(([name, value]) => {
-    url.searchParams.set(name, value);
-  });
+  Object.entries({ ...normalized.params, ...routeParams }).forEach(([name, value]) => url.searchParams.set(name, value));
   url.searchParams.delete('preset');
   clearInactiveViewSearchParams(url, targetView);
   if (targetView !== 'evidence') {
@@ -194,9 +189,7 @@ useEffect(() => {
 useEffect(() => {
   function hydrateShellFromLocation() {
     const url = new URL(window.location.href);
-    if (normalizeLegacyShellUrl(url)) {
-      window.history.replaceState(null, '', url);
-    }
+    if (normalizeLegacyShellUrl(url)) window.history.replaceState(null, '', url);
     const search = url.search;
     const params = new URLSearchParams(search);
     setActiveView(viewFromUrlParam(params.get('view')));
@@ -245,35 +238,18 @@ useEffect(() => {
   }, []);
 
 function openCallInvestigator(recordId: string) {
-const returnView = activeView === 'evidence' || activeView === 'call' ? callReturnView : activeView;
-setCallReturnView(returnView);
-setCallReturnViewExplicit(activeView === 'evidence' || activeView === 'call' ? callReturnViewExplicit : true);
+const destination = callEvidenceUrl({
+  currentUrl: new URL(window.location.href), activeView, returnView: callReturnView, recordId,
+});
+setCallReturnView(destination.returnView);
+setCallReturnViewExplicit(destination.returningFromEvidence ? callReturnViewExplicit : true);
 setActiveView('evidence');
 setActiveRecordId(recordId);
-const url = new URL(window.location.href);
-clearInactiveViewSearchParams(
-  url,
-  'evidence',
-  activeView === 'evidence' || activeView === 'call' ? callReturnView : activeView,
-);
-url.searchParams.set('view', 'evidence');
-url.searchParams.set('kind', 'call');
-url.searchParams.set('record', recordId);
-url.searchParams.set('return', returnView);
-if (returnView === 'explore') {
-  url.searchParams.set('return_mode', activeView === 'explore' ? exploreModeFromSearch() : 'calls');
-}
-pushShellUrl(url);
+pushShellUrl(destination.url);
 }
 
 function backFromCallInvestigator() {
-const returnMode = new URLSearchParams(window.location.search).get('return_mode');
-setView(
-  callReturnView,
-  callReturnView === 'explore' && (returnMode === 'calls' || returnMode === 'threads')
-    ? { mode: returnMode }
-    : {},
-);
+setView(callReturnView, callEvidenceReturnParams(window.location.search, callReturnView));
 }
 
   function updateGlobalQuery(value: string) {
@@ -485,11 +461,7 @@ function handleLanguageChange(nextLanguage: string) {
     try {
       const url = new URL(window.location.href);
       normalizeLegacyShellUrl(url);
-      clearInactiveViewSearchParams(
-        url,
-        activeView,
-        activeView === 'call' || activeView === 'evidence' ? callReturnView : [],
-      );
+      clearInactiveViewSearchParams(url, activeView, activeView === 'call' || activeView === 'evidence' ? callReturnView : []);
       const copied = await copyText(url.toString());
       if (!copied) {
         throw new Error('Clipboard unavailable');
@@ -502,23 +474,10 @@ function handleLanguageChange(nextLanguage: string) {
 
   async function copyCallInvestigatorLink(recordId: string) {
     try {
-      const url = new URL(window.location.href);
-      clearInactiveViewSearchParams(
-        url,
-        'evidence',
-        activeView === 'call' || activeView === 'evidence' ? callReturnView : activeView,
-      );
-      const returnView = activeView === 'call' || activeView === 'evidence'
-        ? callReturnView
-        : activeView;
-      url.searchParams.set('view', 'evidence');
-      url.searchParams.set('kind', 'call');
-      url.searchParams.set('record', recordId);
-url.searchParams.set('return', returnView);
-if (returnView === 'explore') {
-  url.searchParams.set('return_mode', activeView === 'explore' ? exploreModeFromSearch() : 'calls');
-}
-const copied = await copyText(url.toString());
+const destination = callEvidenceUrl({
+  currentUrl: new URL(window.location.href), activeView, returnView: callReturnView, recordId,
+});
+const copied = await copyText(destination.url.toString());
 if (!copied) {
 throw new Error('Clipboard unavailable');
 }
@@ -739,6 +698,7 @@ aria-label="History scope"
         backFromCallInvestigator={backFromCallInvestigator}
         dashboardPayload={dashboardPayload}
         conversationalAnalysis={conversationalAnalysis}
+        homeSummary={homeSummary}
         sourceIdentity={sourceIdentity}
         historyScope={historyScope}
         loadWindow={loadWindow}
