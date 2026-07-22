@@ -638,8 +638,48 @@ commit as each roadmap task.
   their documented window. The repository-wide inherited verifier debt remains
   owned by later architecture, CI, and release-hardening roadmap tasks.
 
+## Task 26 - Introduce the Simplified CLI Hierarchy
+
+- Status: complete; primary help now exposes exactly `setup`, `status`,
+  `doctor`, `refresh`, `analyze`, `query`, `open`, `export`, `config`,
+  `service`, and `admin`. All historical top-level spellings remain parseable
+  through `0.24.x` but are hidden from primary help, and interactive alias
+  notices are isolated to stderr.
+- Branch: `pivot/26-simplified-cli`
+- Commits: `10314a9` (`feat: add simplified CLI hierarchy`), `7d71cf1`
+  (`feat: route stable CLI application commands`), `9a73642` (`docs: publish
+  simplified CLI migration`), plus this documentation commit.
+- Behavior: `status`, bounded `query`, and `analyze` serialize the shared v2
+  application contracts. Old-only query filters and `--limit 0` retain the v1
+  compatibility path. `open` resolves Home, call, thread, target ID, or strict
+  dashboard-target-v2 JSON and opens only matching loopback URLs. Configuration,
+  service, operational, dogfood, and manual MCP commands are routed through the
+  documented namespaces without duplicating their existing option builders.
+- Verification: 191 tests passed across the new parser and command adapters,
+  CLI release contracts, legacy CLI lifecycle, and i18n. Focused Ruff lint and
+  formatting, project-interpreter Pyright, Python compileall, release readiness,
+  `git diff --check`, primary/nested help smoke tests, and a real empty-state
+  `status.v2` invocation passed. The architecture checker reported only the
+  same inherited core/store dependency violations present before this task; it
+  reported no CLI-interface violation.
+- Review: strict target JSON rejects mismatched loopback absolute and relative
+  URLs, machine-readable output never receives deprecation text, translated
+  help keeps the same short inventory, and every legacy parser remains covered.
+  No secrets or private records were added. The task-level child-agent allowance
+  had already been used by prior pivot slices, so no additional review child was
+  created.
+- Deviations from plan: the work was split into three focused implementation
+  commits to remain below the repository's 800-added-line commit cap. The
+  installed-package smoke and release catalogs changed because they previously
+  defined every historical command as stable. No compatibility command was
+  deleted and no publication action was taken.
+- Follow-up risks: the CLI default service object currently shares the proven
+  HTTP v2 application-service adapter; a later boundary cleanup may move that
+  adapter into the application package without changing contracts. Historical
+  aliases and legacy query mode remain removal-blocked until `0.25.0`.
+
 ## Remaining Planned Tasks
 
-Tasks 26 through 45 remain planned in the approved implementation roadmap. Add
+Tasks 27 through 45 remain planned in the approved implementation roadmap. Add
 a full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.
