@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, cast
 
-from codex_usage_tracker.core.contracts.common import MetricValue
+from codex_usage_tracker.core.contracts.common import MetricValue, immutable_snapshot
 
 EvidenceKind = Literal[
     "call",
@@ -33,3 +33,24 @@ class EvidenceV1:
     metrics: Mapping[str, MetricValue]
     source_schema: str
     dashboard_target: Mapping[str, object] | None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "selectors",
+            cast(Mapping[str, str], immutable_snapshot(self.selectors)),
+        )
+        object.__setattr__(
+            self,
+            "metrics",
+            cast(Mapping[str, MetricValue], immutable_snapshot(self.metrics)),
+        )
+        if self.dashboard_target is not None:
+            object.__setattr__(
+                self,
+                "dashboard_target",
+                cast(
+                    Mapping[str, object],
+                    immutable_snapshot(self.dashboard_target),
+                ),
+            )

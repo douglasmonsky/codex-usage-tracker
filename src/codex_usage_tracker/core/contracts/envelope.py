@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Literal, cast
 
 from codex_usage_tracker.core.contracts.common import (
     AccountingContextV1,
@@ -16,6 +16,7 @@ from codex_usage_tracker.core.contracts.common import (
     NextActionV1,
     ScopeV1,
     ToolDataClass,
+    immutable_snapshot,
 )
 from codex_usage_tracker.core.contracts.serialization import payload_mapping
 
@@ -43,6 +44,20 @@ class McpEnvelopeV1:
     result: object
     dashboard_targets: tuple[Mapping[str, object], ...]
     next_actions: tuple[NextActionV1, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "warnings", tuple(self.warnings))
+        object.__setattr__(self, "limitations", tuple(self.limitations))
+        object.__setattr__(self, "result", immutable_snapshot(self.result))
+        object.__setattr__(
+            self,
+            "dashboard_targets",
+            cast(
+                tuple[Mapping[str, object], ...],
+                immutable_snapshot(self.dashboard_targets),
+            ),
+        )
+        object.__setattr__(self, "next_actions", tuple(self.next_actions))
 
 
 def envelope_payload(

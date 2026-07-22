@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Literal, TypeAlias
+from types import MappingProxyType
+from typing import Literal, TypeAlias, cast
 
 ToolDataClass: TypeAlias = Literal["aggregate", "local_index", "raw_context", "administrative"]
 FreshnessState: TypeAlias = Literal["fresh", "aging", "stale", "empty", "unknown"]
@@ -13,6 +14,20 @@ MessageSeverity: TypeAlias = Literal["info", "warning", "blocking"]
 MetricValue: TypeAlias = int | float | str | None
 
 _MESSAGE_CODE_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\Z")
+
+
+def immutable_snapshot(value: object) -> object:
+    """Recursively detach JSON-like mappings and sequences from caller-owned values."""
+    if isinstance(value, Mapping):
+        snapshot: dict[str, object] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise TypeError("mapping keys must be strings")
+            snapshot[key] = immutable_snapshot(item)
+        return MappingProxyType(snapshot)
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return tuple(immutable_snapshot(item) for item in value)
+    return value
 
 
 def _require_choice(value: str, choices: set[str], name: str) -> None:
@@ -42,6 +57,13 @@ class ScopeV1:
     history: str
     privacy_mode: str
     filters: Mapping[str, object]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "filters",
+            cast(Mapping[str, object], immutable_snapshot(self.filters)),
+        )
 
 
 @dataclass(frozen=True)
@@ -124,3 +146,8 @@ class NextActionV1:
     def __post_init__(self) -> None:
         if not _MESSAGE_CODE_PATTERN.fullmatch(self.code):
             raise ValueError("code must be a stable message code")
+        object.__setattr__(
+            self,
+            "arguments",
+            cast(Mapping[str, object], immutable_snapshot(self.arguments)),
+        )

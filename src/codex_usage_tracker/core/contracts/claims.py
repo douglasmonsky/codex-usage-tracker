@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, cast
 
-from codex_usage_tracker.core.contracts.common import MetricValue
+from codex_usage_tracker.core.contracts.common import MetricValue, immutable_snapshot
 
 ClaimType = Literal["observed", "derived", "estimated", "inferred", "recommended"]
 FindingSeverity = Literal["info", "low", "medium", "high"]
@@ -26,6 +26,7 @@ class RecommendationV1:
     supporting_claim_ids: tuple[str, ...]
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "supporting_claim_ids", tuple(self.supporting_claim_ids))
         if not self.supporting_claim_ids:
             raise ValueError("recommendation requires a supporting claim")
 
@@ -48,6 +49,15 @@ class FindingV1:
     caveat_codes: tuple[str, ...]
     recommendation: RecommendationV1 | None = None
 
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "metrics",
+            cast(Mapping[str, MetricValue], immutable_snapshot(self.metrics)),
+        )
+        object.__setattr__(self, "evidence_ids", tuple(self.evidence_ids))
+        object.__setattr__(self, "caveat_codes", tuple(self.caveat_codes))
+
 
 def validate_findings(findings: Sequence[FindingV1]) -> None:
     """Reject recommendations without a present non-recommended supporting claim."""
@@ -56,6 +66,8 @@ def validate_findings(findings: Sequence[FindingV1]) -> None:
     }
     for finding in findings:
         recommendation = finding.recommendation
+        if finding.claim_type == "recommended" and recommendation is None:
+            raise ValueError(f"recommended finding requires recommendation: {finding.finding_id}")
         if recommendation is None:
             continue
         if not set(recommendation.supporting_claim_ids) <= supporting_ids:

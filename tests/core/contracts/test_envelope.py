@@ -12,10 +12,11 @@ from codex_usage_tracker.core.contracts import (
     NextActionV1,
     ScopeV1,
 )
-from codex_usage_tracker.core.contracts.envelope import envelope_payload
+from codex_usage_tracker.core.contracts.envelope import McpEnvelopeV1, envelope_payload
 from codex_usage_tracker.core.contracts.serialization import (
     PayloadBudgetError,
     enforce_payload_budget,
+    payload_mapping,
     serialized_size,
 )
 
@@ -95,10 +96,39 @@ def test_recursive_non_finite_values_are_rejected() -> None:
         )
 
 
+def test_envelope_snapshots_nested_result_and_dashboard_targets() -> None:
+    result = {"rows": [{"tokens": 1200}]}
+    dashboard_targets = [{"relative_url": "/calls", "filters": {"ids": ["call-1"]}}]
+    envelope = McpEnvelopeV1(
+        tool="usage_query",
+        request_id="req-00000000000000000000000000000000",
+        generated_at="2026-07-21T12:00:02Z",
+        source_revision="revision-1",
+        freshness=_freshness(),
+        scope=_scope(),
+        data_class="aggregate",
+        accounting=_accounting(),
+        warnings=(),
+        limitations=(),
+        result_schema="codex-usage-tracker.query.v1",
+        result=result,
+        dashboard_targets=dashboard_targets,  # type: ignore[arg-type]
+        next_actions=(),
+    )
+    expected = payload_mapping(envelope)
+
+    result["rows"][0]["tokens"] = 2400
+    dashboard_targets[0]["filters"]["ids"].append("call-2")
+
+    assert payload_mapping(envelope) == expected
+
+
 def test_serialized_size_is_utf8_and_budget_error_reports_actual_and_maximum() -> None:
     payload = {"message": "évidence"}
     expected = len(
-        json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode(
+            "utf-8"
+        )
     )
 
     assert serialized_size(payload) == expected

@@ -55,6 +55,56 @@ def test_recommendation_must_reference_a_present_non_recommended_finding() -> No
         validate_findings((_observed_finding(), recommended))
 
 
+def test_recommended_finding_requires_recommendation_details() -> None:
+    recommended = FindingV1(
+        finding_id="finding-recommended",
+        title="Start fresh",
+        claim_type="recommended",
+        severity="low",
+        confidence="high",
+        statement="Start a fresh task.",
+        metrics={},
+        evidence_ids=("evidence-1",),
+        caveat_codes=(),
+    )
+
+    with pytest.raises(ValueError, match="recommended finding requires recommendation"):
+        validate_findings((_observed_finding(), recommended))
+
+
+def test_claims_snapshot_mutable_mappings_and_sequences() -> None:
+    supporting_claim_ids = ["finding-observed"]
+    metrics = {"tokens": 1200}
+    evidence_ids = ["evidence-1"]
+    caveat_codes = ["estimate.partial"]
+    recommendation = RecommendationV1(
+        recommendation_id="recommendation-1",
+        action="Start a fresh task.",
+        rationale="Context is no longer useful.",
+        supporting_claim_ids=supporting_claim_ids,  # type: ignore[arg-type]
+    )
+    finding = FindingV1(
+        finding_id="finding-recommended",
+        title="Start fresh",
+        claim_type="recommended",
+        severity="low",
+        confidence="high",
+        statement="Start a fresh task.",
+        metrics=metrics,
+        evidence_ids=evidence_ids,  # type: ignore[arg-type]
+        caveat_codes=caveat_codes,  # type: ignore[arg-type]
+        recommendation=recommendation,
+    )
+    expected = payload_mapping(finding)
+
+    supporting_claim_ids.append("finding-other")
+    metrics["tokens"] = 2400
+    evidence_ids.append("evidence-2")
+    caveat_codes.append("estimate.stale")
+
+    assert payload_mapping(finding) == expected
+
+
 def test_evidence_serialization_is_sorted_and_finite() -> None:
     evidence = EvidenceV1(
         evidence_id="evidence-1",
@@ -82,3 +132,25 @@ def test_evidence_serialization_is_sorted_and_finite() -> None:
     )
     with pytest.raises(ValueError, match="finite"):
         payload_mapping(invalid)
+
+
+def test_evidence_snapshots_nested_caller_inputs() -> None:
+    selectors = {"record_id": "call-1"}
+    metrics = {"tokens": 1200}
+    dashboard_target = {"relative_url": "/calls/call-1", "filters": {"ids": ["call-1"]}}
+    evidence = EvidenceV1(
+        evidence_id="evidence-1",
+        kind="call",
+        label="Selected call",
+        selectors=selectors,
+        metrics=metrics,
+        source_schema="codex-usage-tracker-call-v1",
+        dashboard_target=dashboard_target,
+    )
+    expected = payload_mapping(evidence)
+
+    selectors["record_id"] = "call-2"
+    metrics["tokens"] = 2400
+    dashboard_target["filters"]["ids"].append("call-2")
+
+    assert payload_mapping(evidence) == expected

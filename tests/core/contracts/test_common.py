@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from codex_usage_tracker.core.contracts import MessageV1, ScopeV1
+from codex_usage_tracker.core.contracts import MessageV1, NextActionV1, ScopeV1
 from codex_usage_tracker.core.contracts.serialization import payload_mapping
 
 
@@ -29,6 +29,32 @@ def test_common_contracts_are_frozen_and_serialize_with_sorted_keys() -> None:
     assert list(payload["filters"]["alpha"]) == ["first", "second"]
 
 
+def test_scope_and_next_action_snapshot_nested_caller_inputs() -> None:
+    filters = {"nested": {"models": ["gpt-5.6"]}}
+    arguments = {"selector": {"ids": ["evidence-1"]}}
+    scope = ScopeV1(
+        since=None,
+        until=None,
+        history="active",
+        privacy_mode="strict",
+        filters=filters,
+    )
+    action = NextActionV1(
+        code="open.evidence",
+        label="Open evidence",
+        tool="usage_evidence",
+        arguments=arguments,
+    )
+    expected_scope = payload_mapping(scope)
+    expected_action = payload_mapping(action)
+
+    filters["nested"]["models"].append("gpt-5.5")
+    arguments["selector"]["ids"].append("evidence-2")
+
+    assert payload_mapping(scope) == expected_scope
+    assert payload_mapping(action) == expected_action
+
+
 def test_message_codes_are_stable_machine_codes() -> None:
     message = MessageV1(
         code="source.stale",
@@ -44,11 +70,7 @@ def test_message_codes_are_stable_machine_codes() -> None:
 
 def test_core_contracts_never_import_upward_layers() -> None:
     contract_root = (
-        Path(__file__).resolve().parents[3]
-        / "src"
-        / "codex_usage_tracker"
-        / "core"
-        / "contracts"
+        Path(__file__).resolve().parents[3] / "src" / "codex_usage_tracker" / "core" / "contracts"
     )
     for path in contract_root.glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
