@@ -2,6 +2,10 @@ import { act, App, describe, expect, fireEvent, installAppTestHooks, it, render,
 import { shouldAutoRefreshUsageView } from './App';
 import * as routeCatalogModule from './app/routeCatalog';
 
+function usageRequestCalls(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls.filter(([input]) => String(input).includes('/api/usage?'));
+}
+
 describe('React dashboard live refresh and row loading', () => {
   installAppTestHooks();
 
@@ -26,6 +30,7 @@ it('uses route catalog refresh capability at runtime', () => {
 });
 
 it('auto refreshes live dashboards immediately and on interval', async () => {
+  window.history.replaceState(null, '', '/?view=explore&mode=calls');
   vi.useFakeTimers();
   window.__CODEX_USAGE_BOOT__ = {
     api_token: 'auto-refresh-token',
@@ -54,7 +59,7 @@ it('auto refreshes live dashboards immediately and on interval', async () => {
     if (!url.includes('/api/usage?')) {
       throw new Error(`Unexpected request: ${url}`);
     }
-    const threadName = refreshedRows[Math.min(fetchMock.mock.calls.length - 1, refreshedRows.length - 1)];
+    const threadName = refreshedRows[Math.min(usageRequestCalls(fetchMock).length - 1, refreshedRows.length - 1)];
     return {
       ok: true,
       json: async () => ({
@@ -87,7 +92,7 @@ it('auto refreshes live dashboards immediately and on interval', async () => {
   render(<App />);
   expect(screen.getByText('auto-before-thread')).toBeInTheDocument();
   await enableAutoRefresh();
-  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(usageRequestCalls(fetchMock)).toHaveLength(1);
   expect(screen.getByText('auto-first-thread')).toBeInTheDocument();
 
   await act(async () => {
@@ -95,9 +100,9 @@ it('auto refreshes live dashboards immediately and on interval', async () => {
   });
 
   expect(screen.getByText('auto-second-thread')).toBeInTheDocument();
-  expect(fetchMock).toHaveBeenCalledTimes(2);
-  expect(String(fetchMock.mock.calls[1][0])).toContain('refresh=1');
-  expect(String(fetchMock.mock.calls[1][0])).toContain('limit=500');
+  expect(usageRequestCalls(fetchMock)).toHaveLength(2);
+  expect(String(usageRequestCalls(fetchMock)[1][0])).toContain('refresh=1');
+  expect(String(usageRequestCalls(fetchMock)[1][0])).toContain('limit=500');
 });
 
 it('pauses automatic aggregate refresh on full-page call investigator', async () => {
@@ -164,18 +169,19 @@ await act(async () => {
 await vi.advanceTimersByTimeAsync(20_000);
 });
 
-expect(fetchMock).not.toHaveBeenCalled();
+expect(usageRequestCalls(fetchMock)).toHaveLength(0);
 
 await act(async () => {
 fireEvent.click(screen.getByRole('button', { name: /^Refresh$/i }));
 await Promise.resolve();
 });
-expect(fetchMock).toHaveBeenCalledTimes(1);
-expect(String(fetchMock.mock.calls[0][0])).toContain('/api/usage?');
-expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=1');
+expect(usageRequestCalls(fetchMock)).toHaveLength(1);
+expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('/api/usage?');
+expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('refresh=1');
 });
 
 it('refreshes aggregate rows through the live usage API', async () => {
+  window.history.replaceState(null, '', '/?view=explore&mode=calls');
   window.__CODEX_USAGE_BOOT__ = {
     api_token: 'refresh-token',
       context_api_enabled: true,
@@ -234,16 +240,17 @@ it('refreshes aggregate rows through the live usage API', async () => {
     render(<App />);
     expect(screen.getByText('before-refresh-thread')).toBeInTheDocument();
 
-fireEvent.click(screen.getByRole('button', { name: /^Refresh$/i }));
+fireEvent.click(screen.getAllByRole('button', { name: /^Refresh$/i }).find(button => button.textContent?.trim() === 'Refresh')!);
 
     expect(await screen.findByText('after-refresh-thread')).toBeInTheDocument();
     expect(screen.queryByText('before-refresh-thread')).not.toBeInTheDocument();
     expect(screen.getAllByText('Refreshed index; loaded 1 of 44 calls from Most recent 500').length).toBeGreaterThan(0);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/usage?');
-    expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=1');
-    expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
-    expect(fetchMock.mock.calls[0][1]).toEqual(
+    await waitFor(() => expect(usageRequestCalls(fetchMock)).toHaveLength(1));
+    const [usageInput, usageInit] = usageRequestCalls(fetchMock)[0];
+    expect(String(usageInput)).toContain('/api/usage?');
+    expect(String(usageInput)).toContain('refresh=1');
+    expect(String(usageInput)).toContain('limit=500');
+    expect(usageInit).toEqual(
       expect.objectContaining({
         cache: 'no-store',
         headers: expect.objectContaining({
@@ -254,6 +261,7 @@ fireEvent.click(screen.getByRole('button', { name: /^Refresh$/i }));
 });
 
 it('applies typed row limits only after Load is clicked', async () => {
+  window.history.replaceState(null, '', '/?view=explore&mode=calls');
   window.__CODEX_USAGE_BOOT__ = {
     api_token: 'row-limit-token',
     context_api_enabled: true,
@@ -312,16 +320,17 @@ it('applies typed row limits only after Load is clicked', async () => {
 
   expect(screen.getByLabelText('Rows to load')).toHaveValue(250000);
   expect(screen.getByLabelText('Rows to load slider')).toHaveAttribute('max', '251100');
-  expect(fetchMock).not.toHaveBeenCalled();
+  expect(usageRequestCalls(fetchMock)).toHaveLength(0);
 
   fireEvent.click(screen.getByRole('button', { name: /^Load$/i }));
 
   expect(await screen.findByText('row-limit-after-thread')).toBeInTheDocument();
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=250000');
+  await waitFor(() => expect(usageRequestCalls(fetchMock)).toHaveLength(1));
+  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('limit=250000');
 });
 
 it('switches to all-history scope without materializing an uncapped browser payload', async () => {
+  window.history.replaceState(null, '', '/?view=explore&mode=calls');
   window.__CODEX_USAGE_BOOT__ = {
     api_token: 'row-limit-token',
     context_api_enabled: true,
@@ -392,14 +401,15 @@ render(<App />);
   fireEvent.click(screen.getByRole('button', { name: 'All time' }));
 
   expect(await screen.findByText('row-limit-after-thread-a')).toBeInTheDocument();
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
-  expect(String(fetchMock.mock.calls[0][0])).toContain('load_window=all');
-  expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
+  await waitFor(() => expect(usageRequestCalls(fetchMock)).toHaveLength(1));
+  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('limit=500');
+  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('load_window=all');
+  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('refresh=0');
   expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 it('refreshes usage rows when history scope changes', async () => {
+  window.history.replaceState(null, '', '/?view=explore&mode=calls');
   window.__CODEX_USAGE_BOOT__ = {
       api_token: 'history-token',
       context_api_enabled: true,
@@ -475,12 +485,13 @@ it('refreshes usage rows when history scope changes', async () => {
   expect(screen.queryByText('active-history-thread')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Recent rows' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText('All history includes 6 archived calls')).toBeInTheDocument();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/usage?');
-    expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
-    expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
-    expect(String(fetchMock.mock.calls[0][0])).toContain('include_archived=1');
-  expect(fetchMock.mock.calls[0][1]).toEqual(
+    await waitFor(() => expect(usageRequestCalls(fetchMock)).toHaveLength(1));
+    const [usageInput, usageInit] = usageRequestCalls(fetchMock)[0];
+    expect(String(usageInput)).toContain('/api/usage?');
+    expect(String(usageInput)).toContain('refresh=0');
+    expect(String(usageInput)).toContain('limit=500');
+    expect(String(usageInput)).toContain('include_archived=1');
+  expect(usageInit).toEqual(
     expect.objectContaining({
       cache: 'no-store',
       headers: expect.objectContaining({
@@ -491,6 +502,7 @@ it('refreshes usage rows when history scope changes', async () => {
 });
 
 it('refreshes aggregate report evidence through the shell live usage API', async () => {
+  window.history.replaceState(null, '', '/?view=reports');
   window.__CODEX_USAGE_BOOT__ = {
     api_token: 'report-refresh-token',
     context_api_enabled: true,
@@ -560,7 +572,6 @@ it('refreshes aggregate report evidence through the shell live usage API', async
   vi.stubGlobal('fetch', fetchMock);
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
   expect(screen.getAllByText('Stored snapshot loaded just now').length).toBeGreaterThan(0);
 
   fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));

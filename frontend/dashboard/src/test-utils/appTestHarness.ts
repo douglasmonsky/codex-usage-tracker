@@ -1,12 +1,19 @@
 import { afterEach, beforeEach, vi } from 'vitest';
+import { fireEvent } from '@testing-library/react';
 import { clearDiagnosticApiCache } from '../api/diagnostics';
 import { clearContextEvidenceCache } from '../features/shared/contextEvidenceCache';
 import { dashboardQueryClient } from '../data/queryRuntime';
 
-export { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+export { act, render, screen, waitFor, within } from '@testing-library/react';
+export { fireEvent };
 export { describe, expect, it, vi } from 'vitest';
 export { RoutedApp as App } from '../App';
 export { rowsToCsv } from '../features/shared/exportCsv';
+
+export function navigateApp(path: string) {
+  window.history.pushState(null, '', path);
+  fireEvent.popState(window);
+}
 
 export function installAppTestHooks() {
   beforeEach(() => {

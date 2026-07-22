@@ -6,6 +6,7 @@ import {
   fireEvent,
   installAppTestHooks,
   it,
+  navigateApp,
   render,
   screen,
 } from './test-utils/appTestHarness';
@@ -31,7 +32,7 @@ describe('React dashboard source identity and route preservation', () => {
 
   it('preserves calls drill-down state across same-route browser navigation', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+    navigateApp('/?view=explore&mode=calls');
     fireEvent.click(screen.getByRole('button', { name: /Call Details/i }));
     const row = screen.getByText('thread-7b2e91').closest('tr');
     expect(row).not.toBeNull();

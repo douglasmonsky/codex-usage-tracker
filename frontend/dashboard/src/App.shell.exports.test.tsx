@@ -1,4 +1,4 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, render, rowsToCsv, screen, vi, waitFor, within } from './test-utils/appTestHarness';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, navigateApp, render, rowsToCsv, screen, vi, waitFor, within } from './test-utils/appTestHarness';
 import { callCsvColumns } from './features/shared/tables';
 import { fixtureModel } from './test-fixtures/dashboardFixture';
 
@@ -9,12 +9,13 @@ it('exports the current view from the shell topbar', async () => {
 const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
 
 render(<App />);
+navigateApp('/?view=explore&mode=calls');
 
 fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
 await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
 expect(await screen.findAllByText('Exported 8 call rows')).not.toHaveLength(0);
 
-fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+navigateApp('/?view=explore&mode=threads');
   fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
   await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(2));
   expect(await screen.findAllByText(/Exported \d+ call rows/)).not.toHaveLength(0);

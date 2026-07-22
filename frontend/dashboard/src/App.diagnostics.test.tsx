@@ -1,18 +1,18 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, vi, waitFor, within } from './test-utils/appTestHarness';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, navigateApp, render, screen, vi, waitFor, within } from './test-utils/appTestHarness';
 
 describe('React dashboard diagnostics workspace', () => {
   installAppTestHooks();
 
   it('opens the full-page call investigator from diagnostic evidence calls', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=diagnostics');
 
     expect(screen.getByRole('heading', { name: 'Diagnostics Notebook' })).toBeInTheDocument();
     expect(screen.getAllByText('Evidence Calls').length).toBeGreaterThan(0);
     fireEvent.click(screen.getAllByRole('button', { name: /Open investigator for diagnostic call/i })[0]);
 
     expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
-    expect(window.location.search).toContain('view=call');
+    expect(window.location.search).toContain('view=evidence');
  expect(window.location.search).toContain('record=');
  });
 
@@ -25,12 +25,12 @@ describe('React dashboard diagnostics workspace', () => {
 
  render(<App />);
 
- fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+ navigateApp('/?view=diagnostics');
  fireEvent.click(screen.getAllByRole('button', { name: /Copy link for diagnostic call/i })[0]);
 
  await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
  const evidenceUrl = new URL(writeText.mock.calls[0][0]);
- expect(evidenceUrl.searchParams.get('view')).toBe('call');
+ expect(evidenceUrl.searchParams.get('view')).toBe('evidence');
  expect(evidenceUrl.searchParams.get('return')).toBe('diagnostics');
  expect(evidenceUrl.searchParams.get('record')).toBeTruthy();
 
@@ -49,7 +49,7 @@ describe('React dashboard diagnostics workspace', () => {
 
   it('opens the full-page call investigator from structured diagnostic fact calls', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=diagnostics');
 
     expect(screen.getByRole('heading', { name: 'Diagnostics Notebook' })).toBeInTheDocument();
     expect(screen.getByText('Structured Diagnostic Facts')).toBeInTheDocument();
@@ -74,7 +74,7 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
 
     expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
     expect(screen.getByText('thread-6a5b4c / codex-1')).toBeInTheDocument();
-    expect(window.location.search).toContain('view=call');
+    expect(window.location.search).toContain('view=evidence');
     expect(window.location.search).toContain('record=fixture-call-6');
   });
 
@@ -140,7 +140,7 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
     vi.stubGlobal('fetch', fetchMock);
 
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=diagnostics');
 
     expect(screen.getByRole('progressbar', { name: 'Loading diagnostic fact sources' })).toBeInTheDocument();
     await screen.findByText('Live snapshots: 10');
@@ -152,8 +152,8 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/diagnostics/tools?'))).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/diagnostics/compactions?'))).toBe(false);
 
-  fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
-  fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+  navigateApp('/?view=home');
+  navigateApp('/?view=diagnostics');
 
   expect(screen.getByText('Live snapshots: 10')).toBeInTheDocument();
   expect(screen.getByText('Live facts: 1')).toBeInTheDocument();
@@ -237,7 +237,7 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
     vi.stubGlobal('fetch', fetchMock);
 
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=diagnostics');
 
     await screen.findByText('Live facts: 12');
     expect(screen.getByRole('tab', { name: /Top Facts 12/i })).toBeInTheDocument();
@@ -272,8 +272,8 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
       String(input).includes('/api/diagnostics/facts?'),
     ).length;
 
-    fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=home');
+    navigateApp('/?view=diagnostics');
 
     expect(screen.getByText(/large_uncached_input_8/i)).toBeInTheDocument();
     expect(
@@ -323,7 +323,7 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
 
   it('opens full-page call investigator from investigator evidence table rows', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /^Investigate$/i }));
+    navigateApp('/?view=investigator');
     expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Waste fingerprint matrix' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Evidence ledger' })).toBeInTheDocument();
@@ -331,7 +331,7 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
 
     expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
     expect(screen.getByText('thread-6a5b4c / codex-1')).toBeInTheDocument();
-    expect(window.location.search).toContain('view=call');
+    expect(window.location.search).toContain('view=evidence');
     expect(window.location.search).toContain('record=fixture-call-6');
   });
 
@@ -408,7 +408,7 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
     vi.stubGlobal('fetch', fetchMock);
 
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=diagnostics');
 
     expect((await screen.findAllByText('Showing 8 of 10 calls')).length).toBeGreaterThan(0);
     expect(screen.getByText('Dashboard rows: 1 of 12 loaded')).toBeInTheDocument();
@@ -430,8 +430,8 @@ fireEvent.click(screen.getAllByLabelText(/Open investigator diagnostic fact call
       String(input).includes('/api/diagnostics/fact-calls?'),
     ).length;
 
-    fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=home');
+    navigateApp('/?view=diagnostics');
 
     expect(screen.getAllByText('Showing 10 of 10 calls').length).toBeGreaterThan(0);
     expect(screen.getByText('diag-page-thread-9')).toBeInTheDocument();

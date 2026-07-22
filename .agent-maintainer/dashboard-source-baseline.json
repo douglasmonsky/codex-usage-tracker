@@ -2,8 +2,8 @@
   "exceptions": {
     "frontend/dashboard/src/App.live-refresh.test.tsx": {
       "group": "tests",
-      "nonblank": 553,
-      "physical": 587
+      "nonblank": 563,
+      "physical": 598
     },
     "frontend/dashboard/src/App.tsx": {
       "group": "source",

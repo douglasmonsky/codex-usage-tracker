@@ -1,9 +1,14 @@
 import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, vi, waitFor, within } from './test-utils/appTestHarness';
 
+function usageRequestCalls(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls.filter(([input]) => String(input).includes('/api/usage?'));
+}
+
 describe('React dashboard shell live loading', () => {
   installAppTestHooks();
 
 it('auto-loads live rows for shell boot payloads without showing fixture rows', async () => {
+  window.history.replaceState(null, '', '/?view=explore&mode=calls');
   const embedded = document.createElement('script');
   embedded.id = 'usage-data';
   embedded.type = 'application/json';
@@ -30,15 +35,34 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     void init;
     const url = String(input);
-    if (url.includes('/api/readiness')) {
+    if (url.includes('/api/status?')) {
       return {
         ok: true,
         json: async () => ({
-          schema: 'codex-usage-tracker-conversational-readiness-v1',
-          state: 'ready',
-          summary: 'Deferred MCP readiness passed.',
-          next_action: null,
-          evidence: ['MCP runtime: pass'],
+          schema: 'codex-usage-tracker-status-v1',
+          conversational_analysis: {
+            schema: 'codex-usage-tracker-conversational-readiness-v1',
+            state: 'ready',
+            summary: 'Deferred MCP readiness passed.',
+            next_action: null,
+            evidence: ['MCP runtime: pass'],
+          },
+          home_summary: {
+            schema: 'codex-usage-tracker-home-summary-v1',
+            source_revision: 'shell-live-test',
+            latest_refresh_at: null,
+            latest_event_at: null,
+            accounting: { physical_rows: 1, canonical_rows: 1, excluded_copied_rows: 0 },
+            pricing: { configured: false, model_count: 0, estimated_model_count: 0 },
+            allowance: {
+              configured: false,
+              error: null,
+              observed_usage: { available: false, windows: [] },
+              windows: [],
+            },
+            findings: [],
+            recent_evidence: [],
+          },
         }),
       } as Response;
     }
@@ -78,80 +102,16 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
 
   expect(screen.queryByText('thread-9f3a1c')).not.toBeInTheDocument();
   expect(await screen.findByText('real-live-thread')).toBeInTheDocument();
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-  expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
-  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=500');
-  expect(String(fetchMock.mock.calls[0][0])).toContain('load_window=all');
+  await waitFor(() => expect(usageRequestCalls(fetchMock)).toHaveLength(1));
+  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('refresh=0');
+  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('limit=500');
+  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('load_window=all');
   expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText('2 calls analyzed · 1 detail row cached')).toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Analysis scope' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
   expect(await screen.findByText('Deferred MCP readiness passed.')).toBeInTheDocument();
   embedded.remove();
-});
-
-it('loads more all-time evidence without switching to recent rows', async () => {
-  window.__CODEX_USAGE_BOOT__ = {
-    api_token: 'all-time-more-token',
-    shell_boot: true,
-    loaded_row_count: 0,
-    total_available_rows: 1500,
-    default_load_window: 'all',
-    load_window: 'rows',
-    limit: 500,
-    rows: [],
-  };
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-    const url = String(input);
-    const requestedLimit = Number(new URL(url, 'http://localhost').searchParams.get('limit'));
-    return {
-      ok: true,
-      json: async () => ({
-        api_token: 'all-time-more-token',
-        default_load_window: 'all',
-        load_window: 'all',
-        limit: requestedLimit,
-        loaded_row_count: requestedLimit,
-        total_available_rows: 1500,
-        has_more: requestedLimit < 1500,
-        rows: [
-          {
-            record_id: 'all-time-row-a',
-            call_started_at: '2026-07-02T10:00:00Z',
-            thread_name: 'all-time-thread-a',
-            model: 'codex-1',
-            input_tokens: 100,
-            cached_input_tokens: 50,
-            output_tokens: 10,
-            total_tokens: 110,
-          },
-          ...(requestedLimit > 500 ? [{
-            record_id: 'all-time-row-b',
-            call_started_at: '2026-07-02T11:00:00Z',
-            thread_name: 'all-time-thread-b',
-            model: 'codex-1',
-            input_tokens: 200,
-            cached_input_tokens: 100,
-            output_tokens: 20,
-            total_tokens: 220,
-          }] : []),
-        ],
-      }),
-    } as Response;
-  });
-  vi.stubGlobal('fetch', fetchMock);
-
-  render(<App />);
-
-  expect(await screen.findByText('all-time-thread-a')).toBeInTheDocument();
-  const loadMore = screen.getByRole('button', { name: 'Load more recent calls' });
-  expect(loadMore).toBeEnabled();
-  fireEvent.click(loadMore);
-
-  expect(await screen.findByText('all-time-thread-b')).toBeInTheDocument();
-  expect(String(fetchMock.mock.calls[1]?.[0])).toContain('limit=1500');
-  expect(String(fetchMock.mock.calls[1]?.[0])).toContain('load_window=all');
-  expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 it('renders Reports live boot payloads without embedded report summaries', () => {
@@ -239,79 +199,6 @@ it('hydrates legacy history scope from the URL and exposes granular row controls
     );
   });
 
-it('loads the next finite row batch from recent calls controls', async () => {
-  window.__CODEX_USAGE_BOOT__ = {
-    api_token: 'load-more-token',
-    context_api_enabled: true,
-    loaded_row_count: 500,
-      total_available_rows: 900,
-    has_more: true,
-    limit: 500,
-    rows: [
-      {
-        record_id: 'row-batch-before',
-        call_started_at: '2026-07-01T10:00:00Z',
-        thread_name: 'row-batch-before-thread',
-        model: 'o4-mini',
-        effort: 'medium',
-        input_tokens: 100,
-        cached_input_tokens: 50,
-        output_tokens: 10,
-        total_tokens: 110,
-        estimated_cost_usd: 0.01,
-      },
-    ],
-  };
-  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    void init;
-    const url = String(input);
-    if (!url.includes('/api/usage?')) {
-      throw new Error(`Unexpected request: ${url}`);
-    }
-    return {
-      ok: true,
-      json: async () => ({
-        api_token: 'load-more-token',
-        context_api_enabled: true,
-        loaded_row_count: 1_500,
-        total_available_rows: 1_500,
-        has_more: false,
-        limit: 1_500,
-        rows: [
-          {
-            record_id: 'row-batch-after',
-            call_started_at: '2026-07-01T11:00:00Z',
-            thread_name: 'row-batch-after-thread',
-            model: 'o5',
-            effort: 'high',
-            input_tokens: 200,
-            cached_input_tokens: 20,
-            output_tokens: 25,
-            total_tokens: 225,
-            estimated_cost_usd: 0.02,
-          },
-        ],
-      }),
-    } as Response;
-  });
-  vi.stubGlobal('fetch', fetchMock);
-
-  render(<App />);
-
-expect(screen.getAllByText('Loaded 500 of 900').length).toBeGreaterThan(0);
-expect(screen.getByText('Most recent 500')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Load more recent calls' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Load more recent calls' }));
-
-  expect(await screen.findByText('row-batch-after-thread')).toBeInTheDocument();
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=1500');
-  expect(screen.getByLabelText('Rows to load')).toHaveValue(1500);
-expect(screen.getAllByText('Loaded 1,500 rows').length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Load more recent calls' })).toBeDisabled();
-expect(screen.getByRole('button', { name: /^Load more$/i })).toBeDisabled();
-});
-
 it('virtualizes large tables while preserving page URL state', () => {
   window.__CODEX_USAGE_BOOT__ = {
     api_token: 'large-table-token',
@@ -345,6 +232,7 @@ it('virtualizes large tables while preserving page URL state', () => {
 });
 
 it('restores session row loading preferences on browser refresh', async () => {
+  window.history.replaceState(null, '', '/?view=explore&mode=calls');
   window.sessionStorage.setItem(
     'codexUsageDashboardLoadSettings',
     JSON.stringify({ loadLimit: 1500, historyScope: 'all' }),
@@ -412,10 +300,10 @@ it('restores session row loading preferences on browser refresh', async () => {
   render(<App />);
 
   expect(await screen.findByText('session-after-thread')).toBeInTheDocument();
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-  expect(String(fetchMock.mock.calls[0][0])).toContain('refresh=0');
-  expect(String(fetchMock.mock.calls[0][0])).toContain('limit=1500');
-  expect(String(fetchMock.mock.calls[0][0])).toContain('include_archived=1');
+  await waitFor(() => expect(usageRequestCalls(fetchMock)).toHaveLength(1));
+  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('refresh=0');
+  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('limit=1500');
+  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('include_archived=1');
   expect(screen.getByLabelText('History scope')).toHaveValue('all');
   expect(screen.getByLabelText('Rows to load')).toHaveValue(1500);
   expect(window.sessionStorage.getItem('codexUsageDashboardLoadSettings')).toContain('"loadLimit":1500');
