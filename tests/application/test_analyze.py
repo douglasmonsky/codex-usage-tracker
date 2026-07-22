@@ -5,7 +5,7 @@ from types import MappingProxyType
 
 import pytest
 
-from codex_usage_tracker.analytics.analysis_catalog import AnalysisCatalogEntry
+from codex_usage_tracker.analytics.analysis_catalog import ANALYSIS_CATALOG, AnalysisCatalogEntry
 from codex_usage_tracker.analytics.analysis_models import (
     AnalysisGoal,
     AnalysisReportV2,
@@ -13,6 +13,7 @@ from codex_usage_tracker.analytics.analysis_models import (
     ComparisonWindow,
     WorkEstimate,
 )
+from codex_usage_tracker.application import analyze as analyze_module
 from codex_usage_tracker.application.analyze import (
     AnalysisRuntime,
     analysis_semantic_key,
@@ -22,7 +23,7 @@ from codex_usage_tracker.application.context import RequestContext
 from codex_usage_tracker.application.errors import RequestContextError, RequestValidationError
 from codex_usage_tracker.application.query_models import QueryFilters
 from codex_usage_tracker.core.contracts import FreshnessV1, ScopeV1
-from codex_usage_tracker.core.contracts.serialization import payload_mapping
+from codex_usage_tracker.core.contracts.serialization import payload_mapping, serialized_size
 from codex_usage_tracker.core.json_contracts import validate_json_payload_contract
 from tests.application.fixtures.analysis_cases import ANALYSIS_CASES, synthetic_analysis_report
 
@@ -36,6 +37,7 @@ class _Strategy:
     count: int = 1
     version: str = "1.0.0"
     seen: list[AnalysisRequest] | None = None
+    summary_size: int = 0
 
     @property
     def strategy_id(self) -> str:
@@ -68,6 +70,8 @@ class _Strategy:
         if self.mode == "fail":
             raise RuntimeError("/private/user/path")
         report = synthetic_analysis_report(self.goal, context)
+        if self.summary_size:
+            report = replace(report, summary="x" * self.summary_size)
         if self.mode == "wrong_goal":
             return replace(report, goal="cache_failure")
         if self.mode == "duplicate":
@@ -155,6 +159,98 @@ def test_execution_routing_and_estimate_failures() -> None:
     context.analysis_runtime.catalog = MappingProxyType({})  # type: ignore[union-attr]
     with pytest.raises(RequestValidationError, match="unsupported analysis goal"):
         analyze_usage(AnalysisRequest("token_waste", QueryFilters()), context)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        (field, value)
+        for field in (
+            "pricing_fingerprint",
+            "rate_card_fingerprint",
+            "thresholds_fingerprint",
+            "catalog_version",
+        )
+        for value in (None, "", 1)
+    ],
+)
+def test_runtime_rejects_invalid_semantic_fingerprints(field: str, value: object) -> None:
+    context = _context(_Strategy("token_waste"))
+    runtime = context.analysis_runtime
+    assert runtime is not None
+    kwargs = {
+        "catalog": runtime.catalog,
+        "pricing_fingerprint": "pricing:v1",
+        "rate_card_fingerprint": "rate-card:v1",
+        "thresholds_fingerprint": "thresholds:v1",
+        "catalog_version": "catalog:v1",
+    }
+    kwargs[field] = value
+    with pytest.raises(ValueError, match="non-empty strings"):
+        AnalysisRuntime(**kwargs)  # type: ignore[arg-type]
+
+
+def test_failed_async_analysis_is_private_not_reused_and_has_no_result() -> None:
+    context = _context(_Strategy("token_waste", mode="fail"))
+    request = AnalysisRequest("token_waste", QueryFilters(), execution="async")
+    first = analyze_usage(request, context).job
+    assert first is not None and context.analysis_runtime is not None
+    deadline = time.monotonic() + 2
+    status = context.analysis_runtime.job_service.status(first.job_id, include_result=True)
+    while time.monotonic() < deadline and status.state not in {"failed", "completed"}:
+        time.sleep(0.01)
+        status = context.analysis_runtime.job_service.status(first.job_id, include_result=True)
+    assert status.state == "failed" and status.result is None
+    assert status.error is not None and status.error.code == "job.failed"
+    assert "/private/" not in status.error.message
+    retry = analyze_usage(request, context).job
+    assert retry is not None and retry.job_id != first.job_id
+
+
+def test_near_boundary_async_result_remains_retrievable() -> None:
+    base_context = _context(_Strategy("token_waste"))
+    base = synthetic_analysis_report("token_waste", base_context)
+    overhead = serialized_size(payload_mapping(base)) - len(base.summary)
+    summary_size = analyze_module.MAX_ANALYSIS_REPORT_BYTES - overhead - 64
+    context = _context(_Strategy("token_waste", summary_size=summary_size))
+    job = analyze_usage(
+        AnalysisRequest("token_waste", QueryFilters(), execution="async"), context
+    ).job
+    assert job is not None and context.analysis_runtime is not None
+    deadline = time.monotonic() + 2
+    status = context.analysis_runtime.job_service.status(job.job_id, include_result=True)
+    while time.monotonic() < deadline and status.state != "completed":
+        time.sleep(0.01)
+        status = context.analysis_runtime.job_service.status(job.job_id, include_result=True)
+    assert status.result is not None and status.error is None
+    assert serialized_size(status.to_payload()) <= analyze_module.MAX_ANALYSIS_JOB_BYTES
+
+
+def test_facts_unavailable_async_report_remains_completed_and_reusable() -> None:
+    context = _context(_Strategy("token_waste"))
+    assert context.analysis_runtime is not None
+    runtime = AnalysisRuntime(
+        catalog=ANALYSIS_CATALOG,
+        pricing_fingerprint="pricing:v1",
+        rate_card_fingerprint="rate-card:v1",
+        thresholds_fingerprint="thresholds:v1",
+        catalog_version="catalog:v1",
+    )
+    context = replace(
+        context,
+        analysis_runtime=runtime,
+        freshness=replace(context.freshness, state="stale"),
+    )
+    request = AnalysisRequest("token_waste", QueryFilters(), execution="async")
+    first = analyze_usage(request, context).job
+    assert first is not None
+    deadline = time.monotonic() + 2
+    status = runtime.job_service.status(first.job_id, include_result=True)
+    while time.monotonic() < deadline and status.state != "completed":
+        time.sleep(0.01)
+        status = runtime.job_service.status(first.job_id, include_result=True)
+    assert status.state == "completed" and status.result is not None
+    assert analyze_usage(request, context).job.job_id == first.job_id  # type: ignore[union-attr]
 
 
 def test_active_completed_and_revision_scoped_job_reuse() -> None:

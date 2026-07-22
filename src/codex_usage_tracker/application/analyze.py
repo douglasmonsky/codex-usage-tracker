@@ -28,6 +28,9 @@ from codex_usage_tracker.jobs.models import JobStatusV1
 from codex_usage_tracker.jobs.service import MAX_SEMANTIC_JOBS, JobService
 
 ANALYSIS_RESULT_SCHEMA = "codex-usage-tracker.analysis.v2"
+MAX_ANALYSIS_JOB_BYTES = 64 * 1024
+ANALYSIS_JOB_ENVELOPE_RESERVE_BYTES = 4 * 1024
+MAX_ANALYSIS_REPORT_BYTES = MAX_ANALYSIS_JOB_BYTES - ANALYSIS_JOB_ENVELOPE_RESERVE_BYTES
 
 
 @dataclass(frozen=True)
@@ -61,6 +64,14 @@ class AnalysisRuntime:
         thresholds_fingerprint: str,
         catalog_version: str,
     ) -> None:
+        fingerprints = (
+            pricing_fingerprint,
+            rate_card_fingerprint,
+            thresholds_fingerprint,
+            catalog_version,
+        )
+        if not all(isinstance(value, str) and value for value in fingerprints):
+            raise ValueError("analysis semantic fingerprints must be non-empty strings")
         self.catalog = catalog
         self.job_service = job_service or JobService()
         self.pricing_fingerprint = pricing_fingerprint
@@ -97,7 +108,7 @@ class AnalysisRuntime:
                 kind="analysis",
                 request_hash=semantic_key,
                 result_schema=ANALYSIS_RESULT_SCHEMA,
-                result_budget=64 * 1024,
+                result_budget=MAX_ANALYSIS_JOB_BYTES,
             )
             self.job_service.register_semantic(
                 kind="analysis", job_id=job_id, adapter=adapter, semantic_key=semantic_key
@@ -128,8 +139,12 @@ class AnalysisRuntime:
         semantic_key: str,
     ) -> None:
         self._update(record, status="running")
-        report = _execute(entry, request, context, semantic_key)
-        self._update(record, status="completed", result=payload_mapping(report))
+        try:
+            report = _run_strategy(entry, request, context, semantic_key)
+        except Exception:  # noqa: BLE001 - adapters expose only a privacy-safe failed status.
+            self._update(record, status="failed")
+        else:
+            self._update(record, status="completed", result=payload_mapping(report))
 
     def _update(
         self,
@@ -218,12 +233,21 @@ def _execute(
     semantic_key: str,
 ) -> AnalysisReportV2:
     try:
-        report = entry.strategy.analyze(request, context)
-        if report.goal != entry.goal:
-            raise ValueError("strategy report goal does not match catalog goal")
-        return _bounded_report(report, entry, request, context, semantic_key)
+        return _run_strategy(entry, request, context, semantic_key)
     except Exception:  # noqa: BLE001 - application boundary must remain privacy-safe.
         return _error_report(entry, context, semantic_key)
+
+
+def _run_strategy(
+    entry: AnalysisCatalogEntry,
+    request: AnalysisRequest,
+    context: RequestContext,
+    semantic_key: str,
+) -> AnalysisReportV2:
+    report = entry.strategy.analyze(request, context)
+    if report.goal != entry.goal:
+        raise ValueError("strategy report goal does not match catalog goal")
+    return _bounded_report(report, entry, request, context, semantic_key)
 
 
 def _bounded_report(
@@ -271,7 +295,7 @@ def _bounded_report(
         limitations=tuple(dict.fromkeys(limitations)),
         dashboard_destinations=entry.dashboard_destinations,
     )
-    enforce_payload_budget(payload_mapping(bounded), 64 * 1024, "analysis")
+    enforce_payload_budget(payload_mapping(bounded), MAX_ANALYSIS_REPORT_BYTES, "analysis")
     return bounded
 
 
@@ -300,7 +324,7 @@ def _error_report(
         limitations=("No analytical conclusion or finding was generated.",),
         dashboard_destinations=entry.dashboard_destinations,
     )
-    enforce_payload_budget(payload_mapping(report), 64 * 1024, "analysis")
+    enforce_payload_budget(payload_mapping(report), MAX_ANALYSIS_REPORT_BYTES, "analysis")
     return report
 
 
