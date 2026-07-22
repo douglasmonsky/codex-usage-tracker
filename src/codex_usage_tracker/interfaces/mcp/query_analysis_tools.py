@@ -94,8 +94,9 @@ def usage_analyze(
 ) -> dict[str, object]:
     """Explain a supported usage pattern with bounded aggregate evidence.
 
-    Example: ``goal='token_waste', filters={'range': '7d'}``. Use this for broad
-    diagnostic questions; use ``usage_query`` for exact tables and groupings.
+    Example: ``goal='token_waste', filters={'since': '2026-07-15T00:00:00Z',
+    'until': '2026-07-22T00:00:00Z'}``. Use this for broad diagnostic questions;
+    use ``usage_query`` for exact tables and groupings.
     """
     return build_usage_analyze(
         goal=goal,

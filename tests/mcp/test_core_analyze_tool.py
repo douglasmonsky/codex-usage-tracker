@@ -77,3 +77,6 @@ def test_analyze_errors_and_public_signature_are_field_specific() -> None:
         "comparison",
         "execution",
     )
+    description = inspect.getdoc(usage_analyze) or ""
+    assert "'range'" not in description
+    assert "'since'" in description and "'until'" in description
