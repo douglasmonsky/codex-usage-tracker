@@ -71,6 +71,7 @@ class EvidenceResult:
     records: tuple[EvidenceV1, ...]
     next_cursor: str | None
     dashboard_target: Mapping[str, object]
+    subject: Mapping[str, object] | None = None
 
     def __post_init__(self) -> None:
         if len(self.records) > 200:
@@ -79,6 +80,12 @@ class EvidenceResult:
             self, "selector", cast(Mapping[str, str], immutable_snapshot(self.selector))
         )
         object.__setattr__(self, "records", tuple(self.records))
+        if self.subject is not None:
+            object.__setattr__(
+                self,
+                "subject",
+                cast(Mapping[str, object], immutable_snapshot(self.subject)),
+            )
         object.__setattr__(
             self,
             "dashboard_target",

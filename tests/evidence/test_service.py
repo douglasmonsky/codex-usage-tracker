@@ -130,7 +130,20 @@ def _analysis_service(revision: str = "generation:1") -> JobService:
     report = {
         "schema": "codex-usage-tracker.analysis.v2",
         "analysis_id": "compatibility.token_waste:generation:1",
-        "findings": [{"finding_id": "finding-1", "evidence_ids": ["evidence-1"]}],
+        "findings": [
+            {
+                "finding_id": "finding-1",
+                "title": "Synthetic cache finding",
+                "claim_type": "observed",
+                "severity": "medium",
+                "confidence": "exact",
+                "statement": "Synthetic call evidence shows a cache opportunity.",
+                "metrics": {"uncached_tokens": 10},
+                "evidence_ids": ["evidence-1"],
+                "caveat_codes": ["synthetic_fixture"],
+                "recommendation": None,
+            }
+        ],
         "evidence": [payload_mapping(evidence)],
     }
     raw = {
@@ -174,6 +187,19 @@ def test_completed_analysis_and_finding_resolve_exact_embedded_evidence(tmp_path
     assert analysis.records == finding.records
     assert finding.records[0].selectors == {"record_id": "record-1"}
     assert finding.dashboard_target["analysis_id"] == analysis.selector["id"]
+    assert finding.subject == {
+        "analysis_id": "compatibility.token_waste:generation:1",
+        "caveat_codes": ("synthetic_fixture",),
+        "claim_type": "observed",
+        "confidence": "exact",
+        "evidence_ids": ("evidence-1",),
+        "finding_id": "finding-1",
+        "metrics": {"uncached_tokens": 10},
+        "recommendation": None,
+        "severity": "medium",
+        "statement": "Synthetic call evidence shows a cache opportunity.",
+        "title": "Synthetic cache finding",
+    }
     with pytest.raises(EvidenceNotFoundError):
         get_evidence(
             EvidenceRequest("finding", "finding-1"),

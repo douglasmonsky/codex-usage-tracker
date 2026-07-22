@@ -15,6 +15,7 @@ from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.core.paths import DEFAULT_RATE_CARD_PATH
 from codex_usage_tracker.server import allowance, allowance_v2, compression_routes
 from codex_usage_tracker.server import context as server_context
+from codex_usage_tracker.server import evidence as server_evidence
 from codex_usage_tracker.server import usage_refresh as server_usage_refresh
 from codex_usage_tracker.server.analysis_jobs import AnalysisJobRegistry
 from codex_usage_tracker.server.call_detail import (
@@ -313,6 +314,17 @@ class _UsageDashboardHandler(
 
     def _handle_allowance_history(self, query: str) -> None:
         self._handle_allowance_report(query, diagnostics=False)
+
+    def _handle_evidence_v2(self, query: str) -> None:
+        server_evidence.handle_evidence_request(
+            query,
+            db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            history_default="all" if self._include_archived else "active",
+            send_error=self._send_error,
+            send_exception=self._send_exception,
+            send_json=self._send_json,
+        )
 
     def _handle_allowance_status_v2(self, query: str) -> None:
         allowance_v2.handle_allowance_status_request(

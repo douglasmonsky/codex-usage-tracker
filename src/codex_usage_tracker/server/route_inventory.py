@@ -197,6 +197,17 @@ DASHBOARD_ROUTE_PROFILES: tuple[DashboardRouteProfile, ...] = (
         may_scan_all_history=True,
     ),
     _profile(
+        "POST",
+        "/api/v2/evidence",
+        "_handle_evidence_v2",
+        "server.evidence",
+        "interactive",
+        "Reads one exact evidence selector or one bounded thread-call page.",
+        "At most 200 aggregate evidence records and 128 KiB.",
+        "Live indexed SQLite reads; no response cache.",
+        may_scan_all_history=True,
+    ),
+    _profile(
         "GET",
         "/api/allowance/diagnostics",
         "_handle_allowance_diagnostics",

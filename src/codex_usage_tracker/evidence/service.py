@@ -32,6 +32,7 @@ class EvidenceRepository(Protocol):
 def resolve_evidence(request: EvidenceRequest, repository: EvidenceRepository) -> EvidenceResult:
     """Resolve one exact selector without fabricating records for a miss."""
     analysis_id: str | None = None
+    subject: Mapping[str, object] | None = None
     if request.selector_kind == "call":
         _no_cursor(request)
         record = repository.call(request.selector_id, request.history)
@@ -49,7 +50,7 @@ def resolve_evidence(request: EvidenceRequest, repository: EvidenceRepository) -
         record = repository.allowance(request.selector_id, request.history)
         records, cursor = (() if record is None else (record,)), None
     else:
-        records, cursor, analysis_id = _analysis_records(
+        records, cursor, analysis_id, subject = _analysis_records(
             request, repository.completed_analyses(), repository.source_revision()
         )
     if not records:
@@ -74,6 +75,7 @@ def resolve_evidence(request: EvidenceRequest, repository: EvidenceRepository) -
         records=tuple(records[: request.limit]),
         next_cursor=cursor,
         dashboard_target=target,
+        subject=subject,
     )
 
 
@@ -81,18 +83,23 @@ def _analysis_records(
     request: EvidenceRequest,
     reports: tuple[Mapping[str, object], ...],
     source_revision: str | None,
-) -> tuple[tuple[EvidenceV1, ...], str | None, str | None]:
+) -> tuple[
+    tuple[EvidenceV1, ...],
+    str | None,
+    str | None,
+    Mapping[str, object] | None,
+]:
     matches = [report for report in reports if _matches(report, request)]
     if len(matches) > 1:
         raise EvidenceAmbiguityError(
             "finding evidence matches multiple analyses; provide an exact analysis_id"
         )
     if not matches:
-        return (), None, None
+        return (), None, None, None
     report = matches[0]
     raw_evidence = report.get("evidence")
     if not isinstance(raw_evidence, (list, tuple)):
-        return (), None, None
+        return (), None, None, None
     allowed = None
     if request.selector_kind == "finding":
         allowed = _finding_evidence_ids(report, request.selector_id)
@@ -114,7 +121,35 @@ def _analysis_records(
         else None
     )
     analysis_id = report.get("analysis_id")
-    return page, next_cursor, analysis_id if isinstance(analysis_id, str) else None
+    resolved_analysis_id = analysis_id if isinstance(analysis_id, str) else None
+    return (
+        page,
+        next_cursor,
+        resolved_analysis_id,
+        _analysis_subject(report, request, resolved_analysis_id),
+    )
+
+
+def _analysis_subject(
+    report: Mapping[str, object],
+    request: EvidenceRequest,
+    analysis_id: str | None,
+) -> Mapping[str, object] | None:
+    if request.selector_kind == "finding":
+        findings = report.get("findings")
+        if not isinstance(findings, (list, tuple)):
+            return None
+        for item in findings:
+            if isinstance(item, Mapping) and item.get("finding_id") == request.selector_id:
+                return {**item, "analysis_id": analysis_id}
+        return None
+    if request.selector_kind == "analysis":
+        return {
+            key: report[key]
+            for key in ("analysis_id", "goal", "summary", "methodology")
+            if key in report
+        }
+    return None
 
 
 def _matches(report: Mapping[str, object], request: EvidenceRequest) -> bool:

@@ -65,6 +65,7 @@ GET_DIAGNOSTIC_FACT_ROUTES: Mapping[str, Mapping[str, str]] = MappingProxyType(
 
 POST_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
     {
+        "/api/v2/evidence": "_handle_evidence_v2",
         "/api/compression/start": "_handle_compression_start",
         "/api/allowance/analysis/jobs": "_handle_allowance_analysis_job_start_v2",
         "/api/diagnostics/refresh": "_handle_diagnostics_refresh",

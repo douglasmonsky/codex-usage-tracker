@@ -25,6 +25,7 @@ def test_server_route_tables_cover_dashboard_api_paths() -> None:
     assert POST_ROUTE_METHODS["/api/allowance/analysis/jobs"] == (
         "_handle_allowance_analysis_job_start_v2"
     )
+    assert POST_ROUTE_METHODS["/api/v2/evidence"] == "_handle_evidence_v2"
     assert GET_ROUTE_METHODS["/api/investigations/agentic"] == "_handle_investigation_agentic"
     assert GET_ROUTE_METHODS["/api/investigations/repeated-files"] == (
         "_handle_investigation_repeated_file_rediscovery"
