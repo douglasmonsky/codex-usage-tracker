@@ -50,16 +50,51 @@ def _add_query_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     )
     query.add_argument("--since", help="Only include calls at or after this ISO date/time")
     query.add_argument("--until", help="Only include calls at or before this ISO date/time")
+    query.add_argument(
+        "--entity",
+        choices=(
+            "call",
+            "thread",
+            "project",
+            "model",
+            "effort",
+            "origin",
+            "service_tier",
+            "subagent",
+        ),
+        default="call",
+    )
+    query.add_argument(
+        "--measure",
+        action="append",
+        dest="measures",
+        help="Measure name or comma-separated measure names; repeatable.",
+    )
+    query.add_argument(
+        "--group-by",
+        action="append",
+        dest="group_by",
+        help="Grouping name or comma-separated grouping names; repeatable.",
+    )
+    query.add_argument("--order-by")
+    query.add_argument("--order", choices=("asc", "desc"), default="desc")
+    query.add_argument("--cursor")
+    query.add_argument("--history", choices=("active", "all"), default="active")
     query.add_argument("--model")
     query.add_argument("--effort")
     query.add_argument("--thread")
     query.add_argument("--project")
+    query.add_argument("--origin")
+    query.add_argument("--service-tier")
+    query.add_argument("--subagent-role")
+    query.add_argument("--subagent-type")
+    query.add_argument("--parent-thread-key")
     query.add_argument("--pricing-status", choices=QUERY_PRICING_STATUS_CHOICES)
     query.add_argument("--credit-confidence", choices=QUERY_CREDIT_CONFIDENCE_CHOICES)
     query.add_argument("--min-tokens", type=int)
     query.add_argument("--min-credits", type=float)
     query.add_argument(
-        "--limit", type=int, default=100, help="Maximum rows to return; use 0 for all"
+        "--limit", type=int, default=20, help="Maximum rows to return (1 through 200)"
     )
     query.add_argument(
         "--json",
