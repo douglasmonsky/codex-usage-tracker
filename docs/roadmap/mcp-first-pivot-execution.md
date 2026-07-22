@@ -79,7 +79,8 @@ commit as each roadmap task.
 - Status: complete
 - Branch: `pivot/5-request-context`
 - Commits: `feat: build shared analysis request context`;
-  `fix: harden analysis request context validation` (this commit)
+  `fix: harden analysis request context validation`;
+  `fix: normalize invalid database context errors` (this commit)
 - Focused verification: `python -m pytest tests/application/test_requests.py tests/application/test_context.py tests/store/test_store_dashboard_queries.py -q`
 - Full verification: `python scripts/benchmark_dashboard_routes.py --sizes 100000 --iterations 3 --skip-compression --enforce-thresholds --output-dir /private/tmp/pivot-context-after-final`; `python -m pyright src/codex_usage_tracker/application src/codex_usage_tracker/store/api.py`; `python -m ruff check src/codex_usage_tracker/application src/codex_usage_tracker/store/api.py tests/application tests/store/test_store_dashboard_queries.py`; `git diff --check`
 - Deviations from plan: The local Task 5 branch is intentionally stacked on

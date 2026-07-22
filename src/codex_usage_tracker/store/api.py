@@ -447,8 +447,10 @@ def query_request_context_facts(
         raise InvalidDatabasePathError(
             f"database path could not be opened read-only: {db_path}"
         ) from exc
-    connection.row_factory = sqlite3.Row
+    row: sqlite3.Row | None = None
+    operation_error: BaseException | None = None
     try:
+        connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA query_only = ON")
         connection.execute("BEGIN")
         row = connection.execute(
@@ -498,9 +500,23 @@ def query_request_context_facts(
                 *canonical_params,
             ],
         ).fetchone()
-    finally:
-        connection.rollback()
-        connection.close()
+    except BaseException as exc:
+        operation_error = exc
+    cleanup_error = _finish_request_context_connection(connection)
+    if operation_error is not None:
+        if cleanup_error is not None:
+            operation_error.__context__ = cleanup_error
+        if not isinstance(operation_error, sqlite3.Error):
+            raise operation_error
+        raise InvalidDatabasePathError(
+            f"database path could not be read: {db_path}"
+        ) from operation_error
+    if cleanup_error is not None:
+        if not isinstance(cleanup_error, sqlite3.Error):
+            raise cleanup_error
+        raise InvalidDatabasePathError(
+            f"database path could not be read: {db_path}"
+        ) from cleanup_error
     if row is None:
         return _empty_request_context_facts()
     total_tokens = int(row["total_tokens"] or 0)
@@ -515,6 +531,22 @@ def query_request_context_facts(
         "credit_coverage": _token_coverage(row["credit_tokens"], total_tokens),
         "service_tier_coverage": _token_coverage(row["tier_tokens"], total_tokens),
     }
+
+
+def _finish_request_context_connection(
+    connection: sqlite3.Connection,
+) -> BaseException | None:
+    """Always close and return the first rollback or close failure."""
+    rollback_error: BaseException | None = None
+    try:
+        connection.rollback()
+    except BaseException as exc:
+        rollback_error = exc
+    try:
+        connection.close()
+    except BaseException as exc:
+        return rollback_error or exc
+    return rollback_error
 
 
 def _request_context_where(scope: Mapping[str, object], *, alias: str) -> tuple[str, list[object]]:

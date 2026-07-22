@@ -539,6 +539,32 @@ def test_request_context_facts_reject_existing_non_file_target(tmp_path: Path) -
     assert list(db_path.iterdir()) == []
 
 
+def test_request_context_facts_normalize_plain_text_database_error(tmp_path: Path) -> None:
+    db_path = tmp_path / "not-a-database.sqlite3"
+    db_path.write_text("plain text", encoding="utf-8")
+
+    with pytest.raises(InvalidDatabasePathError, match="could not be read") as exc_info:
+        query_request_context_facts(db_path=db_path, scope={})
+
+    assert exc_info.value.__cause__ is not None
+    assert db_path.read_text(encoding="utf-8") == "plain text"
+
+
+def test_request_context_facts_reject_broken_database_symlink(tmp_path: Path) -> None:
+    missing_target = tmp_path / "missing.sqlite3"
+    db_path = tmp_path / "database-link.sqlite3"
+    try:
+        db_path.symlink_to(missing_target)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"platform cannot create symlinks: {exc}")
+
+    with pytest.raises(InvalidDatabasePathError, match="database path must be a regular file"):
+        query_request_context_facts(db_path=db_path, scope={})
+
+    assert db_path.is_symlink()
+    assert not missing_target.exists()
+
+
 def test_request_context_facts_apply_all_scope_filters_to_physical_and_canonical_rows(
     tmp_path: Path,
 ) -> None:

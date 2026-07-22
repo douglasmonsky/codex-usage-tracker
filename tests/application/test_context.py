@@ -111,3 +111,41 @@ def test_existing_non_file_database_target_fails_without_side_effects(tmp_path: 
     assert db_path.is_dir()
     assert list(db_path.iterdir()) == []
     assert not pricing_path.parent.exists()
+
+
+def test_plain_text_database_file_fails_without_pricing_side_effects(tmp_path: Path) -> None:
+    db_path = tmp_path / "not-a-database.sqlite3"
+    db_path.write_text("plain text", encoding="utf-8")
+    pricing_path = tmp_path / "pricing-parent" / "pricing.json"
+
+    with pytest.raises(RequestContextError, match="could not be read") as exc_info:
+        build_request_context(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            scope=RequestScope(),
+        )
+
+    assert exc_info.value.__cause__ is not None
+    assert db_path.read_text(encoding="utf-8") == "plain text"
+    assert not pricing_path.parent.exists()
+
+
+def test_broken_database_symlink_is_existing_invalid_state(tmp_path: Path) -> None:
+    missing_target = tmp_path / "missing.sqlite3"
+    db_path = tmp_path / "database-link.sqlite3"
+    try:
+        db_path.symlink_to(missing_target)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"platform cannot create symlinks: {exc}")
+    pricing_path = tmp_path / "pricing-parent" / "pricing.json"
+
+    with pytest.raises(RequestContextError, match="database path must be a regular file"):
+        build_request_context(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            scope=RequestScope(),
+        )
+
+    assert db_path.is_symlink()
+    assert not missing_target.exists()
+    assert not pricing_path.parent.exists()
