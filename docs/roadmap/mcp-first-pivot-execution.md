@@ -192,8 +192,18 @@ commit as each roadmap task.
   Comparison goals fail closed with `comparison_algorithm` unavailable until a
   Task 11 strategy explicitly consumes both canonical timestamp windows.
 
+## Task 11 - Implement the canonical analysis application service
+
+- Status: complete
+- Branch: `pivot/11-analysis-service`
+- Commits: `feat: orchestrate evidence-backed usage analysis` (this commit)
+- Focused verification: analysis, analytics, JSON contracts, jobs, server jobs, and report regressions.
+- Full verification: Pyright; Ruff check/format; release checker; diff/privacy review.
+- Deviations from plan: Jobs use a bounded process-local semantic index; comparison goals remain fail-closed.
+- Follow-up risks: Task 12 owns transport serialization; job persistence remains out of scope.
+
 ## Remaining Planned Tasks
 
-Tasks 11 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 12 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

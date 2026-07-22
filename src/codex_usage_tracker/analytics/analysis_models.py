@@ -114,6 +114,7 @@ class AnalysisReportV2:
     source_revision: str | None
     accounting: AccountingContextV1
     messages: tuple[MessageV1, ...]
+    limitations: tuple[str, ...]
     dashboard_destinations: tuple[str, ...]
 
     def __post_init__(self) -> None:
@@ -122,4 +123,5 @@ class AnalysisReportV2:
         object.__setattr__(self, "methodology", tuple(self.methodology))
         object.__setattr__(self, "suggested_questions", tuple(self.suggested_questions))
         object.__setattr__(self, "messages", tuple(self.messages))
+        object.__setattr__(self, "limitations", tuple(self.limitations))
         object.__setattr__(self, "dashboard_destinations", tuple(self.dashboard_destinations))

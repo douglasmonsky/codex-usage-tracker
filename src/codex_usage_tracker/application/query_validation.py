@@ -79,7 +79,10 @@ def validate_query_request(request: QueryRequest) -> QueryRequest:
 
 
 def _normalized_filters(request: QueryRequest) -> QueryFilters:
-    filters = request.filters
+    return normalize_query_filters(request.filters)
+
+
+def normalize_query_filters(filters: QueryFilters) -> QueryFilters:
     if filters.range is not None:
         raise QueryValidationError("range filters are not supported")
     since, until = normalize_timestamp_window(filters.since, filters.until)
@@ -87,15 +90,15 @@ def _normalized_filters(request: QueryRequest) -> QueryFilters:
         filters,
         since=since,
         until=until,
-        model=_text(filters.model),
-        effort=_text(filters.effort),
-        thread_key=_text(filters.thread_key),
-        project=_text(filters.project),
-        origin=_text(filters.origin),
-        service_tier=_text(filters.service_tier),
-        subagent_role=_text(filters.subagent_role),
-        subagent_type=_text(filters.subagent_type),
-        parent_thread_key=_text(filters.parent_thread_key),
+        model=_text(filters.model, "model"),
+        effort=_text(filters.effort, "effort"),
+        thread_key=_text(filters.thread_key, "thread_key"),
+        project=_text(filters.project, "project"),
+        origin=_text(filters.origin, "origin"),
+        service_tier=_text(filters.service_tier, "service_tier"),
+        subagent_role=_text(filters.subagent_role, "subagent_role"),
+        subagent_type=_text(filters.subagent_type, "subagent_type"),
+        parent_thread_key=_text(filters.parent_thread_key, "parent_thread_key"),
     )
 
 
@@ -113,6 +116,8 @@ def normalize_timestamp_window(
 def _timestamp(value: str | None, field_name: str) -> datetime | None:
     if value is None:
         return None
+    if not isinstance(value, str):
+        raise QueryValidationError(f"{field_name} must be a string")
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
@@ -128,9 +133,11 @@ def _canonical_timestamp(value: datetime | None) -> str | None:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _text(value: str | None) -> str | None:
+def _text(value: str | None, field_name: str) -> str | None:
     if value is None:
         return None
+    if not isinstance(value, str):
+        raise QueryValidationError(f"{field_name} must be a string")
     normalized = value.strip()
     return normalized or None
 

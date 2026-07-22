@@ -28,6 +28,45 @@ QUERY_JSON_PAYLOAD_CONTRACTS = {
     }
 }
 
+ANALYSIS_JSON_PAYLOAD_CONTRACTS = {
+    "codex-usage-tracker.analysis.v2": {
+        "required": {
+            "analysis_id": str,
+            "goal": str,
+            "summary": str,
+            "findings": (list, tuple),
+            "evidence": (list, tuple),
+            "methodology": (list, tuple),
+            "suggested_questions": (list, tuple),
+            "strategy_id": str,
+            "strategy_version": str,
+            "source_revision": (str, NoneType),
+            "accounting": dict,
+            "messages": (list, tuple),
+            "limitations": (list, tuple),
+            "dashboard_destinations": (list, tuple),
+        }
+    },
+    "codex-usage-tracker.analysis-job.v1": {
+        "required": {
+            "job_id": str,
+            "kind": str,
+            "state": str,
+            "progress_percent": int,
+            "stage": str,
+            "source_revision": (str, NoneType),
+            "request_hash": str,
+            "created_at": str,
+            "updated_at": str,
+            "completed_at": (str, NoneType),
+            "retryable": bool,
+            "error": (dict, NoneType),
+            "result_schema": (str, NoneType),
+            "result": (dict, NoneType),
+        }
+    },
+}
+
 MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS = {
     "codex-usage-tracker.scope.v1": {
         "required": {
@@ -134,6 +173,7 @@ MCP_EVIDENCE_SCHEMA_IDS = tuple(MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS)
 
 JSON_PAYLOAD_CONTRACTS = {
     **QUERY_JSON_PAYLOAD_CONTRACTS,
+    **ANALYSIS_JSON_PAYLOAD_CONTRACTS,
     **CLI_JSON_PAYLOAD_CONTRACTS,
     **DIAGNOSTIC_JSON_PAYLOAD_CONTRACTS,
     **SERVER_JSON_PAYLOAD_CONTRACTS,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import threading
+from collections import OrderedDict
 from dataclasses import replace
 from typing import cast
 
@@ -12,6 +13,7 @@ from codex_usage_tracker.jobs.adapters import request_hash
 from codex_usage_tracker.jobs.models import JobAdapter, JobHandle, JobKind, JobStatusV1
 
 MAX_COMPACT_STATUS_BYTES = 16 * 1024
+MAX_SEMANTIC_JOBS = 256
 _STATE_RANK = {"queued": 0, "running": 1, "completed": 2, "failed": 2, "cancelled": 2}
 _EPOCH = "1970-01-01T00:00:00Z"
 _REQUEST_HASH = re.compile(r"sha256:[0-9a-f]{64}\Z")
@@ -25,6 +27,7 @@ class JobService:
         self._handles: dict[str, JobHandle] = {}
         self._versions: dict[str, int] = {}
         self._last: dict[str, JobStatusV1] = {}
+        self._semantic: OrderedDict[str, str] = OrderedDict()
 
     def register(self, *, kind: JobKind, job_id: str, adapter: JobAdapter) -> None:
         result_schema = getattr(adapter, "result_schema", None)
@@ -42,6 +45,51 @@ class JobService:
                 raise ValueError("job_id is already registered with a different kind")
             self._handles[job_id] = handle
             self._versions[job_id] = self._versions.get(job_id, 0) + 1
+            self._last.pop(job_id, None)
+
+    def register_semantic(
+        self, *, kind: JobKind, job_id: str, adapter: JobAdapter, semantic_key: str
+    ) -> None:
+        if not _REQUEST_HASH.fullmatch(semantic_key):
+            raise ValueError("semantic_key must be a sha256 fingerprint")
+        self.register(kind=kind, job_id=job_id, adapter=adapter)
+        with self._lock:
+            self._semantic[semantic_key] = job_id
+            self._semantic.move_to_end(semantic_key)
+            while len(self._semantic) > MAX_SEMANTIC_JOBS:
+                _, evicted_id = self._semantic.popitem(last=False)
+                if evicted_id not in self._semantic.values():
+                    self._handles.pop(evicted_id, None)
+                    self._versions.pop(evicted_id, None)
+                    self._last.pop(evicted_id, None)
+
+    def reusable(
+        self, semantic_key: str, *, source_revision: str | None, result_schema: str
+    ) -> JobStatusV1 | None:
+        with self._lock:
+            job_id = self._semantic.get(semantic_key)
+            handle = self._handles.get(job_id) if job_id is not None else None
+        if job_id is None or handle is None or handle.result_schema != result_schema:
+            return None
+        compact = self.status(job_id)
+        if compact.source_revision != source_revision or compact.state in {"failed", "cancelled"}:
+            return None
+        if compact.state in {"queued", "running"}:
+            return compact
+        if compact.state != "completed":
+            return None
+        completed = self.status(job_id, include_result=True)
+        if completed.result_schema != result_schema or completed.result is None:
+            return None
+        return completed
+
+    def discard_semantic_job(self, job_id: str) -> None:
+        with self._lock:
+            for key, indexed_id in tuple(self._semantic.items()):
+                if indexed_id == job_id:
+                    self._semantic.pop(key, None)
+            self._handles.pop(job_id, None)
+            self._versions.pop(job_id, None)
             self._last.pop(job_id, None)
 
     def status(self, job_id: str, *, include_result: bool = False) -> JobStatusV1:

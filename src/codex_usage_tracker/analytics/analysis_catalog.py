@@ -341,6 +341,7 @@ def _legacy_report(
         source_revision=context.source_revision,
         accounting=context.accounting,
         messages=(),
+        limitations=(),
         dashboard_destinations=entry.dashboard_destinations,
     )
 
@@ -368,6 +369,7 @@ def _fallback_report(
                 remediation="Run usage_refresh explicitly if newer local facts are required.",
             ),
         ),
+        limitations=("Required local facts were unavailable or stale.",),
         dashboard_destinations=entry.dashboard_destinations,
     )
 

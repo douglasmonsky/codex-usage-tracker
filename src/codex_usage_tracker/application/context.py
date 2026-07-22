@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from codex_usage_tracker.application.errors import RequestContextError
 from codex_usage_tracker.application.requests import RequestScope
@@ -21,6 +22,9 @@ from codex_usage_tracker.store.api import InvalidDatabasePathError, query_reques
 
 _FRESHNESS_THRESHOLD_SECONDS = 300
 
+if TYPE_CHECKING:
+    from codex_usage_tracker.application.analyze import AnalysisRuntime
+
 
 @dataclass(frozen=True)
 class RequestContext:
@@ -35,6 +39,7 @@ class RequestContext:
     pricing_coverage: float | None
     credit_coverage: float | None
     service_tier_coverage: float | None
+    analysis_runtime: AnalysisRuntime | None = field(default=None, repr=False, compare=False)
 
     @property
     def accounting(self) -> AccountingContextV1:

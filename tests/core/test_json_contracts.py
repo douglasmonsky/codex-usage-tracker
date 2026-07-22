@@ -1,3 +1,4 @@
+# ruff: noqa: SIM905
 from __future__ import annotations
 
 import json
@@ -17,6 +18,7 @@ RUNTIME_SCHEMA_SOURCE_PATHS = [
     REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "api_payloads.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "dashboard_targets.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "application" / "query_models.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "application" / "analyze.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "cli" / "main.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "context" / "api.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "pricing" / "costing.py",
@@ -120,6 +122,20 @@ def test_query_v2_contract_is_exactly_tracked() -> None:
             }
         )
         == []
+    )
+
+
+def test_analysis_v2_and_analysis_job_contracts_are_exactly_tracked() -> None:
+    analysis = JSON_PAYLOAD_CONTRACTS["codex-usage-tracker.analysis.v2"]["required"]
+    job = JSON_PAYLOAD_CONTRACTS["codex-usage-tracker.analysis-job.v1"]["required"]
+
+    assert set(analysis) == set(
+        "analysis_id goal summary findings evidence methodology suggested_questions strategy_id "
+        "strategy_version source_revision accounting messages limitations dashboard_destinations".split()
+    )
+    assert set(job) == set(
+        "job_id kind state progress_percent stage source_revision request_hash created_at updated_at "
+        "completed_at retryable error result_schema result".split()
     )
 
 
