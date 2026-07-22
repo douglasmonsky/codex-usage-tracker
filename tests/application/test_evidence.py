@@ -9,7 +9,7 @@ from codex_usage_tracker.application.evidence import get_evidence
 from codex_usage_tracker.core.contracts import serialized_size
 from codex_usage_tracker.evidence.models import EvidenceNotFoundError, EvidenceRequest
 from codex_usage_tracker.interfaces.mcp.core_tools import build_usage_evidence, usage_evidence
-from tests.evidence.test_service import seed_evidence
+from tests.evidence.test_service import _analysis_service, seed_evidence
 
 
 def test_application_facade_builds_matching_context(tmp_path: Path) -> None:
@@ -43,8 +43,26 @@ def test_core_transport_returns_bounded_versioned_envelope(tmp_path: Path) -> No
         "limit",
         "cursor",
         "history",
+        "analysis_id",
     )
     with pytest.raises(ValueError, match="selector_id"):
         build_usage_evidence(selector_kind="call", selector_id="../bad", db_path=db_path)
     with pytest.raises(EvidenceNotFoundError):
         build_usage_evidence(selector_kind="call", selector_id="record-999", db_path=db_path)
+    qualified = build_usage_evidence(
+        selector_kind="finding",
+        selector_id="finding-1",
+        analysis_id="compatibility.token_waste:generation:1",
+        db_path=db_path,
+        job_service=_analysis_service(),
+    )
+    assert qualified["result"]["selector"]["analysis_id"] == (  # type: ignore[index]
+        "compatibility.token_waste:generation:1"
+    )
+
+
+def test_analysis_qualifier_is_finding_only_and_validated() -> None:
+    with pytest.raises(ValueError, match="only supported for finding"):
+        EvidenceRequest("call", "record-1", analysis_id="analysis-1")
+    with pytest.raises(ValueError, match="analysis"):
+        EvidenceRequest("finding", "finding-1", analysis_id="../bad")

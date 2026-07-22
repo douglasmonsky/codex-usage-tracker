@@ -10,6 +10,7 @@ from codex_usage_tracker.application.requests import RequestScope
 from codex_usage_tracker.core.contracts import EvidenceV1, payload_mapping
 from codex_usage_tracker.core.dashboard_targets import is_canonical_record_id
 from codex_usage_tracker.evidence.models import (
+    EvidenceAmbiguityError,
     EvidenceHistoryMismatchError,
     EvidenceNotFoundError,
     EvidenceRequest,
@@ -202,8 +203,12 @@ def test_allowance_resolves_one_exact_persisted_interval(tmp_path: Path) -> None
 
 
 class _FixtureRepository:
-    def __init__(self, report: dict[str, object], revision: str | None = "generation:1") -> None:
-        self.report = report
+    def __init__(
+        self,
+        report: dict[str, object] | tuple[dict[str, object], ...],
+        revision: str | None = "generation:1",
+    ) -> None:
+        self.reports = report if isinstance(report, tuple) else (report,)
         self.revision = revision
 
     def source_revision(self):
@@ -222,7 +227,7 @@ class _FixtureRepository:
         return None
 
     def completed_analyses(self):
-        return (self.report,)
+        return self.reports
 
 
 @pytest.mark.parametrize(("goal", "_record_id"), ANALYSIS_CASES)
@@ -285,5 +290,54 @@ def test_embedded_analysis_uses_revision_bound_keyset_pagination() -> None:
     with pytest.raises(ValueError, match="stale"):
         resolve_evidence(
             EvidenceRequest("analysis", "analysis-1", limit=1, cursor=first.next_cursor),
+            repository,
+        )
+
+
+def test_finding_requires_qualifier_when_same_revision_reports_share_id() -> None:
+    def report(analysis_id: str, *evidence_ids: str) -> dict[str, object]:
+        evidence = tuple(
+            EvidenceV1(
+                evidence_id=evidence_id,
+                kind="call",
+                label=evidence_id,
+                selectors={"record_id": "record-1"},
+                metrics={"tokens": 1},
+                source_schema="codex-usage-tracker.query.v2",
+                dashboard_target=None,
+            )
+            for evidence_id in evidence_ids
+        )
+        return {
+            "analysis_id": analysis_id,
+            "findings": ({"finding_id": "finding-shared", "evidence_ids": evidence_ids},),
+            "evidence": evidence,
+        }
+
+    repository = _FixtureRepository(
+        (
+            report("analysis-1", "evidence-1a", "evidence-1b"),
+            report("analysis-2", "evidence-2a", "evidence-2b"),
+        )
+    )
+    with pytest.raises(EvidenceAmbiguityError, match="analysis_id"):
+        resolve_evidence(EvidenceRequest("finding", "finding-shared"), repository)
+    qualified = resolve_evidence(
+        EvidenceRequest("finding", "finding-shared", limit=1, analysis_id="analysis-2"),
+        repository,
+    )
+    assert qualified.records[0].evidence_id == "evidence-2a"
+    assert qualified.selector["analysis_id"] == "analysis-2"
+    assert qualified.dashboard_target["selectors"]["analysis_id"] == "analysis-2"
+    assert qualified.next_cursor is not None
+    with pytest.raises(ValueError, match="scope"):
+        resolve_evidence(
+            EvidenceRequest(
+                "finding",
+                "finding-shared",
+                limit=1,
+                cursor=qualified.next_cursor,
+                analysis_id="analysis-1",
+            ),
             repository,
         )

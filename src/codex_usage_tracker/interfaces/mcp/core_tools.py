@@ -76,6 +76,7 @@ def usage_evidence(
     limit: int = 20,
     cursor: str | None = None,
     history: str = "active",
+    analysis_id: str | None = None,
 ) -> dict[str, object]:
     """Open exact canonical aggregate evidence selected by a prior tool result."""
     return build_usage_evidence(
@@ -85,6 +86,7 @@ def usage_evidence(
         limit=limit,
         cursor=cursor,
         history=history,
+        analysis_id=analysis_id,
     )
 
 
@@ -96,12 +98,19 @@ def build_usage_evidence(
     limit: int = 20,
     cursor: str | None = None,
     history: str = "active",
+    analysis_id: str | None = None,
     db_path: Path = DEFAULT_DB_PATH,
     pricing_path: Path = DEFAULT_PRICING_PATH,
     job_service: JobService | None = None,
 ) -> dict[str, object]:
     request = EvidenceRequest(
-        cast(Any, selector_kind), selector_id, section, limit, cursor, cast(Any, history)
+        selector_kind=cast(Any, selector_kind),
+        selector_id=selector_id,
+        section=section,
+        limit=limit,
+        cursor=cursor,
+        history=cast(Any, history),
+        analysis_id=analysis_id,
     )
     scope = RequestScope(
         history=cast(HistoryScope, request.history),

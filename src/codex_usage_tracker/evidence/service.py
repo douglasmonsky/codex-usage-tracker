@@ -11,6 +11,7 @@ from typing import Protocol
 from codex_usage_tracker.core.contracts import EvidenceV1
 from codex_usage_tracker.core.dashboard_targets import build_dashboard_target_v2
 from codex_usage_tracker.evidence.models import (
+    EvidenceAmbiguityError,
     EvidenceNotFoundError,
     EvidenceRequest,
     EvidenceResult,
@@ -61,12 +62,15 @@ def resolve_evidence(request: EvidenceRequest, repository: EvidenceRepository) -
         history=request.history,
         analysis_id=analysis_id,
     )
+    selector = {
+        "kind": request.selector_kind,
+        "id": request.selector_id,
+        "section": request.section,
+    }
+    if request.selector_kind == "finding" and analysis_id is not None:
+        selector["analysis_id"] = analysis_id
     return EvidenceResult(
-        selector={
-            "kind": request.selector_kind,
-            "id": request.selector_id,
-            "section": request.section,
-        },
+        selector=selector,
         records=tuple(records[: request.limit]),
         next_cursor=cursor,
         dashboard_target=target,
@@ -79,7 +83,11 @@ def _analysis_records(
     source_revision: str | None,
 ) -> tuple[tuple[EvidenceV1, ...], str | None, str | None]:
     matches = [report for report in reports if _matches(report, request)]
-    if len(matches) != 1:
+    if len(matches) > 1:
+        raise EvidenceAmbiguityError(
+            "finding evidence matches multiple analyses; provide an exact analysis_id"
+        )
+    if not matches:
         return (), None, None
     report = matches[0]
     raw_evidence = report.get("evidence")
@@ -112,6 +120,8 @@ def _analysis_records(
 def _matches(report: Mapping[str, object], request: EvidenceRequest) -> bool:
     if request.selector_kind == "analysis":
         return report.get("analysis_id") == request.selector_id
+    if request.analysis_id is not None and report.get("analysis_id") != request.analysis_id:
+        return False
     return bool(_finding_evidence_ids(report, request.selector_id))
 
 
@@ -138,6 +148,7 @@ def _cursor_fingerprint(request: EvidenceRequest) -> str:
         "section": request.section,
         "history": request.history,
         "limit": request.limit,
+        "analysis_id": request.analysis_id,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()

@@ -29,6 +29,10 @@ class EvidenceHistoryMismatchError(EvidenceNotFoundError):
     """Raised when exact evidence exists only outside the requested history scope."""
 
 
+class EvidenceAmbiguityError(LookupError):
+    """Raised when a selector needs an additional qualifier to resolve exactly once."""
+
+
 @dataclass(frozen=True)
 class EvidenceRequest:
     selector_kind: EvidenceSelectorKind
@@ -37,6 +41,7 @@ class EvidenceRequest:
     limit: int = 20
     cursor: str | None = None
     history: HistoryScope = "active"
+    analysis_id: str | None = None
 
     def __post_init__(self) -> None:
         EvidenceSelector(self.selector_kind, self.selector_id)
@@ -48,6 +53,13 @@ class EvidenceRequest:
             raise ValueError(f"unsupported history: {self.history}")
         if self.cursor is not None and not isinstance(self.cursor, str):
             raise ValueError("cursor must be a string")
+        if self.analysis_id is not None:
+            if self.selector_kind != "finding":
+                raise ValueError("analysis_id is only supported for finding evidence")
+            try:
+                EvidenceSelector("analysis", self.analysis_id)
+            except ValueError as exc:
+                raise ValueError("analysis_id is invalid") from exc
 
 
 @dataclass(frozen=True)
