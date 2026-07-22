@@ -215,12 +215,12 @@ function SourceHealthSection({ payload }: { payload: DashboardBootPayload | null
 
 function AdvancedSection({ compatibilityLabs, showExperimental, setShowExperimental }: SettingsPageProps) {
   const i18n = useShellI18n();
-  const toggleLabel = i18n.t('settings.compatibility.toggle', 'Show compatibility and Labs links');
+  const toggleLabel = i18n.t('settings.experimental.toggle', 'Show compatibility and Labs links');
   return (
     <div className={styles.grid}>
       <Panel
-        title={i18n.t('settings.compatibility.title', 'Compatibility and Labs')}
-        subtitle={i18n.t('settings.compatibility.subtitle', 'Advanced browser-local preference')}
+        title={i18n.t('settings.experimental.title', 'Compatibility and Labs')}
+        subtitle={i18n.t('settings.experimental.subtitle', 'Advanced browser-local preference')}
       >
         <label className={styles.preference}>
           <input
@@ -232,7 +232,7 @@ function AdvancedSection({ compatibilityLabs, showExperimental, setShowExperimen
           <span>
             <strong>{toggleLabel}</strong>
             <small>{i18n.t(
-              'settings.compatibility.origin_scope',
+              'settings.experimental.origin_scope',
               'This browser-local preference reveals temporary direct links. Labs never join primary navigation.',
             )}</small>
           </span>
@@ -252,8 +252,8 @@ function CompatibilityLabs({
 }) {
   return (
     <Panel
-      title={i18n.t('settings.compatibility.labs_title', 'Compatibility Labs')}
-      subtitle={i18n.t('settings.compatibility.labs_subtitle', 'Direct-only routes during the migration window')}
+      title={i18n.t('settings.experimental.labs_title', 'Compatibility Labs')}
+      subtitle={i18n.t('settings.experimental.labs_subtitle', 'Direct-only routes during the migration window')}
     >
       <ul className={styles.labs}>
         {routes.map(route => (

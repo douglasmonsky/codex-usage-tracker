@@ -185,7 +185,7 @@ test.describe('R11 dashboard release candidate', () => {
     for (const [workspaceName, path] of workspaces) {
       browserIssues.length = 0;
       await openWorkspace(page, workspaceName, path);
-      const visualizations = page.locator('[data-visualization-id]');
+      const visualizations = page.locator('[data-visualization-id]:visible');
 
       for (let index = 0; index < await visualizations.count(); index += 1) {
         const visualization = visualizations.nth(index);
@@ -223,25 +223,28 @@ test.describe('R11 dashboard release candidate', () => {
 
     await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference');
     await page.getByRole('button', { name: 'Advanced', exact: true }).click();
-    const toggle = page.getByRole('checkbox', { name: 'Show experimental dashboard features' });
+    const toggle = page.getByRole('checkbox', { name: 'Show compatibility and Labs links' });
     await toggle.check();
-    expect(await page.evaluate(() => localStorage.getItem('codex-usage-dashboard-show-experimental-v1'))).toBe('true');
+    expect(await page.evaluate(() => localStorage.getItem('codex-usage-dashboard-show-compatibility-labs-v1'))).toBe('true');
+    await expect(page.getByRole('heading', { name: 'Compatibility Labs' })).toBeVisible();
     await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference-reload');
     await page.getByRole('button', { name: 'Advanced', exact: true }).click();
-    await expect(page.getByRole('checkbox', { name: 'Show experimental dashboard features' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Show compatibility and Labs links' })).toBeChecked();
+    await expect(page.getByRole('heading', { name: 'Compatibility Labs' })).toBeVisible();
     await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toHaveCount(0);
     await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toHaveCount(0);
 
-    await page.getByRole('checkbox', { name: 'Show experimental dashboard features' }).uncheck();
+    await page.getByRole('checkbox', { name: 'Show compatibility and Labs links' }).uncheck();
     await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference-reset');
     await page.getByRole('button', { name: 'Advanced', exact: true }).click();
-    await expect(page.getByRole('checkbox', { name: 'Show experimental dashboard features' })).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Show compatibility and Labs links' })).not.toBeChecked();
+    await expect(page.getByRole('heading', { name: 'Compatibility Labs' })).toHaveCount(0);
     await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toHaveCount(0);
     await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toHaveCount(0);
   });
 
   test('keeps direct lifecycle routes reachable with their maturity banners', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('codex-usage-dashboard-show-experimental-v1', 'false'));
+    await page.addInitScript(() => localStorage.setItem('codex-usage-dashboard-show-compatibility-labs-v1', 'false'));
     const routes = [
       ['Investigate', '/?view=investigator&qa=release-n-direct', 'Feature maturity: Highly experimental'],
       ['Compression Lab', '/?view=compression-lab&qa=release-n-direct', 'Feature maturity: Highly experimental'],
@@ -338,9 +341,9 @@ test.describe('R11 dashboard release candidate', () => {
     await page.getByRole('button', { name: 'Application', exact: true }).click();
     await page.getByLabel('Language').selectOption('es');
     await page.getByRole('button', { name: /Advanced|Avanzado/, exact: true }).click();
-    await expect(page.getByRole('checkbox', { name: 'Mostrar funciones experimentales del panel' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Mostrar enlaces de compatibilidad y laboratorios' })).toBeVisible();
     await expect(page.getByText(
-      'Esta preferencia se guarda para este origen del navegador. Los espacios de trabajo experimentales siguen disponibles mediante enlaces directos y Diagnóstico permanece visible.',
+      'Esta preferencia local del navegador muestra enlaces directos temporales. Los laboratorios nunca aparecen en la navegación principal.',
     )).toBeVisible();
 
     await page.goto('/?view=diagnostics&qa=release-n-locale');
