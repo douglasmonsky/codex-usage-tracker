@@ -4,10 +4,7 @@ import { Suspense, type ReactNode } from 'react';
 import type { ContextRuntime, ConversationalReadiness, DashboardBootPayload, DashboardLanguage, DashboardModel, HomeSummaryPayload } from '../api/types';
 import type { HistoryScope, LoadWindow } from '../data/dataScope';
 import type { DashboardSourceIdentity } from '../data/queryRuntime';
-import {
-  evidenceKindFromSearch,
-  type DashboardViewId,
-} from './dashboardSearch';
+import type { DashboardViewId } from './dashboardSearch';
 
 const HomePage = lazyRouteComponent(() => import('../features/home/HomePage'), 'HomePage');
 const InvestigatorPage = lazyRouteComponent(() => import('../features/investigator/InvestigatorPage'), 'InvestigatorPage');
@@ -16,6 +13,10 @@ const ExplorePage = lazyRouteComponent(() => import('../features/explore/Explore
 const CallInvestigatorPage = lazyRouteComponent(
   () => import('../features/call-investigator/CallInvestigatorPage'),
   'CallInvestigatorPage',
+);
+const EvidencePage = lazyRouteComponent(
+  () => import('../features/evidence/EvidencePage'),
+  'EvidencePage',
 );
 const UsageDrainPage = lazyRouteComponent(() => import('../features/usage-drain/UsageDrainPage'), 'UsageDrainPage');
 const CacheContextPage = lazyRouteComponent(() => import('../features/cache-context/CacheContextPage'), 'CacheContextPage');
@@ -30,7 +31,7 @@ const dashboardRouteComponents: Array<{
   { id: 'home', component: HomePage },
   { id: 'explore', component: ExplorePage },
   { id: 'limits', component: UsageDrainPage },
-  { id: 'evidence', component: CallInvestigatorPage },
+  { id: 'evidence', component: EvidencePage },
   { id: 'overview', component: HomePage },
   { id: 'investigator', component: InvestigatorPage },
   { id: 'compression-lab', component: CompressionLabPage },
@@ -208,6 +209,18 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           backLabel={callBackLabel}
         />
       );
+    case 'evidence':
+      return (
+        <EvidencePage
+          model={model}
+          contextRuntime={contextRuntime}
+          onContextApiEnabledChange={setContextApiEnabled}
+          onNavigateRecord={openCallInvestigator}
+          onCopyCallLink={copyCallInvestigatorLink}
+          callBackLabel={callBackLabel}
+          onCallBack={backFromCallInvestigator}
+        />
+      );
     case 'usage-drain':
       return (
         <UsageDrainPage
@@ -295,19 +308,14 @@ function renderDashboardView(props: DashboardRouteViewProps) {
 
 type RenderedDashboardViewId = Exclude<
   DashboardViewId,
-  'home' | 'limits' | 'evidence'
+  'home' | 'limits'
 >;
 
 function renderedDashboardView(activeView: DashboardViewId): RenderedDashboardViewId {
   if (activeView === 'home') return 'overview';
   if (activeView === 'explore') return 'explore';
   if (activeView === 'limits') return 'usage-drain';
-  if (activeView !== 'evidence') return activeView;
-  const evidenceKind = evidenceKindFromSearch();
-  if (evidenceKind === 'thread') return 'threads';
-  if (evidenceKind === 'allowance') return 'usage-drain';
-  if (evidenceKind === 'finding' || evidenceKind === 'analysis') return 'investigator';
-  return 'call';
+  return activeView;
 }
 
 function assertNever(value: never): never {
