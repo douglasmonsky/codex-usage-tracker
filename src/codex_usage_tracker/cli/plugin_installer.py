@@ -226,12 +226,13 @@ def plugin_manifest() -> dict[str, Any]:
 def _mcp_config(python_executable: Path) -> dict[str, Any]:
     server: dict[str, Any] = {
         "command": str(python_executable),
-        "args": ["-m", "codex_usage_tracker.mcp_server"],
+        "args": ["-m", "codex_usage_tracker.interfaces.mcp.server"],
         "cwd": ".",
+        "env": {"CODEX_USAGE_TRACKER_MCP_PROFILE": "core"},
     }
     source_root = _source_checkout_for_python(python_executable)
     if source_root:
-        server["env"] = {"PYTHONPATH": str(source_root / "src")}
+        server["env"]["PYTHONPATH"] = str(source_root / "src")
     return {"mcpServers": {PLUGIN_NAME: server}}
 
 

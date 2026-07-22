@@ -265,8 +265,28 @@ commit as each roadmap task.
   temporary empty `compatibility_mcp` import sentinel remains for compatibility but
   cannot register or run hidden tools.
 
+## Task 16 - Make the installed plugin launch the core MCP profile by default
+
+- Status: complete
+- Branch: `pivot/16-core-launcher`
+- Commits: `feat: default the plugin to core MCP tools` (this commit)
+- Focused verification: launcher, generated-installer, readiness, doctor, and
+  selected-profile server tests passed; the full MCP profile suite also passed.
+- Full verification: release checker before and after build; wheel and sdist
+  build; distribution release check; clean installed-wheel smoke with an isolated
+  FastMCP registry probe proving the seven ordered core tools; touched-file Ruff
+  check/format; source/package launcher byte comparison; independent review clean.
+- Deviations from plan: The public installer module is an import alias, so the
+  generated-config change lives in `cli/plugin_installer.py`. MCP diagnostics also
+  learned the new internal module path, and explicit package data includes the
+  packaged launcher. Static smoke catalogs moved to a small helper so the main
+  smoke gate stays below the repository source-size limit. Its synthetic dashboard
+  check now uses the bounded 5,000-row limit instead of the legacy unbounded value.
+- Follow-up risks: Task 17 must bump both byte-identical launcher copies' pinned
+  runtime version and package spec together with the 0.22.0 release metadata.
+
 ## Remaining Planned Tasks
 
-Tasks 16 through 45 remain planned in the approved implementation roadmap. Add a
+Tasks 17 through 45 remain planned in the approved implementation roadmap. Add a
 full entry using the format above when each task becomes active; do not mark a
 task complete without its named focused and full verification evidence.

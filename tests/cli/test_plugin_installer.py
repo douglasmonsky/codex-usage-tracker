@@ -44,11 +44,15 @@ def test_install_plugin_writes_generated_wrapper_and_marketplace(tmp_path: Path)
     assert (plugin_dir / "assets" / "icon.svg").exists()
     assert (plugin_dir / "skills" / "codex-usage-api" / "SKILL.md").exists()
     assert (plugin_dir / "skills" / "codex-usage-tracker" / "SKILL.md").exists()
+    assert (plugin_dir / "skills" / "codex-usage-tracker" / "scripts" / "run_mcp.py").exists()
     assert mcp_config["mcpServers"]["codex-usage-tracker"]["command"] == str(python_path)
     assert mcp_config["mcpServers"]["codex-usage-tracker"]["args"] == [
         "-m",
-        "codex_usage_tracker.mcp_server",
+        "codex_usage_tracker.interfaces.mcp.server",
     ]
+    assert mcp_config["mcpServers"]["codex-usage-tracker"]["env"] == {
+        "CODEX_USAGE_TRACKER_MCP_PROFILE": "core"
+    }
     assert marketplace["plugins"] == [
         {
             "name": "codex-usage-tracker",
@@ -112,7 +116,10 @@ def test_install_plugin_adds_pythonpath_for_source_checkout_venv(tmp_path: Path)
     mcp_config = json.loads((plugin_dir / ".mcp.json").read_text())
     server = mcp_config["mcpServers"]["codex-usage-tracker"]
 
-    assert server["env"] == {"PYTHONPATH": str(repo_root / "src")}
+    assert server["env"] == {
+        "CODEX_USAGE_TRACKER_MCP_PROFILE": "core",
+        "PYTHONPATH": str(repo_root / "src"),
+    }
 
 
 def test_install_plugin_force_replaces_existing_symlink(tmp_path: Path) -> None:

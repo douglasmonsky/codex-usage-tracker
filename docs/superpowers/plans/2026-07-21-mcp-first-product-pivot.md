@@ -1137,17 +1137,17 @@ git commit -m "refactor: profile the MCP tool surface"
 - Readiness reports the configured profile and whether the runtime version matches the wrapper's package spec.
 - Existing runtime bootstrap cache behavior remains.
 
-- [ ] **Step 1: Write failing launcher tests.** Cover default core, explicit full/developer, invalid profile, generated wrapper environment, cached runtime, local `.venv`, Windows path construction, and readiness output.
+- [x] **Step 1: Write failing launcher tests.** Cover default core, explicit full/developer, invalid profile, generated wrapper environment, cached runtime, local `.venv`, Windows path construction, and readiness output.
 
-- [ ] **Step 2: Pass profile through the exec environment.** Keep `MODULE_ARGS` stable except for using the new `codex_usage_tracker.interfaces.mcp.server` module internally; retain `codex_usage_tracker.mcp_server` as a compatibility module.
+- [x] **Step 2: Pass profile through the exec environment.** Keep `MODULE_ARGS` stable except for using the new `codex_usage_tracker.interfaces.mcp.server` module internally; retain `codex_usage_tracker.mcp_server` as a compatibility module.
 
-- [ ] **Step 3: Update installer templates and readiness checks.** A healthy wrapper with the core profile reports it exactly; do not claim current-task tool discovery.
+- [x] **Step 3: Update installer templates and readiness checks.** A healthy wrapper with the core profile reports it exactly; do not claim current-task tool discovery.
 
-- [ ] **Step 4: Update installed-wheel smoke.** Launch an isolated MCP subprocess, list tools through the SDK or registry probe, and assert exactly the seven core names.
+- [x] **Step 4: Update installed-wheel smoke.** Launch an isolated MCP subprocess, list tools through the SDK or registry probe, and assert exactly the seven core names.
 
-- [ ] **Step 5: Synchronize source and packaged launcher files byte-for-byte.**
+- [x] **Step 5: Synchronize source and packaged launcher files byte-for-byte.**
 
-- [ ] **Step 6: Verify.**
+- [x] **Step 6: Verify.**
 
 ```bash
 python -m pytest tests/cli/test_mcp_launcher.py tests/cli/test_plugin_installer.py tests/core/test_conversational_readiness.py -q
@@ -1159,7 +1159,7 @@ python scripts/smoke_installed_package.py
 
 Expected: PASS; clean installation starts the core profile.
 
-- [ ] **Step 7: Commit.**
+- [x] **Step 7: Commit.**
 
 ```bash
 git add skills/codex-usage-tracker/scripts/run_mcp.py src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py .mcp.json src/codex_usage_tracker/plugin_installer.py src/codex_usage_tracker/core/conversational_readiness.py tests/cli/test_mcp_launcher.py tests/cli/test_plugin_installer.py tests/core/test_conversational_readiness.py scripts/smoke_installed_package.py docs/install.md docs/mcp.md

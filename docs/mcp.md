@@ -32,6 +32,10 @@ Marketplace installs use the bundled MCP launcher at `skills/codex-usage-tracker
 
 The launcher intentionally pins a reviewed package version instead of tracking `main`. Set `CODEX_USAGE_TRACKER_PACKAGE_SPEC` to test another package version or Git ref, and set `CODEX_USAGE_TRACKER_RUNTIME_DIR` to use a separate cache while debugging plugin startup.
 
+Installed and generated wrappers set `CODEX_USAGE_TRACKER_MCP_PROFILE=core`. The launcher and selected-profile server also accept `full` and `developer`; an unknown value fails before FastMCP starts. Source-checkout maintainers can select `developer` explicitly when testing experiments. Changing only the profile reuses a matching cached runtime because cache validity remains tied to the package spec, not the registered tool surface.
+
+Readiness payloads report `configured_profile` and `runtime_version_matches`. A healthy result proves the local wrapper and runtime checks only; it does not prove that the current Codex task has discovered the MCP tools.
+
 ## Companion Skills
 
 The plugin installs two companion skills:
@@ -129,6 +133,10 @@ individual allowance compatibility tools are not part of this default flow.
 
 A server process registers one selected profile; it never registers every tool
 and relies on documentation to hide the others.
+
+The installed default is `core`. `codex_usage_tracker.mcp_server` remains a
+compatibility entrypoint for older direct integrations, while new wrappers use
+`codex_usage_tracker.interfaces.mcp.server` and select their profile explicitly.
 
 | Profile | Registered surface |
 | --- | --- |

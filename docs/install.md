@@ -114,7 +114,9 @@ If you previously installed the older source-checkout symlink, replace it once:
 codex-usage-tracker install-plugin --python .venv/bin/python --force
 ```
 
-`install-plugin` creates `~/plugins/codex-usage-tracker`, writes a package-owned `.mcp.json` that points at the installed Python executable, and updates `~/.agents/plugins/marketplace.json`.
+`install-plugin` creates `~/plugins/codex-usage-tracker`, writes a package-owned `.mcp.json` that points at the installed Python executable, and updates `~/.agents/plugins/marketplace.json`. The generated wrapper sets `CODEX_USAGE_TRACKER_MCP_PROFILE=core`, so a fresh Codex task discovers exactly the seven stable core tools by default.
+
+The launcher accepts `core`, `full`, or `developer`; any other value stops before FastMCP starts. Source-checkout maintainers can run the bundled launcher with `CODEX_USAGE_TRACKER_MCP_PROFILE=developer` when testing experimental tools. Profile selection does not invalidate or reinstall an otherwise matching cached runtime.
 
 ## Local Dashboard
 
@@ -168,7 +170,7 @@ codex-usage-tracker --version
 python -m codex_usage_tracker --version
 ```
 
-`doctor` is read-only. `doctor --suggest-repair` explains likely follow-up commands without making changes.
+`doctor` is read-only. `doctor --suggest-repair` explains likely follow-up commands without making changes. Conversational readiness reports the effective `configured_profile` and whether the bootstrap runtime marker matches the wrapper's package spec as `runtime_version_matches`; these local checks do not prove that the current Codex task has discovered the tools.
 
 ## Lifecycle Commands
 

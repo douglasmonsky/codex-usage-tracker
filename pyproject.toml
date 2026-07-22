@@ -92,6 +92,7 @@ where = ["src"]
   "rate_cards/*",
   "skills/codex-usage-api/*",
   "skills/codex-usage-tracker/*",
+  "skills/codex-usage-tracker/scripts/*.py",
 ]
 
 [tool.setuptools.exclude-package-data]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -45,6 +46,47 @@ def test_built_servers_expose_only_the_selected_profile() -> None:
         actual = [tool.name for tool in asyncio.run(server.list_tools())]
         expected = [tool.name for tool in tools_for_profile(profile)]
         assert actual == expected
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [(None, "core"), ("core", "core"), ("full", "full"), ("developer", "developer")],
+)
+def test_selected_profile_server_reads_the_environment(
+    monkeypatch: pytest.MonkeyPatch, configured: str | None, expected: str
+) -> None:
+    from codex_usage_tracker.interfaces.mcp import server
+
+    selected: list[str] = []
+    if configured is None:
+        monkeypatch.delenv(server.PROFILE_ENV, raising=False)
+    else:
+        monkeypatch.setenv(server.PROFILE_ENV, configured)
+    monkeypatch.setattr(
+        server,
+        "build_mcp_server",
+        lambda profile: SimpleNamespace(run=lambda: selected.append(profile)),
+    )
+
+    server.main()
+
+    assert selected == [expected]
+
+
+def test_selected_profile_server_rejects_invalid_environment_before_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from codex_usage_tracker.interfaces.mcp import server
+
+    monkeypatch.setenv(server.PROFILE_ENV, "unreviewed")
+    monkeypatch.setattr(
+        server,
+        "build_mcp_server",
+        lambda _profile: pytest.fail("FastMCP server built for an invalid profile"),
+    )
+
+    with pytest.raises(SystemExit, match="expected one of: core, full, developer"):
+        server.main()
 
 
 def test_building_core_does_not_resolve_or_mutate_legacy_registration(

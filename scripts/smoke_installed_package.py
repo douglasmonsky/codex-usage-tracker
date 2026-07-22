@@ -24,8 +24,10 @@ from pathlib import Path
 
 try:
     from scripts.smoke_dashboard_server import smoke_served_dashboard
+    from scripts.smoke_installed_catalog import CLI_HELP_SUBCOMMANDS, RESOURCE_PATHS
 except ModuleNotFoundError:  # Direct execution puts scripts/ on sys.path.
     from smoke_dashboard_server import smoke_served_dashboard
+    from smoke_installed_catalog import CLI_HELP_SUBCOMMANDS, RESOURCE_PATHS
 
 try:
     import tomllib
@@ -42,105 +44,14 @@ DEFAULT_DOCKER_IMAGE = "python:3.14-slim"
 REACT_ASSET_PATTERN = re.compile(
     r"""(?:src|href)=["'](?P<path>/codex-usage-tracker-assets/react/[^"']+)["']"""
 )
-CLI_HELP_SUBCOMMANDS = [
-    "setup",
-    "doctor",
-    "install-plugin",
-    "upgrade-plugin",
-    "uninstall-plugin",
-    "refresh",
-    "inspect-log",
-    "rebuild-index",
-    "reset-db",
-    "summary",
-    "subagents",
-    "query",
-    "recommendations",
-    "action-brief",
-    "diagnostics",
-    "session",
-    "context",
-    "dashboard",
-    "open-dashboard",
-    "serve-dashboard",
-    "dashboard-service",
-    "expensive",
-    "pricing-coverage",
-    "source-coverage",
-    "allowance-history",
-    "allowance-diagnostics",
-    "allowance-export",
-    "export",
-    "init-pricing",
-    "update-pricing",
-    "pin-pricing",
-    "init-allowance",
-    "parse-allowance",
-    "update-rate-card",
-    "init-thresholds",
-    "init-projects",
-    "support-bundle",
-]
-
-RESOURCE_PATHS = [
-    "assets/icon.svg",
-    "dashboard/dashboard.css",
-    "dashboard/dashboard_call.css",
-    "dashboard/dashboard_insights.css",
-    "dashboard/dashboard_layout.css",
-    "dashboard/dashboard_tables.css",
-    "dashboard/dashboard_detail.css",
-    "dashboard/dashboard_responsive.css",
-    "dashboard/dashboard_format.js",
-    "dashboard/dashboard_data.js",
-    "dashboard/dashboard_analysis.js",
-    "dashboard/dashboard_cells.js",
-    "dashboard/dashboard_details.js",
-    "dashboard/dashboard_insights.js",
-    "dashboard/dashboard_tables.js",
-    "dashboard/dashboard_filters.js",
-    "dashboard/dashboard_status.js",
-    "dashboard/dashboard_events.js",
-    "dashboard/dashboard_actions.js",
-    "dashboard/dashboard_live.js",
-    "dashboard/dashboard_diagnostics.js",
-    "dashboard/dashboard_call_diagnostics.js",
-    "dashboard/dashboard.js",
-    "dashboard/dashboard_state.js",
-    "dashboard/dashboard_template.html",
-    "dashboard/react/index.html",
-    "dashboard/react/assets/dashboard-react.js",
-    "dashboard/react/assets/index.css",
-    "dashboard/locales/en.json",
-    "dashboard/locales/vi.json",
-    "dashboard/locales/es.json",
-    "dashboard/locales/fr.json",
-    "dashboard/locales/de.json",
-    "dashboard/locales/pt.json",
-    "dashboard/locales/ja.json",
-    "dashboard/locales/zh-Hans.json",
-    "dashboard/locales/ko.json",
-    "dashboard/locales/ru.json",
-    "dashboard/locales/it.json",
-    "dashboard/locales/ar.json",
-    "docs/dashboard-guide.html",
-    "docs/examples/token-waste-conversation.md",
-    "docs/examples/remediation-conversation.md",
-    "docs/assets/dashboard-insights.png",
-    "docs/assets/dashboard-calls.png",
-    "docs/assets/dashboard-calls-preview.png",
-    "docs/assets/dashboard-threads.png",
-    "docs/assets/dashboard-diagnostics.png",
-    "docs/assets/dashboard-diagnostics-git-expanded.png",
-    "docs/assets/dashboard-details.png",
-    "docs/assets/dashboard-call-investigator.png",
-    "docs/assets/dashboard-call-investigator-preview.png",
-    "docs/assets/dashboard-call-investigator-evidence.png",
-    "docs/assets/plugin-prompts.png",
-    "docs/assets/plugin-thread-leaderboard.png",
-    "rate_cards/codex-credit-rates.json",
-    "skills/codex-usage-api/SKILL.md",
-    "skills/codex-usage-tracker/SKILL.md",
+EXPECTED_CORE_MCP_TOOLS = [
+    "usage_status",
+    "usage_refresh",
+    "usage_analyze",
+    "usage_query",
+    "usage_evidence",
+    "usage_allowance",
+    "usage_job_status",
 ]
 BUILD_ARTIFACT_PATHS = [
     REPO_ROOT / "build",
@@ -283,8 +194,16 @@ def _venv_console_script(venv_dir: Path) -> Path:
 def _import_check_code() -> str:
     return textwrap.dedent(
         f"""
+        import asyncio
         import {IMPORT_PACKAGE}
+        from {IMPORT_PACKAGE}.interfaces.mcp.runtime import build_mcp_server
+
+        actual = [tool.name for tool in asyncio.run(build_mcp_server("core").list_tools())]
+        expected = {EXPECTED_CORE_MCP_TOOLS!r}
+        if actual != expected:
+            raise SystemExit(f"installed core MCP profile mismatch: {{actual}}")
         print({IMPORT_PACKAGE}.__version__)
+        print(f"validated {{len(actual)}} installed core MCP tools")
         """
     )
 
@@ -343,6 +262,7 @@ def _smoke_plugin_install(command: Path, temp_dir: Path) -> None:
         plugin_dir / "assets" / "icon.svg",
         plugin_dir / "skills" / "codex-usage-api" / "SKILL.md",
         plugin_dir / "skills" / "codex-usage-tracker" / "SKILL.md",
+        plugin_dir / "skills" / "codex-usage-tracker" / "scripts" / "run_mcp.py",
         marketplace,
     ]
     missing = [path for path in required_files if not path.exists()]
@@ -364,9 +284,12 @@ def _smoke_plugin_install(command: Path, temp_dir: Path) -> None:
         raise SystemExit("plugin MCP config command does not point at installed wheel Python")
     if reported_python != actual_python:
         raise SystemExit("install-plugin JSON and MCP config report different Python executables")
-    if server.get("args") != ["-m", "codex_usage_tracker.mcp_server"]:
+    if server.get("args") != ["-m", "codex_usage_tracker.interfaces.mcp.server"]:
         raise SystemExit("plugin MCP config args do not launch the installed MCP server")
-    if server.get("env", {}).get("PYTHONPATH"):
+    server_env = server.get("env", {})
+    if server_env.get("CODEX_USAGE_TRACKER_MCP_PROFILE") != "core":
+        raise SystemExit("installed-wheel plugin MCP config does not select the core profile")
+    if server_env.get("PYTHONPATH"):
         raise SystemExit("installed-wheel plugin MCP config should not require PYTHONPATH")
 
 
@@ -454,7 +377,7 @@ def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
             "--output",
             str(dashboard_path),
             "--limit",
-            "0",
+            "5000",
             "--json",
         ],
         capture_output=True,
