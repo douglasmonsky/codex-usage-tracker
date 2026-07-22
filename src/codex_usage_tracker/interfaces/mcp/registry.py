@@ -161,9 +161,7 @@ def validate_tool_specs(specs: Iterable[ToolSpec]) -> None:
         if not spec.deprecated_since or not spec.remove_after:
             raise ToolCatalogError(f"missing deprecation release: {spec.name}")
         if _release_tuple(spec.remove_after) < _release_tuple(spec.deprecated_since):
-            raise ToolCatalogError(
-                f"removal release precedes deprecation release: {spec.name}"
-            )
+            raise ToolCatalogError(f"removal release precedes deprecation release: {spec.name}")
 
 
 def _data_class(name: str) -> ToolDataClass:
@@ -187,8 +185,7 @@ def _data_class(name: str) -> ToolDataClass:
     ):
         return "local_index"
     if any(
-        marker in name
-        for marker in ("refresh", "doctor", "generate", "export", "init_", "update_")
+        marker in name for marker in ("refresh", "doctor", "generate", "export", "init_", "update_")
     ):
         return "administrative"
     return "aggregate"
@@ -265,41 +262,45 @@ def _lazy_legacy_handler(name: str) -> Callable[..., object]:
 @lru_cache(maxsize=1)
 def tool_specs() -> tuple[ToolSpec, ...]:
     """Return the validated immutable tool catalog in registration order."""
-    specs = tuple(
-        ToolSpec(
-            name=name,
-            minimum_profile="core",
-            maturity="stable",
-            lifecycle="active",
-            data_class=(
-                "administrative" if name in {"usage_status", "usage_refresh"} else "aggregate"
-            ),
-            handler=_CORE_HANDLERS[name],
+    specs = (
+        tuple(
+            ToolSpec(
+                name=name,
+                minimum_profile="core",
+                maturity="stable",
+                lifecycle="active",
+                data_class=(
+                    "administrative" if name in {"usage_status", "usage_refresh"} else "aggregate"
+                ),
+                handler=_CORE_HANDLERS[name],
+            )
+            for name in CORE_TOOL_NAMES
         )
-        for name in CORE_TOOL_NAMES
-    ) + tuple(
-        ToolSpec(
-            name=name,
-            minimum_profile="full",
-            maturity="beta",
-            lifecycle="deprecated",
-            data_class=_data_class(name),
-            handler=_lazy_legacy_handler(name),
-            replacement=_replacement(name),
-            deprecated_since="0.22.0",
-            remove_after="0.25.0",
+        + tuple(
+            ToolSpec(
+                name=name,
+                minimum_profile="full",
+                maturity="beta",
+                lifecycle="deprecated",
+                data_class=_data_class(name),
+                handler=_lazy_legacy_handler(name),
+                replacement=_replacement(name),
+                deprecated_since="0.22.0",
+                remove_after="0.25.0",
+            )
+            for name in _FULL_TOOL_NAMES
         )
-        for name in _FULL_TOOL_NAMES
-    ) + tuple(
-        ToolSpec(
-            name=name,
-            minimum_profile="developer",
-            maturity="experimental",
-            lifecycle="active",
-            data_class=_data_class(name),
-            handler=_lazy_legacy_handler(name),
+        + tuple(
+            ToolSpec(
+                name=name,
+                minimum_profile="developer",
+                maturity="experimental",
+                lifecycle="active",
+                data_class=_data_class(name),
+                handler=_lazy_legacy_handler(name),
+            )
+            for name in _DEVELOPER_TOOL_NAMES
         )
-        for name in _DEVELOPER_TOOL_NAMES
     )
     validate_tool_specs(specs)
     return specs
