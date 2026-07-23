@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +20,7 @@ from codex_usage_tracker.store.dedupe_queries import (
     query_dedupe_counts,
     query_dedupe_diagnostics,
 )
+from codex_usage_tracker.store.deduplication import classify_usage_rows
 from codex_usage_tracker.store.summary_queries import query_summary
 from codex_usage_tracker.store.usage_api_queries import (
     query_usage_api_event_count,
@@ -57,6 +59,40 @@ def test_clone_copy_is_physical_but_not_billable(tmp_path: Path) -> None:
         )
 
 
+def test_existing_fingerprint_lookup_is_batched() -> None:
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """
+        CREATE TABLE usage_events (
+            usage_fingerprint TEXT,
+            record_id TEXT NOT NULL,
+            is_duplicate INTEGER NOT NULL
+        )
+        """
+    )
+    rows = [
+        {
+            "record_id": f"record-{index}",
+            "usage_fingerprint": f"fingerprint-{index}",
+            "canonical_record_id": f"canonical-{index}",
+        }
+        for index in range(1_201)
+    ]
+    statements: list[str] = []
+    conn.set_trace_callback(statements.append)
+
+    classified = classify_usage_rows(conn, rows)
+
+    lookup_queries = [
+        statement
+        for statement in statements
+        if statement.startswith("SELECT usage_fingerprint, record_id FROM usage_events ")
+    ]
+    assert len(lookup_queries) == 3
+    assert all(row["is_duplicate"] == 0 for row in classified)
+
+
 def test_copied_allowance_rows_do_not_contribute_intervals_or_generation(tmp_path: Path) -> None:
     first = replace(
         _event("first", "/first.jsonl"),
@@ -78,8 +114,12 @@ def test_copied_allowance_rows_do_not_contribute_intervals_or_generation(tmp_pat
         total_tokens=200,
         cumulative_total_tokens=300,
     )
-    copied_first = replace(first, record_id="copied-first", session_id="copy", source_file="/copy-1.jsonl")
-    copied_second = replace(second, record_id="copied-second", session_id="copy", source_file="/copy-2.jsonl")
+    copied_first = replace(
+        first, record_id="copied-first", session_id="copy", source_file="/copy-1.jsonl"
+    )
+    copied_second = replace(
+        second, record_id="copied-second", session_id="copy", source_file="/copy-2.jsonl"
+    )
     db_path = tmp_path / "usage.sqlite3"
     upsert_usage_events([first, second, copied_first, copied_second], db_path)
 
@@ -97,7 +137,9 @@ def test_copied_allowance_rows_do_not_contribute_intervals_or_generation(tmp_pat
         conn.execute(
             "UPDATE usage_events SET rate_limit_primary_used_percent=99 WHERE record_id='copied-second'"
         )
-        assert not materialize_allowance_intelligence(conn, now=datetime(2026, 7, 14, tzinfo=timezone.utc))
+        assert not materialize_allowance_intelligence(
+            conn, now=datetime(2026, 7, 14, tzinfo=timezone.utc)
+        )
         assert tuple(
             conn.execute(
                 "SELECT allowance_generation, source_revision FROM allowance_source_state"

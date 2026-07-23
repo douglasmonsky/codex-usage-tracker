@@ -167,7 +167,7 @@ def test_full_refresh_defers_and_restores_bulk_load_indexes(
     assert observed_source_indexes
     assert all(not names for names in observed_source_indexes)
     assert observed_usage_indexes
-    assert all(names == ["idx_usage_canonical_fingerprint"] for names in observed_usage_indexes)
+    assert all(not names for names in observed_usage_indexes)
     with connect(db_path) as conn:
         restored = {
             str(row["name"])
@@ -181,6 +181,18 @@ def test_full_refresh_defers_and_restores_bulk_load_indexes(
                 """
             )
         }
+        restored_usage_indexes = {
+            str(row["name"])
+            for row in conn.execute(
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type = 'index'
+                  AND tbl_name = 'usage_events'
+                  AND sql IS NOT NULL
+                """
+            )
+        }
     assert restored == {
         "idx_call_diagnostic_facts_aggregate",
         "idx_call_diagnostic_facts_record",
@@ -190,6 +202,7 @@ def test_full_refresh_defers_and_restores_bulk_load_indexes(
         "idx_source_records_shape_adapter",
         "idx_source_records_source_line",
     }
+    assert "idx_usage_canonical_fingerprint" in restored_usage_indexes
 
 
 def test_parallel_parse_submission_queue_is_bounded(tmp_path: Path, monkeypatch) -> None:
