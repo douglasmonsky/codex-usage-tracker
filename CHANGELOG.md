@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+## 0.23.0 - 2026-07-23
+
+- Focus the Evidence Console on Home, unified Calls/Threads Explore, Limits,
+  utility Settings, and contextual call/thread/finding/allowance Evidence.
+- Restore the Home usage pulse, live loading progress, guided MCP/plugin setup,
+  copyable investigation prompts, and a first-visit Calls/Threads switch cue.
+- Make timeframe, history, model, effort, confidence, source, pricing, and
+  credit filters use focused endpoints with exact counts and scoped totals.
+- Render expanded thread calls with the same legible call rows, pricing, and
+  credit semantics as Calls.
+- Keep `service serve --refresh` immediately usable by refreshing in the
+  background, and batch canonical deduplication lookups during ingestion.
+- Credit
+  [`@nrlcode`](https://github.com/nrlcode) and
+  [PR #291](https://github.com/douglasmonsky/codex-usage-tracker/pull/291)
+  for independently identifying the dropped-index deduplication bottleneck
+  and contributing reproducible large-refresh benchmarks and regression-test
+  design. The release ships the batched lookup solution to the same root cause.
+- Keep five legacy workbenches directly routable with explicit transition
+  guidance while removing them from primary navigation.
+- Add eight bounded HTTP API v2 routes backed by the same application services
+  and contracts as the seven-tool MCP core.
+- Remove the experimental Usage Constellation, Three.js dependencies, tests,
+  and packaged assets.
+- Introduce the exact 11-command primary CLI with `config`, `service`, and
+  `admin` namespaces while preserving historical aliases through 0.24.x.
+
+## 0.22.0 - 2026-07-22
+
+- Establish the MCP-first product pivot program, including the `0.22.0` through
+  `0.26.0` release sequence, bounded compatibility and deprecation ledgers, an
+  execution ledger, and a freeze on unplanned dashboard and public-surface
+  growth.
+- Add seven canonical MCP tools for status, refresh, analysis, query, evidence,
+  allowance, and job polling, all returning the shared versioned envelope.
+- Default repository and installed-plugin MCP launchers to the ordered
+  seven-tool `core` profile while retaining non-developer 0.21/PR290 names in
+  `full` and every 0.21/PR290 name in `developer`.
+- Add deterministic routing coverage for ten representative usage questions
+  and equivalence coverage for existing totals, pricing, allowance, and
+  subagent calculations.
+- Reposition the existing browser surface as the supporting Evidence Console;
+  this release does not change dashboard navigation.
+
 ## 0.21.0 - 2026-07-17
 
 - Keep the macOS dashboard available at a stable, localhost-only URL with a

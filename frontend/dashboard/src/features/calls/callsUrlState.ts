@@ -108,7 +108,8 @@ export type CallsViewLinkState = {
 
 export function buildCallsViewLink(state: CallsViewLinkState, href = window.location.href): URL {
   const url = new URL(href);
-  url.searchParams.set('view', 'calls');
+  url.searchParams.set('view', 'explore');
+  url.searchParams.set('mode', 'calls');
   url.searchParams.delete('detail');
   url.searchParams.delete('pricing');
   setOptionalCallsParam(url, 'record', state.selectedRecordId, '');

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { dashboardRenderedViewIds } from '../routes/DashboardRouteView';
 import { dashboardViewIds } from '../routes/dashboardSearch';
-import { secondaryNavItems } from './navigation';
+import { navItems, settingsNavItem } from './navigation';
 import { navigationForPhase, routeCatalog, routeDefinition } from './routeCatalog';
 
 describe('dashboard route catalog', () => {
-  it('catalogs and renders every dashboard view exactly once', () => {
+  it('catalogs and renders every accepted dashboard view exactly once', () => {
     expect(new Set(routeCatalog.map(route => route.id))).toEqual(new Set(dashboardViewIds));
     expect(dashboardRenderedViewIds).toHaveLength(dashboardViewIds.length);
     expect(new Set(dashboardRenderedViewIds)).toEqual(new Set(dashboardViewIds));
@@ -17,60 +17,60 @@ describe('dashboard route catalog', () => {
     expect(new Set(routeCatalog.map(route => route.label))).toHaveLength(routeCatalog.length);
   });
 
-  it('classifies contextual and transitioning routes independently from navigation exposure', () => {
-    expect(routeDefinition('call')).toMatchObject({
+  it('separates stable targets from direct-only compatibility routes', () => {
+    expect(routeDefinition('evidence')).toMatchObject({
       maturity: 'stable', placement: 'contextual', lifecycle: 'active',
     });
     expect(routeDefinition('diagnostics')).toMatchObject({
-      maturity: 'experimental', placement: 'primary', lifecycle: 'active',
+      maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated',
     });
     expect(routeDefinition('cache-context')).toMatchObject({
-      maturity: 'experimental', placement: 'hidden', lifecycle: 'transitioning',
+      maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated',
     });
   });
 
-  it('limits experimental navigation eligibility to the two approved routes', () => {
-    expect(routeCatalog.filter(route => route.experimentalNavigationEligible).map(route => route.id)).toEqual([
-      'investigator',
-      'compression-lab',
-    ]);
+  it('never makes a legacy workbench eligible for experimental navigation', () => {
+    expect(routeCatalog.filter(route => route.experimentalNavigationEligible)).toEqual([]);
   });
 
-  it('locks the Release N foundation navigation baseline', () => {
-    expect(navigationForPhase('foundation').map(route => route.id)).toEqual([
-      'overview', 'investigator', 'compression-lab', 'calls', 'threads',
-      'usage-drain', 'cache-context', 'diagnostics', 'reports', 'settings',
-    ]);
+  it('keeps every deprecated workbench direct-only with a concrete replacement', () => {
+    const deprecatedWorkbenches = {
+      investigator: 'usage_analyze(goal="usage_spike") → usage_evidence',
+      'compression-lab': 'usage_analyze(goal="token_waste"); full-profile compression tools through 0.24.x',
+      'cache-context': 'usage_analyze(goal="context_bloat") or usage_analyze(goal="cache_failure")',
+      diagnostics: 'usage_query(entity="call", measures=["tokens"]) → usage_evidence',
+      reports: 'usage_analyze(goal="usage_spike") or usage_query(...)',
+    } as const;
+
+    for (const id of Object.keys(deprecatedWorkbenches) as Array<keyof typeof deprecatedWorkbenches>) {
+      expect(routeDefinition(id)).toMatchObject({
+        placement: 'hidden',
+        lifecycle: 'deprecated',
+        replacementMcpOperation: deprecatedWorkbenches[id],
+        replacementHref: '?view=explore&mode=calls',
+      });
+    }
   });
 
-  it('keeps legacy quick-link aliases hidden and deprecated', () => {
-    expect(secondaryNavItems.map(({ label, maturity, placement, lifecycle }) => ({
-      label, maturity, placement, lifecycle,
-    }))).toEqual([
-      { label: 'Files', maturity: 'stable', placement: 'hidden', lifecycle: 'deprecated' },
-      { label: 'Commands', maturity: 'stable', placement: 'hidden', lifecycle: 'deprecated' },
-      { label: 'Models', maturity: 'stable', placement: 'hidden', lifecycle: 'deprecated' },
+  it('exposes exactly three analytical destinations and Settings as a utility', () => {
+    expect(navigationForPhase('simplified').map(route => route.id)).toEqual([
+      'home', 'explore', 'limits',
     ]);
+    expect(navItems.map(item => item.id)).toEqual(['home', 'explore', 'limits']);
+    expect(settingsNavItem.id).toBe('settings');
+    expect([...navItems, settingsNavItem]).toHaveLength(4);
   });
 
-  it('preserves the full Task 1 route params separately from handoff params', () => {
-    expect(Object.fromEntries(routeCatalog.map(route => [route.id, route.safeParams]))).toEqual({
-      overview: [], investigator: ['finding'], 'compression-lab': [],
-      calls: ['explore', 'detail', 'call_q', 'source', 'sort', 'direction', 'density', 'page'],
-      call: ['record', 'return', 'mode', 'max_entries', 'max_chars', 'include_tool_output', 'include_compaction_history'],
-      threads: ['thread', 'thread_key', 'expand', 'threads', 'thread_q', 'risk', 'thread_call_sort', 'thread_call_page'],
-      'usage-drain': ['usage_plan', 'usage_effort', 'usage_subagents', 'usage_sample', 'usage_confidence', 'limit_window', 'limit_hypothesis'],
-      'cache-context': ['cache_thread'], diagnostics: ['diagnostic_source', 'diagnostic_fact'],
-      reports: ['report'], settings: [],
-    });
-    expect(Object.fromEntries(routeCatalog.map(route => [route.id, route.handoffParams]))).toEqual({
-      overview: [], investigator: ['finding'], 'compression-lab': [],
-      calls: ['explore', 'detail', 'source', 'sort', 'direction', 'density', 'page'],
-      call: ['record', 'return', 'mode'],
-      threads: ['thread_key', 'expand', 'risk', 'thread_call_sort', 'thread_call_page'],
-      'usage-drain': ['usage_plan', 'usage_effort', 'usage_subagents', 'usage_sample', 'usage_confidence', 'limit_window', 'limit_hypothesis'],
-      'cache-context': [], diagnostics: ['diagnostic_source', 'diagnostic_fact'],
-      reports: ['report'], settings: [],
-    });
+  it('keeps handoff parameters inside each route safe-parameter boundary', () => {
+    for (const route of routeCatalog) {
+      expect(new Set(route.safeParams).size).toBe(route.safeParams.length);
+      expect(route.handoffParams.every(param => route.safeParams.includes(param))).toBe(true);
+    }
+    expect(routeDefinition('explore').handoffParams).toContain('mode');
+    expect(routeDefinition('evidence').handoffParams).toEqual([
+      'kind', 'record', 'thread_key', 'analysis', 'finding', 'evidence', 'return',
+      'return_mode', 'mode',
+    ]);
+    expect(routeDefinition('limits').handoffParams).toContain('window');
   });
 });

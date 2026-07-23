@@ -1,4 +1,4 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, vi, waitFor, within } from './test-utils/appTestHarness';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, navigateApp, render, screen, vi, waitFor, within } from './test-utils/appTestHarness';
 
 function mockClipboardWrite(): ReturnType<typeof vi.fn> {
   const writeText = vi.fn().mockResolvedValue(undefined);
@@ -14,7 +14,7 @@ describe('React dashboard secondary workspaces', () => {
 
   it('opens full-page call investigator from cache context thread calls', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Cache And Context/i }));
+    navigateApp('/?view=cache-context');
     expect(screen.getByRole('heading', { name: 'Cache And Context Lab' })).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Cache context threads overview' })).toBeInTheDocument();
     expect(screen.getByText('Efficiency Profile')).toBeInTheDocument();
@@ -34,7 +34,7 @@ expect(screen.getByText('Thread Calls')).toBeInTheDocument();
 
     expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
   expect(screen.getByText('thread-9f3a1c / codex-1')).toBeInTheDocument();
-  expect(window.location.search).toContain('view=call');
+  expect(window.location.search).toContain('view=evidence');
 expect(window.location.search).toContain('record=fixture-call-0');
 });
 
@@ -46,12 +46,12 @@ it('copies call investigator links from cache context row actions', async () => 
   });
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /Cache And Context/i }));
+  navigateApp('/?view=cache-context');
 
   fireEvent.click(screen.getByRole('button', { name: /Copy link for latest call in thread-9f3a/i }));
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
   const tableUrl = new URL(writeText.mock.calls[0][0]);
-  expect(tableUrl.searchParams.get('view')).toBe('call');
+  expect(tableUrl.searchParams.get('view')).toBe('evidence');
   expect(tableUrl.searchParams.get('return')).toBe('cache-context');
   expect(tableUrl.searchParams.get('record')).toBe('fixture-call-0');
 
@@ -67,27 +67,27 @@ it('copies call investigator links from report and investigation evidence lists'
 
   render(<App />);
 
-fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
+navigateApp('/?view=reports');
 window.history.replaceState(null, '', '/?view=reports&report=weekly-credits&mode=full&max_entries=50&include_tool_output=1');
 fireEvent.click(screen.getByRole('button', { name: /Copy link for report side evidence call thread-6a5b4c codex-1/i }));
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
   const reportUrl = new URL(writeText.mock.calls[0][0]);
-expect(reportUrl.searchParams.get('view')).toBe('call');
+expect(reportUrl.searchParams.get('view')).toBe('evidence');
 expect(reportUrl.searchParams.get('record')).toBe('fixture-call-6');
 expect(reportUrl.searchParams.get('return')).toBe('reports');
 expect(reportUrl.searchParams.get('report')).toBe('weekly-credits');
-expect(reportUrl.searchParams.has('mode')).toBe(false);
-expect(reportUrl.searchParams.has('max_entries')).toBe(false);
-expect(reportUrl.searchParams.has('include_tool_output')).toBe(false);
+expect(reportUrl.searchParams.get('mode')).toBe('full');
+expect(reportUrl.searchParams.get('max_entries')).toBe('50');
+expect(reportUrl.searchParams.get('include_tool_output')).toBe('1');
 
-fireEvent.click(screen.getByRole('button', { name: 'Commands' }));
+navigateApp('/?view=investigator');
   const investigatorEvidenceRow = screen.getByRole('row', {
     name: /thread-6a5b4c cache-risk 1 425\.65K medium/i,
   });
   fireEvent.click(within(investigatorEvidenceRow).getByRole('button', { name: /Copy call link for cache-risk/i }));
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
   const investigatorUrl = new URL(writeText.mock.calls[1][0]);
-  expect(investigatorUrl.searchParams.get('view')).toBe('call');
+  expect(investigatorUrl.searchParams.get('view')).toBe('evidence');
   expect(investigatorUrl.searchParams.get('record')).toBe('fixture-call-6');
   expect(investigatorUrl.searchParams.get('return')).toBe('investigator');
 });
@@ -116,7 +116,7 @@ estimated_cost_usd: 0.12,
 };
 
 render(<App />);
-fireEvent.click(screen.getByRole('button', { name: /Cache And Context/i }));
+navigateApp('/?view=cache-context');
 
 expect(screen.getByText('No cache heatmap rows in the current aggregate snapshot.')).toBeInTheDocument();
 expect(screen.queryByText('May 26')).not.toBeInTheDocument();
@@ -124,7 +124,7 @@ expect(screen.queryByText('May 26')).not.toBeInTheDocument();
 
 it('opens full-page call investigator from cache context thread table rows', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /Cache And Context/i }));
+  navigateApp('/?view=cache-context');
 
   const table = screen.getByRole('table', { name: 'Cache context threads overview' });
   expect(within(table).getByRole('columnheader', { name: 'Thread' })).toHaveClass('sticky-column');
@@ -136,7 +136,7 @@ it('opens full-page call investigator from cache context thread table rows', () 
   expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
   expect(screen.getByText('thread-9f3a1c / codex-1')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /Back to Cache And Context/i })).toBeInTheDocument();
-  expect(window.location.search).toContain('view=call');
+  expect(window.location.search).toContain('view=evidence');
   expect(window.location.search).toContain('record=fixture-call-0');
   expect(window.location.search).toContain('return=cache-context');
 });
@@ -159,7 +159,7 @@ it('opens the weekly-first Limits workspace and evaluates URL-backed hypotheses'
 
   it('opens full-page call investigator from report evidence calls', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
+    navigateApp('/?view=reports');
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Selected report evidence calls' })).toBeInTheDocument();
     expect(screen.getByText('Research Notes')).toBeInTheDocument();
@@ -181,18 +181,18 @@ it('opens the weekly-first Limits workspace and evaluates URL-backed hypotheses'
 expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
 expect(screen.getByText('thread-6a5b4c / codex-1')).toBeInTheDocument();
 const params = new URLSearchParams(window.location.search);
-expect(params.get('view')).toBe('call');
+expect(params.get('view')).toBe('evidence');
 expect(params.get('record')).toBe('fixture-call-6');
 expect(params.get('return')).toBe('reports');
 expect(params.get('report')).toBe('cost-curves');
-expect(params.has('mode')).toBe(false);
-expect(params.has('max_entries')).toBe(false);
+expect(params.get('mode')).toBe('full');
+expect(params.get('max_entries')).toBe('50');
 expect(params.has('diagnostic_fact')).toBe(false);
 });
 
 it('ports Fast Mode Proxy report duration distribution', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
+  navigateApp('/?view=reports');
 
   fireEvent.click(screen.getByRole('button', { name: /Fast Mode Proxy/i }));
 
@@ -280,7 +280,7 @@ it('loads live report-pack evidence rows in Reports', async () => {
   vi.stubGlobal('fetch', fetchMock);
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
+  navigateApp('/?view=reports');
 
   expect(await screen.findByText('Live report pack ready.')).toBeInTheDocument();
   expect(screen.getByText('Live localhost report pack')).toBeInTheDocument();

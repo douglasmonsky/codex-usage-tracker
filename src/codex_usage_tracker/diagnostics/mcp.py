@@ -255,7 +255,13 @@ def _mcp_import_failure(command: str, result: subprocess.CompletedProcess[str]) 
 
 
 def _uses_direct_mcp_module(args: list[str]) -> bool:
-    return "-m" in args and "codex_usage_tracker.mcp_server" in args
+    return "-m" in args and any(
+        module in args
+        for module in (
+            "codex_usage_tracker.interfaces.mcp.server",
+            "codex_usage_tracker.mcp_server",
+        )
+    )
 
 
 def _uses_bootstrap_launcher(args: list[str]) -> bool:

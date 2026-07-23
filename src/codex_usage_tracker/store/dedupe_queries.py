@@ -14,6 +14,32 @@ from codex_usage_tracker.store.schema import init_db
 _MAX_DIAGNOSTIC_ROWS = 1_000
 
 
+def query_dedupe_counts(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> dict[str, int]:
+    """Return canonical accounting counts without hydrating token columns."""
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        row = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS physical_rows,
+                coalesce(SUM(is_duplicate), 0) AS excluded_copied_rows
+            FROM usage_events INDEXED BY idx_usage_duplicate_reason
+            """
+        ).fetchone()
+    physical_rows = int(row["physical_rows"] if row is not None else 0)
+    excluded_copied_rows = int(
+        row["excluded_copied_rows"] if row is not None else 0
+    )
+    return {
+        "physical_rows": physical_rows,
+        "canonical_rows": physical_rows - excluded_copied_rows,
+        "excluded_copied_rows": excluded_copied_rows,
+    }
+
+
 def query_dedupe_diagnostics(
     db_path: Path = DEFAULT_DB_PATH,
     *,

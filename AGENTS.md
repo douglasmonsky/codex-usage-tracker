@@ -51,9 +51,23 @@ codex-usage-tracker install-plugin --python .venv/bin/python
 
 This project is now a published PyPI package with user-facing docs, JSON/MCP contracts, a release workflow, and privacy guarantees. Treat `main` as always releasable.
 
+### MCP-First Pivot Execution
+
+Work in the MCP-first pivot must follow
+`docs/roadmap/mcp-first-pivot.md` and its approved detailed implementation
+roadmap. Use one focused `pivot/<task-number>-<slug>` branch per task, implement
+only the task's declared interfaces, and update
+`docs/roadmap/mcp-first-pivot-execution.md` in the same commit with branch,
+commits, focused and full verification, deviations, and follow-up risks.
+
+Do not add a dashboard workspace, top-level MCP concept, top-level CLI command,
+runtime dependency, or SQLite table unless the roadmap names it or an approved
+design amendment authorizes it. Compatibility removal must also be due in
+`docs/deprecations.md`.
+
 - Do not commit directly to `main`.
 - Start each coherent task from current `main` with a short-lived branch.
-- Use branch prefixes `feature/`, `fix/`, `docs/`, `chore/`, `test/`, `release/`, or `hotfix/`.
+- Use branch prefixes `feature/`, `fix/`, `docs/`, `chore/`, `test/`, `release/`, `hotfix/`, or `pivot/`. Reserve `pivot/` for tasks in the approved MCP-first roadmap.
 - Keep each branch focused on one issue, one reviewable task, or one release.
 - Do not create a long-lived `develop` branch.
 - Do not mix release prep with unrelated feature work.

@@ -48,6 +48,16 @@ Tracked schema ids:
 | `codex-usage-tracker-summary-v1` | CLI `summary --json`, CLI `expensive --json`, MCP summary/expensive JSON |
 | `codex-usage-tracker.subagent-usage.v1` | CLI `subagents --json`, MCP `subagent_usage(response_format="json")` |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
+| `codex-usage-tracker.status.v2` | HTTP `GET /api/v2/status`; bounded application status and freshness contract |
+| `codex-usage-tracker.refresh.v2` | HTTP `POST /api/v2/refresh`; completed refresh result |
+| `codex-usage-tracker.job.v1` | HTTP `GET /api/v2/jobs/{job_id}` and asynchronous v2 starts; generic process-local job status |
+| `codex-usage-tracker.capabilities.v2` | HTTP `GET /api/v2/capabilities`; immutable analysis, query, allowance, and evidence allowlists |
+| `codex-usage-tracker.error.v1` | Stable HTTP v2 error envelope with machine-readable code and message |
+| `codex-usage-tracker.query.v2` | Canonical bounded application query result with deterministic cursor continuation |
+| `codex-usage-tracker.analysis.v2` | Bounded evidence-backed analysis with strategy provenance, limitations, accounting, and dashboard destinations |
+| `codex-usage-tracker.analysis-job.v1` | Process-local semantic analysis job status; active and compatible completed work may be reused |
+| `codex-usage-tracker.evidence-result.v1` | Bounded canonical evidence page with exact selector, immutable records, and revision-bound continuation |
+| `codex-usage-tracker-dashboard-target-v2` | Deterministic evidence-surface handoff with canonical selectors and scope |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")`, MCP `usage_dashboard_recommendations(...)` |
 | `codex-usage-tracker-action-brief-v1` | CLI `action-brief --json`, MCP `usage_action_brief(...)`; compact aggregate remediation brief |
 | `codex-usage-tracker-async-job-status-v1` | MCP `usage_dogfood_start(...)`, `usage_dogfood_status(...)`; async in-process job progress/status payload |
@@ -89,7 +99,7 @@ Tracked schema ids:
 | `codex-usage-tracker-thread-calls-v1` | Dashboard server `/api/thread-calls` response |
 | `codex-usage-tracker-dashboard-v1` | CLI `dashboard --json`, MCP `generate_usage_dashboard()` |
 | `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
-| `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload, including preferred React `dashboard_url` and legacy `legacy_dashboard_url` fallback |
+| `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload, including preferred React `dashboard_url`, legacy `legacy_dashboard_url` fallback, and explicit `refresh_before_start` / `refresh_in_background` state |
 | `codex-usage-tracker-dashboard-target-v1` | Privacy-safe agent/dashboard handoff with a cataloged view, normalized reviewed selectors, and deterministic React URL |
 | `codex-usage-tracker-pricing-coverage-v1` | CLI `pricing-coverage --json`, MCP `usage_pricing_coverage(response_format="json")` |
 | `codex-usage-tracker-source-coverage-v1` | CLI `source-coverage --json`, MCP `usage_source_coverage(response_format="json")` |

@@ -19,7 +19,13 @@ from codex_usage_tracker.store.recommendation_queries import (
     query_recommendation_fact_page,
     query_recommendation_thread_summaries,
 )
-from codex_usage_tracker.store.thread_summaries import rebuild_thread_summaries
+from codex_usage_tracker.store.recommendation_schema import (
+    invalidate_recommendation_fact_tables,
+)
+from codex_usage_tracker.store.thread_summaries import (
+    query_thread_summaries,
+    rebuild_thread_summaries,
+)
 from tests.store_dashboard_helpers import _usage_event
 
 
@@ -70,6 +76,14 @@ def test_recommendation_fact_page_orders_and_counts_before_limiting(tmp_path: Pa
             WHERE record_id = 'higher-score'
             """
         )
+        conn.execute(
+            """
+            UPDATE recommendation_facts
+            SET estimated_cost_usd = 1.25,
+                usage_credits = 2.5
+            WHERE thread_key = 'thread:shared'
+            """
+        )
         sync_thread_recommendation_summaries(conn)
 
     page = query_recommendation_fact_page(db_path=db_path, limit=1)
@@ -91,10 +105,45 @@ def test_recommendation_fact_page_orders_and_counts_before_limiting(tmp_path: Pa
         "title": "Higher",
     }
     assert summaries[0]["secondary_signals"] == ["lower", "shared"]
+    thread_summary = query_thread_summaries(db_path=db_path, limit=1)[0]
+    assert thread_summary["estimated_cost_usd"] == pytest.approx(2.5)
+    assert thread_summary["usage_credits"] == pytest.approx(5.0)
     with connect(db_path) as conn:
         rebuild_thread_summaries(conn)
 
     assert query_recommendation_thread_summaries(db_path=db_path, limit=1) == summaries
+
+
+def test_invalidating_recommendation_facts_clears_thread_usage_totals(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            _usage_event(
+                record_id="stale-totals",
+                session_id="session-stale",
+                thread_key="thread:stale",
+                event_timestamp="2026-07-13T12:00:00Z",
+                cumulative_total_tokens=100,
+            )
+        ],
+        db_path=db_path,
+    )
+    with connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE thread_summaries
+            SET estimated_cost_usd = 12.5,
+                usage_credits = 25
+            WHERE thread_key = 'thread:stale'
+            """
+        )
+        invalidate_recommendation_fact_tables(conn)
+
+    summary = query_thread_summaries(db_path=db_path, limit=1)[0]
+    assert summary["estimated_cost_usd"] is None
+    assert summary["usage_credits"] is None
 
 
 def test_recommendation_thread_summaries_refresh_only_affected_threads(

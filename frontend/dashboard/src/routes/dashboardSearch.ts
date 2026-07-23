@@ -1,15 +1,12 @@
+import { evidenceConsoleRouteIds, exploreModes, type ExploreMode } from './evidenceConsoleRoutes';
+import {
+  legacyCompatibilityRouteIds,
+  normalizeDashboardRouteInput,
+} from './legacyRouteAliases';
+
 export const dashboardViewIds = [
-  'overview',
-  'investigator',
-  'compression-lab',
-  'calls',
-  'call',
-  'threads',
-  'usage-drain',
-  'cache-context',
-  'diagnostics',
-  'reports',
-  'settings',
+  ...evidenceConsoleRouteIds,
+  ...legacyCompatibilityRouteIds,
 ] as const;
 
 export type DashboardViewId = (typeof dashboardViewIds)[number];
@@ -18,8 +15,11 @@ type DashboardHistoryScope = 'active' | 'all';
 export type DashboardSearch = Record<string, unknown> & {
   view: DashboardViewId;
   history?: DashboardHistoryScope;
+  kind?: 'call' | 'thread' | 'finding' | 'allowance' | 'analysis' | 'none';
+  mode?: string;
   record?: string;
-  return?: Exclude<DashboardViewId, 'call'>;
+  return?: Exclude<DashboardViewId, 'call' | 'evidence'>;
+  return_mode?: ExploreMode;
   q?: string;
   preset?: string;
   finding?: number;
@@ -33,27 +33,34 @@ export function isDashboardViewId(value: unknown): value is DashboardViewId {
 
 export function normalizeDashboardView(
   value: unknown,
-  fallback: DashboardViewId = 'overview',
+  fallback: DashboardViewId = 'home',
 ): DashboardViewId {
-  const candidate = searchString(value);
-  if (candidate === 'insights') return 'overview';
-  return isDashboardViewId(candidate) ? candidate : fallback;
+  return normalizeDashboardRouteInput(searchString(value))?.view
+    ?? normalizeDashboardRouteInput(fallback)?.view
+    ?? 'home';
 }
 
 export function validateDashboardSearch(input: Record<string, unknown>): DashboardSearch {
+  const normalizedRoute = normalizeDashboardRouteInput(searchString(input.view))
+    ?? { view: 'home' as const, params: {} };
   const search: DashboardSearch = {
     ...input,
-    view: normalizeDashboardView(input.view),
+    ...normalizedRoute.params,
+    view: normalizedRoute.view,
   };
   assignOptionalString(search, 'record', input.record);
   assignOptionalString(search, 'q', input.q);
   assignOptionalString(search, 'preset', input.preset);
 
-  const returnView = normalizeDashboardView(input.return, 'calls');
-  if (searchString(input.return) && returnView !== 'call') {
-    search.return = returnView;
+  const returnRoute = normalizeDashboardRouteInput(searchString(input.return));
+  if (returnRoute && returnRoute.view !== 'evidence') {
+    search.return = returnRoute.view;
+    if (returnRoute.params.mode === 'calls' || returnRoute.params.mode === 'threads') {
+      search.return_mode = returnRoute.params.mode;
+    }
   } else {
     delete search.return;
+    delete search.return_mode;
   }
 
   const history = searchString(input.history);
@@ -70,6 +77,25 @@ export function validateDashboardSearch(input: Record<string, unknown>): Dashboa
     delete search.finding;
   }
   return search;
+}
+
+export function exploreModeFromSearch(search = window.location.search): ExploreMode {
+  const params = new URLSearchParams(search);
+  const legacyMode = normalizeDashboardRouteInput(params.get('view'))?.params.mode;
+  if (legacyMode === 'calls' || legacyMode === 'threads') return legacyMode;
+  const mode = params.get('mode');
+  return (exploreModes as readonly string[]).includes(mode ?? '') ? mode as ExploreMode : 'calls';
+}
+
+export function evidenceKindFromSearch(
+  search = window.location.search,
+): NonNullable<DashboardSearch['kind']> {
+  const kind = new URLSearchParams(search).get('kind');
+  return kind === 'thread' || kind === 'finding' || kind === 'allowance' || kind === 'analysis'
+    ? kind
+    : kind === 'none'
+      ? 'none'
+      : 'call';
 }
 
 function assignOptionalString(

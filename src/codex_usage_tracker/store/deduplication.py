@@ -26,28 +26,59 @@ def fingerprints_for_source_files(conn: sqlite3.Connection, source_files: list[s
 def classify_usage_rows(
     conn: sqlite3.Connection, rows: list[dict[str, object]]
 ) -> list[dict[str, object]]:
+    """Classify a batch without issuing one database lookup per row."""
+    for row in rows:
+        if row.get("usage_fingerprint") and row.get("canonical_record_id"):
+            continue
+        identity = usage_identity_from_values(
+            row,
+            upstream_usage_id=_string(row.get("upstream_usage_id")),
+        )
+        row.update(
+            upstream_usage_id=identity.upstream_usage_id,
+            usage_fingerprint=identity.usage_fingerprint,
+            canonical_record_id=identity.canonical_record_id,
+        )
+    existing_by_fingerprint = _canonical_records_by_fingerprint(
+        conn,
+        {
+            str(row["usage_fingerprint"])
+            for row in rows
+            if row.get("usage_fingerprint")
+        },
+    )
     seen: set[str] = set()
     for row in rows:
-        if not row.get("usage_fingerprint") or not row.get("canonical_record_id"):
-            identity = usage_identity_from_values(
-                row, upstream_usage_id=_string(row.get("upstream_usage_id"))
-            )
-            row.update(
-                upstream_usage_id=identity.upstream_usage_id,
-                usage_fingerprint=identity.usage_fingerprint,
-                canonical_record_id=identity.canonical_record_id,
-            )
         fingerprint = str(row["usage_fingerprint"])
-        existing = conn.execute(
-            "SELECT 1 FROM usage_events WHERE usage_fingerprint = ? "
-            "AND is_duplicate = 0 AND record_id != ? LIMIT 1",
-            (fingerprint, row["record_id"]),
-        ).fetchone()
-        duplicate = fingerprint in seen or existing is not None
+        record_id = str(row["record_id"])
+        duplicate = fingerprint in seen or any(
+            existing_record_id != record_id
+            for existing_record_id in existing_by_fingerprint.get(fingerprint, ())
+        )
         row["is_duplicate"] = int(duplicate)
         row["duplicate_reason"] = "copied_usage_fingerprint" if duplicate else None
         seen.add(fingerprint)
     return rows
+
+
+def _canonical_records_by_fingerprint(
+    conn: sqlite3.Connection,
+    fingerprints: set[str],
+) -> dict[str, set[str]]:
+    records: dict[str, set[str]] = {}
+    ordered = sorted(fingerprints)
+    for start in range(0, len(ordered), 500):
+        chunk = ordered[start : start + 500]
+        placeholders = ", ".join("?" for _fingerprint in chunk)
+        for row in conn.execute(
+            "SELECT usage_fingerprint, record_id FROM usage_events "
+            f"WHERE usage_fingerprint IN ({placeholders}) AND is_duplicate = 0",  # nosec B608
+            chunk,
+        ):
+            records.setdefault(str(row["usage_fingerprint"]), set()).add(
+                str(row["record_id"])
+            )
+    return records
 
 
 def promote_orphaned_fingerprints(

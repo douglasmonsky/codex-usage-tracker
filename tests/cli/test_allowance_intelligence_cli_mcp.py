@@ -119,8 +119,7 @@ def test_usage_allowance_v2_tools_default_to_canonical_bounded_usage(
     upsert_usage_events([first, second, copied], db_path=db_path)
     with connect(db_path) as connection:
         connection.execute(
-            "INSERT INTO allowance_source_state VALUES "
-            "(1, 1, 'r-mcp', 3, ?, 'reset-aware-v2', ?)",
+            "INSERT INTO allowance_source_state VALUES (1, 1, 'r-mcp', 3, ?, 'reset-aware-v2', ?)",
             (second.event_timestamp, second.event_timestamp),
         )
         connection.execute(
@@ -196,9 +195,7 @@ def test_usage_allowance_v2_tools_default_to_canonical_bounded_usage(
 
     with pytest.raises(ValueError, match="limit must be between 1 and 500"):
         mcp_server.usage_allowance_evidence(limit=0)
-    all_series = mcp_server.usage_allowance_series(
-        range_preset="all", granularity="cycle"
-    )
+    all_series = mcp_server.usage_allowance_series(range_preset="all", granularity="cycle")
     assert all_series["schema"] == "codex-usage-tracker-allowance-series-v2"
     assert all_series["capacity_history"]["unit"] == "credits_per_percent"
 
@@ -227,7 +224,7 @@ def test_usage_allowance_v2_tools_default_to_canonical_bounded_usage(
     assert persisted["quality"]["copied_rows_excluded"] == 1
 
 
-def test_bundled_skills_default_allowance_questions_to_v2_tools() -> None:
+def test_bundled_skills_default_allowance_questions_to_consolidated_tool() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     pairs = [
         (
@@ -255,12 +252,14 @@ def test_bundled_skills_default_allowance_questions_to_v2_tools() -> None:
     for source, bundled in pairs:
         text = source.read_text(encoding="utf-8")
         assert text == bundled.read_text(encoding="utf-8")
-        assert "usage_allowance_status" in text
-        assert "usage_allowance_series" in text
-        assert "usage_allowance_evidence" in text
-        assert "usage_allowance_analysis" in text
+        assert 'usage_allowance(operation="status")' in text
+        assert 'usage_allowance(operation="series"' in text
+        assert 'usage_allowance(operation="evidence"' in text
+        assert 'usage_allowance(operation="analysis"' in text
+        assert "usage_job_status" in text
+        assert "compatibility" in text
         assert "canonical" in text
-        assert "bounded" in text
+        assert "finite" in text
 
 
 def _wait_for_analysis(mcp_server, job_id: str) -> dict[str, object]:

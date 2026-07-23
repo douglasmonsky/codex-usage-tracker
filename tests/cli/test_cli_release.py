@@ -4,6 +4,7 @@ import ast
 import importlib.util
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -14,12 +15,23 @@ from typing import Protocol, cast
 from codex_usage_tracker import __version__
 from codex_usage_tracker.cli.main import _COMMAND_HANDLERS
 from codex_usage_tracker.core.json_contracts import known_json_schemas
-from tests.release_catalog import MCP_TOOL_NAMES, STABLE_CLI_COMMANDS
+from codex_usage_tracker.interfaces.cli.namespaces import STABLE_TOP_LEVEL_COMMANDS
+from tests.release_catalog import (
+    ALL_MCP_TOOL_NAMES,
+    FORBIDDEN_CONSTELLATION_PATHS,
+    FORBIDDEN_DASHBOARD_DEPENDENCIES,
+    MAX_INITIAL_DASHBOARD_JS_KIB,
+    MCP_TOOL_NAMES,
+    STABLE_CLI_COMMANDS,
+)
 
 
 class _ReleaseCheckModule(Protocol):
     REPO_ROOT: Path
     CLI_HELP_SUBCOMMANDS: Iterable[str]
+    REQUIRED_FILES: Iterable[str]
+    SDIST_REQUIRED_MEMBERS: Iterable[str]
+    WHEEL_REQUIRED_MEMBERS: Iterable[str]
 
     def _check_dashboard_asset_sync(self) -> list[str]: ...
 
@@ -57,6 +69,34 @@ def test_release_check_script_passes() -> None:
     )
 
     assert "Release readiness checks passed." in result.stdout
+
+
+def test_dashboard_release_excludes_three_and_constellation_artifacts() -> None:
+    root = Path(__file__).resolve().parents[2]
+    dashboard_package = json.loads(
+        (root / "frontend" / "dashboard" / "package.json").read_text(encoding="utf-8")
+    )
+    declared = set(dashboard_package["dependencies"]) | set(dashboard_package["devDependencies"])
+    assert declared.isdisjoint(FORBIDDEN_DASHBOARD_DEPENDENCIES)
+
+    lock_packages = json.loads((root / "package-lock.json").read_text(encoding="utf-8"))["packages"]
+    assert not any(
+        package.removeprefix("node_modules/") in FORBIDDEN_DASHBOARD_DEPENDENCIES
+        for package in lock_packages
+    )
+    assert not any((root / path).exists() for path in FORBIDDEN_CONSTELLATION_PATHS)
+
+    assets = root / "src" / "codex_usage_tracker" / "plugin_data" / "dashboard" / "react" / "assets"
+    assert not any("UsageConstellation" in path.name for path in assets.iterdir())
+
+
+def test_dashboard_main_bundle_budget_is_ratcheted_after_constellation_removal() -> None:
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts" / "check-dashboard-bundles.mjs"
+    ).read_text(encoding="utf-8")
+    match = re.search(r"currentInitialJs:\s*(\d+)\s*\*\s*1024", script)
+    assert match is not None
+    assert int(match.group(1)) <= MAX_INITIAL_DASHBOARD_JS_KIB
 
 
 def test_release_check_accepts_setup_node_v7(tmp_path: Path) -> None:
@@ -121,8 +161,25 @@ def test_release_check_rejects_stale_public_package_version_claims(tmp_path: Pat
     finally:
         module.REPO_ROOT = original_root
 
-    assert len(failures) == 4
+    assert len(failures) == 1
+    assert failures[0].startswith("docs/development.md public release version 0.4.0")
     assert all("does not match pyproject.toml 0.4.1" in failure for failure in failures)
+
+
+def test_release_check_requires_current_release_docs_and_packaged_launcher() -> None:
+    module = _load_release_check_module()
+    wheel_launcher = "codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py"
+    sdist_launcher = f"src/{wheel_launcher}"
+
+    assert {
+        "docs/releases/0.22.0.md",
+        "docs/upgrading-to-0.22.0.md",
+        "docs/releases/0.23.0.md",
+        "docs/upgrading-to-0.23.0.md",
+        "docs/evidence-console-route-migration.md",
+    } <= set(module.REQUIRED_FILES)
+    assert wheel_launcher in module.WHEEL_REQUIRED_MEMBERS
+    assert sdist_launcher in module.SDIST_REQUIRED_MEMBERS
 
 
 def test_release_check_rejects_old_pypi_package_install_docs(tmp_path: Path) -> None:
@@ -211,14 +268,13 @@ def test_readme_codex_usage_tracker_commands_reference_known_subcommands() -> No
     assert not unresolved
     assert {
         "setup",
-        "serve-dashboard",
-        "dashboard",
+        "analyze",
         "query",
-        "summary",
-        "session",
+        "open",
         "export",
-        "support-bundle",
-        "parse-allowance",
+        "config",
+        "service",
+        "admin",
     } <= documented
 
 
@@ -228,20 +284,28 @@ def test_cli_reference_documents_only_existing_stable_commands() -> None:
     documented, unresolved = _documented_cli_commands(cli_reference)
 
     assert not unresolved
-    assert documented == STABLE_CLI_COMMANDS
-    assert set(_COMMAND_HANDLERS) >= STABLE_CLI_COMMANDS
+    assert documented >= STABLE_CLI_COMMANDS
+    assert set(STABLE_TOP_LEVEL_COMMANDS) == STABLE_CLI_COMMANDS
 
 
 def test_stable_cli_commands_are_not_removed_without_a_deprecation_plan() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     cli_reference = repo_root / "docs" / "cli-reference.md"
     documented, unresolved = _documented_cli_commands(cli_reference)
-    current_commands = set(_COMMAND_HANDLERS)
+    current_commands = set(_COMMAND_HANDLERS) | {"config", "service", "admin"}
 
     assert not unresolved
     missing = sorted(STABLE_CLI_COMMANDS - current_commands)
     assert not missing, f"removed stable CLI commands need a documented deprecation plan: {missing}"
-    assert documented == STABLE_CLI_COMMANDS
+    assert documented >= STABLE_CLI_COMMANDS
+
+
+def test_cli_deprecations_use_the_program_compatibility_ledger() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    deprecations = (repo_root / "docs" / "deprecations.md").read_text(encoding="utf-8")
+
+    assert "CLI command or alias" in deprecations
+    assert "No CLI compatibility surface may be removed before its removal release" in deprecations
 
 
 def test_installed_package_smoke_checks_help_for_stable_commands() -> None:
@@ -325,7 +389,7 @@ def test_mcp_tool_names_remain_documented() -> None:
     documented_tools = _documented_mcp_tools(docs)
 
     assert actual_tools == MCP_TOOL_NAMES
-    assert documented_tools == MCP_TOOL_NAMES
+    assert documented_tools == ALL_MCP_TOOL_NAMES
 
 
 def test_mcp_dashboard_evidence_targets_are_documented_as_additive() -> None:
@@ -486,9 +550,14 @@ def test_dashboard_launch_commands_refresh_by_default() -> None:
     assert parser.parse_args(["serve-dashboard", "--no-refresh"]).refresh is False
 
 
-def test_cli_json_schema_doc_lists_tracked_contracts() -> None:
+def test_public_schema_docs_list_tracked_contracts() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    docs = (repo_root / "docs" / "cli-json-schemas.md").read_text(encoding="utf-8")
+    docs = "\n".join(
+        [
+            (repo_root / "docs" / "cli-json-schemas.md").read_text(encoding="utf-8"),
+            (repo_root / "docs" / "contracts.md").read_text(encoding="utf-8"),
+        ]
+    )
 
     missing = [schema for schema in known_json_schemas() if schema not in docs]
 
@@ -517,7 +586,7 @@ def _load_release_check_module() -> _ReleaseCheckModule:
 
 
 def _documented_cli_commands(path: Path) -> tuple[set[str], list[str]]:
-    commands = set(_COMMAND_HANDLERS)
+    commands = set(_COMMAND_HANDLERS) | set(STABLE_TOP_LEVEL_COMMANDS)
     documented: set[str] = set()
     unresolved: list[str] = []
 

@@ -43,6 +43,11 @@ def test_dashboard_shell_payload_builds_lightweight_payload(
 
     monkeypatch.setattr(server_dashboard_shell, "dashboard_payload", dashboard_payload)
     monkeypatch.setattr(server_dashboard_shell, "conversational_readiness", capture_readiness)
+    monkeypatch.setattr(
+        server_dashboard_shell,
+        "home_summary_payload",
+        lambda **kwargs: {"schema": "codex-usage-tracker-home-summary-v1"},
+    )
 
     payload = server_dashboard_shell.dashboard_shell_payload(
         "history=all&include_archived=false&lang=es",
@@ -59,6 +64,7 @@ def test_dashboard_shell_payload_builds_lightweight_payload(
 
     assert payload["shell_boot"] is True
     assert payload["conversational_analysis"]["state"] == "ready"
+    assert payload["home_summary"] == {"schema": "codex-usage-tracker-home-summary-v1"}
     assert readiness_homes == [codex_home]
     assert str(codex_home) not in str(payload["conversational_analysis"])
     assert calls["limit"] == 5000
@@ -82,6 +88,11 @@ def test_dashboard_shell_payload_history_scope_controls_default(
         return {}
 
     monkeypatch.setattr(server_dashboard_shell, "dashboard_payload", dashboard_payload)
+    monkeypatch.setattr(
+        server_dashboard_shell,
+        "home_summary_payload",
+        lambda **kwargs: {"schema": "codex-usage-tracker-home-summary-v1"},
+    )
 
     server_dashboard_shell.dashboard_shell_payload(
         "history=active",
@@ -98,3 +109,19 @@ def test_dashboard_shell_payload_history_scope_controls_default(
 
     assert calls["include_archived"] is False
     assert calls["language"] == "en"
+
+
+def test_react_boot_defers_home_summary_without_reading_the_database() -> None:
+    payload = server_dashboard_shell.react_dashboard_boot_payload(
+        "",
+        api_token="token",
+        context_api_enabled=False,
+        include_archived_default=False,
+        language_default="en",
+        limit_default=5000,
+        privacy_mode="normal",
+        since=None,
+    )
+
+    assert payload["home_summary_deferred"] is True
+    assert "home_summary" not in payload

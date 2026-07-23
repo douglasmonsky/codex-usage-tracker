@@ -2,6 +2,72 @@
 
 This page lists the common command-line workflows. For tested JSON contract ids, payload shapes, and error codes, see [CLI And MCP JSON Schemas](cli-json-schemas.md).
 
+## Primary Command Surface
+
+The stable top-level commands are:
+
+```text
+setup  status  doctor  refresh  analyze  query  open  export  config  service  admin
+```
+
+Use `status`, `analyze`, and `query` for the same v2 semantic contracts exposed
+through MCP and HTTP:
+
+```bash
+codex-usage-tracker status --json
+codex-usage-tracker analyze --goal usage_spike --since 2026-07-01T00:00:00Z --json
+codex-usage-tracker query --entity model --measure tokens,call_count --group-by effort --json
+```
+
+`query` accepts one or more `--measure` and `--group-by` values; each value may
+also be comma-separated. Results are bounded to 1–200 rows. The historical
+`--pricing-status`, `--credit-confidence`, `--min-tokens`, `--min-credits`, and
+`--limit 0` query forms remain available through the compatibility window and
+retain their v1 result contract.
+
+Open the Evidence Console at Home or at an exact v2 target:
+
+```bash
+codex-usage-tracker open
+codex-usage-tracker open --call-id record-12
+codex-usage-tracker open --thread-key session:00000000-0000-0000-0000-000000000000
+codex-usage-tracker open --target-json '{"schema":"codex-usage-tracker-dashboard-target-v2",...}'
+```
+
+The persistent service must be reachable for relative targets. `open --json`
+prints the resolved target without launching a browser.
+
+Advanced operations are grouped by ownership:
+
+```bash
+codex-usage-tracker config pricing update
+codex-usage-tracker service status
+codex-usage-tracker admin source-coverage --json
+```
+
+```text
+config pricing init|update|pin
+config allowance init|parse|history|diagnostics|export
+config rate-card update
+config projects init
+config thresholds init
+
+service install|status|uninstall|serve
+
+admin inspect-log|rebuild-index|reset-db|dedupe-diagnostics|source-coverage
+admin support-bundle|dogfood
+admin mcp serve --profile core|full|developer
+```
+
+Historical top-level spellings remain parseable through `0.24.x`, but normal
+help shows only the stable surface. Interactive use prints one deprecation line
+to stderr; noninteractive output and JSON stdout remain unchanged.
+
+## Compatibility Command Reference
+
+The sections below document the historical spellings retained during the
+migration window. Prefer the primary commands and namespaces above for new use.
+
 ## Index And Setup
 
 Run first-time setup:

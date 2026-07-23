@@ -147,8 +147,8 @@ threadCallSortDirection: ThreadCallSortDirection;
 
 export function buildThreadsViewLink(state: ThreadsViewLinkState, href = window.location.href): URL {
   const url = new URL(href);
-  url.searchParams.set('view', 'threads');
-  url.searchParams.delete('record');
+  url.searchParams.set('view', 'explore');
+  url.searchParams.set('mode', 'threads');
   url.searchParams.delete('detail');
   url.searchParams.delete('expand');
   url.searchParams.delete('threads');

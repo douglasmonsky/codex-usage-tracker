@@ -9,13 +9,19 @@ const apiSortByColumn: Record<string, ThreadsApiSort> = {
   latestActivity: 'time',
   turns: 'calls',
   totalTokens: 'tokens',
+  estimatedCost: 'cost',
+  credits: 'credits',
   cachePct: 'cache',
+  contextPct: 'context',
+  coldResumeRisk: 'risk',
+  costPerCall: 'cost_per_call',
 };
 
 export type ThreadsEndpointState = {
   enabled: boolean;
   reason: string;
   query: string;
+  risk?: 'high' | 'medium' | 'low';
   sort: ThreadsApiSort;
   direction: 'asc' | 'desc';
 };
@@ -35,6 +41,9 @@ export function threadsEndpointState(input: {
     enabled: !reason,
     reason,
     query: input.localQuery.trim() || input.globalQuery.trim(),
+    risk: input.riskFilter === 'all'
+      ? undefined
+      : input.riskFilter.toLowerCase() as 'high' | 'medium' | 'low',
     sort: sort ?? 'tokens',
     direction: selectedSort ? (selectedSort.desc ? 'desc' : 'asc') : 'desc',
   };
@@ -46,7 +55,6 @@ function fallbackReason(
 ): string {
   if (!input.enabled || input.runtime.fileMode || !input.runtime.apiToken) return 'Stored snapshot';
   if (input.globalQuery.trim() && input.localQuery.trim()) return 'Multiple searches use loaded snapshot';
-  if (input.riskFilter !== 'all') return 'Risk filter uses loaded snapshot';
   if (!sort) return 'This sort uses loaded snapshot';
   return '';
 }

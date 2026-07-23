@@ -174,8 +174,8 @@ python scripts/smoke_installed_package.py --docker
 To verify the public PyPI package instead of the local checkout:
 
 ```bash
-python scripts/smoke_installed_package.py --from-pypi --version 0.21.0
-python scripts/smoke_installed_package.py --docker --from-pypi --version 0.21.0
+python scripts/smoke_installed_package.py --from-pypi --version 0.23.0
+python scripts/smoke_installed_package.py --docker --from-pypi --version 0.23.0
 ```
 
 `scripts/check_release.py` treats these public-package smoke commands as release-state claims. Keep their `--version` and `codex-usage-tracking==...` values aligned with `pyproject.toml`; the release gate fails when the docs claim a different public version. It also checks that install docs point at the real PyPI distribution, `codex-usage-tracking`, and keep the warning that `codex-usage-tracker` is a different PyPI package.
@@ -228,7 +228,22 @@ with:
 npm run dashboard:screenshots
 ```
 
-The tracked dashboard screenshot set is:
+The 0.23 Evidence Console release set is:
+
+- `evidence-console-home.png`
+- `evidence-console-explore-calls.png`
+- `evidence-console-explore-threads.png`
+- `evidence-console-limits.png`
+- `evidence-console-evidence-call.png`
+- `evidence-console-settings.png`
+- `evidence-console-legacy-reports.png`
+- `evidence-console-home-tablet.png`
+- `evidence-console-home-mobile.png`
+- `evidence-console-home-zoom-200.png`
+- `evidence-console-home-reduced-motion.png`
+- `evidence-console-home-keyboard.png`
+
+The following compatibility screenshots remain tracked for earlier documentation:
 
 - `dashboard-insights.png`
 - `dashboard-calls.png`

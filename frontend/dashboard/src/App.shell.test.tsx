@@ -11,7 +11,7 @@ describe('React dashboard shell controls', () => {
     );
   });
 
-it('normalizes legacy insights view URLs to the renamed overview workspace', async () => {
+it('normalizes legacy insights view URLs to the Home route', async () => {
   window.history.replaceState(null, '', '/?view=insights');
 
   render(<App />);
@@ -19,7 +19,7 @@ it('normalizes legacy insights view URLs to the renamed overview workspace', asy
   expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
-    expect(params.get('view')).toBe('overview');
+    expect(params.get('view')).toBe('home');
   });
 });
 
@@ -30,12 +30,12 @@ it('normalizes legacy insights view URLs to the renamed overview workspace', asy
 
   expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
   await waitFor(() => {
-    expect(new URLSearchParams(window.location.search).get('return')).toBe('overview');
+    expect(new URLSearchParams(window.location.search).get('return')).toBe('home');
   });
 
-  fireEvent.click(screen.getByRole('button', { name: /Back to Overview/i }));
+  fireEvent.click(screen.getByRole('button', { name: /Back to Home/i }));
   expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
-  expect(new URLSearchParams(window.location.search).get('view')).toBe('overview');
+  expect(new URLSearchParams(window.location.search).get('view')).toBe('home');
 });
 
 it('hydrates legacy call investigator context options from URL params', () => {
@@ -54,15 +54,16 @@ it('hydrates legacy call investigator context options from URL params', () => {
   expect(screen.getByLabelText('Include compaction history')).toBeChecked();
   expect(screen.getByLabelText('No char limit')).toBeChecked();
 
-  fireEvent.click(screen.getByRole('button', { name: /Back to Calls/i }));
+  fireEvent.click(screen.getByRole('button', { name: /Back to Explore/i }));
   const params = new URLSearchParams(window.location.search);
-  expect(params.get('view')).toBe('calls');
-  for (const name of ['mode', 'max_entries', 'max_chars', 'include_tool_output', 'include_compaction_history']) {
+  expect(params.get('view')).toBe('explore');
+  expect(params.get('mode')).toBe('calls');
+  for (const name of ['max_entries', 'max_chars', 'include_tool_output', 'include_compaction_history']) {
     expect(params.get(name)).toBeNull();
   }
 });
 
-it('supports legacy keyboard shortcuts outside form fields', () => {
+it('supports target-route keyboard shortcuts outside form fields', () => {
 render(<App />);
 
 fireEvent.keyDown(window, { key: '/' });
@@ -72,30 +73,30 @@ searchInput.blur();
 
 fireEvent.keyDown(window, { key: '1' });
 expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
-expect(window.location.search).toContain('view=overview');
+expect(window.location.search).toContain('view=home');
 
 fireEvent.keyDown(window, { key: '2' });
 expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
-expect(window.location.search).toContain('view=calls');
+expect(window.location.search).toContain('view=explore');
 
 fireEvent.keyDown(window, { key: '3' });
-expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
-expect(window.location.search).toContain('view=threads');
+expect(screen.getByRole('heading', { name: 'Limits' })).toBeInTheDocument();
+expect(window.location.search).toContain('view=limits');
 
 fireEvent.keyDown(searchInput, { key: '4' });
-expect(screen.getByRole('heading', { name: 'Threads' })).toBeInTheDocument();
-expect(window.location.search).toContain('view=threads');
+expect(screen.getByRole('heading', { name: 'Limits' })).toBeInTheDocument();
+expect(window.location.search).toContain('view=limits');
 
 fireEvent.keyDown(window, { key: '4' });
-expect(screen.getByRole('heading', { name: 'Diagnostics Notebook' })).toBeInTheDocument();
-expect(window.location.search).toContain('view=diagnostics');
+expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+expect(window.location.search).toContain('view=settings');
 });
 
 it('creates navigation history entries and rehydrates shell state on popstate', () => {
   const pushState = vi.spyOn(window.history, 'pushState');
   render(<App />);
 
-  fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Explore$/i }));
   expect(pushState).toHaveBeenCalledTimes(1);
   expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
 
@@ -104,7 +105,9 @@ it('creates navigation history entries and rehydrates shell state on popstate', 
 
   expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
   expect(screen.getByLabelText('Search dashboard')).toHaveValue('cache');
-  expect(new URLSearchParams(window.location.search).get('history')).toBe('all');
+  const params = new URLSearchParams(window.location.search);
+  expect(params.get('view')).toBe('home');
+  expect(params.get('history')).toBe('all');
 });
 
 it('shows legacy back-to-top control after scrolling', () => {
@@ -148,11 +151,11 @@ fireEvent.click(within(screen.getByRole('banner', { name: 'Dashboard toolbar' })
 
 await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
 const copiedUrl = new URL(writeText.mock.calls[0][0]);
-  expect(copiedUrl.searchParams.get('view')).toBe('threads');
+  expect(copiedUrl.searchParams.get('view')).toBe('explore');
+  expect(copiedUrl.searchParams.get('mode')).toBe('threads');
   expect(copiedUrl.searchParams.get('thread')).toBe('thread-3c5d');
   expect(copiedUrl.searchParams.get('history')).toBe('all');
   expect(copiedUrl.searchParams.has('report')).toBe(false);
-  expect(copiedUrl.searchParams.has('mode')).toBe(false);
   expect(copiedUrl.searchParams.has('max_entries')).toBe(false);
   expect(screen.getByText('Copied current view link')).toBeInTheDocument();
 });
@@ -174,7 +177,8 @@ fireEvent.click(within(screen.getByRole('banner', { name: 'Dashboard toolbar' })
 
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
   const copiedUrl = new URL(writeText.mock.calls[0][0]);
-  expect(copiedUrl.searchParams.get('view')).toBe('call');
+  expect(copiedUrl.searchParams.get('view')).toBe('evidence');
+  expect(copiedUrl.searchParams.get('kind')).toBe('call');
   expect(copiedUrl.searchParams.get('record')).toBe('fixture-call-6');
   expect(copiedUrl.searchParams.get('return')).toBe('reports');
   expect(copiedUrl.searchParams.get('report')).toBe('weekly-credits');
@@ -191,7 +195,8 @@ fireEvent.click(screen.getByRole('button', { name: /^Copy investigator link$/i }
 
 await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
 const pageUrl = new URL(writeText.mock.calls[1][0]);
-expect(pageUrl.searchParams.get('view')).toBe('call');
+expect(pageUrl.searchParams.get('view')).toBe('evidence');
+expect(pageUrl.searchParams.get('kind')).toBe('call');
 expect(pageUrl.searchParams.get('record')).toBe('fixture-call-6');
 expect(pageUrl.searchParams.get('return')).toBe('reports');
 expect(pageUrl.searchParams.get('report')).toBe('weekly-credits');
@@ -204,10 +209,10 @@ it('clears stale investigator finding state when leaving Investigator workspace'
   window.history.replaceState(null, '', '/?view=investigator&finding=2');
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Explore$/i }));
 
   const params = new URLSearchParams(window.location.search);
-  expect(params.get('view')).toBe('threads');
+  expect(params.get('view')).toBe('explore');
   expect(params.get('finding')).toBeNull();
 });
 
@@ -219,10 +224,10 @@ it('clears stale thread state when leaving Threads workspace', () => {
   );
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Home$/i }));
 
   const params = new URLSearchParams(window.location.search);
-  expect(params.get('view')).toBe('overview');
+  expect(params.get('view')).toBe('home');
   for (const name of ['thread', 'expand', 'threads', 'thread_q', 'risk', 'thread_call_sort', 'thread_call_page']) {
     expect(params.get(name)).toBeNull();
   }
@@ -232,10 +237,10 @@ it('clears stale cache thread state leaving Cache And Context workspace', () => 
   window.history.replaceState(null, '', '/?view=cache-context&cache_thread=Thread%20Alpha');
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Home$/i }));
 
   const params = new URLSearchParams(window.location.search);
-  expect(params.get('view')).toBe('overview');
+  expect(params.get('view')).toBe('home');
   expect(params.get('cache_thread')).toBeNull();
 });
 
@@ -243,10 +248,10 @@ it('clears stale report state leaving Reports workspace', () => {
   window.history.replaceState(null, '', '/?view=reports&report=weekly-credits');
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Home$/i }));
 
   const params = new URLSearchParams(window.location.search);
-  expect(params.get('view')).toBe('overview');
+  expect(params.get('view')).toBe('home');
   expect(params.get('report')).toBeNull();
 });
 
@@ -258,10 +263,10 @@ it('clears stale usage drain state leaving Usage Drain workspace', () => {
   );
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Home$/i }));
 
   const params = new URLSearchParams(window.location.search);
-  expect(params.get('view')).toBe('overview');
+  expect(params.get('view')).toBe('home');
   for (const name of ['usage_plan', 'usage_effort', 'usage_subagents', 'usage_sample', 'usage_confidence', 'limit_window', 'limit_hypothesis']) {
     expect(params.get(name)).toBeNull();
   }
@@ -275,10 +280,10 @@ it('clears stale diagnostics state leaving Diagnostics workspace', () => {
   );
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Home$/i }));
 
   const params = new URLSearchParams(window.location.search);
-  expect(params.get('view')).toBe('overview');
+  expect(params.get('view')).toBe('home');
   expect(params.get('diagnostic_source')).toBeNull();
   expect(params.get('diagnostic_fact')).toBeNull();
 });
@@ -291,10 +296,10 @@ it('clears stale Calls table state leaving Calls workspace but preserves global 
   );
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
+  fireEvent.click(screen.getByRole('button', { name: /^Home$/i }));
 
   const params = new URLSearchParams(window.location.search);
-  expect(params.get('view')).toBe('overview');
+  expect(params.get('view')).toBe('home');
   for (const name of ['record', 'detail', 'call_q', 'source', 'sort', 'direction', 'density', 'page']) {
     expect(params.get(name)).toBeNull();
   }
@@ -310,14 +315,22 @@ it('switches between feature workspaces and preserves active navigation state', 
     expect(screen.getByRole('heading', { name: 'Limits' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Limits$/i })).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
-    expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Settings$/i }));
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
   });
 
-it('wires quick links and local prototype action controls', () => {
+it('exposes only target navigation plus the Settings utility', () => {
   render(<App />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Models' }));
+    const primary = screen.getByRole('navigation', { name: 'Primary' });
+    expect(within(primary).getAllByRole('button').map(button => button.textContent)).toEqual([
+      'Home', 'Explore', 'Limits',
+    ]);
+    expect(screen.queryByRole('group', { name: 'Quick Links' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Models' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Commands' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Explore' }));
     expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
 
 fireEvent.click(screen.getByText('More filters'));
@@ -326,7 +339,7 @@ expect(screen.getByRole('combobox', { name: 'Source filter' })).toBeVisible();
     fireEvent.click(sortButton);
     expect(sortButton.closest('th')).toHaveAttribute('aria-sort', 'descending');
 
-    fireEvent.click(within(screen.getByRole('group', { name: 'Quick Links' })).getByRole('button', { name: 'Files' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Utility' })).getByRole('button', { name: 'Settings' }));
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
     expect(screen.getByText('Loaded Data')).toBeInTheDocument();
  expect(screen.getAllByText('Evidence rows').length).toBeGreaterThan(0);
@@ -334,24 +347,13 @@ expect(screen.getByRole('combobox', { name: 'Source filter' })).toBeVisible();
     expect(screen.getByText('Static snapshot')).toBeInTheDocument();
     expect(screen.getByText('Content access gated')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Commands' }));
-    expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^Cache Misses \(Large Inputs\)/i }));
-    expect(screen.getByRole('heading', { name: 'Cache Misses (Large Inputs)' })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /^Reports$/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Cost Curves/i }));
-    expect(screen.getAllByText('Cost Curves').length).toBeGreaterThan(1);
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    fireEvent.click(screen.getByRole('button', { name: 'Export selected' }));
-    expect(screen.getByText('Exported Cost Curves')).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole('button', { name: /^Limits$/i }));
     fireEvent.click(screen.getByRole('button', { name: '5-hour' }));
     expect(screen.getByRole('heading', { level: 2, name: '5-hour rolling context' })).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get('limit_window')).toBe('five_hour');
 
-    fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+    window.history.replaceState(null, '', '/?view=explore&mode=threads');
+    fireEvent.popState(window);
     expect(screen.getByPlaceholderText('Search threads, risks, token totals...')).toBeVisible();
   });
 

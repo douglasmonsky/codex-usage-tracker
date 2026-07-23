@@ -42,25 +42,33 @@ export function OverviewMetrics({ metrics, loadedCalls, availableCalls }: Overvi
     },
     {
       label: 'Cache Reuse',
-      value: pct(metrics.cachePercent),
-      trend: metrics.cachePercent >= 80 ? 'healthy cache reuse' : 'risk: low cache reuse',
-      detail: `${formatCompact(metrics.cachedInputTokens)} cached input tokens`,
-      tone: metrics.cachePercent >= 80 ? 'green' : 'orange',
+      value: metrics.hasInputTokens ? pct(metrics.cachePercent) : 'No input data',
+      trend: metrics.hasInputTokens
+        ? metrics.cachePercent >= 80 ? 'healthy cache reuse' : 'risk: low cache reuse'
+        : 'cache reuse unavailable',
+      detail: metrics.hasInputTokens
+        ? `${formatCompact(metrics.cachedInputTokens)} cached input tokens`
+        : 'No reported input tokens in this scope',
+      tone: metrics.hasInputTokens ? metrics.cachePercent >= 80 ? 'green' : 'orange' : 'blue',
     },
     {
       label: 'Estimated Cost',
-      value: money(metrics.estimatedCostUsd),
-      trend: scopeMetrics ? 'complete selected scope' : 'loaded calls only',
-      detail: 'calls with mapped cost and credit rates',
-      tone: 'orange',
-      breakdown: [
-        { label: 'Estimated credits', value: creditFormat.format(metrics.estimatedCredits) },
-      ],
+      value: metrics.hasPricingCoverage ? money(metrics.estimatedCostUsd) : 'Unavailable',
+      trend: metrics.hasPricingCoverage
+        ? scopeMetrics ? 'complete selected scope' : 'loaded calls only'
+        : 'pricing coverage unavailable',
+      detail: metrics.hasPricingCoverage
+        ? 'calls with mapped cost and credit rates'
+        : 'No loaded calls have mapped cost rates',
+      tone: metrics.hasPricingCoverage ? 'orange' : 'blue',
+      breakdown: metrics.hasPricingCoverage
+        ? [{ label: 'Estimated credits', value: creditFormat.format(metrics.estimatedCredits) }]
+        : undefined,
     },
   ];
   return (
-    <div className={styles.metricGrid} aria-label={scopeMetrics ? 'Selected scope usage metrics' : 'Loaded usage metrics'}>
-      {cards.map(card => <MetricCard key={card.label} card={card} />)}
-    </div>
+    <section className={styles.metricGrid} aria-label={scopeMetrics ? 'Selected scope usage metrics' : 'Loaded usage metrics'}>
+      {cards.map(card => <MetricCard key={card.label} card={card} showAnnotations={false} />)}
+    </section>
   );
 }

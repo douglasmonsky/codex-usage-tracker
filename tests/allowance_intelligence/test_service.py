@@ -56,6 +56,15 @@ def test_status_exposes_versioned_weekly_estimation_without_changing_observation
     assert payload["estimation"]["forecast"]["used_percent"] is None
 
 
+def test_status_can_skip_historical_estimation_for_first_paint(
+    connection: sqlite3.Connection,
+) -> None:
+    payload = build_allowance_status(connection, now=NOW, include_estimation=False)
+
+    assert payload["weekly"]["used_percent"] == 40
+    assert "estimation" not in payload
+
+
 def test_status_omits_historical_reconstructions_from_polling_payload(
     connection: sqlite3.Connection,
 ) -> None:

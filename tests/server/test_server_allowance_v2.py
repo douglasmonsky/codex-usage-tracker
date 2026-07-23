@@ -32,6 +32,18 @@ def test_status_payload_is_constant_size_and_supports_revision_polling(tmp_path:
     }
 
 
+def test_status_payload_can_defer_estimation_for_first_paint(tmp_path: Path) -> None:
+    payload = allowance_v2.allowance_status_payload(
+        "include_estimation=false",
+        db_path=_initialized_db(tmp_path),
+        privacy_mode="strict",
+        include_archived_default=False,
+    )
+
+    assert payload["changed"] is True
+    assert "estimation" not in payload
+
+
 @pytest.mark.parametrize(
     ("query", "message"),
     [
@@ -159,6 +171,10 @@ def test_analysis_job_is_token_protected_deduplicated_and_persisted(
         "action": "reload_persisted_results",
         "endpoint": "/api/allowance/analysis",
     }
+    generic = registry.job_service.status(job_id, include_result=True)
+    assert generic.kind == "allowance"
+    assert generic.state == "completed"
+    assert generic.result == completed["result"]
 
 
 def test_analysis_job_start_and_status_require_token(tmp_path: Path) -> None:

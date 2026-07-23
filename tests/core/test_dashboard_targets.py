@@ -4,7 +4,11 @@ import json
 
 import pytest
 
-from codex_usage_tracker.core.dashboard_targets import build_dashboard_target
+from codex_usage_tracker.core.dashboard_targets import (
+    build_dashboard_target,
+    build_dashboard_target_v2,
+    build_limits_target_v2,
+)
 from codex_usage_tracker.dashboard_service import DashboardServiceStatus
 
 
@@ -48,6 +52,43 @@ def test_build_dashboard_target_resolves_healthy_service_then_fallback() -> None
     assert target["fallback_instruction"] == "codex-usage-tracker serve-dashboard --open"
 
 
+def test_v2_evidence_target_is_deterministic_and_v1_remains_compatible() -> None:
+    first = build_dashboard_target_v2(evidence_kind="call", selector_id="record-123", history="all")
+    second = build_dashboard_target_v2(
+        evidence_kind="call", selector_id="record-123", history="all"
+    )
+    assert first == second
+    assert first["schema"] == "codex-usage-tracker-dashboard-target-v2"
+    assert first["target_id"] == "evidence:call:record-123:all"
+    assert first["expires_at"] is None
+    assert first["surface"] == "evidence"
+    assert first["selectors"] == {"record_id": "record-123"}
+    assert first["relative_url"].endswith(
+        "history=all&kind=call&record=record-123&view=evidence"
+    )
+    assert build_dashboard_target(view="call", record_id="record-123")["schema"] == (
+        "codex-usage-tracker-dashboard-target-v1"
+    )
+    finding = build_dashboard_target_v2(
+        evidence_kind="finding", selector_id="finding-1", analysis_id="analysis-1"
+    )
+    assert finding["selectors"] == {"finding_id": "finding-1", "analysis_id": "analysis-1"}
+
+    thread = build_dashboard_target_v2(
+        evidence_kind="thread",
+        selector_id="session:019e374d-c19f-7da3-a44f-8de043a7a64e",
+        target_purpose="explore",
+    )
+    assert thread["surface"] == "explore"
+    assert thread["relative_url"].endswith(
+        "mode=threads&thread_key=session%3A019e374d-c19f-7da3-a44f-8de043a7a64e&view=explore"
+    )
+    with pytest.raises(ValueError, match="require thread evidence"):
+        build_dashboard_target_v2(
+            evidence_kind="call", selector_id="record-123", target_purpose="explore"
+        )
+
+
 def test_build_dashboard_target_rejects_uncataloged_inputs() -> None:
     with pytest.raises(ValueError, match="dashboard view"):
         build_dashboard_target(view="secrets")
@@ -66,15 +107,18 @@ def test_build_dashboard_target_maps_canonical_route_selectors() -> None:
         "8de043a7a64e&view=threads"
     )
     assert (
-        build_dashboard_target(
-            view="diagnostics", diagnostic_fact="activity:search_read_command"
-        )["relative_url"]
+        build_dashboard_target(view="diagnostics", diagnostic_fact="activity:search_read_command")[
+            "relative_url"
+        ]
         == "/react-dashboard.html?diagnostic_fact=activity%3Asearch_read_command&view=diagnostics"
     )
     for diagnostic_fact in ("skill:codex-usage-tracker", "skill:brooks-test"):
-        assert build_dashboard_target(
-            view="diagnostics", diagnostic_fact=diagnostic_fact
-        )["diagnostic_fact"] == diagnostic_fact
+        assert (
+            build_dashboard_target(view="diagnostics", diagnostic_fact=diagnostic_fact)[
+                "diagnostic_fact"
+            ]
+            == diagnostic_fact
+        )
     assert (
         build_dashboard_target(view="usage-drain", limit_evidence="stable")["relative_url"]
         == "/react-dashboard.html?limit_hypothesis=stable&view=usage-drain"
@@ -263,19 +307,22 @@ def test_report_filter_accepts_only_cataloged_ids(
     ],
 )
 def test_report_filter_accepts_cataloged_ids(report_id: str) -> None:
-    assert build_dashboard_target(view="reports", filters={"report": report_id})[
-        "filters"
-    ] == {"report": report_id}
+    assert build_dashboard_target(view="reports", filters={"report": report_id})["filters"] == {
+        "report": report_id
+    }
 
 
 @pytest.mark.parametrize("privacy_mode", ["normal", "redacted", "strict"])
 def test_session_thread_keys_are_safe_in_every_privacy_mode(privacy_mode: str) -> None:
     session_key = "session:019e374d-c19f-7da3-a44f-8de043a7a64e"
-    assert build_dashboard_target(
-        view="threads",
-        thread_key=session_key,
-        privacy_mode=privacy_mode,
-    )["thread_key"] == session_key
+    assert (
+        build_dashboard_target(
+            view="threads",
+            thread_key=session_key,
+            privacy_mode=privacy_mode,
+        )["thread_key"]
+        == session_key
+    )
 
 
 @pytest.mark.parametrize(
@@ -291,9 +338,10 @@ def test_numeric_filter_serialization_is_canonical(value: float, serialized: str
 
 @pytest.mark.parametrize("value", [-0.01, 1.01, float("inf"), float("nan")])
 def test_numeric_filter_rejects_non_finite_or_out_of_range_values(value: float) -> None:
-    assert build_dashboard_target(
-        view="usage-drain", filters={"usage_confidence": value}
-    )["filters"] == {}
+    assert (
+        build_dashboard_target(view="usage-drain", filters={"usage_confidence": value})["filters"]
+        == {}
+    )
 
 
 @pytest.mark.parametrize(
@@ -303,3 +351,51 @@ def test_numeric_filter_rejects_non_finite_or_out_of_range_values(value: float) 
 def test_service_origin_requires_valid_non_privileged_port(origin: str) -> None:
     with pytest.raises(ValueError):
         build_dashboard_target(view="overview", service_origin=origin)
+
+
+def test_limits_target_v2_is_deterministic_and_allowlisted() -> None:
+    arguments = {
+        "operation": "evidence",
+        "window": "weekly",
+        "range_preset": "8w",
+        "since": "2026-05-27T11:00:00+00:00",
+        "until": "2026-07-22T11:00:00+00:00",
+        "analysis_id": None,
+    }
+    first = build_limits_target_v2(**arguments)
+    second = build_limits_target_v2(**arguments)
+
+    assert first == second
+    assert first["schema"] == "codex-usage-tracker-dashboard-target-v2"
+    assert first["surface"] == "limits"
+    assert first["evidence_kind"] == "allowance"
+    assert first["selectors"] == {
+        "operation": "evidence",
+        "window_kind": "weekly",
+        "range": "8w",
+    }
+    assert first["scope"]["since"] == arguments["since"]
+    assert first["view"] == "limits"
+    assert first["relative_url"] == (
+        "/react-dashboard.html?operation=evidence&range=8w&view=limits&window=weekly"
+    )
+    assert first["absolute_url"] is None
+
+
+def test_limits_target_v2_rejects_unreviewed_values() -> None:
+    with pytest.raises(ValueError, match="operation"):
+        build_limits_target_v2(
+            operation="https://example.invalid",
+            window="weekly",
+            range_preset="8w",
+            since=None,
+            until=None,
+        )
+    with pytest.raises(ValueError, match="timezone-aware"):
+        build_limits_target_v2(
+            operation="series",
+            window="weekly",
+            range_preset="8w",
+            since="2026-07-22T11:00:00",
+            until=None,
+        )

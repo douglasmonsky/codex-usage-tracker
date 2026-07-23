@@ -1,0 +1,13 @@
+{
+  "id": "fast_usage",
+  "question": "Explain whether synthetic Fast-tier usage is driving the recent increase.",
+  "guidance_terms": ["broad diagnostic", "estimates"],
+  "expected_envelope_schema": "codex-usage-tracker.mcp-envelope.v1",
+  "expected_core_tool_sequence": [
+    {
+      "tool": "usage_analyze",
+      "arguments": {"goal": "fast_usage", "execution": "sync"},
+      "result_schema": "codex-usage-tracker.analysis.v2"
+    }
+  ]
+}

@@ -13,7 +13,6 @@ import {
   loadAllowanceSeries,
   loadAllowanceStatus,
   startAllowanceAnalysis,
-  type AllowanceSeriesRequest,
 } from '../../api/allowanceIntelligence';
 import type { ContextRuntime, DashboardModel } from '../../api/types';
 import { Button, MetricReadout, PageLoadProgress, SegmentedControl, StatusBadge, Surface } from '../../design';
@@ -24,6 +23,7 @@ import { AllowanceCapacityLegend } from './AllowanceCapacityLegend';
 import { AllowanceCapacityMethodology } from './AllowanceCapacityMethodology';
 import { AllowanceCapacityStatusRow } from './AllowanceCapacityStatusRow';
 import { AllowanceEvidenceLedger } from './AllowanceEvidenceLedger';
+import { AllowanceHistoryControls, type Granularity, type RangePreset } from './AllowanceHistoryControls';
 import { AllowanceIntelligenceEvidenceTable } from './AllowanceIntelligenceEvidenceTable';
 import {
   capacityRatio,
@@ -45,9 +45,9 @@ import {
 import { buildAllowanceVisualizationSpec } from './allowanceVisualization';
 import { allowanceAnalysisPollInterval, allowanceStatusPollInterval, isPageVisible } from './allowancePolling';
 import { downloadJson, errorMessage } from './limitsPageActions';
+import { useAllowanceStatusEstimation, useFastAllowanceStatus } from './useAllowanceStatusEstimation';
 import baseStyles from './LimitsPage.module.css';
 import intelligenceStyles from './LimitsIntelligence.module.css';
-import type { AllowanceStatusPayload } from '../../api/allowanceIntelligenceTypes';
 
 const styles = { ...baseStyles, ...intelligenceStyles };
 
@@ -61,9 +61,6 @@ type LimitsPageProps = {
 };
 
 export { allowanceEvidenceCallsForCurrentUrl };
-
-type RangePreset = NonNullable<AllowanceSeriesRequest['rangePreset']>;
-type Granularity = NonNullable<AllowanceSeriesRequest['granularity']>;
 
 export function LimitsPage(props: LimitsPageProps) {
   const canUseLive = Boolean(props.contextRuntime.apiToken) && !props.contextRuntime.fileMode;
@@ -87,7 +84,6 @@ function LiveLimitsPage({
   const [analysisJobId, setAnalysisJobId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('Canonical allowance evidence ready');
   const [exporting, setExporting] = useState(false);
-  const statusSnapshotRef = useRef<AllowanceStatusPayload | null>(null);
   const automaticAnalysisRevisionRef = useRef<string | null>(null);
   const queryScope = [contextRuntime.apiToken, includeArchived] as const;
   const customStartAt = dateBoundary(customStart, false);
@@ -95,30 +91,8 @@ function LiveLimitsPage({
   const customReady = rangePreset !== 'custom' || Boolean(customStartAt && customEndAt);
   const evidenceBefore = evidenceCursors.at(-1);
 
-  const statusQuery = useQuery({
-    queryKey: ['allowance-v2', 'status', ...queryScope],
-    queryFn: async ({ signal }) => {
-      const previous = statusSnapshotRef.current;
-      const payload = await loadAllowanceStatus(contextRuntime, {
-        includeArchived,
-        sinceRevision: previous?.revision,
-      }, signal);
-      if (!payload.changed && previous) {
-        return { ...previous, changed: false, quality: payload.quality, next: payload.next };
-      }
-      statusSnapshotRef.current = payload;
-      return payload;
-    },
-    staleTime: 0,
-    refetchInterval: query => allowanceStatusPollInterval(
-      query.state.data?.data_state,
-      query.state.fetchFailureCount,
-      isPageVisible(),
-    ),
-    refetchIntervalInBackground: false,
-    retry: false,
-  });
-  const allowanceRevision = statusQuery.data?.revision ?? '';
+  const statusQuery = useFastAllowanceStatus(contextRuntime, includeArchived, queryScope);
+  const allowanceRevision = statusQuery.data?.revision ?? ''; const allowanceStatus = useAllowanceStatusEstimation(contextRuntime, includeArchived, queryScope, statusQuery.data);
   const seriesQuery = useQuery({
     queryKey: ['allowance-v2', 'series', ...queryScope, allowanceRevision, windowKind, rangePreset, granularity, customStartAt, customEndAt],
     queryFn: ({ signal }) => loadAllowanceSeries(contextRuntime, {
@@ -196,10 +170,10 @@ function LiveLimitsPage({
       });
   }, [allowanceRevision, analysisJobId, analysisQuery.data?.status, analysisQuery.isFetching, contextRuntime, includeArchived]);
 
-  const readout = useMemo(() => buildAllowanceReadout(statusQuery.data), [statusQuery.data]);
+  const readout = useMemo(() => buildAllowanceReadout(allowanceStatus), [allowanceStatus]);
   const chartSpec = useMemo(() => seriesQuery.data
-    ? buildAllowanceIntelligenceVisualization(seriesQuery.data, statusQuery.data, windowKind, { showFullRange })
-    : null, [seriesQuery.data, statusQuery.data, windowKind, showFullRange]);
+    ? buildAllowanceIntelligenceVisualization(seriesQuery.data, allowanceStatus, windowKind, { showFullRange })
+    : null, [seriesQuery.data, allowanceStatus, windowKind, showFullRange]);
   const rangeHasNoOlderData = Boolean(seriesQuery.data && (
     rangePreset === 'all'
     || (rangePreset === '6m'
@@ -278,26 +252,17 @@ function LiveLimitsPage({
             </Button>
           ) : null}
         </div>
-        <div className={styles.rangeControls}>
-          <SegmentedControl
-            label="History range"
-            options={[{ label: '8w', value: '8w' }, { label: '6m', value: '6m' }, { label: 'All', value: 'all' }, { label: 'Custom', value: 'custom' }]}
-            value={rangePreset}
-            onValueChange={selectRange}
-          />
-          <label className={styles.controlField}>Granularity
-            <select value={granularity} onChange={event => selectGranularity(event.target.value as Granularity)}>
-              <option value="cycle">By reset window</option><option value="week">Weekly</option><option value="month">Monthly</option>
-            </select>
-          </label>
-        </div>
-        {rangePreset === 'custom' ? (
-          <div className={styles.customRange}>
-            <label>Start date<input type="date" value={customStart} onChange={event => setCustomStart(event.target.value)} /></label>
-            <label>End date<input type="date" value={customEnd} onChange={event => setCustomEnd(event.target.value)} /></label>
-            {!customReady ? <span>Choose both dates to load the custom range.</span> : null}
-          </div>
-        ) : null}
+        <AllowanceHistoryControls
+          customEnd={customEnd}
+          customReady={customReady}
+          customStart={customStart}
+          granularity={granularity}
+          rangePreset={rangePreset}
+          onCustomEndChange={setCustomEnd}
+          onCustomStartChange={setCustomStart}
+          onGranularityChange={selectGranularity}
+          onRangeChange={selectRange}
+        />
         {seriesQuery.data ? (
           <p className={styles.rangeFeedback} role="status" aria-label="History range result" data-localization-attributes="aria-label">
             <strong>{rangePreset === 'all' ? 'All history' : rangePreset} selected</strong>
@@ -315,9 +280,14 @@ function LiveLimitsPage({
         ) : null}
       </Surface>
 
-      <AllowanceCapacityChangeTimeline analysis={analysisQuery.data} running={Boolean(analysisJobId)} />
+      <AllowanceCapacityChangeTimeline
+        analysis={analysisQuery.data}
+        evidenceRows={evidenceQuery.data?.rows ?? []}
+        running={Boolean(analysisJobId)}
+      />
 
       <AllowanceIntelligenceEvidenceTable
+        analysisId={analysisQuery.data?.snapshot_id ?? null}
         rows={evidenceQuery.data?.rows ?? []}
         page={evidenceCursors.length}
         hasOlder={Boolean(evidenceQuery.data?.next_cursor)}
@@ -559,6 +529,9 @@ function StaticLimitsPage({
         <Surface><MetricReadout label="Unexplained movement" value={unexplainedMovement(workspace.candidate?.unexplained_usage_percent)} detail={workspace.candidate?.outside_usage_possible ? 'Outside usage possible' : 'No large outside-usage flag'} /></Surface>
       </div>
 
+      <details className={styles.advancedControls}>
+        <summary>Advanced compatibility controls</summary>
+        <div className={styles.advancedControlsBody}>
       <div className={styles.modeBar}>
         <div>
           <h2>{windowKind === 'weekly' ? 'Weekly allowance evidence' : '5-hour rolling context'}</h2>
@@ -626,6 +599,8 @@ function StaticLimitsPage({
         onOpenCall={onOpenInvestigator}
         onCopyCallLink={onCopyCallLink}
       />
+        </div>
+      </details>
 
       <details className={styles.caveats}>
         <summary><ShieldCheck />Method, readiness, and caveats</summary>

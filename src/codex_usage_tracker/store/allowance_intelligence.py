@@ -130,6 +130,26 @@ def query_allowance_evidence(
     return AllowanceEvidencePage(rows=page_rows, next_cursor=next_cursor)
 
 
+def query_allowance_evidence_record(
+    connection: sqlite3.Connection,
+    *,
+    interval_id: str,
+    include_archived: bool = False,
+) -> dict[str, Any] | None:
+    """Return one exact persisted allowance interval in the current source revision."""
+    revision = _source_revision(connection)
+    if revision is None:
+        return None
+    archives = (0, 1) if include_archived else (0,)
+    placeholders = ",".join("?" for _item in archives)
+    row = connection.execute(
+        f"SELECT * FROM allowance_intervals WHERE interval_id = ? "
+        f"AND source_revision = ? AND is_archived IN ({placeholders}) LIMIT 1",  # nosec B608
+        (interval_id, revision, *archives),
+    ).fetchone()
+    return _row_to_dict(row) if row is not None else None
+
+
 def _cycle_partition_rows(
     connection: sqlite3.Connection,
     *,
@@ -276,9 +296,15 @@ def _decode_cursor(cursor: str, *, revision: str, scope: dict[str, Any]) -> dict
         if not isinstance(cursor, str):
             raise TypeError
         padded = cursor + "=" * (-len(cursor) % 4)
-        payload = json.loads(base64.b64decode(padded.encode("ascii"), altchars=b"-_", validate=True))
+        payload = json.loads(
+            base64.b64decode(padded.encode("ascii"), altchars=b"-_", validate=True)
+        )
         if not isinstance(payload, dict) or set(payload) != {
-            "source_revision", "observed_at", "row_id", "order", "scope"
+            "source_revision",
+            "observed_at",
+            "row_id",
+            "order",
+            "scope",
         }:
             raise TypeError
         source_revision = payload["source_revision"]
@@ -311,11 +337,19 @@ def _decode_cursor(cursor: str, *, revision: str, scope: dict[str, Any]) -> dict
 
 def _valid_cursor_scope(value: object) -> bool:
     if not isinstance(value, dict) or set(value) != {
-        "window_kind", "cohort_id", "start_at", "end_at", "order", "include_archived"
+        "window_kind",
+        "cohort_id",
+        "start_at",
+        "end_at",
+        "order",
+        "include_archived",
     }:
         return False
     return (
-        all(value[key] is None or isinstance(value[key], str) for key in ("window_kind", "cohort_id", "start_at", "end_at"))
+        all(
+            value[key] is None or isinstance(value[key], str)
+            for key in ("window_kind", "cohort_id", "start_at", "end_at")
+        )
         and value["order"] in {"asc", "desc"}
         and type(value["include_archived"]) is bool
     )

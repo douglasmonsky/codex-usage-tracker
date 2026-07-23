@@ -1,0 +1,17 @@
+{
+  "id": "subagent_comparison",
+  "question": "Compare aggregate synthetic subagent token and call totals by subagent type.",
+  "guidance_terms": ["exact tabular", "subagent"],
+  "expected_envelope_schema": "codex-usage-tracker.mcp-envelope.v1",
+  "expected_core_tool_sequence": [
+    {
+      "tool": "usage_query",
+      "arguments": {
+        "entity": "subagent",
+        "measures": ["tokens", "call_count"],
+        "group_by": ["subagent_type"]
+      },
+      "result_schema": "codex-usage-tracker.query.v2"
+    }
+  ]
+}

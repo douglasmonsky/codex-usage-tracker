@@ -186,7 +186,10 @@ def plugin_manifest() -> dict[str, Any]:
     return {
         "name": PLUGIN_NAME,
         "version": __version__,
-        "description": "Unofficial local Codex usage dashboard and MCP diagnostics from local session logs.",
+        "description": (
+            "Unofficial local, evidence-backed Codex usage analyst with MCP tools "
+            "and an Evidence Console."
+        ),
         "author": {"name": "Douglas Monsky"},
         "homepage": "https://github.com/douglasmonsky/codex-usage-tracker",
         "repository": "https://github.com/douglasmonsky/codex-usage-tracker",
@@ -196,12 +199,15 @@ def plugin_manifest() -> dict[str, Any]:
         "mcpServers": "./.mcp.json",
         "interface": {
             "displayName": "Codex Usage Tracker",
-            "shortDescription": "Local Codex usage dashboard, MCP diagnostics, and token-waste investigations",
+            "shortDescription": (
+                "Local, evidence-backed Codex usage analyst with MCP tools and an Evidence Console"
+            ),
             "longDescription": (
                 "Unofficial independent project, not made by, affiliated with, endorsed by, "
-                "sponsored by, or supported by OpenAI. Reads local Codex session logs "
-                "to power a local dashboard, MCP tools, allowance diagnostics, token-waste "
-                "investigations, and shareable aggregate reports without uploading logs."
+                "sponsored by, or supported by OpenAI. Reads local Codex session logs to "
+                "power MCP-based usage analysis, allowance diagnostics, token-waste "
+                "investigations, shareable aggregate reports, and a supporting local "
+                "Evidence Console without uploading logs."
             ),
             "developerName": "Douglas Monsky",
             "category": "Productivity",
@@ -210,9 +216,9 @@ def plugin_manifest() -> dict[str, Any]:
             "privacyPolicyURL": "https://github.com/douglasmonsky/codex-usage-tracker",
             "termsOfServiceURL": "https://github.com/douglasmonsky/codex-usage-tracker",
             "defaultPrompt": [
-                "Open dashboard",
+                "What drove my Codex usage this week?",
                 "Look through my usage for token waste",
-                "Suggest usage investigations",
+                "Compare model and effort usage",
                 "Check whether my weekly allowance changed",
             ],
             "brandColor": "#2563EB",
@@ -226,12 +232,13 @@ def plugin_manifest() -> dict[str, Any]:
 def _mcp_config(python_executable: Path) -> dict[str, Any]:
     server: dict[str, Any] = {
         "command": str(python_executable),
-        "args": ["-m", "codex_usage_tracker.mcp_server"],
+        "args": ["-m", "codex_usage_tracker.interfaces.mcp.server"],
         "cwd": ".",
+        "env": {"CODEX_USAGE_TRACKER_MCP_PROFILE": "core"},
     }
     source_root = _source_checkout_for_python(python_executable)
     if source_root:
-        server["env"] = {"PYTHONPATH": str(source_root / "src")}
+        server["env"]["PYTHONPATH"] = str(source_root / "src")
     return {"mcpServers": {PLUGIN_NAME: server}}
 
 

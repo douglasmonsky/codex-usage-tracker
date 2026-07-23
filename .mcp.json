@@ -4,6 +4,9 @@
       "command": "python3",
       "args": ["./skills/codex-usage-tracker/scripts/run_mcp.py"],
       "cwd": ".",
+      "env": {
+        "CODEX_USAGE_TRACKER_MCP_PROFILE": "core"
+      },
       "startup_timeout_sec": 120
     }
   }

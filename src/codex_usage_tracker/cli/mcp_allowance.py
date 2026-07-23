@@ -28,7 +28,7 @@ def usage_allowance_status(
     privacy_mode: str = "strict",
     since_revision: str | None = None,
 ) -> dict[str, Any]:
-    """Return compact canonical allowance status for polling and refresh decisions."""
+    """Compatibility tool; prefer ``usage_allowance(operation="status")``."""
     payload = allowance_v2.allowance_status_payload(
         _query(include_archived=include_archived, since_revision=since_revision),
         db_path=DEFAULT_DB_PATH,
@@ -62,7 +62,7 @@ def usage_allowance_series(
     cohort_id: str | None = None,
     include_archived: bool = False,
 ) -> dict[str, Any]:
-    """Return a finite canonical allowance timeline with dedupe disclosure."""
+    """Compatibility tool; prefer ``usage_allowance(operation="series")``."""
     return allowance_v2.allowance_series_payload(
         _query(
             range_preset=range_preset,
@@ -90,7 +90,7 @@ def usage_allowance_evidence(
     include_archived: bool = False,
     privacy_mode: str = "strict",
 ) -> dict[str, Any]:
-    """Return one bounded page of canonical allowance evidence and provenance."""
+    """Compatibility tool; prefer ``usage_allowance(operation="evidence")``."""
     return allowance_v2.allowance_evidence_payload(
         _query(
             limit=limit,
@@ -119,7 +119,7 @@ def usage_allowance_analysis(
     permutation_count: int | None = None,
     start_if_missing: bool = True,
 ) -> dict[str, Any]:
-    """Return persisted change analysis or start one bounded background job."""
+    """Compatibility tool; prefer ``usage_allowance(operation="analysis")``."""
     query = _query(
         window_kind=window_kind,
         cohort_id=cohort_id,

@@ -1,0 +1,13 @@
+{
+  "id": "allowance_status",
+  "question": "What is the current synthetic weekly allowance status?",
+  "guidance_terms": ["operation=\"status\"", "weekly windows"],
+  "expected_envelope_schema": "codex-usage-tracker.mcp-envelope.v1",
+  "expected_core_tool_sequence": [
+    {
+      "tool": "usage_allowance",
+      "arguments": {"operation": "status", "window": "weekly"},
+      "result_schema": "codex-usage-tracker-allowance-status-v2"
+    }
+  ]
+}

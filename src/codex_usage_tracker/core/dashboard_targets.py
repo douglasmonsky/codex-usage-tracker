@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode, urlsplit
 
@@ -45,26 +46,74 @@ _DIAGNOSTIC_FACT = re.compile(
 )
 _LIMIT_EVIDENCE = frozenset({"stable", "decreased"})
 _REPORT_IDS = frozenset(
-    {"fast-mode-proxy", "cost-curves", "usage-remaining", "allowance-change", "weekly-credits", "usage-drain-model"}
+    {
+        "fast-mode-proxy",
+        "cost-curves",
+        "usage-remaining",
+        "allowance-change",
+        "weekly-credits",
+        "usage-drain-model",
+    }
 )
 _ENUM_FILTERS: dict[str, frozenset[str]] = {
     "explore": frozenset({"calls", "tools", "files"}),
     "detail": frozenset({"first"}),
     "source": frozenset({"all", "project", "session", "git", "source-file", "missing"}),
-    "sort": frozenset({"time", "duration", "gap", "attention", "thread", "initiator", "model", "effort", "total", "cached", "uncached", "output", "reasoning", "cost", "usage", "cache", "context"}),
+    "sort": frozenset(
+        {
+            "time",
+            "duration",
+            "gap",
+            "attention",
+            "thread",
+            "initiator",
+            "model",
+            "effort",
+            "total",
+            "cached",
+            "uncached",
+            "output",
+            "reasoning",
+            "cost",
+            "usage",
+            "cache",
+            "context",
+        }
+    ),
     "direction": frozenset({"asc", "desc"}),
     "density": frozenset({"dense", "roomy"}),
     "return": frozenset(_FILTERS_BY_VIEW) - {"call"},
     "mode": frozenset({"summary", "full"}),
     "expand": frozenset({"first", "all"}),
     "risk": frozenset({"all", "Low", "Medium", "High"}),
-    "thread_call_sort": frozenset({"newest", "duration", "gap", "initiator", "model", "effort", "tokens", "cached", "uncached", "output", "reasoning", "cost", "cache"}),
+    "thread_call_sort": frozenset(
+        {
+            "newest",
+            "duration",
+            "gap",
+            "initiator",
+            "model",
+            "effort",
+            "tokens",
+            "cached",
+            "uncached",
+            "output",
+            "reasoning",
+            "cost",
+            "cache",
+        }
+    ),
     "usage_plan": frozenset({"Weekly", "weekly", "five_hour"}),
     "usage_effort": frozenset({"low", "medium", "high"}),
     "limit_window": frozenset({"weekly", "five_hour"}),
     "diagnostic_source": frozenset({"facts", "tools", "compactions"}),
 }
-_INTEGER_FILTERS = {"finding": (1, 10_000), "page": (1, 10_000), "thread_call_page": (1, 10_000), "usage_sample": (1, 10_000)}
+_INTEGER_FILTERS = {
+    "finding": (1, 10_000),
+    "page": (1, 10_000),
+    "thread_call_page": (1, 10_000),
+    "usage_sample": (1, 10_000),
+}
 
 
 def build_dashboard_target(
@@ -96,12 +145,28 @@ def build_dashboard_target(
     }
     query: dict[str, str] = {"view": view}
     _add_selector(target, query, view, "record_id", "record", record_id, "call", privacy_mode)
-    _add_selector(target, query, view, "thread_key", "thread_key", thread_key, "threads", privacy_mode)
     _add_selector(
-        target, query, view, "diagnostic_fact", "diagnostic_fact", diagnostic_fact, "diagnostics", privacy_mode
+        target, query, view, "thread_key", "thread_key", thread_key, "threads", privacy_mode
     )
     _add_selector(
-        target, query, view, "limit_evidence", "limit_hypothesis", limit_evidence, "usage-drain", privacy_mode
+        target,
+        query,
+        view,
+        "diagnostic_fact",
+        "diagnostic_fact",
+        diagnostic_fact,
+        "diagnostics",
+        privacy_mode,
+    )
+    _add_selector(
+        target,
+        query,
+        view,
+        "limit_evidence",
+        "limit_hypothesis",
+        limit_evidence,
+        "usage-drain",
+        privacy_mode,
     )
     query.update({key: _query_value(value) for key, value in normalized_filters.items()})
     if history != "active":
@@ -122,6 +187,174 @@ def build_dashboard_target(
     return target
 
 
+def build_dashboard_target_v2(
+    *,
+    evidence_kind: str,
+    selector_id: str,
+    history: str = "active",
+    analysis_id: str | None = None,
+    target_purpose: str = "evidence",
+    service_origin: str | None = None,
+    service_status: DashboardServiceStatus | None = None,
+) -> dict[str, Any]:
+    """Build a deterministic evidence handoff without changing the v1 compatibility shape."""
+    if evidence_kind not in {"finding", "call", "thread", "allowance", "analysis"}:
+        raise ValueError(f"unsupported evidence kind: {evidence_kind}")
+    if target_purpose not in {"evidence", "explore"}:
+        raise ValueError(f"unsupported dashboard target purpose: {target_purpose}")
+    if target_purpose == "explore" and evidence_kind != "thread":
+        raise ValueError("explore targets require thread evidence")
+    safe_id = (
+        isinstance(selector_id, str)
+        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:@+ -]{0,255}", selector_id) is not None
+    )
+    if evidence_kind == "call":
+        safe_id = isinstance(selector_id, str) and is_canonical_record_id(selector_id)
+    if evidence_kind == "thread":
+        safe_id = isinstance(selector_id, str) and is_canonical_thread_key(selector_id)
+    if not safe_id:
+        raise ValueError("selector_id is invalid")
+    if history not in _HISTORY_SCOPES:
+        raise ValueError(f"unknown dashboard history scope: {history}")
+    if (
+        analysis_id is not None
+        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:@+-]{0,255}", analysis_id) is None
+    ):
+        raise ValueError("analysis_id is invalid")
+    selector_keys = {
+        "call": "record_id",
+        "thread": "thread_key",
+        "allowance": "evidence_id",
+        "analysis": "analysis_id",
+        "finding": "finding_id",
+    }
+    query_keys = {**selector_keys, "call": "record"}
+    target_kind = "none" if evidence_kind == "analysis" else evidence_kind
+    selector_key = selector_keys[evidence_kind]
+    query_key = query_keys[evidence_kind]
+    surface = "explore" if target_purpose == "explore" else "evidence"
+    query = (
+        {"view": "explore", "mode": "threads", "thread_key": selector_id}
+        if surface == "explore"
+        else {"view": "evidence", "kind": target_kind, query_key: selector_id}
+    )
+    if history != "active":
+        query["history"] = history
+    if analysis_id is not None and evidence_kind == "finding":
+        query["analysis_id"] = analysis_id
+    relative_url = f"/react-dashboard.html?{urlencode(sorted(query.items()))}"
+    origin = _active_origin(service_origin, service_status)
+    selectors = {selector_key: selector_id}
+    if evidence_kind == "finding" and analysis_id is not None:
+        selectors["analysis_id"] = analysis_id
+    return {
+        "schema": "codex-usage-tracker-dashboard-target-v2",
+        "target_id": f"{surface}:{evidence_kind}:{selector_id}:{history}",
+        "surface": surface,
+        "evidence_kind": target_kind,
+        "analysis_id": analysis_id,
+        "expires_at": None,
+        "view": surface,
+        "selectors": selectors,
+        "scope": {
+            "since": None,
+            "until": None,
+            "history": history,
+            "privacy_mode": "normal",
+            "filters": {},
+        },
+        "history": history,
+        "relative_url": relative_url,
+        "absolute_url": f"{origin}{relative_url}" if origin else None,
+        "fallback_instruction": None if origin else DASHBOARD_TARGET_FALLBACK,
+    }
+
+
+def build_limits_target_v2(
+    *,
+    operation: str,
+    window: str,
+    range_preset: str,
+    since: str | None,
+    until: str | None,
+    analysis_id: str | None = None,
+    service_origin: str | None = None,
+    service_status: DashboardServiceStatus | None = None,
+) -> dict[str, Any]:
+    """Build an allowlisted v2 handoff to the current Limits dashboard surface."""
+    if operation not in {"status", "series", "evidence", "analysis"}:
+        raise ValueError(f"unsupported allowance operation: {operation}")
+    if window not in {"weekly", "five_hour"}:
+        raise ValueError(f"unsupported allowance window: {window}")
+    if range_preset not in {"24h", "7d", "8w", "6m"}:
+        raise ValueError(f"unsupported allowance range: {range_preset}")
+    if (
+        analysis_id is not None
+        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:@+-]{0,255}", analysis_id) is None
+    ):
+        raise ValueError("analysis_id is invalid")
+    normalized_since = _limits_timestamp(since, "since")
+    normalized_until = _limits_timestamp(until, "until")
+    if (
+        normalized_since is not None
+        and normalized_until is not None
+        and datetime.fromisoformat(normalized_since) > datetime.fromisoformat(normalized_until)
+    ):
+        raise ValueError("since must not be after until")
+    query = {
+        "view": "limits",
+        "operation": operation,
+        "window": window,
+        "range": range_preset,
+    }
+    if analysis_id is not None:
+        query["analysis_id"] = analysis_id
+    relative_url = f"/react-dashboard.html?{urlencode(sorted(query.items()))}"
+    origin = _active_origin(service_origin, service_status)
+    selectors = {
+        "operation": operation,
+        "window_kind": window,
+        "range": range_preset,
+    }
+    if analysis_id is not None:
+        selectors["analysis_id"] = analysis_id
+    return {
+        "schema": "codex-usage-tracker-dashboard-target-v2",
+        "target_id": f"limits:{operation}:{window}:{range_preset}:{analysis_id or 'current'}",
+        "surface": "limits",
+        "evidence_kind": "allowance",
+        "analysis_id": analysis_id,
+        "expires_at": None,
+        "view": "limits",
+        "selectors": selectors,
+        "scope": {
+            "since": normalized_since,
+            "until": normalized_until,
+            "history": "active",
+            "privacy_mode": "strict",
+            "filters": {"window_kind": window},
+        },
+        "history": "active",
+        "relative_url": relative_url,
+        "absolute_url": f"{origin}{relative_url}" if origin else None,
+        "fallback_instruction": None if origin else DASHBOARD_TARGET_FALLBACK,
+    }
+
+
+def _limits_timestamp(value: str | None, field_name: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a timezone-aware ISO-8601 timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be a timezone-aware ISO-8601 timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{field_name} must be a timezone-aware ISO-8601 timestamp")
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
 def _normalize_filters(view: str, filters: Mapping[str, object]) -> dict[str, object]:
     normalized: dict[str, object] = {}
     for key in sorted(_FILTERS_BY_VIEW[view] & filters.keys()):
@@ -137,7 +370,13 @@ def _normalize_filter_value(key: str, value: object) -> object | None:
         return candidate if candidate in _ENUM_FILTERS[key] else None
     if key in _INTEGER_FILTERS:
         minimum, maximum = _INTEGER_FILTERS[key]
-        return value if isinstance(value, int) and not isinstance(value, bool) and minimum <= value <= maximum else None
+        return (
+            value
+            if isinstance(value, int)
+            and not isinstance(value, bool)
+            and minimum <= value <= maximum
+            else None
+        )
     if key == "usage_subagents":
         if isinstance(value, bool):
             return value
@@ -196,9 +435,21 @@ def _normal_thread_key(value: str) -> bool:
     if not value.startswith("thread:"):
         return False
     label = value.removeprefix("thread:")
-    return bool(label) and len(label) <= 80 and not any(
-        character in label for character in "\r\n\t/\\?#{}[]"
+    return (
+        bool(label)
+        and len(label) <= 80
+        and not any(character in label for character in "\r\n\t/\\?#{}[]")
     )
+
+
+def is_canonical_record_id(value: str) -> bool:
+    """Return whether a public canonical record identifier is dashboard-safe."""
+    return _RECORD_ID.fullmatch(value) is not None
+
+
+def is_canonical_thread_key(value: str) -> bool:
+    """Return whether a canonical session/thread key is bounded and safe."""
+    return _SESSION_THREAD_KEY.fullmatch(value) is not None or _normal_thread_key(value)
 
 
 def _query_value(value: object) -> str:

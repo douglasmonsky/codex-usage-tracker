@@ -68,7 +68,8 @@
 
 .controlField select:focus-visible,
 .customRange input:focus-visible,
-.rowActions button:focus-visible {
+.rowActions button:focus-visible,
+.rowActions a:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -79,6 +80,26 @@
   background: var(--surface-subtle);
   border: 1px solid var(--line-subtle);
   border-radius: 10px;
+}
+
+.advancedControls {
+  background: var(--surface-subtle);
+  border: 1px solid var(--line-subtle);
+  border-radius: 10px;
+}
+
+.advancedControls > summary {
+  padding: 10px 12px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.advancedControlsBody {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
 }
 
 .rangeFeedback {
@@ -174,7 +195,26 @@
 .rowActions {
   display: flex;
   gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
 }
+
+.rowActions > span { color: var(--ink-muted); font-size: 11px; }
+
+.rowActions a {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 7px;
+  color: var(--signal-context);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid var(--line-subtle);
+  border-radius: 5px;
+}
+
+.rowActions a:hover { background: var(--surface-subtle); border-color: var(--line-strong); }
 
 .rowActions button {
   display: inline-grid;

@@ -8,11 +8,26 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import type { CallRow, ThreadRow } from '../../api/types';
+import { EvidenceGrid } from '../explore/EvidenceGrid';
 import { EvidenceGridControls } from '../explore/EvidenceGridControls';
-import type { EvidenceGridPreferences } from '../explore/useEvidenceGridPreferences';
-import { ThreadCallControls, ThreadCallEvidenceRow } from './ThreadAccordionRows';
+import {
+  useEvidenceGridPreferences,
+  type EvidenceGridPreferences,
+} from '../explore/useEvidenceGridPreferences';
+import { formatCompact, pct } from '../shared/format';
+import {
+  callActionColumn,
+  callColumns,
+  callInvestigatorRowLabel,
+} from '../shared/tables';
+import { ThreadCallControls } from './ThreadAccordionRows';
+import {
+  callColumnBySort,
+  callColumnId,
+  callSortByColumn,
+} from './threadCallGridState';
 import {
   threadRowIdentity,
   threadRowSelector,
@@ -54,13 +69,11 @@ export type ThreadAccordionGridProps = {
 type ThreadAccordionItem =
   | { key: string; kind: 'thread'; thread: ThreadRow }
   | { key: string; kind: 'summary'; thread: ThreadRow }
-  | { key: string; kind: 'call'; call: CallRow }
   | { key: string; kind: 'status' };
 
 function accordionItems(
   threads: ThreadRow[],
   expandedThreadIdentity: string | null,
-  expandedCalls: CallRow[],
 ): ThreadAccordionItem[] {
   return threads.flatMap(thread => {
     const identity = threadRowIdentity(thread);
@@ -69,7 +82,6 @@ function accordionItems(
     return [
       parent,
       { key: `summary:${identity}`, kind: 'summary', thread },
-      ...expandedCalls.map(call => ({ key: `call:${call.id}`, kind: 'call' as const, call })),
       { key: `status:${identity}`, kind: 'status' as const },
     ];
   });
@@ -108,6 +120,33 @@ export function ThreadAccordionGrid({
   onCopyCallLink,
 }: ThreadAccordionGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const callPreferences = useEvidenceGridPreferences('codexUsageThreadCallsEvidenceGridV1', {
+    density: 'compact',
+    columnVisibility: {},
+  });
+  const expandedCallColumns = useMemo<Array<ColumnDef<CallRow, unknown>>>(() => [
+    ...callColumns.map(column => ({
+      ...column,
+      enableSorting: Boolean(callSortByColumn[callColumnId(column)]),
+    })),
+    callActionColumn({
+      labelPrefix: 'thread call',
+      onOpenInvestigator,
+      onCopyCallLink,
+    }),
+  ], [onCopyCallLink, onOpenInvestigator]);
+  const callSorting = useMemo<SortingState>(() => [{
+    id: callColumnBySort[callSort],
+    desc: callSortDirection === 'desc',
+  }], [callSort, callSortDirection]);
+  const updateCallSorting: OnChangeFn<SortingState> = updater => {
+    const next = typeof updater === 'function' ? updater(callSorting) : updater;
+    const selected = next[0];
+    const nextSort = selected ? callSortByColumn[selected.id] : undefined;
+    if (!selected || !nextSort) return;
+    onCallSortChange(nextSort);
+    onCallSortDirectionChange(selected.desc ? 'desc' : 'asc');
+  };
   const table = useReactTable({
     columns,
     data: threads,
@@ -120,12 +159,11 @@ export function ThreadAccordionGrid({
     enableSortingRemoval: false,
   });
   const rows = table.getRowModel().rows;
-  const items = accordionItems(rows.map(row => row.original), expandedThreadIdentity, expandedCalls);
+  const items = accordionItems(rows.map(row => row.original), expandedThreadIdentity);
   const roomy = preferences.density === 'comfortable';
   const estimatedSize = (index: number) => {
     const kind = items[index]?.kind;
-    if (kind === 'call') return roomy ? 128 : 96;
-    if (kind === 'summary') return roomy ? 140 : 116;
+    if (kind === 'summary') return roomy ? 650 : 610;
     if (kind === 'status') return roomy ? 56 : 48;
     return roomy ? 56 : 44;
   };
@@ -285,14 +323,34 @@ export function ThreadAccordionGrid({
                       <div><dt>Duration</dt><dd>{item.thread.totalDuration}</dd></div>
                       <div><dt>Latest</dt><dd>{item.thread.latestActivity}</dd></div>
                     </dl>
-                    <ThreadCallControls callSort={callSort} callSortDirection={callSortDirection} onCallSortChange={onCallSortChange} onCallSortDirectionChange={onCallSortDirectionChange} />
+                <ThreadCallControls callSort={callSort} callSortDirection={callSortDirection} onCallSortChange={onCallSortChange} onCallSortDirectionChange={onCallSortDirectionChange} />
+                <EvidenceGrid
+                  ariaLabel={`Model usage in ${item.thread.name}`}
+                  columns={expandedCallColumns}
+                  data={expandedCalls}
+                  identityColumnId="thread"
+                  lockedColumnIds={['investigate']}
+                  getRowId={call => call.id}
+                  mobile={{
+                    primary: call => call.thread,
+                    secondary: call => `${call.time} · ${call.model} · ${formatCompact(call.totalTokens)} tokens · ${pct(call.cachedPct)} cache`,
+                    actionLabel: call => callInvestigatorRowLabel(call, 'thread call'),
+                  }}
+                  sorting={callSorting}
+                  onSortingChange={updateCallSorting}
+                  manualSorting
+                  columnVisibility={callPreferences.columnVisibility}
+                  onColumnVisibilityChange={callPreferences.setColumnVisibility}
+                  density={callPreferences.density}
+                  onDensityChange={callPreferences.setDensity}
+                  onRestoreDefaults={callPreferences.restoreDefaults}
+                  onRowActivate={call => onOpenInvestigator(call.id)}
+                  activateOnClick
+                  viewportHeight={360}
+                  emptyLabel={loadingCalls ? 'Loading calls…' : 'No calls are available for this thread.'}
+                />
                   </section>
                 </div>
-              </div>;
-            }
-            if (item.kind === 'call') {
-              return <div key={item.key} ref={virtualizer.measureElement} id={`thread-call-row-${encodeURIComponent(item.call.id)}`} role="row" aria-level={2} aria-describedby={expandedThreadId} className={styles.accordionItem} style={{ ...itemStyle, minHeight: estimatedSize(virtualItem.index) }} data-accordion-item data-index={virtualItem.index}>
-                <div role="gridcell"><ThreadCallEvidenceRow call={item.call} onOpenInvestigator={onOpenInvestigator} onCopyCallLink={onCopyCallLink} /></div>
               </div>;
             }
             return <div key={item.key} ref={virtualizer.measureElement} id={`${regionId}-status-row`} role="row" aria-level={2} aria-describedby={expandedThreadId} className={styles.accordionItem} style={{ ...itemStyle, minHeight: estimatedSize(virtualItem.index) }} data-accordion-item data-index={virtualItem.index}>

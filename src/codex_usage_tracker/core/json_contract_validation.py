@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import math
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 NoneType = type(None)
@@ -31,7 +32,24 @@ def validate_json_payload_contract(
     return [
         *_validate_required_contract_fields(payload, schema=schema, contract=contract),
         *_validate_nested_contract_fields(payload, schema=schema, contract=contract),
+        *_validate_finite_numbers(payload, path=schema),
     ]
+
+
+def _validate_finite_numbers(value: object, *, path: str) -> list[str]:
+    if isinstance(value, float) and not math.isfinite(value):
+        return [f"{path} must contain only finite numeric values"]
+    if isinstance(value, Mapping):
+        errors: list[str] = []
+        for key, nested in value.items():
+            errors.extend(_validate_finite_numbers(nested, path=f"{path}.{key}"))
+        return errors
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        errors = []
+        for index, nested in enumerate(value):
+            errors.extend(_validate_finite_numbers(nested, path=f"{path}[{index}]"))
+        return errors
+    return []
 
 
 def _validate_required_contract_fields(

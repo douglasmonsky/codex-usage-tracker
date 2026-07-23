@@ -9,6 +9,7 @@ import type { AllowanceEvidenceRow } from '../../api/allowanceIntelligenceTypes'
 const styles = { ...baseStyles, ...intelligenceStyles };
 
 type Props = {
+  analysisId: string | null;
   rows: AllowanceEvidenceRow[];
   page: number;
   hasOlder: boolean;
@@ -22,6 +23,7 @@ type Props = {
 };
 
 export function AllowanceIntelligenceEvidenceTable({
+  analysisId,
   rows,
   page,
   hasOlder,
@@ -76,12 +78,22 @@ export function AllowanceIntelligenceEvidenceTable({
                   <td><StatusBadge tone={tone(row.point_kind)}>{label(row.point_kind, row.censor_reason)}</StatusBadge></td>
                   <td data-localization-skip="true">{row.cohort_key || 'Codex'}</td>
                   <td>
-                    {showPhysicalProvenance && recordId ? (
-                      <div className={styles.rowActions}>
+                    <div className={styles.rowActions}>
+                      {analysisId && row.interval_id ? (
+                        <a
+                          href={allowanceEvidenceHref(analysisId, row.interval_id)}
+                          aria-label={`Open allowance Evidence for ${row.interval_id}`}
+                        >
+                          Evidence <ExternalLink aria-hidden="true" />
+                        </a>
+                      ) : null}
+                      {showPhysicalProvenance && recordId ? (
+                        <>
                         <button type="button" title="Open source call" data-localization-attributes="title" onClick={() => onOpenCall(recordId)}><ExternalLink /><span className="sr-only">Open source call</span></button>
                         <button type="button" title="Copy source call link" data-localization-attributes="title" onClick={() => onCopyCallLink(recordId)}><Copy /><span className="sr-only">Copy source call link</span></button>
-                      </div>
-                    ) : 'Canonical aggregate'}
+                        </>
+                      ) : <span>Canonical aggregate</span>}
+                    </div>
                   </td>
                 </tr>
               );
@@ -94,6 +106,17 @@ export function AllowanceIntelligenceEvidenceTable({
       </div>
     </Surface>
   );
+}
+
+function allowanceEvidenceHref(analysisId: string, evidenceId: string): string {
+  const params = new URLSearchParams({
+    view: 'evidence',
+    kind: 'allowance',
+    analysis: analysisId,
+    evidence: evidenceId,
+  });
+  if (new URLSearchParams(window.location.search).get('history') === 'all') params.set('history', 'all');
+  return `?${params.toString()}`;
 }
 
 function label(kind: AllowanceEvidenceRow['point_kind'], reason: string | null): string {

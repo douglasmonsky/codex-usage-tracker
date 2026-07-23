@@ -8,6 +8,7 @@ from typing import Literal
 RouteMethod = Literal["GET", "POST"]
 RouteWorkload = Literal["interactive", "bounded_report", "heavy_analysis"]
 RouteExecution = Literal["synchronous", "async_start", "poll"]
+RouteExposure = Literal["stable", "compatibility", "developer"]
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,9 @@ class DashboardRouteProfile:
     cache_behavior: str
     may_scan_all_history: bool
     execution: RouteExecution
+    exposure: RouteExposure = "compatibility"
+    input_limit_bytes: int | None = None
+    output_limit_bytes: int | None = None
 
 
 def profile(
@@ -38,6 +42,9 @@ def profile(
     *,
     may_scan_all_history: bool = False,
     execution: RouteExecution = "synchronous",
+    exposure: RouteExposure = "compatibility",
+    input_limit_bytes: int | None = None,
+    output_limit_bytes: int | None = None,
 ) -> DashboardRouteProfile:
     """Build one immutable route profile."""
     return DashboardRouteProfile(
@@ -51,4 +58,7 @@ def profile(
         cache_behavior=cache_behavior,
         may_scan_all_history=may_scan_all_history,
         execution=execution,
+        exposure=exposure,
+        input_limit_bytes=input_limit_bytes,
+        output_limit_bytes=output_limit_bytes,
     )

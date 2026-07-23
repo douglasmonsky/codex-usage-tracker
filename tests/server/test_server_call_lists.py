@@ -121,7 +121,14 @@ def test_calls_payload_applies_derived_filters_and_pagination() -> None:
 
     def live_query_params(params: dict[str, list[str]]) -> dict[str, object]:
         calls["params"] = params
-        return {"limit": 2, "offset": 3, "filters": {"model": "gpt-5.5"}}
+        return {
+            "limit": 2,
+            "offset": 3,
+            "since": "2026-07-01",
+            "until": None,
+            "include_archived": False,
+            "filters": {"model": "gpt-5.5"},
+        }
 
     def live_call_rows(**kwargs: Any) -> tuple[list[dict[str, object]], int]:
         calls["rows"] = kwargs
@@ -131,6 +138,10 @@ def test_calls_payload_applies_derived_filters_and_pagination() -> None:
         "pricing_status=priced&credit_confidence=exact",
         live_query_params=live_query_params,
         live_call_rows=live_call_rows,
+        live_call_filter_options=lambda **_kwargs: {
+            "models": ["gpt-5.5", "gpt-older-page"],
+            "efforts": ["high"],
+        },
     )
 
     assert calls["rows"]["pricing_status"] == "priced"
@@ -146,6 +157,10 @@ def test_calls_payload_applies_derived_filters_and_pagination() -> None:
         "credit_confidence": "exact",
     }
     assert payload["raw_context_included"] is False
+    assert payload["filter_options"] == {
+        "models": ["gpt-5.5", "gpt-older-page"],
+        "efforts": ["high"],
+    }
 
 
 def test_thread_calls_payload_forwards_thread_key_and_omits_filters() -> None:

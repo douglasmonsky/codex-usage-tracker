@@ -52,7 +52,6 @@ DASHBOARD_LOCALE_WHEEL_MEMBERS = {
     for code in DASHBOARD_LOCALE_CODES
 }
 PUBLIC_RELEASE_DOCS = [
-    "docs/one-dot-oh-readiness.md",
     "docs/development.md",
 ]
 PACKAGE_NAMING_DOCS = [
@@ -105,6 +104,28 @@ REACT_DASHBOARD_PRIVACY_PATTERNS = {
         r'"role"\s*:\s*"user"\s*,\s*"content"\s*:\s*\[',
     ),
 }
+DASHBOARD_FORBIDDEN_DEPENDENCIES = {"three", "@types/three"}
+DASHBOARD_REMOVED_VISUALIZATION_PATHS = (
+    "frontend/dashboard/src/features/overview/usageConstellationModel.ts",
+    "frontend/dashboard/src/features/overview/usageConstellationModel.test.ts",
+    "frontend/dashboard/src/visualization/three",
+    "tests/playwright/dashboard-constellation.spec.mjs",
+)
+DASHBOARD_THREE_IMPORT = re.compile(r'''(?:from\s+|import\s*\()\s*["']three(?:/|["'])''')
+EVIDENCE_CONSOLE_SCREENSHOTS = (
+    "evidence-console-home.png",
+    "evidence-console-explore-calls.png",
+    "evidence-console-explore-threads.png",
+    "evidence-console-limits.png",
+    "evidence-console-evidence-call.png",
+    "evidence-console-settings.png",
+    "evidence-console-legacy-reports.png",
+    "evidence-console-home-tablet.png",
+    "evidence-console-home-mobile.png",
+    "evidence-console-home-zoom-200.png",
+    "evidence-console-home-reduced-motion.png",
+    "evidence-console-home-keyboard.png",
+)
 REQUIRED_FILES = [
     "README.md",
     "LICENSE",
@@ -117,6 +138,11 @@ REQUIRED_FILES = [
     "docs/dashboard-guide.md",
     "docs/cli-json-schemas.md",
     "docs/one-dot-oh-readiness.md",
+    "docs/releases/0.22.0.md",
+    "docs/upgrading-to-0.22.0.md",
+    "docs/releases/0.23.0.md",
+    "docs/upgrading-to-0.23.0.md",
+    "docs/evidence-console-route-migration.md",
     "docs/assets/dashboard-insights.png",
     "docs/assets/dashboard-calls.png",
     "docs/assets/dashboard-calls-preview.png",
@@ -127,6 +153,7 @@ REQUIRED_FILES = [
     "docs/assets/dashboard-call-investigator.png",
     "docs/assets/dashboard-call-investigator-preview.png",
     "docs/assets/dashboard-call-investigator-evidence.png",
+    *(f"docs/assets/{name}" for name in EVIDENCE_CONSOLE_SCREENSHOTS),
     "docs/assets/plugin-prompts.png",
     "docs/assets/plugin-thread-leaderboard.png",
     "scripts/check_release.py",
@@ -180,10 +207,15 @@ REQUIRED_FILES = [
     "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator.png",
     "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-preview.png",
     "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-evidence.png",
+    *(
+        f"src/codex_usage_tracker/plugin_data/docs/assets/{name}"
+        for name in EVIDENCE_CONSOLE_SCREENSHOTS
+    ),
     "src/codex_usage_tracker/plugin_data/docs/assets/plugin-prompts.png",
     "src/codex_usage_tracker/plugin_data/docs/assets/plugin-thread-leaderboard.png",
     "src/codex_usage_tracker/plugin_data/skills/codex-usage-api/SKILL.md",
     "src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/SKILL.md",
+    "src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py",
 ]
 WHEEL_REQUIRED_MEMBERS = {
     "codex_usage_tracker/plugin_data/assets/icon.svg",
@@ -226,17 +258,28 @@ WHEEL_REQUIRED_MEMBERS = {
     "codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator.png",
     "codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-preview.png",
     "codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-evidence.png",
+    *(
+        f"codex_usage_tracker/plugin_data/docs/assets/{name}"
+        for name in EVIDENCE_CONSOLE_SCREENSHOTS
+    ),
     "codex_usage_tracker/plugin_data/docs/assets/plugin-prompts.png",
     "codex_usage_tracker/plugin_data/docs/assets/plugin-thread-leaderboard.png",
     "codex_usage_tracker/plugin_data/skills/codex-usage-api/SKILL.md",
     "codex_usage_tracker/plugin_data/skills/codex-usage-tracker/SKILL.md",
+    "codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py",
 }
 SDIST_REQUIRED_MEMBERS = {
     "docs/cli-json-schemas.md",
+    "docs/releases/0.22.0.md",
+    "docs/upgrading-to-0.22.0.md",
+    "docs/releases/0.23.0.md",
+    "docs/upgrading-to-0.23.0.md",
+    "docs/evidence-console-route-migration.md",
     "scripts/benchmark_synthetic_history.py",
     "skills/codex-usage-api/SKILL.md",
     "skills/codex-usage-tracker/SKILL.md",
     "skills/codex-usage-tracker/scripts/run_mcp.py",
+    "src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py",
 }
 
 
@@ -271,6 +314,7 @@ def main() -> int:
     failures.extend(_check_packaging_metadata())
     failures.extend(_check_tracked_files_for_secrets())
     failures.extend(_check_react_dashboard_privacy_artifacts())
+    failures.extend(_check_removed_dashboard_visualization())
     if args.dist:
         failures.extend(_check_sdist())
         failures.extend(_check_wheel())
@@ -308,6 +352,53 @@ def _check_dashboard_asset_sync() -> list[str]:
         if paths:
             failures.append(
                 "dashboard React assets include untracked generated files: " + ", ".join(paths)
+            )
+    return failures
+
+
+def _check_removed_dashboard_visualization() -> list[str]:
+    failures: list[str] = []
+    dashboard_package = json.loads(
+        (REPO_ROOT / "frontend/dashboard/package.json").read_text(encoding="utf-8")
+    )
+    declared = set(dashboard_package.get("dependencies", {})) | set(
+        dashboard_package.get("devDependencies", {})
+    )
+    for dependency in sorted(declared & DASHBOARD_FORBIDDEN_DEPENDENCIES):
+        failures.append(f"removed dashboard dependency remains declared: {dependency}")
+
+    lock_packages = json.loads((REPO_ROOT / "package-lock.json").read_text(encoding="utf-8"))[
+        "packages"
+    ]
+    for package in sorted(lock_packages):
+        dependency = package.removeprefix("node_modules/")
+        if dependency in DASHBOARD_FORBIDDEN_DEPENDENCIES:
+            failures.append(f"removed dashboard dependency remains locked: {dependency}")
+
+    for relative_path in DASHBOARD_REMOVED_VISUALIZATION_PATHS:
+        if (REPO_ROOT / relative_path).exists():
+            failures.append(f"removed dashboard visualization path remains: {relative_path}")
+
+    source_root = REPO_ROOT / "frontend/dashboard/src"
+    for path in sorted((*source_root.rglob("*.ts"), *source_root.rglob("*.tsx"))):
+        if DASHBOARD_THREE_IMPORT.search(path.read_text(encoding="utf-8")):
+            failures.append(
+                "removed Three.js import remains: " + path.relative_to(REPO_ROOT).as_posix()
+            )
+
+    assets_root = REPO_ROOT / "src/codex_usage_tracker/plugin_data/dashboard/react"
+    for path in sorted(assets_root.rglob("*")):
+        if (
+            path.is_file()
+            and path.suffix in {".html", ".js"}
+            and (
+                "UsageConstellation" in path.name
+                or "UsageConstellation" in path.read_text(encoding="utf-8")
+            )
+        ):
+            failures.append(
+                "removed constellation reference remains in packaged asset: "
+                + path.relative_to(REPO_ROOT).as_posix()
             )
     return failures
 
@@ -479,6 +570,8 @@ def _check_packaging_metadata() -> list[str]:
         failures.append(
             ".mcp.json should allow enough startup time for first-run runtime bootstrap"
         )
+    if mcp_server.get("env") != {"CODEX_USAGE_TRACKER_MCP_PROFILE": "core"}:
+        failures.append(".mcp.json should configure the core MCP profile")
     manifest = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
     if "recursive-include skills *.md *.py" not in manifest:
         failures.append("MANIFEST.in should include Codex skill scripts in the source distribution")
@@ -486,6 +579,11 @@ def _check_packaging_metadata() -> list[str]:
     launcher = (REPO_ROOT / "skills/codex-usage-tracker/scripts/run_mcp.py").read_text(
         encoding="utf-8"
     )
+    packaged_launcher = REPO_ROOT / (
+        "src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py"
+    )
+    if launcher.encode() != packaged_launcher.read_bytes():
+        failures.append("source and packaged MCP runtime launchers must be byte-identical")
     if "codex-usage-tracker.git@main" in launcher:
         failures.append("MCP runtime launcher must pin the package spec instead of tracking main")
     git_package_spec = re.search(r"codex-usage-tracker\.git@([0-9a-f]{40})", launcher)
@@ -501,6 +599,9 @@ def _check_packaging_metadata() -> list[str]:
             "MCP runtime launcher must pin an exact codex-usage-tracking version or a "
             "40-character GitHub commit SHA"
         )
+    runtime_version = re.search(r'^RUNTIME_VERSION = "([0-9]+(?:\.[0-9]+){2})"$', launcher, re.M)
+    if runtime_version is None or runtime_version.group(1) != str(project.get("version")):
+        failures.append("MCP runtime launcher cache version does not match project.version")
     if "importlib.metadata.version('codex-usage-tracking')" not in launcher:
         failures.append("MCP runtime launcher must check the codex-usage-tracking distribution")
     if "PACKAGE_SPEC_MARKER" not in launcher:
@@ -641,11 +742,7 @@ def _check_ci_workflow() -> list[str]:
             None,
         )
         if matched is None:
-            label = (
-                required
-                if isinstance(required, str)
-                else "one of " + ", ".join(required)
-            )
+            label = required if isinstance(required, str) else "one of " + ", ".join(required)
             failures.append(f"CI package job is missing required build check: {label}")
         else:
             positions.append(package_job.find(matched))

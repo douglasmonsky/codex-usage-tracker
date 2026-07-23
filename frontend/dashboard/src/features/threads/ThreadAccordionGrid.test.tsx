@@ -150,16 +150,17 @@ it('renders an associated expanded region and explicit child actions', () => {
   expect(onCopyCallLink).toHaveBeenCalledWith(fixtureCall.id);
 });
 
-it('uses density-specific estimates and rendered spacing for parents and calls', () => {
+  it('uses density-specific estimates for parents and the nested calls table', () => {
   const { rerender } = render(<ThreadAccordionGrid
     {...defaultProps}
     expandedThreadIdentity={threadRowIdentity(fixtureThread)}
     expandedCalls={[fixtureCall]}
   />);
   const compactParent = screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` });
-  const compactCall = screen.getByRole('button', { name: /Open investigator for thread call/i }).closest('[data-accordion-item]');
-  expect(compactParent).toHaveStyle({ minHeight: '44px' });
-  expect(compactCall).toHaveStyle({ minHeight: '96px' });
+    const compactSummary = document.querySelector('[id$="-summary-row"]');
+    expect(compactParent).toHaveStyle({ minHeight: '44px' });
+    expect(compactSummary).toHaveStyle({ minHeight: '610px' });
+    expect(screen.getByRole('button', { name: /Open investigator for thread call/i })).toBeInTheDocument();
 
   rerender(<ThreadAccordionGrid
     {...defaultProps}
@@ -168,7 +169,7 @@ it('uses density-specific estimates and rendered spacing for parents and calls',
     expandedCalls={[fixtureCall]}
   />);
   expect(screen.getByRole('row', { name: `Collapse calls for ${fixtureThread.name}` })).toHaveStyle({ minHeight: '56px' });
-  expect(screen.getByRole('button', { name: /Open investigator for thread call/i }).closest('[data-accordion-item]')).toHaveStyle({ minHeight: '128px' });
+    expect(document.querySelector('[id$="-summary-row"]')).toHaveStyle({ minHeight: '650px' });
 });
 
 it('keeps a thousand child calls bounded to one virtual window', () => {

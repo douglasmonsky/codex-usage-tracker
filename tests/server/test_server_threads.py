@@ -89,7 +89,7 @@ def test_threads_payload_normalizes_query_filters(
     monkeypatch.setattr(server_threads, "query_thread_summary_count", lambda **_kwargs: 11)
 
     payload = server_threads.threads_payload(
-        "limit=7&offset=3&include_archived=true&q=preferred&search=ignored&sort=calls&direction=asc",
+        "limit=7&offset=3&include_archived=true&q=preferred&search=ignored&risk=medium&sort=calls&direction=asc",
         db_path=tmp_path / "usage.sqlite3",
         include_archived_default=False,
     )
@@ -105,6 +105,7 @@ def test_threads_payload_normalizes_query_filters(
     assert payload["include_archived"] is True
     assert payload["raw_context_included"] is False
     assert calls["search"] == "preferred"
+    assert calls["risk"] == "medium"
     assert calls["sort"] == "calls"
     assert calls["direction"] == "asc"
 

@@ -470,4 +470,4 @@ def test_dashboard_service_status_exposes_react_url_without_changing_root_url() 
 def test_dashboard_service_help_is_localized() -> None:
     help_text = build_parser("zh-Hans").format_help()
 
-    assert "管理常驻仪表盘服务" in help_text
+    assert "管理本地仪表盘服务" in help_text

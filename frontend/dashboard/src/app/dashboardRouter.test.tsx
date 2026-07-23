@@ -18,21 +18,21 @@ describe('dashboard search contract', () => {
         custom_future_filter: 'preserved',
       }),
     ).toEqual({
-      view: 'overview',
+      view: 'home',
       record: 'call-7',
       report: 'weekly-credits',
       custom_future_filter: 'preserved',
     });
-    expect(normalizeDashboardView('not-a-view')).toBe('overview');
+    expect(normalizeDashboardView('not-a-view')).toBe('home');
     expect(isDashboardViewId('compression-lab')).toBe(true);
   });
 
   it('types shared parameters and removes invalid values', () => {
     expect(
       validateDashboardSearch({ view: 'call', return: 'insights', history: 'all', finding: '4' }),
-    ).toMatchObject({ view: 'call', return: 'overview', history: 'all', finding: 4 });
+    ).toMatchObject({ view: 'evidence', return: 'home', history: 'all', finding: 4 });
     const search = validateDashboardSearch({ view: 'threads', return: 'call', history: 'weekly', finding: '-2' });
-    expect(search).toEqual({ view: 'threads' });
+    expect(search).toEqual({ view: 'explore', mode: 'threads' });
     expect(isDashboardViewId(search.view)).toBe(true);
   });
 });
@@ -70,7 +70,8 @@ describe('dashboard router', () => {
     });
 
     expect(router.state.location.search).toMatchObject({
-      view: 'threads',
+      view: 'explore',
+      mode: 'threads',
       model: 'gpt-5',
       history: 'all',
       thread: 'thread-7',

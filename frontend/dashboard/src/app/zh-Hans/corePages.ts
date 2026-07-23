@@ -151,7 +151,6 @@ export const corePagesZhHansTranslations: Readonly<Record<string, string>> = {
   'One ranked call supports this pattern.': '有 1 次已排序调用支持此模式。',
   'all-history scope': '全部历史记录范围',
   'active-history scope': '活动记录范围',
-  'No loaded calls are available for the usage constellation.': '没有可用于用量星图的已加载调用。',
   'Unassigned thread': '未归属线程',
   'Other models': '其他模型',
   'Overview calls': '概览调用',
@@ -589,8 +588,6 @@ export const corePagesZhHansPatterns: ReadonlyArray<ZhHansPattern> = [
   { pattern: /^(.+) initiated$/iu, replace: '$1 发起' },
   { pattern: /^(.+) is the clearest current signal$/u, replace: '当前最明确的信号是：$1' },
   { pattern: /^([\d,.]+) representative calls from ([\d,.]+) loaded calls$/u, replace: '从 $2 次已加载调用中选取 $1 次代表性调用' },
-  { pattern: /^The constellation plots ([\d,.]+) loaded calls\. The largest plotted call used ([\d,.]+) tokens\. The lowest plotted cache reuse was ([\d,.]+) percent\.$/u, replace: '星图展示了 $1 次已加载调用。图中最大调用使用 $2 个token，最低缓存复用率为 $3%。' },
-  { pattern: /^The constellation plots ([\d,.]+) representative calls from ([\d,.]+) loaded calls\. The largest plotted call used ([\d,.]+) tokens\. The lowest plotted cache reuse was ([\d,.]+) percent\.$/u, replace: '星图从 $2 次已加载调用中展示 $1 次代表性调用。图中最大调用使用 $3 个token，最低缓存复用率为 $4%。' },
 
   // Calls, evidence, and context counts. Captured labels and identifiers are preserved verbatim.
   { pattern: /^Showing ([\d,.]+) of ([\d,.]+) aggregate rows$/u, replace: '显示 $1 / $2 条聚合记录' },

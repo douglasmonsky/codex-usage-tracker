@@ -30,6 +30,8 @@ type OverviewFindingView = {
 
 export type OverviewLoadedMetrics = {
   basis: 'scope' | 'loaded';
+  hasInputTokens: boolean;
+  hasPricingCoverage: boolean;
   calls: number;
   totalTokens: number;
   cachedInputTokens: number;
@@ -59,7 +61,7 @@ export function buildOverviewViewModel(
   endpoints: OverviewEndpointBundle | undefined,
   historyScope: 'active' | 'all',
 ): OverviewViewModel {
-  const metrics = scopeMetrics(model.scopeSummary) ?? loadedMetrics(model.calls);
+  const metrics = buildOverviewMetrics(model);
   const findings = endpointFindings(endpoints?.recommendations.data) ?? fallbackFindings(model);
   const topFinding = findings[0];
   return {
@@ -83,6 +85,10 @@ export function buildOverviewViewModel(
     pulseSpec: usagePulseSpec(model, endpoints?.summary, historyScope),
     tokenFlowSpec: tokenAccountingSpec(model.calls, metrics, historyScope),
   };
+}
+
+export function buildOverviewMetrics(model: DashboardModel): OverviewLoadedMetrics {
+  return scopeMetrics(model.scopeSummary, model.calls) ?? loadedMetrics(model.calls);
 }
 
 function endpointFindings(report: OverviewRecommendationsReport | null | undefined): OverviewFindingView[] | null {
@@ -161,16 +167,23 @@ function loadedMetrics(calls: CallRow[]): OverviewLoadedMetrics {
   const inputTokens = totals.cachedInputTokens + totals.uncachedInputTokens;
   return {
     basis: 'loaded',
+    hasInputTokens: inputTokens > 0,
+    hasPricingCoverage: calls.some(hasMappedPricing),
     calls: calls.length,
     ...totals,
     cachePercent: inputTokens > 0 ? (totals.cachedInputTokens / inputTokens) * 100 : 0,
   };
 }
 
-function scopeMetrics(summary: DashboardScopeSummary | undefined): OverviewLoadedMetrics | null {
+function scopeMetrics(
+  summary: DashboardScopeSummary | undefined,
+  calls: CallRow[],
+): OverviewLoadedMetrics | null {
   if (!summary) return null;
   return {
     basis: 'scope',
+    hasInputTokens: summary.inputTokens > 0,
+    hasPricingCoverage: summary.estimatedCostUsd > 0 || calls.some(hasMappedPricing),
     calls: summary.visibleCalls,
     totalTokens: summary.totalTokens,
     cachedInputTokens: summary.cachedInputTokens,
@@ -181,6 +194,12 @@ function scopeMetrics(summary: DashboardScopeSummary | undefined): OverviewLoade
     estimatedCostUsd: summary.estimatedCostUsd,
     estimatedCredits: summary.usageCredits,
   };
+}
+
+function hasMappedPricing(call: CallRow): boolean {
+  return call.standardCost !== null
+    || call.priorityCost !== null
+    || call.billingBasis !== 'unknown';
 }
 
 function usagePulseSpec(

@@ -6,7 +6,21 @@ MIGRATION_NAMES = {
     27: "add allowance intelligence storage",
     28: "repair allowance intelligence query indexes",
     29: "persist allowance subscription plan provenance",
+    32: "index all-history allowance observations",
 }
+
+
+def add_allowance_all_history_query_index(conn: sqlite3.Connection) -> None:
+    """Index the bounded newest-observation query when archives are included."""
+
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_allowance_observations_all_newest
+        ON allowance_observations(
+            event_timestamp DESC, cumulative_total_tokens DESC, window_key DESC
+        )
+        """
+    )
 
 
 def migrate_allowance_intelligence_v2(conn: sqlite3.Connection) -> None:

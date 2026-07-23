@@ -22,6 +22,24 @@ afterEach(() => {
 });
 
 describe('Limits live evidence flow', () => {
+  it('keeps static compatibility controls behind an Advanced disclosure', () => {
+    render(
+      <QueryClientProvider client={createDashboardQueryClient()}>
+        <LimitsPage
+          model={fixtureModel}
+          contextRuntime={{ apiToken: '', contextApiEnabled: false, fileMode: true }}
+          onOpenInvestigator={vi.fn()}
+          onCopyCallLink={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Limits' })).toBeInTheDocument();
+    const summary = screen.getByText('Advanced compatibility controls');
+    expect(summary.closest('details')).not.toHaveAttribute('open');
+    expect(screen.getByRole('button', { name: 'Test weekly claim', hidden: true })).toBeInTheDocument();
+  });
+
   it('uses revision-aware v2 allowance endpoints and keeps export as an explicit offline action', async () => {
     const openCall = vi.fn();
     const copyCall = vi.fn();
@@ -66,6 +84,9 @@ describe('Limits live evidence flow', () => {
       screen.queryByRole('progressbar', { name: 'Loading allowance intelligence' }),
     ).not.toBeInTheDocument());
     expect(screen.getByRole('group', { name: 'Current limit status' })).toBeInTheDocument();
+    expect(screen.getAllByText('Observed').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Unavailable').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('Descriptive estimate')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Weekly limit capacity over time' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How to read and trust this chart' })).toBeInTheDocument();
     expect(screen.getByText(/Locally priced credits ÷ visible percentage-point movement/)).toBeInTheDocument();
@@ -88,6 +109,11 @@ describe('Limits live evidence flow', () => {
     expect(screen.queryByText('Personal model')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /analysis|revision/i })).not.toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Latest-first allowance intelligence evidence' })).toBeInTheDocument();
+    const evidenceLink = screen.getByRole('link', { name: 'Open allowance Evidence for newer' });
+    expect(evidenceLink).toHaveAttribute(
+      'href',
+      expect.stringMatching(/view=evidence.*kind=allowance.*analysis=snapshot-1.*evidence=newer/),
+    );
     expect(screen.getByText('Overview')).toHaveAttribute('data-localization-skip', 'true');
 
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/allowance/history'))).toBe(false);
@@ -112,6 +138,9 @@ describe('Limits live evidence flow', () => {
     const rangeResult = await screen.findByRole('status', { name: 'History range result' });
     expect(rangeResult).toHaveTextContent('6m selected');
     expect(rangeResult).toHaveTextContent('No older capacity history is available');
+    const advancedSummary = screen.getByText('Advanced history controls');
+    expect(advancedSummary.closest('details')).not.toHaveAttribute('open');
+    fireEvent.click(advancedSummary);
     fireEvent.change(screen.getByRole('combobox', { name: 'Granularity' }), { target: { value: 'week' } });
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => (
       String(input).includes('granularity=week')
@@ -216,7 +245,7 @@ describe('Limits live evidence flow', () => {
       const path = String(input);
       if (path.startsWith('/api/allowance/status')) return jsonResponse(statusPayload());
       if (path.startsWith('/api/allowance/series')) return jsonResponse(seriesPayload());
-      if (path.startsWith('/api/allowance/evidence')) return jsonResponse(evidencePayload());
+      if (path.startsWith('/api/allowance/evidence')) return jsonResponse(changeEvidencePayload());
       if (path.startsWith('/api/allowance/analysis')) return jsonResponse(multipleChangesPayload());
       return jsonResponse({ error: 'unknown path' }, 404);
     });
@@ -237,6 +266,11 @@ describe('Limits live evidence flow', () => {
     expect(changes).toHaveLength(2);
     expect(changes[0]).toHaveTextContent('Jul 1');
     expect(changes[1]).toHaveTextContent('Jun 1');
+    expect(screen.getAllByText('Supported change')).toHaveLength(2);
+    const links = screen.getAllByRole('link', { name: /Open supporting Evidence for/ });
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute('href', expect.stringContaining('evidence=newer-transition'));
+    expect(links[1]).toHaveAttribute('href', expect.stringContaining('evidence=older-transition'));
     expect(screen.queryByText('Adjusted p-value')).not.toBeInTheDocument();
   });
 });
@@ -335,6 +369,22 @@ function evidencePayload() {
     copied_rows_excluded: 2,
     provenance: 'local',
     offline_export_action: 'build_allowance_export_report',
+  };
+}
+
+function changeEvidencePayload() {
+  return {
+    ...evidencePayload(),
+    rows: [
+      {
+        interval_id: 'older-transition', cycle_id: 'older-after', window_kind: 'weekly', cohort_key: 'codex',
+        end_observed_at: '2026-06-01T00:00:00Z', end_used_percent: 35, point_kind: 'positive', censor_reason: null,
+      },
+      {
+        interval_id: 'newer-transition', cycle_id: 'newer-after', window_kind: 'weekly', cohort_key: 'codex',
+        end_observed_at: '2026-07-01T00:00:00Z', end_used_percent: 42, point_kind: 'positive', censor_reason: null,
+      },
+    ],
   };
 }
 

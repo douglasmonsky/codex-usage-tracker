@@ -8,15 +8,11 @@ import AxeBuilder from '@axe-core/playwright';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 const workspaces = [
-  ['Overview', '/?view=overview&qa=r11-accessibility'],
-  ['Investigate', '/?view=investigator&qa=r11-accessibility'],
-  ['Calls', '/?view=calls&qa=r11-accessibility'],
-  ['Call Investigator', '/?view=call&record=fixture-call-2&qa=r11-accessibility'],
-  ['Threads', '/?view=threads&thread=thread-9f3a1c&qa=r11-accessibility'],
-  ['Limits', '/?view=usage-drain&qa=r11-accessibility'],
-  ['Cache And Context Lab', '/?view=cache-context&qa=r11-accessibility'],
-  ['Diagnostics Notebook', '/?view=diagnostics&qa=r11-accessibility'],
-  ['Reports', '/?view=reports&qa=r11-accessibility'],
+  ['Overview', '/?view=home&qa=r11-accessibility'],
+  ['Calls', '/?view=explore&mode=calls&qa=r11-accessibility'],
+  ['Threads', '/?view=explore&mode=threads&thread=thread-9f3a1c&qa=r11-accessibility'],
+  ['Call Investigator', '/?view=evidence&kind=call&record=fixture-call-2&qa=r11-accessibility'],
+  ['Limits', '/?view=limits&qa=r11-accessibility'],
   ['Settings', '/?view=settings&qa=r11-accessibility'],
 ];
 
@@ -26,11 +22,11 @@ const viewports = [
   ['mobile', { width: 390, height: 844 }],
 ];
 
-test.describe('R11 dashboard release candidate', () => {
+test.describe('0.23 Evidence Console release candidate', () => {
   test('defines and gates the release-candidate command in one Chromium CI job', async () => {
     const packageJson = JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8'));
     expect(packageJson.scripts['dashboard:release-candidate']).toBe(
-      'REACT_DASHBOARD_WEB_SERVER=1 DASHBOARD_BASE_URL=http://127.0.0.1:5173 playwright test tests/playwright/dashboard-release-candidate.spec.mjs --project=chromium-desktop',
+      'REACT_DASHBOARD_WEB_SERVER=1 playwright test tests/playwright/dashboard-release-candidate.spec.mjs --project=chromium-desktop',
     );
 
     const workflow = await readFile(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8');
@@ -82,7 +78,7 @@ test.describe('R11 dashboard release candidate', () => {
   test('keeps the dense toolbar and Threads controls compact without wrapping commands', async ({ page }) => {
     for (const viewport of [{ width: 2048, height: 900 }, { width: 1280, height: 720 }]) {
       await page.setViewportSize(viewport);
-      await openWorkspace(page, 'Threads', '/?view=threads&thread=thread-9f3a1c&qa=r11-toolbar-density');
+      await openWorkspace(page, 'Threads', '/?view=explore&mode=threads&thread=thread-9f3a1c&qa=r11-toolbar-density');
 
       const geometry = await page.evaluate(() => {
         const box = element => {
@@ -189,7 +185,7 @@ test.describe('R11 dashboard release candidate', () => {
     for (const [workspaceName, path] of workspaces) {
       browserIssues.length = 0;
       await openWorkspace(page, workspaceName, path);
-      const visualizations = page.locator('[data-visualization-id]');
+      const visualizations = page.locator('[data-visualization-id]:visible');
 
       for (let index = 0; index < await visualizations.count(); index += 1) {
         const visualization = visualizations.nth(index);
@@ -217,43 +213,44 @@ test.describe('R11 dashboard release candidate', () => {
     }
   });
 
-  test('preserves baseline navigation and the browser-local experimental preference', async ({ page }) => {
-    await openWorkspace(page, 'Overview', '/?view=overview&qa=release-n-preference');
+  test('keeps simplified navigation stable while preserving the browser-local preference', async ({ page }) => {
+    await openWorkspace(page, 'Overview', '/?view=home&qa=release-n-preference');
     const primary = page.getByRole('navigation', { name: 'Primary' });
-    for (const label of [
-      'Overview', 'Investigate', 'Compression Lab', 'Calls', 'Threads',
-      'Limits', 'Cache And Context', 'Diagnostics Notebook', 'Reports', 'Settings',
-    ]) {
+    for (const label of ['Home', 'Explore', 'Limits']) {
       await expect(primary.getByRole('button', { name: label, exact: true }), `${label} baseline navigation`).toBeVisible();
     }
+    await expect(page.getByRole('group', { name: 'Utility' }).getByRole('button', { name: 'Settings' })).toBeVisible();
 
     await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference');
     await page.getByRole('button', { name: 'Advanced', exact: true }).click();
-    const toggle = page.getByRole('checkbox', { name: 'Show experimental dashboard features' });
+    const toggle = page.getByRole('checkbox', { name: 'Show compatibility and Labs links' });
     await toggle.check();
-    expect(await page.evaluate(() => localStorage.getItem('codex-usage-dashboard-show-experimental-v1'))).toBe('true');
+    expect(await page.evaluate(() => localStorage.getItem('codex-usage-dashboard-show-compatibility-labs-v1'))).toBe('true');
+    await expect(page.getByRole('heading', { name: 'Compatibility Labs' })).toBeVisible();
     await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference-reload');
     await page.getByRole('button', { name: 'Advanced', exact: true }).click();
-    await expect(page.getByRole('checkbox', { name: 'Show experimental dashboard features' })).toBeChecked();
-    await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();
-    await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Show compatibility and Labs links' })).toBeChecked();
+    await expect(page.getByRole('heading', { name: 'Compatibility Labs' })).toBeVisible();
+    await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toHaveCount(0);
+    await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toHaveCount(0);
 
-    await page.getByRole('checkbox', { name: 'Show experimental dashboard features' }).uncheck();
+    await page.getByRole('checkbox', { name: 'Show compatibility and Labs links' }).uncheck();
     await openWorkspace(page, 'Settings', '/?view=settings&settings=advanced&qa=release-n-preference-reset');
     await page.getByRole('button', { name: 'Advanced', exact: true }).click();
-    await expect(page.getByRole('checkbox', { name: 'Show experimental dashboard features' })).not.toBeChecked();
-    await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toBeVisible();
-    await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Show compatibility and Labs links' })).not.toBeChecked();
+    await expect(page.getByRole('heading', { name: 'Compatibility Labs' })).toHaveCount(0);
+    await expect(primary.getByRole('button', { name: 'Investigate', exact: true })).toHaveCount(0);
+    await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toHaveCount(0);
   });
 
   test('keeps direct lifecycle routes reachable with their maturity banners', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('codex-usage-dashboard-show-experimental-v1', 'false'));
+    await page.addInitScript(() => localStorage.setItem('codex-usage-dashboard-show-compatibility-labs-v1', 'false'));
     const routes = [
-      ['Investigate', '/?view=investigator&qa=release-n-direct', 'Feature maturity: Highly experimental'],
-      ['Compression Lab', '/?view=compression-lab&qa=release-n-direct', 'Feature maturity: Highly experimental'],
+      ['Investigate', '/?view=investigator&qa=release-n-direct', 'Feature maturity: Available during transition'],
+      ['Compression Lab', '/?view=compression-lab&qa=release-n-direct', 'Feature maturity: Available during transition'],
       ['Cache And Context Lab', '/?view=cache-context&qa=release-n-direct', 'Feature maturity: Available during transition'],
       ['Reports', '/?view=reports&qa=release-n-direct', 'Feature maturity: Available during transition'],
-      ['Diagnostics Notebook', '/?view=diagnostics&qa=release-n-direct', 'Feature maturity: Highly experimental'],
+      ['Diagnostics Notebook', '/?view=diagnostics&qa=release-n-direct', 'Feature maturity: Available during transition'],
     ];
     for (const [workspace, route, banner] of routes) {
       await openWorkspace(page, workspace, route);
@@ -261,29 +258,111 @@ test.describe('R11 dashboard release candidate', () => {
     }
     await expect(
       page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Diagnostics Notebook', exact: true }),
-    ).toBeVisible();
+    ).toHaveCount(0);
+  });
+
+  test('normalizes every old stable URL to its canonical 0.23 route', async ({ page }) => {
+    const routes = [
+      ['Overview', '/?view=overview&qa=release-023-alias', /view=home/],
+      ['Calls', '/?view=calls&qa=release-023-alias', /view=explore.*mode=calls|mode=calls.*view=explore/],
+      ['Threads', '/?view=threads&qa=release-023-alias', /view=explore.*mode=threads|mode=threads.*view=explore/],
+      [
+        'Call Investigator',
+        '/?view=call&record=fixture-call-2&qa=release-023-alias',
+        /view=evidence.*kind=call|kind=call.*view=evidence/,
+      ],
+    ];
+
+    for (const [heading, route, canonical] of routes) {
+      await openWorkspace(page, heading, route);
+      await expect(page).toHaveURL(canonical);
+    }
+  });
+
+  test('renders every contextual Evidence selector kind', async ({ page }) => {
+    await page.route('**/api/v2/evidence', async route => {
+      const request = route.request().postDataJSON();
+      const kind = request.selector_kind;
+      const selector = {
+        kind,
+        id: request.selector_id,
+        section: request.section ?? 'summary',
+        ...(request.analysis_id ? { analysis_id: request.analysis_id } : {}),
+      };
+      const record = {
+        schema: 'codex-usage-tracker.evidence.v1',
+        evidence_id: `${kind}-record`,
+        kind: kind === 'allowance' ? 'allowance_cycle' : kind,
+        label: `${kind} release evidence`,
+        selectors: {},
+        metrics: kind === 'allowance' ? { percent_delta: 8, credits_delta: 1200, quality_grade: 'A' } : {},
+        source_schema: 'release-candidate.synthetic.v1',
+        dashboard_target: null,
+      };
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          schema: 'codex-usage-tracker.evidence-result.v1',
+          selector,
+          records: [record],
+          next_cursor: null,
+          dashboard_target: {},
+          subject: kind === 'finding' ? {
+            finding_id: request.selector_id,
+            title: 'Synthetic release finding',
+            statement: 'Synthetic evidence verifies this release route.',
+            claim_type: 'observed-pattern',
+            confidence: 'high',
+            severity: 'medium',
+            caveat_codes: [],
+            analysis_id: request.analysis_id,
+          } : null,
+        }),
+      });
+    });
+
+    const routes = [
+      ['Call Investigator', '/?view=evidence&kind=call&record=fixture-call-2'],
+      ['Thread evidence', '/?view=evidence&kind=thread&thread_key=thread%3Aalpha'],
+      ['Synthetic release finding', '/?view=evidence&kind=finding&analysis=analysis-7&finding=finding-3'],
+      ['Allowance evidence', '/?view=evidence&kind=allowance&analysis=allowance-7&evidence=interval-3'],
+    ];
+    for (const [heading, route] of routes) await openWorkspace(page, heading, route);
+  });
+
+  test('loads Home without starting hidden heavy analysis', async ({ page }) => {
+    const heavyRequests = [];
+    page.on('request', request => {
+      if (/\/api\/v2\/analyze|compression|diagnostics\/run|usage-drain/.test(request.url())) {
+        heavyRequests.push(request.url());
+      }
+    });
+
+    await openWorkspace(page, 'Overview', '/?view=home&qa=release-023-no-heavy-scan');
+    expect(heavyRequests).toEqual([]);
   });
 
   test('preserves the Call Investigator return route and thread context', async ({ page }) => {
     await openWorkspace(
       page,
       'Call Investigator',
-      '/?view=call&record=fixture-call-2&return=threads&thread=thread-9f3a1c&qa=release-n-return',
+      '/?view=evidence&kind=call&record=fixture-call-2&return=explore&return_mode=threads&thread=thread-9f3a1c&qa=release-n-return',
     );
-    await page.getByRole('button', { name: 'Back to Threads' }).click();
+    await page.getByRole('button', { name: 'Back to Explore' }).click();
     await expect(page.getByRole('heading', { name: 'Threads', exact: true })).toBeVisible();
-    await expect(page).toHaveURL(/view=threads/);
-    await expect(page).not.toHaveURL(/record=|return=/);
+    await expect(page).toHaveURL(/view=explore/);
+    await expect(page).toHaveURL(/mode=threads/);
+    await expect(page).not.toHaveURL(/record=|return=|kind=call/);
   });
 
-  test('renders every readiness state with recovery guidance and manual fallbacks', async ({ browser }, testInfo) => {
-    const states = [
-      ['ready', 'Ready', /current task loaded MCP tools/i],
-      ['restart-required', 'Restart required', /Restart Codex and open a fresh task/i],
-      ['unavailable', 'Unavailable', /setup|doctor/i],
-      ['unknown', 'Unknown', /could not be determined/i],
+test('maps conversational readiness into the Home prompt library', async ({ browser }, testInfo) => {
+  const states = [
+    ['ready', 'MCP ready'],
+    ['restart-required', 'Setup may be required'],
+    ['unavailable', 'Setup may be required'],
+    ['unknown', 'Setup may be required'],
     ];
-    for (const [state, label, guidance] of states) {
+    for (const [state, label] of states) {
       const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL });
       const statePage = await context.newPage();
       const browserIssues = collectBrowserIssues(statePage);
@@ -303,14 +382,10 @@ test.describe('R11 dashboard release candidate', () => {
         next_action: null,
         evidence: [],
       });
-      await openWorkspace(statePage, 'Overview', '/?view=overview&qa=release-n-readiness');
-      const readiness = statePage.getByRole('heading', { name: 'Analysis readiness' }).locator('xpath=ancestor::section');
-      await expect(readiness.getByText(label, { exact: true })).toBeVisible();
-      await expect(readiness.getByText(guidance)).toBeVisible();
-      await expect(readiness.getByText('Manual fallback', { exact: true })).toBeVisible();
-      for (const fallback of ['Calls', 'Threads', 'Limits', 'Diagnostics', 'Advanced experimental controls']) {
-        await expect(readiness.getByText(fallback, { exact: true })).toBeVisible();
-      }
+      await openWorkspace(statePage, 'Overview', '/?view=home&qa=release-n-readiness');
+    const promptLibrary = statePage.getByRole('region', { name: 'Codex prompt library' });
+    await expect(promptLibrary.getByText(label, { exact: true }).first()).toBeVisible();
+    await expect(promptLibrary.getByText('How to enable the MCP or plugin')).toBeVisible();
       expect(browserIssues, `${state} readiness console/page errors`).toEqual([]);
       await context.close();
     }
@@ -345,14 +420,14 @@ test.describe('R11 dashboard release candidate', () => {
     await page.getByRole('button', { name: 'Application', exact: true }).click();
     await page.getByLabel('Language').selectOption('es');
     await page.getByRole('button', { name: /Advanced|Avanzado/, exact: true }).click();
-    await expect(page.getByRole('checkbox', { name: 'Mostrar funciones experimentales del panel' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Mostrar enlaces de compatibilidad y laboratorios' })).toBeVisible();
     await expect(page.getByText(
-      'Esta preferencia se guarda para este origen del navegador. Los espacios de trabajo experimentales siguen disponibles mediante enlaces directos y Diagnóstico permanece visible.',
+      'Esta preferencia local del navegador muestra enlaces directos temporales. Los laboratorios nunca aparecen en la navegación principal.',
     )).toBeVisible();
 
     await page.goto('/?view=diagnostics&qa=release-n-locale');
-    await expect(page.getByRole('note', { name: 'Madurez de la función: Altamente experimental' })).toBeVisible();
-    await expect(page.getByText('Altamente experimental', { exact: true })).toBeVisible();
+    await expect(page.getByRole('note', { name: 'Madurez de la función: Disponible durante la transición' })).toBeVisible();
+    await expect(page.getByText('Disponible durante la transición', { exact: true })).toBeVisible();
     await expect(page.getByText('Highly experimental', { exact: true })).toHaveCount(0);
   });
 });

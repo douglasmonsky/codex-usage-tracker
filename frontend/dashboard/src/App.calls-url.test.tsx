@@ -1,4 +1,4 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, vi, waitFor, within } from './test-utils/appTestHarness';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, navigateApp, render, screen, vi, waitFor, within } from './test-utils/appTestHarness';
 
 describe('React dashboard calls links presets and URL state', () => {
   installAppTestHooks();
@@ -179,13 +179,13 @@ expect(screen.getByRole('button', { name: /Convocatoria anterior/i })).toBeInThe
     expect(screen.getByText('Sin límite de caracteres')).toBeInTheDocument();
   });
 
-it('opens Investigate and detailed overview calls without homepage presets', () => {
+it('opens Investigate and detailed Explore calls without homepage presets', () => {
   render(<App />);
   expect(screen.queryByText('Investigation Presets')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Investigate' }));
+  navigateApp('/?view=investigator');
   expect(screen.getByRole('heading', { name: 'Investigate' })).toBeInTheDocument();
   expect(window.location.search).toContain('view=investigator');
-  fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }));
+  navigateApp('/?view=explore&mode=calls');
   fireEvent.click(screen.getByRole('button', { name: 'Open investigator for thread-1a2b3c codex-1' }));
   expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
   expect(screen.getByText('thread-1a2b3c / codex-1')).toBeInTheDocument();
@@ -196,14 +196,15 @@ it('clears active investigation presets without leaving the current view', () =>
   window.history.replaceState(null, '', '/?view=calls&preset=context-bloat');
   render(<App />);
   expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
-  expect(window.location.search).toContain('view=calls');
+  expect(window.location.search).toContain('view=explore');
+  expect(window.location.search).toContain('mode=calls');
   expect(window.location.search).toContain('preset=context-bloat');
   expect(screen.getByRole('button', { name: /Clear Context Bloat/i })).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: /Clear Context Bloat/i }));
 
   expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
-  expect(window.location.search).toContain('view=calls');
+  expect(window.location.search).toContain('view=explore');
   expect(window.location.search).not.toContain('preset=');
   expect(screen.queryByRole('button', { name: /Clear Context Bloat/i })).not.toBeInTheDocument();
   expect(screen.getAllByText('Investigation preset cleared').length).toBeGreaterThan(0);
@@ -247,14 +248,14 @@ it('hydrates active preset clear label dashboard i18n payload', () => {
   const clearButton = screen.getByRole('button', { name: /Borrar Context Bloat/i });
   fireEvent.click(clearButton);
 
-  expect(window.location.search).toContain('view=calls');
+  expect(window.location.search).toContain('view=explore');
   expect(window.location.search).not.toContain('preset=');
   expect(screen.queryByRole('button', { name: /Borrar Context Bloat/i })).not.toBeInTheDocument();
 });
 
 it('filters calls by pricing and credit confidence', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  navigateApp('/?view=explore&mode=calls');
 
   fireEvent.change(screen.getByLabelText('Confidence filter'), { target: { value: 'cost-estimated' } });
 
@@ -265,7 +266,7 @@ it('filters calls by pricing and credit confidence', () => {
 
 it('hydrates legacy pricing confidence URL alias', async () => { window.history.replaceState(null, '', '/?view=calls&pricing=estimated'); render(<App />); expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument(); expect(screen.getByLabelText('Confidence filter')).toHaveValue('cost-estimated'); expect(screen.getByText('thread-7b2e91')).toBeInTheDocument(); expect(screen.getByText('thread-2f9e7d')).toBeInTheDocument(); expect(screen.queryByText('thread-9f3a1c')).not.toBeInTheDocument(); await waitFor(() => { const params = new URLSearchParams(window.location.search); expect(params.get('confidence')).toBe('cost-estimated'); expect(params.get('pricing')).toBeNull(); }); }); it('filters calls by legacy unpriced cost and credit override confidence', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  navigateApp('/?view=explore&mode=calls');
 
   fireEvent.change(screen.getByLabelText('Confidence filter'), { target: { value: 'cost-unpriced' } });
   expect(screen.getByText('thread-8d7c6b')).toBeInTheDocument();
@@ -284,7 +285,7 @@ window.__CODEX_USAGE_BOOT__ = { rows: [
 { record_id: 'old-time-row', call_started_at: '2026-06-15T10:00:00Z', thread_name: 'old-time-thread', model: 'o4-mini', effort: 'medium', input_tokens: 100, cached_input_tokens: 40, output_tokens: 10, total_tokens: 110, estimated_cost_usd: 0.01 },
 ] };
 render(<App />);
-fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+navigateApp('/?view=explore&mode=calls');
 fireEvent.change(screen.getByLabelText('Time filter'), { target: { value: 'last-7-days' } });
 expect(screen.getByText('recent-time-thread')).toBeInTheDocument();
 expect(screen.queryByText('old-time-thread')).not.toBeInTheDocument();
@@ -313,7 +314,8 @@ it('hydrates and copies shareable calls filter links', async () => {
 
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
   const copiedUrl = new URL(writeText.mock.calls[0][0]);
-  expect(copiedUrl.searchParams.get('view')).toBe('calls');
+  expect(copiedUrl.searchParams.get('view')).toBe('explore');
+  expect(copiedUrl.searchParams.get('mode')).toBe('calls');
   expect(copiedUrl.searchParams.get('record')).toBeNull();
   expect(copiedUrl.searchParams.get('call_q')).toBe('thread-2f9e7d');
   expect(copiedUrl.searchParams.get('model')).toBe('o4-mini');
@@ -371,7 +373,8 @@ it('hydrates and copies legacy custom calls date ranges', async () => {
 
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
   const copiedUrl = new URL(writeText.mock.calls[0][0]);
-  expect(copiedUrl.searchParams.get('view')).toBe('calls');
+  expect(copiedUrl.searchParams.get('view')).toBe('explore');
+  expect(copiedUrl.searchParams.get('mode')).toBe('calls');
   expect(copiedUrl.searchParams.get('date')).toBe('custom');
   expect(copiedUrl.searchParams.get('from')).toBe('2026-07-01');
   expect(copiedUrl.searchParams.get('to')).toBe('2026-07-01');
@@ -396,7 +399,8 @@ it('hydrates and copies legacy calls sort state', async () => {
 
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
   const copiedUrl = new URL(writeText.mock.calls[0][0]);
-  expect(copiedUrl.searchParams.get('view')).toBe('calls');
+  expect(copiedUrl.searchParams.get('view')).toBe('explore');
+  expect(copiedUrl.searchParams.get('mode')).toBe('calls');
   expect(copiedUrl.searchParams.get('sort')).toBe('cache');
   expect(copiedUrl.searchParams.get('direction')).toBe('desc');
 });

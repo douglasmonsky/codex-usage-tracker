@@ -2,11 +2,34 @@
 
 Codex Usage Tracker is a local sidecar app. It reads Codex session JSONL logs, stores tracker-owned indexes in SQLite, and exposes usage data through CLI commands, MCP tools, CSV export, generated dashboards, and the localhost React dashboard.
 
+## MCP-First Product Layers
+
+MCP is the primary analysis interface. The conversational agent selects bounded
+tools and explains results, while deterministic application services remain the
+source of accounting, classification, ranking, pricing, allowance, and evidence
+selection.
+
+The Evidence Console is the supporting verification interface. It displays
+exact supporting records and time-series evidence and manages local setup; it
+does not independently invent analytical conclusions. The CLI remains the
+interface for setup, automation, scripting, recovery, export, and compatibility.
+
+The [MCP-first roadmap](roadmap/mcp-first-pivot.md) freezes unplanned surface
+growth during the pivot. New dashboard workspaces, top-level MCP concepts,
+top-level CLI commands, runtime dependencies, and SQLite tables require an
+approved roadmap task or design amendment.
+
 The current storage model has three layers:
 
 - Aggregate usage index: token counters, model/effort metadata, call origins, diagnostic labels, thread summaries, pricing/credit estimates, allowance snapshots, and safe report payloads.
 - Canonical/materialized intelligence: physical usage provenance plus logical usage fingerprints and canonical pointers, reset-aware allowance observations/cycles/intervals, source revisions, and persisted analysis snapshots/jobs. Default totals read canonical rows; physical rows remain available for bounded local diagnostics.
 - Local content index: normalized conversation turns, bounded content fragments, tool calls, command runs, file events, persisted investigation run summaries, and source provenance for explicit local MCP/API investigation.
+
+Analysis ownership follows the MCP-first product layers: `analytics/` owns
+calculation contracts and strategy selection, `application/` owns orchestration,
+and `interfaces/` owns transport. Existing `reports/` builders remain private
+compatibility delegates until their algorithms move behind analytics contracts;
+they do not own canonical strategy selection.
 
 The aggregate index preserves every parsed row in `usage_events` for source provenance. A versioned strict fingerprint links exact copies of the same logged model call, and the `canonical_usage_events` view selects one physical representative for default totals. Only high-confidence fingerprint matches are excluded; ambiguous or merely similar calls remain canonical. If the original source disappears, the surviving physical copy is promoted without changing the logical call identity.
 
@@ -42,6 +65,7 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
   revision-keyed persisted results.
 - `reports.py` is the application-service layer for summaries, expensive-call reports, recommendations, pricing coverage, source coverage, allowance reports, and filtered query payloads. CLI and MCP wrappers should call this layer instead of duplicating report assembly.
 - `api_payloads.py` owns stable JSON payload helpers shared by CLI and MCP. `json_contracts.py` owns lightweight contract checks for schema-versioned CLI/MCP payloads and localhost live API payloads.
+- `interfaces/http/v2.py` is the stable localhost HTTP adapter. It decodes bounded strict requests and serializes shared application contracts; it calls `application/` services directly and never routes through MCP handlers. `server/handler.py` retains Host, Origin, and local-token enforcement at the transport boundary, while `server/route_inventory.py` records exposure, execution, history, cache, and byte budgets.
 - `costing.py`, `pricing_config.py`, `pricing_openai.py`, `pricing_estimates.py`, and `allowance.py` own cost, credit, rate-card, and allowance annotation. Keep estimate confidence and source metadata attached to rows.
 - `projects.py`, `threads.py`, and `recommendations.py` annotate aggregate rows with project identity, thread relationships, and actionable signals. Project privacy redaction belongs in `projects.py` so CLI, MCP, dashboard, CSV, and support-bundle surfaces share behavior.
 - `context.py` is the normal path for explicit selected-call raw context. It reads one selected source file on demand, applies redaction and size limits, omits tool output by default, and keeps full serialized group analysis explicit.
@@ -64,6 +88,7 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
 9. Diagnostic snapshot refresh must remain explicit on demand. Normal usage refresh paths may load stored snapshots, but must not rescan source logs for diagnostic sections unless the user calls diagnostics `--refresh` or a `/api/diagnostics/<section>/refresh` endpoint.
 10. Register each new dashboard query in `dashboardQueryContracts.json` with one stable identity, endpoint, data class, and response schema. Query keys must include source, source revision, scope, and every payload-changing option.
 11. Register each dashboard route in `server.route_inventory`. Interactive routes must be bounded and index-backed; unavoidable all-history detector work uses the shared asynchronous job lifecycle.
+    New stable Evidence Console requests use `/api/v2/`; compatibility routes remain available only for their documented migration window.
 12. Cache only immutable aggregate responses. Server keys include source generation and semantic/configuration inputs; browser persistence rejects raw or indexed content.
 13. Add or change a route budget only from repeatable synthetic evidence. Database indexes require an additive migration, query-plan or timing evidence, and focused migration coverage.
 14. Preserve physical usage rows for provenance, but route default dashboard,

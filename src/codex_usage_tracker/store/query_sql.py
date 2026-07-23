@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from string import Template
 from typing import Any
 
@@ -50,6 +50,10 @@ API_USAGE_SORTS = {
             -1
         )
     """,
+    "attention": "recommendation_facts.recommendation_score",
+    "cost": "coalesce(recommendation_facts.estimated_cost_usd, 0)",
+    "credits": "coalesce(recommendation_facts.usage_credits, 0)",
+    "context": "recommendation_facts.context_window_percent",
 }
 
 
@@ -103,10 +107,13 @@ def _usage_where_clause(
     until: str | None = None,
     model: str | None = None,
     effort: str | None = None,
+    source: str | None = None,
+    cwds: Sequence[str] | None = None,
     thread: str | None = None,
     min_tokens: int | None = None,
     table_alias: str | None = None,
     include_archived: bool = True,
+    legacy_archive_path_fallback: bool = True,
 ) -> tuple[str, list[Any]]:
     prefix = f"{table_alias}." if table_alias else ""
     clauses: list[str] = []
@@ -120,9 +127,17 @@ def _usage_where_clause(
         model=model,
         effort=effort,
     )
+    _extend_source_filter(clauses, prefix=prefix, source=source)
+    _extend_cwd_filter(clauses, params, prefix=prefix, cwds=cwds)
     _extend_thread_filter(clauses, params, prefix=prefix, thread=thread)
     _extend_min_tokens_filter(clauses, params, prefix=prefix, min_tokens=min_tokens)
-    _extend_archive_filter(clauses, params, prefix=prefix, include_archived=include_archived)
+    _extend_archive_filter(
+        clauses,
+        params,
+        prefix=prefix,
+        include_archived=include_archived,
+        legacy_path_fallback=legacy_archive_path_fallback,
+    )
     return _where_clause(clauses, params)
 
 
@@ -142,9 +157,60 @@ def _extend_basic_usage_filters(
         (model, f"{prefix}model = ?"),
         (effort, f"{prefix}effort = ?"),
     ):
-        if value:
+        if value is not None:
             clauses.append(clause)
             params.append(value)
+
+
+def _extend_source_filter(
+    clauses: list[str],
+    *,
+    prefix: str,
+    source: str | None,
+) -> None:
+    if source is None:
+        return
+    project = f"nullif({prefix}cwd, '') IS NOT NULL"
+    session = (
+        f"(nullif({prefix}session_id, '') IS NOT NULL "
+        f"OR nullif({prefix}turn_id, '') IS NOT NULL "
+        f"OR nullif({prefix}parent_session_id, '') IS NOT NULL)"
+    )
+    source_file = (
+        f"(nullif({prefix}source_file, '') IS NOT NULL OR {prefix}line_number IS NOT NULL)"
+    )
+    predicates = {
+        "project": project,
+        "session": session,
+        "source-file": source_file,
+        "missing": f"NOT ({project} OR {session} OR {source_file})",
+    }
+    try:
+        clauses.append(predicates[source])
+    except KeyError as exc:
+        raise ValueError(
+            "source must be one of: project, session, git, source-file, missing"
+        ) from exc
+
+
+def _extend_cwd_filter(
+    clauses: list[str],
+    params: list[Any],
+    *,
+    prefix: str,
+    cwds: Sequence[str] | None,
+) -> None:
+    if cwds is None:
+        return
+    if not cwds:
+        clauses.append("0")
+        return
+    groups: list[str] = []
+    for start in range(0, len(cwds), 500):
+        chunk = cwds[start : start + 500]
+        groups.append(f"{prefix}cwd IN ({', '.join('?' for _ in chunk)})")
+        params.extend(chunk)
+    clauses.append(f"({' OR '.join(groups)})")
 
 
 def _extend_thread_filter(
@@ -157,9 +223,10 @@ def _extend_thread_filter(
     if not thread:
         return
     clauses.append(
-        f"({prefix}thread_name = ? OR {prefix}parent_thread_name = ? OR {prefix}session_id = ?)"
+        f"({prefix}thread_key = ? OR {prefix}thread_name = ? OR {prefix}parent_thread_name = ? "
+        f"OR {prefix}session_id = ? OR 'session:' || {prefix}session_id = ?)"
     )
-    params.extend([thread, thread, thread])
+    params.extend([thread, thread, thread, thread, thread])
 
 
 def _extend_min_tokens_filter(
@@ -181,8 +248,12 @@ def _extend_archive_filter(
     *,
     prefix: str,
     include_archived: bool,
+    legacy_path_fallback: bool,
 ) -> None:
     if include_archived:
+        return
+    if not legacy_path_fallback:
+        clauses.append(f"{prefix}is_archived = 0")
         return
     archived_path_clause = " OR ".join(
         f"{prefix}source_file LIKE ?" for _pattern in _ARCHIVED_SOURCE_PATTERNS
@@ -204,12 +275,15 @@ def _usage_api_where_clause(
     until: str | None = None,
     model: str | None = None,
     effort: str | None = None,
+    source: str | None = None,
+    cwds: Sequence[str] | None = None,
     thread: str | None = None,
     thread_key: str | None = None,
     min_tokens: int | None = None,
     include_archived: bool = True,
     table_alias: str | None = None,
     thread_key_mode: str = "all",
+    legacy_archive_path_fallback: bool = True,
 ) -> tuple[str, list[Any]]:
     prefix = f"{table_alias}." if table_alias else ""
     base_where, params = _usage_where_clause(
@@ -217,10 +291,13 @@ def _usage_api_where_clause(
         until=until,
         model=model,
         effort=effort,
+        source=source,
+        cwds=cwds,
         thread=thread,
         min_tokens=min_tokens,
         include_archived=include_archived,
         table_alias=table_alias,
+        legacy_archive_path_fallback=legacy_archive_path_fallback,
     )
     clauses = [base_where.removeprefix("WHERE ")] if base_where else []
     if search:

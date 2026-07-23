@@ -191,7 +191,7 @@ export function modelFromBootPayload(payload: DashboardBootPayload | null): Dash
     ? sumRows(rows, row => Number(row.reasoning_output_tokens ?? 0))
     : summaryNumber(payload, 'reasoning_output_tokens');
   const cachePct = inputTokens > 0 ? (cachedTokens / inputTokens) * 100 : 0;
-  const totalCalls = calls.length || Math.max(0, Number(payload.loaded_row_count ?? 0));
+  const totalCalls = calls.length || Math.max(0, Number(payload.loaded_row_count ?? 0), Number(payload.total_available_rows ?? 0), summaryNumber(payload, 'visible_calls'));
 const overviewSeries = buildOverviewSeries(rows);
 const usageDrainSeries = buildUsageDrainSeries(rows);
 const cards = buildCards({

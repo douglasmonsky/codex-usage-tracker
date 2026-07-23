@@ -1,0 +1,142 @@
+.page {
+  display: grid;
+  gap: 1rem;
+}
+
+.toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.content,
+.unavailable {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #d8dee8);
+  border-radius: 16px;
+  display: grid;
+  gap: 1.25rem;
+  padding: clamp(1rem, 2vw, 1.75rem);
+}
+
+.unavailable {
+  margin: 1rem auto;
+  max-width: 48rem;
+}
+
+.content h1,
+.content h2,
+.unavailable h1 {
+  margin: 0;
+}
+
+.content p,
+.unavailable p {
+  margin: 0.35rem 0 0;
+}
+
+.eyebrow {
+  color: var(--text-muted, #667085);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.claim {
+  font-size: 1.05rem;
+  max-width: 70ch;
+}
+
+.factGrid,
+.metricGrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  margin: 0;
+}
+
+.factGrid > div,
+.metricGrid > div {
+  background: var(--surface-subtle, #f7f9fc);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.factGrid dt,
+.metricGrid dt {
+  color: var(--text-muted, #667085);
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.factGrid dd,
+.metricGrid dd {
+  font-weight: 650;
+  margin: 0.3rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.sectionHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.recordList {
+  display: grid;
+  gap: 0.65rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.recordList li {
+  align-items: center;
+  border: 1px solid var(--border, #d8dee8);
+  border-radius: 10px;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 2fr) auto;
+  padding: 0.75rem;
+}
+
+.recordList li div {
+  display: grid;
+}
+
+.recordList small,
+.metricLine {
+  color: var(--text-muted, #667085);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.chipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.chipList li {
+  background: var(--surface-subtle, #f2f4f7);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+}
+
+@media (max-width: 720px) {
+  .recordList li {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionHeader {
+    display: grid;
+  }
+}

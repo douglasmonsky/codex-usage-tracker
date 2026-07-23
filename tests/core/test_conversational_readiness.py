@@ -30,7 +30,7 @@ def _write_wrapper(codex_home: Path, server: dict[str, object]) -> Path:
 def _write_runtime_python(path: Path) -> None:
     path.parent.mkdir(parents=True)
     path.write_text(
-        f"#!/bin/sh\nexec {shlex.quote(sys.executable)} \"$@\"\n",
+        f'#!/bin/sh\nexec {shlex.quote(sys.executable)} "$@"\n',
         encoding="utf-8",
     )
     path.chmod(0o755)
@@ -77,7 +77,9 @@ def test_bootstrap_runtime_with_matching_marker_and_import_is_ready(tmp_path: Pa
     result = conversational_readiness(codex_home=codex_home)
 
     assert result["state"] == "ready", result["evidence"]
-    assert "current task" in result["summary"].lower()
+    assert result["configured_profile"] == "core"
+    assert result["runtime_version_matches"] is True
+    assert "current task tool exposure is not verified" in result["summary"].lower()
 
 
 def test_bootstrap_runtime_wrong_marker_or_failed_import_requires_restart(tmp_path: Path) -> None:
@@ -111,21 +113,54 @@ def test_bootstrap_runtime_wrong_marker_or_failed_import_requires_restart(tmp_pa
     assert any("import" in item.lower() for item in failed_import["evidence"])
 
 
+def test_readiness_reports_profile_and_mismatched_runtime_version(tmp_path: Path) -> None:
+    codex_home = tmp_path / ".codex"
+    runtime = tmp_path / "runtime"
+    root = _write_wrapper(
+        codex_home,
+        {
+            "command": "python3",
+            "args": ["skills/codex-usage-tracker/scripts/run_mcp.py"],
+            "env": {
+                "CODEX_USAGE_TRACKER_MCP_PROFILE": "full",
+                "CODEX_USAGE_TRACKER_RUNTIME_DIR": str(runtime),
+                "CODEX_USAGE_TRACKER_PACKAGE_SPEC": "codex-usage-tracking==999.0",
+            },
+        },
+    )
+    launcher = root / "skills" / "codex-usage-tracker" / "scripts" / "run_mcp.py"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("# launcher\n", encoding="utf-8")
+    runtime.mkdir(parents=True)
+    (runtime / ".codex-usage-tracker-package-spec").write_text(
+        f"codex-usage-tracking=={__version__}\n", encoding="utf-8"
+    )
+
+    result = conversational_readiness(codex_home=codex_home)
+
+    assert result["configured_profile"] == "full"
+    assert result["runtime_version_matches"] is False
+    assert "current task tool exposure" not in result["summary"].lower()
+
+
 def test_valid_generated_wrapper_is_ready(tmp_path: Path) -> None:
     codex_home = tmp_path / ".codex"
     _write_wrapper(
         codex_home,
         {
             "command": sys.executable,
-            "args": ["-m", "codex_usage_tracker.mcp_server"],
+            "args": ["-m", "codex_usage_tracker.interfaces.mcp.server"],
+            "env": {"CODEX_USAGE_TRACKER_MCP_PROFILE": "core"},
         },
     )
 
     result = conversational_readiness(codex_home=codex_home)
 
     assert result["state"] == "ready"
+    assert result["configured_profile"] == "core"
+    assert result["runtime_version_matches"] is True
     assert result["next_action"] is None
-    assert "current task" in result["summary"].lower()
+    assert "current task tool exposure is not verified" in result["summary"].lower()
 
 
 def test_missing_or_malformed_wrapper_is_unavailable(tmp_path: Path) -> None:

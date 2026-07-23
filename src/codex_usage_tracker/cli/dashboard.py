@@ -81,21 +81,12 @@ def run_serve_dashboard(args: argparse.Namespace) -> int:
                 "limit": _limit_value(args),
                 "since": args.since,
                 "context_api": _context_api(args),
-                "refresh_before_start": args.refresh,
+                "refresh_before_start": False,
+                "refresh_in_background": args.refresh,
                 "privacy_mode": args.privacy_mode,
                 "include_archived": args.include_archived,
                 "language": _language(args),
             }
-        )
-    if args.refresh:
-        refresh_usage_index(
-            codex_home=args.codex_home,
-            db_path=args.db,
-            include_archived=args.include_archived,
-            pricing_path=args.pricing,
-            allowance_path=args.allowance,
-            rate_card_path=args.rate_card,
-            thresholds_path=args.thresholds,
         )
     serve_dashboard(
         db_path=args.db,
@@ -116,6 +107,7 @@ def run_serve_dashboard(args: argparse.Namespace) -> int:
         projects_path=args.projects,
         privacy_mode=args.privacy_mode,
         language=_language(args),
+        refresh_on_start=args.refresh,
     )
     return 0
 

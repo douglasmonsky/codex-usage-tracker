@@ -69,6 +69,8 @@ RELEASE_N_LOCALIZATION_KEYS = {
     "settings.experimental.subtitle",
     "settings.experimental.toggle",
     "settings.experimental.origin_scope",
+    "settings.experimental.labs_title",
+    "settings.experimental.labs_subtitle",
     "maturity.aria",
     "maturity.highly_experimental",
     "maturity.highly_experimental_description",

@@ -15,7 +15,10 @@ from codex_usage_tracker.store.dashboard_queries import (
     query_dashboard_events,
     query_dashboard_token_summary,
 )
-from codex_usage_tracker.store.dedupe_queries import query_dedupe_diagnostics
+from codex_usage_tracker.store.dedupe_queries import (
+    query_dedupe_counts,
+    query_dedupe_diagnostics,
+)
 from codex_usage_tracker.store.summary_queries import query_summary
 from codex_usage_tracker.store.usage_api_queries import (
     query_usage_api_event_count,
@@ -191,6 +194,11 @@ def test_default_usage_surfaces_exclude_copied_clone_rows(tmp_path: Path) -> Non
     assert recommendation_rows == 2
 
     diagnostics = query_dedupe_diagnostics(db_path, limit=10)
+    assert query_dedupe_counts(db_path) == {
+        "physical_rows": 3,
+        "canonical_rows": 2,
+        "excluded_copied_rows": 1,
+    }
     assert diagnostics["summary"] == {
         "dedupe_enabled": True,
         "fingerprint_version": "usage-fingerprint-v2",

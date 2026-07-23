@@ -2,16 +2,19 @@ import { StatusBadge, Surface } from '../../design';
 import type {
   AllowanceAnalysisPayload,
   AllowanceCapacityBoundary,
+  AllowanceEvidenceRow,
 } from '../../api/allowanceIntelligenceTypes';
 import styles from './AllowanceCapacity.module.css';
 
 type AllowanceCapacityChangeTimelineProps = {
   analysis: AllowanceAnalysisPayload | undefined;
+  evidenceRows: AllowanceEvidenceRow[];
   running: boolean;
 };
 
 export function AllowanceCapacityChangeTimeline({
   analysis,
+  evidenceRows,
   running,
 }: AllowanceCapacityChangeTimelineProps) {
   const boundaries = [...(analysis?.boundaries ?? [])]
@@ -36,7 +39,14 @@ export function AllowanceCapacityChangeTimeline({
           aria-label="Supported capacity changes"
           data-localization-attributes="aria-label"
         >
-          {boundaries.map(boundary => <BoundaryItem key={boundary.boundary_id} boundary={boundary} />)}
+          {boundaries.map(boundary => (
+            <BoundaryItem
+              key={boundary.boundary_id}
+              analysisId={analysis?.snapshot_id ?? null}
+              boundary={boundary}
+              evidenceId={boundaryEvidenceId(boundary, evidenceRows)}
+            />
+          ))}
         </ol>
       ) : (
         <p className={styles.capacityChangeExplanation}>{timelineExplanation(analysis, running)}</p>
@@ -50,7 +60,15 @@ export function AllowanceCapacityChangeTimeline({
   );
 }
 
-function BoundaryItem({ boundary }: { boundary: AllowanceCapacityBoundary }) {
+function BoundaryItem({
+  analysisId,
+  boundary,
+  evidenceId,
+}: {
+  analysisId: string | null;
+  boundary: AllowanceCapacityBoundary;
+  evidenceId: string | null;
+}) {
   const before = boundary.effect_size.median_before_credits_per_percent;
   const after = boundary.effect_size.median_after_credits_per_percent;
   const deltaPercent = before === 0 ? null : ((after - before) / before) * 100;
@@ -59,12 +77,45 @@ function BoundaryItem({ boundary }: { boundary: AllowanceCapacityBoundary }) {
   return (
     <li className={styles.capacityChangeItem} aria-label={accessibleLabel}>
       <time dateTime={boundary.effective_at}>{formatDate(boundary.effective_at)}</time>
-      <div>
-        <strong>Credits per 1% {direction}</strong>
-        <p>{formatCredits(before)} → {formatCredits(after)}{deltaPercent === null ? '' : ` (${formatSignedPercent(deltaPercent)})`}</p>
+      <div className={styles.capacityChangeDetail}>
+        <div>
+          <span className={styles.capacityChangeType}>Supported change</span>
+          <strong>Credits per 1% {direction}</strong>
+          <p>{formatCredits(before)} → {formatCredits(after)}{deltaPercent === null ? '' : ` (${formatSignedPercent(deltaPercent)})`}</p>
+        </div>
+        {analysisId && evidenceId ? (
+          <a
+            className={styles.capacityEvidenceLink}
+            href={allowanceEvidenceHref(analysisId, evidenceId)}
+            aria-label={`Open supporting Evidence for ${boundary.boundary_id}`}
+          >
+            View Evidence
+          </a>
+        ) : null}
       </div>
     </li>
   );
+}
+
+function boundaryEvidenceId(
+  boundary: AllowanceCapacityBoundary,
+  rows: AllowanceEvidenceRow[],
+): string | null {
+  const match = rows.find(row => (
+    row.cycle_id === boundary.after_cycle_id || row.cycle_id === boundary.before_cycle_id
+  ) && row.interval_id);
+  return match?.interval_id ?? null;
+}
+
+function allowanceEvidenceHref(analysisId: string, evidenceId: string): string {
+  const params = new URLSearchParams({
+    view: 'evidence',
+    kind: 'allowance',
+    analysis: analysisId,
+    evidence: evidenceId,
+  });
+  if (new URLSearchParams(window.location.search).get('history') === 'all') params.set('history', 'all');
+  return `?${params.toString()}`;
 }
 
 function timelineTitle(

@@ -93,7 +93,7 @@ expect(readThreadCallSortDirectionParam('cache', `${baseHref}&thread_call_sort=c
     expect(readThreadCallSortParam(href)).toBe('newest');
   });
 
-  it('builds normalized thread view links and clears stale legacy params', () => {
+  it('builds normalized thread view links while preserving inactive call selection', () => {
     const url = buildThreadsViewLink(
       {
         localQuery: ' thread ',
@@ -107,7 +107,8 @@ threadCallSortDirection: 'asc',
       `${baseHref}&record=stale&detail=first&expand=all&threads=legacy-a,legacy-b`,
     );
 
-    expect(url.searchParams.get('view')).toBe('threads');
+    expect(url.searchParams.get('view')).toBe('explore');
+    expect(url.searchParams.get('mode')).toBe('threads');
     expect(url.searchParams.get('thread_q')).toBe('thread');
     expect(url.searchParams.get('risk')).toBe('Medium');
     expect(url.searchParams.get('thread')).toBe('thread-3c5d');
@@ -117,7 +118,7 @@ expect(url.searchParams.get('page')).toBe('3');
 expect(url.searchParams.get('thread_call_sort')).toBe('tokens');
 expect(url.searchParams.get('thread_call_direction')).toBe('asc');
 expect(url.searchParams.get('thread_call_page')).toBeNull();
-    expect(url.searchParams.get('record')).toBeNull();
+    expect(url.searchParams.get('record')).toBe('stale');
     expect(url.searchParams.get('detail')).toBeNull();
     expect(url.searchParams.get('expand')).toBeNull();
     expect(url.searchParams.get('threads')).toBeNull();
@@ -156,7 +157,8 @@ threadCallSortDirection: 'desc',
       `${baseHref}&thread_q=old&risk=High&thread=old&sort=totalTokens&direction=desc&page=4&thread_call_sort=cache&thread_call_page=2`,
     );
 
-    expect(url.searchParams.get('view')).toBe('threads');
+    expect(url.searchParams.get('view')).toBe('explore');
+    expect(url.searchParams.get('mode')).toBe('threads');
     expect(url.searchParams.get('thread_q')).toBeNull();
     expect(url.searchParams.get('risk')).toBeNull();
     expect(url.searchParams.get('thread')).toBeNull();

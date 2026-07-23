@@ -38,6 +38,7 @@ def test_dashboard_route_benchmark_emits_compact_synthetic_measurements(tmp_path
     assert set(routes) == {
         "/api/summary",
         "/api/recommendations",
+        "/api/calls",
         "/api/threads",
         "/api/thread-calls",
         "/api/diagnostics/facts",

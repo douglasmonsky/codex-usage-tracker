@@ -18,6 +18,10 @@ from codex_usage_tracker.server.dashboard_shell import (
     react_dashboard_boot_payload,
 )
 from codex_usage_tracker.server.responses import send_html_response
+from codex_usage_tracker.server.routes import (
+    HTTP_V1_DEPRECATION_LINK,
+    is_deprecated_http_v1_path,
+)
 
 _first = server_utils.first_query_value
 
@@ -55,10 +59,14 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
         def _send_exception(self, prefix: str, exc: BaseException) -> None: ...
 
     def end_headers(self) -> None:
+        request_path = urlparse(self.path).path
         if self._is_dashboard_html_request():
             self.send_header("Cache-Control", "no-store")
-        elif urlparse(self.path).path.startswith("/codex-usage-tracker-assets/react/assets/"):
+        elif request_path.startswith("/codex-usage-tracker-assets/react/assets/"):
             self.send_header("Cache-Control", "no-cache")
+        if is_deprecated_http_v1_path(request_path):
+            self.send_header("Deprecation", "true")
+            self.send_header("Link", HTTP_V1_DEPRECATION_LINK)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header(

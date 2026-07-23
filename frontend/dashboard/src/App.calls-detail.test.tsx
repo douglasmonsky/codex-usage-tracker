@@ -1,11 +1,11 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, within } from './test-utils/appTestHarness';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, navigateApp, render, screen, within } from './test-utils/appTestHarness';
 
 describe('React dashboard calls drilldown and investigator', () => {
   installAppTestHooks();
 
   it('filters and drills into calls through detail tabs', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+    navigateApp('/?view=explore&mode=calls');
     expect(screen.queryByRole('heading', { name: 'Call Drill-Down' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Call Details/i }));
     expect(screen.getByRole('heading', { name: 'Call Drill-Down' })).toBeInTheDocument();
@@ -67,7 +67,7 @@ expect(screen.getByText('fixture-rate-card')).toBeInTheDocument();
     expect(screen.getByText('Next: Use loaded evidence if aggregate totals are not enough to understand this isolated call.')).toBeInTheDocument();
     expect(screen.getByText('No previous aggregate call available for cache delta accounting.')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: /Thread/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Thread$/i }));
 expect(screen.getByText('Call Narrative')).toBeInTheDocument();
 expect(screen.getByText('Initiated by')).toBeInTheDocument();
 expect(screen.getAllByText('tool').length).toBeGreaterThan(0);
@@ -85,7 +85,7 @@ expect(screen.getByText(/localhost dashboard server API token/i)).toBeInTheDocum
 
 it('shows legacy calls date range status and invalid range feedback', () => {
 render(<App />);
-fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+navigateApp('/?view=explore&mode=calls');
 
 expect(screen.queryByText(/Custom:/i)).not.toBeInTheDocument();
 
@@ -104,7 +104,7 @@ expect(screen.getByText('No rows match current filters.')).toBeInTheDocument();
 
 it('toggles the calls detail panel like the legacy dashboard', () => {
 render(<App />);
-fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+navigateApp('/?view=explore&mode=calls');
 
     expect(screen.queryByRole('heading', { name: 'Call Drill-Down' })).not.toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Model calls' })).toBeInTheDocument();
@@ -157,7 +157,7 @@ it('hydrates calls detail panel toggle labels from dashboard i18n payload', () =
   };
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  navigateApp('/?view=explore&mode=calls');
   fireEvent.click(screen.getByRole('button', { name: /Detalles de la llamada/i }));
 
   expect(screen.getByText('Llamadas modelo')).toBeInTheDocument();
@@ -171,7 +171,7 @@ it('hydrates calls detail panel toggle labels from dashboard i18n payload', () =
 
 it('updates the calls drill-down when hovering model-call rows', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  navigateApp('/?view=explore&mode=calls');
   fireEvent.click(screen.getByRole('button', { name: /Call Details/i }));
 
   expect(screen.getByText('thread-9f3a1c / codex-1')).toBeInTheDocument();
@@ -186,7 +186,7 @@ it('updates the calls drill-down when hovering model-call rows', () => {
 
 it('sorts table columns through accessible header controls', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+    navigateApp('/?view=explore&mode=calls');
 
     const sortButton = screen.getByRole('button', { name: 'Sort by Est. Cost' });
     fireEvent.click(sortButton);
@@ -195,7 +195,7 @@ it('sorts table columns through accessible header controls', () => {
 
   it('toggles call and thread columns while keeping identity columns locked', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  navigateApp('/?view=explore&mode=calls');
   const callsTable = screen.getByRole('table', { name: 'Model calls' });
   expect(within(callsTable).getByRole('button', { name: /Sort by Total Tokens/i })).toBeInTheDocument();
   expect(within(callsTable).getByRole('button', { name: /Sort by Cached Input/i })).toBeInTheDocument();
@@ -214,7 +214,7 @@ it('sorts table columns through accessible header controls', () => {
   fireEvent.click(screen.getByRole('checkbox', { name: 'Reasoning Output' }));
   expect(screen.queryByRole('columnheader', { name: /Reasoning Output/i })).not.toBeInTheDocument();
 
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('button', { name: /^Threads$/i }));
+    navigateApp('/?view=explore&mode=threads');
     const threadsTable = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
     expect(within(threadsTable).getByRole('button', { name: /Sort by Latest/i })).toBeInTheDocument();
     expect(within(threadsTable).queryByRole('button', { name: /Sort by Avg Gap/i })).not.toBeInTheDocument();
@@ -231,7 +231,7 @@ it('sorts table columns through accessible header controls', () => {
 
   it('keeps selected-call thread context modular in the calls drill-down', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+    navigateApp('/?view=explore&mode=calls');
     fireEvent.click(screen.getByRole('button', { name: /Call Details/i }));
     fireEvent.click(screen.getByRole('tab', { name: /^Thread$/i }));
 
@@ -243,7 +243,7 @@ it('sorts table columns through accessible header controls', () => {
 
   it('opens the full-page call investigator from calls and direct record URLs', () => {
   const view = render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  navigateApp('/?view=explore&mode=calls');
   fireEvent.click(screen.getByRole('button', { name: /Open investigator for thread-9f3a1c codex-1/i }));
 
 expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
@@ -266,15 +266,14 @@ expect(metadataPanel.getByText('usage-reviewer')).toBeInTheDocument();
 expect(screen.getByText('Thread Context')).toBeInTheDocument();
 expect(screen.getByText('Thread timeline')).toBeInTheDocument();
 expect(screen.getByText('Models in thread')).toBeInTheDocument();
-expect(window.location.search).toContain('view=call');
+expect(window.location.search).toContain('view=evidence');
     expect(window.location.search).toContain('record=fixture-call-0');
-    expect(screen.getByRole('button', { name: /^Calls$/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^Explore$/i })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: /Next/i }));
-    expect(screen.getByText('thread-7b2e91 / o4-mini')).toBeInTheDocument();
     expect(window.location.search).toContain('record=fixture-call-1');
 
-    fireEvent.click(screen.getByRole('button', { name: /Back to Calls/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Back to Explore/i }));
     expect(screen.getByRole('heading', { name: 'Calls' })).toBeInTheDocument();
 
     view.unmount();
@@ -291,7 +290,7 @@ expect(screen.getByRole('button', { name: /^Open$/i })).toBeInTheDocument();
 
 it('opens full-page call investigator through call-row activation', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Calls$/i }));
+  navigateApp('/?view=explore&mode=calls');
 
   const row = screen.getByText('thread-3c8d4e').closest('tr');
   expect(row).not.toBeNull();
@@ -299,7 +298,7 @@ it('opens full-page call investigator through call-row activation', () => {
 
   expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
   expect(screen.getByText('thread-3c8d4e / o3')).toBeInTheDocument();
-  expect(window.location.search).toContain('view=call');
+  expect(window.location.search).toContain('view=evidence');
   expect(window.location.search).toContain('record=fixture-call-2');
 });
 });

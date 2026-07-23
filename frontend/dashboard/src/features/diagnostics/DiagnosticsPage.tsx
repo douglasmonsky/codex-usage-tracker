@@ -184,11 +184,11 @@ export function DiagnosticsPage({
         </div>
       </div>
 
-      <FeatureMaturityBanner
-        className="span-all"
-        kind="experimental"
-        title="Highly experimental"
-        description="Useful for technical exploration; methods and presentation may change."
+      <FeatureMaturityBanner className="span-all"
+        kind="transitioning"
+        title="Available during transition"
+        description="This workspace remains available in Release N while its future placement is prepared."
+        replacement={{ operation: 'usage_query(entity="call", measures=["tokens"]) → usage_evidence', href: '?view=explore&mode=calls' }}
       />
 
       <PageLoadProgress

@@ -10,6 +10,7 @@ from codex_usage_tracker.core.projects import (
     annotate_rows_with_project_identity,
     apply_project_privacy_to_rows,
     load_project_config,
+    project_identity_for_cwd,
 )
 from codex_usage_tracker.core.threads import annotate_thread_attachments
 from codex_usage_tracker.pricing.allowance import (
@@ -21,8 +22,11 @@ from codex_usage_tracker.reports.recommendations import (
     annotate_rows_with_recommendations,
     load_threshold_config,
 )
-from codex_usage_tracker.server.utils import matches_live_derived_filters
-from codex_usage_tracker.store.api import query_usage_api_event_count, query_usage_api_events
+from codex_usage_tracker.store.api import (
+    query_usage_api_distinct_cwds,
+    query_usage_api_event_count,
+    query_usage_api_events,
+)
 
 
 def query_live_call_rows(
@@ -39,12 +43,21 @@ def query_live_call_rows(
     privacy_mode: str,
 ) -> tuple[list[dict[str, Any]], int]:
     """Return annotated live API rows plus the total row count for pagination."""
-    derived_filter = bool(pricing_status or credit_confidence)
-    derived_sort = query_params["sort"] == "cost"
+    git_cwds = (
+        _git_cwds_for_scope(
+            db_path=db_path,
+            query_params=query_params,
+            projects_path=projects_path,
+        )
+        if query_params["source"] == "git"
+        else None
+    )
     rows = _query_raw_live_rows(
         db_path=db_path,
         query_params=query_params,
-        derived_filter=derived_filter or derived_sort,
+        cwds=git_cwds,
+        pricing_status=pricing_status,
+        credit_confidence=credit_confidence,
     )
     rows = annotate_live_rows(
         rows,
@@ -55,26 +68,54 @@ def query_live_call_rows(
         projects_path=projects_path,
         privacy_mode=privacy_mode,
     )
-    if derived_filter or derived_sort:
-        return _filter_derived_live_rows(
-            rows,
-            query_params=query_params,
-            pricing_status=pricing_status,
-            credit_confidence=credit_confidence,
-        )
-    return rows, _query_live_total_count(db_path=db_path, query_params=query_params)
+    return rows, _query_live_total_count(
+        db_path=db_path,
+        query_params=query_params,
+        cwds=git_cwds,
+        pricing_status=pricing_status,
+        credit_confidence=credit_confidence,
+    )
 
 
 def _query_raw_live_rows(
     *,
     db_path: Path,
     query_params: dict[str, Any],
-    derived_filter: bool,
+    cwds: list[str] | None,
+    pricing_status: str | None,
+    credit_confidence: str | None,
 ) -> list[dict[str, Any]]:
     return query_usage_api_events(
         db_path=db_path,
-        limit=None if derived_filter else query_params["limit"],
-        offset=0 if derived_filter else query_params["offset"],
+        limit=query_params["limit"],
+        offset=query_params["offset"],
+        search=query_params["search"],
+        since=query_params["since"],
+        until=query_params["until"],
+        model=query_params["model"],
+        effort=query_params["effort"],
+        source=None if cwds is not None else query_params["source"],
+        cwds=cwds,
+        thread=query_params["thread"],
+        thread_key=query_params["thread_key"],
+        include_archived=query_params["include_archived"],
+        sort=query_params["sort"],
+        direction=query_params["direction"],
+        pricing_status=pricing_status,
+        credit_confidence=credit_confidence,
+        legacy_archive_path_fallback=False,
+    )
+
+
+def _git_cwds_for_scope(
+    *,
+    db_path: Path,
+    query_params: dict[str, Any],
+    projects_path: Path,
+) -> list[str]:
+    projects = load_project_config(projects_path)
+    cwds = query_usage_api_distinct_cwds(
+        db_path=db_path,
         search=query_params["search"],
         since=query_params["since"],
         until=query_params["until"],
@@ -83,42 +124,26 @@ def _query_raw_live_rows(
         thread=query_params["thread"],
         thread_key=query_params["thread_key"],
         include_archived=query_params["include_archived"],
-        sort="time" if query_params["sort"] == "cost" else query_params["sort"],
-        direction=query_params["direction"],
+        legacy_archive_path_fallback=False,
     )
-
-
-def _filter_derived_live_rows(
-    rows: list[dict[str, Any]],
-    *,
-    query_params: dict[str, Any],
-    pricing_status: str | None,
-    credit_confidence: str | None,
-) -> tuple[list[dict[str, Any]], int]:
-    filtered_rows = [
-        row
-        for row in rows
-        if matches_live_derived_filters(
-            row,
-            pricing_status=pricing_status,
-            credit_confidence=credit_confidence,
+    return [
+        cwd
+        for cwd in cwds
+        if any(
+            project_identity_for_cwd(cwd, projects).get(key)
+            for key in ("git_branch", "git_remote_label", "git_remote_hash")
         )
     ]
-    if query_params["sort"] == "cost":
-        filtered_rows.sort(key=lambda row: str(row.get("record_id") or ""))
-        filtered_rows.sort(key=lambda row: str(row.get("event_timestamp") or ""), reverse=True)
-        filtered_rows.sort(
-            key=lambda row: float(row.get("estimated_cost_usd") or 0.0),
-            reverse=query_params["direction"] == "desc",
-        )
-    total_matched = len(filtered_rows)
-    limit = query_params["limit"]
-    offset = query_params["offset"]
-    rows_page = filtered_rows[offset:] if limit is None else filtered_rows[offset : offset + limit]
-    return rows_page, total_matched
 
 
-def _query_live_total_count(*, db_path: Path, query_params: dict[str, Any]) -> int:
+def _query_live_total_count(
+    *,
+    db_path: Path,
+    query_params: dict[str, Any],
+    cwds: list[str] | None,
+    pricing_status: str | None,
+    credit_confidence: str | None,
+) -> int:
     return query_usage_api_event_count(
         db_path=db_path,
         search=query_params["search"],
@@ -126,9 +151,14 @@ def _query_live_total_count(*, db_path: Path, query_params: dict[str, Any]) -> i
         until=query_params["until"],
         model=query_params["model"],
         effort=query_params["effort"],
+        source=None if cwds is not None else query_params["source"],
+        cwds=cwds,
         thread=query_params["thread"],
         thread_key=query_params["thread_key"],
         include_archived=query_params["include_archived"],
+        pricing_status=pricing_status,
+        credit_confidence=credit_confidence,
+        legacy_archive_path_fallback=False,
     )
 
 

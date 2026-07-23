@@ -7,6 +7,7 @@ from typing import Any
 
 from codex_usage_tracker.compression.jobs import CompressionJobRegistry
 from codex_usage_tracker.compression.models import CompressionScope
+from codex_usage_tracker.jobs import JobService
 from codex_usage_tracker.server import compression_routes
 
 
@@ -65,7 +66,13 @@ def test_compression_start_delegates_to_shared_application_api(
         return expected
 
     monkeypatch.setattr(compression_routes, "start_compression_analysis", start)
+    monkeypatch.setattr(
+        compression_routes,
+        "compression_status",
+        lambda _db_path, *, run_id, registry: expected,
+    )
     registry = CompressionJobRegistry()
+    job_service = JobService()
     db_path = tmp_path / "usage.sqlite3"
 
     compression_routes.handle_compression_start_request(
@@ -78,6 +85,7 @@ def test_compression_start_delegates_to_shared_application_api(
         send_error=lambda _status, _message: None,
         send_exception=lambda _prefix, _exc: None,
         send_json=lambda status, payload: responses.append((status, payload)),
+        job_service=job_service,
     )
 
     assert calls == [
@@ -90,6 +98,9 @@ def test_compression_start_delegates_to_shared_application_api(
         }
     ]
     assert responses == [(HTTPStatus.ACCEPTED, expected)]
+    generic = job_service.status("compression-1")
+    assert generic.kind == "compression"
+    assert generic.state == "running"
 
 
 def test_compression_start_reports_refresh_lock_as_retryable_busy_state(

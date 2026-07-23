@@ -13,7 +13,13 @@ const iconByLabel: Record<string, LucideIcon> = {
   'Usage Remaining': Gauge,
 };
 
-export function MetricCard({ card }: { card: MetricCardModel }) {
+export function MetricCard({
+  card,
+  showAnnotations = true,
+}: {
+  card: MetricCardModel;
+  showAnnotations?: boolean;
+}) {
   const i18n = useShellI18n();
   const Icon = iconByLabel[card.label] ?? Activity;
   const trendTone = card.trend.startsWith('down') || card.trend.includes('risk') ? 'negative' : 'positive';
@@ -36,8 +42,12 @@ export function MetricCard({ card }: { card: MetricCardModel }) {
             ))}
           </dl>
         ) : null}
-        <span className={`trend ${trendTone}`}>{i18n.translateText(card.trend)}</span>
-        <small>{i18n.translateText(card.detail)}</small>
+        {showAnnotations ? (
+          <>
+            <span className={`trend ${trendTone}`}>{i18n.translateText(card.trend)}</span>
+            <small>{i18n.translateText(card.detail)}</small>
+          </>
+        ) : null}
       </div>
     </article>
   );

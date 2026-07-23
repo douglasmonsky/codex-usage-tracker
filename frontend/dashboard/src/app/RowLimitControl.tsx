@@ -5,6 +5,7 @@ import type { LoadWindow } from './rowLimit';
 type RowLimitControlProps = {
   canUseLiveApi: boolean;
   finitePendingLoadLimit: number;
+  focusedScope: boolean;
   hasMoreRows: boolean;
   loadLabel: string;
   loadMoreLabel: string;
@@ -39,13 +40,19 @@ export function RowLimitControl(props: RowLimitControlProps) {
   const disabled = props.refreshing || !props.canUseLiveApi;
   const isRecentRows = props.loadWindow === 'rows';
   const detailRowLabel = `${props.loadedRowCount.toLocaleString()} detail row${props.loadedRowCount === 1 ? '' : 's'} cached`;
-  const loadedSummary = isRecentRows
+  const loadedSummary = props.focusedScope
+    ? 'Focused query updates this view'
+    : isRecentRows
     ? `${props.loadedRowCount.toLocaleString()} loaded / ${props.totalAvailableRows.toLocaleString()} total`
     : `${props.totalAvailableRows.toLocaleString()} calls analyzed · ${detailRowLabel}`;
-  const loadedSummaryTitle = isRecentRows
+  const loadedSummaryTitle = props.focusedScope
+    ? `${props.rowLoadModeLabel} is fetched through the focused endpoint for the current view.`
+    : isRecentRows
     ? `${props.loadedRowCount.toLocaleString()} of ${props.totalAvailableRows.toLocaleString()} evidence rows loaded`
     : `Focused pages analyze all ${props.totalAvailableRows.toLocaleString()} calls in scope; ${props.loadedRowCount.toLocaleString()} call rows are cached for immediate detail views.`;
-  const accessibleStatus = isRecentRows
+  const accessibleStatus = props.focusedScope
+    ? `${props.rowLoadModeLabel} selected; the current view updates through its focused endpoint`
+    : isRecentRows
     ? props.rowLoadStatus
     : `${props.rowLoadModeLabel} analysis uses ${props.totalAvailableRows.toLocaleString()} calls; ${detailRowLabel}`;
 

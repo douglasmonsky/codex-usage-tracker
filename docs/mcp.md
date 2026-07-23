@@ -1,6 +1,16 @@
 # MCP And Codex Skills
 
-Codex Usage Tracker can be installed as a local Codex plugin. It exposes MCP tools for local usage analysis, dashboard-shaped aggregate payloads, allowance diagnostics, source coverage, and opt-in local content-index investigations.
+MCP is the primary analysis interface for Codex Usage Tracker. The local Codex
+plugin exposes deterministic tools for usage analysis, bounded queries,
+allowance diagnostics, source coverage, and explicit local content-index
+investigations. Material conclusions can link to the supporting
+[Evidence Console](evidence-console.md); the browser does not perform or invent
+the analysis.
+
+Normal refresh indexes aggregate counters and the existing bounded local
+content/event index. Aggregate-only commands retain the older posture, and
+shareable outputs follow existing behavior. See [Data Posture](data-posture.md)
+and [Privacy](privacy.md) for the exact local-storage and output boundaries.
 
 ## Local Plugin
 
@@ -21,6 +31,10 @@ Restart Codex after registration so the plugin and skills are discovered.
 Marketplace installs use the bundled MCP launcher at `skills/codex-usage-tracker/scripts/run_mcp.py`. On first MCP startup it creates a cached runtime under `~/.cache/codex-usage-tracker/mcp-runtime/` and installs the exact pinned Python package, so the plugin does not need a `.venv` inside its directory.
 
 The launcher intentionally pins a reviewed package version instead of tracking `main`. Set `CODEX_USAGE_TRACKER_PACKAGE_SPEC` to test another package version or Git ref, and set `CODEX_USAGE_TRACKER_RUNTIME_DIR` to use a separate cache while debugging plugin startup.
+
+Installed and generated wrappers set `CODEX_USAGE_TRACKER_MCP_PROFILE=core`. The launcher and selected-profile server also accept `full` and `developer`; an unknown value fails before FastMCP starts. Source-checkout maintainers can select `developer` explicitly when testing experiments. Changing only the profile reuses a matching cached runtime because cache validity remains tied to the package spec, not the registered tool surface.
+
+Readiness payloads report `configured_profile` and `runtime_version_matches`. A healthy result proves the local wrapper and runtime checks only; it does not prove that the current Codex task has discovered the MCP tools.
 
 ## Companion Skills
 
@@ -109,13 +123,45 @@ the highest-token thread summaries instead.
 
 ## Tools
 
+The default `core` profile uses `usage_analyze` for broad diagnostic or
+explanatory questions (for example, `goal="token_waste"`) and `usage_query`
+for exact tabular or grouped questions (for example, tokens grouped by model
+and effort). Both return bounded versioned envelopes. An asynchronous analysis
+returns an analysis-job handle; poll its `job_id` with `usage_job_status`.
+Allowance questions use `usage_allowance(operation=...)`. Raw-context and
+individual allowance compatibility tools are not part of this default flow.
+
+A server process registers one selected profile; it never registers every tool
+and relies on documentation to hide the others.
+
+The installed default is `core`. `codex_usage_tracker.mcp_server` remains a
+compatibility entrypoint for older direct integrations, while new wrappers use
+`codex_usage_tracker.interfaces.mcp.server` and select their profile explicitly.
+
+| Profile | Registered surface |
+| --- | --- |
+| `core` | Exactly `usage_status`, `usage_refresh`, `usage_analyze`, `usage_query`, `usage_evidence`, `usage_allowance`, and `usage_job_status`, in that order. |
+| `full` | Core plus the 0.21 compatibility names, except the five explicit developer experiments. Deprecated schemas and names remain unchanged through 0.24.x. |
+| `developer` | Full plus dogfood and visualization experiments. These tools are excluded from `core` and `full`. |
+
+Deprecated tool descriptions name the stable replacement and `0.25.0` as the
+earliest removal release. Seven local operations without one-call core parity
+remain active, advanced `full` tools; see [Deprecations](deprecations.md).
+
+The complete catalog across all three profiles is:
+
 - `refresh_usage_index`
+- `usage_refresh`
 - `usage_refresh_start`
 - `usage_refresh_status`
+- `usage_job_status`
 - `usage_doctor`
 - `usage_summary`
 - `subagent_usage`
 - `usage_query`
+- `usage_analyze`
+- `usage_evidence`
+- `usage_allowance`
 - `usage_status`
 - `usage_dedupe_diagnostics`
 - `usage_calls`
@@ -168,6 +214,26 @@ the highest-token thread summaries instead.
 - `init_usage_pricing_config`
 - `update_usage_pricing_config`
 - `init_usage_allowance_config`
+
+## Dashboard workbench replacements
+
+The default dashboard contains Home, Explore, and Limits, with Settings as a
+utility and Evidence opened contextually. Legacy analytical workbench URLs stay
+directly reachable through `0.24.x`, but new investigations should use these
+core requests:
+
+| Job | Core request | Evidence surface |
+| --- | --- | --- |
+| Usage drivers | `usage_analyze(goal="usage_spike")` | Finding, Call, or Thread Evidence |
+| Token waste | `usage_analyze(goal="token_waste")` | Finding Evidence and Explore |
+| Context/cache | `usage_analyze(goal="context_bloat")` or `usage_analyze(goal="cache_failure")` | Call or Thread Evidence |
+| Command/file churn | `usage_analyze(goal="workflow_churn")` | Finding Evidence |
+| Diagnostic facts | `usage_query(...)`, then `usage_evidence(...)` | Explore and contextual Evidence |
+| Subagents | `usage_query(entity="subagent")` or `usage_analyze(goal="subagent_cost")` | Explore and contextual Evidence |
+
+Compression candidate ranking remains available through the full profile until
+`0.25.0`. The executable fixture, accounting, scope, caveat, and canonical-ID
+record is [Dashboard Sunset Job Parity V2](dashboard-sunset-job-parity-v2.md).
 
 ## Tool Notes
 
@@ -230,52 +296,49 @@ claiming MCP availability.
 
 ## Allowance Intelligence
 
-- `usage_allowance_status(...)` is the default polling entry point. It reads a
-  constant-size canonical snapshot, reports copied clone rows excluded, and
-  directs stale or empty indexes through `usage_refresh_start` and
-  `usage_refresh_status` without running full diagnostics. Pass the last
-  `revision` as `since_revision`; an unchanged response stays compact.
-- `usage_allowance_series(...)` returns canonical observed context plus weekly
-  completed-cycle `credits / 1%` capacity history, robust rolling summaries,
-  regimes, and every supported boundary. It accepts bounded presets, bounded
-  custom ranges, or `all` aggregate cycles without scanning raw transcripts.
-- `usage_allowance_evidence(...)` returns latest-first canonical transitions in
-  pages of at most 500 rows; 50 is the normal first page. Pass `next_cursor` back
-  as `cursor`. Strict and normal modes return aggregate provenance; local mode
-  explicitly opts into bounded physical record identifiers for debugging.
-- `usage_allowance_analysis(...)` reads the exact persisted multi-change result
-  for the current source/model/rate-card key or starts one deduplicated background job.
-  Poll active work with `usage_allowance_analysis_status(job_id)`, then reload
-  `usage_allowance_analysis(...)` after completion.
+- `usage_allowance(operation="status")` is the default polling entry point. It
+  returns a constant-size canonical snapshot, reports copied clone rows excluded,
+  and distinguishes fresh, stale, and empty indexes without running full diagnostics.
+- `usage_allowance(operation="series", window="weekly", range="8w")` returns a
+  finite canonical timeline. Valid ranges are `24h`, `7d`, `8w`, and `6m`; the
+  interactive core tool rejects `all`.
+- `usage_allowance(operation="evidence", window="weekly", range="8w", limit=50)`
+  returns latest-first canonical transitions. Pass `next_cursor` back as `cursor`;
+  limits are 1–200 and the cursor remains bound to the selected window and range.
+- `usage_allowance(operation="analysis", execution="auto")` returns an exact
+  compatible persisted analysis or a generic job handle. Poll a returned handle
+  with `usage_job_status(job_id, include_result=True)`. Analysis currently supports
+  the weekly window.
 - `usage_allowance_history(...)` returns normalized observed weekly and 5-hour allowance snapshots.
 - `usage_allowance_diagnostics(...)` returns evidence grades comparing observed usage movement against estimated local credits. Weekly windows are the primary long-range signal; 5-hour windows are noisy rolling-window context.
 - `usage_allowance_export(...)` returns strict-privacy evidence bundles for manual sharing.
 
-The v2 status, series, evidence, and analysis tools are the normal MCP/plugin
-surface. History, diagnostics, and export remain compatibility and explicit
-offline-diagnostic tools. Use allowance tools when users ask whether limits
-changed, whether weekly allowance behavior shifted, why the 5-hour counter
-looks noisy, or how to share aggregate allowance evidence safely. The tracker
-cannot read the user's logged-in Codex account plan, native remaining
-allowance, or usage from other agentic surfaces. Remaining allowance context is
-only as accurate as values manually copied into
+The consolidated tool is the normal MCP/plugin surface and each successful
+operation includes a bounded Limits v2 dashboard target. The individual
+`usage_allowance_status`, `usage_allowance_series`, `usage_allowance_evidence`,
+`usage_allowance_analysis`, and `usage_allowance_analysis_status` tools remain
+full-profile compatibility surfaces through 0.24. History, diagnostics, and
+export remain compatibility and explicit offline-diagnostic tools. Use allowance
+operations when users ask whether limits changed, whether weekly allowance
+behavior shifted, why the 5-hour counter looks noisy, or how to share aggregate
+allowance evidence safely. The tracker cannot read the user's logged-in Codex
+account plan, native remaining allowance, or usage from other agentic surfaces.
+Remaining allowance context is only as accurate as values manually copied into
 `~/.codex-usage-tracker/allowance.json`.
 
 Recommended polling flow:
 
 ```text
-usage_allowance_status()
-usage_allowance_status(since_revision="r-example")
-usage_allowance_series(range_preset="8w", granularity="cycle")
-usage_allowance_evidence(limit=50)
-usage_allowance_analysis()
-usage_allowance_analysis_status(job_id="allowance-analysis-example")
+usage_allowance(operation="status")
+usage_allowance(operation="series", window="weekly", range="8w")
+usage_allowance(operation="evidence", window="weekly", range="8w", limit=50)
+usage_allowance(operation="analysis", execution="auto")
+usage_job_status(job_id="allowance-analysis-example", include_result=True)
 ```
 
-Poll status after the returned interval (30 seconds for fresh/aging data, 60
-seconds for stale/empty/unchanged data). Poll an analysis job every 500
-milliseconds only while it is pending, queued, or running. Do not pass `limit=0`
-to v2 evidence. See
+Follow the returned next action for refresh or polling cadence. Poll an analysis
+job only while it is pending, queued, or running. Do not pass `limit=0` or
+`range="all"` to interactive evidence. See
 [Allowance Intelligence](allowance-intelligence.md) for model gates and
 [CLI, MCP, and Dashboard JSON Schemas](cli-json-schemas.md) for synthetic payloads.
 

@@ -1,20 +1,23 @@
 import { lazyRouteComponent } from '@tanstack/react-router';
 import { Suspense, type ReactNode } from 'react';
 
-import type { ContextRuntime, ConversationalReadiness, DashboardBootPayload, DashboardLanguage, DashboardModel } from '../api/types';
+import type { ContextRuntime, ConversationalReadiness, DashboardBootPayload, DashboardLanguage, DashboardModel, HomeSummaryPayload } from '../api/types';
 import type { HistoryScope, LoadWindow } from '../data/dataScope';
 import type { DashboardSourceIdentity } from '../data/queryRuntime';
 import type { DashboardViewId } from './dashboardSearch';
 
-const OverviewPage = lazyRouteComponent(() => import('../features/overview/OverviewPage'), 'OverviewPage');
+const HomePage = lazyRouteComponent(() => import('../features/home/HomePage'), 'HomePage');
 const InvestigatorPage = lazyRouteComponent(() => import('../features/investigator/InvestigatorPage'), 'InvestigatorPage');
 const CompressionLabPage = lazyRouteComponent(() => import('../features/compression-lab/CompressionLabPage'), 'CompressionLabPage');
-const ExploreRoutePage = lazyRouteComponent(() => import('../features/explore/ExploreRoutePage'), 'ExploreRoutePage');
+const ExplorePage = lazyRouteComponent(() => import('../features/explore/ExplorePage'), 'ExplorePage');
 const CallInvestigatorPage = lazyRouteComponent(
   () => import('../features/call-investigator/CallInvestigatorPage'),
   'CallInvestigatorPage',
 );
-const ThreadsPage = lazyRouteComponent(() => import('../features/threads/ThreadsPage'), 'ThreadsPage');
+const EvidencePage = lazyRouteComponent(
+  () => import('../features/evidence/EvidencePage'),
+  'EvidencePage',
+);
 const UsageDrainPage = lazyRouteComponent(() => import('../features/usage-drain/UsageDrainPage'), 'UsageDrainPage');
 const CacheContextPage = lazyRouteComponent(() => import('../features/cache-context/CacheContextPage'), 'CacheContextPage');
 const DiagnosticsPage = lazyRouteComponent(() => import('../features/diagnostics/DiagnosticsPage'), 'DiagnosticsPage');
@@ -25,12 +28,16 @@ const dashboardRouteComponents: Array<{
   id: DashboardViewId;
   component: { preload?: () => Promise<unknown> };
 }> = [
-  { id: 'overview', component: OverviewPage },
+  { id: 'home', component: HomePage },
+  { id: 'explore', component: ExplorePage },
+  { id: 'limits', component: UsageDrainPage },
+  { id: 'evidence', component: EvidencePage },
+  { id: 'overview', component: HomePage },
   { id: 'investigator', component: InvestigatorPage },
   { id: 'compression-lab', component: CompressionLabPage },
-  { id: 'calls', component: ExploreRoutePage },
+  { id: 'calls', component: ExplorePage },
   { id: 'call', component: CallInvestigatorPage },
-  { id: 'threads', component: ThreadsPage },
+  { id: 'threads', component: ExplorePage },
   { id: 'usage-drain', component: UsageDrainPage },
   { id: 'cache-context', component: CacheContextPage },
   { id: 'diagnostics', component: DiagnosticsPage },
@@ -54,6 +61,13 @@ type DashboardRouteViewProps = {
   callBackLabel: string;
   canLoadAllRows: boolean;
   canUseLiveApi: boolean;
+  compatibilityLabs: readonly {
+    id: string;
+    label: string;
+    maturity: string;
+    lifecycle: string;
+    replacementMcpOperation: string;
+  }[];
   contextRuntime: ContextRuntime;
   conversationalAnalysis?: ConversationalReadiness;
   copyCallInvestigatorLink: (recordId: string) => void;
@@ -62,6 +76,9 @@ type DashboardRouteViewProps = {
   globalQuery: string;
   hasMoreRows: boolean;
   historyScope: HistoryScope;
+  homeSummary?: HomeSummaryPayload;
+  homeStatusLoading: boolean;
+  homeStatusError: string | null;
   loadWindow: LoadWindow;
   loadAllRows: () => void;
   loadedRowCount: number;
@@ -73,11 +90,14 @@ type DashboardRouteViewProps = {
   onRefresh: () => void;
   openCallInvestigator: (recordId: string) => void;
   refreshing: boolean;
+  refreshProgressPercent: number | null;
+  refreshProgressText: string;
   refreshState: string;
   setShowExperimental: (showExperimental: boolean) => void;
   setContextApiEnabled: (enabled: boolean) => void;
   showExperimental: boolean;
   sourceIdentity: DashboardSourceIdentity;
+  threadsModel: DashboardModel;
   totalAvailableRows: number;
 };
 
@@ -100,6 +120,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     callBackLabel,
     canLoadAllRows,
     canUseLiveApi,
+    compatibilityLabs,
     contextRuntime,
     conversationalAnalysis,
     copyCallInvestigatorLink,
@@ -108,6 +129,9 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     globalQuery,
     hasMoreRows,
     historyScope,
+    homeSummary,
+    homeStatusLoading,
+    homeStatusError,
     loadWindow,
     loadAllRows,
     loadedRowCount,
@@ -119,33 +143,38 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     onRefresh,
     openCallInvestigator,
     refreshing,
+    refreshProgressPercent,
+    refreshProgressText,
     refreshState,
     setShowExperimental,
     setContextApiEnabled,
     showExperimental,
     sourceIdentity,
+    threadsModel,
     totalAvailableRows,
   } = props;
 
-  switch (activeView) {
+  const renderedView = renderedDashboardView(activeView);
+  switch (renderedView) {
     case 'overview':
       return (
-        <OverviewPage
-          conversationalAnalysis={conversationalAnalysis}
+        <HomePage
           model={model}
-          contextRuntime={contextRuntime}
-          sourceKey={sourceIdentity.sourceKey}
-          sourceRevision={sourceIdentity.sourceRevision}
-          onRefresh={onRefresh}
-          globalQuery={globalQuery}
-          runtime={{ historyScope, loadLimit, loadWindow, loadedRowCount, scopeSince, totalAvailableRows }}
+          payload={dashboardPayload}
+          summary={homeSummary}
+          readiness={conversationalAnalysis}
+          historyScope={historyScope}
+          loadWindow={loadWindow}
+          loadLimit={loadLimit}
+          scopeSince={scopeSince}
           refreshing={refreshing}
-          canLoadMoreRows={canUseLiveApi && hasMoreRows}
-          onLoadMoreRows={loadMoreRows}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          onNavigateView={navigateView}
-          globalFilters={globalFilters}
+          refreshProgressPercent={refreshProgressPercent}
+          refreshProgressText={refreshProgressText}
+          homeStatusLoading={homeStatusLoading}
+          homeStatusError={homeStatusError}
+          onRefresh={onRefresh}
+          onNavigate={navigateView}
+          onOpenCall={openCallInvestigator}
         />
       );
     case 'investigator':
@@ -171,9 +200,11 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           sourceRevision={sourceIdentity.sourceRevision}
         />
       );
+    case 'explore':
     case 'calls':
+    case 'threads':
       return (
-        <ExploreRoutePage
+        <ExplorePage
           model={model}
           globalQuery={globalQuery}
           activePreset={activePreset}
@@ -186,7 +217,8 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           onContextApiEnabledChange={setContextApiEnabled}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}
-          onNavigateView={navigateView}
+          globalFilters={globalFilters}
+          threadsModel={threadsModel}
         />
       );
     case 'call':
@@ -202,19 +234,16 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           backLabel={callBackLabel}
         />
       );
-    case 'threads':
+    case 'evidence':
       return (
-        <ThreadsPage
+        <EvidencePage
           model={model}
-          globalQuery={globalQuery}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          globalFilters={globalFilters}
           contextRuntime={contextRuntime}
-          includeArchived={historyScope === 'all'}
-          sourceKey={sourceIdentity.sourceKey}
-          sourceRevision={sourceIdentity.sourceRevision}
-          onNavigateView={navigateView}
+          onContextApiEnabledChange={setContextApiEnabled}
+          onNavigateRecord={openCallInvestigator}
+          onCopyCallLink={copyCallInvestigatorLink}
+          callBackLabel={callBackLabel}
+          onCallBack={backFromCallInvestigator}
         />
       );
     case 'usage-drain':
@@ -293,13 +322,26 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           autoRefreshEnabled={autoRefreshEnabled}
           refreshState={refreshState}
           applicationI18n={applicationI18n}
+          compatibilityLabs={compatibilityLabs}
           showExperimental={showExperimental}
           setShowExperimental={setShowExperimental}
         />
       );
     default:
-      return assertNever(activeView);
+      return assertNever(renderedView);
   }
+}
+
+type RenderedDashboardViewId = Exclude<
+  DashboardViewId,
+  'home' | 'limits'
+>;
+
+function renderedDashboardView(activeView: DashboardViewId): RenderedDashboardViewId {
+  if (activeView === 'home') return 'overview';
+  if (activeView === 'explore') return 'explore';
+  if (activeView === 'limits') return 'usage-drain';
+  return activeView;
 }
 
 function assertNever(value: never): never {

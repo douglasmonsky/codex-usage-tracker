@@ -36,4 +36,26 @@ describe('FeatureMaturityBanner', () => {
     fireEvent.click(within(note).getByRole('button', { name: 'Open replacement' }));
     expect(onSelect).toHaveBeenCalledOnce();
   });
+
+  it('names and links the core replacement for direct-only workbenches', () => {
+    render(
+      <FeatureMaturityBanner
+        kind="transitioning"
+        title="Available during transition"
+        description="This workspace remains available in Release N."
+        replacement={{
+          operation: 'usage_analyze(goal="usage_spike") → usage_evidence',
+          href: '?view=explore&mode=calls',
+        }}
+      />,
+    );
+
+    const note = screen.getByRole('note', {
+      name: 'Feature maturity: Available during transition',
+    });
+    expect(within(note).getByText('usage_analyze(goal="usage_spike") → usage_evidence'))
+      .toBeInTheDocument();
+    expect(within(note).getByRole('link', { name: 'Open evidence' }))
+      .toHaveAttribute('href', '?view=explore&mode=calls');
+  });
 });

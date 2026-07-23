@@ -7,6 +7,11 @@ import type { ViewId } from './navigation';
 import { routeDefinition } from './routeCatalog';
 import { rowLimitNoCap } from './rowLimit';
 import type { HistoryScope } from './shellUrl';
+import {
+  evidenceKindFromSearch,
+  exploreModeFromSearch,
+  type DashboardViewId,
+} from '../routes/dashboardSearch';
 
 export type RuntimeExportState = {
   contextRuntime: ContextRuntime;
@@ -39,7 +44,8 @@ export async function currentViewCsvExport(
     throw new Error(`CSV export is not available for ${routeDefinition(activeView).label}.`);
   }
   const stamp = csvDateStamp();
-    switch (activeView) {
+  const exportView = legacyExportView(activeView);
+    switch (exportView) {
       case 'threads': {
       const { threadCallsForCurrentUrl } = await import('../features/threads/ThreadsPage');
       return csvExport(`codex-thread-filtered-calls-${stamp}.csv`, threadCallsForCurrentUrl(model, globalQuery), callCsvColumns, 'call rows');
@@ -79,6 +85,20 @@ export async function currentViewCsvExport(
     case 'call':
       return csvExport(`codex-call-calls-${stamp}.csv`, callInvestigatorCallForCurrentUrl(model), callCsvColumns, 'call rows');
   }
+}
+
+type LegacyExportViewId = Exclude<DashboardViewId, 'home' | 'explore' | 'limits' | 'evidence'>;
+
+function legacyExportView(activeView: ViewId): LegacyExportViewId {
+  if (activeView === 'home') return 'overview';
+  if (activeView === 'explore') return exploreModeFromSearch() === 'threads' ? 'threads' : 'calls';
+  if (activeView === 'limits') return 'usage-drain';
+  if (activeView !== 'evidence') return activeView;
+  const evidenceKind = evidenceKindFromSearch();
+  if (evidenceKind === 'thread') return 'threads';
+  if (evidenceKind === 'allowance') return 'usage-drain';
+  if (evidenceKind === 'finding' || evidenceKind === 'analysis') return 'investigator';
+  return 'call';
 }
 
 function csvExport<T>(filename: string, rows: T[], columns: Array<CsvColumn<T>>, label: string): CsvExportSpec {

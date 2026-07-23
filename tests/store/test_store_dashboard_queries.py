@@ -5,16 +5,24 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from codex_usage_tracker.core.models import UsageEvent
+from codex_usage_tracker.recommendation_engine.materialization import sync_recommendation_facts
+from codex_usage_tracker.store import api as store_api
 from codex_usage_tracker.store import dashboard_queries
 from codex_usage_tracker.store.api import (
+    InvalidDatabasePathError,
     connect,
     init_db,
     query_dashboard_event_count,
     query_dashboard_events,
+    query_request_context_facts,
     query_thread_summaries,
+    query_usage_api_distinct_cwds,
     query_usage_api_event_count,
     query_usage_api_events,
+    query_usage_api_filter_options,
     refresh_usage_index,
     upsert_usage_events,
 )
@@ -282,6 +290,144 @@ def test_dashboard_rows_include_call_timing_from_thread_adjacency(tmp_path: Path
     assert by_gap[0]["record_id"] == "a3"
 
 
+def test_usage_api_uses_materialized_call_sort_facts(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id=record_id,
+            session_id=f"session-{record_id}",
+            thread_key=f"thread:{record_id}",
+            event_timestamp=f"2026-05-17T12:00:0{index}Z",
+            cumulative_total_tokens=100 + index,
+        )
+        for index, record_id in enumerate(("low", "middle", "high"), start=1)
+    ]
+    events[1] = replace(events[1], cwd="/tmp/older-project", model="gpt-older")
+    upsert_usage_events(events, db_path=db_path)
+    with connect(db_path) as conn:
+        init_db(conn)
+        sync_recommendation_facts(
+            conn,
+            record_ids=[event.record_id for event in events],
+        )
+        for record_id, attention, cost, credits, context in (
+            ("low", 10.0, 0.25, 1.0, 10.0),
+            ("middle", 50.0, 1.0, 2.0, 50.0),
+            ("high", 90.0, 4.5, 3.0, 90.0),
+        ):
+            conn.execute(
+                """
+                UPDATE recommendation_facts
+                SET recommendation_score = ?,
+                    estimated_cost_usd = ?,
+                    usage_credits = ?,
+                    context_window_percent = ?
+                WHERE record_id = ?
+                """,
+                (attention, cost, credits, context, record_id),
+            )
+        conn.execute(
+            """
+            UPDATE recommendation_facts
+            SET pricing_model = CASE record_id
+                    WHEN 'low' THEN NULL
+                    ELSE 'gpt-5.5'
+                END,
+                pricing_estimated = CASE record_id
+                    WHEN 'middle' THEN 1
+                    ELSE 0
+                END,
+                usage_credit_confidence = CASE record_id
+                    WHEN 'high' THEN 'exact'
+                    ELSE 'estimated'
+                END
+            """
+        )
+
+    for sort in ("attention", "cost", "credits", "context"):
+        rows = query_usage_api_events(
+            db_path=db_path,
+            limit=3,
+            include_archived=True,
+            sort=sort,
+            direction="desc",
+            legacy_archive_path_fallback=False,
+        )
+        record_ids = [row["record_id"] for row in rows]
+        assert record_ids == ["high", "middle", "low"], f"{sort}: {record_ids}"
+
+    assert [
+        row["record_id"]
+        for row in query_usage_api_events(
+            db_path=db_path,
+            limit=3,
+            pricing_status="estimated",
+            legacy_archive_path_fallback=False,
+        )
+    ] == ["middle"]
+    assert [
+        row["record_id"]
+        for row in query_usage_api_events(
+            db_path=db_path,
+            limit=3,
+            pricing_status="priced",
+            legacy_archive_path_fallback=False,
+        )
+    ] == ["high"]
+    assert [
+        row["record_id"]
+        for row in query_usage_api_events(
+            db_path=db_path,
+            limit=3,
+            pricing_status="unpriced",
+            legacy_archive_path_fallback=False,
+        )
+    ] == ["low"]
+    assert [
+        row["record_id"]
+        for row in query_usage_api_events(
+            db_path=db_path,
+            limit=3,
+            credit_confidence="exact",
+            legacy_archive_path_fallback=False,
+        )
+    ] == ["high"]
+    assert (
+        query_usage_api_event_count(
+            db_path=db_path,
+            pricing_status="estimated",
+            legacy_archive_path_fallback=False,
+        )
+        == 1
+    )
+    assert (
+        query_usage_api_event_count(
+            db_path=db_path,
+            pricing_status="priced",
+            legacy_archive_path_fallback=False,
+        )
+        == 1
+    )
+    assert (
+        query_usage_api_event_count(
+            db_path=db_path,
+            cwds=["/tmp/project"],
+            pricing_status="priced",
+            legacy_archive_path_fallback=False,
+        )
+        == 1
+    )
+    assert query_usage_api_filter_options(db_path=db_path, include_archived=True) == {
+        "models": ["gpt-5.5", "gpt-older"],
+        "efforts": [events[0].effort],
+    }
+    assert query_usage_api_distinct_cwds(
+        db_path=db_path,
+        include_archived=True,
+        legacy_archive_path_fallback=False,
+    ) == ["/tmp/older-project", "/tmp/project"]
+
+
 def test_upsert_materializes_thread_summaries(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     events = [
@@ -334,7 +480,67 @@ def test_upsert_materializes_thread_summaries(tmp_path: Path) -> None:
     assert persisted["count"] == 4
 
 
-def test_thread_summary_latest_record_lookup_uses_thread_index(tmp_path: Path) -> None:
+def test_thread_summaries_filter_risk_and_sort_cost(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            _usage_event(
+                record_id="high-risk",
+                session_id="session-high",
+                thread_key="thread:High",
+                event_timestamp="2026-05-17T12:00:00Z",
+                cumulative_total_tokens=100,
+            ),
+            _usage_event(
+                record_id="low-risk",
+                session_id="session-low",
+                thread_key="thread:Low",
+                event_timestamp="2026-05-17T12:01:00Z",
+                cumulative_total_tokens=100,
+            ),
+        ],
+        db_path=db_path,
+    )
+    with connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE thread_summaries
+            SET avg_cache_ratio = CASE thread_key
+                    WHEN 'thread:High' THEN 0.10 ELSE 0.80 END,
+                estimated_cost_usd = CASE thread_key
+                    WHEN 'thread:High' THEN 1.25 ELSE 4.50 END
+            WHERE is_archived_scope = 'active'
+            """
+        )
+
+    high_risk = query_thread_summaries(db_path=db_path, risk="high")
+    by_cost = query_thread_summaries(
+        db_path=db_path,
+        sort="cost",
+        direction="desc",
+    )
+
+    assert [row["thread_key"] for row in high_risk] == ["thread:High"]
+    assert [row["thread_key"] for row in by_cost] == ["thread:Low", "thread:High"]
+    assert query_thread_summary_count(db_path=db_path, risk="low") == 1
+    for sort in (
+        "tokens",
+        "time",
+        "calls",
+        "cache",
+        "thread",
+        "cost",
+        "credits",
+        "context",
+        "risk",
+        "cost_per_call",
+    ):
+        assert len(query_thread_summaries(db_path=db_path, sort=sort)) == 2
+
+
+def test_thread_summary_latest_record_lookup_uses_materialized_fact_index(
+    tmp_path: Path,
+) -> None:
     db_path = tmp_path / "usage.sqlite3"
     upsert_usage_events(
         [
@@ -363,8 +569,11 @@ def test_thread_summary_latest_record_lookup_uses_thread_index(tmp_path: Path) -
             ).fetchall()
         ]
 
-    assert any("idx_usage_thread_key_timestamp (thread_key=?)" in detail for detail in plan)
-    assert not any("SCAN u" in detail for detail in plan)
+    assert any(
+        "idx_recommendation_facts_thread_latest (thread_key=? AND event_timestamp=?)" in detail
+        for detail in plan
+    )
+    assert not any("SCAN rf" in detail for detail in plan)
 
 
 def test_thread_summary_latest_record_lookup_preserves_legacy_keys(tmp_path: Path) -> None:
@@ -476,3 +685,158 @@ def test_dashboard_event_counts_are_computed_together(tmp_path: Path) -> None:
         "active_available_rows": 4,
         "all_history_available_rows": 5,
     }
+
+
+def test_request_context_facts_use_one_read_transaction_and_canonical_totals(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_usage_index(codex_home=_make_codex_home(tmp_path), db_path=db_path)
+    with connect(db_path) as connection:
+        record_ids = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT record_id FROM usage_events ORDER BY record_id LIMIT 2"
+            )
+        ]
+        connection.execute(
+            "UPDATE usage_events SET is_duplicate = 1, canonical_record_id = ? WHERE record_id = ?",
+            (record_ids[0], record_ids[1]),
+        )
+
+    statements: list[str] = []
+    original_connect = store_api.sqlite3.connect
+
+    def traced_connect(*args: object, **kwargs: object) -> object:
+        connection = original_connect(*args, **kwargs)
+        connection.set_trace_callback(statements.append)
+        return connection
+
+    monkeypatch.setattr("codex_usage_tracker.store.api.sqlite3.connect", traced_connect)
+    facts = query_request_context_facts(
+        db_path=db_path,
+        scope={"history": "all"},
+        priced_models={"gpt-5.5"},
+        credit_models={"gpt-5.5"},
+    )
+
+    assert facts["physical_rows"] == 4
+    assert facts["canonical_rows"] == 3
+    assert facts["copied_rows_excluded"] == 1
+    assert facts["pricing_coverage"] == 1.0
+    assert facts["credit_coverage"] == 1.0
+    assert sum(statement.strip().upper() == "BEGIN" for statement in statements) == 1
+    assert (
+        sum(statement.lstrip().upper().startswith(("SELECT", "WITH")) for statement in statements)
+        == 1
+    )
+
+
+def test_request_context_facts_reject_existing_non_file_target(tmp_path: Path) -> None:
+    db_path = tmp_path / "database-target"
+    db_path.mkdir()
+
+    with pytest.raises(InvalidDatabasePathError, match="database path must be a regular file"):
+        query_request_context_facts(db_path=db_path, scope={})
+
+    assert db_path.is_dir()
+    assert list(db_path.iterdir()) == []
+
+
+def test_request_context_facts_normalize_plain_text_database_error(tmp_path: Path) -> None:
+    db_path = tmp_path / "not-a-database.sqlite3"
+    db_path.write_text("plain text", encoding="utf-8")
+
+    with pytest.raises(InvalidDatabasePathError, match="could not be read") as exc_info:
+        query_request_context_facts(db_path=db_path, scope={})
+
+    assert exc_info.value.__cause__ is not None
+    assert db_path.read_text(encoding="utf-8") == "plain text"
+
+
+def test_request_context_facts_reject_broken_database_symlink(tmp_path: Path) -> None:
+    missing_target = tmp_path / "missing.sqlite3"
+    db_path = tmp_path / "database-link.sqlite3"
+    try:
+        db_path.symlink_to(missing_target)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"platform cannot create symlinks: {exc}")
+
+    with pytest.raises(InvalidDatabasePathError, match="database path must be a regular file"):
+        query_request_context_facts(db_path=db_path, scope={})
+
+    assert db_path.is_symlink()
+    assert not missing_target.exists()
+
+
+def test_request_context_facts_apply_all_scope_filters_to_physical_and_canonical_rows(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    matching = replace(
+        _usage_event(
+            record_id="matching",
+            session_id="session-matching",
+            thread_key="thread:Alpha",
+            event_timestamp="2026-07-21T12:00:00Z",
+            cumulative_total_tokens=110,
+        ),
+        cwd="/tmp/project-a",
+        model="model-a",
+        effort="high",
+    )
+
+    def variant(record_id: str, timestamp: str, **changes: object) -> UsageEvent:
+        return replace(
+            matching,
+            record_id=record_id,
+            session_id=f"session-{record_id}",
+            source_file=f"/tmp/synthetic/{record_id}.jsonl",
+            turn_id=f"turn-{record_id}",
+            event_timestamp=timestamp,
+            turn_timestamp=timestamp,
+            **changes,
+        )
+
+    events = [
+        matching,
+        variant("copied", "2026-07-21T12:01:00Z"),
+        variant("archived", "2026-07-21T12:02:00Z", is_archived=1),
+        variant("other-project", "2026-07-21T12:03:00Z", cwd="/tmp/project-b"),
+        variant("other-thread", "2026-07-21T12:04:00Z", thread_key="thread:Beta"),
+        variant("other-model", "2026-07-21T12:05:00Z", model="model-b"),
+        variant("other-effort", "2026-07-21T12:06:00Z", effort="low"),
+        variant("before-window", "2026-07-21T10:00:00Z"),
+        variant("after-window", "2026-07-21T14:00:00Z"),
+    ]
+    upsert_usage_events(events, db_path=db_path)
+    with connect(db_path) as connection:
+        connection.execute("UPDATE usage_events SET is_duplicate = 0")
+        connection.execute(
+            "UPDATE usage_events SET is_duplicate = 1, canonical_record_id = ? WHERE record_id = ?",
+            ("matching", "copied"),
+        )
+
+    scope = {
+        "history": "active",
+        "since": "2026-07-21T11:30:00Z",
+        "until": "2026-07-21T12:30:00Z",
+        "filters": {
+            "project": "/tmp/project-a",
+            "thread_key": "thread:Alpha",
+            "model": "model-a",
+            "effort": "high",
+        },
+    }
+    active = query_request_context_facts(db_path=db_path, scope=scope)
+    all_history = query_request_context_facts(
+        db_path=db_path,
+        scope={**scope, "history": "all"},
+    )
+
+    assert active["physical_rows"] == 2
+    assert active["canonical_rows"] == 1
+    assert active["copied_rows_excluded"] == 1
+    assert all_history["physical_rows"] == 3
+    assert all_history["canonical_rows"] == 2
+    assert all_history["copied_rows_excluded"] == 1

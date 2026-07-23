@@ -8,6 +8,6 @@ from importlib import import_module
 _impl = import_module("codex_usage_tracker.cli.mcp_server")
 
 if __name__ == "__main__":
-    _impl.mcp.run()
+    _impl.main()
 else:
     sys.modules[__name__] = _impl

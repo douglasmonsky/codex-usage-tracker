@@ -26,13 +26,19 @@ function StatusCell({ readout }: { readout: MetricReadout }) {
   return (
     <div className={styles.capacityStatusCell}>
       <div className={styles.capacityStatusLabel}>
-        <span>{readout.label}</span>
+        <span>{readout.label}<small>{typeLabel(readout.kind)}</small></span>
         <StatusBadge tone={badgeTone(readout.kind)}>{readout.grade}</StatusBadge>
       </div>
       <strong>{readout.value}</strong>
       <p>{readout.detail}</p>
     </div>
   );
+}
+
+function typeLabel(kind: MetricReadout['kind']): string {
+  if (kind === 'observed') return 'Observed';
+  if (kind === 'estimated') return 'Descriptive estimate';
+  return 'Unavailable';
 }
 
 function badgeTone(kind: MetricReadout['kind']): 'positive' | 'context' | 'neutral' {

@@ -2,6 +2,11 @@ import { App, describe, expect, fireEvent, installAppTestHooks, it, render, scre
 import { threadsForCurrentUrl } from './features/threads/ThreadsPage';
 import { fixtureModel } from './test-fixtures/dashboardFixture';
 
+function openThreadsMode() {
+  fireEvent.click(screen.getByRole('button', { name: /^Explore$/i }));
+  fireEvent.click(screen.getByRole('tab', { name: /^Threads$/i }));
+}
+
 describe('React dashboard threads workspace', () => {
   installAppTestHooks();
 
@@ -57,7 +62,8 @@ describe('React dashboard threads workspace', () => {
 
     await waitFor(() => {
       const params = new URLSearchParams(window.location.search);
-      expect(params.get('view')).toBe('threads');
+      expect(params.get('view')).toBe('explore');
+      expect(params.get('mode')).toBe('threads');
       expect(params.get('thread_key')).toBe('fixture-thread-key-0');
       expect(params.has('thread')).toBe(false);
       expect(params.get('detail')).toBeNull();
@@ -66,7 +72,7 @@ describe('React dashboard threads workspace', () => {
 
   it('starts with scan-first columns while keeping advanced metrics available', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+    openThreadsMode();
 
     const table = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
     expect(within(table).getByRole('columnheader', { name: 'Thread' })).toBeInTheDocument();
@@ -92,7 +98,8 @@ describe('React dashboard threads workspace', () => {
 
     await waitFor(() => {
       const params = new URLSearchParams(window.location.search);
-      expect(params.get('view')).toBe('threads');
+      expect(params.get('view')).toBe('explore');
+      expect(params.get('mode')).toBe('threads');
       expect(params.get('thread')).toBe('thread-7c2b');
       expect(params.get('threads')).toBeNull();
     });
@@ -145,7 +152,7 @@ describe('React dashboard threads workspace', () => {
 
 it('expands, switches, and collapses one thread inline', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+  openThreadsMode();
   const table = screen.getByRole('treegrid', { name: 'Thread leaderboard' });
   const first = within(table).getByRole('row', { name: /thread-9f3a/i });
   const second = within(table).getByRole('row', { name: /thread-7c2b/i });
@@ -167,7 +174,7 @@ it('expands, switches, and collapses one thread inline', () => {
 
 it('never opens a representative call from parent activation', () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+  openThreadsMode();
   const row = screen.getByRole('row', { name: /thread-9f3a/i });
   fireEvent.doubleClick(row);
   fireEvent.keyDown(row, { key: 'Enter' });
@@ -180,15 +187,16 @@ it('copies a child call link with the selected thread return state', async () =>
   const writeText = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+  openThreadsMode();
   fireEvent.click(screen.getByRole('row', { name: /Expand calls for thread-9f3a/i }));
   fireEvent.click(screen.getByRole('button', { name: /Copy link for thread call thread-9f3a1c codex-1/i }));
 
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
   const copied = new URL(writeText.mock.calls[0][0]);
-  expect(copied.searchParams.get('view')).toBe('call');
+  expect(copied.searchParams.get('view')).toBe('evidence');
   expect(copied.searchParams.get('record')).toBe('fixture-call-0');
-  expect(copied.searchParams.get('return')).toBe('threads');
+  expect(copied.searchParams.get('return')).toBe('explore');
+  expect(copied.searchParams.get('return_mode')).toBe('threads');
   expect(copied.searchParams.get('thread_key')).toBe('fixture-thread-key-0');
   expect(copied.searchParams.has('thread')).toBe(false);
 });
@@ -215,17 +223,17 @@ it('shows and sorts all selected thread calls inline', () => {
     };
 
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: /^Threads$/i }));
+  openThreadsMode();
   fireEvent.click(screen.getByRole('row', { name: /thread-page-demo/i }));
   const threadCallList = within(screen.getByRole('region', { name: /Calls for thread-page-demo/i }));
 
   expect(threadCallList.getByText('7 of 7 calls loaded')).toBeInTheDocument();
-  expect(screen.getByText('model-0 / high')).toBeInTheDocument();
+  expect(threadCallList.getByText('model-0')).toBeInTheDocument();
 
 fireEvent.change(threadCallList.getByLabelText('Sort thread calls'), { target: { value: 'tokens' } });
 expect(threadCallList.getByLabelText('Sort thread calls direction')).toHaveValue('desc');
 fireEvent.change(threadCallList.getByLabelText('Sort thread calls direction'), { target: { value: 'asc' } });
-expect(screen.getByText('model-1 / high')).toBeInTheDocument();
+    expect(threadCallList.getByText('model-1')).toBeInTheDocument();
 });
 
 it('hydrates and syncs selected thread call sort URL state', async () => {
@@ -253,7 +261,7 @@ it('hydrates and syncs selected thread call sort URL state', async () => {
 
   expect(threadCallList.getByLabelText('Sort thread calls')).toHaveValue('tokens');
   expect(threadCallList.getByText('7 of 7 calls loaded')).toBeInTheDocument();
-  expect(screen.getByText('model-0 / high')).toBeInTheDocument();
+  expect(threadCallList.getByText('model-0')).toBeInTheDocument();
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
@@ -264,7 +272,7 @@ it('hydrates and syncs selected thread call sort URL state', async () => {
   fireEvent.change(threadCallList.getByLabelText('Sort thread calls'), { target: { value: 'cost' } });
 
   expect(threadCallList.getByLabelText('Sort thread calls')).toHaveValue('cost');
-  expect(screen.getByText('model-6 / high')).toBeInTheDocument();
+  expect(threadCallList.getByText('model-6')).toBeInTheDocument();
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
@@ -375,7 +383,8 @@ const row = within(screen.getByRole('treegrid', { name: 'Thread leaderboard' }))
 expect(row).not.toBeNull();
     fireEvent.click(row as HTMLTableRowElement);
 
-expect(window.location.search).toContain('view=threads');
+expect(window.location.search).toContain('view=explore');
+expect(window.location.search).toContain('mode=threads');
     expect(window.location.search).toContain('thread_key=fixture-thread-key-0');
     expect(new URLSearchParams(window.location.search).has('thread')).toBe(false);
     expect(screen.getByRole('button', { name: /Open investigator for thread call thread-9f3a1c codex-1/i })).toBeInTheDocument();
@@ -397,11 +406,12 @@ it('hydrates and syncs thread filter URL state', async () => {
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
-    expect(params.get('view')).toBe('threads');
+    expect(params.get('view')).toBe('explore');
+    expect(params.get('mode')).toBe('threads');
     expect(params.get('thread_q')).toBe('thread-0e16');
     expect(params.get('risk')).toBe('Low');
     expect(params.get('thread')).toBe('thread-0e16');
-    expect(params.get('record')).toBeNull();
+    expect(params.get('record')).toBe('stale-record');
   });
 });
 
@@ -416,11 +426,12 @@ it('hydrates and syncs thread table sort URL state', async () => {
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
-    expect(params.get('view')).toBe('threads');
+    expect(params.get('view')).toBe('explore');
+    expect(params.get('mode')).toBe('threads');
     expect(params.get('sort')).toBe('totalTokens');
     expect(params.get('direction')).toBe('asc');
     expect(params.get('page')).toBe('2');
-    expect(params.get('record')).toBeNull();
+    expect(params.get('record')).toBe('stale-record');
   });
 
   fireEvent.click(within(table).getByRole('button', { name: /Total Tokens/i }));
@@ -463,11 +474,12 @@ it('clears thread filters and selected thread URL state', () => {
   expect(screen.getAllByText('thread-9f3a').length).toBeGreaterThan(0);
   expect(screen.getByText('Thread filters cleared')).toBeInTheDocument();
   params = new URLSearchParams(window.location.search);
-  expect(params.get('view')).toBe('threads');
+  expect(params.get('view')).toBe('explore');
+  expect(params.get('mode')).toBe('threads');
 expect(params.get('thread')).toBeNull();
 expect(params.get('thread_q')).toBeNull();
 expect(params.get('risk')).toBeNull();
 expect(params.get('page')).toBeNull();
-expect(params.get('record')).toBeNull();
+expect(params.get('record')).toBe('stale-record');
 });
 });

@@ -34,6 +34,7 @@ from codex_usage_tracker.server.dashboard_pages import (
 )
 from codex_usage_tracker.server.dedupe import DedupeRouteMixin
 from codex_usage_tracker.server.diagnostic_routes import DiagnosticRouteMixin
+from codex_usage_tracker.server.http_v2 import HttpV2RouteMixin
 from codex_usage_tracker.server.investigations import (
     InvestigationKind,
     handle_investigation_request,
@@ -59,19 +60,21 @@ from codex_usage_tracker.server.responses import (
 )
 from codex_usage_tracker.server.routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
-    GET_ROUTE_METHODS,
-    POST_ROUTE_METHODS,
+    get_route_method,
     is_dashboard_shell_path,
+    post_route_method,
 )
 from codex_usage_tracker.server.status import handle_readiness_request, handle_status_request
 from codex_usage_tracker.server.summary import handle_summary_request
 from codex_usage_tracker.server.threads import handle_threads_request
+from codex_usage_tracker.store.api import query_usage_api_filter_options
 
 
 class _UsageDashboardHandler(
     compression_routes.CompressionRouteMixin,
     DiagnosticRouteMixin,
     DedupeRouteMixin,
+    HttpV2RouteMixin,
     DashboardPageMixin,
 ):
     def __init__(
@@ -130,6 +133,7 @@ class _UsageDashboardHandler(
         self._compression_jobs = compression_jobs or compression_routes.CompressionJobRegistry()
         self._query_cache = query_cache or AggregateQueryCache()
         self._allowance_query_cache = allowance_query_cache or allowance.new_query_cache()
+        self._configure_http_v2()
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name
@@ -141,9 +145,12 @@ class _UsageDashboardHandler(
                 "Request host or origin is not allowed",
             )
             return
-        route_method = GET_ROUTE_METHODS.get(parsed.path)
+        route_method = get_route_method(parsed.path)
         if route_method is not None:
-            getattr(self, route_method)(parsed.query)
+            if route_method == "_handle_http_v2":
+                self._handle_http_v2(parsed.query)
+            else:
+                getattr(self, route_method)(parsed.query)
             return
         fact_filters = GET_DIAGNOSTIC_FACT_ROUTES.get(parsed.path)
         if fact_filters is not None:
@@ -169,9 +176,12 @@ class _UsageDashboardHandler(
                 "Request host or origin is not allowed",
             )
             return
-        route_method = POST_ROUTE_METHODS.get(parsed.path)
+        route_method = post_route_method(parsed.path)
         if route_method is not None:
-            getattr(self, route_method)(parsed.query)
+            if route_method == "_handle_http_v2":
+                self._handle_http_v2(parsed.query)
+            else:
+                getattr(self, route_method)(parsed.query)
             return
         self._send_error(HTTPStatus.NOT_FOUND, "Unknown API endpoint")
 
@@ -223,6 +233,9 @@ class _UsageDashboardHandler(
             query,
             codex_home=self._codex_home,
             db_path=self._db_path,
+            pricing_path=self._pricing_path,
+            allowance_path=self._allowance_path,
+            rate_card_path=self._rate_card_path,
             include_archived_default=self._include_archived,
             send_exception=self._send_exception,
             send_json=self._send_json,
@@ -244,6 +257,7 @@ class _UsageDashboardHandler(
             query,
             live_query_params=self._live_query_params,
             live_call_rows=self._live_call_rows,
+            live_call_filter_options=self._live_call_filter_options,
             send_error=self._send_error,
             send_exception=self._send_exception,
             send_json=self._send_json,
@@ -474,6 +488,20 @@ class _UsageDashboardHandler(
             thresholds_path=self._thresholds_path,
             projects_path=self._projects_path,
             privacy_mode=self._privacy_mode,
+        )
+
+    def _live_call_filter_options(
+        self,
+        *,
+        since: str | None,
+        until: str | None,
+        include_archived: bool,
+    ) -> dict[str, list[str]]:
+        return query_usage_api_filter_options(
+            db_path=self._db_path,
+            since=since,
+            until=until,
+            include_archived=include_archived,
         )
 
     def _annotate_live_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

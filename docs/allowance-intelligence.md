@@ -158,34 +158,39 @@ because they cannot poll the v2 localhost services or analysis jobs.
 
 ## HTTP And MCP Contracts
 
-The default v2 surfaces are:
+The HTTP v2 endpoints remain operation-specific. The default MCP surface
+consolidates them behind one bounded tool:
 
 | Purpose | HTTP | MCP |
 | --- | --- | --- |
-| Poll current state | `GET /api/allowance/status` | `usage_allowance_status(...)` |
-| Query a finite timeline | `GET /api/allowance/series` | `usage_allowance_series(...)` |
-| Page latest-first evidence | `GET /api/allowance/evidence` | `usage_allowance_evidence(...)` |
-| Read/start analysis | `GET`/`POST /api/allowance/analysis` | `usage_allowance_analysis(...)` |
-| Poll analysis job | `GET /api/allowance/analysis/jobs/{job_id}` | `usage_allowance_analysis_status(job_id)` |
+| Poll current state | `GET /api/allowance/status` | `usage_allowance(operation="status")` |
+| Query a finite timeline | `GET /api/allowance/series` | `usage_allowance(operation="series", window="weekly", range="8w")` |
+| Page latest-first evidence | `GET /api/allowance/evidence` | `usage_allowance(operation="evidence", window="weekly", range="8w", limit=50)` |
+| Read/start analysis | `GET`/`POST /api/allowance/analysis` | `usage_allowance(operation="analysis", execution="auto")` |
+| Poll analysis job | `GET /api/allowance/analysis/jobs/{job_id}` | `usage_job_status(job_id, include_result=True)` |
 
-Series presets are `24h`, `7d`, `8w`, `6m`, and `all`; custom ranges are limited
-to 366 days. The `all` capacity view scans indexed aggregate cycle rows, not raw
-transcripts. Evidence limits are 1–500 and the dashboard defaults to 50;
-interactive evidence never accepts an unlimited-history setting.
+The consolidated MCP tool accepts only the finite presets `24h`, `7d`, `8w`,
+and `6m`; it rejects `all`. Its evidence limits are 1–200 and default to 50.
+Existing HTTP and individual v2 compatibility surfaces retain their documented
+bounded custom-range and aggregate-cycle behavior.
 
-Normal and strict evidence return aggregate provenance. `privacy_mode="local"`
-opts into bounded physical record identifiers. Full strict evidence export remains
-the explicit offline `usage_allowance_export(...)` compatibility workflow.
+Consolidated results are aggregate-first and each successful operation includes
+a bounded Limits v2 dashboard target. The individual v2 evidence tool retains its
+explicit local-provenance opt-in. Full strict evidence export remains the offline
+`usage_allowance_export(...)` compatibility workflow.
 
 See [CLI, MCP, and Dashboard JSON Schemas](cli-json-schemas.md) for synthetic v2
 payloads and [MCP And Codex Skills](mcp.md) for polling examples.
 
-## V1 Compatibility
+## Compatibility
 
 `usage_allowance_history`, `usage_allowance_diagnostics`, and
 `usage_allowance_export` remain available for compatibility and explicit offline
-diagnostics. New dashboard, plugin, and MCP workflows should start with the v2
-status/series/evidence/analysis tools. Interactive v2 paths never use `limit=0`.
+diagnostics. The individual `usage_allowance_status`, `usage_allowance_series`,
+`usage_allowance_evidence`, `usage_allowance_analysis`, and
+`usage_allowance_analysis_status` tools remain full-profile compatibility tools
+through 0.24. New plugin and MCP workflows should use `usage_allowance` and generic
+`usage_job_status`; interactive paths never use `limit=0` or `range="all"`.
 
 ## Privacy
 

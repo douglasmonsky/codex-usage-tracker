@@ -9,21 +9,24 @@ describe('React dashboard call investigator link URL state', () => {
         configurable: true,
         value: { writeText },
       });
-      window.history.replaceState(null, '', '/?view=overview&qa=row-copy');
+      window.history.replaceState(null, '', '/?view=explore&mode=calls&qa=row-copy');
 
  render(<App />);
  const copyButton = screen.getByRole('button', { name: /Copy link for thread-9f3a1c codex-1/i });
  fireEvent.keyDown(copyButton, { key: 'Enter' });
  expect(screen.queryByRole('heading', { name: 'Call Investigator' })).not.toBeInTheDocument();
- expect(window.location.search).toContain('view=overview');
+ expect(window.location.search).toContain('view=explore');
  fireEvent.click(copyButton);
 
       await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
       const copiedUrl = new URL(writeText.mock.calls[0][0]);
-      expect(copiedUrl.searchParams.get('view')).toBe('call');
+      expect(copiedUrl.searchParams.get('view')).toBe('evidence');
+      expect(copiedUrl.searchParams.get('kind')).toBe('call');
       expect(copiedUrl.searchParams.get('record')).toBe('fixture-call-0');
+      expect(copiedUrl.searchParams.get('return')).toBe('explore');
+      expect(copiedUrl.searchParams.get('return_mode')).toBe('calls');
       expect(copiedUrl.searchParams.get('qa')).toBe('row-copy');
-  expect(window.location.search).toContain('view=overview');
+  expect(window.location.search).toContain('view=explore');
   expect(await screen.findByText('Copied call investigator link')).toBeInTheDocument();
   });
 
@@ -43,9 +46,11 @@ describe('React dashboard call investigator link URL state', () => {
 
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
   const copiedUrl = new URL(writeText.mock.calls[0][0]);
-  expect(copiedUrl.searchParams.get('view')).toBe('call');
+  expect(copiedUrl.searchParams.get('view')).toBe('evidence');
+  expect(copiedUrl.searchParams.get('kind')).toBe('call');
   expect(copiedUrl.searchParams.get('record')).toBe('fixture-call-0');
-  expect(copiedUrl.searchParams.get('return')).toBe('calls');
+  expect(copiedUrl.searchParams.get('return')).toBe('explore');
+  expect(copiedUrl.searchParams.get('return_mode')).toBe('calls');
   expect(copiedUrl.searchParams.get('call_q')).toBe('thread-9f3a');
   expect(copiedUrl.searchParams.get('sort')).toBe('cache');
   expect(await screen.findByText('Copied investigator link')).toBeInTheDocument();
@@ -111,9 +116,11 @@ describe('React dashboard call investigator link URL state', () => {
 
    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
    const copiedUrl = new URL(writeText.mock.calls[0][0]);
-   expect(copiedUrl.searchParams.get('view')).toBe('call');
+   expect(copiedUrl.searchParams.get('view')).toBe('evidence');
+   expect(copiedUrl.searchParams.get('kind')).toBe('call');
    expect(copiedUrl.searchParams.get('record')).toBe('timeline-row-1');
-   expect(copiedUrl.searchParams.get('return')).toBe('calls');
+   expect(copiedUrl.searchParams.get('return')).toBe('explore');
+   expect(copiedUrl.searchParams.get('return_mode')).toBe('calls');
    expect(copiedUrl.searchParams.get('qa')).toBe('timeline-copy');
    expect(window.location.search).toContain('record=timeline-row-2');
    expect(await screen.findByText('Copied call investigator link')).toBeInTheDocument();
@@ -170,7 +177,7 @@ describe('React dashboard call investigator link URL state', () => {
     };
 
     render(<App />);
-    fireEvent.click(screen.getByRole('tab', { name: /Thread/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Thread$/i }));
 
     expect(screen.getByText('Context 82.0%')).toBeInTheDocument();
     expect(screen.getByText('Best-guess estimate')).toBeInTheDocument();
@@ -180,15 +187,19 @@ describe('React dashboard call investigator link URL state', () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copiedUrl = new URL(writeText.mock.calls[0][0]);
-    expect(copiedUrl.searchParams.get('view')).toBe('call');
+    expect(copiedUrl.searchParams.get('view')).toBe('evidence');
+    expect(copiedUrl.searchParams.get('kind')).toBe('call');
     expect(copiedUrl.searchParams.get('record')).toBe('timeline-row-1');
-    expect(copiedUrl.searchParams.get('return')).toBe('calls');
+    expect(copiedUrl.searchParams.get('return')).toBe('explore');
+    expect(copiedUrl.searchParams.get('return_mode')).toBe('calls');
     expect(copiedUrl.searchParams.get('qa')).toBe('side-timeline-copy');
-    expect(window.location.search).toContain('view=calls');
+    expect(window.location.search).toContain('view=explore');
+    expect(window.location.search).toContain('mode=calls');
     expect(await screen.findByText('Copied call investigator link')).toBeInTheDocument();
   });
 
-  it('opens the full-page call investigator from a single overview recent-call row click', () => {
+  it('opens the full-page call investigator from a single Explore call row click', () => {
+      window.history.replaceState(null, '', '/?view=explore&mode=calls');
       render(<App />);
 
     fireEvent.click(screen.getByText('thread-9f3a1c'));
@@ -201,7 +212,8 @@ describe('React dashboard call investigator link URL state', () => {
     expect(screen.getByText('Evidence state')).toBeInTheDocument();
     expect(screen.getByText('Next diagnostic move')).toBeInTheDocument();
     expect(screen.getByText('Evidence is not loaded yet. Aggregate token counts are exact, but visible-context attribution needs runtime evidence.')).toBeInTheDocument();
-    expect(window.location.search).toContain('view=call');
+    expect(window.location.search).toContain('view=evidence');
+    expect(window.location.search).toContain('kind=call');
     expect(window.location.search).toContain('record=fixture-call-0');
   });
 });

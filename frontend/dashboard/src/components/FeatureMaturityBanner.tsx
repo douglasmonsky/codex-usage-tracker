@@ -12,6 +12,10 @@ type FeatureMaturityBannerProps = {
     label: string;
     onSelect: () => void;
   };
+  replacement?: {
+    operation: string;
+    href: string;
+  };
 };
 
 export function FeatureMaturityBanner({
@@ -20,6 +24,7 @@ export function FeatureMaturityBanner({
   description,
   className,
   replacementAction,
+  replacement,
 }: FeatureMaturityBannerProps) {
   const i18n = useShellI18n();
   const Icon = kind === 'experimental' ? FlaskConical : Waypoints;
@@ -41,8 +46,13 @@ export function FeatureMaturityBanner({
       <div className={styles.copy}>
         <strong>{localizedTitle}</strong>
         <p>{localizedDescription}</p>
+        {replacement ? <code>{replacement.operation}</code> : null}
       </div>
-      {replacementAction ? (
+      {replacement ? (
+        <a className={styles.action} href={replacement.href}>
+          {i18n.t('evidence.open', 'Open evidence')}<ArrowRight aria-hidden="true" />
+        </a>
+      ) : replacementAction ? (
         <button className={styles.action} type="button" onClick={replacementAction.onSelect}>
           {i18n.translateText(replacementAction.label)}<ArrowRight aria-hidden="true" />
         </button>

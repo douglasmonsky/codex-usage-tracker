@@ -101,9 +101,10 @@ For experiment-style answers, use this structure:
 - An observed spawn is a distinct persisted subagent session. Agents that produced no usage event are not visible, and comparison results are descriptive rather than causal.
 - Use `usage_query` for stable JSON rows filtered by date, project, model, effort, thread, pricing status, token minimums, or Codex credit minimums.
 - Use `usage_status` for dashboard/index freshness, active/scoped/total row counts, latest refresh timestamp, and observed allowance windows.
-- Use `usage_allowance_status` as the default Limits polling entry point. It is canonical/deduped, constant-size, reports copied clone rows excluded, and returns the next refresh or polling action.
-- Use `usage_allowance_series` for a bounded reset-aware weekly or 5-hour timeline and `usage_allowance_evidence` for latest-first bounded transitions. Request local privacy mode only when physical record provenance is needed.
-- Use `usage_allowance_analysis` for persisted change evidence; if it returns a job, poll `usage_allowance_analysis_status` and reload after completion.
+- Use `usage_allowance(operation="status")` as the default Limits polling entry point. It is canonical/deduped, constant-size, reports copied clone rows excluded, and returns the next refresh or polling action.
+- Use `usage_allowance(operation="series", window="weekly", range="8w")` for a finite reset-aware timeline and `usage_allowance(operation="evidence", window="weekly", range="8w", limit=50)` for latest-first bounded transitions. Treat weekly windows as primary and 5-hour windows as noisy rolling-window context.
+- Use `usage_allowance(operation="analysis", execution="auto")` for persisted change evidence; if it returns a generic job handle, poll `usage_job_status(job_id, include_result=True)`.
+- The old `usage_allowance_status`, `usage_allowance_series`, `usage_allowance_evidence`, `usage_allowance_analysis`, and `usage_allowance_analysis_status` names remain full-profile compatibility tools through 0.24, not the default workflow.
 - Use `usage_dedupe_diagnostics` to explain copied clone rows excluded from canonical totals while preserving aggregate/source provenance.
 - Treat `usage_allowance_history`, `usage_allowance_diagnostics`, and `usage_allowance_export` as compatibility or explicit offline-diagnostic surfaces, not the default Limits workflow.
 - Use `usage_calls` for the same aggregate Calls table rows as the React dashboard, including pagination, filters, derived pricing status, and credit confidence.

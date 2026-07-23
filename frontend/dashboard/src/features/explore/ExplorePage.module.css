@@ -1,0 +1,118 @@
+.page {
+  min-width: 0;
+}
+
+.modeBar {
+  align-items: center;
+  background: var(--surface-raised, #ffffff);
+  border: 1px solid var(--border-subtle, #dfe3ea);
+  border-radius: 14px;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+}
+
+.eyebrow {
+  color: var(--text-muted, #596579);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 3px;
+  text-transform: uppercase;
+}
+
+.tabs {
+  background: var(--surface-muted, #f1f4f8);
+  border-radius: 10px;
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+}
+
+.modeControls {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+}
+
+.modeHint {
+  align-items: center;
+  background: var(--signal-selection-surface, #eef4ff);
+  border: 1px solid var(--signal-selection-line, #8db0f7);
+  border-radius: 9px;
+  color: var(--signal-selection-ink, #1d4ed8);
+  display: flex;
+  font-size: 0.8rem;
+  font-weight: 650;
+  gap: 0.45rem;
+  max-width: 20rem;
+  padding: 0.55rem 0.65rem;
+}
+
+.modeHint button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  padding: 0.15rem;
+}
+
+.hintArrow {
+  flex: 0 0 auto;
+}
+
+.tabs button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-muted, #596579);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  min-height: 36px;
+  padding: 7px 16px;
+}
+
+.tabs button:focus-visible {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 2px;
+}
+
+.tabs .activeTab {
+  background: var(--surface-raised, #ffffff);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
+  color: var(--text-strong, #172033);
+}
+
+.panel {
+  min-width: 0;
+}
+
+@media (width <= 700px) {
+  .modeBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .modeControls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .modeHint {
+    max-width: none;
+  }
+
+  .hintArrow {
+    transform: rotate(90deg);
+  }
+}

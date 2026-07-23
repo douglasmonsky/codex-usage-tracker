@@ -1,3 +1,4 @@
+# ruff: noqa: SIM905
 from __future__ import annotations
 
 import json
@@ -6,6 +7,7 @@ from pathlib import Path
 
 from codex_usage_tracker.core.json_contracts import (
     JSON_PAYLOAD_CONTRACTS,
+    MCP_EVIDENCE_SCHEMA_IDS,
     known_json_schemas,
     validate_json_payload_contract,
 )
@@ -15,6 +17,12 @@ SCHEMA_PATTERN = re.compile(r"codex-usage-tracker(?:-[a-z0-9-]+-v[0-9]+|\.[a-z0-
 RUNTIME_SCHEMA_SOURCE_PATHS = [
     REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "api_payloads.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "core" / "dashboard_targets.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "application" / "query_models.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "application" / "analyze.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "application" / "status.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "application" / "refresh.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "jobs" / "models.py",
+    REPO_ROOT / "src" / "codex_usage_tracker" / "interfaces" / "http" / "v2.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "cli" / "main.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "context" / "api.py",
     REPO_ROOT / "src" / "codex_usage_tracker" / "pricing" / "costing.py",
@@ -77,6 +85,39 @@ def test_allowance_v2_contracts_are_tracked() -> None:
     } <= schemas
 
 
+def test_http_v2_contracts_are_tracked_and_validate() -> None:
+    schemas = set(known_json_schemas())
+    assert {
+        "codex-usage-tracker.status.v2",
+        "codex-usage-tracker.refresh.v2",
+        "codex-usage-tracker.job.v1",
+        "codex-usage-tracker.capabilities.v2",
+        "codex-usage-tracker.error.v1",
+    } <= schemas
+    assert (
+        validate_json_payload_contract(
+            {
+                "schema": "codex-usage-tracker.capabilities.v2",
+                "analysis_goals": [],
+                "query_entities": {},
+                "query_measures": [],
+                "allowance_operations": [],
+                "evidence_selector_kinds": [],
+            }
+        )
+        == []
+    )
+    assert (
+        validate_json_payload_contract(
+            {
+                "schema": "codex-usage-tracker.error.v1",
+                "error": {"code": "invalid_request", "message": "invalid"},
+            }
+        )
+        == []
+    )
+
+
 def test_dashboard_target_contract_is_tracked() -> None:
     payload = {
         "schema": "codex-usage-tracker-dashboard-target-v1",
@@ -90,6 +131,57 @@ def test_dashboard_target_contract_is_tracked() -> None:
     }
 
     assert validate_json_payload_contract(payload) == []
+
+
+def test_query_v2_contract_is_exactly_tracked() -> None:
+    expected = {
+        "required": {
+            "entity": str,
+            "columns": (list, tuple),
+            "rows": (list, tuple),
+            "next_cursor": (str, type(None)),
+            "total_matched": (int, type(None)),
+            "dashboard_target": (dict, type(None)),
+        }
+    }
+
+    assert JSON_PAYLOAD_CONTRACTS["codex-usage-tracker.query.v2"] == expected
+    assert (
+        validate_json_payload_contract(
+            {
+                "schema": "codex-usage-tracker.query.v2",
+                "entity": "model",
+                "columns": ["model", "tokens"],
+                "rows": [],
+                "next_cursor": None,
+                "total_matched": 0,
+                "dashboard_target": None,
+            }
+        )
+        == []
+    )
+
+
+def test_analysis_v2_and_analysis_job_contracts_are_exactly_tracked() -> None:
+    analysis = JSON_PAYLOAD_CONTRACTS["codex-usage-tracker.analysis.v2"]["required"]
+    job = JSON_PAYLOAD_CONTRACTS["codex-usage-tracker.analysis-job.v1"]["required"]
+
+    assert set(analysis) == set(
+        "analysis_id goal summary findings evidence methodology suggested_questions strategy_id "
+        "strategy_version source_revision accounting messages limitations dashboard_destinations".split()
+    )
+    assert set(job) == set(
+        "job_id kind state progress_percent stage source_revision request_hash created_at updated_at "
+        "completed_at retryable error result_schema result".split()
+    )
+
+
+def test_evidence_result_and_dashboard_v2_contracts_are_non_colliding() -> None:
+    result = JSON_PAYLOAD_CONTRACTS["codex-usage-tracker.evidence-result.v1"]["required"]
+    target = JSON_PAYLOAD_CONTRACTS["codex-usage-tracker-dashboard-target-v2"]["required"]
+    assert set(result) == {"selector", "records", "next_cursor", "dashboard_target"}
+    assert {"target_id", "surface", "evidence_kind", "selectors", "scope"} <= set(target)
+    assert "codex-usage-tracker.evidence.v1" in JSON_PAYLOAD_CONTRACTS
 
 
 def test_subagent_usage_schema_id_contract_is_tracked() -> None:
@@ -163,9 +255,10 @@ def test_json_contract_validation_reports_schema_and_type_errors() -> None:
 
 
 def test_documented_schema_table_matches_tracked_contracts() -> None:
-    documented = _documented_schema_ids()
+    documented = _documented_schema_ids() | _documented_mcp_schema_ids()
 
     assert documented == set(known_json_schemas())
+    assert _documented_mcp_schema_ids() == set(MCP_EVIDENCE_SCHEMA_IDS)
 
 
 def test_runtime_schema_ids_emitted_by_code_are_tracked() -> None:
@@ -224,6 +317,11 @@ def _documented_schema_ids() -> set[str]:
         if match:
             schemas.add(match.group(0))
     return schemas
+
+
+def _documented_mcp_schema_ids() -> set[str]:
+    docs = (REPO_ROOT / "docs" / "contracts.md").read_text(encoding="utf-8")
+    return set(SCHEMA_PATTERN.findall(docs))
 
 
 def _example_value(expected: object) -> object:

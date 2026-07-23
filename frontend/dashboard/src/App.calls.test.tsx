@@ -30,7 +30,8 @@ expect(screen.getByLabelText('Sort calls')).toHaveValue('time');
 expect(screen.getByRole('button', { name: 'Dense' })).toHaveAttribute('aria-pressed', 'true');
 expect(screen.getByText('Calls filters cleared')).toBeInTheDocument();
 const params = new URLSearchParams(window.location.search);
-expect(params.get('view')).toBe('calls');
+expect(params.get('view')).toBe('explore');
+expect(params.get('mode')).toBe('calls');
 for (const key of ['record', 'call_q', 'model', 'effort', 'confidence', 'source', 'date', 'from', 'to', 'sort', 'direction', 'density']) {
 expect(params.get(key)).toBeNull();
 }
@@ -52,7 +53,8 @@ it('hydrates selected calls record URL state', async () => {
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
-    expect(params.get('view')).toBe('calls');
+    expect(params.get('view')).toBe('explore');
+    expect(params.get('mode')).toBe('calls');
     expect(params.get('record')).toBe('fixture-call-2');
   });
 });
@@ -70,7 +72,8 @@ it('hydrates legacy detail-first calls URL state', async () => {
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
-    expect(params.get('view')).toBe('calls');
+    expect(params.get('view')).toBe('explore');
+    expect(params.get('mode')).toBe('calls');
     expect(params.get('record')).toBe('fixture-call-0');
     expect(params.get('detail')).toBeNull();
   });
@@ -88,7 +91,8 @@ it('syncs selected calls record when a table row is hovered', async () => {
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
-    expect(params.get('view')).toBe('calls');
+    expect(params.get('view')).toBe('explore');
+    expect(params.get('mode')).toBe('calls');
     expect(params.get('record')).toBe('fixture-call-2');
   });
 });
@@ -105,9 +109,11 @@ it('opens full call investigator when a calls table row is clicked', async () =>
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
-    expect(params.get('view')).toBe('call');
+    expect(params.get('view')).toBe('evidence');
+    expect(params.get('kind')).toBe('call');
     expect(params.get('record')).toBe('fixture-call-2');
-    expect(params.get('return')).toBe('calls');
+    expect(params.get('return')).toBe('explore');
+    expect(params.get('return_mode')).toBe('calls');
   });
   expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
 });
@@ -133,7 +139,8 @@ fireEvent.change(screen.getByLabelText('End date'), { target: { value: '2026-07-
     ).toBeInTheDocument();
 
     let params = new URLSearchParams(window.location.search);
-  expect(params.get('view')).toBe('calls');
+  expect(params.get('view')).toBe('explore');
+  expect(params.get('mode')).toBe('calls');
   expect(params.get('record')).toBeNull();
   expect(params.get('page')).toBeNull();
   expect(params.get('call_q')).toBe('thread-3c8d4e');

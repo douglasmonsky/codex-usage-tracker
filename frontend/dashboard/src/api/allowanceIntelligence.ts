@@ -43,12 +43,19 @@ export type AllowanceAnalysisRequest = {
 
 export async function loadAllowanceStatus(
   runtime: ContextRuntime,
-  options: { includeArchived?: boolean; sinceRevision?: string } = {},
+  options: {
+    includeArchived?: boolean;
+    sinceRevision?: string;
+    includeEstimation?: boolean;
+  } = {},
   signal?: AbortSignal,
 ): Promise<AllowanceStatusPayload> {
   const params = new URLSearchParams();
   appendBoolean(params, 'include_archived', options.includeArchived);
   appendValue(params, 'since_revision', options.sinceRevision);
+  if (options.includeEstimation !== undefined) {
+    params.set('include_estimation', options.includeEstimation ? '1' : '0');
+  }
   return fetchAllowance(runtime, '/api/allowance/status', params, 'GET',
     'codex-usage-tracker-allowance-status-v2', 'Allowance status', signal);
 }

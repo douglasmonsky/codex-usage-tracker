@@ -7,10 +7,7 @@ import { csvDateStamp, downloadCsv, rowsToCsv } from '../shared/exportCsv';
 import { copyText } from '../shared/copyText';
 import { presetLabel } from '../shared/investigationPresets';
 import { callActionColumn, callColumns, callCsvColumns } from '../shared/tables';
-import {
-  buildCallsFilterSummary,
-  type CallsSortKey,
-} from './callFilterSummary';
+import { buildCallsFilterSummary, type CallsSortKey } from './callFilterSummary';
 import {
   buildCallsViewLink,
   defaultCallsSortDirection,
@@ -27,6 +24,7 @@ import { filterCalls, sortCalls } from './callsFilterSort';
 import { callsEndpointState } from './callsEndpointState';
 import { CallsExplorerView } from './CallsExplorerView';
 import { callsTablePageSize, useCallsExplorerControls } from './useCallsExplorerControls';
+import { useFocusedCallFilterOptions } from './useFocusedCallFilterOptions';
 
 export type CallsPageProps = {
   model: DashboardModel;
@@ -84,9 +82,7 @@ const callsSortToColumnId: Record<CallsSortKey, string> = {
   cache: 'cachedPct',
   context: 'contextWindowPct',
 };
-const callsColumnIdToSort = Object.fromEntries(
-  Object.entries(callsSortToColumnId).map(([sortKey, columnId]) => [columnId, sortKey]),
-) as Record<string, CallsSortKey>;
+const callsColumnIdToSort = Object.fromEntries(Object.entries(callsSortToColumnId).map(([sortKey, columnId]) => [columnId, sortKey])) as Record<string, CallsSortKey>;
 export function CallsPage({
   model,
   globalQuery,
@@ -105,52 +101,67 @@ export function CallsPage({
 }: CallsPageProps) {
   const controls = useCallsExplorerControls(model, globalQuery);
   const {
-    localQuery, modelFilter, effortFilter, confidenceFilter, sourceFilter, timeFilter,
-    dateStart, dateEnd, sortKey, setSortKey, sortDirection, setSortDirection,
-    gridPreferences, density, selectedCallId, setSelectedCallId, visibleCallRows,
-    setVisibleCallRows, exportStatus, setExportStatus, filterStatus, detailsExpanded,
-    searchInputRef, modelOptions, effortOptions, sourceCoverage, dateRangeStatus,
-    resetCallTablePage, updateLocalQuery, updateModelFilter, updateEffortFilter,
-    updateConfidenceFilter, updateSourceFilter, updateTimeFilter, updateDateStart,
-    updateDateEnd, updateSortKey, updateSortDirection, clearCallFilters, toggleCallDetails,
+    localQuery,
+    modelFilter,
+    effortFilter,
+    confidenceFilter,
+    sourceFilter,
+    timeFilter,
+    dateStart,
+    dateEnd,
+    sortKey,
+    setSortKey,
+    sortDirection,
+    setSortDirection,
+    gridPreferences,
+    density,
+    selectedCallId,
+    setSelectedCallId,
+    visibleCallRows,
+    setVisibleCallRows,
+    exportStatus,
+    setExportStatus,
+    filterStatus,
+    detailsExpanded,
+    searchInputRef,
+    modelOptions,
+    effortOptions,
+    sourceCoverage,
+    dateRangeStatus,
+    resetCallTablePage,
+    updateLocalQuery,
+    updateModelFilter,
+    updateEffortFilter,
+    updateConfidenceFilter,
+    updateSourceFilter,
+    updateTimeFilter,
+    updateDateStart,
+    updateDateEnd,
+    updateSortKey,
+    updateSortDirection,
+    clearCallFilters,
+    toggleCallDetails,
   } = controls;
-  const interactiveCallColumns = useMemo<Array<ColumnDef<CallRow, unknown>>>(
-    () => [...callColumns, callActionColumn({ onOpenInvestigator, onCopyCallLink })],
-    [onCopyCallLink, onOpenInvestigator],
-  );
+  const interactiveCallColumns = useMemo<Array<ColumnDef<CallRow, unknown>>>(() => [...callColumns, callActionColumn({ onOpenInvestigator, onCopyCallLink })], [onCopyCallLink, onOpenInvestigator]);
   const endpointState = useMemo(
-    () => callsEndpointState({
-      runtime: contextRuntime,
-      enabled: focusedEndpointsEnabled,
-      activePreset,
-      sourceFilter,
-      sortKey,
-      scopeSince,
-      timeFilter,
-      dateStart,
-      dateEnd,
-      confidenceFilter,
-      globalQuery,
-      localQuery,
-      modelFilter,
-      effortFilter,
-    }),
-    [
-      activePreset,
-      confidenceFilter,
-      contextRuntime,
-      dateEnd,
-      dateStart,
-      effortFilter,
-      focusedEndpointsEnabled,
-      globalQuery,
-      localQuery,
-      modelFilter,
-      sortKey,
-      sourceFilter,
-      scopeSince,
-      timeFilter,
-    ],
+    () =>
+      callsEndpointState({
+        runtime: contextRuntime,
+        enabled: focusedEndpointsEnabled,
+        activePreset,
+        sourceFilter,
+        sortKey,
+        scopeSince,
+        timeFilter,
+        dateStart,
+        dateEnd,
+        confidenceFilter,
+        globalQuery,
+        localQuery,
+        modelFilter,
+        effortFilter,
+      }),
+    [activePreset, confidenceFilter, contextRuntime, dateEnd, dateStart, effortFilter, focusedEndpointsEnabled, globalQuery, localQuery, modelFilter, sortKey, sourceFilter, scopeSince, timeFilter],
   );
   const focusedCallsQuery = useInfiniteQuery({
     ...callsInfiniteQueryOptions({
@@ -164,7 +175,7 @@ export function CallsPage({
       pageSize: callsTablePageSize,
     }),
     enabled: endpointState.enabled,
-    placeholderData: previous => previous,
+    placeholderData: (previous) => previous,
   });
   const locallyFilteredCalls = useMemo(
     () =>
@@ -182,22 +193,20 @@ export function CallsPage({
       }),
     [activePreset, confidenceFilter, dateEnd, dateStart, effortFilter, globalQuery, localQuery, model.calls, modelFilter, sourceFilter, timeFilter],
   );
-  const localSortedCalls = useMemo(
-    () => sortCalls(locallyFilteredCalls, sortKey, sortDirection),
-    [locallyFilteredCalls, sortDirection, sortKey],
-  );
-  const focusedCalls = useMemo(
-    () => focusedCallsQuery.data?.pages.flatMap(page => page.rows) ?? [],
-    [focusedCallsQuery.data],
-  );
+  const localSortedCalls = useMemo(() => sortCalls(locallyFilteredCalls, sortKey, sortDirection), [locallyFilteredCalls, sortDirection, sortKey]);
+  const focusedCalls = useMemo(() => focusedCallsQuery.data?.pages.flatMap((page) => page.rows) ?? [], [focusedCallsQuery.data]);
+  const focusedFilterOptions = useFocusedCallFilterOptions({
+    calls: focusedCalls,
+    modelOptions,
+    effortOptions,
+    focusedModelOptions: focusedCallsQuery.data?.pages[0]?.filterOptions.models ?? [],
+    focusedEffortOptions: focusedCallsQuery.data?.pages[0]?.filterOptions.efforts ?? [],
+    selectedModel: modelFilter,
+    selectedEffort: effortFilter,
+  });
   const usingFocusedCalls = endpointState.enabled && Boolean(focusedCallsQuery.data);
-  const sortedCalls = useMemo(
-    () => usingFocusedCalls ? sortCalls(focusedCalls, sortKey, sortDirection) : localSortedCalls,
-    [focusedCalls, localSortedCalls, sortDirection, sortKey, usingFocusedCalls],
-  );
-  const totalMatchedCalls = usingFocusedCalls
-    ? focusedCallsQuery.data?.pages[0]?.totalMatchedRows ?? sortedCalls.length
-    : model.calls.length;
+  const sortedCalls = useMemo(() => (usingFocusedCalls ? sortCalls(focusedCalls, sortKey, sortDirection) : localSortedCalls), [focusedCalls, localSortedCalls, sortDirection, sortKey, usingFocusedCalls]);
+  const totalMatchedCalls = usingFocusedCalls ? (focusedCallsQuery.data?.pages[0]?.totalMatchedRows ?? sortedCalls.length) : model.calls.length;
   const tableSubtitle = useMemo(
     () =>
       buildCallsFilterSummary({
@@ -213,32 +222,11 @@ export function CallsPage({
         dateRangeStatus,
         activePresetLabel: activePreset ? presetLabel(activePreset) : '',
       }),
-    [
-      activePreset,
-      confidenceFilter,
-      dateRangeStatus,
-      effortFilter,
-      globalQuery,
-      localQuery,
-      modelFilter,
-      sortedCalls.length,
-      sourceFilter,
-      timeFilter,
-      totalMatchedCalls,
-    ],
+    [activePreset, confidenceFilter, dateRangeStatus, effortFilter, globalQuery, localQuery, modelFilter, sortedCalls.length, sourceFilter, timeFilter, totalMatchedCalls],
   );
-  const tableSorting = useMemo<SortingState>(
-    () => [{ id: callsSortToColumnId[sortKey], desc: sortDirection === 'desc' }],
-    [sortDirection, sortKey],
-  );
-  const selectedCall =
-    selectedCallId === detailFirstSelectedCallId
-      ? sortedCalls[0] ?? null
-      : sortedCalls.find(call => call.id === selectedCallId) ?? sortedCalls[0] ?? null;
-  const selectedRecordId =
-    selectedCall && (selectedCall.id === selectedCallId || selectedCallId === detailFirstSelectedCallId)
-      ? selectedCall.id
-      : '';
+  const tableSorting = useMemo<SortingState>(() => [{ id: callsSortToColumnId[sortKey], desc: sortDirection === 'desc' }], [sortDirection, sortKey]);
+  const selectedCall = selectedCallId === detailFirstSelectedCallId ? (sortedCalls[0] ?? null) : (sortedCalls.find((call) => call.id === selectedCallId) ?? sortedCalls[0] ?? null);
+  const selectedRecordId = selectedCall && (selectedCall.id === selectedCallId || selectedCallId === detailFirstSelectedCallId) ? selectedCall.id : '';
 
   useEffect(() => {
     if (selectedCallId === detailFirstSelectedCallId && selectedRecordId) {
@@ -249,26 +237,26 @@ export function CallsPage({
   useEffect(() => {
     const url = buildCallsViewLink({
       localQuery,
-modelFilter,
-effortFilter,
-confidenceFilter,
-sourceFilter,
-timeFilter,
-dateStart,
-dateEnd,
-sortKey,
-sortDirection,
-density,
-selectedRecordId,
-visibleRowCount: visibleCallRows,
-pageSize: callsTablePageSize,
-});
-if (url.toString() !== window.location.href) {
-window.history.replaceState(null, '', url);
-}
-}, [confidenceFilter, dateEnd, dateStart, density, effortFilter, localQuery, modelFilter, selectedRecordId, sortDirection, sortKey, sourceFilter, timeFilter, visibleCallRows]);
+      modelFilter,
+      effortFilter,
+      confidenceFilter,
+      sourceFilter,
+      timeFilter,
+      dateStart,
+      dateEnd,
+      sortKey,
+      sortDirection,
+      density,
+      selectedRecordId,
+      visibleRowCount: visibleCallRows,
+      pageSize: callsTablePageSize,
+    });
+    if (url.toString() !== window.location.href) {
+      window.history.replaceState(null, '', url);
+    }
+  }, [confidenceFilter, dateEnd, dateStart, density, effortFilter, localQuery, modelFilter, selectedRecordId, sortDirection, sortKey, sourceFilter, timeFilter, visibleCallRows]);
 
-function exportCalls() {
+  function exportCalls() {
     downloadCsv(`codex-calls-${csvDateStamp()}.csv`, rowsToCsv(sortedCalls, callCsvColumns));
     setExportStatus(`Exported ${sortedCalls.length} calls`);
   }
@@ -279,18 +267,18 @@ function exportCalls() {
         localQuery,
         modelFilter,
         effortFilter,
-confidenceFilter,
-sourceFilter,
-timeFilter,
+        confidenceFilter,
+        sourceFilter,
+        timeFilter,
         dateStart,
         dateEnd,
-          sortKey,
-          sortDirection,
-          density,
-selectedRecordId,
-visibleRowCount: visibleCallRows,
-pageSize: callsTablePageSize,
-});
+        sortKey,
+        sortDirection,
+        density,
+        selectedRecordId,
+        visibleRowCount: visibleCallRows,
+        pageSize: callsTablePageSize,
+      });
       const copied = await copyText(url.toString());
       if (!copied) {
         throw new Error('Clipboard unavailable');
@@ -313,7 +301,7 @@ pageSize: callsTablePageSize,
   async function loadMoreFocusedCalls() {
     if (!focusedCallsQuery.hasNextPage || focusedCallsQuery.isFetchingNextPage) return;
     await focusedCallsQuery.fetchNextPage();
-    setVisibleCallRows(current => current + callsTablePageSize);
+    setVisibleCallRows((current) => current + callsTablePageSize);
   }
 
   return (
@@ -338,8 +326,8 @@ pageSize: callsTablePageSize,
         dateEnd,
         sortKey,
         sortDirection,
-        modelOptions,
-        effortOptions,
+        modelOptions: focusedFilterOptions.models,
+        effortOptions: focusedFilterOptions.efforts,
         sourceCoverage,
         dateRangeStatus,
         onLocalQueryChange: updateLocalQuery,

@@ -58,6 +58,11 @@ def test_analysis_jobs_deduplicate_active_work_and_publish_monotonic_progress() 
     }
     assert completed["result"] == {"refreshed_sections": 10}
     assert completed["next"] == {"action": "reload_persisted_results"}
+    generic = registry.job_service.status(str(first["job_id"]), include_result=True)
+    assert generic.kind == "diagnostic"
+    assert generic.state == "completed"
+    assert generic.result == {"refreshed_sections": 10}
+    assert "generation:7:all" not in generic.request_hash
 
 
 def test_analysis_job_status_is_read_only_and_worker_survives_abandoned_observer() -> None:

@@ -1,18 +1,18 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, render, screen, vi, within } from './test-utils/appTestHarness';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, navigateApp, render, screen, vi, within } from './test-utils/appTestHarness';
 
 describe('React dashboard diagnostics snapshot matrix', () => {
   installAppTestHooks();
 
  it('opens full-page call investigator from diagnostic snapshot rows', () => {
  render(<App />);
- fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+ navigateApp('/?view=diagnostics');
 
  fireEvent.click(
  screen.getByRole('button', { name: /Open investigator for diagnostic snapshot Tool Output file-heavy/i }),
  );
 
  expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
- expect(window.location.search).toContain('view=call');
+ expect(window.location.search).toContain('view=evidence');
  expect(window.location.search).toContain('record=fixture-call-6');
  });
 
@@ -78,7 +78,7 @@ describe('React dashboard diagnostics snapshot matrix', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=diagnostics');
 
     await screen.findByText('Live snapshots: 10');
     const overviewCard = screen.getByText('Distinct aggregate thread labels').closest('article') as HTMLElement;
@@ -186,7 +186,7 @@ describe('React dashboard diagnostics snapshot matrix', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=diagnostics');
     await screen.findByText('Live snapshots: 10');
 
     const overviewCard = screen.getByText('Distinct aggregate thread labels').closest('article') as HTMLElement;
@@ -207,7 +207,7 @@ describe('React dashboard diagnostics snapshot matrix', () => {
 
   it('opens the full-page call investigator from diagnostics snapshot matrix rows', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=diagnostics');
 
     expect(screen.getByRole('heading', { name: 'Diagnostics Notebook' })).toBeInTheDocument();
     expect(screen.getByText('Diagnostics Snapshot Matrix')).toBeInTheDocument();
@@ -219,13 +219,13 @@ describe('React dashboard diagnostics snapshot matrix', () => {
 
     expect(screen.getByRole('heading', { name: 'Call Investigator' })).toBeInTheDocument();
     expect(screen.getByText('thread-6a5b4c / codex-1')).toBeInTheDocument();
-    expect(window.location.search).toContain('view=call');
+    expect(window.location.search).toContain('view=evidence');
     expect(window.location.search).toContain('record=fixture-call-6');
   });
 
   it('expands compact diagnostic snapshot cards and keeps hidden row actions available', () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=diagnostics');
 
     const toolOutputCard = screen.getByRole('heading', { name: 'Tool Output' }).closest('article');
     if (!toolOutputCard) throw new Error('Tool Output diagnostic card not found');
@@ -291,7 +291,7 @@ describe('React dashboard diagnostics snapshot matrix', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Diagnostics Notebook/i }));
+    navigateApp('/?view=diagnostics');
     await screen.findByText('Live snapshots: 10');
 
     const commandsCard = screen.getByRole('heading', { name: 'Commands' }).closest('article');

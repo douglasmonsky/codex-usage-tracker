@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { buildThreads } from '../../api/client';
 import { fixtureModel } from '../../test-fixtures/dashboardFixture';
 import {
-  buildThreadsDepartureUrl,
   callsForThreadRow,
   canonicalThreadSelector,
   nextThreadSelection,
@@ -78,13 +77,4 @@ describe('ThreadsPage canonical thread routing', () => {
     expect(resolveSelectedThread(renamedThreads, canonical)?.name).toBe('Updated private label');
   });
 
-  it('clears both thread selectors when leaving the Threads workspace', () => {
-    const url = buildThreadsDepartureUrl(
-      'tools',
-      'http://localhost/react-dashboard.html?view=threads&thread=Private%20project&thread_key=session%3A019e374d-c19f-7da3-a44f-8de043a7a64e',
-    );
-
-    expect(url.searchParams.has('thread')).toBe(false);
-    expect(url.searchParams.has('thread_key')).toBe(false);
-  });
 });

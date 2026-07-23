@@ -20,6 +20,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_THRESHOLDS_PATH,
 )
 from codex_usage_tracker.dashboard.api import dashboard_payload
+from codex_usage_tracker.jobs import JobService, RefreshJobAdapter, request_hash
 from codex_usage_tracker.recommendation_engine.api import refresh_usage_index
 from codex_usage_tracker.server.utils import (
     elapsed_ms,
@@ -45,9 +46,10 @@ TokenValidator = Callable[[dict[str, list[str]]], bool]
 class RefreshJobRegistry:
     """In-process async refresh job registry for live dashboard polling."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, job_service: JobService | None = None) -> None:
         self._lock = threading.Lock()
         self._jobs: dict[str, dict[str, object]] = {}
+        self.job_service = job_service or JobService()
 
     def start_refresh(
         self,
@@ -84,6 +86,14 @@ class RefreshJobRegistry:
         }
         with self._lock:
             self._jobs[job_id] = job
+        self.job_service.register(
+            kind="refresh",
+            job_id=job_id,
+            adapter=RefreshJobAdapter(
+                lambda registered_id, *, include_result=False: self.status(registered_id),
+                request_hash=request_hash((str(db_path), include_archived, aggregate_only)),
+            ),
+        )
         thread = threading.Thread(
             target=self._run_refresh,
             kwargs={

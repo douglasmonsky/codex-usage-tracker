@@ -30,12 +30,14 @@ export function ConversationalAnalysisStatus({ readiness }: Props) {
   const i18n = useShellI18n();
   const status = normalizeConversationalReadiness(readiness);
   const fallbackLabels = [
-    ['readiness.fallback.calls', 'Calls'],
-    ['readiness.fallback.threads', 'Threads'],
+    ['readiness.fallback.home', 'Home'],
+    ['readiness.fallback.explore', 'Explore'],
     ['readiness.fallback.limits', 'Limits'],
-    ['readiness.fallback.diagnostics', 'Diagnostics'],
-    ['readiness.fallback.advanced', 'Advanced experimental controls'],
+    ['readiness.fallback.cli', 'CLI analyze or query'],
   ] as const;
+  const action = status.next_action
+    ? i18n.translateText(status.next_action)
+    : i18n.t(guidanceKeys[status.state], status.summary);
   return (
     <section className={styles.card} aria-labelledby="conversational-analysis-title">
       <div className={styles.heading}>
@@ -46,7 +48,7 @@ export function ConversationalAnalysisStatus({ readiness }: Props) {
         <span className={styles.state}>{i18n.t(stateKeys[status.state], status.state)}</span>
       </div>
       <p>{i18n.translateText(status.summary)}</p>
-      <p className={styles.action}>{i18n.t(guidanceKeys[status.state], status.summary)}</p>
+      <p className={styles.action}>{action}</p>
       <div className={styles.fallbacks}>
         <strong>{i18n.t('readiness.manual_fallback', 'Manual fallback')}</strong>
         <ul>

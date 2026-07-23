@@ -211,7 +211,8 @@ describe('Overview focused evidence flow', () => {
     expect(screen.queryByRole('progressbar', { name: 'Loading overview evidence' })).not.toBeInTheDocument();
     expect(screen.getByText('Total Calls')).toBeInTheDocument();
     expect(screen.getByText('1,250')).toBeInTheDocument();
-    expect(screen.getByText('8 detailed rows available')).toBeInTheDocument();
+    expect(screen.queryByText('8 detailed rows available')).not.toBeInTheDocument();
+    expect(screen.queryByText('reported token accounting')).not.toBeInTheDocument();
     expect(screen.getByText('Estimated Cost')).toBeInTheDocument();
     expect(screen.getByText('$890.00')).toBeInTheDocument();
     expect(screen.getByText('Estimated credits')).toBeInTheDocument();

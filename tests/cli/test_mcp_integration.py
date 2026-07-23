@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -10,6 +11,7 @@ from typing import Any, cast
 from codex_usage_tracker.cli.plugin_installer import install_plugin
 from codex_usage_tracker.dashboard_service import DashboardServiceStatus
 from codex_usage_tracker.store.api import query_session_usage
+from tests.release_catalog import ALL_MCP_TOOL_NAMES
 from tests.store_dashboard_helpers import (
     ARCHIVED_SESSION_ID,
     SESSION_ID,
@@ -21,6 +23,18 @@ from tests.store_dashboard_helpers import (
     _write_jsonl,
     _write_pricing,
 )
+
+
+def test_legacy_imports_do_not_register_a_hidden_compatibility_server() -> None:
+    from codex_usage_tracker import mcp_server
+    from codex_usage_tracker.cli.mcp_runtime import mcp
+    from codex_usage_tracker.interfaces.mcp.runtime import build_mcp_server, compatibility_mcp
+
+    assert callable(mcp.tool)
+    assert asyncio.run(compatibility_mcp.list_tools()) == []
+    developer = {tool.name for tool in asyncio.run(build_mcp_server("developer").list_tools())}
+    assert developer == ALL_MCP_TOOL_NAMES
+    assert callable(mcp_server.main)
 
 
 def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
@@ -712,6 +726,7 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     with mcp_server._DOGFOOD_JOB_LOCK:
         mcp_server._DOGFOOD_JOBS.clear()
         mcp_dogfood.DOGFOOD_RESULT_CACHE.clear()
+    dogfood_job_service = mcp_dogfood.reset_job_service()
 
     started = mcp_server.usage_dogfood_start(
         evidence_limit=1,
@@ -736,6 +751,10 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     assert status["cache"]["cache_keys"]
     assert status["stages"][-1]["stage"] == "write_artifacts"
     assert Path(status["artifacts"]["summary_json_path"]).exists()
+    generic = dogfood_job_service.status(str(job_id))
+    assert generic.kind == "diagnostic"
+    assert generic.state == "completed"
+    assert generic.result is None
 
     result = mcp_server.usage_dogfood_result(job_id)
     assert result["schema"] == "codex-usage-tracker-agentic-dogfood-v1"
@@ -779,3 +798,13 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     assert disk_cached["status"] == "completed"
     assert disk_cached["result_cache"]["hit"] is True
     assert disk_cached["result_cache"]["source"] == "disk"
+
+
+def test_core_query_adapter_does_not_replace_legacy_cli_handler() -> None:
+    from codex_usage_tracker import mcp_server
+    from codex_usage_tracker.interfaces.mcp.registry import handler_for_profile, tool_specs
+
+    query_spec = next(spec for spec in tool_specs() if spec.name == "usage_query")
+    assert handler_for_profile(query_spec, "core") is query_spec.handler
+    assert handler_for_profile(query_spec, "full") is mcp_server.usage_query
+    assert handler_for_profile(query_spec, "developer") is mcp_server.usage_query

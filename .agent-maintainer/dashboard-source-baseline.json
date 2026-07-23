@@ -2,13 +2,13 @@
   "exceptions": {
     "frontend/dashboard/src/App.live-refresh.test.tsx": {
       "group": "tests",
-      "nonblank": 553,
-      "physical": 587
+      "nonblank": 563,
+      "physical": 598
     },
     "frontend/dashboard/src/App.tsx": {
       "group": "source",
-      "nonblank": 708,
-      "physical": 751
+      "nonblank": 705,
+      "physical": 744
     },
     "frontend/dashboard/src/api/client.ts": {
       "group": "source",
@@ -17,8 +17,8 @@
     },
     "frontend/dashboard/src/api/types.ts": {
       "group": "source",
-      "nonblank": 431,
-      "physical": 458
+      "nonblank": 429,
+      "physical": 456
     },
     "frontend/dashboard/src/app/zh-Hans/advancedPages.ts": {
       "group": "source",
@@ -27,8 +27,8 @@
     },
     "frontend/dashboard/src/app/zh-Hans/corePages.ts": {
       "group": "source",
-      "nonblank": 716,
-      "physical": 733
+      "nonblank": 713,
+      "physical": 730
     },
     "frontend/dashboard/src/app/zh-Hans/diagnosticsReports.ts": {
       "group": "source",
@@ -37,8 +37,8 @@
     },
     "frontend/dashboard/src/features/call-investigator/CallInvestigatorPage.tsx": {
       "group": "source",
-      "nonblank": 762,
-      "physical": 808
+      "nonblank": 761,
+      "physical": 807
     },
     "frontend/dashboard/src/features/diagnostics/DiagnosticFactsPanels.tsx": {
       "group": "source",
@@ -57,13 +57,13 @@
     },
     "frontend/dashboard/src/features/limits/LimitsPage.tsx": {
       "group": "source",
-      "nonblank": 639,
-      "physical": 683
+      "nonblank": 615,
+      "physical": 658
     },
     "frontend/dashboard/src/features/threads/ThreadsPage.tsx": {
       "group": "source",
-      "nonblank": 450,
-      "physical": 476
+      "nonblank": 433,
+      "physical": 457
     },
     "frontend/dashboard/src/styles/context-evidence.css": {
       "group": "styles",

@@ -21,7 +21,10 @@ describe('SettingsPage', () => {
     }
     expect(screen.getByText('Data window')).toBeInTheDocument();
     expect(screen.getByText('Evidence rows')).toBeInTheDocument();
-    expect(screen.getByText('Local checks passed.')).toBeInTheDocument();
+    expect(screen.getByText('Local Codex session logs')).toBeInTheDocument();
+    expect(screen.getByText('Local SQLite usage index')).toBeInTheDocument();
+    expect(screen.getByText('Local installation and launcher checks passed; current task tool exposure is not verified.')).toBeInTheDocument();
+    expect(screen.getByText(/This does not verify that the current task loaded MCP tools\./)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Estimates' }));
     expect(screen.getByText('custom-pricing.json')).toBeInTheDocument();
@@ -33,6 +36,9 @@ describe('SettingsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Application' }));
     expect(screen.getByText('en, es')).toBeInTheDocument();
+    expect(screen.getByText('core')).toBeInTheDocument();
+    expect(screen.getByText('Installed version matches launcher')).toBeInTheDocument();
+    expect(screen.getByText('Local service available')).toBeInTheDocument();
   });
 
   it('persists and restores the selected category', async () => {
@@ -65,19 +71,30 @@ describe('SettingsPage', () => {
     expect(screen.getByText('English (en)')).toBeInTheDocument();
   });
 
-  it('controls experimental features from Advanced with the complete scope explanation', () => {
+  it('keeps compatibility Labs off by default and reveals the complete direct-link inventory immediately', () => {
     const setShowExperimental = vi.fn();
     window.localStorage.setItem(settingsSectionStorageKey, '"advanced"');
-    renderPage(undefined, false, setShowExperimental);
+    const first = renderPage(undefined, false, setShowExperimental);
 
-    const checkbox = screen.getByRole('checkbox', { name: 'Show experimental dashboard features' });
+    const checkbox = screen.getByRole('checkbox', { name: 'Show compatibility and Labs links' });
     expect(checkbox).not.toBeChecked();
     expect(screen.getByText(
-      'This preference is stored for this browser origin. Experimental workspaces remain available from direct links, and Diagnostics stays visible.',
+      'This browser-local preference reveals temporary direct links. Labs never join primary navigation.',
     )).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Compatibility Labs' })).not.toBeInTheDocument();
 
     fireEvent.click(checkbox);
     expect(setShowExperimental).toHaveBeenCalledWith(true);
+
+    first.unmount();
+    renderPage(undefined, true, setShowExperimental);
+    expect(screen.getByRole('heading', { name: 'Compatibility Labs' })).toBeInTheDocument();
+    for (const label of ['Investigate', 'Compression Lab', 'Diagnostics Notebook', 'Cache And Context', 'Reports']) {
+      expect(screen.getByRole('link', { name: `Open ${label}` })).toHaveAttribute('href', expect.stringContaining('view='));
+    }
+    expect(screen.getAllByText('experimental').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('deprecated').length).toBeGreaterThan(0);
+    expect(screen.getByText('usage_analyze(goal="cache_failure")')).toBeInTheDocument();
   });
 });
 
@@ -101,18 +118,29 @@ function renderPage(
       autoRefreshEnabled={false}
       refreshState="Refresh idle"
       applicationI18n={applicationI18n}
+      compatibilityLabs={compatibilityLabs}
       showExperimental={showExperimental}
       setShowExperimental={setShowExperimental}
     />,
   );
 }
 
+const compatibilityLabs = [
+  { id: 'investigator', label: 'Investigate', maturity: 'experimental', lifecycle: 'deprecated', replacementMcpOperation: 'usage_analyze + usage_evidence' },
+  { id: 'compression-lab', label: 'Compression Lab', maturity: 'experimental', lifecycle: 'deprecated', replacementMcpOperation: 'usage_analyze(goal="token_waste")' },
+  { id: 'diagnostics', label: 'Diagnostics Notebook', maturity: 'experimental', lifecycle: 'deprecated', replacementMcpOperation: 'usage_query + usage_evidence' },
+  { id: 'cache-context', label: 'Cache And Context', maturity: 'experimental', lifecycle: 'deprecated', replacementMcpOperation: 'usage_analyze(goal="cache_failure")' },
+  { id: 'reports', label: 'Reports', maturity: 'experimental', lifecycle: 'deprecated', replacementMcpOperation: 'usage_analyze or usage_query' },
+] as const;
+
 const payload: DashboardBootPayload = {
   conversational_analysis: {
     schema: 'codex-usage-tracker-conversational-readiness-v1',
     state: 'ready',
-    summary: 'Local checks passed.',
+    summary: 'Local installation and launcher checks passed; current task tool exposure is not verified.',
     next_action: null,
+    configured_profile: 'core',
+    runtime_version_matches: true,
     evidence: ['MCP config: pass'],
   },
   shell_boot: true,

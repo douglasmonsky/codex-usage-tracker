@@ -2,13 +2,14 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ArrowUp, Copy, Download, RefreshCw, ShieldAlert, Terminal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { currentViewCsvExport } from './app/currentViewExport';
+import { createDataScopeActions, usesFocusedScopeEndpoints } from './app/dataScopeActions';
 import { errorMessage, refreshProgressLabel, type RefreshOptions } from './app/dashboardRefresh';
 import { historyScopeFromPayload, historyScopeStatusLabel } from './app/historyScope';
 import { createShellI18n, initialDashboardLanguage, storeDashboardLanguage } from './app/i18n';
 import { LocalizedShellI18nProvider } from './app/DocumentLocalizationBridge';
 import { modelWithLegacyShellFilters } from './app/legacyShellFilters';
-import { navItems, secondaryNavItems, type ViewId } from './app/navigation';
-import { routeDefinition } from './app/routeCatalog';
+import { navItems, settingsNavItem, type ViewId } from './app/navigation';
+import { compatibilityLabRoutes, routeDefinition } from './app/routeCatalog';
 import { useConversationalReadiness, useExperimentalDashboardFeatures } from './app/dashboardHooks';
 import { RowLimitControl } from './app/RowLimitControl';
 import { ShellGlobalFilters } from './app/ShellGlobalFilters';
@@ -28,8 +29,8 @@ import {
   type LoadWindow,
 } from './app/rowLimit';
 import {
-  callReturnViewFromSearch,
-  callReturnViewLabel,
+  callEvidenceReturnParams, callEvidenceUrl,
+  callReturnViewFromSearch, callReturnViewLabel,
   clearInactiveViewSearchParams,
   hasCallReturnViewParam,
   historyScopeFromUrl,
@@ -38,6 +39,8 @@ import {
   type HistoryScope,
   viewFromUrlParam,
 } from './app/shellUrl';
+import { normalizeDashboardRouteInput } from './routes/legacyRouteAliases';
+import { isEvidenceConsoleRouteId } from './routes/evidenceConsoleRoutes';
 import { modelFromBootPayload, readBootPayload, type RefreshProgressPayload } from './api/client';
 import { clearDiagnosticApiCache } from './api/diagnostics';
 import type { ContextRuntime, DashboardBootPayload, DashboardModel } from './api/types';
@@ -56,11 +59,12 @@ import { DashboardRouteView } from './routes/DashboardRouteView';
 
 const autoRefreshIntervalMs = 10_000;
 const keyboardShortcutViews: Record<string, ViewId> = {
-  '1': 'overview',
-  '2': 'calls',
-  '3': 'threads',
-  '4': 'diagnostics',
+  '1': 'home',
+  '2': 'explore',
+  '3': 'limits',
+  '4': 'settings',
 };
+const SettingsNavIcon = settingsNavItem.icon;
 export function shouldAutoRefreshUsageView(view: ViewId): boolean {
   return routeDefinition(view).capabilities.refresh;
 }
@@ -100,7 +104,7 @@ const initialLiveLoadAttempted = useRef(false);
   const [loadWindow, setLoadWindow] = useState<LoadWindow>(() => initialLoadWindowFromPayload(initialPayload));
   const [historyScope, setHistoryScope] = useState<HistoryScope>(() => historyScopeFromUrl(historyScopeFromPayload(initialPayload)));
   const [contextApiEnabled, setContextApiEnabled] = useState(model.contextRuntime.contextApiEnabled);
-const { canUseLiveApi, conversationalAnalysis } = useConversationalReadiness(initialPayload, dashboardPayload);
+const { canUseLiveApi, conversationalAnalysis, homeSummary, homeStatusLoading, homeStatusError } = useConversationalReadiness(initialPayload, dashboardPayload);
 const sourceIdentity = useMemo(() => dashboardSourceIdentityFromPayload(dashboardPayload), [dashboardPayload]);
 const shellI18n = useMemo(() => createShellI18n(dashboardPayload, language), [dashboardPayload, language]);
 const contextRuntime = useMemo<ContextRuntime>(
@@ -111,7 +115,7 @@ const legacyShellFilteredModel = useMemo(
 () => modelWithLegacyShellFilters(model, historyScope, locationSearch),
 [historyScope, locationSearch, model],
 );
-const scopedModel = activeView === 'calls' || activeView === 'call' ? model : legacyShellFilteredModel;
+const scopedModel = ['calls', 'call', 'explore', 'evidence'].includes(activeView) ? model : legacyShellFilteredModel;
 const canAutoRefreshUsageRows = shouldAutoRefreshUsageView(activeView);
   const finitePendingLoadLimit = finiteRowLimitFallback(pendingLoadLimit, loadLimit, 500);
   const loadedRowCount = Math.max(0, Number(dashboardPayload?.loaded_row_count ?? dashboardPayload?.rows?.length ?? model.calls.length ?? 0));
@@ -151,14 +155,17 @@ allRows: dashboardPayload?.all_history_available_rows,
     archivedRows: dashboardPayload?.archived_available_rows,
   });
 
-function setView(view: ViewId) {
-    setActiveView(view);
+function setView(view: ViewId, routeParams: Record<string, string> = {}) {
+  const normalized = normalizeDashboardRouteInput(view) ?? { view: 'home' as const, params: {} };
+  const targetView = normalized.view;
+    setActiveView(targetView);
     setActivePreset('');
   const url = new URL(window.location.href);
-  url.searchParams.set('view', view);
+  url.searchParams.set('view', targetView);
+  Object.entries({ ...normalized.params, ...routeParams }).forEach(([name, value]) => url.searchParams.set(name, value));
   url.searchParams.delete('preset');
-  clearInactiveViewSearchParams(url, view);
-  if (view !== 'call') {
+  clearInactiveViewSearchParams(url, targetView);
+  if (targetView !== 'evidence') {
     setActiveRecordId('');
   }
   pushShellUrl(url);
@@ -183,7 +190,9 @@ useEffect(() => {
 
 useEffect(() => {
   function hydrateShellFromLocation() {
-    const search = window.location.search;
+    const url = new URL(window.location.href);
+    if (normalizeLegacyShellUrl(url)) window.history.replaceState(null, '', url);
+    const search = url.search;
     const params = new URLSearchParams(search);
     setActiveView(viewFromUrlParam(params.get('view')));
     setActiveRecordId(params.get('record') ?? '');
@@ -231,21 +240,18 @@ useEffect(() => {
   }, []);
 
 function openCallInvestigator(recordId: string) {
-const returnView = activeView === 'call' ? callReturnView : activeView;
-setCallReturnView(returnView);
-setCallReturnViewExplicit(activeView === 'call' ? callReturnViewExplicit : true);
-setActiveView('call');
+const destination = callEvidenceUrl({
+  currentUrl: new URL(window.location.href), activeView, returnView: callReturnView, recordId,
+});
+setCallReturnView(destination.returnView);
+setCallReturnViewExplicit(destination.returningFromEvidence ? callReturnViewExplicit : true);
+setActiveView('evidence');
 setActiveRecordId(recordId);
-const url = new URL(window.location.href);
-clearInactiveViewSearchParams(url, activeView, activeView === 'call' ? callReturnView : []);
-url.searchParams.set('view', 'call');
-url.searchParams.set('record', recordId);
-url.searchParams.set('return', returnView);
-pushShellUrl(url);
+pushShellUrl(destination.url);
 }
 
 function backFromCallInvestigator() {
-setView(callReturnView);
+setView(callReturnView, callEvidenceReturnParams(window.location.search, callReturnView));
 }
 
   function updateGlobalQuery(value: string) {
@@ -350,14 +356,27 @@ useEffect(() => {
   const nextLoadLimit = sessionSettings?.loadLimit ?? loadLimit;
   const nextLoadWindow = sessionSettings?.loadWindow ?? loadWindow;
   const payloadLoadWindow = currentLoadWindowFromPayload(dashboardPayload);
-  const needsSessionRestore =
-    nextHistoryScope !== historyScope ||
-    nextLoadWindow !== payloadLoadWindow ||
-    (nextLoadWindow === 'rows' && nextLoadLimit !== loadLimitFromPayload(dashboardPayload));
-  const hasLoadedRows = loadedRows > 0;
-  if (
-    !canUseLiveApi ||
-    (!needsSessionRestore && hasLoadedRows) ||
+    const needsSessionRestore =
+      nextHistoryScope !== historyScope ||
+      nextLoadWindow !== payloadLoadWindow ||
+      (nextLoadWindow === 'rows' && nextLoadLimit !== loadLimitFromPayload(dashboardPayload));
+    const hasLoadedRows = loadedRows > 0;
+    const isFocusedShellBoot =
+      dashboardPayload?.shell_boot === true && isEvidenceConsoleRouteId(activeView);
+    if (isFocusedShellBoot) {
+      if (needsSessionRestore) {
+        setHistoryScope(nextHistoryScope);
+        setLoadLimit(nextLoadLimit);
+        setPendingLoadLimit(nextLoadLimit);
+        setLoadWindow(nextLoadWindow);
+        replaceShellUrl(historyScopeUrl(nextHistoryScope));
+      }
+      initialLiveLoadAttempted.current = true;
+      return;
+    }
+    if (
+      !canUseLiveApi ||
+      (!needsSessionRestore && hasLoadedRows) ||
     (dashboardPayload?.shell_boot !== true && availableRows <= 0) ||
     refreshing ||
     initialLiveLoadAttempted.current
@@ -409,30 +428,10 @@ function handleLoadLimitSliderChange(value: string) {
 handleLoadLimitDraftChange(value);
 }
 
-function applyLoadLimitChange() {
-void refreshDashboard({ refresh: false, loadLimit: pendingLoadLimit, loadWindow: 'rows' });
-}
-
-function loadAllRows() {
-void refreshDashboard({ refresh: false, loadWindow: 'all' });
-}
-
-function loadMoreRows() {
-setPendingLoadLimit(nextLoadMoreLimit);
-void refreshDashboard({ refresh: false, loadLimit: nextLoadMoreLimit, loadWindow });
-}
-
-function handleLoadWindowChange(nextLoadWindow: LoadWindow) {
-  if (nextLoadWindow === loadWindow) return;
-  void refreshDashboard({ refresh: false, loadWindow: nextLoadWindow });
-}
-
-function handleHistoryScopeChange(value: string) {
-  const nextHistoryScope: HistoryScope = value === 'all' ? 'all' : 'active';
-  setHistoryScope(nextHistoryScope);
-  replaceShellUrl(historyScopeUrl(nextHistoryScope));
-  void refreshDashboard({ refresh: false, historyScope: nextHistoryScope });
-}
+const { applyLoadLimitChange, handleHistoryScopeChange, handleLoadWindowChange, loadAllRows, loadMoreRows } = createDataScopeActions({
+  activeView, historyScope, loadLimit, loadWindow, nextLoadMoreLimit, pendingLoadLimit,
+  refreshDashboard, replaceShellUrl, setHistoryScope, setLoadLimit, setLoadWindow, setPendingLoadLimit, setRefreshState,
+});
 
 function handleAutoRefreshChange(enabled: boolean) {
 setAutoRefreshEnabled(enabled);
@@ -457,7 +456,7 @@ function handleLanguageChange(nextLanguage: string) {
     try {
       const url = new URL(window.location.href);
       normalizeLegacyShellUrl(url);
-      clearInactiveViewSearchParams(url, activeView, activeView === 'call' ? callReturnView : []);
+      clearInactiveViewSearchParams(url, activeView, activeView === 'call' || activeView === 'evidence' ? callReturnView : []);
       const copied = await copyText(url.toString());
       if (!copied) {
         throw new Error('Clipboard unavailable');
@@ -470,13 +469,10 @@ function handleLanguageChange(nextLanguage: string) {
 
   async function copyCallInvestigatorLink(recordId: string) {
     try {
-      const url = new URL(window.location.href);
-      clearInactiveViewSearchParams(url, activeView, activeView === 'call' ? callReturnView : []);
-      const returnView = activeView === 'call' ? callReturnView : activeView;
-      url.searchParams.set('view', 'call');
-      url.searchParams.set('record', recordId);
-url.searchParams.set('return', returnView);
-const copied = await copyText(url.toString());
+const destination = callEvidenceUrl({
+  currentUrl: new URL(window.location.href), activeView, returnView: callReturnView, recordId,
+});
+const copied = await copyText(destination.url.toString());
 if (!copied) {
 throw new Error('Clipboard unavailable');
 }
@@ -489,13 +485,13 @@ setRefreshState('Copy unavailable in browser');
 async function exportCurrentViewCsv() {
 const exportSpec = await currentViewCsvExport(
 activeView,
-scopedModel,
+activeView === 'explore' && new URLSearchParams(window.location.search).get('mode') === 'threads' ? legacyShellFilteredModel : scopedModel,
       {
         contextRuntime,
         historyScope,
         loadWindow,
         loadLimit,
-        scopeSince: dashboardPayload?.since ?? sinceForLoadWindow(loadWindow),
+        scopeSince: sinceForLoadWindow(loadWindow),
         loadedRowCount,
         totalAvailableRows,
         canUseLiveApi,
@@ -546,7 +542,8 @@ Local data only
 <nav className="primary-nav" aria-label="Primary">
           {navItems.map(item => {
             const Icon = item.icon;
-const selected = activeView === item.id || (activeView === 'call' && item.id === 'calls');
+const selected = activeView === item.id
+  || ((activeView === 'call' || activeView === 'evidence') && item.id === 'explore');
 return (
               <button
                 type="button"
@@ -561,17 +558,12 @@ return (
 );
           })}
         </nav>
-        <div className="secondary-block" role="group" aria-label="Quick Links">
-          <span>Quick Links</span>
-          {secondaryNavItems.map(item => {
-            const Icon = item.icon;
-            return (
-              <button type="button" key={item.label} onClick={() => setView(item.target)}>
-                <Icon size={16} />
-                {item.label}
-              </button>
-            );
-          })}
+        <div className="secondary-block" role="group" aria-label="Utility">
+          <span>Utility</span>
+          <button type="button" onClick={() => setView(settingsNavItem.id)}>
+            <SettingsNavIcon size={16} />
+            {settingsNavItem.label}
+          </button>
         </div>
       </aside>
       <main className="workspace">
@@ -625,6 +617,7 @@ aria-label="History scope"
           <RowLimitControl
             canUseLiveApi={canUseLiveApi}
             finitePendingLoadLimit={finitePendingLoadLimit}
+            focusedScope={usesFocusedScopeEndpoints(activeView)}
             hasMoreRows={hasMoreRows}
             loadLabel={shellI18n.t('nav.load', 'Load')}
             loadMoreLabel={shellI18n.t('button.load_more', 'Load more')}
@@ -683,13 +676,12 @@ aria-label="History scope"
       <p className="sr-only" role="status" aria-live="polite">{refreshState}</p>
       <DashboardRouteView
         activeView={activeView}
-        model={scopedModel} navigateView={setView}
-        onRefresh={onRefresh}
-        refreshState={refreshState}
-        globalQuery={globalQuery}
-        activePreset={activePreset}
-        activeRecordId={activeRecordId}
-        contextRuntime={contextRuntime}
+        model={scopedModel} threadsModel={legacyShellFilteredModel} navigateView={setView}
+        onRefresh={onRefresh} refreshState={refreshState}
+        refreshProgressPercent={refreshProgressPercent} refreshProgressText={refreshProgressText}
+        homeStatusLoading={homeStatusLoading} homeStatusError={homeStatusError}
+        globalQuery={globalQuery} activePreset={activePreset}
+        activeRecordId={activeRecordId} contextRuntime={contextRuntime}
         setContextApiEnabled={setContextApiEnabled}
         openCallInvestigator={openCallInvestigator}
         copyCallInvestigatorLink={copyCallInvestigatorLink}
@@ -701,15 +693,16 @@ aria-label="History scope"
         backFromCallInvestigator={backFromCallInvestigator}
         dashboardPayload={dashboardPayload}
         conversationalAnalysis={conversationalAnalysis}
+        homeSummary={homeSummary}
         sourceIdentity={sourceIdentity}
         historyScope={historyScope}
         loadWindow={loadWindow}
-        scopeSince={dashboardPayload?.since ?? sinceForLoadWindow(loadWindow)}
+        scopeSince={sinceForLoadWindow(loadWindow)}
         loadLimit={loadLimit}
         loadedRowCount={loadedRowCount}
         totalAvailableRows={totalAvailableRows}
         canUseLiveApi={canUseLiveApi}
-        autoRefreshEnabled={autoRefreshEnabled} applicationI18n={shellI18n}
+        autoRefreshEnabled={autoRefreshEnabled} applicationI18n={shellI18n} compatibilityLabs={compatibilityLabRoutes}
         showExperimental={showExperimental}
         setShowExperimental={setShowExperimental}
         refreshing={refreshing}

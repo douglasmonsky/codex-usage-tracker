@@ -9,7 +9,10 @@ export function summaryNumber(payload: DashboardBootPayload, key: string): numbe
 export function scopeSummaryFromBootPayload(
   payload: DashboardBootPayload,
 ): DashboardScopeSummary | undefined {
-  if (!payload.summary || payload.load_window === 'rows') return undefined;
+  if (
+    !payload.summary
+    || (payload.load_window === 'rows' && payload.shell_boot !== true)
+  ) return undefined;
   return {
     visibleCalls: summaryNumber(payload, 'visible_calls'),
     inputTokens: summaryNumber(payload, 'input_tokens'),

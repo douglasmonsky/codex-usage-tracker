@@ -41,6 +41,11 @@ def test_refresh_job_registry_reports_progress_and_result(tmp_path: Path) -> Non
     assert progress["phase"] == "finalizing"
     assert progress["status"] == "completed"
     assert int(result["parsed_events"]) > 0
+    generic = registry.job_service.status(job_id, include_result=True)
+    assert generic.kind == "refresh"
+    assert generic.state == "completed"
+    assert generic.result is not None
+    assert "db_path" not in generic.result  # type: ignore[operator]
 
 
 def test_refresh_job_registry_reports_missing_job() -> None:

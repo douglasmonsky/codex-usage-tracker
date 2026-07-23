@@ -9,12 +9,14 @@ from typing import Any
 
 _THREAD_KEY_BATCH_SIZE = 400
 _RESET_SQL = """
-    UPDATE thread_summaries
-    SET recommendation_score = 0,
-        recommendation_total_tokens = 0,
-        recommendation_summary_json = NULL,
-        max_recommendation_score = 0,
-        primary_recommendation = NULL
+UPDATE thread_summaries
+SET recommendation_score = 0,
+    recommendation_total_tokens = 0,
+    recommendation_summary_json = NULL,
+    max_recommendation_score = 0,
+    primary_recommendation = NULL,
+    estimated_cost_usd = NULL,
+    usage_credits = NULL
 """
 
 
@@ -30,6 +32,7 @@ def sync_thread_recommendation_summaries(
     before = conn.total_changes
     _reset_summaries(conn, selected)
     for chunk in _thread_key_chunks(selected):
+        _persist_usage_totals(conn, _aggregate_usage_totals(conn, chunk))
         rows = _aggregate_summaries(conn, chunk)
         signals = _aggregate_signals(conn, chunk)
         _persist_summaries(conn, rows, signals)
@@ -61,6 +64,62 @@ def _thread_key_chunks(
         return
     for start in range(0, len(thread_keys), _THREAD_KEY_BATCH_SIZE):
         yield thread_keys[start : start + _THREAD_KEY_BATCH_SIZE]
+
+
+def _aggregate_usage_totals(
+    conn: sqlite3.Connection,
+    thread_keys: tuple[str, ...] | None,
+) -> list[sqlite3.Row]:
+    filter_sql, params = _thread_filter("rf.thread_key", thread_keys)
+    return conn.execute(
+        f"""
+        WITH scopes(scope, include_archived) AS (
+            VALUES ('active', 0), ('all-history', 1)
+        )
+        SELECT
+            s.scope,
+            rf.thread_key,
+            CASE
+                WHEN count(rf.estimated_cost_usd) > 0
+                THEN sum(rf.estimated_cost_usd)
+            END AS estimated_cost_usd,
+            CASE
+                WHEN count(rf.usage_credits) > 0
+                THEN sum(rf.usage_credits)
+            END AS usage_credits
+        FROM recommendation_facts AS rf
+        JOIN scopes AS s
+          ON s.include_archived = 1 OR rf.is_archived = 0
+        WHERE 1 = 1
+          {filter_sql}
+        GROUP BY s.scope, rf.thread_key
+        """,  # nosec B608 - only generated placeholders; values remain bound params.
+        params,
+    ).fetchall()
+
+
+def _persist_usage_totals(
+    conn: sqlite3.Connection,
+    rows: list[sqlite3.Row],
+) -> None:
+    conn.executemany(
+        """
+        UPDATE thread_summaries
+        SET estimated_cost_usd = ?,
+            usage_credits = ?
+        WHERE thread_key = ?
+          AND is_archived_scope = ?
+        """,
+        [
+            (
+                row["estimated_cost_usd"],
+                row["usage_credits"],
+                row["thread_key"],
+                row["scope"],
+            )
+            for row in rows
+        ],
+    )
 
 
 def _aggregate_summaries(

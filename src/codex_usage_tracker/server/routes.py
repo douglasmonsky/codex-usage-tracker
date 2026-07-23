@@ -12,6 +12,8 @@ GET_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
         "/api/open-investigator": "_handle_open_investigator",
         "/api/health": "_handle_health",
         "/api/status": "_handle_status",
+        "/api/v2/status": "_handle_http_v2",
+        "/api/v2/capabilities": "_handle_http_v2",
         "/api/readiness": "_handle_readiness",
         "/api/calls": "_handle_calls",
         "/api/call": "_handle_call",
@@ -65,6 +67,11 @@ GET_DIAGNOSTIC_FACT_ROUTES: Mapping[str, Mapping[str, str]] = MappingProxyType(
 
 POST_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
     {
+        "/api/v2/refresh": "_handle_http_v2",
+        "/api/v2/analyze": "_handle_http_v2",
+        "/api/v2/query": "_handle_http_v2",
+        "/api/v2/evidence": "_handle_http_v2",
+        "/api/v2/allowance": "_handle_http_v2",
         "/api/compression/start": "_handle_compression_start",
         "/api/allowance/analysis/jobs": "_handle_allowance_analysis_job_start_v2",
         "/api/diagnostics/refresh": "_handle_diagnostics_refresh",
@@ -81,7 +88,40 @@ POST_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
     }
 )
 
+GET_DYNAMIC_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
+    {"/api/v2/jobs/{job_id}": "_handle_http_v2"}
+)
+
+HTTP_V1_DEPRECATION_LINK = (
+    "<https://github.com/douglasmonsky/codex-usage-tracker/blob/main/"
+    'docs/deprecations.md#http-api-v1-compatibility-mapping>; rel="deprecation"'
+)
+
+
+def get_route_method(path: str) -> str | None:
+    """Return the GET handler for one exact or bounded dynamic API path."""
+    exact = GET_ROUTE_METHODS.get(path)
+    if exact is not None:
+        return exact
+    if path.startswith("/api/v2/jobs/") and path != "/api/v2/jobs/":
+        return GET_DYNAMIC_ROUTE_METHODS["/api/v2/jobs/{job_id}"]
+    if path.startswith("/api/v2/"):
+        return "_handle_http_v2"
+    return None
+
+
+def post_route_method(path: str) -> str | None:
+    """Return the POST handler, including JSON errors for unknown v2 paths."""
+    return POST_ROUTE_METHODS.get(path) or (
+        "_handle_http_v2" if path.startswith("/api/v2/") else None
+    )
+
 
 def is_dashboard_shell_path(path: str, dashboard_name: str) -> bool:
     """Return whether a path should render the dashboard shell."""
     return path in {"/", f"/{dashboard_name}"}
+
+
+def is_deprecated_http_v1_path(path: str) -> bool:
+    """Return whether one local API response belongs to the retiring v1 surface."""
+    return path.startswith("/api/") and not path.startswith("/api/v2/")
