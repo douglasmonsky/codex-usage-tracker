@@ -14,6 +14,12 @@
   credit semantics as Calls.
 - Keep `service serve --refresh` immediately usable by refreshing in the
   background, and batch canonical deduplication lookups during ingestion.
+- Credit
+  [`@nrlcode`](https://github.com/nrlcode) and
+  [PR #291](https://github.com/douglasmonsky/codex-usage-tracker/pull/291)
+  for independently identifying the dropped-index deduplication bottleneck
+  and contributing reproducible large-refresh benchmarks and regression-test
+  design. The release ships the batched lookup solution to the same root cause.
 - Keep five legacy workbenches directly routable with explicit transition
   guidance while removing them from primary navigation.
 - Add eight bounded HTTP API v2 routes backed by the same application services
