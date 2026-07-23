@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from functools import cache, lru_cache
+from functools import cache, lru_cache, wraps
 
+from codex_usage_tracker.application.container import ApplicationContainer
 from codex_usage_tracker.interfaces.mcp.compatibility_tools import (
     ADVANCED_TOOL_NAMES,
     COMPATIBILITY_TOOL_NAMES,
@@ -12,6 +13,13 @@ from codex_usage_tracker.interfaces.mcp.compatibility_tools import (
     compatibility_handler,
 )
 from codex_usage_tracker.interfaces.mcp.core_tools import (
+    build_usage_allowance,
+    build_usage_analyze,
+    build_usage_evidence,
+    build_usage_job_status,
+    build_usage_query,
+    build_usage_refresh,
+    build_usage_status,
     usage_allowance,
     usage_analyze,
     usage_evidence,
@@ -206,7 +214,10 @@ def tool_specs() -> tuple[ToolSpec, ...]:
     return specs
 
 
-def handler_for_profile(spec: ToolSpec, profile: McpProfile) -> Callable[..., object]:
+def handler_for_profile(
+    spec: ToolSpec,
+    profile: McpProfile,
+) -> Callable[..., object]:
     """Preserve existing overlapping handlers outside the core-only server."""
     if profile == "core":
         return spec.handler
@@ -215,6 +226,134 @@ def handler_for_profile(spec: ToolSpec, profile: McpProfile) -> Callable[..., ob
     if spec.minimum_profile == "developer":
         return developer_handler(spec.name)
     return spec.handler
+
+
+def bound_core_handlers(
+    container: ApplicationContainer,
+) -> dict[str, Callable[..., object]]:
+    @wraps(usage_status)
+    def bound_usage_status() -> dict[str, object]:
+        return build_usage_status(container=container)
+
+    @wraps(usage_refresh)
+    def bound_usage_refresh(
+        history: str = "active",
+        aggregate_only: bool = True,
+        execution: str = "auto",
+    ) -> dict[str, object]:
+        return build_usage_refresh(
+            history=history,
+            aggregate_only=aggregate_only,
+            execution=execution,
+            container=container,
+        )
+
+    @wraps(usage_analyze)
+    def bound_usage_analyze(
+        goal: str,
+        filters: dict[str, object] | None = None,
+        history: str = "active",
+        evidence_limit: int = 8,
+        comparison: dict[str, object] | None = None,
+        execution: str = "auto",
+    ) -> dict[str, object]:
+        return build_usage_analyze(
+            goal=goal,
+            filters=filters,
+            history=history,
+            evidence_limit=evidence_limit,
+            comparison=comparison,
+            execution=execution,
+            container=container,
+        )
+
+    @wraps(usage_query)
+    def bound_usage_query(
+        entity: str,
+        measures: list[str],
+        filters: dict[str, object] | None = None,
+        group_by: list[str] | None = None,
+        order_by: str | None = None,
+        order: str = "desc",
+        limit: int = 20,
+        cursor: str | None = None,
+        history: str = "active",
+    ) -> dict[str, object]:
+        return build_usage_query(
+            entity=entity,
+            measures=measures,
+            filters=filters,
+            group_by=group_by,
+            order_by=order_by,
+            order=order,
+            limit=limit,
+            cursor=cursor,
+            history=history,
+            container=container,
+        )
+
+    @wraps(usage_evidence)
+    def bound_usage_evidence(
+        selector_kind: str,
+        selector_id: str,
+        section: str = "summary",
+        limit: int = 20,
+        cursor: str | None = None,
+        history: str = "active",
+        analysis_id: str | None = None,
+    ) -> dict[str, object]:
+        return build_usage_evidence(
+            selector_kind=selector_kind,
+            selector_id=selector_id,
+            section=section,
+            limit=limit,
+            cursor=cursor,
+            history=history,
+            analysis_id=analysis_id,
+            container=container,
+        )
+
+    @wraps(usage_allowance)
+    def bound_usage_allowance(
+        operation: str,
+        window: str = "weekly",
+        range: str = "8w",  # noqa: A002 - public roadmap field name.
+        cursor: str | None = None,
+        limit: int = 50,
+        analysis_id: str | None = None,
+        execution: str = "auto",
+    ) -> dict[str, object]:
+        return build_usage_allowance(
+            operation=operation,
+            window=window,
+            range_preset=range,
+            cursor=cursor,
+            limit=limit,
+            analysis_id=analysis_id,
+            execution=execution,
+            container=container,
+        )
+
+    @wraps(usage_job_status)
+    def bound_usage_job_status(
+        job_id: str,
+        include_result: bool = False,
+    ) -> dict[str, object]:
+        return build_usage_job_status(
+            job_id=job_id,
+            include_result=include_result,
+            container=container,
+        )
+
+    return {
+        "usage_status": bound_usage_status,
+        "usage_refresh": bound_usage_refresh,
+        "usage_analyze": bound_usage_analyze,
+        "usage_query": bound_usage_query,
+        "usage_evidence": bound_usage_evidence,
+        "usage_allowance": bound_usage_allowance,
+        "usage_job_status": bound_usage_job_status,
+    }
 
 
 def _full_tool_spec(name: str) -> ToolSpec:

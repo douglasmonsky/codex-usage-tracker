@@ -8,6 +8,7 @@ from typing import Any, cast
 
 from codex_usage_tracker.application.allowance import AllowanceAnalysisRuntime, get_allowance
 from codex_usage_tracker.application.allowance_models import AllowanceRequest
+from codex_usage_tracker.application.container import ApplicationContainer
 from codex_usage_tracker.application.context import build_request_context
 from codex_usage_tracker.application.evidence import get_evidence
 from codex_usage_tracker.application.job_status import JobStatusService, get_job_status
@@ -27,7 +28,12 @@ from codex_usage_tracker.core.contracts import (
     enforce_payload_budget,
     envelope_payload,
 )
-from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH, DEFAULT_PRICING_PATH
+from codex_usage_tracker.core.paths import (
+    DEFAULT_ALLOWANCE_PATH,
+    DEFAULT_CODEX_HOME,
+    DEFAULT_DB_PATH,
+    DEFAULT_PRICING_PATH,
+)
 from codex_usage_tracker.evidence.models import EvidenceRequest
 from codex_usage_tracker.interfaces.mcp.models import McpProfile
 from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
@@ -129,7 +135,13 @@ def build_usage_allowance(
     now: datetime | None = None,
     job_service: JobService | None = None,
     runtime: AllowanceAnalysisRuntime | None = None,
+    container: ApplicationContainer | None = None,
 ) -> dict[str, object]:
+    if container is not None:
+        db_path = container.paths.db_path
+        pricing_path = container.paths.pricing_path
+        now = now or container.clock.now()
+        job_service = job_service or container.jobs
     request = AllowanceRequest(
         operation=cast(Any, operation),
         window=cast(Any, window),
@@ -146,10 +158,14 @@ def build_usage_allowance(
         job_service=job_service,
         runtime=runtime,
     )
-    context = build_request_context(
-        db_path=db_path,
-        pricing_path=pricing_path,
-        scope=RequestScope(privacy_mode="strict"),
+    context = (
+        container.request_context(RequestScope(privacy_mode="strict"))
+        if container is not None
+        else build_request_context(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            scope=RequestScope(privacy_mode="strict"),
+        )
     )
     state = result.payload.get("state")
     job_id = result.payload.get("job_id")
@@ -193,8 +209,15 @@ def build_usage_evidence(
     analysis_id: str | None = None,
     db_path: Path = DEFAULT_DB_PATH,
     pricing_path: Path = DEFAULT_PRICING_PATH,
+    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
     job_service: JobService | None = None,
+    container: ApplicationContainer | None = None,
 ) -> dict[str, object]:
+    if container is not None:
+        db_path = container.paths.db_path
+        pricing_path = container.paths.pricing_path
+        allowance_path = container.paths.allowance_path
+        job_service = job_service or container.jobs
     request = EvidenceRequest(
         selector_kind=cast(Any, selector_kind),
         selector_id=selector_id,
@@ -208,11 +231,16 @@ def build_usage_evidence(
         history=cast(HistoryScope, request.history),
         thread_key=request.selector_id if request.selector_kind == "thread" else None,
     )
-    context = build_request_context(db_path=db_path, pricing_path=pricing_path, scope=scope)
+    context = (
+        container.request_context(scope)
+        if container is not None
+        else build_request_context(db_path=db_path, pricing_path=pricing_path, scope=scope)
+    )
     result = get_evidence(
         request,
         db_path=db_path,
         pricing_path=pricing_path,
+        allowance_path=allowance_path,
         job_service=job_service,
         context=context,
     )
@@ -237,8 +265,14 @@ def build_usage_status(
     codex_home: Path = DEFAULT_CODEX_HOME,
     home: Path | None = None,
     profile: str = "core",
+    container: ApplicationContainer | None = None,
 ) -> dict[str, object]:
     """Build the core status envelope with explicit testable local dependencies."""
+    if container is not None:
+        db_path = container.paths.db_path
+        pricing_path = container.paths.pricing_path
+        codex_home = container.paths.codex_home
+        home = home or codex_home.parent
     request = StatusRequest(
         db_path=db_path,
         pricing_path=pricing_path,
@@ -246,7 +280,19 @@ def build_usage_status(
         home=home or Path.home(),
         mcp_profile=cast(McpProfile, profile),
     )
-    result, context = _build_status(request)
+    if container is None:
+        result, context = _build_status(request)
+    else:
+        context = container.request_context(
+            request.scope,
+            prefer_materialized_active=True,
+        )
+        result, context = _build_status(
+            request,
+            context=context,
+            clock=container.clock,
+            pricing_provider=container.pricing,
+        )
     next_action = cast(dict[str, object], result["next_action"])
     payload = envelope_payload(
         tool="usage_status",
@@ -284,7 +330,12 @@ def build_usage_refresh(
     db_path: Path = DEFAULT_DB_PATH,
     pricing_path: Path = DEFAULT_PRICING_PATH,
     codex_home: Path = DEFAULT_CODEX_HOME,
+    container: ApplicationContainer | None = None,
 ) -> dict[str, object]:
+    if container is not None:
+        db_path = container.paths.db_path
+        pricing_path = container.paths.pricing_path
+        codex_home = container.paths.codex_home
     request = RefreshRequest(
         history=cast(HistoryScope, history),
         aggregate_only=aggregate_only,
@@ -295,11 +346,16 @@ def build_usage_refresh(
         db_path=db_path,
         pricing_path=pricing_path,
         codex_home=codex_home,
+        job_service=None if container is None else container.jobs,
     )
-    context = build_request_context(
-        db_path=db_path,
-        pricing_path=pricing_path,
-        scope=RequestScope(history=request.history),
+    context = (
+        container.request_context(RequestScope(history=request.history))
+        if container is not None
+        else build_request_context(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            scope=RequestScope(history=request.history),
+        )
     )
     if outcome.result is not None:
         result_schema = REFRESH_SCHEMA
@@ -340,13 +396,22 @@ def build_usage_job_status(
     db_path: Path = DEFAULT_DB_PATH,
     pricing_path: Path = DEFAULT_PRICING_PATH,
     job_service: JobStatusService | None = None,
+    container: ApplicationContainer | None = None,
 ) -> dict[str, object]:
+    if container is not None:
+        db_path = container.paths.db_path
+        pricing_path = container.paths.pricing_path
+        job_service = job_service or container.jobs
     request = JobStatusRequest(job_id=job_id, include_result=include_result)
     status = get_job_status(request, job_service=job_service)
-    context = build_request_context(
-        db_path=db_path,
-        pricing_path=pricing_path,
-        scope=RequestScope(),
+    context = (
+        container.request_context(RequestScope())
+        if container is not None
+        else build_request_context(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            scope=RequestScope(),
+        )
     )
     payload = envelope_payload(
         tool="usage_job_status",

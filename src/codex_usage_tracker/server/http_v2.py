@@ -22,6 +22,7 @@ class _HttpV2Handler(Protocol):
     _allowance_path: Path
     _rate_card_path: Path
     _thresholds_path: Path
+    _projects_path: Path
     _codex_home: Path
 
     def _has_valid_api_token(self, params: dict[str, list[str]]) -> bool: ...
@@ -30,7 +31,10 @@ class _HttpV2Handler(Protocol):
 class HttpV2RouteMixin:
     """Attach stable v2 application services to each localhost request handler."""
 
-    def _configure_http_v2(self) -> None:
+    def _configure_http_v2(self, facade: HttpV2Facade | None = None) -> None:
+        if facade is not None:
+            self._http_v2_facade = facade
+            return
         handler = cast(_HttpV2Handler, self)
         self._http_v2_facade = HttpV2Facade(
             ApplicationHttpV2Services(
@@ -39,6 +43,7 @@ class HttpV2RouteMixin:
                 allowance_path=handler._allowance_path,
                 rate_card_path=handler._rate_card_path,
                 thresholds_path=handler._thresholds_path,
+                projects_path=handler._projects_path,
                 codex_home=handler._codex_home,
             )
         )

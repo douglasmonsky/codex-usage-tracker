@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import threading
 import urllib.error
 import urllib.request
@@ -9,12 +10,24 @@ from functools import partial
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+from codex_usage_tracker.interfaces.http.v2 import ApplicationHttpV2Services, HttpV2Facade
 from codex_usage_tracker.server.api import _UsageDashboardHandler
 from tests.store_dashboard_helpers import _http_error_json, _read_json
 
 
 @contextmanager
 def _v2_server(tmp_path: Path) -> Iterator[str]:
+    facade = HttpV2Facade(
+        ApplicationHttpV2Services(
+            db_path=tmp_path / "usage.sqlite3",
+            pricing_path=tmp_path / "pricing.json",
+            allowance_path=tmp_path / "allowance.json",
+            rate_card_path=tmp_path / "rate-card.json",
+            thresholds_path=tmp_path / "thresholds.json",
+            projects_path=tmp_path / "projects.json",
+            codex_home=tmp_path / ".codex",
+        )
+    )
     handler = partial(
         _UsageDashboardHandler,
         directory=str(tmp_path),
@@ -31,6 +44,7 @@ def _v2_server(tmp_path: Path) -> Iterator[str]:
         context_chars=2000,
         api_token="test-token",
         refresh_lock=threading.Lock(),
+        http_v2_facade=facade,
     )
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -41,6 +55,32 @@ def _v2_server(tmp_path: Path) -> Iterator[str]:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_live_v2_async_job_survives_a_separate_poll_request(tmp_path: Path) -> None:
+    with _v2_server(tmp_path) as base_url:
+        request = urllib.request.Request(
+            f"{base_url}/api/v2/analyze",
+            data=json.dumps(
+                {
+                    "goal": "token_waste",
+                    "execution": "async",
+                }
+            ).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "X-Codex-Usage-Token": "test-token",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310
+            started = json.load(response)
+        polled = _read_json(
+            f"{base_url}/api/v2/jobs/{started['job_id']}?include_result=1"
+        )
+
+    assert polled["job_id"] == started["job_id"]
+    assert polled["state"] in {"queued", "running", "completed"}
 
 
 def test_live_v2_capabilities_and_dynamic_job_routes_are_json(tmp_path: Path) -> None:

@@ -12,7 +12,6 @@ from codex_usage_tracker.application.query import query_usage
 from codex_usage_tracker.application.query_models import QueryFilters, QueryRequest
 from codex_usage_tracker.application.requests import RequestScope
 from codex_usage_tracker.core.contracts import EvidenceV1
-from codex_usage_tracker.core.paths import DEFAULT_DB_PATH, DEFAULT_PRICING_PATH
 from codex_usage_tracker.evidence.models import (
     EvidenceHistoryMismatchError,
     EvidenceRequest,
@@ -60,12 +59,15 @@ _ALLOWANCE_METRICS = (
 def get_evidence(
     request: EvidenceRequest,
     *,
-    db_path: Path = DEFAULT_DB_PATH,
-    pricing_path: Path = DEFAULT_PRICING_PATH,
+    db_path: Path,
+    pricing_path: Path | None = None,
+    allowance_path: Path | None = None,
     job_service: JobService | None = None,
     context: RequestContext | None = None,
 ) -> EvidenceResult:
     """Resolve one request with a single scope/revision context."""
+    resolved_pricing_path = pricing_path or db_path.with_name("pricing.json")
+    resolved_allowance_path = allowance_path or db_path.with_name("allowance.json")
     scope = RequestScope(
         history=request.history,
         thread_key=request.selector_id if request.selector_kind == "thread" else None,
@@ -73,8 +75,17 @@ def get_evidence(
     if context is not None and context.scope != scope.to_contract():
         raise RequestContextError("evidence context scope does not match the request")
     if context is None and _requires_request_context(request):
-        context = build_request_context(db_path=db_path, pricing_path=pricing_path, scope=scope)
-    repository = _LocalEvidenceRepository(db_path, context, job_service)
+        context = build_request_context(
+            db_path=db_path,
+            pricing_path=resolved_pricing_path,
+            scope=scope,
+        )
+    repository = _LocalEvidenceRepository(
+        db_path,
+        resolved_allowance_path,
+        context,
+        job_service,
+    )
     return resolve_evidence(request, repository)
 
 
@@ -87,9 +98,14 @@ def _requires_request_context(request: EvidenceRequest) -> bool:
 
 class _LocalEvidenceRepository(EvidenceRepository):
     def __init__(
-        self, db_path: Path, context: RequestContext | None, job_service: JobService | None
+        self,
+        db_path: Path,
+        allowance_path: Path,
+        context: RequestContext | None,
+        job_service: JobService | None,
     ) -> None:
         self.db_path = db_path
+        self.allowance_path = allowance_path
         self.context = context
         if job_service is None:
             from codex_usage_tracker.application.refresh import default_job_service
@@ -162,6 +178,7 @@ class _LocalEvidenceRepository(EvidenceRepository):
                 history=cast(Any, history),
             ),
             db_path=self.db_path,
+            allowance_path=self.allowance_path,
             context=self.context,
         )
         records = tuple(

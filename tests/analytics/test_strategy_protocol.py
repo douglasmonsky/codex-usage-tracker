@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -10,6 +11,7 @@ from codex_usage_tracker.analytics.analysis_catalog import ANALYSIS_CATALOG
 from codex_usage_tracker.analytics.analysis_models import AnalysisRequest, ComparisonWindow
 from codex_usage_tracker.analytics.strategies.protocol import AnalysisStrategy
 from codex_usage_tracker.application.context import RequestContext
+from codex_usage_tracker.application.paths import ApplicationPaths
 from codex_usage_tracker.application.query_models import QueryFilters
 from codex_usage_tracker.core.contracts import FreshnessV1, ScopeV1
 
@@ -20,6 +22,7 @@ def _context(
     pricing_coverage: float | None = 1.0,
     service_tier_coverage: float | None = 0.8,
 ) -> RequestContext:
+    root = Path("/synthetic/codex-usage-tracker")
     return RequestContext(
         source_revision="generation:7",
         freshness=FreshnessV1(
@@ -44,6 +47,15 @@ def _context(
         pricing_coverage=pricing_coverage,
         credit_coverage=0.9,
         service_tier_coverage=service_tier_coverage,
+        application_paths=ApplicationPaths(
+            codex_home=root / ".codex",
+            db_path=root / "usage.sqlite3",
+            pricing_path=root / "pricing.json",
+            allowance_path=root / "allowance.json",
+            rate_card_path=root / "rate-card.json",
+            thresholds_path=root / "thresholds.json",
+            projects_path=root / "projects.json",
+        ),
     )
 
 

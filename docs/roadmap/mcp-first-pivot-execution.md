@@ -824,10 +824,82 @@ commit as each roadmap task.
   checkpoint lands. Focused Home, Limits, Calls, Threads, and Thread Calls
   routes remain protected until exact parity and performance gates pass.
 
+## Task 28 - Application Composition Root and Dependency Protocols
+
+- Stable task ID: `ARCH-COMPOSE-01`.
+- Status: complete on `pivot/28-composition-root`; Task 27.5 recorded
+  `PROCEED` before implementation began.
+- Branch: `pivot/28-composition-root`.
+- Commits: `refactor: compose tracker application services` (this task; exact
+  SHA is recorded in Git/PR history).
+- Composition contract:
+  - frozen `ApplicationPaths` owns the Codex home, database, pricing,
+    allowance, rate-card, threshold, and project paths;
+  - frozen `ApplicationContainer` owns those paths, one clock, narrow
+    repositories/providers, one shared `JobService`, the analysis catalog, and
+    dashboard-target resolution;
+  - CLI, HTTP v2, and the selected-profile MCP server compose the container at
+    their interface boundary and pass it inward;
+  - application and analytics modules no longer import `core.paths`, and
+    status requests no longer consult `Path.home()` implicitly;
+  - compatibility analysis delegates receive the exact container paths through
+    immutable request context instead of reopening module-global defaults.
+- Changed files: new `application/container.py`, `application/paths.py`,
+  `application/protocols.py`, and their tests; path/context injection across
+  status, query, evidence, allowance, refresh, analytics compatibility, CLI,
+  HTTP v2, the live server, and core MCP registration; architecture
+  documentation and the user-approved GitNexus resource navigation table.
+- Focused verification:
+  - required container/protocol, MCP, and interface suite:
+    `92 passed in 10.67s`;
+  - expanded application/analytics/HTTP/CLI slice:
+    `110 passed in 3.26s`;
+  - `ruff check` over the changed application, analytics, interface, and test
+    surfaces: passed;
+  - Pyright over `src/codex_usage_tracker/application`: 0 errors;
+  - custom temporary-container tests reject default-home access, preserve exact
+    paths, bind all seven core MCP tools, and prove the job/result repository is
+    shared.
+- Independent review:
+  - one final reviewer reported two actionable findings; both were accepted as
+    `R1` and `R2`;
+  - `R1` moved live HTTP v2 composition to server startup so async jobs remain
+    visible across separate request-handler connections;
+  - `R2` preserves the configured projects path through both CLI and live HTTP
+    composition;
+  - the focused post-review regression slice passed `34 tests in 3.40s`, and
+    the bounded application, analytics, MCP, interface, and server recheck
+    passed `456 tests in 31.18s`;
+  - reviewer-efficiency attribution timed out once and was recorded with token
+    status `pending`, as required; it did not block the task.
+- Full verification:
+  - `.venv/bin/python -m pytest -q`: `1912 passed in 118.84s`;
+  - `.venv/bin/python -m ruff check .`: passed;
+  - `.venv/bin/python -m mypy`: passed;
+  - `.venv/bin/python -m pyright --pythonpath .venv/bin/python src`: 0 errors
+    and the seven inherited lazy-export warnings;
+  - compileall, release-readiness checks, and `git diff --check`: passed.
+- Architecture evidence:
+  - the final GitNexus `detect-changes --scope all` mapped 96 changed symbols
+    to 15 affected execution flows and classified the cross-cutting composition
+    change as high risk, which triggered the full verification gate;
+  - Tach still reports the eight dependency-direction violations recorded by
+    Task 27.5. This task introduced no new violation; Task 30 remains their
+    assigned owner.
+- Deviations from plan: `RequestContext` gained a non-serialized
+  `application_paths` field so compatibility strategies can use the composed
+  path set without creating an analytics-to-default-path dependency. Core MCP
+  registration gained explicit container-bound handler adapters while retaining
+  the unbound compatibility functions for direct callers. No DI framework,
+  route, schema, table, or public payload changed.
+- Follow-up risks: full/developer MCP compatibility registration remains the
+  Task 29 extraction target. The known Tach direction violations and remaining
+  explicit adapter work remain Task 30 scope. Focused Home, Limits, Calls,
+  Threads, and Thread Calls route protections are unchanged.
+
 ## Remaining Planned Tasks
 
-Task 27.5 is complete once this independent checkpoint lands. Tasks 28 through
-45 remain planned in the approved implementation roadmap, and no later `0.24`
-task may begin before that checkpoint. Add a full entry using the format above
-when each task becomes active; do not mark a task complete without its named
-focused and full verification evidence.
+Tasks 27.5 and 28 are complete. Tasks 29 through 45 remain planned in the
+approved implementation roadmap. Add a full entry using the format above when
+each task becomes active; do not mark a task complete without its named focused
+and full verification evidence.

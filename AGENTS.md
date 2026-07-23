@@ -156,6 +156,15 @@ Install the repository's pinned profiling tools with `uv sync --group performanc
 
 Use GitNexus for repository orientation, architecture, execution-flow tracing, subsystem discovery, and broad change-impact analysis.
 
+Start unfamiliar or cross-cutting GitNexus work with the repository context resource, then open only the relevant cluster or process:
+
+| Resource | Use for |
+| -------- | ------- |
+| `gitnexus://repo/codex-usage-tracker/context` | Codebase overview and index-freshness check |
+| `gitnexus://repo/codex-usage-tracker/clusters` | Functional-area discovery |
+| `gitnexus://repo/codex-usage-tracker/processes` | Execution-flow discovery |
+| `gitnexus://repo/codex-usage-tracker/process/{name}` | One selected step-by-step execution trace |
+
 Use Serena for exact symbol definitions, references, implementations, type-aware navigation, diagnostics, and symbol-level edits or refactors.
 
 For unfamiliar or cross-cutting work, use GitNexus to identify where to investigate, then use Serena to verify the exact symbols before editing.

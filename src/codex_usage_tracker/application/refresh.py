@@ -19,7 +19,6 @@ from codex_usage_tracker.application.context import build_request_context
 from codex_usage_tracker.application.requests import RefreshRequest, RequestScope
 from codex_usage_tracker.core.contracts import payload_mapping
 from codex_usage_tracker.core.models import RefreshResult
-from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH, DEFAULT_PRICING_PATH
 from codex_usage_tracker.jobs.adapters import RefreshJobAdapter, request_hash
 from codex_usage_tracker.jobs.models import JobStatusV1
 from codex_usage_tracker.jobs.service import JobService
@@ -161,8 +160,8 @@ def default_job_service() -> JobService:
 def plan_refresh(
     request: RefreshRequest,
     *,
-    codex_home: Path = DEFAULT_CODEX_HOME,
-    db_path: Path = DEFAULT_DB_PATH,
+    codex_home: Path,
+    db_path: Path,
 ) -> RefreshPlan:
     """Plan from bounded file/store facts without creating or migrating a database."""
     logs = find_session_logs(codex_home, include_archived=request.history == "all")
@@ -217,9 +216,9 @@ def plan_refresh(
 def refresh_usage(
     request: RefreshRequest,
     *,
-    codex_home: Path = DEFAULT_CODEX_HOME,
-    db_path: Path = DEFAULT_DB_PATH,
-    pricing_path: Path = DEFAULT_PRICING_PATH,
+    codex_home: Path,
+    db_path: Path,
+    pricing_path: Path,
     job_service: JobService | None = None,
     coordinator: RefreshCoordinator | None = None,
     refresh_fn: RefreshFunction = refresh_usage_index,
