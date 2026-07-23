@@ -594,6 +594,19 @@ get_job_status(request: JobStatusRequest) -> JobStatusV1
 
 CLI, MCP, and HTTP adapters invoke these functions. No interface reconstructs reports independently.
 
+### 13.4 Pre-0.24 foundation audit
+
+Before the `0.24` application and persistence refactor begins, Task 27.5
+performs a foundation audit to verify that canonical accounting, migration,
+table-ownership, and public-contract assumptions remain valid. The audit may
+confirm the plan, propose bounded amendments requiring maintainer approval, or
+block implementation. It does not authorize an autonomous rewrite.
+
+The audit is the entry gate for the composition root, dependency boundaries,
+SQLite integrity, migration safety, persistent jobs, and context indexing
+implemented by Tasks 28-33. Those tasks may begin only after the audit records
+`PROCEED` or a maintainer approves an `AMEND`; `STOP` blocks implementation.
+
 ## 14. HTTP API v2
 
 The Evidence Console and MCP adapters share application services, but the live frontend receives a small HTTP surface.

@@ -758,8 +758,38 @@ commit as each roadmap task.
   content/fact indexing pipeline rather than dashboard availability or focused
   endpoint hydration; it is recorded for 0.24 performance hardening.
 
+## Task 27.5 - Foundation Audit and 0.24 Plan Confirmation
+
+- Stable task ID: `ARCH-AUDIT-00`
+- Status: planned; blocked on Task 27 and successful completion of the `0.23`
+  release gate.
+- Branch: `pivot/27.5-foundation-audit`
+- Commits: pending; prescribed commit is
+  `docs: add 0.24 foundation audit checkpoint`.
+- Audit report: `docs/superpowers/reports/0.24-foundation-audit.md` (pending).
+- Audited commit SHA: pending.
+- Decision: pending; must be exactly `PROCEED`, `AMEND`, or `STOP`.
+- Changed files: pending.
+- Focused verification: pending; record the exact documentation, dependency,
+  architecture-analysis, migration, storage-integrity, canonical-accounting,
+  and public-contract commands used.
+- Full verification: pending; record all results without hiding failures.
+- Architecture graph or generated inventory artifacts: pending.
+- Migration fixtures tested: pending.
+- Findings assigned to Tasks 28-33: pending.
+- Maintainer approval reference: not required for `PROCEED`; pending and
+  mandatory for `AMEND` or `STOP`.
+- Deviations from plan: none; this planned entry does not authorize production
+  refactoring or silent roadmap amendments.
+- Follow-up risks: Tasks 28-39 and all other `0.24` implementation work remain
+  blocked until this entry records `PROCEED` or a maintainer-approved `AMEND`.
+  A `STOP` decision blocks implementation and requires a separate
+  maintainer-approved redesign.
+
 ## Remaining Planned Tasks
 
-Tasks 28 through 45 remain planned in the approved implementation roadmap. Add
-a full entry using the format above when each task becomes active; do not mark a
-task complete without its named focused and full verification evidence.
+Task 27.5 and Tasks 28 through 45 remain planned in the approved implementation
+roadmap. Task 27.5 is the exclusive entry gate for `0.24`; no later `0.24` task
+may begin or run in parallel with it. Add a full entry using the format above
+when each task becomes active; do not mark a task complete without its named
+focused and full verification evidence.
