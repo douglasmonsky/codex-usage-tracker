@@ -119,6 +119,7 @@ def test_full_refresh_defers_and_restores_bulk_load_indexes(
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     observed_source_indexes: list[list[str]] = []
+    observed_usage_indexes: list[list[str]] = []
     original_upsert = stream_module.upsert_source_records_from_events
 
     def recording_upsert(conn, *, events):
@@ -131,6 +132,21 @@ def test_full_refresh_defers_and_restores_bulk_load_indexes(
                     FROM sqlite_master
                     WHERE type = 'index'
                       AND tbl_name = 'source_records'
+                      AND sql IS NOT NULL
+                    ORDER BY name
+                    """
+                )
+            ]
+        )
+        observed_usage_indexes.append(
+            [
+                str(row["name"])
+                for row in conn.execute(
+                    """
+                    SELECT name
+                    FROM sqlite_master
+                    WHERE type = 'index'
+                      AND tbl_name = 'usage_events'
                       AND sql IS NOT NULL
                     ORDER BY name
                     """
@@ -150,6 +166,8 @@ def test_full_refresh_defers_and_restores_bulk_load_indexes(
 
     assert observed_source_indexes
     assert all(not names for names in observed_source_indexes)
+    assert observed_usage_indexes
+    assert all(names == ["idx_usage_canonical_fingerprint"] for names in observed_usage_indexes)
     with connect(db_path) as conn:
         restored = {
             str(row["name"])
