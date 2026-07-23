@@ -171,6 +171,7 @@ OTEL_REFRESH_COUNTER_KEYS = (
 )
 __all__ = ["EVENT_COLUMNS", "SCHEMA_VERSION", "SchemaMigrationError", "init_db"]
 SQLITE_VARIABLE_BATCH_SIZE = 500
+_USAGE_EVENT_INDEXES_REQUIRED_DURING_REFRESH = frozenset({"idx_usage_canonical_fingerprint"})
 RefreshProgressCallback = Callable[[dict[str, object]], None]
 
 
@@ -773,7 +774,7 @@ def _deferred_usage_event_indexes(
         (str(row["name"]), str(row["sql"]))
         for row in conn.execute(
             f"""
-            SELECT name, sql
+            SELECT name, sql, tbl_name
             FROM sqlite_master
             WHERE type = 'index'
               AND tbl_name IN ({placeholders})
@@ -781,6 +782,10 @@ def _deferred_usage_event_indexes(
             ORDER BY name
             """,  # nosec B608 - placeholders are generated, values remain parameterized
             table_names,
+        )
+        if not (
+            str(row["tbl_name"]) == "usage_events"
+            and str(row["name"]) in _USAGE_EVENT_INDEXES_REQUIRED_DURING_REFRESH
         )
     ]
     for name, _sql in indexes:
