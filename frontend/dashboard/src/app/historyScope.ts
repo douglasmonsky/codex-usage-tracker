@@ -1,16 +1,5 @@
-import type { DashboardBootPayload } from '../api/types';
 import type { HistoryScope } from './shellUrl';
-
-export function historyScopeFromPayload(
-  payload: DashboardBootPayload | null,
-  fallback: HistoryScope = 'active',
-): HistoryScope {
-  if (!payload) return fallback;
-  if (typeof payload.include_archived === 'boolean') return payload.include_archived ? 'all' : 'active';
-  if (payload.history_scope === 'all-history' || payload.history_scope === 'all') return 'all';
-  if (payload.history_scope === 'active') return 'active';
-  return fallback;
-}
+export { historyScopeFromPayload } from '../api/historyScope';
 
 export type HistoryScopeStatusInput = {
   historyScope: HistoryScope;

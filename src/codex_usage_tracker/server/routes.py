@@ -92,6 +92,11 @@ GET_DYNAMIC_ROUTE_METHODS: Mapping[str, str] = MappingProxyType(
     {"/api/v2/jobs/{job_id}": "_handle_http_v2"}
 )
 
+HTTP_V1_DEPRECATION_LINK = (
+    "<https://github.com/douglasmonsky/codex-usage-tracker/blob/main/"
+    'docs/deprecations.md#http-api-v1-compatibility-mapping>; rel="deprecation"'
+)
+
 
 def get_route_method(path: str) -> str | None:
     """Return the GET handler for one exact or bounded dynamic API path."""
@@ -115,3 +120,8 @@ def post_route_method(path: str) -> str | None:
 def is_dashboard_shell_path(path: str, dashboard_name: str) -> bool:
     """Return whether a path should render the dashboard shell."""
     return path in {"/", f"/{dashboard_name}"}
+
+
+def is_deprecated_http_v1_path(path: str) -> bool:
+    """Return whether one local API response belongs to the retiring v1 surface."""
+    return path.startswith("/api/") and not path.startswith("/api/v2/")

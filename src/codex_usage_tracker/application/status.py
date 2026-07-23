@@ -38,6 +38,7 @@ def _build_status(request: StatusRequest) -> tuple[dict[str, object], RequestCon
         db_path=request.db_path,
         pricing_path=request.pricing_path,
         scope=request.scope,
+        prefer_materialized_active=True,
     )
     freshness = _freshness_for_threshold(context.freshness, request.freshness_threshold_seconds)
     context = replace(context, freshness=freshness)

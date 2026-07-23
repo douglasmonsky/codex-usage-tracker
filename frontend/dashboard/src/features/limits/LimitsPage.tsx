@@ -45,9 +45,9 @@ import {
 import { buildAllowanceVisualizationSpec } from './allowanceVisualization';
 import { allowanceAnalysisPollInterval, allowanceStatusPollInterval, isPageVisible } from './allowancePolling';
 import { downloadJson, errorMessage } from './limitsPageActions';
+import { useAllowanceStatusEstimation, useFastAllowanceStatus } from './useAllowanceStatusEstimation';
 import baseStyles from './LimitsPage.module.css';
 import intelligenceStyles from './LimitsIntelligence.module.css';
-import type { AllowanceStatusPayload } from '../../api/allowanceIntelligenceTypes';
 
 const styles = { ...baseStyles, ...intelligenceStyles };
 
@@ -84,7 +84,6 @@ function LiveLimitsPage({
   const [analysisJobId, setAnalysisJobId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState('Canonical allowance evidence ready');
   const [exporting, setExporting] = useState(false);
-  const statusSnapshotRef = useRef<AllowanceStatusPayload | null>(null);
   const automaticAnalysisRevisionRef = useRef<string | null>(null);
   const queryScope = [contextRuntime.apiToken, includeArchived] as const;
   const customStartAt = dateBoundary(customStart, false);
@@ -92,30 +91,8 @@ function LiveLimitsPage({
   const customReady = rangePreset !== 'custom' || Boolean(customStartAt && customEndAt);
   const evidenceBefore = evidenceCursors.at(-1);
 
-  const statusQuery = useQuery({
-    queryKey: ['allowance-v2', 'status', ...queryScope],
-    queryFn: async ({ signal }) => {
-      const previous = statusSnapshotRef.current;
-      const payload = await loadAllowanceStatus(contextRuntime, {
-        includeArchived,
-        sinceRevision: previous?.revision,
-      }, signal);
-      if (!payload.changed && previous) {
-        return { ...previous, changed: false, quality: payload.quality, next: payload.next };
-      }
-      statusSnapshotRef.current = payload;
-      return payload;
-    },
-    staleTime: 0,
-    refetchInterval: query => allowanceStatusPollInterval(
-      query.state.data?.data_state,
-      query.state.fetchFailureCount,
-      isPageVisible(),
-    ),
-    refetchIntervalInBackground: false,
-    retry: false,
-  });
-  const allowanceRevision = statusQuery.data?.revision ?? '';
+  const statusQuery = useFastAllowanceStatus(contextRuntime, includeArchived, queryScope);
+  const allowanceRevision = statusQuery.data?.revision ?? ''; const allowanceStatus = useAllowanceStatusEstimation(contextRuntime, includeArchived, queryScope, statusQuery.data);
   const seriesQuery = useQuery({
     queryKey: ['allowance-v2', 'series', ...queryScope, allowanceRevision, windowKind, rangePreset, granularity, customStartAt, customEndAt],
     queryFn: ({ signal }) => loadAllowanceSeries(contextRuntime, {
@@ -193,10 +170,10 @@ function LiveLimitsPage({
       });
   }, [allowanceRevision, analysisJobId, analysisQuery.data?.status, analysisQuery.isFetching, contextRuntime, includeArchived]);
 
-  const readout = useMemo(() => buildAllowanceReadout(statusQuery.data), [statusQuery.data]);
+  const readout = useMemo(() => buildAllowanceReadout(allowanceStatus), [allowanceStatus]);
   const chartSpec = useMemo(() => seriesQuery.data
-    ? buildAllowanceIntelligenceVisualization(seriesQuery.data, statusQuery.data, windowKind, { showFullRange })
-    : null, [seriesQuery.data, statusQuery.data, windowKind, showFullRange]);
+    ? buildAllowanceIntelligenceVisualization(seriesQuery.data, allowanceStatus, windowKind, { showFullRange })
+    : null, [seriesQuery.data, allowanceStatus, windowKind, showFullRange]);
   const rangeHasNoOlderData = Boolean(seriesQuery.data && (
     rangePreset === 'all'
     || (rangePreset === '6m'

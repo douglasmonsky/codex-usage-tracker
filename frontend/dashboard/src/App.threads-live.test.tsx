@@ -50,7 +50,7 @@ describe('React dashboard threads live queries', () => {
 
     expect(await screen.findByRole('row', { name: /Collapse calls for page-two-thread/i })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: /Calls for page-two-thread/i })).toBeInTheDocument();
-    expect(await screen.findByText('page-two-model / high')).toBeInTheDocument();
+    expect(await screen.findByText('page-two-model')).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get('thread_key')).toBe('page-two-thread');
     expect(new URLSearchParams(window.location.search).has('thread')).toBe(false);
     expect(fetchMock.mock.calls.some(([input]) => new URL(String(input), window.location.origin).searchParams.get('offset') === '1')).toBe(true);
@@ -216,15 +216,15 @@ describe('React dashboard threads live queries', () => {
     expect(await screen.findByText('2 of 3 calls loaded')).toBeInTheDocument();
     expect(newThreadPageTwoAttempts).toBe(0);
     resolveOldThread?.(callsPage('old-thread', [callRow('old-1', 'old-thread', 'old-model')], 0, false));
-    await waitFor(() => expect(screen.queryByText('old-model / high')).not.toBeInTheDocument());
-    expect(screen.getAllByText('new-model-boundary / high')).toHaveLength(1);
+    await waitFor(() => expect(screen.queryByText('old-model')).not.toBeInTheDocument());
+    expect(screen.getAllByText('new-model-boundary')).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Load 100 more thread calls' }));
     await screen.findByText(/Partial result:/i, {}, { timeout: 3_000 });
     fireEvent.click(await screen.findByRole('button', { name: 'Retry loading thread calls' }));
     await screen.findByText('3 of 3 calls loaded');
-    expect(screen.getAllByText('new-model-boundary / high')).toHaveLength(1);
-    expect(screen.getByText('new-model-3 / high')).toBeInTheDocument();
+    expect(screen.getAllByText('new-model-boundary')).toHaveLength(1);
+    expect(screen.getByText('new-model-3')).toBeInTheDocument();
   });
 
   it('keeps boot calls as a labelled snapshot and retries an initial call failure', async () => {

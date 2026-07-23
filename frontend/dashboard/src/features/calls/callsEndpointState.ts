@@ -22,6 +22,10 @@ const apiSortByCallsSort: Partial<Record<CallsSortKey, CallsApiSort>> = {
   output: 'output',
   reasoning: 'reasoning',
   cache: 'cache',
+  attention: 'attention',
+  cost: 'cost',
+  usage: 'credits',
+  context: 'context',
 };
 
 export type CallsEndpointStateInput = {
@@ -60,6 +64,7 @@ export function callsEndpointState(input: CallsEndpointStateInput): CallsEndpoin
       query: [input.globalQuery.trim(), input.localQuery.trim()].filter(Boolean).join(' '),
       model: input.modelFilter === 'all' ? undefined : input.modelFilter,
       effort: input.effortFilter === 'all' ? undefined : input.effortFilter,
+      source: input.sourceFilter === 'all' ? undefined : input.sourceFilter,
       ...confidenceApiFilters(input.confidenceFilter),
       ...dateApiFilters(dateRange.start, dateRange.endExclusive, input.scopeSince),
     },
@@ -74,7 +79,6 @@ function endpointFallbackReason(
   if (!input.enabled || input.runtime.fileMode || !input.runtime.apiToken) return 'Stored snapshot';
   if (input.globalQuery.trim() && input.localQuery.trim()) return 'Multiple searches use loaded snapshot';
   if (input.activePreset) return 'Preset uses loaded snapshot';
-  if (input.sourceFilter !== 'all') return 'Source filter uses loaded snapshot';
   if (!sort) return 'This sort uses loaded snapshot';
   if (invalidDateRange) return 'Invalid date range';
   return '';

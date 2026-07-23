@@ -2,10 +2,18 @@
 
 ## Unreleased
 
-## 0.23.0 - 2026-07-22
+## 0.23.0 - 2026-07-23
 
 - Focus the Evidence Console on Home, unified Calls/Threads Explore, Limits,
   utility Settings, and contextual call/thread/finding/allowance Evidence.
+- Restore the Home usage pulse, live loading progress, guided MCP/plugin setup,
+  copyable investigation prompts, and a first-visit Calls/Threads switch cue.
+- Make timeframe, history, model, effort, confidence, source, pricing, and
+  credit filters use focused endpoints with exact counts and scoped totals.
+- Render expanded thread calls with the same legible call rows, pricing, and
+  credit semantics as Calls.
+- Keep `service serve --refresh` immediately usable by refreshing in the
+  background, and batch canonical deduplication lookups during ingestion.
 - Keep five legacy workbenches directly routable with explicit transition
   guidance while removing them from primary navigation.
 - Add eight bounded HTTP API v2 routes backed by the same application services

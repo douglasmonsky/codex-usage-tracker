@@ -18,7 +18,11 @@ from codex_usage_tracker.pricing.allowance_rate_card import (
     parse_aliases as parse_credit_aliases,
 )
 from codex_usage_tracker.pricing.config import PricingConfig, load_pricing_config
-from codex_usage_tracker.store.api import InvalidDatabasePathError, query_request_context_facts
+from codex_usage_tracker.store.api import (
+    InvalidDatabasePathError,
+    query_request_context_facts,
+    query_status_context_facts,
+)
 
 _FRESHNESS_THRESHOLD_SECONDS = 300
 
@@ -56,7 +60,11 @@ class RequestContext:
 
 
 def build_request_context(
-    *, db_path: Path, pricing_path: Path, scope: RequestScope
+    *,
+    db_path: Path,
+    pricing_path: Path,
+    scope: RequestScope,
+    prefer_materialized_active: bool = False,
 ) -> RequestContext:
     """Build bounded context without reports, database creation, or migrations."""
     scope_contract = scope.to_contract()
@@ -68,7 +76,12 @@ def build_request_context(
     pricing = load_pricing_config(pricing_path)
     credit_card = load_bundled_rate_card()
     try:
-        facts = query_request_context_facts(
+        query_facts = (
+            query_status_context_facts
+            if prefer_materialized_active
+            else query_request_context_facts
+        )
+        facts = query_facts(
             db_path=db_path,
             scope=scope.to_payload(),
             priced_models=_priced_model_names(pricing),

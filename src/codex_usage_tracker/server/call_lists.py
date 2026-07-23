@@ -21,6 +21,7 @@ from codex_usage_tracker.server.utils import (
 
 LiveQueryParams = Callable[..., dict[str, Any]]
 LiveCallRows = Callable[..., tuple[list[dict[str, object]], int]]
+LiveCallFilterOptions = Callable[..., dict[str, list[str]]]
 ErrorSender = Callable[[HTTPStatus, str], None]
 ExceptionSender = Callable[[str, BaseException], None]
 JsonSender = Callable[[HTTPStatus, dict[str, object]], None]
@@ -35,6 +36,7 @@ def handle_calls_request(
     *,
     live_query_params: LiveQueryParams,
     live_call_rows: LiveCallRows,
+    live_call_filter_options: LiveCallFilterOptions | None = None,
     send_error: ErrorSender,
     send_exception: ExceptionSender,
     send_json: JsonSender,
@@ -45,6 +47,7 @@ def handle_calls_request(
             query,
             live_query_params=live_query_params,
             live_call_rows=live_call_rows,
+            live_call_filter_options=live_call_filter_options,
         )
     except ValueError as exc:
         send_error(HTTPStatus.BAD_REQUEST, str(exc))
@@ -85,6 +88,7 @@ def calls_payload(
     *,
     live_query_params: LiveQueryParams,
     live_call_rows: LiveCallRows,
+    live_call_filter_options: LiveCallFilterOptions | None = None,
 ) -> dict[str, object]:
     """Build the filtered calls API payload."""
     params = parse_qs(query)
@@ -104,7 +108,7 @@ def calls_payload(
         pricing_status=pricing_status,
         credit_confidence=credit_confidence,
     )
-    return _calls_payload(
+    payload = _calls_payload(
         schema="codex-usage-tracker-calls-v1",
         rows=rows,
         total_matched=total_matched,
@@ -115,6 +119,13 @@ def calls_payload(
             "credit_confidence": credit_confidence,
         },
     )
+    if live_call_filter_options is not None:
+        payload["filter_options"] = live_call_filter_options(
+            since=query_params["since"],
+            until=query_params["until"],
+            include_archived=query_params["include_archived"],
+        )
+    return payload
 
 
 def thread_calls_payload(

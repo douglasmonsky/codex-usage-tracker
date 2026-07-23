@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from contextlib import suppress
 from pathlib import Path
@@ -78,6 +79,103 @@ def test_source_logs_requiring_parse_classifies_new_unchanged_and_append_only(
     assert by_path[grown_path].start_byte == len("{}\n")
     assert by_path[grown_path].start_line == 1
     assert by_path[grown_path].initial_state == state
+
+
+def test_source_logs_requiring_parse_accepts_device_id_change_for_unchanged_file(
+    tmp_path: Path,
+) -> None:
+    conn = _memory_db()
+    source_path = tmp_path / "events.jsonl"
+    source_path.write_text("{}\n", encoding="utf-8")
+    state = ParserState(session_id="session")
+    upsert_source_file_metadata(
+        conn.connection,
+        parsed_files=[(source_path, [], {}, state)],
+    )
+    conn.execute(
+        "UPDATE source_files SET source_device = ? WHERE source_file = ?",
+        (f"fsid-v1:{source_path.stat().st_dev + 1}", str(source_path)),
+    )
+
+    assert source_logs_requiring_parse(conn.connection, [source_path]) == []
+
+
+def test_source_logs_requiring_parse_rejects_device_drift_with_changed_content(
+    tmp_path: Path,
+) -> None:
+    conn = _memory_db()
+    source_path = tmp_path / "events.jsonl"
+    source_path.write_text("first\n", encoding="utf-8")
+    state = ParserState(session_id="session")
+    upsert_source_file_metadata(
+        conn.connection,
+        parsed_files=[(source_path, [], {}, state)],
+    )
+    original_stat = source_path.stat()
+    conn.execute(
+        "UPDATE source_files SET source_device = ? WHERE source_file = ?",
+        (f"fsid-v1:{original_stat.st_dev + 1}", str(source_path)),
+    )
+    source_path.write_text("other\n", encoding="utf-8")
+    os.utime(
+        source_path,
+        ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns),
+    )
+
+    plans = source_logs_requiring_parse(conn.connection, [source_path])
+
+    assert len(plans) == 1
+    assert plans[0].replace_existing is True
+
+
+def test_source_logs_requiring_parse_accepts_device_id_change_for_append(
+    tmp_path: Path,
+) -> None:
+    conn = _memory_db()
+    source_path = tmp_path / "events.jsonl"
+    source_path.write_text("{}\n", encoding="utf-8")
+    state = ParserState(session_id="session")
+    upsert_source_file_metadata(
+        conn.connection,
+        parsed_files=[(source_path, [], {}, state)],
+    )
+    conn.execute(
+        "UPDATE source_files SET source_device = ? WHERE source_file = ?",
+        (f"fsid-v1:{source_path.stat().st_dev + 1}", str(source_path)),
+    )
+    with source_path.open("a", encoding="utf-8") as handle:
+        handle.write("{}\n")
+
+    plans = source_logs_requiring_parse(conn.connection, [source_path])
+
+    assert len(plans) == 1
+    assert plans[0].replace_existing is False
+    assert plans[0].start_byte == len("{}\n")
+    assert plans[0].start_line == 1
+
+
+def test_source_logs_requiring_parse_rejects_inode_change_with_matching_tail(
+    tmp_path: Path,
+) -> None:
+    conn = _memory_db()
+    source_path = tmp_path / "events.jsonl"
+    source_path.write_text("{}\n", encoding="utf-8")
+    state = ParserState(session_id="session")
+    upsert_source_file_metadata(
+        conn.connection,
+        parsed_files=[(source_path, [], {}, state)],
+    )
+    conn.execute(
+        "UPDATE source_files SET source_inode = ? WHERE source_file = ?",
+        (f"fsid-v1:{source_path.stat().st_ino + 1}", str(source_path)),
+    )
+    with source_path.open("a", encoding="utf-8") as handle:
+        handle.write("{}\n")
+
+    plans = source_logs_requiring_parse(conn.connection, [source_path])
+
+    assert len(plans) == 1
+    assert plans[0].replace_existing is True
 
 
 def test_source_logs_requiring_parse_rejects_larger_replacement(

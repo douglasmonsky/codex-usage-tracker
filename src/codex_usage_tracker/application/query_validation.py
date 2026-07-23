@@ -54,6 +54,8 @@ def validate_query_request(request: QueryRequest) -> QueryRequest:
         if measure not in {"estimated_cost", "estimated_credits"}
     )
     allowed_order = {capability.identity, *request.group_by, *sortable_measures}
+    if request.entity == "call" and not request.group_by:
+        allowed_order.add("time")
     order_by = request.order_by or (
         sortable_measures[0] if sortable_measures else capability.identity
     )

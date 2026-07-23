@@ -1,9 +1,10 @@
-import { usageRowToCall } from '../../api/client';
-import type { CallRow, UsageRow } from '../../api/types';
+import { usageRowToCall } from "../../api/client";
+import type { CallRow, UsageRow } from "../../api/types";
 
-export const exploreCallsSchema = 'codex-usage-tracker-calls-v1' as const;
-export const exploreThreadCallsSchema = 'codex-usage-tracker-thread-calls-v1' as const;
-export const exploreThreadsSchema = 'codex-usage-tracker-threads-v1' as const;
+export const exploreCallsSchema = "codex-usage-tracker-calls-v1" as const;
+export const exploreThreadCallsSchema =
+  "codex-usage-tracker-thread-calls-v1" as const;
+export const exploreThreadsSchema = "codex-usage-tracker-threads-v1" as const;
 
 type ExplorePage<T> = {
   rows: T[];
@@ -19,6 +20,10 @@ type ExplorePage<T> = {
 export type ExploreCallsPage = ExplorePage<CallRow> & {
   schema: typeof exploreCallsSchema | typeof exploreThreadCallsSchema;
   threadKey: string;
+  filterOptions: {
+    models: string[];
+    efforts: string[];
+  };
 };
 
 export type ThreadSummaryRecord = {
@@ -54,42 +59,61 @@ export type ExploreThreadsPage = ExplorePage<ThreadSummaryRecord> & {
 export class ExploreContractError extends Error {}
 
 export function decodeExploreCalls(value: unknown): ExploreCallsPage {
-  const payload = record(value, 'calls response');
+  const payload = record(value, "calls response");
   const schema = payload.schema;
   if (schema !== exploreCallsSchema && schema !== exploreThreadCallsSchema) {
-    throw new ExploreContractError('Unsupported calls response schema.');
+    throw new ExploreContractError("Unsupported calls response schema.");
   }
   const page = pageMetadata(payload);
   return {
     schema,
     ...page,
-    rows: records(payload.rows, 'call rows').map((row, index) =>
+    rows: records(payload.rows, "call rows").map((row, index) =>
       usageRowToCall(row as UsageRow, page.offset + index),
     ),
     threadKey: text(payload.thread_key),
+    filterOptions: decodeCallFilterOptions(payload.filter_options),
+  };
+}
+
+function decodeCallFilterOptions(
+  value: unknown,
+): ExploreCallsPage["filterOptions"] {
+  const payload =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+  return {
+    models: strings(payload.models),
+    efforts: strings(payload.efforts),
   };
 }
 
 export function decodeExploreThreads(value: unknown): ExploreThreadsPage {
-  const payload = record(value, 'threads response');
+  const payload = record(value, "threads response");
   if (payload.schema !== exploreThreadsSchema) {
-    throw new ExploreContractError('Unsupported threads response schema.');
+    throw new ExploreContractError("Unsupported threads response schema.");
   }
   return {
     schema: payload.schema,
     ...pageMetadata(payload),
-    rows: records(payload.rows, 'thread rows').map(decodeThreadSummary),
+    rows: records(payload.rows, "thread rows").map(decodeThreadSummary),
     includeArchived: boolean(payload.include_archived),
   };
 }
 
-function pageMetadata(payload: Record<string, unknown>): Omit<ExplorePage<never>, 'rows'> {
+function pageMetadata(
+  payload: Record<string, unknown>,
+): Omit<ExplorePage<never>, "rows"> {
   const rowCount = number(payload.row_count);
-  const totalMatchedRows = optionalNumber(payload.total_matched_rows) ?? rowCount;
+  const totalMatchedRows =
+    optionalNumber(payload.total_matched_rows) ?? rowCount;
   const limit = nullableLimit(payload.limit);
   const offset = number(payload.offset);
-  const computedHasMore = limit !== null && offset + rowCount < totalMatchedRows;
-  const hasMore = typeof payload.has_more === 'boolean' ? payload.has_more : computedHasMore;
+  const computedHasMore =
+    limit !== null && offset + rowCount < totalMatchedRows;
+  const hasMore =
+    typeof payload.has_more === "boolean" ? payload.has_more : computedHasMore;
   const computedNextOffset = hasMore ? offset + rowCount : null;
   return {
     rowCount,
@@ -102,7 +126,9 @@ function pageMetadata(payload: Record<string, unknown>): Omit<ExplorePage<never>
   };
 }
 
-function decodeThreadSummary(value: Record<string, unknown>): ThreadSummaryRecord {
+function decodeThreadSummary(
+  value: Record<string, unknown>,
+): ThreadSummaryRecord {
   return {
     threadKey: text(value.thread_key),
     threadLabel: text(value.thread_label || value.thread_key),
@@ -130,19 +156,27 @@ function decodeThreadSummary(value: Record<string, unknown>): ThreadSummaryRecor
 }
 
 function record(value: unknown, label: string): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new ExploreContractError(`Expected ${label} to be an object.`);
   }
   return value as Record<string, unknown>;
 }
 
-function records(value: unknown, label: string): Array<Record<string, unknown>> {
-  if (!Array.isArray(value)) throw new ExploreContractError(`Expected ${label} to be an array.`);
+function records(
+  value: unknown,
+  label: string,
+): Array<Record<string, unknown>> {
+  if (!Array.isArray(value))
+    throw new ExploreContractError(`Expected ${label} to be an array.`);
   return value.map((item, index) => record(item, `${label}[${index}]`));
 }
 
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(text).filter(Boolean) : [];
+}
+
 function text(value: unknown): string {
-  return typeof value === 'string' ? value : value == null ? '' : String(value);
+  return typeof value === "string" ? value : value == null ? "" : String(value);
 }
 
 function number(value: unknown): number {
@@ -150,13 +184,20 @@ function number(value: unknown): number {
 }
 
 function optionalNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === '') return null;
+  if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 function nullableLimit(value: unknown): number | null {
-  if (value === null || value === undefined || value === '' || value === 0 || value === '0') return null;
+  if (
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    value === 0 ||
+    value === "0"
+  )
+    return null;
   return optionalNumber(value);
 }
 

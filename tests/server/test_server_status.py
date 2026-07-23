@@ -113,7 +113,20 @@ def test_status_payload_normalizes_include_archived_and_metadata(
     monkeypatch.setattr(
         server_status,
         "query_dedupe_diagnostics",
-        lambda **kwargs: {"summary": {"excluded_copied_rows": 2}},
+        lambda **kwargs: {
+            "summary": {
+                "dedupe_enabled": True,
+                "fingerprint_version": 2,
+                "physical_rows": 4,
+                "canonical_rows": 2,
+                "excluded_copied_rows": 2,
+                "physical_total_tokens": 400,
+                "canonical_total_tokens": 200,
+                "excluded_total_tokens": 200,
+                "duplicate_fingerprint_groups": 1,
+                "duplicate_reasons": {"copied": 2},
+            }
+        },
     )
     monkeypatch.setattr(
         server_status,
@@ -151,7 +164,18 @@ def test_status_payload_normalizes_include_archived_and_metadata(
     assert payload["observed_usage"] == {"weekly_percent": 37}
     assert payload["parser_adapter"] == "jsonl"
     assert payload["parser_diagnostics"] == {"skipped_events": 3}
-    assert payload["dedupe"] == {"excluded_copied_rows": 2}
+    assert payload["dedupe"] == {
+        "dedupe_enabled": True,
+        "fingerprint_version": 2,
+        "physical_rows": 4,
+        "canonical_rows": 2,
+        "excluded_copied_rows": 2,
+        "physical_total_tokens": 400,
+        "canonical_total_tokens": 200,
+        "excluded_total_tokens": 200,
+        "duplicate_fingerprint_groups": 1,
+        "duplicate_reasons": {"copied": 2},
+    }
     assert payload["conversational_analysis"]["state"] == "ready"
     assert readiness_homes == [codex_home]
     assert str(codex_home) not in str(payload["conversational_analysis"])
@@ -233,6 +257,15 @@ def test_home_summary_payload_is_active_only_and_bounded(
 
     monkeypatch.setattr(server_status, "query_home_finding_rows", query_findings)
     monkeypatch.setattr(server_status, "query_home_recent_evidence_rows", query_recent)
+    monkeypatch.setattr(
+        server_status,
+        "query_home_usage_metrics",
+        lambda **_kwargs: {
+            "calls": 7,
+            "total_tokens": 12_345,
+            "pricing_coverage": 1.0,
+        },
+    )
     monkeypatch.setattr(server_status, "current_source_revision", lambda _path: "generation:9")
     monkeypatch.setattr(
         server_status,
@@ -281,6 +314,11 @@ def test_home_summary_payload_is_active_only_and_bounded(
     }
     assert payload["schema"] == "codex-usage-tracker-home-summary-v1"
     assert payload["source_revision"] == "generation:9"
+    assert payload["usage_metrics"] == {
+        "calls": 7,
+        "total_tokens": 12_345,
+        "pricing_coverage": 1.0,
+    }
     assert payload["pricing"] == {
         "configured": True,
         "model_count": 2,

@@ -173,6 +173,7 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "since": (str, NoneType),
             "context_api": str,
             "refresh_before_start": bool,
+            "refresh_in_background": bool,
             "privacy_mode": str,
             "include_archived": bool,
         }

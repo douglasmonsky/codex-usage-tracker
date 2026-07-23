@@ -7,8 +7,8 @@ function usageRequestCalls(fetchMock: ReturnType<typeof vi.fn>) {
 describe('React dashboard shell live loading', () => {
   installAppTestHooks();
 
-it('auto-loads live rows for shell boot payloads without showing fixture rows', async () => {
-  window.history.replaceState(null, '', '/?view=explore&mode=calls');
+it('keeps stable Home shell boot bounded instead of hydrating compatibility rows', async () => {
+  window.history.replaceState(null, '', '/?view=home');
   const embedded = document.createElement('script');
   embedded.id = 'usage-data';
   embedded.type = 'application/json';
@@ -33,8 +33,35 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
   });
   document.body.append(embedded);
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    void init;
     const url = String(input);
+    if (url === '/api/v2/query') {
+      const request = JSON.parse(String(init?.body)) as {
+        filters?: { since?: string };
+        history?: string;
+      };
+      expect(request.filters?.since).toMatch(/^2026-|^2027-/);
+      expect(['active', 'all']).toContain(request.history);
+      return {
+        ok: true,
+        json: async () => ({
+          schema: 'codex-usage-tracker.query.v2',
+          rows: [{
+            model: 'gpt-5.6',
+            tokens: 900,
+            cached_tokens: 600,
+            uncached_tokens: 200,
+            output_tokens: 100,
+            reasoning_tokens: 50,
+            estimated_cost: 0.25,
+            estimated_cost_coverage: 1,
+            estimated_credits: 9,
+            call_count: 3,
+          }],
+          next_cursor: null,
+          total_matched: 1,
+        }),
+      } as Response;
+    }
     if (url.includes('/api/status?')) {
       return {
         ok: true,
@@ -66,55 +93,122 @@ it('auto-loads live rows for shell boot payloads without showing fixture rows', 
         }),
       } as Response;
     }
-    if (!url.includes('/api/usage?')) {
-      throw new Error(`Unexpected request: ${url}`);
-    }
-    return {
-      ok: true,
-      json: async () => ({
-        api_token: 'shell-load-token',
-        context_api_enabled: true,
-        loaded_row_count: 1,
-        total_available_rows: 2,
-        default_load_window: 'all',
-        load_window: 'all',
-        limit: 500,
-        rows: [
-          {
-            record_id: 'real-live-row',
-            call_started_at: '2026-07-02T10:00:00Z',
-            thread_name: 'real-live-thread',
-            model: 'codex-1',
-            effort: 'high',
-            input_tokens: 1_000,
-            cached_input_tokens: 400,
-            output_tokens: 250,
-            total_tokens: 1_250,
-            estimated_cost_usd: 0.12,
-          },
-        ],
-      }),
-    } as Response;
+    throw new Error(`Unexpected request: ${url}`);
   });
   vi.stubGlobal('fetch', fetchMock);
 
   render(<App />);
 
   expect(screen.queryByText('thread-9f3a1c')).not.toBeInTheDocument();
-  expect(await screen.findByText('real-live-thread')).toBeInTheDocument();
-  await waitFor(() => expect(usageRequestCalls(fetchMock)).toHaveLength(1));
-  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('refresh=0');
-  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('limit=500');
-  expect(String(usageRequestCalls(fetchMock)[0][0])).toContain('load_window=all');
+  expect(await screen.findByRole('heading', { name: 'Overview' })).toBeInTheDocument();
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+  expect(usageRequestCalls(fetchMock)).toHaveLength(0);
+  expect(screen.getByText('Total Calls')).toBeInTheDocument();
+  expect(screen.getAllByText('2').length).toBeGreaterThan(0);
   expect(screen.getByRole('button', { name: 'All time' })).toHaveAttribute('aria-pressed', 'true');
-  expect(screen.getByText('2 calls analyzed · 1 detail row cached')).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: 'Analysis scope' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Last 24h' }));
+  expect(await screen.findByText('900')).toBeInTheDocument();
+  expect(screen.getByText('3')).toBeInTheDocument();
+  expect(fetchMock.mock.calls.some(([input]) => String(input) === '/api/v2/query')).toBe(true);
+  expect(usageRequestCalls(fetchMock)).toHaveLength(0);
+  fireEvent.change(screen.getByLabelText('History scope'), { target: { value: 'all' } });
+  await waitFor(() => {
+    const v2Calls = fetchMock.mock.calls.filter(([input]) => String(input) === '/api/v2/query');
+    expect(v2Calls).toHaveLength(2);
+    expect(JSON.parse(String(v2Calls[1]?.[1]?.body)).history).toBe('all');
+  });
+  expect(usageRequestCalls(fetchMock)).toHaveLength(0);
   fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
   expect(await screen.findByText('Deferred MCP readiness passed.')).toBeInTheDocument();
   embedded.remove();
 });
 
-it('renders Reports live boot payloads without embedded report summaries', () => {
+  it('restores saved Home scope controls without compatibility hydration', async () => {
+    window.history.replaceState(null, '', '/?view=home');
+    window.sessionStorage.setItem(
+      'codexUsageDashboardLoadSettings',
+      JSON.stringify({ loadLimit: 1_500, historyScope: 'all', loadWindow: 'rows' }),
+    );
+    window.__CODEX_USAGE_BOOT__ = {
+      api_token: 'home-session-token',
+      shell_boot: true,
+      loaded_row_count: 0,
+      total_available_rows: 0,
+      load_window: 'all',
+      default_load_window: 'all',
+      limit: 500,
+      history_scope: 'active',
+      rows: [],
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/v2/query') {
+        return {
+          ok: true,
+          json: async () => ({
+            schema: 'codex-usage-tracker.query.v2',
+            rows: [],
+            next_cursor: null,
+          }),
+        } as Response;
+      }
+      if (url.includes('/api/status?')) {
+        return {
+          ok: true,
+          json: async () => ({
+            schema: 'codex-usage-tracker-status-v1',
+            conversational_analysis: {
+              schema: 'codex-usage-tracker-conversational-readiness-v1',
+              state: 'ready',
+              summary: 'Ready.',
+              next_action: null,
+              configured_profile: 'core',
+              runtime_version_matches: true,
+              evidence: [],
+            },
+            home_summary: {
+              schema: 'codex-usage-tracker-home-summary-v1',
+              source_revision: 'session-restore',
+              accounting: {
+                physical_rows: 0,
+                canonical_rows: 0,
+                excluded_copied_rows: 0,
+              },
+              usage_metrics: null,
+              pricing: { configured: false, model_count: 0, estimated_model_count: 0 },
+              allowance: {
+                configured: false,
+                error: null,
+                observed_usage: { available: false, windows: [] },
+                windows: [],
+              },
+              findings: [],
+              recent_evidence: [],
+            },
+          }),
+        } as Response;
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: 'Recent rows' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByLabelText('History scope')).toHaveValue('all');
+    expect(screen.getByLabelText('Rows to load')).toHaveValue(1_500);
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([input]) => String(input) === '/api/v2/query'),
+      ).toBe(true);
+    });
+    expect(usageRequestCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it('renders Reports live boot payloads without embedded report summaries', () => {
     window.history.replaceState(null, '', '/?view=reports&report=fast-mode-proxy');
     window.__CODEX_USAGE_BOOT__ = {
       loaded_row_count: 1,

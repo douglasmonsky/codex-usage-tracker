@@ -21,7 +21,14 @@ describe('Explore endpoint queries', () => {
       runtime,
       includeArchived: true,
       sourceRevision: 'rev-1',
-      filters: { query: 'cache', model: 'gpt-5.6', effort: 'high', since: '2026-07-01', pricingStatus: 'priced' },
+      filters: {
+        query: 'cache',
+        model: 'gpt-5.6',
+        effort: 'high',
+        source: 'project',
+        since: '2026-07-01',
+        pricingStatus: 'priced',
+      },
       sort: 'tokens',
       direction: 'desc',
     }, 100, 50);
@@ -29,6 +36,7 @@ describe('Explore endpoint queries', () => {
     const url = new URL(String(fetchMock.mock.calls[0][0]), 'http://localhost');
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
       include_archived: 'true', limit: '50', offset: '100', q: 'cache', model: 'gpt-5.6', effort: 'high',
+      source: 'project',
       since: '2026-07-01', pricing_status: 'priced', sort: 'tokens', direction: 'desc',
     });
   });
@@ -44,14 +52,24 @@ describe('Explore endpoint queries', () => {
         total_matched_rows: 125, limit: 25, offset: 100,
       }));
 
-    await loadThreadsPage({ runtime, includeArchived: false, sourceRevision: 'rev', query: 'thread', sort: 'calls', direction: 'asc' }, 0, 25);
+    await loadThreadsPage({
+      runtime,
+      includeArchived: false,
+      sourceRevision: 'rev',
+      query: 'thread',
+      risk: 'medium',
+      sort: 'calls',
+      direction: 'asc',
+    }, 0, 25);
     await loadThreadCalls(
       { runtime, includeArchived: false, sourceRevision: 'rev', threadKey: 'thread-a' },
       100,
       25,
     );
 
-    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/threads?');
+    const threadsUrl = new URL(String(fetchMock.mock.calls[0][0]), 'http://localhost');
+    expect(threadsUrl.pathname).toBe('/api/threads');
+    expect(threadsUrl.searchParams.get('risk')).toBe('medium');
     const threadCallsUrl = new URL(String(fetchMock.mock.calls[1][0]), 'http://localhost');
     expect(threadCallsUrl.pathname).toBe('/api/thread-calls');
     expect(threadCallsUrl.searchParams.get('thread_key')).toBe('thread-a');

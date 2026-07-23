@@ -79,3 +79,49 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
     query_cache = handler.keywords["query_cache"]
     assert isinstance(query_cache, AggregateQueryCache)
     assert query_cache.max_entries == 64
+
+
+def test_serve_dashboard_starts_requested_refresh_after_binding(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    events: list[object] = []
+
+    class FakeServer:
+        def __init__(self, address: tuple[str, int], handler: object) -> None:
+            events.append(("bound", address, handler))
+
+        def serve_forever(self) -> None:
+            events.append("serving")
+            raise KeyboardInterrupt
+
+        def server_close(self) -> None:
+            events.append("closed")
+
+    def start_refresh(self, **kwargs: object) -> dict[str, object]:
+        events.append(("refresh", kwargs))
+        return {"job_id": "startup-job"}
+
+    monkeypatch.setattr(server_api, "ThreadingHTTPServer", FakeServer)
+    monkeypatch.setattr(
+        server_api,
+        "generate_dashboard",
+        lambda **kwargs: Path(str(kwargs["output_path"])),
+    )
+    monkeypatch.setattr(server_api.RefreshJobRegistry, "start_refresh", start_refresh)
+
+    server_api.serve_dashboard(
+        db_path=tmp_path / "usage.sqlite3",
+        output_path=tmp_path / "dashboard.html",
+        codex_home=tmp_path / "codex-home",
+        host="127.0.0.1",
+        port=8765,
+        refresh_on_start=True,
+    )
+
+    assert events[0][0] == "bound"
+    assert events[1][0] == "refresh"
+    assert events[1][1]["aggregate_only"] is False
+    assert events[2:] == ["serving", "closed"]
+    assert "Background refresh started: startup-job" in capsys.readouterr().out

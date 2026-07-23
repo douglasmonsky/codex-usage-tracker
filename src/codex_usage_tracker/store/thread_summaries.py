@@ -133,11 +133,24 @@ def _insert_thread_summary_scopes(
 
 
 def _latest_record_id_expression(*, include_archived: bool) -> str:
+    active_fact_filter = "" if include_archived else "AND rf.is_archived = 0"
     active_usage_filter = _active_usage_filter(include_archived)
     legacy_thread_key = thread_key_expression("u.")
     return render_sql_template(
         """
         coalesce(
+            (
+                SELECT rf.record_id
+                FROM recommendation_facts AS rf
+                    INDEXED BY idx_recommendation_facts_thread_latest
+                WHERE rf.thread_key = t.thread_key
+                    AND rf.event_timestamp = t.latest_event_timestamp
+                    $active_fact_filter
+                ORDER BY
+                    rf.total_tokens DESC,
+                    rf.record_id DESC
+                LIMIT 1
+            ),
             (
                 SELECT u.record_id
                 FROM canonical_usage_events AS u
@@ -164,6 +177,7 @@ def _latest_record_id_expression(*, include_archived: bool) -> str:
         )
         """,
         {
+            "active_fact_filter": active_fact_filter,
             "active_usage_filter": active_usage_filter,
             "legacy_thread_key": legacy_thread_key,
         },
@@ -176,6 +190,7 @@ def query_thread_summaries(
     limit: int | None = 100,
     offset: int = 0,
     search: str | None = None,
+    risk: str | None = None,
     include_archived: bool = False,
     sort: str = "tokens",
     direction: str = "desc",
@@ -184,6 +199,7 @@ def query_thread_summaries(
 
     where_clause, params = _thread_summary_where_clause(
         search=search,
+        risk=risk,
         include_archived=include_archived,
     )
     sort_column = _thread_summary_sort_column(sort)
@@ -250,6 +266,14 @@ def _thread_summary_sort_column(sort: str) -> str:
         "calls": "call_count",
         "cache": "avg_cache_ratio",
         "thread": "thread_label",
+        "cost": "coalesce(estimated_cost_usd, 0)",
+        "credits": "coalesce(usage_credits, 0)",
+        "context": "coalesce(max_context_window_percent, 0)",
+        "risk": "coalesce(avg_cache_ratio, 0)",
+        "cost_per_call": (
+            "CASE WHEN call_count > 0 "
+            "THEN coalesce(estimated_cost_usd, 0) / call_count ELSE 0 END"
+        ),
     }
     if sort not in sort_map:
         allowed = ", ".join(sorted(sort_map))
@@ -285,12 +309,14 @@ def query_thread_summary_count(
     db_path: Path = DEFAULT_DB_PATH,
     *,
     search: str | None = None,
+    risk: str | None = None,
     include_archived: bool = False,
 ) -> int:
     """Return the number of thread summaries matching list filters."""
 
     where_clause, params = _thread_summary_where_clause(
         search=search,
+        risk=risk,
         include_archived=include_archived,
     )
     with connect(db_path) as conn:
@@ -305,6 +331,7 @@ def query_thread_summary_count(
 def _thread_summary_where_clause(
     *,
     search: str | None,
+    risk: str | None,
     include_archived: bool,
 ) -> tuple[str, list[Any]]:
     clauses = ["is_archived_scope = ?"]
@@ -313,6 +340,19 @@ def _thread_summary_where_clause(
         like = f"%{search}%"
         clauses.append("(thread_key LIKE ? OR thread_label LIKE ?)")
         params.extend([like, like])
+    if risk is not None:
+        risk_clauses = {
+            "high": "coalesce(avg_cache_ratio, 0) < 0.25",
+            "medium": (
+                "coalesce(avg_cache_ratio, 0) >= 0.25 "
+                "AND coalesce(avg_cache_ratio, 0) < 0.45"
+            ),
+            "low": "coalesce(avg_cache_ratio, 0) >= 0.45",
+        }
+        try:
+            clauses.append(risk_clauses[risk.lower()])
+        except KeyError as exc:
+            raise ValueError("risk must be one of: high, medium, low") from exc
     return "WHERE " + " AND ".join(f"({clause})" for clause in clauses), params
 
 

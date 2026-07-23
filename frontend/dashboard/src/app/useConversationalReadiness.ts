@@ -13,11 +13,15 @@ export function useConversationalReadiness(
   canUseLiveApi: boolean;
   conversationalAnalysis: ConversationalReadiness | undefined;
   homeSummary: HomeSummaryPayload | undefined;
+  homeStatusLoading: boolean;
+  homeStatusError: string | null;
 } {
   const canUseLiveApi = Boolean(dashboardPayload?.api_token);
-  const lastRequestedPayload = useRef<DashboardBootPayload | null>(null);
+  const lastCompletedPayload = useRef<DashboardBootPayload | null>(null);
   const [readiness, setReadiness] = useState(initialPayload?.conversational_analysis);
   const [homeSummary, setHomeSummary] = useState(initialPayload?.home_summary);
+  const [homeStatusLoading, setHomeStatusLoading] = useState(false);
+  const [homeStatusError, setHomeStatusError] = useState<string | null>(null);
   useEffect(() => {
     const readinessDeferred = initialPayload?.readiness_deferred === true && !readiness;
     const homeDeferred = initialPayload?.home_summary_deferred === true && !homeSummary;
@@ -25,18 +29,28 @@ export function useConversationalReadiness(
     if (
       (!readinessDeferred && !homeDeferred && !dashboardSnapshotChanged)
       || !canUseLiveApi
-      || lastRequestedPayload.current === dashboardPayload
+      || lastCompletedPayload.current === dashboardPayload
     ) return;
-    lastRequestedPayload.current = dashboardPayload;
     const controller = new AbortController();
+    setHomeStatusLoading(true);
+    setHomeStatusError(null);
     void loadHomeStatus({
       apiToken: String(dashboardPayload?.api_token ?? ''),
       contextApiEnabled: Boolean(dashboardPayload?.context_api_enabled),
       fileMode: false,
     }, controller.signal).then(status => {
+      if (controller.signal.aborted) return;
+      lastCompletedPayload.current = dashboardPayload;
       setReadiness(status.conversational_analysis);
       setHomeSummary(status.home_summary);
-    }).catch(() => undefined);
+    }).catch(error => {
+      if (!controller.signal.aborted) {
+        lastCompletedPayload.current = dashboardPayload;
+        setHomeStatusError(error instanceof Error ? error.message : 'Home status is unavailable.');
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted) setHomeStatusLoading(false);
+    });
     return () => controller.abort();
   }, [
     canUseLiveApi,
@@ -46,5 +60,11 @@ export function useConversationalReadiness(
     initialPayload?.readiness_deferred,
     readiness,
   ]);
-  return { canUseLiveApi, conversationalAnalysis: readiness, homeSummary };
+  return {
+    canUseLiveApi,
+    conversationalAnalysis: readiness,
+    homeSummary,
+    homeStatusLoading,
+    homeStatusError,
+  };
 }

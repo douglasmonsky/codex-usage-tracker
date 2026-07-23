@@ -137,7 +137,7 @@ export function ThreadsPage({
       includeArchived,
       sourceKey,
       sourceRevision,
-      query: endpointState.query,
+      query: endpointState.query, risk: endpointState.risk,
       sort: endpointState.sort,
       direction: endpointState.direction,
       pageSize: threadsTablePageSize,

@@ -8,8 +8,10 @@ those results.
 The stable Evidence Console direction is limited to these surfaces:
 
 - `Home`: a Usage Pulse summary of calls, tokens, cache reuse, and estimated
-  cost, followed by readiness, freshness, recent high-confidence findings, and
-  suggested analysis questions.
+  cost, followed by MCP/plugin setup, copyable analysis prompts, and recent
+  high-confidence findings. Freshness stays visible through loading/refresh
+  progress and snapshot/timeframe state; bounded status and recent-evidence
+  inventories are intentionally omitted.
 - `Explore`: bounded Calls and Threads evidence browsing with shared scope and
   filtering.
 - `Limits`: current allowance status, observed history, supported changes,
@@ -18,6 +20,16 @@ The stable Evidence Console direction is limited to these surfaces:
   explicit compatibility controls.
 - `Evidence`: contextual detail for a selected finding, call, thread, or
   allowance record.
+
+Home keeps the four Usage Pulse cards concise, shows progress while deferred
+status, timeframe, or refresh work is running, and provides an MCP/plugin setup
+disclosure followed by visible copyable prompts for common usage, cost, cache,
+context, allowance, workflow-waste, and subagent-effectiveness questions.
+
+Explore opens in Calls mode. On the first visit, a dismissible accessible hint
+points to the Calls/Threads switch. Both modes keep server-side filtering,
+sorting, exact matched counts, and bounded pagination; expanding a thread uses
+the same Calls evidence grid rather than a separate row format.
 
 ## Evidence Targets
 

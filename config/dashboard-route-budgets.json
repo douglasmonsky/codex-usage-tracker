@@ -10,6 +10,9 @@
       "cold_p95_seconds": 0.5,
       "warm_p95_seconds": 0.05
     },
+    "/api/calls": {
+      "p95_seconds": 0.25
+    },
     "/api/threads": {
       "p95_seconds": 0.1
     },

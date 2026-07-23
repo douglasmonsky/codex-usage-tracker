@@ -1330,13 +1330,12 @@ git commit -m "refactor: define Evidence Console routes"
 
 **Home content contract:**
 
-1. Index freshness and source revision.
-2. Conversational-analysis readiness and configured MCP profile.
-3. Accounting status: canonical/physical/excluded rows and pricing coverage.
-4. Current allowance summary when available.
-5. At most three deterministic high-confidence findings from a bounded home-summary endpoint.
-6. Recent evidence: at most five calls or threads.
-7. Primary actions: copy a starter investigation prompt, open Explore, open Limits, refresh.
+1. Four concise Usage Pulse metrics scoped to the selected timeframe.
+2. An MCP/plugin explainer, expandable setup guidance, and a bounded library of visible copyable prompts for common investigations.
+3. At most three deterministic high-confidence findings from a bounded home-summary endpoint.
+4. A visible loading/progress state for deferred Home status, selected-timeframe changes, and index refresh.
+5. Snapshot/timeframe state remains visible without exposing a separate status inventory.
+6. Refresh remains a primary Home action.
 
 **Explicit removals from Home:**
 
@@ -1346,12 +1345,15 @@ git commit -m "refactor: define Evidence Console routes"
 - multiple competing charts.
 - manual report configuration.
 - hidden all-history scans during initial hydration.
+- annotation footnotes beneath the four headline usage cards.
+- bounded status-card inventories for freshness, accounting, pricing, or allowance.
+- the separate recent-evidence inventory.
 
-- [ ] **Step 1: Write failing model tests.** Cover fresh, stale, empty, pricing-partial, copied-row, MCP-ready, MCP-unavailable, allowance-missing, and bounded-findings states. Assert at most five top-level status cards and at most three findings.
+- [ ] **Step 1: Write failing model tests.** Cover fresh, stale, empty, pricing-partial, copied-row, MCP-ready, MCP-unavailable, allowance-missing, and bounded-findings states. Assert the status-card and recent-evidence inventories stay absent and at most three findings render.
 
 - [ ] **Step 2: Add a bounded home-summary response.** Extend `/api/status` or add `/api/v2/home` only if status would become semantically overloaded. The endpoint must execute constant-size metadata reads plus bounded persisted recommendation/finding reads; no full-history detector runs.
 
-- [ ] **Step 3: Implement Home.** Use existing design tokens and accessibility primitives. Each finding has an `Open evidence` target and a copyable conversational follow-up. No finding is generated in React.
+- [ ] **Step 3: Implement Home.** Use existing design tokens and accessibility primitives. Each finding has an `Open evidence` target and a copyable conversational follow-up. Add setup guidance plus visible copyable starter prompts without generating analytical findings in React. Show progress for deferred status, timeframe updates, and refresh without starting a hidden scan.
 
 - [ ] **Step 4: Route `overview` compatibility URLs to Home.** Preserve old bookmark behavior.
 
@@ -1400,6 +1402,7 @@ git commit -m "feat: add focused Evidence Console home"
 - Switching modes does not refetch unrelated data until that mode becomes active.
 - Old `view=calls` and `view=threads` URLs normalize to Explore with the corresponding mode.
 - No cross-mode calculation is implemented in the frontend.
+- The first Explore visit displays a dismissible accessible pointer beside the Calls/Threads switch so the two modes are discoverable.
 
 - [ ] **Step 1: Write failing state tests.** Cover default mode, old URL normalization, deep-linked call/thread, mode switching, browser back/forward, shared time/history scope, incompatible filter cleanup, and preserved pagination per mode.
 
@@ -1692,6 +1695,9 @@ GET  /api/v2/capabilities
 - Existing dashboard GET routes remain through compatibility but new Evidence Console code prefers v2.
 - Mutating/expensive endpoints retain token and local-origin guards.
 - Route inventory declares execution type, input limit, output limit, cache behavior, and all-history behavior.
+- The generic v2 facade dispatches Calls, Threads, and bounded thread-call queries to focused repository plans. It must not materialize full history in Python to implement filtering, sorting, counts, cost/credit totals, or pagination.
+- Replacing a focused compatibility endpoint requires synthetic parity for every visible filter/sort plus a 100,000-row route budget at least as strict as the endpoint being replaced.
+- Refresh responses advance source revision and latest-event metadata after an appended source event so focused query caches invalidate deterministically.
 
 - [ ] **Step 1: Write failing route and serialization tests.** Cover exact paths, methods, content type, malformed JSON, oversized body, unknown fields, token failures, status codes, job polling, and schema equality with MCP results.
 
@@ -1812,6 +1818,9 @@ git commit -m "feat: simplify the tracker CLI hierarchy"
 - Legacy workbenches are direct-only and clearly transitioning.
 - Calls and Threads parity tests pass inside Explore.
 - Home does no hidden heavy scan.
+- Home exposes progress for deferred status and refresh, and Explore makes its Calls/Threads switch discoverable on first visit.
+- A normal dashboard start performs bounded incremental refresh; the newest synthetic appended event is visible without rebuilding or loading all history.
+- Focused Calls, Threads, and thread-call routes meet their 100,000-row budgets and return exact server-side filtered counts.
 - README and first-run guide begin with conversational analysis and use the Evidence Console for verification.
 - Removed constellation dependencies and assets are absent.
 - CLI primary help shows the new hierarchy.
@@ -2310,6 +2319,8 @@ fail_under = 85
 - Successful tool executions that unexpectedly process zero units when relevant inputs exist fail a contract test.
 - Every emitted schema appears in the runtime registry, documentation, and release inventory.
 - Every compatibility alias appears in `docs/deprecations.md` and tests.
+- Focused Calls, Threads, thread-call, Home, and Limits workflows have synthetic query-plan/route budgets; v2 adapters cannot replace them with broad Python-side materialization.
+- Incremental refresh tests assert both source-revision advancement and visibility of the newest appended event through focused queries.
 
 - [ ] **Step 1: Add direct coverage threshold and verify current suite.** If current coverage is below 85%, add focused tests for uncovered stable/core/application paths. Do not exclude files solely to meet the number.
 
@@ -2767,6 +2778,9 @@ A surface can be deleted only when its row in `docs/dashboard-sunset-job-parity-
 
 - Deterministic analytics used by core strategies stay under `analytics/`, even if their old UI/API route disappears.
 - Stable query and export behavior remains under application services.
+- Focused Calls, Threads, and thread-call repository queries remain the execution plans behind stable v2 query services until a measured replacement passes the same filters, sorts, exact counts, bounded expansion, cost/credit accounting, and synthetic 100,000-row budgets.
+- `/api/calls`, `/api/threads`, or `/api/thread-calls` cannot be removed merely because `/api/v2/query` exists; removal requires recorded functional and performance parity plus a focused-client cutover.
+- Home and Limits retain bounded metadata/materialized reads. Compatibility deletion must not introduce a startup full-history scan.
 - Developer-only experiments explicitly retained by design may remain in the `developer` MCP profile only if they have a named owner, bounded contract, and no dashboard route.
 - Old broad diagnostic HTTP endpoints return `410` for one release only when a known external bookmark path exists; otherwise remove them.
 
@@ -2785,7 +2799,7 @@ A surface can be deleted only when its row in `docs/dashboard-sunset-job-parity-
 
 - [ ] **Step 2: Remove frontend routes and source.** Old URLs without a direct stable alias return a not-found page that names the Evidence Console and does not retain the full legacy feature name as an active capability.
 
-- [ ] **Step 3: Remove HTTP handlers and API client methods.** Keep application services used by core. Update route inventory and route-budget fixtures.
+- [ ] **Step 3: Remove HTTP handlers and API client methods only after focused parity.** Keep application services and focused repository query plans used by core. Cut the Evidence Console over to v2, prove every visible filter/sort/count/expansion/cost-credit behavior and the synthetic route budgets, then update route inventory and compatibility fixtures.
 
 - [ ] **Step 4: Remove expired MCP tools and CLI aliases.** Update catalog counts and skills. Preserve historical JSON schema docs in an archived compatibility appendix rather than current tool reference.
 
@@ -3177,6 +3191,7 @@ git commit -m "chore: prepare 0.26.0 contract-stabilization release"
 | Dashboard feature sunset | 23-24, 38, 40-43 | Parity record, zero-network notices, removed-source inventory |
 | CLI simplification | 26, 41-43, 45 | Parser inventories, alias lifecycle, help snapshots |
 | HTTP API v2 | 25, 28-30, 41, 45 | Route inventory, schema equality, architecture gates |
+| Focused dashboard query performance and freshness | 19-20, 25, 27, 34, 41, 45 | Filter/sort/count parity, 100k route budgets, incremental-refresh visibility |
 | Application architecture and dependency direction | 28-30 | Container tests, Tach, secondary import regression |
 | SQLite integrity and migration safety | 31-33, 39, 45 | Foreign-key checks, migration fixtures, upgrade smokes |
 | Context-read performance | 32, 39, 45 | Payload equivalence and inspected-byte performance ratchet |

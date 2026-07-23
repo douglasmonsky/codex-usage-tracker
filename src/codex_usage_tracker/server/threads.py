@@ -64,11 +64,13 @@ def threads_payload(
         include_archived_default,
     )
     search = first_query_value(params.get("q")) or first_query_value(params.get("search"))
+    risk = first_query_value(params.get("risk"))
     rows = query_thread_summaries(
         db_path=db_path,
         limit=limit,
         offset=offset,
         search=search,
+        risk=risk,
         include_archived=include_archived,
         sort=first_query_value(params.get("sort")) or "tokens",
         direction=first_query_value(params.get("direction")) or "desc",
@@ -76,6 +78,7 @@ def threads_payload(
     total_matched = query_thread_summary_count(
         db_path=db_path,
         search=search,
+        risk=risk,
         include_archived=include_archived,
     )
     return {

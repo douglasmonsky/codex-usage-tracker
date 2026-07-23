@@ -145,10 +145,16 @@ from codex_usage_tracker.store.thread_summaries import (
 )
 from codex_usage_tracker.store.thread_summaries import rebuild_thread_summaries
 from codex_usage_tracker.store.usage_api_queries import (
+    query_usage_api_distinct_cwds as query_usage_api_distinct_cwds,
+)
+from codex_usage_tracker.store.usage_api_queries import (
     query_usage_api_event_count as query_usage_api_event_count,
 )
 from codex_usage_tracker.store.usage_api_queries import (
     query_usage_api_events as query_usage_api_events,
+)
+from codex_usage_tracker.store.usage_api_queries import (
+    query_usage_api_filter_options as query_usage_api_filter_options,
 )
 from codex_usage_tracker.store.usage_record_queries import (
     query_most_expensive_calls as query_most_expensive_calls,
@@ -534,6 +540,99 @@ def query_request_context_facts(
         "credit_coverage": _token_coverage(row["credit_tokens"], total_tokens),
         "service_tier_coverage": _token_coverage(row["tier_tokens"], total_tokens),
     }
+
+
+def query_status_context_facts(
+    db_path: Path,
+    *,
+    scope: Mapping[str, object],
+    priced_models: Collection[str] = (),
+    credit_models: Collection[str] = (),
+) -> dict[str, object]:
+    """Read bounded status facts, preferring current persisted active aggregates."""
+    if not db_path.exists() and not db_path.is_symlink():
+        return _empty_request_context_facts()
+    if not db_path.is_file():
+        raise InvalidDatabasePathError(f"database path must be a regular file: {db_path}")
+    focused_facts = _query_materialized_active_context_facts(db_path, scope)
+    if focused_facts is not None:
+        return focused_facts
+    return query_request_context_facts(
+        db_path,
+        scope=scope,
+        priced_models=priced_models,
+        credit_models=credit_models,
+    )
+
+
+def _query_materialized_active_context_facts(
+    db_path: Path,
+    scope: Mapping[str, object],
+) -> dict[str, object] | None:
+    """Use current aggregate facts for the common unfiltered active status scope."""
+    filters = scope.get("filters")
+    if (
+        scope.get("history", "active") != "active"
+        or scope.get("since") is not None
+        or scope.get("until") is not None
+        or (isinstance(filters, Mapping) and any(filters.values()))
+    ):
+        return None
+    from codex_usage_tracker.store.home_queries import query_home_usage_metrics
+
+    metrics = query_home_usage_metrics(db_path=db_path)
+    if metrics is None:
+        return None
+    uri = f"{db_path.resolve().as_uri()}?mode=ro"
+    try:
+        with sqlite3.connect(uri, uri=True, timeout=1.0) as connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA query_only = ON")
+            row = connection.execute(
+                """
+                SELECT
+                    (
+                        SELECT COUNT(*)
+                        FROM usage_events INDEXED BY idx_usage_archived_timestamp
+                        WHERE is_archived = 0
+                    ) AS physical_rows,
+                    (
+                        SELECT event_timestamp
+                        FROM usage_events INDEXED BY idx_canonical_usage_archived_timestamp
+                        WHERE is_archived = 0 AND is_duplicate = 0
+                        ORDER BY event_timestamp DESC, cumulative_total_tokens DESC
+                        LIMIT 1
+                    ) AS latest_indexed_event_at,
+                    (
+                        SELECT value
+                        FROM refresh_meta
+                        WHERE key = 'latest_refresh_at'
+                    ) AS refresh_completed_at
+                """
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise InvalidDatabasePathError(f"database path could not be read: {db_path}") from exc
+    if row is None:
+        return None
+    canonical_rows = int(metrics.get("calls") or 0)
+    physical_rows = int(row["physical_rows"] or 0)
+    return {
+        "physical_rows": physical_rows,
+        "canonical_rows": canonical_rows,
+        "copied_rows_excluded": max(0, physical_rows - canonical_rows),
+        "source_revision": f"generation:{int(metrics.get('source_generation') or 0)}",
+        "latest_indexed_event_at": row["latest_indexed_event_at"],
+        "refresh_completed_at": row["refresh_completed_at"],
+        "pricing_coverage": _optional_metric_coverage(metrics.get("pricing_coverage")),
+        "credit_coverage": _optional_metric_coverage(metrics.get("credit_coverage")),
+        "service_tier_coverage": _optional_metric_coverage(metrics.get("service_tier_coverage")),
+    }
+
+
+def _optional_metric_coverage(value: object) -> float | None:
+    if not isinstance(value, int | float):
+        return None
+    return min(1.0, max(0.0, float(value)))
 
 
 def _finish_request_context_connection(

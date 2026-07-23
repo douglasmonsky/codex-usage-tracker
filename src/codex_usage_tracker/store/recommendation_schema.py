@@ -7,6 +7,7 @@ import sqlite3
 MIGRATION_NAMES = {
     20: "persist versioned recommendation facts",
     21: "materialize recommendation thread summaries",
+    33: "index recommendation facts by active time",
 }
 
 _INDEX_STATEMENTS = (
@@ -17,6 +18,12 @@ _INDEX_STATEMENTS = (
     "ON recommendation_facts(model, effort, is_archived, recommendation_score DESC)",
     "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_thread "
     "ON recommendation_facts(thread_key, recommendation_score DESC, event_timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_thread_latest "
+    "ON recommendation_facts(thread_key, event_timestamp DESC, total_tokens DESC, record_id DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_time_model "
+    "ON recommendation_facts(is_archived, event_timestamp, model)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_time_effort "
+    "ON recommendation_facts(is_archived, event_timestamp, effort)",
     "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_primary "
     "ON recommendation_facts(primary_recommendation_key, recommendation_score DESC)",
     "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_rank_all "
@@ -27,6 +34,27 @@ _INDEX_STATEMENTS = (
     "ON recommendation_facts(recommendation_score DESC, total_tokens DESC, "
     "event_timestamp, record_id) "
     "WHERE is_archived = 0 AND json_array_length(recommendations_json) > 0",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_attention_sort "
+    "ON recommendation_facts(recommendation_score DESC, event_timestamp DESC, record_id)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_cost_sort "
+    "ON recommendation_facts(coalesce(estimated_cost_usd, 0) DESC, "
+    "event_timestamp DESC, record_id)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_credits_sort "
+    "ON recommendation_facts(coalesce(usage_credits, 0) DESC, "
+    "event_timestamp DESC, record_id)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_context_sort "
+    "ON recommendation_facts(context_window_percent DESC, event_timestamp DESC, record_id)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_pricing_coverage_scope "
+    "ON recommendation_facts((pricing_model IS NOT NULL), pricing_estimated, is_archived, "
+    "event_timestamp DESC, record_id)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_pricing_estimated_scope "
+    "ON recommendation_facts(pricing_estimated, is_archived, event_timestamp DESC, record_id)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_credit_confidence_scope "
+    "ON recommendation_facts(usage_credit_confidence, is_archived, "
+    "event_timestamp DESC, record_id)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendation_facts_record_filter_cover "
+    "ON recommendation_facts(record_id, pricing_model, pricing_estimated, "
+    "usage_credit_confidence)",
 )
 _INDEX_DROP_STATEMENTS = tuple(
     statement.replace("CREATE INDEX IF NOT EXISTS ", "DROP INDEX IF EXISTS ").split(" ON ", 1)[0]
@@ -149,6 +177,7 @@ def reconcile_recommendation_facts_with_canonical_usage(conn: sqlite3.Connection
         "UPDATE recommendation_fact_state SET record_count="
         "(SELECT COUNT(*) FROM recommendation_facts), thread_summaries_complete=0"
     )
+    conn.execute("DELETE FROM refresh_meta WHERE key = 'home_usage_metrics_v1'")
     _reset_thread_recommendation_columns(conn)
 
 
@@ -156,7 +185,8 @@ def _reset_thread_recommendation_columns(conn: sqlite3.Connection) -> None:
     conn.execute(
         "UPDATE thread_summaries SET recommendation_score=0, "
         "recommendation_total_tokens=0, recommendation_summary_json=NULL, "
-        "max_recommendation_score=0, primary_recommendation=NULL"
+        "max_recommendation_score=0, primary_recommendation=NULL, "
+        "estimated_cost_usd=NULL, usage_credits=NULL"
     )
 
 

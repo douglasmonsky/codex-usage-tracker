@@ -99,7 +99,7 @@ Tracked schema ids:
 | `codex-usage-tracker-thread-calls-v1` | Dashboard server `/api/thread-calls` response |
 | `codex-usage-tracker-dashboard-v1` | CLI `dashboard --json`, MCP `generate_usage_dashboard()` |
 | `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
-| `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload, including preferred React `dashboard_url` and legacy `legacy_dashboard_url` fallback |
+| `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload, including preferred React `dashboard_url`, legacy `legacy_dashboard_url` fallback, and explicit `refresh_before_start` / `refresh_in_background` state |
 | `codex-usage-tracker-dashboard-target-v1` | Privacy-safe agent/dashboard handoff with a cataloged view, normalized reviewed selectors, and deterministic React URL |
 | `codex-usage-tracker-pricing-coverage-v1` | CLI `pricing-coverage --json`, MCP `usage_pricing_coverage(response_format="json")` |
 | `codex-usage-tracker-source-coverage-v1` | CLI `source-coverage --json`, MCP `usage_source_coverage(response_format="json")` |

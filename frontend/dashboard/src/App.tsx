@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ArrowUp, Copy, Download, RefreshCw, ShieldAlert, Terminal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { currentViewCsvExport } from './app/currentViewExport';
+import { createDataScopeActions, usesFocusedScopeEndpoints } from './app/dataScopeActions';
 import { errorMessage, refreshProgressLabel, type RefreshOptions } from './app/dashboardRefresh';
 import { historyScopeFromPayload, historyScopeStatusLabel } from './app/historyScope';
 import { createShellI18n, initialDashboardLanguage, storeDashboardLanguage } from './app/i18n';
@@ -39,6 +40,7 @@ import {
   viewFromUrlParam,
 } from './app/shellUrl';
 import { normalizeDashboardRouteInput } from './routes/legacyRouteAliases';
+import { isEvidenceConsoleRouteId } from './routes/evidenceConsoleRoutes';
 import { modelFromBootPayload, readBootPayload, type RefreshProgressPayload } from './api/client';
 import { clearDiagnosticApiCache } from './api/diagnostics';
 import type { ContextRuntime, DashboardBootPayload, DashboardModel } from './api/types';
@@ -102,7 +104,7 @@ const initialLiveLoadAttempted = useRef(false);
   const [loadWindow, setLoadWindow] = useState<LoadWindow>(() => initialLoadWindowFromPayload(initialPayload));
   const [historyScope, setHistoryScope] = useState<HistoryScope>(() => historyScopeFromUrl(historyScopeFromPayload(initialPayload)));
   const [contextApiEnabled, setContextApiEnabled] = useState(model.contextRuntime.contextApiEnabled);
-const { canUseLiveApi, conversationalAnalysis, homeSummary } = useConversationalReadiness(initialPayload, dashboardPayload);
+const { canUseLiveApi, conversationalAnalysis, homeSummary, homeStatusLoading, homeStatusError } = useConversationalReadiness(initialPayload, dashboardPayload);
 const sourceIdentity = useMemo(() => dashboardSourceIdentityFromPayload(dashboardPayload), [dashboardPayload]);
 const shellI18n = useMemo(() => createShellI18n(dashboardPayload, language), [dashboardPayload, language]);
 const contextRuntime = useMemo<ContextRuntime>(
@@ -354,14 +356,27 @@ useEffect(() => {
   const nextLoadLimit = sessionSettings?.loadLimit ?? loadLimit;
   const nextLoadWindow = sessionSettings?.loadWindow ?? loadWindow;
   const payloadLoadWindow = currentLoadWindowFromPayload(dashboardPayload);
-  const needsSessionRestore =
-    nextHistoryScope !== historyScope ||
-    nextLoadWindow !== payloadLoadWindow ||
-    (nextLoadWindow === 'rows' && nextLoadLimit !== loadLimitFromPayload(dashboardPayload));
-  const hasLoadedRows = loadedRows > 0;
-  if (
-    !canUseLiveApi ||
-    (!needsSessionRestore && hasLoadedRows) ||
+    const needsSessionRestore =
+      nextHistoryScope !== historyScope ||
+      nextLoadWindow !== payloadLoadWindow ||
+      (nextLoadWindow === 'rows' && nextLoadLimit !== loadLimitFromPayload(dashboardPayload));
+    const hasLoadedRows = loadedRows > 0;
+    const isFocusedShellBoot =
+      dashboardPayload?.shell_boot === true && isEvidenceConsoleRouteId(activeView);
+    if (isFocusedShellBoot) {
+      if (needsSessionRestore) {
+        setHistoryScope(nextHistoryScope);
+        setLoadLimit(nextLoadLimit);
+        setPendingLoadLimit(nextLoadLimit);
+        setLoadWindow(nextLoadWindow);
+        replaceShellUrl(historyScopeUrl(nextHistoryScope));
+      }
+      initialLiveLoadAttempted.current = true;
+      return;
+    }
+    if (
+      !canUseLiveApi ||
+      (!needsSessionRestore && hasLoadedRows) ||
     (dashboardPayload?.shell_boot !== true && availableRows <= 0) ||
     refreshing ||
     initialLiveLoadAttempted.current
@@ -413,30 +428,10 @@ function handleLoadLimitSliderChange(value: string) {
 handleLoadLimitDraftChange(value);
 }
 
-function applyLoadLimitChange() {
-void refreshDashboard({ refresh: false, loadLimit: pendingLoadLimit, loadWindow: 'rows' });
-}
-
-function loadAllRows() {
-void refreshDashboard({ refresh: false, loadWindow: 'all' });
-}
-
-function loadMoreRows() {
-setPendingLoadLimit(nextLoadMoreLimit);
-void refreshDashboard({ refresh: false, loadLimit: nextLoadMoreLimit, loadWindow });
-}
-
-function handleLoadWindowChange(nextLoadWindow: LoadWindow) {
-  if (nextLoadWindow === loadWindow) return;
-  void refreshDashboard({ refresh: false, loadWindow: nextLoadWindow });
-}
-
-function handleHistoryScopeChange(value: string) {
-  const nextHistoryScope: HistoryScope = value === 'all' ? 'all' : 'active';
-  setHistoryScope(nextHistoryScope);
-  replaceShellUrl(historyScopeUrl(nextHistoryScope));
-  void refreshDashboard({ refresh: false, historyScope: nextHistoryScope });
-}
+const { applyLoadLimitChange, handleHistoryScopeChange, handleLoadWindowChange, loadAllRows, loadMoreRows } = createDataScopeActions({
+  activeView, historyScope, loadLimit, loadWindow, nextLoadMoreLimit, pendingLoadLimit,
+  refreshDashboard, replaceShellUrl, setHistoryScope, setLoadLimit, setLoadWindow, setPendingLoadLimit, setRefreshState,
+});
 
 function handleAutoRefreshChange(enabled: boolean) {
 setAutoRefreshEnabled(enabled);
@@ -496,7 +491,7 @@ activeView === 'explore' && new URLSearchParams(window.location.search).get('mod
         historyScope,
         loadWindow,
         loadLimit,
-        scopeSince: dashboardPayload?.since ?? sinceForLoadWindow(loadWindow),
+        scopeSince: sinceForLoadWindow(loadWindow),
         loadedRowCount,
         totalAvailableRows,
         canUseLiveApi,
@@ -622,6 +617,7 @@ aria-label="History scope"
           <RowLimitControl
             canUseLiveApi={canUseLiveApi}
             finitePendingLoadLimit={finitePendingLoadLimit}
+            focusedScope={usesFocusedScopeEndpoints(activeView)}
             hasMoreRows={hasMoreRows}
             loadLabel={shellI18n.t('nav.load', 'Load')}
             loadMoreLabel={shellI18n.t('button.load_more', 'Load more')}
@@ -681,12 +677,11 @@ aria-label="History scope"
       <DashboardRouteView
         activeView={activeView}
         model={scopedModel} threadsModel={legacyShellFilteredModel} navigateView={setView}
-        onRefresh={onRefresh}
-        refreshState={refreshState}
-        globalQuery={globalQuery}
-        activePreset={activePreset}
-        activeRecordId={activeRecordId}
-        contextRuntime={contextRuntime}
+        onRefresh={onRefresh} refreshState={refreshState}
+        refreshProgressPercent={refreshProgressPercent} refreshProgressText={refreshProgressText}
+        homeStatusLoading={homeStatusLoading} homeStatusError={homeStatusError}
+        globalQuery={globalQuery} activePreset={activePreset}
+        activeRecordId={activeRecordId} contextRuntime={contextRuntime}
         setContextApiEnabled={setContextApiEnabled}
         openCallInvestigator={openCallInvestigator}
         copyCallInvestigatorLink={copyCallInvestigatorLink}
@@ -702,7 +697,7 @@ aria-label="History scope"
         sourceIdentity={sourceIdentity}
         historyScope={historyScope}
         loadWindow={loadWindow}
-        scopeSince={dashboardPayload?.since ?? sinceForLoadWindow(loadWindow)}
+        scopeSince={sinceForLoadWindow(loadWindow)}
         loadLimit={loadLimit}
         loadedRowCount={loadedRowCount}
         totalAvailableRows={totalAvailableRows}

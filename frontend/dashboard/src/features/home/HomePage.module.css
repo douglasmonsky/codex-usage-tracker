@@ -45,7 +45,7 @@
 
 .copyStatus {
   color: var(--text-muted);
-  margin: -1rem 0 0;
+  margin: 0;
   min-height: 1.25rem;
 }
 
@@ -96,6 +96,67 @@
 
 .section {
   padding: 1.1rem;
+}
+
+.promptLibrary {
+  display: grid;
+  gap: 1rem;
+}
+
+.promptIntro {
+  color: var(--text-muted);
+  margin: -0.35rem 0 0;
+  max-width: 58rem;
+}
+
+.setupGuide {
+  background: var(--surface-muted, #f5f7fb);
+  border: 1px solid var(--border-subtle, #d9dee8);
+  border-radius: var(--radius-md, 0.55rem);
+  padding: 0.8rem 0.9rem;
+}
+
+.setupGuide summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.setupGuide ol {
+  color: var(--text-muted);
+  margin: 0.8rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.setupGuide code {
+  color: var(--text-strong);
+  font-weight: 650;
+}
+
+.promptRows {
+  display: grid;
+}
+
+.promptRow {
+  align-items: center;
+  border-top: 1px solid var(--border-subtle, #d9dee8);
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0.9rem 0;
+}
+
+.promptRow:first-child {
+  border-top: 0;
+}
+
+.promptRow h3,
+.promptRow p {
+  margin: 0;
+}
+
+.promptRow p {
+  color: var(--text-muted);
+  margin-top: 0.35rem;
 }
 
 .sectionHeading {
@@ -184,5 +245,10 @@
 
   .actions {
     justify-content: flex-start;
+  }
+
+  .promptRow {
+    align-items: stretch;
+    grid-template-columns: 1fr;
   }
 }

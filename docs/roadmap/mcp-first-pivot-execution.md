@@ -680,9 +680,9 @@ commit as each roadmap task.
 
 ## Task 27 - Gate and Prepare Release 0.23.0
 
-- Status: blocked; the complete local release candidate is prepared, but
-  publication remains blocked on a stable passing 100,000-row route-budget
-  run. No tag, push, or package publication was performed.
+- Status: release-ready; the complete local release candidate and required
+  100,000-row route budget pass. Publication proceeds through the reviewed PR,
+  updated `main`, GitHub release, and Trusted Publishing workflow.
 - Branch: `pivot/27-release-0.23.0`
 - Commits: `6441076` (`chore: prepare 0.23 release contracts`), `f67a647`
   (`docs: explain the 0.23 Evidence Console`), `a84b10e` (`docs: add core
@@ -710,7 +710,7 @@ commit as each roadmap task.
   Twelve synthetic screenshots cover Home, Explore Calls, Explore Threads,
   Limits, Evidence, Settings, a legacy route, tablet, mobile, 200% zoom,
   reduced motion, and keyboard use without private user data.
-- Full verification: all 1,880 Python tests passed and coverage measured 88%.
+- Full verification: all 1,905 Python tests passed and coverage measured 88%.
   Ruff, mypy, Pyright (zero errors and seven inherited lazy-export warnings),
   TypeScript, ESLint, dependency boundaries, dead-code detection, stylelint,
   source budgets, dashboard asset parity, release checks, installed-package
@@ -719,23 +719,44 @@ commit as each roadmap task.
   documented 112.00 KiB gzip exception under its 113.00 KiB ADR limit. The
   recorded candidate wheel and sdist measure 6,956,865 and 31,909,932 bytes,
   respectively, and both pass Twine and distribution release checks.
-- Performance evidence: migration 32 added the global newest-first allowance
-  observation index. Pre-index all-history allowance runs measured 0.818 to
-  1.426 seconds; the route measured 0.155 seconds p95 after the index. The latest
-  enforced run still exceeded unrelated cold-route limits: recommendations
-  0.521 > 0.500 seconds, thread calls 0.369 > 0.250, diagnostics facts 0.850 >
-  0.800, and allowance diagnostics 1.485 > 0.750. Population time varied from
-  46.7 to 65.5 seconds across otherwise identical runs, while warm medians and
-  the repaired allowance-history route remained healthy.
-- Deviations from plan: release preparation is complete, but Task 27 is not
-  marked complete because its named performance gate is red under the current
-  variable host load. The additive database index and its schema documentation
-  were necessary to correct a real query-plan issue revealed by the gate. No
-  threshold was loosened and no failing result was hidden.
-- Follow-up risks: rerun the named route-budget gate on a stable host or CI
-  runner before publication. If the same cold-route violations reproduce under
-  stable load, profile and optimize them before tagging 0.23.0. The local
-  release artifacts are candidates only until that gate passes.
+- Performance evidence: migrations 32–34 add the global newest-first allowance,
+  focused recommendation/call sorting, source, and parent-thread lookup indexes.
+  The stable enforced 100,000-row run passed every route budget: Calls measured
+  0.074 seconds p95, Threads 0.007 seconds p95, thread calls 0.014 seconds p95,
+  and allowance diagnostics 0.584 seconds p95. Population completed in 44.8
+  seconds.
+- Post-candidate polish and freshness correction: Home once again exposes
+  refresh/loading progress, removes annotation footnotes from Usage Pulse, and
+  replaces the three generic actions with an MCP/plugin setup guide and six
+  visible copyable investigation prompts. Explore now points first-time visitors
+  to the Calls/Threads switch. Live preview diagnosis found macOS volume-device
+  drift was misclassifying 1,217 tracked logs as replacements; preserving
+  path/inode/prefix-tail safety while tolerating `st_dev` drift reduced the same
+  catch-up to 11 append-safe logs and 14 new logs. The preview advanced from
+  `2026-07-22T19:59:50.013Z` to `2026-07-23T17:21:33.634Z`; the focused Calls
+  route returned that newest row with populated cost and credit fields in 0.006
+  seconds. A profiled synthetic refresh identified per-row canonical
+  fingerprint lookups as the Python hotspot. Batched lookups reduced the
+  identical unprofiled 10,000-row refresh from 7.55 to 3.52 seconds. Startup
+  refresh is now asynchronous: the real 224,244-call preview served its stored
+  dashboard in about four seconds while refresh continued in the background,
+  instead of withholding the server behind the roughly 10.5-minute full scan.
+- Roadmap protection: Tasks 25, 27, 34, and 41 now explicitly preserve bounded
+  Home/Limits hydration and the focused Calls, Threads, and Thread Calls query
+  plans. A v2 facade may not replace or deprecate those routes until functional
+  parity, exact filtering/sorting/counts, cost/credit parity,
+  incremental-freshness coverage, and the named 100,000-row route budget all
+  pass.
+- Deviations from plan: additive migrations 33 and 34 and focused endpoint
+  changes were necessary to correct real filter/count/query-plan defects found
+  during release qualification. No route threshold was loosened and no failing
+  route result was hidden.
+- Follow-up risks: the broader 100,000-row full-content ingestion benchmark
+  retained exact table parity and measured a 23.5% parallel speedup, but its
+  26.9-second median and 578 MiB sampled process-tree peak remain above the
+  historical 20-second/544 MiB sentinels. The excess is in the optional
+  content/fact indexing pipeline rather than dashboard availability or focused
+  endpoint hydration; it is recorded for 0.24 performance hardening.
 
 ## Remaining Planned Tasks
 

@@ -42,6 +42,21 @@ accounting, and aggregate-first shareable outputs remain unchanged unless a
 roadmap task explicitly changes them. Examples, fixtures, and screenshots must
 remain synthetic.
 
+## Performance And Freshness Preservation
+
+Interface consolidation is a facade change, not permission to replace focused
+Calls, Threads, thread-call, Home, or Limits query plans with broad history
+materialization. Stable v2 services must preserve server-side filtering,
+sorting, exact matched counts, bounded pagination/expansion, and persisted
+cost/credit accounting before their compatibility routes can be removed.
+
+Release gates use synthetic 100,000-row parity and route-budget fixtures for
+these workflows. They also prove that an incremental refresh exposes a newly
+appended source event and advances the source revision/latest-event timestamp.
+A compatibility endpoint cannot be removed while its stable replacement fails
+functional parity, performs an unbounded dashboard scan, or regresses the
+recorded route budget.
+
 ## Compatibility Policy
 
 Compatibility is bounded by [the deprecation ledger](../deprecations.md). An

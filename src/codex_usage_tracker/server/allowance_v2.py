@@ -45,6 +45,7 @@ def allowance_status_payload(
 ) -> dict[str, Any]:
     params = parse_qs(query, keep_blank_values=True)
     include_archived = _include_archived(params, include_archived_default)
+    include_estimation = parse_bool_query_value(_value(params, "include_estimation"), True)
     since_revision = _value(params, "since_revision")
     with connect(db_path) as connection:
         return build_allowance_status(
@@ -53,6 +54,7 @@ def allowance_status_payload(
             privacy_mode=privacy_mode,
             include_archived=include_archived,
             since_revision=since_revision,
+            include_estimation=include_estimation,
         )
 
 

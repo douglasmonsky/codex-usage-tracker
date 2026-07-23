@@ -31,6 +31,7 @@ from codex_usage_tracker.server.threads import threads_payload as threads_payloa
 from codex_usage_tracker.store.api import (
     query_usage_api_event_count,
     query_usage_api_events,
+    query_usage_api_filter_options,
 )
 
 
@@ -71,6 +72,36 @@ def thread_calls_benchmark_payload(db_path: Path, thread_key: str) -> dict[str, 
         "total_matched_rows": query_usage_api_event_count(
             db_path=db_path,
             thread_key=thread_key,
+            include_archived=True,
+        ),
+    }
+
+
+def calls_filter_benchmark_payload(db_path: Path) -> dict[str, object]:
+    """Exercise the focused call filter path with bounded project directories."""
+    cwds = [f"/tmp/project-{index}" for index in range(10)]
+    rows = query_usage_api_events(
+        db_path=db_path,
+        cwds=cwds,
+        include_archived=True,
+        limit=100,
+        sort="cost",
+        direction="desc",
+        pricing_status="priced",
+        legacy_archive_path_fallback=False,
+    )
+    return {
+        "rows": rows,
+        "row_count": len(rows),
+        "total_matched_rows": query_usage_api_event_count(
+            db_path=db_path,
+            cwds=cwds,
+            include_archived=True,
+            pricing_status="priced",
+            legacy_archive_path_fallback=False,
+        ),
+        "filter_options": query_usage_api_filter_options(
+            db_path=db_path,
             include_archived=True,
         ),
     }

@@ -23,7 +23,15 @@ _GRANULARITIES = {"auto", "raw", "hour", "day", "week", "month", "cycle"}
 _AGING = {"weekly": 6 * 60 * 60, "five_hour": 15 * 60}
 
 
-def build_allowance_status(connection: sqlite3.Connection, *, now: datetime, privacy_mode: str = "strict", include_archived: bool = False, since_revision: str | None = None) -> dict[str, Any]:
+def build_allowance_status(
+    connection: sqlite3.Connection,
+    *,
+    now: datetime,
+    privacy_mode: str = "strict",
+    include_archived: bool = False,
+    since_revision: str | None = None,
+    include_estimation: bool = True,
+) -> dict[str, Any]:
     """Return a constant-size current status; callers own connection lifetime."""
     revision = _revision(connection) or "missing"
     if since_revision is not None and since_revision == revision:
@@ -49,9 +57,12 @@ def build_allowance_status(connection: sqlite3.Connection, *, now: datetime, pri
         for row in cohorts["rows"]
     )
     data_state = "partial" if partial else _data_state(states)
-    estimation = _weekly_estimation(connection, revision, include_archived, now)
-    estimation["reconstructions"] = []
-    return {"schema": ALLOWANCE_STATUS_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "data_as_of": _latest_at(windows), "revision": revision, "changed": True, "privacy_mode": privacy_mode, "include_archived": include_archived, "data_state": data_state, "weekly": windows["weekly"], "five_hour": windows["five_hour"], "estimation": estimation, "quality": {"canonical": True, "copied_rows_excluded": _copied_excluded(connection, include_archived)}, "cohorts": {"selected": cohorts["selected"], "alternates": cohorts["alternates"], "reconciliation": cohorts["reconciliation"]}, "next": {"action": "poll_status", "poll_after_seconds": 30 if data_state in {"fresh", "aging", "partial"} else 60}}
+    payload = {"schema": ALLOWANCE_STATUS_SCHEMA, "model_version": MODEL_VERSION, "generated_at": now.isoformat(), "data_as_of": _latest_at(windows), "revision": revision, "changed": True, "privacy_mode": privacy_mode, "include_archived": include_archived, "data_state": data_state, "weekly": windows["weekly"], "five_hour": windows["five_hour"], "quality": {"canonical": True, "copied_rows_excluded": _copied_excluded(connection, include_archived)}, "cohorts": {"selected": cohorts["selected"], "alternates": cohorts["alternates"], "reconciliation": cohorts["reconciliation"]}, "next": {"action": "poll_status", "poll_after_seconds": 30 if data_state in {"fresh", "aging", "partial"} else 60}}
+    if include_estimation:
+        estimation = _weekly_estimation(connection, revision, include_archived, now)
+        estimation["reconstructions"] = []
+        payload["estimation"] = estimation
+    return payload
 
 
 def _weekly_estimation(connection: sqlite3.Connection, revision: str | None, include_archived: bool, now: datetime) -> dict[str, Any]:
@@ -215,13 +226,27 @@ def _cycle(row: dict[str, Any]) -> dict[str, Any]: return {key: row.get(key) for
 def _available_range(rows: list[dict[str, Any]]) -> dict[str, str | None]: return {"start_at": rows[0]["first_observed_at"] if rows else None, "end_at": rows[-1]["last_observed_at"] if rows else None}
 def _copied_excluded(conn: sqlite3.Connection, include_archived: bool) -> int:
     try:
-        return int(
+        archive_clause = "" if include_archived else "WHERE is_archived=0"
+        physical = int(
             conn.execute(
-                "SELECT count(*) FROM usage_events WHERE is_duplicate=1 "
-                "AND (? OR is_archived=0)",
-                (include_archived,),
+                "SELECT count(*) FROM usage_events "
+                "INDEXED BY idx_usage_archived_timestamp "
+                f"{archive_clause}"
             ).fetchone()[0]
         )
+        canonical_clause = (
+            "WHERE is_duplicate=0"
+            if include_archived
+            else "WHERE is_duplicate=0 AND is_archived=0"
+        )
+        canonical = int(
+            conn.execute(
+                "SELECT count(*) FROM usage_events "
+                "INDEXED BY idx_canonical_usage_archived_timestamp "
+                f"{canonical_clause}"
+            ).fetchone()[0]
+        )
+        return physical - canonical
     except sqlite3.OperationalError:
         return 0
 def _evidence_row(row: dict[str, Any], privacy_mode: str) -> dict[str, Any]:

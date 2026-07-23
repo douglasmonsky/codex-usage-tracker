@@ -67,6 +67,7 @@ from codex_usage_tracker.server.routes import (
 from codex_usage_tracker.server.status import handle_readiness_request, handle_status_request
 from codex_usage_tracker.server.summary import handle_summary_request
 from codex_usage_tracker.server.threads import handle_threads_request
+from codex_usage_tracker.store.api import query_usage_api_filter_options
 
 
 class _UsageDashboardHandler(
@@ -256,6 +257,7 @@ class _UsageDashboardHandler(
             query,
             live_query_params=self._live_query_params,
             live_call_rows=self._live_call_rows,
+            live_call_filter_options=self._live_call_filter_options,
             send_error=self._send_error,
             send_exception=self._send_exception,
             send_json=self._send_json,
@@ -486,6 +488,20 @@ class _UsageDashboardHandler(
             thresholds_path=self._thresholds_path,
             projects_path=self._projects_path,
             privacy_mode=self._privacy_mode,
+        )
+
+    def _live_call_filter_options(
+        self,
+        *,
+        since: str | None,
+        until: str | None,
+        include_archived: bool,
+    ) -> dict[str, list[str]]:
+        return query_usage_api_filter_options(
+            db_path=self._db_path,
+            since=since,
+            until=until,
+            include_archived=include_archived,
         )
 
     def _annotate_live_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

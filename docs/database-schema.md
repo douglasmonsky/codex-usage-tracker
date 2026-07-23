@@ -73,6 +73,10 @@ revision. Schema migration 32 adds the newest-first all-history index used by
 bounded allowance evidence reads; the migration is additive and does not
 rewrite observation rows.
 
+Schema migrations 33 and 34 add focused recommendation, call sorting, source,
+and parent-thread lookup indexes used by the Evidence Console. They are also
+additive and preserve every stored usage row.
+
 `allowance_cycles` stores one reset-aware cycle summary: window/cohort identity,
 normalized reset, observed range, latest/peak percentage, canonical token/credit
 totals, price coverage, conflict/reversal/censor counts, quality/state, archive

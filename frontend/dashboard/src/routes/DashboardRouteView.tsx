@@ -77,6 +77,8 @@ type DashboardRouteViewProps = {
   hasMoreRows: boolean;
   historyScope: HistoryScope;
   homeSummary?: HomeSummaryPayload;
+  homeStatusLoading: boolean;
+  homeStatusError: string | null;
   loadWindow: LoadWindow;
   loadAllRows: () => void;
   loadedRowCount: number;
@@ -88,6 +90,8 @@ type DashboardRouteViewProps = {
   onRefresh: () => void;
   openCallInvestigator: (recordId: string) => void;
   refreshing: boolean;
+  refreshProgressPercent: number | null;
+  refreshProgressText: string;
   refreshState: string;
   setShowExperimental: (showExperimental: boolean) => void;
   setContextApiEnabled: (enabled: boolean) => void;
@@ -126,6 +130,8 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     hasMoreRows,
     historyScope,
     homeSummary,
+    homeStatusLoading,
+    homeStatusError,
     loadWindow,
     loadAllRows,
     loadedRowCount,
@@ -137,6 +143,8 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     onRefresh,
     openCallInvestigator,
     refreshing,
+    refreshProgressPercent,
+    refreshProgressText,
     refreshState,
     setShowExperimental,
     setContextApiEnabled,
@@ -155,7 +163,15 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           payload={dashboardPayload}
           summary={homeSummary}
           readiness={conversationalAnalysis}
+          historyScope={historyScope}
+          loadWindow={loadWindow}
+          loadLimit={loadLimit}
+          scopeSince={scopeSince}
           refreshing={refreshing}
+          refreshProgressPercent={refreshProgressPercent}
+          refreshProgressText={refreshProgressText}
+          homeStatusLoading={homeStatusLoading}
+          homeStatusError={homeStatusError}
           onRefresh={onRefresh}
           onNavigate={navigateView}
           onOpenCall={openCallInvestigator}

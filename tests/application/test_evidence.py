@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import codex_usage_tracker.application.evidence as evidence_application
 from codex_usage_tracker.application.evidence import get_evidence
 from codex_usage_tracker.core.contracts import serialized_size
 from codex_usage_tracker.evidence.models import EvidenceNotFoundError, EvidenceRequest
@@ -18,6 +19,22 @@ def test_application_facade_builds_matching_context(tmp_path: Path) -> None:
     result = get_evidence(EvidenceRequest("call", "record-1"), db_path=db_path)
     assert result.selector == {"kind": "call", "id": "record-1", "section": "summary"}
     assert result.dashboard_target["target_id"].startswith("evidence:")
+
+
+def test_exact_call_evidence_skips_global_request_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    seed_evidence(db_path)
+
+    def unexpected_context(**_kwargs: object) -> None:
+        raise AssertionError("exact call evidence should not scan global request context")
+
+    monkeypatch.setattr(evidence_application, "build_request_context", unexpected_context)
+
+    result = get_evidence(EvidenceRequest("call", "record-1"), db_path=db_path)
+
+    assert result.records[0].evidence_id == "call:record-1"
 
 
 def test_core_transport_returns_bounded_versioned_envelope(tmp_path: Path) -> None:

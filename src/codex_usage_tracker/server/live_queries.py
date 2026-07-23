@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from codex_usage_tracker.server import utils as server_utils
+import codex_usage_tracker.server.utils as server_utils
 
 
 def live_query_params(
@@ -29,6 +29,7 @@ def live_query_params(
         "until": first(params.get("until")),
         "model": first(params.get("model")),
         "effort": first(params.get("effort")),
+        "source": first(params.get("source")),
         "thread": thread,
         "thread_key": thread_key,
         "include_archived": include_archived,
@@ -43,6 +44,7 @@ def live_query_params(
         "until": filters["until"],
         "model": filters["model"],
         "effort": filters["effort"],
+        "source": filters["source"],
         "thread": thread,
         "thread_key": thread_key,
         "include_archived": include_archived,

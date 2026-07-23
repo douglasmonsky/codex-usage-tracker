@@ -2,7 +2,8 @@
 
 Release 0.23.0 focuses the browser and CLI surfaces around the MCP-first product
 model. It does not remove compatibility commands, tools, or routes, and it does
-not require a database migration.
+not require a manual database step. The first start upgrades the local schema
+to version 34 with additive query indexes; stored usage rows are not rewritten.
 
 ## Upgrade
 
@@ -15,6 +16,11 @@ codex-usage-tracker doctor
 Restart Codex or open a fresh task if setup requests it. Then ask a usage
 question conversationally and use the returned Evidence Console target only
 when you want to verify the supporting records.
+
+`service serve --refresh` now opens the stored snapshot immediately and
+refreshes local history in the background. The Home progress indicator and
+Refresh control report explicit refresh work without blocking the server from
+accepting dashboard requests.
 
 ## Open Evidence
 

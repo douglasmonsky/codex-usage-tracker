@@ -12,7 +12,7 @@ describe('callsEndpointState', () => {
       runtime,
       enabled: true,
       activePreset: '',
-      sourceFilter: 'all',
+      sourceFilter: 'git',
       sortKey: 'total',
       timeFilter: 'last-7-days',
       dateStart: '',
@@ -28,21 +28,46 @@ describe('callsEndpointState', () => {
     expect(state.enabled).toBe(true);
     expect(state.sort).toBe('tokens');
     expect(state.filters).toMatchObject({
-      query: 'cache', model: 'gpt-5.6', effort: 'high', creditConfidence: 'user_override',
+      query: 'cache',
+      model: 'gpt-5.6',
+      effort: 'high',
+      source: 'git',
+      creditConfidence: 'user_override',
     });
     expect(state.filters.since).toContain('2026-07-04');
     expect(Date.parse(state.filters.until ?? '') - Date.parse(state.filters.since ?? '')).toBeGreaterThan(6 * 86_400_000);
   });
 
   it.each([
-    ['preset', { activePreset: 'large-calls' }],
-    ['source', { sourceFilter: 'git' }],
-    ['derived sort', { sortKey: 'attention' }],
-  ])('uses stored rows for unsupported %s state', (_label, override) => {
+    ['attention', 'attention'],
+    ['cost', 'cost'],
+    ['usage', 'credits'],
+    ['context', 'context'],
+  ] as const)('keeps the %s sort on the focused API', (sortKey, apiSort) => {
     const state = callsEndpointState({
       runtime,
       enabled: true,
       activePreset: '',
+      sourceFilter: 'all',
+      sortKey,
+      timeFilter: 'all',
+      dateStart: '',
+      dateEnd: '',
+      confidenceFilter: 'all',
+      globalQuery: '',
+      localQuery: '',
+      modelFilter: 'all',
+      effortFilter: 'all',
+    });
+    expect(state.enabled).toBe(true);
+    expect(state.sort).toBe(apiSort);
+  });
+
+  it('uses stored rows for unsupported presets', () => {
+    const state = callsEndpointState({
+      runtime,
+      enabled: true,
+      activePreset: 'large-calls',
       sourceFilter: 'all',
       sortKey: 'time',
       timeFilter: 'all',
@@ -53,8 +78,7 @@ describe('callsEndpointState', () => {
       localQuery: '',
       modelFilter: 'all',
       effortFilter: 'all',
-      ...override,
-    } as Parameters<typeof callsEndpointState>[0]);
+    });
     expect(state.enabled).toBe(false);
     expect(state.reason).toContain('snapshot');
   });

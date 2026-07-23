@@ -24,6 +24,15 @@ const props = {} as ExplorePageProps;
 describe('ExplorePage', () => {
   beforeEach(() => {
     renderedModes.length = 0;
+    const values = new Map<string, string>();
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        clear: () => values.clear(),
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+      },
+    });
     window.history.replaceState(null, '', '/?view=explore');
   });
 
@@ -38,6 +47,17 @@ describe('ExplorePage', () => {
     expect(screen.getByRole('heading', { name: 'Calls workspace' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Threads workspace' })).not.toBeInTheDocument();
     expect(renderedModes).toEqual(['calls']);
+  });
+
+  it('points out the Calls and Threads switch on the first Explore visit', () => {
+    render(<ExplorePage {...props} />);
+
+    expect(screen.getByRole('note', { name: 'Explore mode hint' })).toHaveTextContent(
+      'Switch between individual calls and grouped threads here',
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Threads' }));
+    expect(screen.queryByText(/Switch between individual calls/i)).not.toBeInTheDocument();
+    expect(window.localStorage.getItem('codexUsageExploreModeHintV1')).toBe('dismissed');
   });
 
   it('normalizes a legacy Threads deep link and does not mount Calls', () => {

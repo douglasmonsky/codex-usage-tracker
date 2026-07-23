@@ -68,7 +68,7 @@ export function OverviewMetrics({ metrics, loadedCalls, availableCalls }: Overvi
   ];
   return (
     <section className={styles.metricGrid} aria-label={scopeMetrics ? 'Selected scope usage metrics' : 'Loaded usage metrics'}>
-      {cards.map(card => <MetricCard key={card.label} card={card} />)}
+      {cards.map(card => <MetricCard key={card.label} card={card} showAnnotations={false} />)}
     </section>
   );
 }

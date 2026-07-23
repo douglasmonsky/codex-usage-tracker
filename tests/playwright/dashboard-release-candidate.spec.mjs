@@ -355,12 +355,12 @@ test.describe('0.23 Evidence Console release candidate', () => {
     await expect(page).not.toHaveURL(/record=|return=|kind=call/);
   });
 
-  test('renders every conversational readiness state on Home', async ({ browser }, testInfo) => {
-    const states = [
-      ['ready', 'Ready'],
-      ['restart-required', 'Restart required'],
-      ['unavailable', 'Unavailable'],
-      ['unknown', 'Checking'],
+test('maps conversational readiness into the Home prompt library', async ({ browser }, testInfo) => {
+  const states = [
+    ['ready', 'MCP ready'],
+    ['restart-required', 'Setup may be required'],
+    ['unavailable', 'Setup may be required'],
+    ['unknown', 'Setup may be required'],
     ];
     for (const [state, label] of states) {
       const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL });
@@ -383,11 +383,9 @@ test.describe('0.23 Evidence Console release candidate', () => {
         evidence: [],
       });
       await openWorkspace(statePage, 'Overview', '/?view=home&qa=release-n-readiness');
-      const readiness = statePage.getByRole('region', { name: 'Home status' })
-        .getByRole('article')
-        .filter({ hasText: 'Conversational analysis' });
-      await expect(readiness.getByText(label, { exact: true }).first()).toBeVisible();
-      await expect(readiness).toContainText('profile');
+    const promptLibrary = statePage.getByRole('region', { name: 'Codex prompt library' });
+    await expect(promptLibrary.getByText(label, { exact: true }).first()).toBeVisible();
+    await expect(promptLibrary.getByText('How to enable the MCP or plugin')).toBeVisible();
       expect(browserIssues, `${state} readiness console/page errors`).toEqual([]);
       await context.close();
     }

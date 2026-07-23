@@ -28,10 +28,14 @@ from codex_usage_tracker.store.api import (
     query_usage_status,
     refresh_metadata,
 )
-from codex_usage_tracker.store.dedupe_queries import query_dedupe_diagnostics
+from codex_usage_tracker.store.dedupe_queries import (
+    query_dedupe_counts,
+    query_dedupe_diagnostics,
+)
 from codex_usage_tracker.store.home_queries import (
     query_home_finding_rows,
     query_home_recent_evidence_rows,
+    query_home_usage_metrics,
 )
 
 ExceptionSender = Callable[[str, BaseException], None]
@@ -91,16 +95,23 @@ def status_payload(
     counts = query_usage_status(
         db_path=db_path,
         include_archived=include_archived,
+        legacy_archive_path_fallback=False,
     )
     observed_usage = query_latest_observed_usage(
         db_path=db_path,
         include_archived=include_archived,
+        legacy_archive_path_fallback=False,
     )
     if include_archived:
-        home_counts = query_usage_status(db_path=db_path, include_archived=False)
+        home_counts = query_usage_status(
+            db_path=db_path,
+            include_archived=False,
+            legacy_archive_path_fallback=False,
+        )
         home_observed_usage = query_latest_observed_usage(
             db_path=db_path,
             include_archived=False,
+            legacy_archive_path_fallback=False,
         )
     else:
         home_counts = counts
@@ -153,17 +164,22 @@ def home_summary_payload(
     resolved_dedupe = (
         dedupe
         if dedupe is not None
-        else query_dedupe_diagnostics(db_path=db_path, limit=0)["summary"]
+        else query_dedupe_counts(db_path=db_path)
     )
     if latest_event_at is None:
         latest_event_at = query_usage_status(
             db_path=db_path,
             include_archived=False,
+            legacy_archive_path_fallback=False,
         ).get("max_event_timestamp")
     resolved_observed_usage = (
         observed_usage
         if observed_usage is not None
-        else query_latest_observed_usage(db_path=db_path, include_archived=False)
+        else query_latest_observed_usage(
+            db_path=db_path,
+            include_archived=False,
+            legacy_archive_path_fallback=False,
+        )
     )
     findings_rows = query_home_finding_rows(
         db_path=db_path,
@@ -191,6 +207,7 @@ def home_summary_payload(
                 resolved_dedupe.get("excluded_copied_rows")
             ),
         },
+        "usage_metrics": query_home_usage_metrics(db_path=db_path),
         "pricing": _home_pricing_summary(pricing_path),
         "allowance": _home_allowance_summary(
             allowance_path=allowance_path,

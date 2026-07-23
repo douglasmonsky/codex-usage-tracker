@@ -87,6 +87,71 @@ def test_query_has_stable_keyset_pagination_and_no_matches(tmp_path: Path, order
     assert empty.next_cursor is None
 
 
+def test_query_pages_recent_calls_by_time_without_exposing_internal_sort_column(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    _seed(db_path)
+    request = QueryRequest(
+        entity="call",
+        measures=("tokens", "cached_tokens"),
+        filters=QueryFilters(),
+        order_by="time",
+        order="desc",
+        limit=1,
+    )
+
+    first = query_usage(request, db_path=db_path)
+    second = query_usage(replace(request, cursor=first.next_cursor), db_path=db_path)
+
+    assert first.total_matched == 2
+    assert [first.rows[0]["record_id"], second.rows[0]["record_id"]] == ["call-3", "call-0"]
+    assert "time" not in first.rows[0]
+    assert second.next_cursor is None
+
+
+def test_query_pages_recent_calls_with_matching_timestamps_without_skipping(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            _usage_event(
+                record_id="call-a",
+                session_id="session-a",
+                thread_key="thread:a",
+                event_timestamp="2026-07-25T12:00:00Z",
+                cumulative_total_tokens=1,
+            ),
+            _usage_event(
+                record_id="call-z",
+                session_id="session-z",
+                thread_key="thread:z",
+                event_timestamp="2026-07-25T12:00:00Z",
+                cumulative_total_tokens=999,
+            ),
+        ],
+        db_path,
+    )
+    request = QueryRequest(
+        entity="call",
+        measures=("tokens",),
+        filters=QueryFilters(),
+        order_by="time",
+        order="desc",
+        limit=1,
+    )
+
+    first = query_usage(request, db_path=db_path)
+    second = query_usage(replace(request, cursor=first.next_cursor), db_path=db_path)
+
+    assert [first.rows[0]["record_id"], second.rows[0]["record_id"]] == [
+        "call-a",
+        "call-z",
+    ]
+    assert second.next_cursor is None
+
+
 def test_query_rejects_scope_mismatched_and_stale_cursors(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     _seed(db_path)

@@ -1,4 +1,4 @@
-import { cleanup, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { DashboardBootPayload, HomeStatusPayload } from '../api/types';
@@ -12,7 +12,16 @@ afterEach(() => {
 describe('useConversationalReadiness', () => {
   it('loads deferred Home status immediately and reloads it after a dashboard refresh', async () => {
     let requestCount = 0;
-    const fetchMock = vi.fn(async () => jsonResponse(homeStatus(`revision-${++requestCount}`)));
+    let resolveInitialRequest: ((response: Response) => void) | undefined;
+    const initialRequest = new Promise<Response>(resolve => {
+      resolveInitialRequest = resolve;
+    });
+    const fetchMock = vi.fn(async () => {
+      requestCount += 1;
+      return requestCount === 1
+        ? initialRequest
+        : jsonResponse(homeStatus(`revision-${requestCount}`));
+    });
     vi.stubGlobal('fetch', fetchMock);
     const initialPayload: DashboardBootPayload = {
       api_token: 'test-token',
@@ -27,7 +36,14 @@ describe('useConversationalReadiness', () => {
       { initialProps: { dashboardPayload: initialPayload } },
     );
 
+    await waitFor(() => expect(result.current.homeStatusLoading).toBe(true));
+    await act(async () => {
+      resolveInitialRequest?.(jsonResponse(homeStatus('revision-1')));
+      await initialRequest;
+    });
     await waitFor(() => expect(result.current.homeSummary?.source_revision).toBe('revision-1'));
+    expect(result.current.homeStatusLoading).toBe(false);
+    expect(result.current.homeStatusError).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/status?include_archived=false',
@@ -39,6 +55,39 @@ describe('useConversationalReadiness', () => {
     rerender({ dashboardPayload: { ...initialPayload, loaded_row_count: 1 } });
 
     await waitFor(() => expect(result.current.homeSummary?.source_revision).toBe('revision-2'));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('restarts an aborted Strict Mode setup request', async () => {
+    let requestCount = 0;
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      requestCount += 1;
+      if (requestCount === 1) {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        });
+      }
+      return Promise.resolve(jsonResponse(homeStatus('strict-revision')));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const payload: DashboardBootPayload = {
+      api_token: 'test-token',
+      context_api_enabled: true,
+      shell_boot: true,
+      readiness_deferred: true,
+      home_summary_deferred: true,
+    };
+
+    const { result } = renderHook(
+      () => useConversationalReadiness(payload, payload),
+      { reactStrictMode: true },
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.homeSummary?.source_revision).toBe('strict-revision'));
+    expect(result.current.homeStatusLoading).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

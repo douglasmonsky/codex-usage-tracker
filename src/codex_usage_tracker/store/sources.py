@@ -107,7 +107,7 @@ def _source_parse_plan_from_row(
     previous_state = parser_state_from_json(row["parser_state_json"])
     if _requires_full_source_parse(row, previous_state):
         return SourceParsePlan(path=path)
-    if _source_metadata_matches(row, metadata):
+    if _source_metadata_matches(path, row, metadata):
         return None
     if _can_incrementally_parse_source(path, metadata, row):
         return SourceParsePlan(
@@ -125,12 +125,27 @@ def _requires_full_source_parse(row: sqlite3.Row, previous_state: ParserState | 
     return previous_adapter != PARSER_ADAPTER_VERSION or previous_state is None
 
 
-def _source_metadata_matches(row: sqlite3.Row, metadata: SourceFileMetadata) -> bool:
+def _source_metadata_matches(
+    path: Path,
+    row: sqlite3.Row,
+    metadata: SourceFileMetadata,
+) -> bool:
+    # macOS can assign a different st_dev after a volume remount. The tracked
+    # path and inode remain stable. On device drift, verify the stored prefix
+    # tail too so an inode collision on another volume cannot mask replacement.
+    device_matches = _filesystem_id_key(row["source_device"]) == metadata.source_device
+    parsed_until_byte = int(row["parsed_until_byte"])
+    expected_tail = str(row["parsed_prefix_tail_hash"] or "")
+    content_matches = device_matches or (
+        0 <= parsed_until_byte <= metadata.size_bytes
+        and bool(expected_tail)
+        and _parsed_prefix_tail_hash(path, parsed_until_byte) == expected_tail
+    )
     return (
         int(row["size_bytes"]) == metadata.size_bytes
         and int(row["mtime_ns"]) == metadata.mtime_ns
-        and _filesystem_id_key(row["source_device"]) == metadata.source_device
         and _filesystem_id_key(row["source_inode"]) == metadata.source_inode
+        and content_matches
     )
 
 
@@ -140,9 +155,10 @@ def _can_incrementally_parse_source(
     previous_size = int(row["size_bytes"])
     previous_byte = int(row["parsed_until_byte"])
     expected_tail = str(row["parsed_prefix_tail_hash"] or "")
+    # The inode and stored prefix tail protect append-only parsing. Requiring
+    # st_dev as well turns a harmless macOS remount into a full-history rebuild.
     return (
         0 < previous_byte <= previous_size < metadata.size_bytes
-        and _filesystem_id_key(row["source_device"]) == metadata.source_device
         and _filesystem_id_key(row["source_inode"]) == metadata.source_inode
         and bool(expected_tail)
         and _parsed_prefix_tail_hash(path, previous_byte) == expected_tail

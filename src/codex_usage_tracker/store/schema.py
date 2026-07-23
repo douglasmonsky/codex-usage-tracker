@@ -19,7 +19,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
 
-SCHEMA_VERSION = 32
+SCHEMA_VERSION = 34
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -121,6 +121,8 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (30, otel_schema.migrate_otel_completion_tiers),
         (31, otel_schema.add_otel_cursor_resume_anchor),
         (32, allowance_schema.add_allowance_all_history_query_index),
+        (33, recommendation_schema.create_recommendation_fact_indexes),
+        (34, _migrate_v34),
     )
 
 
@@ -200,6 +202,11 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
             ON usage_events(thread_key, event_timestamp, cumulative_total_tokens);
         """
     )
+
+
+def _migrate_v34(conn: sqlite3.Connection) -> None:
+    recommendation_schema.create_recommendation_fact_indexes(conn)
+    schema_query_indexes.add_call_explorer_parent_lookup_indexes(conn)
 
 
 def _migrate_v5(conn: sqlite3.Connection) -> None:

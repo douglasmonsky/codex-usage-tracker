@@ -27,6 +27,7 @@ from codex_usage_tracker.recommendation_engine.summary_materialization import (
     sync_thread_recommendation_summaries,
 )
 from codex_usage_tracker.store.compression_schema import read_compression_source_generation
+from codex_usage_tracker.store.home_queries import persist_home_usage_metrics
 from codex_usage_tracker.store.recommendation_schema import (
     create_recommendation_fact_indexes,
     drop_recommendation_fact_indexes,
@@ -331,6 +332,11 @@ def _stamp_state(
             count,
             updated_at,
         ),
+    )
+    persist_home_usage_metrics(
+        conn,
+        source_generation=source_generation,
+        materialized_calls=count,
     )
 
 

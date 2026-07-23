@@ -1,9 +1,12 @@
 import { build } from 'esbuild';
+import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
 const targetBytes = 110 * 1024;
 const approvedLimitBytes = 113 * 1024;
-const entryPoint = new URL('../frontend/dashboard/src/visualization/renderer/echartsRenderer.ts', import.meta.url).pathname;
+const entryPoint = fileURLToPath(
+  new URL('../frontend/dashboard/src/visualization/renderer/echartsRenderer.ts', import.meta.url),
+);
 
 const result = await build({
   entryPoints: [entryPoint],

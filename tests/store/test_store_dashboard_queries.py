@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from codex_usage_tracker.core.models import UsageEvent
+from codex_usage_tracker.recommendation_engine.materialization import sync_recommendation_facts
 from codex_usage_tracker.store import api as store_api
 from codex_usage_tracker.store import dashboard_queries
 from codex_usage_tracker.store.api import (
@@ -18,8 +19,10 @@ from codex_usage_tracker.store.api import (
     query_dashboard_events,
     query_request_context_facts,
     query_thread_summaries,
+    query_usage_api_distinct_cwds,
     query_usage_api_event_count,
     query_usage_api_events,
+    query_usage_api_filter_options,
     refresh_usage_index,
     upsert_usage_events,
 )
@@ -287,6 +290,144 @@ def test_dashboard_rows_include_call_timing_from_thread_adjacency(tmp_path: Path
     assert by_gap[0]["record_id"] == "a3"
 
 
+def test_usage_api_uses_materialized_call_sort_facts(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    events = [
+        _usage_event(
+            record_id=record_id,
+            session_id=f"session-{record_id}",
+            thread_key=f"thread:{record_id}",
+            event_timestamp=f"2026-05-17T12:00:0{index}Z",
+            cumulative_total_tokens=100 + index,
+        )
+        for index, record_id in enumerate(("low", "middle", "high"), start=1)
+    ]
+    events[1] = replace(events[1], cwd="/tmp/older-project", model="gpt-older")
+    upsert_usage_events(events, db_path=db_path)
+    with connect(db_path) as conn:
+        init_db(conn)
+        sync_recommendation_facts(
+            conn,
+            record_ids=[event.record_id for event in events],
+        )
+        for record_id, attention, cost, credits, context in (
+            ("low", 10.0, 0.25, 1.0, 10.0),
+            ("middle", 50.0, 1.0, 2.0, 50.0),
+            ("high", 90.0, 4.5, 3.0, 90.0),
+        ):
+            conn.execute(
+                """
+                UPDATE recommendation_facts
+                SET recommendation_score = ?,
+                    estimated_cost_usd = ?,
+                    usage_credits = ?,
+                    context_window_percent = ?
+                WHERE record_id = ?
+                """,
+                (attention, cost, credits, context, record_id),
+            )
+        conn.execute(
+            """
+            UPDATE recommendation_facts
+            SET pricing_model = CASE record_id
+                    WHEN 'low' THEN NULL
+                    ELSE 'gpt-5.5'
+                END,
+                pricing_estimated = CASE record_id
+                    WHEN 'middle' THEN 1
+                    ELSE 0
+                END,
+                usage_credit_confidence = CASE record_id
+                    WHEN 'high' THEN 'exact'
+                    ELSE 'estimated'
+                END
+            """
+        )
+
+    for sort in ("attention", "cost", "credits", "context"):
+        rows = query_usage_api_events(
+            db_path=db_path,
+            limit=3,
+            include_archived=True,
+            sort=sort,
+            direction="desc",
+            legacy_archive_path_fallback=False,
+        )
+        record_ids = [row["record_id"] for row in rows]
+        assert record_ids == ["high", "middle", "low"], f"{sort}: {record_ids}"
+
+    assert [
+        row["record_id"]
+        for row in query_usage_api_events(
+            db_path=db_path,
+            limit=3,
+            pricing_status="estimated",
+            legacy_archive_path_fallback=False,
+        )
+    ] == ["middle"]
+    assert [
+        row["record_id"]
+        for row in query_usage_api_events(
+            db_path=db_path,
+            limit=3,
+            pricing_status="priced",
+            legacy_archive_path_fallback=False,
+        )
+    ] == ["high"]
+    assert [
+        row["record_id"]
+        for row in query_usage_api_events(
+            db_path=db_path,
+            limit=3,
+            pricing_status="unpriced",
+            legacy_archive_path_fallback=False,
+        )
+    ] == ["low"]
+    assert [
+        row["record_id"]
+        for row in query_usage_api_events(
+            db_path=db_path,
+            limit=3,
+            credit_confidence="exact",
+            legacy_archive_path_fallback=False,
+        )
+    ] == ["high"]
+    assert (
+        query_usage_api_event_count(
+            db_path=db_path,
+            pricing_status="estimated",
+            legacy_archive_path_fallback=False,
+        )
+        == 1
+    )
+    assert (
+        query_usage_api_event_count(
+            db_path=db_path,
+            pricing_status="priced",
+            legacy_archive_path_fallback=False,
+        )
+        == 1
+    )
+    assert (
+        query_usage_api_event_count(
+            db_path=db_path,
+            cwds=["/tmp/project"],
+            pricing_status="priced",
+            legacy_archive_path_fallback=False,
+        )
+        == 1
+    )
+    assert query_usage_api_filter_options(db_path=db_path, include_archived=True) == {
+        "models": ["gpt-5.5", "gpt-older"],
+        "efforts": [events[0].effort],
+    }
+    assert query_usage_api_distinct_cwds(
+        db_path=db_path,
+        include_archived=True,
+        legacy_archive_path_fallback=False,
+    ) == ["/tmp/older-project", "/tmp/project"]
+
+
 def test_upsert_materializes_thread_summaries(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     events = [
@@ -339,7 +480,67 @@ def test_upsert_materializes_thread_summaries(tmp_path: Path) -> None:
     assert persisted["count"] == 4
 
 
-def test_thread_summary_latest_record_lookup_uses_thread_index(tmp_path: Path) -> None:
+def test_thread_summaries_filter_risk_and_sort_cost(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [
+            _usage_event(
+                record_id="high-risk",
+                session_id="session-high",
+                thread_key="thread:High",
+                event_timestamp="2026-05-17T12:00:00Z",
+                cumulative_total_tokens=100,
+            ),
+            _usage_event(
+                record_id="low-risk",
+                session_id="session-low",
+                thread_key="thread:Low",
+                event_timestamp="2026-05-17T12:01:00Z",
+                cumulative_total_tokens=100,
+            ),
+        ],
+        db_path=db_path,
+    )
+    with connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE thread_summaries
+            SET avg_cache_ratio = CASE thread_key
+                    WHEN 'thread:High' THEN 0.10 ELSE 0.80 END,
+                estimated_cost_usd = CASE thread_key
+                    WHEN 'thread:High' THEN 1.25 ELSE 4.50 END
+            WHERE is_archived_scope = 'active'
+            """
+        )
+
+    high_risk = query_thread_summaries(db_path=db_path, risk="high")
+    by_cost = query_thread_summaries(
+        db_path=db_path,
+        sort="cost",
+        direction="desc",
+    )
+
+    assert [row["thread_key"] for row in high_risk] == ["thread:High"]
+    assert [row["thread_key"] for row in by_cost] == ["thread:Low", "thread:High"]
+    assert query_thread_summary_count(db_path=db_path, risk="low") == 1
+    for sort in (
+        "tokens",
+        "time",
+        "calls",
+        "cache",
+        "thread",
+        "cost",
+        "credits",
+        "context",
+        "risk",
+        "cost_per_call",
+    ):
+        assert len(query_thread_summaries(db_path=db_path, sort=sort)) == 2
+
+
+def test_thread_summary_latest_record_lookup_uses_materialized_fact_index(
+    tmp_path: Path,
+) -> None:
     db_path = tmp_path / "usage.sqlite3"
     upsert_usage_events(
         [
@@ -368,8 +569,11 @@ def test_thread_summary_latest_record_lookup_uses_thread_index(tmp_path: Path) -
             ).fetchall()
         ]
 
-    assert any("idx_usage_thread_key_timestamp (thread_key=?)" in detail for detail in plan)
-    assert not any("SCAN u" in detail for detail in plan)
+    assert any(
+        "idx_recommendation_facts_thread_latest (thread_key=? AND event_timestamp=?)" in detail
+        for detail in plan
+    )
+    assert not any("SCAN rf" in detail for detail in plan)
 
 
 def test_thread_summary_latest_record_lookup_preserves_legacy_keys(tmp_path: Path) -> None:

@@ -70,18 +70,24 @@ def get_evidence(
         history=request.history,
         thread_key=request.selector_id if request.selector_kind == "thread" else None,
     )
-    context = context or build_request_context(
-        db_path=db_path, pricing_path=pricing_path, scope=scope
-    )
-    if context.scope != scope.to_contract():
+    if context is not None and context.scope != scope.to_contract():
         raise RequestContextError("evidence context scope does not match the request")
+    if context is None and _requires_request_context(request):
+        context = build_request_context(db_path=db_path, pricing_path=pricing_path, scope=scope)
     repository = _LocalEvidenceRepository(db_path, context, job_service)
     return resolve_evidence(request, repository)
 
 
+def _requires_request_context(request: EvidenceRequest) -> bool:
+    """Only cursor- or revision-aware evidence needs global accounting context."""
+    return request.selector_kind in {"finding", "analysis"} or (
+        request.selector_kind == "thread" and request.section == "calls"
+    )
+
+
 class _LocalEvidenceRepository(EvidenceRepository):
     def __init__(
-        self, db_path: Path, context: RequestContext, job_service: JobService | None
+        self, db_path: Path, context: RequestContext | None, job_service: JobService | None
     ) -> None:
         self.db_path = db_path
         self.context = context
@@ -92,6 +98,8 @@ class _LocalEvidenceRepository(EvidenceRepository):
         self.job_service = job_service
 
     def source_revision(self) -> str | None:
+        if self.context is None:
+            raise RuntimeError("source revision requires request context")
         return self.context.source_revision
 
     def call(self, selector_id: str, history: str) -> EvidenceV1 | None:
@@ -141,6 +149,8 @@ class _LocalEvidenceRepository(EvidenceRepository):
     def thread_calls(
         self, selector_id: str, history: str, limit: int, cursor: str | None
     ) -> tuple[tuple[EvidenceV1, ...], str | None]:
+        if self.context is None:
+            raise RuntimeError("thread call evidence requires request context")
         result = query_usage(
             QueryRequest(
                 entity="call",
@@ -196,6 +206,8 @@ class _LocalEvidenceRepository(EvidenceRepository):
         )
 
     def completed_analyses(self) -> tuple[Mapping[str, object], ...]:
+        if self.context is None:
+            raise RuntimeError("analysis evidence requires request context")
         results = self.job_service.completed_results(
             kind="analysis",
             result_schema="codex-usage-tracker.analysis.v2",

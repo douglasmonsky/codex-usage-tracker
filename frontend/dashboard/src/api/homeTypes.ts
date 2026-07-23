@@ -63,6 +63,22 @@ type HomeAllowanceWindow = {
   captured_at?: string | null;
 };
 
+type HomeUsageMetricsPayload = {
+  calls: number;
+  input_tokens: number;
+  cached_input_tokens: number;
+  uncached_input_tokens: number;
+  output_tokens: number;
+  reasoning_output_tokens: number;
+  total_tokens: number;
+  estimated_cost_usd: number;
+  usage_credits: number;
+  pricing_coverage: number;
+  credit_coverage: number;
+  source_generation: number;
+  materialized_calls: number;
+};
+
 export type HomeSummaryPayload = {
   schema: 'codex-usage-tracker-home-summary-v1';
   source_revision: string;
@@ -73,6 +89,7 @@ export type HomeSummaryPayload = {
     canonical_rows: number;
     excluded_copied_rows: number;
   };
+  usage_metrics?: HomeUsageMetricsPayload | null;
   pricing: PricingSnapshot;
   allowance: {
     configured: boolean;

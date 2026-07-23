@@ -71,3 +71,24 @@ stdout is never used for deprecation text.
 The stable `query` spelling keeps its old-only filters and unbounded `--limit 0`
 form as a v1 compatibility mode. New bounded query options return
 `codex-usage-tracker.query.v2`.
+
+## HTTP API v1 compatibility mapping
+
+All unversioned `/api/*` responses advertise `Deprecation: true` and link back
+to this ledger. They remain compatibility routes through `0.24.x`; new
+dashboard code must not add dependencies on them.
+
+| Compatibility route family | v2 replacement | Current dashboard use |
+| --- | --- | --- |
+| `/api/usage` | `/api/v2/query` for bounded reads; `/api/v2/refresh` for index refresh | Removed from stable Home timeframe changes in `0.23.0`; retained by legacy snapshot hydration and legacy routes only. |
+| `/api/refresh/start`, `/api/refresh/status` | `/api/v2/refresh`, then `/api/v2/jobs/{job_id}` | Compatibility refresh flow pending migration. |
+| `/api/status`, `/api/readiness`, `/api/health` | `/api/v2/status` and `/api/v2/capabilities` | The bounded Home bootstrap still uses the compatibility status envelope while its component payloads move independently. |
+| `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls` | `/api/v2/query` plus `/api/v2/evidence` | Explore Calls and Threads remain explicit compatibility exceptions until their richer display fields have v2 parity. |
+| `/api/summary`, `/api/recommendations` | `/api/v2/query` and `/api/v2/analyze` | Legacy Overview routes only. Stable Home uses the bounded status summary and focused v2 usage queries. |
+| `/api/allowance/*` | `/api/v2/allowance` and `/api/v2/jobs/{job_id}` | Limits migration is incremental; focused compatibility endpoints remain supported through `0.24.x`. |
+| `/api/investigations/*`, `/api/reports/*`, `/api/diagnostics/*`, `/api/compression/*` | `/api/v2/analyze`, `/api/v2/query`, and `/api/v2/evidence` where semantic parity exists | Compatibility and deprecated lab routes only; operations without proven parity remain supported through the final compatibility release. |
+| `/api/context`, `/api/context-settings`, `/api/open-investigator` | `/api/v2/evidence` or direct Evidence Console navigation | Compatibility helpers pending removal with the legacy dashboard surface. |
+
+Deprecation does not mean an endpoint may be removed early. Each family keeps
+its current contract until the final supported release, and removal still
+requires the parity and direct-route checks named above.

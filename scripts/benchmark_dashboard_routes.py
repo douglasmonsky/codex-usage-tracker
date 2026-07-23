@@ -240,6 +240,13 @@ def benchmark_fixture(
     ]
     routes.append(
         route_support.benchmark_route(
+            "/api/calls",
+            lambda: route_support.calls_filter_benchmark_payload(db_path),
+            iterations=iterations,
+        )
+    )
+    routes.append(
+        route_support.benchmark_route(
             "/api/threads",
             lambda: route_support.threads_payload(
                 "limit=250&include_archived=true&sort=tokens&direction=desc",

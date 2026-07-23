@@ -32,6 +32,18 @@ def test_status_payload_is_constant_size_and_supports_revision_polling(tmp_path:
     }
 
 
+def test_status_payload_can_defer_estimation_for_first_paint(tmp_path: Path) -> None:
+    payload = allowance_v2.allowance_status_payload(
+        "include_estimation=false",
+        db_path=_initialized_db(tmp_path),
+        privacy_mode="strict",
+        include_archived_default=False,
+    )
+
+    assert payload["changed"] is True
+    assert "estimation" not in payload
+
+
 @pytest.mark.parametrize(
     ("query", "message"),
     [

@@ -228,12 +228,12 @@ it('shows and sorts all selected thread calls inline', () => {
   const threadCallList = within(screen.getByRole('region', { name: /Calls for thread-page-demo/i }));
 
   expect(threadCallList.getByText('7 of 7 calls loaded')).toBeInTheDocument();
-  expect(screen.getByText('model-0 / high')).toBeInTheDocument();
+  expect(threadCallList.getByText('model-0')).toBeInTheDocument();
 
 fireEvent.change(threadCallList.getByLabelText('Sort thread calls'), { target: { value: 'tokens' } });
 expect(threadCallList.getByLabelText('Sort thread calls direction')).toHaveValue('desc');
 fireEvent.change(threadCallList.getByLabelText('Sort thread calls direction'), { target: { value: 'asc' } });
-expect(screen.getByText('model-1 / high')).toBeInTheDocument();
+    expect(threadCallList.getByText('model-1')).toBeInTheDocument();
 });
 
 it('hydrates and syncs selected thread call sort URL state', async () => {
@@ -261,7 +261,7 @@ it('hydrates and syncs selected thread call sort URL state', async () => {
 
   expect(threadCallList.getByLabelText('Sort thread calls')).toHaveValue('tokens');
   expect(threadCallList.getByText('7 of 7 calls loaded')).toBeInTheDocument();
-  expect(screen.getByText('model-0 / high')).toBeInTheDocument();
+  expect(threadCallList.getByText('model-0')).toBeInTheDocument();
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
@@ -272,7 +272,7 @@ it('hydrates and syncs selected thread call sort URL state', async () => {
   fireEvent.change(threadCallList.getByLabelText('Sort thread calls'), { target: { value: 'cost' } });
 
   expect(threadCallList.getByLabelText('Sort thread calls')).toHaveValue('cost');
-  expect(screen.getByText('model-6 / high')).toBeInTheDocument();
+  expect(threadCallList.getByText('model-6')).toBeInTheDocument();
 
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);

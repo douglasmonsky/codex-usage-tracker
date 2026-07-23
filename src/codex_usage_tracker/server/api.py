@@ -68,6 +68,7 @@ def serve_dashboard(
     projects_path: Path = DEFAULT_PROJECTS_PATH,
     privacy_mode: str = "normal",
     language: str | None = None,
+    refresh_on_start: bool = False,
 ) -> None:
     """Generate and serve the dashboard plus a localhost-only context endpoint."""
 
@@ -95,6 +96,7 @@ def serve_dashboard(
         include_rows=False,
     )
     refresh_jobs = RefreshJobRegistry()
+    refresh_lock = threading.Lock()
     analysis_jobs = AnalysisJobRegistry()
     compression_jobs = compression_routes.CompressionJobRegistry()
     query_cache = AggregateQueryCache()
@@ -122,7 +124,7 @@ def serve_dashboard(
         api_token=api_token,
         context_api_state=context_api_state,
         language=selected_language,
-        refresh_lock=threading.Lock(),
+        refresh_lock=refresh_lock,
         refresh_jobs=refresh_jobs,
         analysis_jobs=analysis_jobs,
         compression_jobs=compression_jobs,
@@ -148,6 +150,23 @@ def serve_dashboard(
         )
         print("Aggregate rows refresh through /api/usage with a per-server token.")
         print(f"Raw context API is {context_mode}; context is never embedded in the dashboard HTML.")
+    if refresh_on_start:
+        refresh_job = refresh_jobs.start_refresh(
+            codex_home=codex_home,
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
+            include_archived=include_archived,
+            aggregate_only=False,
+            refresh_lock=refresh_lock,
+        )
+        job_id = refresh_job["job_id"]
+        if selected_language == "zh-Hans":
+            print(f"后台刷新已开始：{job_id}")
+        else:
+            print(f"Background refresh started: {job_id}")
     if open_browser:
         webbrowser.open(dashboard_url)
     try:

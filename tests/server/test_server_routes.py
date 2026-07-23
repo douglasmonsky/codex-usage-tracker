@@ -7,6 +7,7 @@ from codex_usage_tracker.server.routes import (
     POST_ROUTE_METHODS,
     get_route_method,
     is_dashboard_shell_path,
+    is_deprecated_http_v1_path,
 )
 
 
@@ -86,3 +87,10 @@ def test_dashboard_shell_path_matches_root_and_generated_dashboard_name() -> Non
     assert is_dashboard_shell_path("/", "dashboard.html")
     assert is_dashboard_shell_path("/dashboard.html", "dashboard.html")
     assert not is_dashboard_shell_path("/api/usage", "dashboard.html")
+
+
+def test_only_unversioned_api_routes_receive_v1_deprecation_metadata() -> None:
+    assert is_deprecated_http_v1_path("/api/usage")
+    assert is_deprecated_http_v1_path("/api/calls")
+    assert not is_deprecated_http_v1_path("/api/v2/query")
+    assert not is_deprecated_http_v1_path("/react-dashboard.html")
