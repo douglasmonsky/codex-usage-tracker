@@ -7,8 +7,9 @@ those results.
 
 The stable Evidence Console direction is limited to these surfaces:
 
-- `Home`: readiness, freshness, headline status, recent high-confidence
-  findings, and suggested analysis questions.
+- `Home`: a Usage Pulse summary of calls, tokens, cache reuse, and estimated
+  cost, followed by readiness, freshness, recent high-confidence findings, and
+  suggested analysis questions.
 - `Explore`: bounded Calls and Threads evidence browsing with shared scope and
   filtering.
 - `Limits`: current allowance status, observed history, supported changes,

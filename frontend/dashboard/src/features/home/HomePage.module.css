@@ -30,11 +30,17 @@
   text-transform: uppercase;
 }
 
+.headerActions,
 .actions,
 .inlineActions {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.actions {
+  justify-content: flex-end;
 }
 
 .copyStatus {
@@ -174,5 +180,9 @@
 
   .statusGrid {
     grid-template-columns: 1fr;
+  }
+
+  .actions {
+    justify-content: flex-start;
   }
 }

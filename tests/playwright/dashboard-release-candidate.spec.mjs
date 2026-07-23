@@ -8,7 +8,7 @@ import AxeBuilder from '@axe-core/playwright';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 const workspaces = [
-  ['Home', '/?view=home&qa=r11-accessibility'],
+  ['Overview', '/?view=home&qa=r11-accessibility'],
   ['Calls', '/?view=explore&mode=calls&qa=r11-accessibility'],
   ['Threads', '/?view=explore&mode=threads&thread=thread-9f3a1c&qa=r11-accessibility'],
   ['Call Investigator', '/?view=evidence&kind=call&record=fixture-call-2&qa=r11-accessibility'],
@@ -214,7 +214,7 @@ test.describe('0.23 Evidence Console release candidate', () => {
   });
 
   test('keeps simplified navigation stable while preserving the browser-local preference', async ({ page }) => {
-    await openWorkspace(page, 'Home', '/?view=home&qa=release-n-preference');
+    await openWorkspace(page, 'Overview', '/?view=home&qa=release-n-preference');
     const primary = page.getByRole('navigation', { name: 'Primary' });
     for (const label of ['Home', 'Explore', 'Limits']) {
       await expect(primary.getByRole('button', { name: label, exact: true }), `${label} baseline navigation`).toBeVisible();
@@ -263,7 +263,7 @@ test.describe('0.23 Evidence Console release candidate', () => {
 
   test('normalizes every old stable URL to its canonical 0.23 route', async ({ page }) => {
     const routes = [
-      ['Home', '/?view=overview&qa=release-023-alias', /view=home/],
+      ['Overview', '/?view=overview&qa=release-023-alias', /view=home/],
       ['Calls', '/?view=calls&qa=release-023-alias', /view=explore.*mode=calls|mode=calls.*view=explore/],
       ['Threads', '/?view=threads&qa=release-023-alias', /view=explore.*mode=threads|mode=threads.*view=explore/],
       [
@@ -338,7 +338,7 @@ test.describe('0.23 Evidence Console release candidate', () => {
       }
     });
 
-    await openWorkspace(page, 'Home', '/?view=home&qa=release-023-no-heavy-scan');
+    await openWorkspace(page, 'Overview', '/?view=home&qa=release-023-no-heavy-scan');
     expect(heavyRequests).toEqual([]);
   });
 
@@ -382,7 +382,7 @@ test.describe('0.23 Evidence Console release candidate', () => {
         next_action: null,
         evidence: [],
       });
-      await openWorkspace(statePage, 'Home', '/?view=home&qa=release-n-readiness');
+      await openWorkspace(statePage, 'Overview', '/?view=home&qa=release-n-readiness');
       const readiness = statePage.getByRole('region', { name: 'Home status' })
         .getByRole('article')
         .filter({ hasText: 'Conversational analysis' });

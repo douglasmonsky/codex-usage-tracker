@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ConversationalReadiness, HomeSummaryPayload } from '../../api/types';
+import { fixtureModel } from '../../test-fixtures/dashboardFixture';
 import { HomePage } from './HomePage';
 
 const readiness: ConversationalReadiness = {
@@ -57,6 +58,7 @@ describe('HomePage', () => {
   it('renders bounded status, findings, and evidence without legacy dashboard modules', () => {
     render(
       <HomePage
+        model={fixtureModel}
         payload={{ pricing_configured: true }}
         summary={summary}
         readiness={readiness}
@@ -67,7 +69,13 @@ describe('HomePage', () => {
       />,
     );
 
-    expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
+    expect(screen.getByText('Usage pulse')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Loaded usage metrics' })).toBeInTheDocument();
+    expect(screen.getByText('Total Calls')).toBeInTheDocument();
+    expect(screen.getByText('Total Tokens')).toBeInTheDocument();
+    expect(screen.getByText('Cache Reuse')).toBeInTheDocument();
+    expect(screen.getByText('Estimated Cost')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Home status' })).getAllByRole('article')).toHaveLength(5);
     expect(within(screen.getByRole('region', { name: 'Recent findings' })).getAllByRole('article')).toHaveLength(3);
     expect(within(screen.getByRole('region', { name: 'Recent evidence' })).getAllByRole('listitem')).toHaveLength(5);
@@ -81,6 +89,7 @@ describe('HomePage', () => {
     const onOpenCall = vi.fn();
     render(
       <HomePage
+        model={fixtureModel}
         payload={{ pricing_configured: true }}
         summary={summary}
         readiness={readiness}
@@ -96,7 +105,7 @@ describe('HomePage', () => {
     expect(await screen.findByText('Starter prompt copied')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open Explore' }));
     fireEvent.click(screen.getByRole('button', { name: 'Open Limits' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh Home' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh data' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Open evidence' })[0]);
 
     expect(onNavigate).toHaveBeenNthCalledWith(1, 'explore');
@@ -108,6 +117,7 @@ describe('HomePage', () => {
   it('copies each server-provided follow-up without generating finding text in React', async () => {
     render(
       <HomePage
+        model={fixtureModel}
         payload={{ pricing_configured: true }}
         summary={summary}
         readiness={readiness}
@@ -121,5 +131,56 @@ describe('HomePage', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Copy follow-up' })[1]);
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Investigate finding 1');
     expect(await screen.findByText('Follow-up copied')).toBeInTheDocument();
+  });
+
+  it('labels empty usage metrics as unavailable instead of measured zeroes', () => {
+    render(
+      <HomePage
+        model={{ ...fixtureModel, calls: [], scopeSummary: undefined }}
+        payload={{ pricing_configured: true }}
+        summary={summary}
+        readiness={readiness}
+        refreshing={false}
+        onRefresh={vi.fn()}
+        onNavigate={vi.fn()}
+        onOpenCall={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('No input data')).toBeInTheDocument();
+    expect(screen.getByText('No reported input tokens in this scope')).toBeInTheDocument();
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+    expect(screen.getByText('No loaded calls have mapped cost rates')).toBeInTheDocument();
+  });
+
+  it('keeps cache evidence while marking unpriced calls unavailable', () => {
+    const call = fixtureModel.calls[0]!;
+    render(
+      <HomePage
+        model={{
+          ...fixtureModel,
+          calls: [{
+            ...call,
+            cost: 0,
+            standardCost: null,
+            priorityCost: null,
+            billingBasis: 'unknown',
+            credits: 0,
+          }],
+          scopeSummary: undefined,
+        }}
+        payload={{ pricing_configured: true }}
+        summary={summary}
+        readiness={readiness}
+        refreshing={false}
+        onRefresh={vi.fn()}
+        onNavigate={vi.fn()}
+        onOpenCall={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('No input data')).not.toBeInTheDocument();
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+    expect(screen.getByText('pricing coverage unavailable')).toBeInTheDocument();
   });
 });

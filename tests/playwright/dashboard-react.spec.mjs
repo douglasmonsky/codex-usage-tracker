@@ -12,7 +12,7 @@ async function navigateDirectRoute(page, search) {
 test.describe('React dashboard rewrite smoke', () => {
   test('renders Home and returns from call Evidence to Explore', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
     await expect(page.getByText('Local data only').first()).toBeVisible();
 
     await page.getByRole('button', { name: /^Explore$/i }).click();

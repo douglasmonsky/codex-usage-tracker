@@ -694,15 +694,19 @@ commit as each roadmap task.
 - Product inventory: 15 browser routes comprise five Evidence Console routes
   and ten direct-only legacy routes. Default analytical navigation is Home,
   Explore, and Limits; Settings is a utility action and Evidence is contextual.
-  Explore provides Calls and Threads modes. All four Evidence selector kinds
-  render, stable old URLs normalize, and Home performs no hidden heavy scan.
+  Home begins with the bounded Usage Pulse calls, tokens, cache-reuse, and cost
+  summary before its readiness and evidence sections. Explore provides Calls
+  and Threads modes. All four Evidence selector kinds render, stable old URLs
+  normalize, and Home performs no hidden heavy scan.
   MCP profiles expose 7 core, 59 full, and 64 developer tools. Primary CLI help
   exposes 11 commands and retains 34 hidden compatibility aliases. The shared
   JSON inventory contains 95 schemas.
 - Focused verification: 381 Python acceptance tests passed. The frontend suite
-  passed 607 tests across 115 files. The port-isolated Playwright release
+  passed 609 tests across 115 files. The port-isolated Playwright release
   candidate passed 14 scenarios, including Explore Calls and Threads parity,
   stable URL normalization, all Evidence selectors, and the Home scan guard.
+  The restored Usage Pulse recheck passed 31 focused frontend tests and the
+  complete dashboard and browser release-candidate gates again.
   Twelve synthetic screenshots cover Home, Explore Calls, Explore Threads,
   Limits, Evidence, Settings, a legacy route, tablet, mobile, 200% zoom,
   reduced motion, and keyboard use without private user data.

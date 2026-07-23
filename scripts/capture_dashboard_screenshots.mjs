@@ -20,7 +20,7 @@ const captures = [
   {
     name: 'evidence-console-home.png',
     query: '?view=home&qa=docs-023',
-    heading: 'Home',
+    heading: 'Overview',
     evidence: 'desktop',
   },
   {
@@ -56,35 +56,35 @@ const captures = [
   {
     name: 'evidence-console-home-tablet.png',
     query: '?view=home&qa=docs-023-tablet',
-    heading: 'Home',
+    heading: 'Overview',
     viewport: { width: 1024, height: 768 },
     evidence: 'tablet',
   },
   {
     name: 'evidence-console-home-mobile.png',
     query: '?view=home&qa=docs-023-mobile',
-    heading: 'Home',
+    heading: 'Overview',
     viewport: { width: 390, height: 844 },
     evidence: 'mobile',
   },
   {
     name: 'evidence-console-home-zoom-200.png',
     query: '?view=home&qa=docs-023-zoom',
-    heading: 'Home',
+    heading: 'Overview',
     viewport: { width: 800, height: 450 },
     evidence: 'zoom-200',
   },
   {
     name: 'evidence-console-home-reduced-motion.png',
     query: '?view=home&qa=docs-023-motion',
-    heading: 'Home',
+    heading: 'Overview',
     reducedMotion: 'reduce',
     evidence: 'reduced-motion',
   },
   {
     name: 'evidence-console-home-keyboard.png',
     query: '?view=home&qa=docs-023-keyboard',
-    heading: 'Home',
+    heading: 'Overview',
     keyboard: true,
     evidence: 'keyboard',
   },
@@ -108,7 +108,7 @@ try {
       viewport: capture.viewport ?? { width: 1600, height: 900 },
     });
     try {
-      if (capture.heading === 'Home') await page.addInitScript(homeBoot);
+      if (capture.heading === 'Overview') await page.addInitScript(homeBoot);
       await page.goto(new URL(capture.query, dashboardBaseUrl).href, { waitUntil: 'networkidle' });
       await page.getByRole('heading', { name: capture.heading, exact: true }).first().waitFor();
       await assertSyntheticFixture(page);
@@ -138,6 +138,10 @@ function homeBoot() {
     cached_input_tokens: 2400 + index * 250,
     output_tokens: 600 + index * 50,
     reasoning_output_tokens: 150 + index * 10,
+    estimated_cost_usd: 0.2 + index * 0.05,
+    standard_cost_usd: 0.2 + index * 0.05,
+    billing_basis: 'pricing_table',
+    usage_credits: 6 + index,
     total_tokens: 4750 + index * 560,
   }));
   window.__CODEX_USAGE_BOOT__ = {

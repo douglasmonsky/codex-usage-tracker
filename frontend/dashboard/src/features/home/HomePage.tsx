@@ -4,15 +4,19 @@ import { useMemo, useState } from 'react';
 import type {
   ConversationalReadiness,
   DashboardBootPayload,
+  DashboardModel,
   HomeSummaryPayload,
 } from '../../api/types';
 import { Button, StatusBadge } from '../../design';
 import type { DashboardViewId } from '../../routes/dashboardSearch';
 import { copyText } from '../shared/copyText';
+import { OverviewMetrics } from '../overview/OverviewMetrics';
+import { buildOverviewMetrics } from '../overview/overviewModel';
 import { buildHomeModel } from './homeModel';
 import styles from './HomePage.module.css';
 
 export function HomePage({
+  model: dashboardModel,
   payload,
   summary,
   readiness,
@@ -21,6 +25,7 @@ export function HomePage({
   onNavigate,
   onOpenCall,
 }: {
+  model: DashboardModel;
   payload: DashboardBootPayload | null;
   summary?: HomeSummaryPayload;
   readiness?: ConversationalReadiness;
@@ -29,10 +34,11 @@ export function HomePage({
   onNavigate: (view: DashboardViewId) => void;
   onOpenCall: (recordId: string) => void;
 }) {
-  const model = useMemo(
+  const home = useMemo(
     () => buildHomeModel({ payload, summary, readiness }),
     [payload, readiness, summary],
   );
+  const usageMetrics = useMemo(() => buildOverviewMetrics(dashboardModel), [dashboardModel]);
   const [copyStatus, setCopyStatus] = useState('');
 
   async function copyPrompt(prompt: string, success: string) {
@@ -44,33 +50,45 @@ export function HomePage({
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Evidence Console</p>
-          <h1>Home</h1>
-          <p>Check readiness, start an investigation, and open the strongest recent evidence.</p>
+          <p className={styles.eyebrow}>Usage pulse</p>
+          <h1>Overview</h1>
+          <p>The important changes first, with direct paths into supporting evidence.</p>
         </div>
-        <div className={styles.actions}>
-          <Button
-            variant="secondary"
-            onClick={() => void copyPrompt(model.starterPrompt, 'Starter prompt copied')}
-          >
-            <Copy size={16} /> Copy starter prompt
-          </Button>
-          <Button variant="secondary" onClick={() => onNavigate('explore')}>
-            <Search size={16} /> Open Explore
-          </Button>
-          <Button variant="secondary" onClick={() => onNavigate('limits')}>
-            <TimerReset size={16} /> Open Limits
-          </Button>
+        <div className={styles.headerActions}>
+          <StatusBadge tone={refreshing ? 'caution' : 'neutral'}>
+            {refreshing ? 'Refreshing' : 'Stored snapshot'}
+          </StatusBadge>
           <Button variant="primary" onClick={onRefresh} disabled={refreshing}>
-            <RefreshCw size={16} /> {refreshing ? 'Refreshing...' : 'Refresh Home'}
+            <RefreshCw size={16} /> {refreshing ? 'Refreshing...' : 'Refresh data'}
           </Button>
         </div>
       </header>
 
+      <OverviewMetrics
+        metrics={usageMetrics}
+        loadedCalls={dashboardModel.calls.length}
+        availableCalls={payload?.total_available_rows ?? dashboardModel.calls.length}
+      />
+
+      <nav className={styles.actions} aria-label="Home actions">
+        <Button
+          variant="secondary"
+          onClick={() => void copyPrompt(home.starterPrompt, 'Starter prompt copied')}
+        >
+          <Copy size={16} /> Copy starter prompt
+        </Button>
+        <Button variant="secondary" onClick={() => onNavigate('explore')}>
+          <Search size={16} /> Open Explore
+        </Button>
+        <Button variant="secondary" onClick={() => onNavigate('limits')}>
+          <TimerReset size={16} /> Open Limits
+        </Button>
+      </nav>
+
       <p className={styles.copyStatus} role="status" aria-live="polite">{copyStatus}</p>
 
       <section className={styles.statusGrid} aria-label="Home status">
-        {model.statusCards.map(card => (
+        {home.statusCards.map(card => (
           <article className={styles.statusCard} key={card.id}>
             <div className={styles.cardHeading}>
               <span>{card.label}</span>
@@ -90,9 +108,9 @@ export function HomePage({
           </div>
           <span>Up to 3 high-confidence findings</span>
         </div>
-        {model.findings.length ? (
+        {home.findings.length ? (
           <div className={styles.findings}>
-            {model.findings.map(finding => (
+            {home.findings.map(finding => (
               <article className={styles.finding} key={finding.finding_id}>
                 <div className={styles.cardHeading}>
                   <h3>{finding.title}</h3>
@@ -127,9 +145,9 @@ export function HomePage({
           </div>
           <span>Up to 5 aggregate records</span>
         </div>
-        {model.recentEvidence.length ? (
+        {home.recentEvidence.length ? (
           <ul className={styles.evidenceList}>
-            {model.recentEvidence.map(evidence => (
+            {home.recentEvidence.map(evidence => (
               <li key={evidence.evidence_id}>
                 <div>
                   <strong>{evidence.label}</strong>

@@ -16,7 +16,7 @@ it('normalizes legacy insights view URLs to the Home route', async () => {
 
   render(<App />);
 
-  expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
   await waitFor(() => {
     const params = new URLSearchParams(window.location.search);
     expect(params.get('view')).toBe('home');
@@ -34,7 +34,7 @@ it('normalizes legacy insights view URLs to the Home route', async () => {
   });
 
   fireEvent.click(screen.getByRole('button', { name: /Back to Home/i }));
-  expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
   expect(new URLSearchParams(window.location.search).get('view')).toBe('home');
 });
 
@@ -72,7 +72,7 @@ expect(searchInput).toHaveFocus();
 searchInput.blur();
 
 fireEvent.keyDown(window, { key: '1' });
-expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
+expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
 expect(window.location.search).toContain('view=home');
 
 fireEvent.keyDown(window, { key: '2' });
@@ -103,7 +103,7 @@ it('creates navigation history entries and rehydrates shell state on popstate', 
   window.history.replaceState(null, '', '/?view=overview&q=cache&preset=cache-heavy&history=all');
   fireEvent.popState(window);
 
-  expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
   expect(screen.getByLabelText('Search dashboard')).toHaveValue('cache');
   const params = new URLSearchParams(window.location.search);
   expect(params.get('view')).toBe('home');

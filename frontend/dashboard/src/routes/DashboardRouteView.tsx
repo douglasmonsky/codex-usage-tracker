@@ -151,6 +151,7 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     case 'overview':
       return (
         <HomePage
+          model={model}
           payload={dashboardPayload}
           summary={homeSummary}
           readiness={conversationalAnalysis}
