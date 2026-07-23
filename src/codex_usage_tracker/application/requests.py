@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,7 +13,6 @@ from codex_usage_tracker.application.allowance_models import AllowanceRequest as
 from codex_usage_tracker.application.errors import RequestValidationError
 from codex_usage_tracker.application.query_models import QueryRequest as QueryRequest
 from codex_usage_tracker.core.contracts import ScopeV1
-from codex_usage_tracker.core.contracts.common import immutable_snapshot
 from codex_usage_tracker.core.contracts.serialization import payload_mapping
 from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH, DEFAULT_PRICING_PATH
 from codex_usage_tracker.evidence.models import EvidenceRequest as EvidenceRequest
@@ -81,10 +79,6 @@ def _normalize_datetime(value: str | None, field_name: str) -> tuple[str | None,
     parsed = _parse_datetime(value.strip(), field_name)
     normalized = parsed.isoformat().replace("+00:00", "Z")
     return normalized, parsed
-
-
-def _mapping_snapshot(value: Mapping[str, object]) -> Mapping[str, object]:
-    return cast(Mapping[str, object], immutable_snapshot(value))
 
 
 @dataclass(frozen=True)

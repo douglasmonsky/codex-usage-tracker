@@ -43,6 +43,7 @@ spans_with_candidates
 spans_without_candidates
 with_vs_without_median_drain_ratio
 installed
+recommended_refresh_action
 
 # HTTP handlers are selected by BaseHTTPRequestHandler or route dispatch maps.
 _.do_POST
@@ -108,3 +109,5 @@ _._handle_usage
 # sqlite3 protocols and test doubles consume these assigned attributes.
 _.row_factory
 _.closed
+_.__context__
+_.local_path
