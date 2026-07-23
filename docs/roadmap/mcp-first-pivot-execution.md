@@ -758,8 +758,76 @@ commit as each roadmap task.
   content/fact indexing pipeline rather than dashboard availability or focused
   endpoint hydration; it is recorded for 0.24 performance hardening.
 
+## Task 27.5 - Foundation Audit and 0.24 Plan Confirmation
+
+- Stable task ID: `ARCH-AUDIT-00`
+- Status: complete; Task 27 and the `0.23.0` release gate completed before
+  evidence collection, and this checkpoint recorded `PROCEED`.
+- Branch: `pivot/27.5-foundation-audit`
+- Commits: `docs: add 0.24 foundation audit checkpoint` (this checkpoint;
+  exact SHA is recorded in Git/PR history).
+- Audit report: `docs/superpowers/reports/0.24-foundation-audit.md`.
+- Audited commit SHA: `589e10a1afeca72e47d6b2d5777cd8189d292996`.
+- Decision: `PROCEED`.
+- Changed files:
+  `docs/superpowers/reports/0.24-foundation-audit.md`,
+  `docs/roadmap/mcp-first-pivot-execution.md`, `.gitignore`, and `AGENTS.md`.
+  The latter two add the user-approved ignored GitNexus index and
+  context-efficient GitNexus/Serena/source/test workflow; the 548 MiB local
+  `.gitnexus/` index and IntelliJ `.idea/` directory remain untracked.
+- Focused verification:
+  - migration, canonical accounting, refresh, content, OTel, allowance,
+    contract, core MCP, profile, and HTTP-v2 suite: `126 passed in 11.35s`;
+  - fresh temporary SQLite database: schema/user version 34, 34 migration
+    records, 38 physical tables, `integrity_check=ok`,
+    `foreign_key_check=[]`, and normal `foreign_keys=0`;
+  - `ruff check .`: passed;
+  - `.venv/bin/python -m pyright --pythonpath .venv/bin/python src`: 0 errors,
+    7 existing lazy-export warnings;
+  - `python scripts/check_release.py`: passed;
+  - `npx markdownlint-cli2`: passed;
+  - synthetic isolated doctor: completed with the expected warning-only
+    missing-local-setup result.
+- Full verification: `.venv/bin/python -m pytest -q`:
+  `1907 passed in 116.87s`.
+- Architecture graph and inventory evidence:
+  - Tach map: 381 modules, 1,327 edges, 3 non-trivial SCCs;
+  - `tach check`: the 8 pre-existing direction violations recorded in the
+    report, assigned to Tasks 28-30;
+  - GitNexus at the audited SHA: 1,348 files, 25,190 symbols, 54,349
+    relationships, 1,311 clusters, and 300 processes;
+  - `gitnexus check --cycles --json`: 7 file-level cycles, including
+    analytics/application, store/schema, store/refresh, frontend, and one
+    generated-bundle cycle.
+- Migration fixtures tested: unversioned legacy aggregate through v34; fresh
+  v34; representative v23, v24, v25, v27, v28, v31, and v33 states; canonical
+  rebuild; OTel v30/v31; malformed legacy failure/partial-commit evidence;
+  refresh idempotency and CSV compatibility. Every retained SQLite fixture
+  returned `integrity_check=ok` and zero `foreign_key_check` rows.
+- Findings assigned to Tasks 28-33:
+  - Task 28: composition, status, repository, evidence, focused-route, and
+    refresh workflow ownership;
+  - Task 29: MCP extraction and registration cycles;
+  - Task 30: dependency direction, explicit adapters, contract isolation, and
+    remaining cycles;
+  - Task 31: foreign-key enforcement, atomic migration failure,
+    transaction/rebuild/cache-write safety, cascade and retained migration
+    fixtures;
+  - Task 32: indexed byte-offset context retrieval and inspected-byte budgets;
+  - Task 33: persistent generic jobs/results and recovery.
+- Maintainer approval reference: not required for `PROCEED`.
+- Deviations from plan: no production behavior or schema changed. GitNexus
+  added independent graph evidence and user-approved repository guidance; no
+  roadmap task was broadened.
+- Follow-up risks: the report contains 14 assigned findings and no blocker or
+  unassigned high-severity finding. Task 28 may start only after this audit
+  checkpoint lands. Focused Home, Limits, Calls, Threads, and Thread Calls
+  routes remain protected until exact parity and performance gates pass.
+
 ## Remaining Planned Tasks
 
-Tasks 28 through 45 remain planned in the approved implementation roadmap. Add
-a full entry using the format above when each task becomes active; do not mark a
-task complete without its named focused and full verification evidence.
+Task 27.5 is complete once this independent checkpoint lands. Tasks 28 through
+45 remain planned in the approved implementation roadmap, and no later `0.24`
+task may begin before that checkpoint. Add a full entry using the format above
+when each task becomes active; do not mark a task complete without its named
+focused and full verification evidence.

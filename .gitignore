@@ -30,6 +30,7 @@ dist/
 .DS_Store
 tmp/
 .cache/
+/.gitnexus/
 
 .codex/*
 !.codex/tasks.toml

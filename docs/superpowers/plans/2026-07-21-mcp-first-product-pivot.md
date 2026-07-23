@@ -10,6 +10,10 @@
 
 **Approved design:** `docs/superpowers/specs/2026-07-21-mcp-first-product-pivot-design.md`
 
+**Program size:** 46 tasks: Tasks 1-45 retain their existing numbers, with the
+human-visible Task 27.5 checkpoint (`ARCH-AUDIT-00`) inserted between Tasks 27
+and 28.
+
 ## Global Constraints
 
 - Baseline repository state is `main` at `bf383e1f4d9e206f3ba8cb004075bc3e87bc3fa6` and published package `0.21.0`.
@@ -43,7 +47,7 @@
 | --- | --- | --- |
 | `0.22.0` | Stable MCP core profile, shared contracts, truthful product positioning, generic job facade | Existing dashboard and old tools still function; old tools are `full` profile |
 | `0.23.0` | Evidence Console becomes default; CLI and HTTP v2 ship | Old dashboard pages are direct-link compatibility routes; old CLI names remain aliases |
-| `0.24.0` | Python architecture refit, database integrity, context offsets, infrastructure hardening | Old pages are notice-only; old APIs and aliases remain supported |
+| `0.24.0` | Foundation audit, Python architecture refit, database integrity, context offsets, infrastructure hardening | No implementation begins before Task 27.5 records `PROCEED` or a maintainer-approved `AMEND`; old pages are notice-only and old APIs and aliases remain supported |
 | `0.25.0` | Expired dashboard, static, MCP, CLI, and HTTP compatibility removed | Only documented stable and advanced surfaces remain |
 | `0.26.0` | Feature-free stabilization release for pre-1.0 contract hardening | No new public surface; migration and package gates prove final state |
 
@@ -59,6 +63,10 @@ Task 6-14 Core application services and tools
 Task 15-17 Compatibility isolation and 0.22 release
    |
 Task 18-27 Evidence Console, CLI, HTTP v2, and 0.23 release
+   |
+Task 27.5 Foundation audit and 0.24 plan confirmation
+   |
+Record PROCEED or maintainer-approved AMEND
    |
 Task 28-39 Architecture, integrity, CI/release, and 0.24 release
    |
@@ -1867,9 +1875,495 @@ git commit -m "chore: prepare 0.23.0 Evidence Console release"
 
 ---
 
+## Pre-0.24 entry checkpoint
+
+The `0.23` release gate must complete before this checkpoint begins. No Task
+28-39 implementation branch may start, run in parallel, or merge until Task
+27.5 records `PROCEED` or a maintainer approves its `AMEND` result. A `STOP`
+result blocks the `0.24` implementation program and does not authorize a
+rewrite.
+
+```text
+Complete 0.23 gate
+    |
+Task 27.5 foundation audit
+    |
+Record PROCEED or approved AMEND
+    |
+Tasks 28-33 foundation refactor
+    |
+Remaining 0.24 hardening and release gate
+    |
+0.25 deletion and sunset work
+```
+
+### Task 27.5: Foundation Audit and 0.24 Plan Confirmation
+
+**Release:** Pre-`0.24` entry checkpoint
+
+**Stable task ID:** `ARCH-AUDIT-00`
+
+**Depends on:** Task 27 and successful completion of the `0.23` release gate
+
+**Blocks:** Tasks 28-39 and all other `0.24` implementation work
+
+**Implementation type:** Audit, evidence collection, and roadmap confirmation
+
+**Production behavior change:** None
+
+**Maintainer decision required:** Only for an `AMEND` or `STOP` result
+
+**Files:**
+
+- Create: `docs/superpowers/reports/0.24-foundation-audit.md`
+- Optionally create: repeatable audit-only scripts, dependency-graph helpers,
+  synthetic test fixtures, or generated inventory artifacts
+- Modify only when evidence requires it: architecture/storage claims in the
+  roadmap or directly related documentation
+- Modify after maintainer approval only: Tasks 28-39 when the decision is
+  `AMEND`
+
+#### Purpose
+
+Before enforcing the new application-service boundaries, inspect the actual
+repository and prove whether the existing accounting, persistence, migration,
+and public-contract foundations can support the MCP-first pivot without a
+foundation rewrite.
+
+The audit must distinguish:
+
+1. a healthy data core surrounded by an overgrown application shell;
+2. remediable foundation defects requiring amendments to Tasks 28-33;
+3. incompatible core semantics that invalidate the current `0.24` plan.
+
+The audit must not assume that the foundation is either healthy or rotten. It
+must produce evidence.
+
+#### Non-goals
+
+Task 27.5 must not:
+
+- refactor packages;
+- move production modules;
+- introduce the application composition root;
+- change public MCP, HTTP, CLI, or dashboard contracts;
+- change SQLite tables or migrations;
+- delete compatibility paths;
+- redesign canonical identity;
+- rewrite accounting algorithms;
+- begin the dashboard sunset;
+- perform external user validation;
+- expand privacy scope beyond identifying inaccurate documentation claims;
+- authorize a full rewrite automatically.
+
+Small audit scripts, dependency-graph helpers, test fixtures, and documentation
+may be added when needed to collect repeatable evidence. They must not become
+new production abstractions.
+
+#### Required audit artifact
+
+Create `docs/superpowers/reports/0.24-foundation-audit.md`. The report must
+contain all sections below.
+
+##### 1. Baseline and scope
+
+Record:
+
+- audited Git commit;
+- package version;
+- SQLite schema version;
+- current public MCP tools;
+- current HTTP route families;
+- current top-level CLI commands;
+- current dashboard destinations;
+- Python package/module inventory;
+- migration-fixture inventory;
+- commands used to collect evidence.
+
+State whether the checkout was clean when evidence was collected.
+
+##### 2. Interface-to-storage execution map
+
+For every stable or intended-to-remain interface entry point, map the complete
+execution path:
+
+```text
+interface entry point
+    -> interface adapter
+    -> application/orchestration service
+    -> deterministic domain service
+    -> repository/query service
+    -> SQLite tables or source logs
+```
+
+Cover at minimum:
+
+- every core MCP tool;
+- HTTP API v2 routes;
+- stable CLI commands;
+- Evidence Console data routes;
+- refresh and rebuild paths;
+- allowance analysis;
+- canonical accounting;
+- evidence retrieval;
+- background analysis jobs.
+
+Classify each path as:
+
+- `COMPLIANT`: already follows the intended dependency direction;
+- `BYPASS`: reaches repositories, SQL, globals, or report internals directly;
+- `DUPLICATED`: reimplements domain behavior owned elsewhere;
+- `AMBIGUOUS`: ownership cannot be determined.
+
+Every `BYPASS`, `DUPLICATED`, or `AMBIGUOUS` result must map to a specific
+existing `0.24` task or a proposed roadmap amendment.
+
+##### 3. Python dependency and ownership audit
+
+Generate or document:
+
+- package-level dependency graph;
+- module-level strongly connected components;
+- imports from interface packages into storage internals;
+- imports from storage into application or interface layers;
+- import-time registration or mutable-global side effects;
+- modules with mixed interface, domain, and persistence responsibilities;
+- duplicated implementations of the same analytical concept.
+
+Compare the observed graph with the intended direction:
+
+```text
+interfaces
+    |
+application
+    |
+analytics / evidence / jobs
+    |
+store / ingest / core
+```
+
+For every violation, record the importing module, imported module, reason for
+the violation, desired owner, remediation task, and whether it blocks Task 28.
+Do not count test-only imports as production violations unless they reveal that
+production behavior cannot be instantiated without global state.
+
+##### 4. SQL table ownership matrix
+
+Inventory every application-owned SQLite table and classify it as exactly one
+of:
+
+- `SOURCE_OBSERVATION`
+- `CANONICAL_RECORD`
+- `DERIVED_MATERIALIZATION`
+- `CACHE`
+- `JOB_STATE`
+- `USER_CONFIGURATION`
+- `CONTENT_EVIDENCE`
+- `SEARCH_INDEX`
+- `DEPRECATED`
+
+For every table, record:
+
+- schema introduction version;
+- authoritative owner module;
+- writer functions or services;
+- reader functions or services;
+- transaction owner;
+- deletion and cascade behavior;
+- whether the table is rebuildable;
+- rebuild source;
+- whether it participates in canonical identity;
+- whether it leaks directly into a public API schema;
+- migration coverage;
+- integrity risks.
+
+Every table must have one declared write owner. Multiple low-level helper
+functions are acceptable only when they are called through the same ownership
+boundary.
+
+Flag tables with:
+
+- multiple incompatible writers;
+- undocumented direct SQL writes;
+- unclear source-of-truth status;
+- report-specific data treated as canonical state;
+- derived data that cannot be rebuilt;
+- deletion behavior that depends on foreign keys not being enforced;
+- public API identity coupled to an unstable physical row ID.
+
+##### 5. Write-path and transaction audit
+
+For each write workflow, identify:
+
+- transaction start and commit owner;
+- tables mutated;
+- failure and rollback behavior;
+- retry or idempotency behavior;
+- interaction with refresh cursors;
+- interaction with canonical promotion;
+- interaction with allowance materialization;
+- interaction with background jobs;
+- cleanup behavior.
+
+Cover at minimum:
+
+- initial database creation;
+- incremental refresh;
+- full rebuild;
+- canonical deduplication;
+- original-row deletion and canonical promotion;
+- content-index refresh;
+- OTel enrichment;
+- allowance recomputation;
+- persistent analysis-job creation and completion;
+- purge and reset commands;
+- schema migration.
+
+Explicitly identify workflows in which two services mutate the same logical
+aggregate under different transaction semantics.
+
+##### 6. Canonical-domain invariant audit
+
+Document the authoritative implementation and storage representation for:
+
+- physical usage-event identity;
+- logical/canonical usage identity;
+- copied-session suppression;
+- canonical representative promotion;
+- pricing and service-tier provenance;
+- allowance observations and cycles;
+- evidence references;
+- source revision and freshness;
+- project/thread/call identity;
+- background-analysis identity.
+
+For each invariant, answer:
+
+1. Is it defined in one authoritative domain implementation?
+2. Is it persisted in one authoritative representation?
+3. Is it duplicated in route-, report-, CLI-, dashboard-, or MCP-specific code?
+4. Can it be tested without invoking an interface layer?
+5. Can Tasks 28-33 preserve it without changing user-visible semantics?
+
+Any invariant with incompatible authoritative definitions is a potential
+`STOP` condition.
+
+##### 7. Public contract leakage audit
+
+Inspect the core MCP schemas, HTTP API v2 schemas, stable CLI JSON output, and
+Evidence Console contracts. Classify every public field as:
+
+- stable domain value;
+- deterministic derived value;
+- evidence/provenance value;
+- storage implementation detail;
+- physical database identifier;
+- deprecated compatibility field.
+
+Flag:
+
+- `SELECT *`-style serialization;
+- public models constructed directly from SQLite rows;
+- public identifiers that cannot survive a rebuild;
+- route-specific representations of the same domain entity;
+- duplicated schema definitions across MCP, HTTP, CLI, and frontend code;
+- fields whose meaning differs by interface;
+- public contracts dependent on table or column names.
+
+Determine whether stable contracts can be preserved by adapters or whether any
+public identity is irreconcilably tied to the current storage layout.
+
+##### 8. SQL integrity and migration evidence
+
+Using temporary copies only:
+
+- create a fresh database at the current schema version;
+- migrate every retained historical fixture;
+- migrate representative databases from multiple prior public versions;
+- run `PRAGMA integrity_check`;
+- run `PRAGMA foreign_key_check`;
+- test canonical promotion after deleting an original physical row;
+- test deletion or replacement of parent rows with dependent materializations;
+- test interrupted or failed migration rollback where supported;
+- test refresh after migration;
+- test rebuild equivalence for rebuildable tables;
+- verify schema version and migration idempotency.
+
+Record exact commands, fixture names, row counts before and after, and any
+differences accepted as intentional.
+
+Task 27.5 may expose that normal connections do not yet enable foreign keys.
+That known defect alone does not imply `STOP`; map it to the existing
+SQLite-hardening task unless integrity cannot be restored safely.
+
+##### 9. Current documentation truth audit
+
+Review only claims directly relevant to the architecture and storage contract.
+At minimum, identify and correct roadmap assumptions that claim the normal
+database is aggregate-only when current defaults also persist bounded content
+evidence.
+
+Do not expand this task into a privacy redesign. The requirement is only that
+the roadmap and audit accurately describe current behavior.
+
+##### 10. Risk register
+
+Create a table with:
+
+- finding ID;
+- severity: `BLOCKER`, `HIGH`, `MEDIUM`, or `LOW`;
+- affected invariant;
+- evidence;
+- likely consequence;
+- owning roadmap task;
+- whether the existing task is sufficient;
+- proposed amendment;
+- maintainer decision required.
+
+No `BLOCKER` or unassigned `HIGH` finding may remain when the task is marked
+complete.
+
+##### 11. Decision
+
+End the report with exactly one decision.
+
+###### `PROCEED`
+
+Use when:
+
+- canonical accounting invariants have coherent authoritative owners;
+- table write ownership can be made explicit without changing core semantics;
+- retained migration fixtures pass or have bounded fixes already covered by
+  Tasks 28-33;
+- public contracts can be isolated through adapters;
+- discovered architecture violations are addressable by the current `0.24`
+  plan;
+- no foundation rewrite is justified.
+
+###### `AMEND`
+
+Use when:
+
+- the core remains retainable;
+- no full rewrite is justified;
+- Tasks 28-33 are insufficient or incorrectly ordered;
+- additional bounded `0.24` tasks or acceptance criteria are required.
+
+An `AMEND` result must include exact roadmap edits. Those edits require
+maintainer approval before Task 28 starts.
+
+###### `STOP`
+
+Use only when evidence shows at least one of:
+
+- canonical accounting has incompatible authoritative definitions;
+- multiple write paths implement irreconcilable semantics for the same logical
+  state;
+- retained databases cannot be migrated safely without destructive rebuilding;
+- core public identities cannot be separated from unstable physical storage
+  identities;
+- foundational invariants cannot be preserved through the planned
+  strangler-style refactor;
+- data-integrity failures cannot be repaired by bounded changes to Tasks 28-33.
+
+`STOP` does not authorize an autonomous rewrite. It blocks implementation and
+requires a separate maintainer-approved redesign.
+
+##### 12. Roadmap reconciliation
+
+If the decision is `PROCEED`, record that Tasks 28-33 remain sufficient and
+list all findings assigned to each task.
+
+If the decision is `AMEND`, update the roadmap only after maintainer approval.
+Do not silently broaden existing tasks while performing the audit.
+
+If the decision is `STOP`, do not alter Tasks 28-39 beyond recording the block.
+
+#### Required implementation method
+
+The Task 27.5 executor must:
+
+1. start from a clean checkout at the completed `0.23` checkpoint;
+2. read Tasks 28-33 before collecting evidence;
+3. collect dependency, interface, SQL ownership, and migration evidence;
+4. add audit-only scripts or tests where repeatability requires them;
+5. write the audit report;
+6. assign every finding to an existing task or proposed amendment;
+7. record one decision: `PROCEED`, `AMEND`, or `STOP`;
+8. run documentation, manifest, architecture-analysis, and audit-script tests;
+9. obtain maintainer approval for `AMEND` or `STOP`;
+10. commit the completed audit independently from Task 28.
+
+#### Acceptance criteria
+
+Task 27.5 is complete only when:
+
+- `docs/superpowers/reports/0.24-foundation-audit.md` exists;
+- the audited commit and schema version are recorded;
+- every intended stable interface has an execution-path classification;
+- every application-owned table appears in the ownership matrix;
+- every table has a declared write owner or a blocking finding;
+- every core write workflow has a transaction owner;
+- every canonical invariant has an authoritative implementation identified;
+- all direct interface-to-storage bypasses are listed;
+- all public contract/storage leaks are listed;
+- retained migration fixtures have recorded results;
+- `integrity_check` and `foreign_key_check` results are recorded;
+- every finding maps to Tasks 28-33 or an explicit proposed amendment;
+- no unassigned `BLOCKER` or `HIGH` finding remains;
+- the final decision is exactly `PROCEED`, `AMEND`, or `STOP`;
+- Task 28 is blocked unless the decision is `PROCEED` or an `AMEND` is
+  approved;
+- no production refactor is mixed into the audit commit.
+
+#### Suggested verification commands
+
+Use the repository's current equivalents of:
+
+```bash
+python -m pytest <migration and storage integrity tests>
+python -m pytest <canonical accounting tests>
+python -m pytest <public contract tests>
+tach check
+pyright
+ruff check .
+python -m codex_usage_tracker doctor
+sqlite3 <temporary-db> "PRAGMA integrity_check;"
+sqlite3 <temporary-db> "PRAGMA foreign_key_check;"
+```
+
+Do not invent nonexistent test paths. Resolve current test modules by searching
+the repository and record the exact commands actually used.
+
+#### Completion evidence
+
+The execution-ledger entry must contain:
+
+- audit report path;
+- audited commit SHA;
+- decision;
+- changed files;
+- verification commands and results;
+- architecture graph or generated inventory artifacts;
+- migration fixtures tested;
+- findings assigned to Tasks 28-33;
+- maintainer approval reference when the result is `AMEND` or `STOP`.
+
+#### Prescribed commit
+
+```bash
+git add docs/superpowers/reports/0.24-foundation-audit.md docs/roadmap/mcp-first-pivot-execution.md
+git commit -m "docs: add 0.24 foundation audit checkpoint"
+```
+
+---
+
 ## Release 0.24.0 - Architecture, integrity, and delivery hardening
 
 ### Task 28: Add an application composition root and dependency protocols
+
+**Depends on:** Task 27.5 with a `PROCEED` decision or a
+maintainer-approved `AMEND`
 
 **Files:**
 
@@ -2601,6 +3095,7 @@ git commit -m "refactor: retire legacy dashboard workbenches"
 
 **Files:**
 
+- Require: `docs/superpowers/reports/0.24-foundation-audit.md`
 - Create: `docs/releases/0.24.0.md`
 - Create: `docs/upgrading-to-0.24.0.md`
 - Create: `docs/releases/0.24.0-artifact-manifest-example.json`
@@ -2613,6 +3108,11 @@ git commit -m "refactor: retire legacy dashboard workbenches"
 
 **Release acceptance:**
 
+- Task 27.5 records `PROCEED` or a maintainer-approved `AMEND`; a `STOP`
+  decision prevents this gate from starting.
+- No unassigned `BLOCKER` or `HIGH` foundation finding remains.
+- Every approved audit amendment is represented in this roadmap and its
+  execution ledger before the release gate starts.
 - Python architecture has zero Tach cycles and `root_module="forbid"`.
 - Application services run from custom temporary paths without global defaults.
 - Default MCP server is explicitly constructed and has no import-registration side effects.
@@ -2625,14 +3125,20 @@ git commit -m "refactor: retire legacy dashboard workbenches"
 - Complexity budgets pass.
 - Legacy dashboard workbenches are notice-only and make no old API calls.
 
-- [ ] **Step 1: Run architecture/integrity focused gates.**
+- [ ] **Step 1: Confirm the foundation-audit entry gate.** Verify the audit
+  report path, audited commit, final decision, risk assignments, migration
+  evidence, and any maintainer approval. Stop if the decision is `STOP`, any
+  `BLOCKER` or unassigned `HIGH` finding remains, or an approved amendment is
+  absent from the roadmap.
+
+- [ ] **Step 2: Run architecture/integrity focused gates.**
 
 ```bash
 tach check
 python -m pytest tests/architecture tests/store/test_connection_integrity.py tests/store/test_foreign_key_cascades.py tests/jobs/test_persisted_jobs.py tests/context/test_byte_offset_reads.py -q
 ```
 
-- [ ] **Step 2: Run complete quality and product gates.**
+- [ ] **Step 3: Run complete quality and product gates.**
 
 ```bash
 python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
@@ -2655,11 +3161,14 @@ git diff --check
 
 Expected: all PASS.
 
-- [ ] **Step 3: Run one TestPyPI promotion rehearsal using the new artifact workflow.** Verify downloaded TestPyPI hashes equal the build manifest before enabling the production environment.
+- [ ] **Step 4: Run one TestPyPI promotion rehearsal using the new artifact workflow.** Verify downloaded TestPyPI hashes equal the build manifest before enabling the production environment.
 
-- [ ] **Step 4: Record release evidence.** Include architecture graph summary, integrity check output, schema version/migration, offset performance evidence, coverage, complexity budgets, action pin inventory, and artifact hashes.
+- [ ] **Step 5: Record release evidence.** Include the foundation-audit report,
+  decision and finding assignments; architecture graph summary; integrity check
+  output; schema version/migration; offset performance evidence; coverage;
+  complexity budgets; action pin inventory; and artifact hashes.
 
-- [ ] **Step 5: Commit.**
+- [ ] **Step 6: Commit.**
 
 ```bash
 git add README.md CHANGELOG.md pyproject.toml docs/releases/0.24.0.md docs/upgrading-to-0.24.0.md docs/releases/0.24.0-artifact-manifest-example.json docs/roadmap/mcp-first-pivot-execution.md docs/release-checklist.md tests/golden_questions/test_core_tools.py
@@ -3186,15 +3695,15 @@ git commit -m "chore: prepare 0.26.0 contract-stabilization release"
 | MCP-first product positioning and accurate public claims | 1-2, 17, 27, 42, 45 | Public-doc tests, package metadata, release notes |
 | Seven-tool default profile and compatibility isolation | 3, 12-16, 41, 45 | Tool inventory snapshots and installed-plugin smoke |
 | Shared envelope, scope, messages, findings, and evidence | 4-5, 9-14, 25, 45 | JSON contract registry and exact fixtures |
-| Generic job lifecycle | 7-8, 11, 14, 33, 44 | Job adapter, persistence, recovery, and fault tests |
+| Generic job lifecycle | 7-8, 11, 14, 27.5, 33, 44 | Audit ownership map, job adapter, persistence, recovery, and fault tests |
 | Evidence Console route model | 18-23, 27 | Route catalog, URL aliases, browser acceptance |
 | Dashboard feature sunset | 23-24, 38, 40-43 | Parity record, zero-network notices, removed-source inventory |
 | CLI simplification | 26, 41-43, 45 | Parser inventories, alias lifecycle, help snapshots |
-| HTTP API v2 | 25, 28-30, 41, 45 | Route inventory, schema equality, architecture gates |
+| HTTP API v2 and public-contract isolation | 25, 27.5, 28-30, 41, 45 | Audit leakage map, route inventory, schema equality, architecture gates |
 | Focused dashboard query performance and freshness | 19-20, 25, 27, 34, 41, 45 | Filter/sort/count parity, 100k route budgets, incremental-refresh visibility |
-| Application architecture and dependency direction | 28-30 | Container tests, Tach, secondary import regression |
-| SQLite integrity and migration safety | 31-33, 39, 45 | Foreign-key checks, migration fixtures, upgrade smokes |
-| Context-read performance | 32, 39, 45 | Payload equivalence and inspected-byte performance ratchet |
+| Application composition root and dependency direction | 27.5, 28-30 | Foundation audit, container tests, Tach, secondary import regression |
+| SQLite ownership, integrity, and migration safety | 27.5, 31-33, 39, 45 | Table/write-owner audit, foreign-key checks, migration fixtures, upgrade smokes |
+| Context indexing and read performance | 27.5, 32, 39, 45 | Audit ownership map, payload equivalence, inspected-byte performance ratchet |
 | Coverage and false-green prevention | 34, 39, 43-45 | 85% branch coverage, 90% changed lines, work-proof contracts |
 | Immutable CI and release promotion | 35-36, 39, 43, 45 | Action-pin tests and identical public artifact hashes |
 | Product/package complexity reduction | 24, 37-43, 45 | Blocking budgets and baseline/final comparison |
@@ -3204,6 +3713,10 @@ git commit -m "chore: prepare 0.26.0 contract-stabilization release"
 
 Tasks may run in parallel only when they do not edit the same contracts or depend on an unmerged interface. The preferred execution remains sequential; this map exists for a coordinator using isolated worktrees.
 
+Task 27.5 is an exclusive entry gate. No `0.24` implementation track may run
+in parallel with it, and no Task 28-39 branch may begin until it records
+`PROCEED` or a maintainer approves its `AMEND`.
+
 | After completion of | Tasks that may run concurrently | Merge order constraint |
 | --- | --- | --- |
 | 5 | 6 and 7 | Merge 6 before 8; merge 7 before 8 and 11 |
@@ -3211,6 +3724,7 @@ Tasks may run in parallel only when they do not edit the same contracts or depen
 | 14 | 15 and documentation preparation for 16 | Merge 15 before 16 |
 | 18 | 19 and 20 | Merge both before 21 and 23 |
 | 21 | 22 and 24 | Merge both before 27; 23 depends on 19-22 |
+| 27 and completed `0.23` gate | 27.5 only | Record `PROCEED` or approved `AMEND` before any Task 28-39 work |
 | 28 | 31 and 32 | Merge both before 30 only when domain paths are stable; otherwise 30 merges first and both rebase |
 | 30 | 34 and 35 | Merge independently; 36 depends on 35 and current release checks |
 | 31-33 | 37 and 38 | Merge 38 before 39; 37 must remeasure after 38 |
@@ -3232,6 +3746,8 @@ The pivot is complete only when all statements below are true:
 - [ ] Legacy static dashboard and workbench source are absent from distributions.
 - [ ] Stable CLI help contains only the simplified hierarchy.
 - [ ] HTTP API v2, MCP, and CLI share request/response models.
+- [ ] Task 27.5 records `PROCEED` or an approved `AMEND`, with no unassigned
+  `BLOCKER` or `HIGH` foundation finding.
 - [ ] Tach blocks cycles and upward dependencies.
 - [ ] SQLite foreign keys and integrity checks are enabled and tested.
 - [ ] Context reads use validated byte offsets with a correct fallback.

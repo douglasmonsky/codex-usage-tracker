@@ -152,6 +152,22 @@ Use the `agent-perf` skill and CLI when optimizing localhost API endpoints, dash
 
 Install the repository's pinned profiling tools with `uv sync --group performance`. Profile the smallest repeatable workload with synthetic or anonymized inputs; never profile production, live private databases, arbitrary processes, or real Codex session content. Record the identical workload without a profiler before making a performance claim. Change one suspected cause at a time, rerun the unprofiled workload, and use `agent-perf compare` only to compare attribution evidence rather than as proof of a speedup.
 
+### Code intelligence tools
+
+Use GitNexus for repository orientation, architecture, execution-flow tracing, subsystem discovery, and broad change-impact analysis.
+
+Use Serena for exact symbol definitions, references, implementations, type-aware navigation, diagnostics, and symbol-level edits or refactors.
+
+For unfamiliar or cross-cutting work, use GitNexus to identify where to investigate, then use Serena to verify the exact symbols before editing.
+
+Treat GitNexus relationships as navigational guidance. Treat Serena as authoritative for precise symbol resolution and modification.
+
+Confirm architectural conclusions against the source and relevant tests before changing behavior. Use `agent-perf` and an identical unprofiled workload for performance evidence; GitNexus may locate a hot path but does not prove a regression or speedup.
+
+Do not repeat the same lookup in both tools unless validating an uncertain relationship or investigating conflicting results.
+
+Refresh the GitNexus index after major branch changes, file moves, or architectural refactors.
+
 ## Validation
 
 Run focused tests first, then broader checks. Run the full local CI gate before opening or updating PRs that touch release, packaging, CLI contracts, MCP behavior, dashboard behavior, privacy behavior, schemas, generated docs/assets, or bundled plugin/skill files.
@@ -159,6 +175,27 @@ Run focused tests first, then broader checks. Run the full local CI gate before 
 ## Source Inspection And Tool Output
 
 Large command outputs in Codex chat can be visually compacted by the transcript renderer. When inspecting source, especially after broad `rg`, `sed`, `nl`, generated dashboard assets, logs, or workflow output, do not treat a mangled rendered snippet as proof that the file is corrupt. Prefer small targeted file windows, `git diff`, `python -m py_compile`, focused tests, and CI as the source of truth. If exact syntax matters, inspect a narrow range or use a parser/compiler rather than relying on large printed source dumps.
+
+Use this progressive inspection ladder:
+
+1. Choose one first locator based on the question:
+   - Use GitNexus for an unfamiliar subsystem, cross-cutting architecture, execution flow, dependency cycle, or broad change impact.
+   - Use Serena for a known code symbol, exact definition, callers, references, implementations, types, diagnostics, or a symbol-level edit.
+   - Use `rg -n` for an exact string, route, configuration key, SQL fragment, schema field, error text, documentation claim, or non-symbol asset.
+   - Use `rg --files` when the filename or owning directory is unknown.
+2. Do not run all locators by default. After GitNexus selects a code path, use Serena only on the relevant symbol before editing. After `rg` finds an exact non-code match, inspect that narrow file window directly.
+3. Inspect symbol metadata, callers, and references before requesting source bodies.
+4. Read the smallest useful source window, normally one symbol or roughly 80-160 lines.
+5. Expand only to a dependency, caller, test, or contract needed to answer the current question.
+6. Run the smallest relevant validation, then broaden checks in proportion to risk.
+
+Start GitNexus searches with a small result limit and without `--content`; request full symbol content only after selecting the relevant process or symbol. Use Serena symbol overviews and reference queries before reading whole files. Do not dump entire directories, generated bundles, large JSON, full database rows, or multiple long files into one tool response.
+
+Within one uninterrupted task, do not reread unchanged files, guidance, roadmap sections, or the complete diff unless context was compacted, the branch or guidance changed, evidence conflicts, or exact verification requires it. Persist durable cross-cutting findings in the active task report or execution ledger and reuse them. For edits, prefer a path-scoped diff; inspect the complete diff once when it reaches a stable review checkpoint.
+
+Redirect oversized machine output to an ignored temporary file and extract a bounded summary with `rg`, `jq`, a parser, or a short read-only script. Keep the exact command and artifact path when the full result is evidence, but do not stream the full artifact into the conversation. Batch independent narrow lookups when useful, but do not concatenate unrelated large outputs.
+
+These rules optimize context use, not correctness. Reopen source or rerun evidence whenever behavior, safety, privacy, or a public contract remains uncertain.
 
 ```bash
 python -m ruff check .

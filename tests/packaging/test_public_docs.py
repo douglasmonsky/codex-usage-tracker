@@ -24,6 +24,42 @@ def test_mcp_first_roadmap_names_the_normative_release_sequence() -> None:
     assert positions == sorted(positions)
 
 
+def test_mcp_first_roadmap_gates_024_on_foundation_audit() -> None:
+    summary = (REPO_ROOT / "docs/roadmap/mcp-first-pivot.md").read_text(encoding="utf-8")
+    execution = (REPO_ROOT / "docs/roadmap/mcp-first-pivot-execution.md").read_text(
+        encoding="utf-8"
+    )
+    plan = (REPO_ROOT / "docs/superpowers/plans/2026-07-21-mcp-first-product-pivot.md").read_text(
+        encoding="utf-8"
+    )
+    design = (
+        REPO_ROOT / "docs/superpowers/specs/2026-07-21-mcp-first-product-pivot-design.md"
+    ).read_text(encoding="utf-8")
+
+    task_headings = [
+        line.split(":", maxsplit=1)[0].removeprefix("### Task ")
+        for line in plan.splitlines()
+        if line.startswith("### Task ")
+    ]
+    expected_task_headings = [
+        *(str(task_number) for task_number in range(1, 28)),
+        "27.5",
+        *(str(task_number) for task_number in range(28, 46)),
+    ]
+
+    assert task_headings == expected_task_headings
+    assert "**Stable task ID:** `ARCH-AUDIT-00`" in plan
+    assert "**Program size:** 46 tasks" in plan
+    assert (
+        "**Depends on:** Task 27.5 with a `PROCEED` decision or a\nmaintainer-approved `AMEND`"
+    ) in plan
+
+    assert "## Pre-0.24 Foundation Gate" in summary
+    assert "No Task 28-39 implementation work may begin" in summary
+    assert "## Task 27.5 - Foundation Audit and 0.24 Plan Confirmation" in execution
+    assert "### 13.4 Pre-0.24 foundation audit" in design
+
+
 def test_deprecation_ledger_has_required_compatibility_columns() -> None:
     deprecations = (REPO_ROOT / "docs/deprecations.md").read_text(encoding="utf-8")
 
