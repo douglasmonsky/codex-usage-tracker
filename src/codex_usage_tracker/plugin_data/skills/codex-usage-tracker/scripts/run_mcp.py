@@ -9,7 +9,7 @@ package from GitHub, and then execs the real MCP server.
 from __future__ import annotations
 
 import os
-import subprocess
+import subprocess  # nosec B404 - fixed argv only; no shell is invoked.
 import sys
 from pathlib import Path
 
@@ -109,7 +109,7 @@ def _can_use_runtime(python_path: Path) -> bool:
 
 def _can_import_server(python_path: Path) -> bool:
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 - explicit Python path and fixed probe argv.
             [str(python_path), "-c", MODULE_CHECK],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -125,9 +125,12 @@ def _ensure_runtime(python_path: Path) -> None:
     venv_root = _venv_root(python_path)
     if not python_path.exists():
         print(f"Creating Codex Usage Tracker MCP runtime at {venv_root}", file=sys.stderr)
-        subprocess.run([sys.executable, "-m", "venv", str(venv_root)], check=True)
+        subprocess.run(  # nosec B603 - current interpreter and fixed venv argv.
+            [sys.executable, "-m", "venv", str(venv_root)],
+            check=True,
+        )
     print(f"Installing Codex Usage Tracker MCP runtime from {PACKAGE_SPEC}", file=sys.stderr)
-    subprocess.run(
+    subprocess.run(  # nosec B603 - selected runtime Python; pip receives argv without a shell.
         [str(python_path), "-m", "pip", "install", "--upgrade", PACKAGE_SPEC],
         check=True,
     )
@@ -137,7 +140,11 @@ def _ensure_runtime(python_path: Path) -> None:
 def _exec_server(python_path: Path, profile: str) -> None:
     env = os.environ.copy()
     env[PROFILE_ENV] = profile
-    os.execve(str(python_path), [str(python_path), *MODULE_ARGS], env)
+    os.execve(  # nosec B606 - intentional process replacement with fixed module argv.
+        str(python_path),
+        [str(python_path), *MODULE_ARGS],
+        env,
+    )
 
 
 if __name__ == "__main__":

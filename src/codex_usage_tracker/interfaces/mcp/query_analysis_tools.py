@@ -291,9 +291,11 @@ def _analysis_envelope(outcome: AnalyzeResult, context: RequestContext) -> dict[
         )
         actions: tuple[NextActionV1, ...] = ()
     else:
-        assert outcome.job is not None
+        if outcome.job is None:
+            raise RuntimeError("analysis outcome contained neither a result nor a job")
+        job = outcome.job
         result_schema = ANALYSIS_JOB_SCHEMA
-        result = outcome.job.to_payload()
+        result = job.to_payload()
         result["schema"] = ANALYSIS_JOB_SCHEMA
         errors = validate_json_payload_contract(result)
         if errors:
@@ -304,7 +306,7 @@ def _analysis_envelope(outcome: AnalyzeResult, context: RequestContext) -> dict[
                 code="job.poll",
                 label="Poll analysis job",
                 tool="usage_job_status",
-                arguments={"job_id": outcome.job.job_id},
+                arguments={"job_id": job.job_id},
             ),
         )
     return envelope_payload(

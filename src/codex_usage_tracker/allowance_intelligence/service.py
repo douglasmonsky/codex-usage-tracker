@@ -229,7 +229,7 @@ def _copied_excluded(conn: sqlite3.Connection, include_archived: bool) -> int:
         archive_clause = "" if include_archived else "WHERE is_archived=0"
         physical = int(
             conn.execute(
-                "SELECT count(*) FROM usage_events "
+                "SELECT count(*) FROM usage_events "  # nosec B608
                 "INDEXED BY idx_usage_archived_timestamp "
                 f"{archive_clause}"
             ).fetchone()[0]
@@ -241,7 +241,7 @@ def _copied_excluded(conn: sqlite3.Connection, include_archived: bool) -> int:
         )
         canonical = int(
             conn.execute(
-                "SELECT count(*) FROM usage_events "
+                "SELECT count(*) FROM usage_events "  # nosec B608
                 "INDEXED BY idx_canonical_usage_archived_timestamp "
                 f"{canonical_clause}"
             ).fetchone()[0]

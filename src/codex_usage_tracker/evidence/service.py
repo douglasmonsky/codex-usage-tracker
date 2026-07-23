@@ -196,7 +196,8 @@ def _encode_cursor(request: EvidenceRequest, revision: str | None, evidence_id: 
 
 
 def _decode_cursor(request: EvidenceRequest, revision: str | None) -> str:
-    assert request.cursor is not None
+    if request.cursor is None:
+        raise ValueError("cursor is required")
     try:
         padding = "=" * (-len(request.cursor) % 4)
         payload = json.loads(base64.urlsafe_b64decode(request.cursor + padding))

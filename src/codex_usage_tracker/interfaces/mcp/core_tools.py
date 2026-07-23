@@ -306,15 +306,17 @@ def build_usage_refresh(
         result: object = outcome.result
         next_actions: tuple[NextActionV1, ...] = ()
     else:
-        assert outcome.job is not None
+        if outcome.job is None:
+            raise RuntimeError("refresh outcome contained neither a result nor a job")
+        job = outcome.job
         result_schema = "codex-usage-tracker.job.v1"
-        result = outcome.job.to_payload()
+        result = job.to_payload()
         next_actions = (
             NextActionV1(
                 code="job.poll",
                 label="Poll refresh job",
                 tool="usage_job_status",
-                arguments={"job_id": outcome.job.job_id},
+                arguments={"job_id": job.job_id},
             ),
         )
     payload = envelope_payload(

@@ -625,7 +625,7 @@ def query_canonical_usage_v2(
         {cursor_where}
         ORDER BY ({order_by} IS NULL) ASC, {order_by} {direction}, {identity_alias} ASC
         LIMIT ?
-    """
+    """  # nosec B608 - identifiers and clauses come from validated internal allowlists.
     with connect(db_path) as conn:
         init_db(conn)
         rows = conn.execute(sql, [*params, *cursor_params, limit + 1]).fetchall()
@@ -702,14 +702,14 @@ def _query_recent_calls(
         "WHERE count_events.is_duplicate = 0 AND count_events.is_archived = 0)"
     )
     total_matched = (
-        "coalesce((SELECT recommendation_fact_state.record_count "
+        "coalesce((SELECT recommendation_fact_state.record_count "  # nosec B608
         "FROM recommendation_fact_state JOIN compression_source_state "
         "ON compression_source_state.singleton = 1 "
         "WHERE recommendation_fact_state.singleton = 1 "
         "AND recommendation_fact_state.source_generation = "
         f"compression_source_state.generation), {fallback_count})"
         if include_archived
-        else "coalesce((SELECT json_extract(refresh_meta.value, '$.calls') "
+        else "coalesce((SELECT json_extract(refresh_meta.value, '$.calls') "  # nosec B608
         "FROM refresh_meta JOIN recommendation_fact_state "
         "ON recommendation_fact_state.singleton = 1 "
         "JOIN compression_source_state ON compression_source_state.singleton = 1 "
@@ -735,7 +735,7 @@ def _query_recent_calls(
             usage_events.event_timestamp {direction},
             usage_events.record_id ASC
         LIMIT ?
-        """
+        """  # nosec B608 - clauses are fixed or built from validated internal allowlists.
     with connect(db_path) as conn:
         init_db(conn)
         rows = conn.execute(sql, [*params, limit + 1]).fetchall()
@@ -831,7 +831,7 @@ def _query_materialized_models(
         {cursor_where}
         ORDER BY ({order_by} IS NULL) ASC, {order_by} {direction}, model ASC
         LIMIT ?
-    """
+    """  # nosec B608 - identifiers and clauses come from validated internal allowlists.
     with connect(db_path) as conn:
         init_db(conn)
         rows = conn.execute(sql, [*params, *cursor_params, limit + 1]).fetchall()

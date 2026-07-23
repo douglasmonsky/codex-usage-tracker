@@ -59,13 +59,15 @@ def evidence_payload(
     if selector_kind is None or selector_id is None:
         raise ValueError("selector_kind and selector_id are required")
     limit_value = _one(params, "limit", "20")
-    assert limit_value is not None
+    if limit_value is None:
+        raise ValueError("limit is required")
     try:
         limit = int(limit_value)
     except ValueError as exc:
         raise ValueError("limit must be an integer") from exc
     history = _one(params, "history", history_default)
-    assert history is not None
+    if history is None:
+        raise ValueError("history is required")
     request = EvidenceRequest(
         selector_kind=cast(Any, selector_kind),
         selector_id=selector_id,
