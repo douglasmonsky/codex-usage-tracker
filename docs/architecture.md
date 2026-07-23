@@ -31,6 +31,21 @@ and `interfaces/` owns transport. Existing `reports/` builders remain private
 compatibility delegates until their algorithms move behind analytics contracts;
 they do not own canonical strategy selection.
 
+### Application composition root
+
+`application/paths.py` defines the complete local path set consumed by current
+application services. `application/protocols.py` defines the narrow clock,
+repository, pricing, and dashboard-target boundaries. `application/container.py`
+builds one immutable `ApplicationContainer` for those dependencies and shares
+one job service across refresh, analysis, evidence, allowance, and job polling.
+
+CLI, MCP, and HTTP adapters may select default local paths, but they must compose
+the container once and pass its paths and services inward. Application and
+analytics modules must not import global default paths or consult the user home
+implicitly. Tests that use temporary paths build a custom container without
+monkeypatching module globals. This is manual constructor injection; the project
+does not use a dependency-injection framework.
+
 The aggregate index preserves every parsed row in `usage_events` for source provenance. A versioned strict fingerprint links exact copies of the same logged model call, and the `canonical_usage_events` view selects one physical representative for default totals. Only high-confidence fingerprint matches are excluded; ambiguous or merely similar calls remain canonical. If the original source disappears, the surviving physical copy is promoted without changing the logical call identity.
 
 Materialized facts may retain physical rows so source replacement and local evidence remain auditable. Unscoped aggregate and compression-fact reads join the canonical view, while explicit deduplication diagnostics report physical, canonical, and excluded counts separately.

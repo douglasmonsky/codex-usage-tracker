@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from inspect import getdoc
 
+from codex_usage_tracker.application.container import ApplicationContainer
 from codex_usage_tracker.interfaces.mcp.models import McpProfile, ToolSpec
 from mcp.server.fastmcp import FastMCP
 
@@ -11,14 +12,26 @@ from mcp.server.fastmcp import FastMCP
 compatibility_mcp = FastMCP("codex-usage-tracker")
 
 
-def build_mcp_server(profile: McpProfile) -> FastMCP:
+def build_mcp_server(
+    profile: McpProfile,
+    *,
+    container: ApplicationContainer | None = None,
+) -> FastMCP:
     """Build an isolated server containing exactly the selected profile."""
     from codex_usage_tracker.interfaces.mcp.profiles import tools_for_profile
-    from codex_usage_tracker.interfaces.mcp.registry import handler_for_profile
+    from codex_usage_tracker.interfaces.mcp.registry import (
+        bound_core_handlers,
+        handler_for_profile,
+    )
 
     server = FastMCP("codex-usage-tracker")
+    bound = (
+        bound_core_handlers(container)
+        if profile == "core" and container is not None
+        else None
+    )
     for spec in tools_for_profile(profile):
-        handler = handler_for_profile(spec, profile)
+        handler = bound[spec.name] if bound is not None else handler_for_profile(spec, profile)
         server.tool(name=spec.name, description=_tool_description(spec, handler))(handler)
     return server
 

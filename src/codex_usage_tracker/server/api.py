@@ -23,6 +23,7 @@ from codex_usage_tracker.core.paths import (
 from codex_usage_tracker.dashboard.api import (
     generate_dashboard,
 )
+from codex_usage_tracker.interfaces.http.v2 import ApplicationHttpV2Services, HttpV2Facade
 from codex_usage_tracker.server import compression_routes
 from codex_usage_tracker.server import utils as server_utils
 from codex_usage_tracker.server.analysis_jobs import AnalysisJobRegistry
@@ -104,6 +105,17 @@ def serve_dashboard(
         max_entries=4,
         max_payload_bytes=8 * 1_024 * 1_024,
     )
+    http_v2_facade = HttpV2Facade(
+        ApplicationHttpV2Services(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
+            projects_path=projects_path,
+            codex_home=codex_home,
+        )
+    )
     handler = partial(
         _UsageDashboardHandler,
         directory=str(output.parent),
@@ -130,6 +142,7 @@ def serve_dashboard(
         compression_jobs=compression_jobs,
         query_cache=query_cache,
         allowance_query_cache=allowance_query_cache,
+        http_v2_facade=http_v2_facade,
     )
     server = ThreadingHTTPServer((host, port), handler)
     legacy_url = f"http://{_url_host(host)}:{port}/{output.name}"

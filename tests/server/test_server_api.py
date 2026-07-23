@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from codex_usage_tracker.interfaces.http.v2 import ApplicationHttpV2Services, HttpV2Facade
 from codex_usage_tracker.server import api as server_api
 from codex_usage_tracker.server.query_cache import AggregateQueryCache
 
@@ -79,6 +80,10 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
     query_cache = handler.keywords["query_cache"]
     assert isinstance(query_cache, AggregateQueryCache)
     assert query_cache.max_entries == 64
+    facade = handler.keywords["http_v2_facade"]
+    assert isinstance(facade, HttpV2Facade)
+    assert isinstance(facade.services, ApplicationHttpV2Services)
+    assert facade.services.application.paths.projects_path == tmp_path / "projects.json"
 
 
 def test_serve_dashboard_starts_requested_refresh_after_binding(

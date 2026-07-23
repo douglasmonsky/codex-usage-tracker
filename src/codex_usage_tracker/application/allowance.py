@@ -27,7 +27,6 @@ from codex_usage_tracker.allowance_intelligence.service import (
 from codex_usage_tracker.application.allowance_models import AllowanceRequest, AllowanceResult
 from codex_usage_tracker.application.errors import RequestContextError, RequestValidationError
 from codex_usage_tracker.core.dashboard_targets import build_limits_target_v2
-from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
 from codex_usage_tracker.jobs.adapters import AnalysisJobAdapter, request_hash
 from codex_usage_tracker.jobs.models import JobStatusV1
 from codex_usage_tracker.jobs.service import MAX_SEMANTIC_JOBS, JobService
@@ -155,7 +154,7 @@ _RUNTIMES: weakref.WeakKeyDictionary[JobService, AllowanceAnalysisRuntime] = (
 def get_allowance(
     request: AllowanceRequest,
     *,
-    db_path: Path = DEFAULT_DB_PATH,
+    db_path: Path,
     now: datetime | None = None,
     job_service: JobService | None = None,
     runtime: AllowanceAnalysisRuntime | None = None,

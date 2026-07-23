@@ -18,6 +18,8 @@ from codex_usage_tracker.analytics.analysis_models import (
     AnalysisRequest,
     ComparisonWindow,
 )
+from codex_usage_tracker.application.container import build_application_container
+from codex_usage_tracker.application.paths import ApplicationPaths
 from codex_usage_tracker.application.query_models import (
     ALL_QUERY_MEASURES,
     QUERY_ENTITY_CAPABILITIES,
@@ -30,6 +32,7 @@ from codex_usage_tracker.application.query_models import (
 from codex_usage_tracker.application.requests import HistoryScope, StatusRequest
 from codex_usage_tracker.core.contracts import payload_mapping
 from codex_usage_tracker.core.dashboard_targets import build_dashboard_target_v2
+from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME
 from codex_usage_tracker.dashboard_service import dashboard_service_status
 from codex_usage_tracker.interfaces.http.v2 import ApplicationHttpV2Services
 
@@ -59,6 +62,8 @@ def run_status(
     request = StatusRequest(
         db_path=args.db,
         pricing_path=args.pricing,
+        codex_home=DEFAULT_CODEX_HOME,
+        home=DEFAULT_CODEX_HOME.parent,
         scope=_scope(args),
     )
     _write_json((services or _default_services(args)).status(request), stdout)
@@ -153,13 +158,18 @@ def warn_legacy_alias(
 
 
 def _default_services(args: argparse.Namespace) -> CliApplicationServices:
-    return ApplicationHttpV2Services(
-        db_path=args.db,
-        pricing_path=args.pricing,
-        allowance_path=args.allowance,
-        rate_card_path=args.rate_card,
-        thresholds_path=args.thresholds,
+    container = build_application_container(
+        ApplicationPaths(
+            codex_home=DEFAULT_CODEX_HOME,
+            db_path=args.db,
+            pricing_path=args.pricing,
+            allowance_path=args.allowance,
+            rate_card_path=args.rate_card,
+            thresholds_path=args.thresholds,
+            projects_path=args.projects,
+        )
     )
+    return ApplicationHttpV2Services(container=container)
 
 
 def _scope(args: argparse.Namespace):

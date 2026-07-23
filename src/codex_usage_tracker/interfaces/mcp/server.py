@@ -6,6 +6,17 @@ import os
 from collections.abc import Mapping
 from typing import cast
 
+from codex_usage_tracker.application.container import build_application_container
+from codex_usage_tracker.application.paths import ApplicationPaths
+from codex_usage_tracker.core.paths import (
+    DEFAULT_ALLOWANCE_PATH,
+    DEFAULT_CODEX_HOME,
+    DEFAULT_DB_PATH,
+    DEFAULT_PRICING_PATH,
+    DEFAULT_PROJECTS_PATH,
+    DEFAULT_RATE_CARD_PATH,
+    DEFAULT_THRESHOLDS_PATH,
+)
 from codex_usage_tracker.interfaces.mcp.models import McpProfile
 from codex_usage_tracker.interfaces.mcp.runtime import build_mcp_server
 
@@ -30,7 +41,18 @@ def main(profile: McpProfile | None = None) -> None:
         selected_profile = configured_profile() if profile is None else profile
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
-    build_mcp_server(selected_profile).run()
+    container = build_application_container(
+        ApplicationPaths(
+            codex_home=DEFAULT_CODEX_HOME,
+            db_path=DEFAULT_DB_PATH,
+            pricing_path=DEFAULT_PRICING_PATH,
+            allowance_path=DEFAULT_ALLOWANCE_PATH,
+            rate_card_path=DEFAULT_RATE_CARD_PATH,
+            thresholds_path=DEFAULT_THRESHOLDS_PATH,
+            projects_path=DEFAULT_PROJECTS_PATH,
+        )
+    )
+    build_mcp_server(selected_profile, container=container).run()
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 
 from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.core.paths import DEFAULT_RATE_CARD_PATH
+from codex_usage_tracker.interfaces.http.v2 import HttpV2Facade
 from codex_usage_tracker.server import allowance, allowance_v2, compression_routes
 from codex_usage_tracker.server import context as server_context
 from codex_usage_tracker.server import usage_refresh as server_usage_refresh
@@ -98,6 +99,7 @@ class _UsageDashboardHandler(
         compression_jobs: compression_routes.CompressionJobRegistry | None = None,
         query_cache: AggregateQueryCache | None = None,
         allowance_query_cache: AggregateQueryCache | None = None,
+        http_v2_facade: HttpV2Facade | None = None,
         dashboard_path: Path | None = None,
         context_api_enabled: bool = False,
         context_api_state: ContextApiState | None = None,
@@ -133,7 +135,7 @@ class _UsageDashboardHandler(
         self._compression_jobs = compression_jobs or compression_routes.CompressionJobRegistry()
         self._query_cache = query_cache or AggregateQueryCache()
         self._allowance_query_cache = allowance_query_cache or allowance.new_query_cache()
-        self._configure_http_v2()
+        self._configure_http_v2(http_v2_facade)
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name

@@ -21,11 +21,6 @@ from codex_usage_tracker.application.query_validation import (
     validate_query_request,
 )
 from codex_usage_tracker.application.requests import RequestScope
-from codex_usage_tracker.core.paths import (
-    DEFAULT_ALLOWANCE_PATH,
-    DEFAULT_DB_PATH,
-    DEFAULT_PRICING_PATH,
-)
 from codex_usage_tracker.pricing.allowance_usage import annotate_rows_with_allowance
 from codex_usage_tracker.pricing.config import PricingConfig, load_pricing_config
 from codex_usage_tracker.pricing.costing import estimate_cost_usd
@@ -37,12 +32,14 @@ from codex_usage_tracker.store.connection import connect
 def query_usage(
     request: QueryRequest,
     *,
-    db_path: Path = DEFAULT_DB_PATH,
-    pricing_path: Path = DEFAULT_PRICING_PATH,
-    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+    db_path: Path,
+    pricing_path: Path | None = None,
+    allowance_path: Path | None = None,
     context: RequestContext | None = None,
 ) -> QueryResult:
     """Execute one validated canonical query with revision-bound keyset pagination."""
+    resolved_pricing_path = pricing_path or db_path.with_name("pricing.json")
+    resolved_allowance_path = allowance_path or db_path.with_name("allowance.json")
     normalized = validate_query_request(request)
     scope = RequestScope(
         since=normalized.filters.since,
@@ -90,14 +87,14 @@ def query_usage(
     has_more = len(rows) > normalized.limit
     page = rows[: normalized.limit]
     total_matched = int(page[0].pop("_total_matched")) if page else 0
-    pricing = load_pricing_config(pricing_path)
+    pricing = load_pricing_config(resolved_pricing_path)
     for row in page:
         row.pop("_total_matched", None)
         _attach_estimates(
             row,
             normalized.measures,
             pricing=pricing,
-            allowance_path=allowance_path,
+            allowance_path=resolved_allowance_path,
         )
     next_cursor = None
     if has_more and page:

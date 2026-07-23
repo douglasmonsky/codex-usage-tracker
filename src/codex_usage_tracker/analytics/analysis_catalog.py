@@ -17,13 +17,8 @@ from codex_usage_tracker.analytics.analysis_models import (
 from codex_usage_tracker.analytics.strategies.protocol import AnalysisStrategy
 from codex_usage_tracker.application.context import RequestContext
 from codex_usage_tracker.application.errors import RequestValidationError
+from codex_usage_tracker.application.paths import ApplicationPaths
 from codex_usage_tracker.core.contracts import MessageV1
-from codex_usage_tracker.core.paths import (
-    DEFAULT_ALLOWANCE_PATH,
-    DEFAULT_DB_PATH,
-    DEFAULT_PRICING_PATH,
-    DEFAULT_PROJECTS_PATH,
-)
 from codex_usage_tracker.recommendation_engine import api as recommendation_api
 from codex_usage_tracker.recommendation_engine.query import RecommendationFactsUnavailableError
 from codex_usage_tracker.reports import agentic as agentic_reports
@@ -94,8 +89,15 @@ class _CompatibilityStrategy:
         missing = _missing_facts(entry, request, context)
         if missing:
             return _fallback_report(entry, context, missing)
+        if context.application_paths is None:
+            return _fallback_report(entry, context, ("application_paths",))
         try:
-            legacy = _run_compatibility_delegate(self.delegate, request, context)
+            legacy = _run_compatibility_delegate(
+                self.delegate,
+                request,
+                context,
+                context.application_paths,
+            )
         except (FileNotFoundError, RecommendationFactsUnavailableError) as exc:
             return _fallback_report(entry, context, (type(exc).__name__,))
         return _legacy_report(entry, context, legacy)
@@ -252,7 +254,10 @@ def _missing_facts(
 
 
 def _run_compatibility_delegate(
-    delegate: CompatibilityDelegate, request: AnalysisRequest, context: RequestContext
+    delegate: CompatibilityDelegate,
+    request: AnalysisRequest,
+    context: RequestContext,
+    paths: ApplicationPaths,
 ) -> object:
     common = {
         "since": request.filters.since,
@@ -268,18 +273,18 @@ def _run_compatibility_delegate(
             "workflow_churn": "workflow_churn",
         }.get(request.goal, "token_waste")
         return agentic_reports.build_agentic_investigation_report(
-            db_path=DEFAULT_DB_PATH,
-            pricing_path=DEFAULT_PRICING_PATH,
-            allowance_path=DEFAULT_ALLOWANCE_PATH,
-            projects_path=DEFAULT_PROJECTS_PATH,
+            db_path=paths.db_path,
+            pricing_path=paths.pricing_path,
+            allowance_path=paths.allowance_path,
+            projects_path=paths.projects_path,
             goal=legacy_goal,
             thread=request.filters.thread_key,
             **common,
         )
     if delegate == "subagent":
         return subagent_reports.build_subagent_usage_report(
-            db_path=DEFAULT_DB_PATH,
-            pricing_path=DEFAULT_PRICING_PATH,
+            db_path=paths.db_path,
+            pricing_path=paths.pricing_path,
             since=request.filters.since,
             parent_thread=request.filters.parent_thread_key,
             agent_role=request.filters.subagent_role,
@@ -290,10 +295,10 @@ def _run_compatibility_delegate(
         )
     if delegate == "recommendations":
         return recommendation_api.build_recommendations_report(
-            db_path=DEFAULT_DB_PATH,
-            pricing_path=DEFAULT_PRICING_PATH,
-            allowance_path=DEFAULT_ALLOWANCE_PATH,
-            projects_path=DEFAULT_PROJECTS_PATH,
+            db_path=paths.db_path,
+            pricing_path=paths.pricing_path,
+            allowance_path=paths.allowance_path,
+            projects_path=paths.projects_path,
             model=request.filters.model,
             effort=request.filters.effort,
             thread=request.filters.thread_key,
@@ -302,10 +307,10 @@ def _run_compatibility_delegate(
             **{key: common[key] for key in ("since", "until", "include_archived", "privacy_mode")},
         )
     return report_api.build_hypothesis_test_report(
-        db_path=DEFAULT_DB_PATH,
-        pricing_path=DEFAULT_PRICING_PATH,
-        allowance_path=DEFAULT_ALLOWANCE_PATH,
-        projects_path=DEFAULT_PROJECTS_PATH,
+        db_path=paths.db_path,
+        pricing_path=paths.pricing_path,
+        allowance_path=paths.allowance_path,
+        projects_path=paths.projects_path,
         question=f"Analyze {request.goal.replace('_', ' ')} using local aggregate facts.",
         thread=request.filters.thread_key,
         **common,

@@ -19,10 +19,14 @@ from codex_usage_tracker.analytics.analysis_models import (
 from codex_usage_tracker.application.allowance import get_allowance
 from codex_usage_tracker.application.allowance_models import AllowanceRequest
 from codex_usage_tracker.application.analyze import AnalysisRuntime, analyze_usage
-from codex_usage_tracker.application.context import build_request_context
+from codex_usage_tracker.application.container import (
+    ApplicationContainer,
+    build_application_container,
+)
 from codex_usage_tracker.application.errors import ApplicationError
 from codex_usage_tracker.application.evidence import get_evidence
 from codex_usage_tracker.application.job_status import get_job_status
+from codex_usage_tracker.application.paths import ApplicationPaths
 from codex_usage_tracker.application.query import query_usage
 from codex_usage_tracker.application.query_models import (
     ALL_QUERY_MEASURES,
@@ -31,7 +35,7 @@ from codex_usage_tracker.application.query_models import (
     QueryRequest,
 )
 from codex_usage_tracker.application.query_validation import normalize_query_filters
-from codex_usage_tracker.application.refresh import default_job_service, refresh_usage
+from codex_usage_tracker.application.refresh import refresh_usage
 from codex_usage_tracker.application.requests import (
     JobStatusRequest,
     RefreshRequest,
@@ -44,6 +48,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_CODEX_HOME,
     DEFAULT_DB_PATH,
     DEFAULT_PRICING_PATH,
+    DEFAULT_PROJECTS_PATH,
     DEFAULT_RATE_CARD_PATH,
     DEFAULT_THRESHOLDS_PATH,
 )
@@ -112,25 +117,62 @@ class ApplicationHttpV2Services:
     rate_card_path: Path = DEFAULT_RATE_CARD_PATH
     thresholds_path: Path = DEFAULT_THRESHOLDS_PATH
     codex_home: Path = DEFAULT_CODEX_HOME
+    projects_path: Path = DEFAULT_PROJECTS_PATH
+    container: ApplicationContainer | None = None
 
     def __post_init__(self) -> None:
-        self.job_service = default_job_service()
+        if self.container is None:
+            self.container = build_application_container(
+                ApplicationPaths(
+                    codex_home=self.codex_home,
+                    db_path=self.db_path,
+                    pricing_path=self.pricing_path,
+                    allowance_path=self.allowance_path,
+                    rate_card_path=self.rate_card_path,
+                    thresholds_path=self.thresholds_path,
+                    projects_path=self.projects_path,
+                )
+            )
+        else:
+            self.codex_home = self.container.paths.codex_home
+            self.db_path = self.container.paths.db_path
+            self.pricing_path = self.container.paths.pricing_path
+            self.allowance_path = self.container.paths.allowance_path
+            self.rate_card_path = self.container.paths.rate_card_path
+            self.thresholds_path = self.container.paths.thresholds_path
+            self.projects_path = self.container.paths.projects_path
+        self.job_service = self.container.jobs
         self.analysis_runtime = AnalysisRuntime(
             job_service=self.job_service,
+            catalog=self.container.analyses,
             pricing_fingerprint=_path_fingerprint(self.pricing_path),
             rate_card_fingerprint=_path_fingerprint(self.rate_card_path),
             thresholds_fingerprint=_path_fingerprint(self.thresholds_path),
             catalog_version=_catalog_fingerprint(),
         )
 
+    @property
+    def application(self) -> ApplicationContainer:
+        if self.container is None:
+            raise RuntimeError("application container was not initialized")
+        return self.container
+
     def status(self, request: StatusRequest) -> object:
+        context = self.application.request_context(
+            request.scope,
+            prefer_materialized_active=True,
+        )
         return get_status(
             replace(
                 request,
                 db_path=self.db_path,
                 pricing_path=self.pricing_path,
                 codex_home=self.codex_home,
-            )
+                home=self.codex_home.parent,
+            ),
+            context=context,
+            clock=self.application.clock,
+            pricing_provider=self.application.pricing,
         )
 
     def refresh(self, request: RefreshRequest) -> object:
@@ -139,16 +181,15 @@ class ApplicationHttpV2Services:
             codex_home=self.codex_home,
             db_path=self.db_path,
             pricing_path=self.pricing_path,
+            source_repository=self.application.repositories.sources,
             job_service=self.job_service,
         )
         return outcome.result if outcome.result is not None else outcome.job
 
     def analyze(self, request: AnalysisRequest) -> object:
         normalized = replace(request, filters=normalize_query_filters(request.filters))
-        context = build_request_context(
-            db_path=self.db_path,
-            pricing_path=self.pricing_path,
-            scope=_request_scope(normalized.filters, normalized.history),
+        context = self.application.request_context(
+            _request_scope(normalized.filters, normalized.history)
         )
         outcome = analyze_usage(
             normalized,
@@ -157,11 +198,16 @@ class ApplicationHttpV2Services:
         return outcome.completed if outcome.completed is not None else outcome.job
 
     def query(self, request: QueryRequest) -> object:
+        normalized = replace(request, filters=normalize_query_filters(request.filters))
+        context = self.application.request_context(
+            _request_scope(normalized.filters, normalized.history)
+        )
         return query_usage(
-            request,
+            normalized,
             db_path=self.db_path,
             pricing_path=self.pricing_path,
             allowance_path=self.allowance_path,
+            context=context,
         )
 
     def evidence(self, request: EvidenceRequest) -> object:
@@ -169,6 +215,7 @@ class ApplicationHttpV2Services:
             request,
             db_path=self.db_path,
             pricing_path=self.pricing_path,
+            allowance_path=self.allowance_path,
             job_service=self.job_service,
         )
 

@@ -22,7 +22,9 @@ from codex_usage_tracker.application.analyze import (
     AnalyzeResult,
     analyze_usage,
 )
+from codex_usage_tracker.application.container import ApplicationContainer
 from codex_usage_tracker.application.context import RequestContext, build_request_context
+from codex_usage_tracker.application.paths import ApplicationPaths
 from codex_usage_tracker.application.query import query_usage
 from codex_usage_tracker.application.query_models import QueryFilters, QueryRequest, QueryResult
 from codex_usage_tracker.application.query_validation import normalize_query_filters
@@ -36,8 +38,10 @@ from codex_usage_tracker.core.contracts import (
 from codex_usage_tracker.core.json_contracts import validate_json_payload_contract
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
+    DEFAULT_CODEX_HOME,
     DEFAULT_DB_PATH,
     DEFAULT_PRICING_PATH,
+    DEFAULT_PROJECTS_PATH,
     DEFAULT_RATE_CARD_PATH,
     DEFAULT_THRESHOLDS_PATH,
 )
@@ -124,14 +128,26 @@ def build_usage_query(
     allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
     query_service: QueryService = query_usage,
     context_builder: ContextBuilder = build_request_context,
+    container: ApplicationContainer | None = None,
 ) -> dict[str, object]:
+    if container is not None:
+        db_path = container.paths.db_path
+        pricing_path = container.paths.pricing_path
+        allowance_path = container.paths.allowance_path
     request = _query_request(
         entity, measures, filters, group_by, order_by, order, limit, cursor, history
     )
     normalized = normalize_query_filters(request.filters)
     request = replace(request, filters=normalized)
-    context = context_builder(
-        db_path=db_path, pricing_path=pricing_path, scope=_request_scope(normalized, history)
+    scope = _request_scope(normalized, history)
+    context = (
+        container.request_context(scope)
+        if container is not None
+        else context_builder(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            scope=scope,
+        )
     )
     result = query_service(
         request,
@@ -166,19 +182,51 @@ def build_usage_analyze(
     execution: str = "auto",
     db_path: Path = DEFAULT_DB_PATH,
     pricing_path: Path = DEFAULT_PRICING_PATH,
+    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
     rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
     thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
+    projects_path: Path = DEFAULT_PROJECTS_PATH,
+    codex_home: Path = DEFAULT_CODEX_HOME,
     runtime: AnalysisRuntime | None = None,
     catalog: Mapping[AnalysisGoal, AnalysisCatalogEntry] = ANALYSIS_CATALOG,
     job_service: JobService | None = None,
     analysis_service: AnalysisService = analyze_usage,
     context_builder: ContextBuilder = build_request_context,
+    container: ApplicationContainer | None = None,
 ) -> dict[str, object]:
+    paths = (
+        container.paths
+        if container is not None
+        else ApplicationPaths(
+            codex_home=codex_home,
+            db_path=db_path,
+            pricing_path=pricing_path,
+            allowance_path=allowance_path,
+            rate_card_path=rate_card_path,
+            thresholds_path=thresholds_path,
+            projects_path=projects_path,
+        )
+    )
+    if container is not None:
+        db_path = paths.db_path
+        pricing_path = paths.pricing_path
+        rate_card_path = paths.rate_card_path
+        thresholds_path = paths.thresholds_path
+        catalog = container.analyses
+        job_service = job_service or container.jobs
     request = _analysis_request(goal, filters, history, evidence_limit, comparison, execution)
     normalized = normalize_query_filters(request.filters)
     request = replace(request, filters=normalized)
-    context = context_builder(
-        db_path=db_path, pricing_path=pricing_path, scope=_request_scope(normalized, history)
+    scope = _request_scope(normalized, history)
+    context = (
+        container.request_context(scope)
+        if container is not None
+        else context_builder(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            scope=scope,
+            application_paths=paths,
+        )
     )
     runtime = runtime or _analysis_runtime(
         pricing_path, rate_card_path, thresholds_path, catalog, job_service

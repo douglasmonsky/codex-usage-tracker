@@ -62,10 +62,15 @@ def test_selected_profile_server_reads_the_environment(
         monkeypatch.delenv(server.PROFILE_ENV, raising=False)
     else:
         monkeypatch.setenv(server.PROFILE_ENV, configured)
+
+    def build(profile: str, *, container: object) -> SimpleNamespace:
+        assert container is not None
+        return SimpleNamespace(run=lambda: selected.append(profile))
+
     monkeypatch.setattr(
         server,
         "build_mcp_server",
-        lambda profile: SimpleNamespace(run=lambda: selected.append(profile)),
+        build,
     )
 
     server.main()
@@ -133,6 +138,47 @@ def test_core_binds_stable_adapters_once() -> None:
     assert list(registered).count("usage_analyze") == list(registered).count("usage_query") == 1
     assert list(registered).count("usage_evidence") == 1
     assert status_spec.data_class == "administrative"
+
+
+def test_core_can_bind_one_explicit_application_container(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from codex_usage_tracker.application import status
+    from codex_usage_tracker.application.container import build_application_container
+    from codex_usage_tracker.application.paths import ApplicationPaths
+    from codex_usage_tracker.dashboard_service import DashboardServiceStatus
+    from codex_usage_tracker.interfaces.mcp.core_tools import usage_status
+
+    monkeypatch.setattr(
+        status,
+        "dashboard_service_status",
+        lambda *, home: DashboardServiceStatus(False, False, False, 47821, str(home)),
+    )
+    monkeypatch.setattr(
+        Path,
+        "home",
+        classmethod(lambda _cls: (_ for _ in ()).throw(AssertionError("default home accessed"))),
+    )
+    container = build_application_container(
+        ApplicationPaths(
+            codex_home=tmp_path / ".codex",
+            db_path=tmp_path / "usage.sqlite3",
+            pricing_path=tmp_path / "pricing.json",
+            allowance_path=tmp_path / "allowance.json",
+            rate_card_path=tmp_path / "rate-card.json",
+            thresholds_path=tmp_path / "thresholds.json",
+            projects_path=tmp_path / "projects.json",
+        )
+    )
+
+    server = build_mcp_server("core", container=container)
+    registered = server._tool_manager._tools
+    payload = registered["usage_status"].fn()
+
+    assert registered["usage_status"].fn is not usage_status
+    assert payload["result"]["sources"]["canonical_rows"] == 0
+    assert container.repositories.jobs is container.jobs
 
 
 def test_core_status_returns_bounded_v2_envelope(

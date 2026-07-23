@@ -8,6 +8,7 @@ from pathlib import Path
 from codex_usage_tracker.analytics.analysis_models import AnalysisRequest
 from codex_usage_tracker.application.query_models import QueryRequest
 from codex_usage_tracker.application.requests import StatusRequest
+from codex_usage_tracker.interfaces.cli import commands as commands_module
 from codex_usage_tracker.interfaces.cli.commands import (
     run_analyze,
     run_open,
@@ -44,6 +45,17 @@ def test_status_prints_the_application_contract_as_json() -> None:
     assert json.loads(stdout.getvalue())["schema"] == "codex-usage-tracker.status.v2"
     assert isinstance(services.request, StatusRequest)
     assert services.request.db_path == Path("usage.db")
+
+
+def test_default_services_preserve_the_configured_projects_path(tmp_path: Path) -> None:
+    projects_path = tmp_path / "custom-projects.json"
+    args = build_parser().parse_args(
+        ["--projects", str(projects_path), "status", "--json"]
+    )
+
+    services = commands_module._default_services(args)
+
+    assert services.application.paths.projects_path == projects_path
 
 
 def test_query_builds_the_typed_v2_request() -> None:

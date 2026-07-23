@@ -16,10 +16,10 @@ from pathlib import Path
 from typing import Generic, Literal, TypeVar
 
 from codex_usage_tracker.application.context import build_request_context
+from codex_usage_tracker.application.protocols import SourceRepository
 from codex_usage_tracker.application.requests import RefreshRequest, RequestScope
 from codex_usage_tracker.core.contracts import payload_mapping
 from codex_usage_tracker.core.models import RefreshResult
-from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH, DEFAULT_PRICING_PATH
 from codex_usage_tracker.jobs.adapters import RefreshJobAdapter, request_hash
 from codex_usage_tracker.jobs.models import JobStatusV1
 from codex_usage_tracker.jobs.service import JobService
@@ -161,11 +161,16 @@ def default_job_service() -> JobService:
 def plan_refresh(
     request: RefreshRequest,
     *,
-    codex_home: Path = DEFAULT_CODEX_HOME,
-    db_path: Path = DEFAULT_DB_PATH,
+    codex_home: Path,
+    db_path: Path,
+    source_repository: SourceRepository | None = None,
 ) -> RefreshPlan:
     """Plan from bounded file/store facts without creating or migrating a database."""
-    logs = find_session_logs(codex_home, include_archived=request.history == "all")
+    logs = (
+        source_repository.session_logs(include_archived=request.history == "all")
+        if source_repository is not None
+        else find_session_logs(codex_home, include_archived=request.history == "all")
+    )
     if not db_path.exists():
         return RefreshPlan(
             "sync" if not logs else "async",
@@ -217,9 +222,10 @@ def plan_refresh(
 def refresh_usage(
     request: RefreshRequest,
     *,
-    codex_home: Path = DEFAULT_CODEX_HOME,
-    db_path: Path = DEFAULT_DB_PATH,
-    pricing_path: Path = DEFAULT_PRICING_PATH,
+    codex_home: Path,
+    db_path: Path,
+    pricing_path: Path,
+    source_repository: SourceRepository | None = None,
     job_service: JobService | None = None,
     coordinator: RefreshCoordinator | None = None,
     refresh_fn: RefreshFunction = refresh_usage_index,
@@ -246,14 +252,26 @@ def refresh_usage(
 
     if request.execution == "sync":
         with lock:
-            observed = planner(request, codex_home=codex_home, db_path=db_path)
+            observed = _plan_refresh(
+                planner,
+                request,
+                codex_home=codex_home,
+                db_path=db_path,
+                source_repository=source_repository,
+            )
             explicit = RefreshPlan(
                 "sync", "explicit_sync", observed.changed_source_files, observed.added_bytes
             )
             return CompletedOrJob(result=execute(explicit))
     if request.execution == "auto":
         with lock:
-            observed = planner(request, codex_home=codex_home, db_path=db_path)
+            observed = _plan_refresh(
+                planner,
+                request,
+                codex_home=codex_home,
+                db_path=db_path,
+                source_repository=source_repository,
+            )
             if observed.execution == "sync":
                 return CompletedOrJob(result=execute(observed))
 
@@ -266,7 +284,13 @@ def refresh_usage(
 
     def worker() -> dict[str, object]:
         with lock:
-            observed = planner(request, codex_home=codex_home, db_path=db_path)
+            observed = _plan_refresh(
+                planner,
+                request,
+                codex_home=codex_home,
+                db_path=db_path,
+                source_repository=source_repository,
+            )
             async_plan = RefreshPlan(
                 "async",
                 "explicit_async" if request.execution == "async" else observed.reason,
@@ -276,6 +300,24 @@ def refresh_usage(
             return execute(async_plan)
 
     return CompletedOrJob(job=runtime.start(key, worker))
+
+
+def _plan_refresh(
+    planner: Planner,
+    request: RefreshRequest,
+    *,
+    codex_home: Path,
+    db_path: Path,
+    source_repository: SourceRepository | None,
+) -> RefreshPlan:
+    if source_repository is None:
+        return planner(request, codex_home=codex_home, db_path=db_path)
+    return planner(
+        request,
+        codex_home=codex_home,
+        db_path=db_path,
+        source_repository=source_repository,
+    )
 
 
 def _completed_payload(

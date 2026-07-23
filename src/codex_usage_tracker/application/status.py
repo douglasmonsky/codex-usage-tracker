@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timezone
+from pathlib import Path
 
 from codex_usage_tracker.application.context import RequestContext, build_request_context
+from codex_usage_tracker.application.errors import RequestContextError
+from codex_usage_tracker.application.protocols import Clock, PricingProvider
 from codex_usage_tracker.application.requests import StatusRequest
 from codex_usage_tracker.core.contracts import FreshnessV1, payload_mapping
 from codex_usage_tracker.core.conversational_readiness import conversational_readiness
@@ -27,24 +30,57 @@ CORE_TOOL_NAMES = (
 )
 
 
-def get_status(request: StatusRequest) -> dict[str, object]:
+def get_status(
+    request: StatusRequest,
+    *,
+    context: RequestContext | None = None,
+    clock: Clock | None = None,
+    pricing_provider: PricingProvider | None = None,
+) -> dict[str, object]:
     """Return codex-usage-tracker.status.v2 without starting background work."""
-    result, _context = _build_status(request)
+    result, _context = _build_status(
+        request,
+        context=context,
+        clock=clock,
+        pricing_provider=pricing_provider,
+    )
     return result
 
 
-def _build_status(request: StatusRequest) -> tuple[dict[str, object], RequestContext]:
-    context = build_request_context(
-        db_path=request.db_path,
-        pricing_path=request.pricing_path,
-        scope=request.scope,
-        prefer_materialized_active=True,
+def _build_status(
+    request: StatusRequest,
+    *,
+    context: RequestContext | None = None,
+    clock: Clock | None = None,
+    pricing_provider: PricingProvider | None = None,
+) -> tuple[dict[str, object], RequestContext]:
+    db_path = _required_path(request.db_path, "db_path")
+    pricing_path = _required_path(request.pricing_path, "pricing_path")
+    codex_home = _required_path(request.codex_home, "codex_home")
+    home = _required_path(request.home, "home")
+    if context is None:
+        context = build_request_context(
+            db_path=db_path,
+            pricing_path=pricing_path,
+            scope=request.scope,
+            prefer_materialized_active=True,
+            pricing_provider=pricing_provider,
+            clock=clock,
+        )
+    now = clock.now() if clock is not None else datetime.now(timezone.utc)
+    freshness = _freshness_for_threshold(
+        context.freshness,
+        request.freshness_threshold_seconds,
+        now=now,
     )
-    freshness = _freshness_for_threshold(context.freshness, request.freshness_threshold_seconds)
     context = replace(context, freshness=freshness)
-    pricing_config = load_pricing_config(request.pricing_path)
-    readiness = conversational_readiness(codex_home=request.codex_home)
-    service = _service_status(request)
+    pricing_config = (
+        load_pricing_config(pricing_path)
+        if pricing_provider is None
+        else pricing_provider.load(pricing_path)
+    )
+    readiness = conversational_readiness(codex_home=codex_home)
+    service = _service_status(home)
     pricing_state = (
         "malformed"
         if pricing_config.error
@@ -91,12 +127,20 @@ def _build_status(request: StatusRequest) -> tuple[dict[str, object], RequestCon
     return result, context
 
 
-def _freshness_for_threshold(freshness: FreshnessV1, threshold: float) -> FreshnessV1:
+def _freshness_for_threshold(
+    freshness: FreshnessV1,
+    threshold: float,
+    *,
+    now: datetime,
+) -> FreshnessV1:
     if freshness.state in {"empty", "unknown"}:
         state = freshness.state
         reason = freshness.reason
     else:
-        age = _age_seconds(freshness.refresh_completed_at or freshness.latest_indexed_event_at)
+        age = _age_seconds(
+            freshness.refresh_completed_at or freshness.latest_indexed_event_at,
+            now=now,
+        )
         if age is None:
             state = "unknown"
             reason = "The index has no parseable freshness timestamp."
@@ -117,7 +161,7 @@ def _freshness_for_threshold(freshness: FreshnessV1, threshold: float) -> Freshn
     )
 
 
-def _age_seconds(value: str | None) -> float | None:
+def _age_seconds(value: str | None, *, now: datetime) -> float | None:
     if value is None:
         return None
     try:
@@ -126,14 +170,20 @@ def _age_seconds(value: str | None) -> float | None:
         return None
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
-    return max(0.0, (datetime.now(timezone.utc) - parsed).total_seconds())
+    return max(0.0, (now - parsed).total_seconds())
 
 
-def _service_status(request: StatusRequest) -> DashboardServiceStatus:
+def _service_status(home: Path) -> DashboardServiceStatus:
     try:
-        return dashboard_service_status(home=request.home)
+        return dashboard_service_status(home=home)
     except (OSError, RuntimeError, ValueError) as exc:
         return DashboardServiceStatus(False, False, False, 47821, f"unavailable: {exc}")
+
+
+def _required_path(value: Path | None, name: str) -> Path:
+    if value is None:
+        raise RequestContextError(f"status request requires {name}")
+    return value
 
 
 def _service_payload(service: DashboardServiceStatus) -> dict[str, object]:

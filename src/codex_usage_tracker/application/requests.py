@@ -14,7 +14,6 @@ from codex_usage_tracker.application.errors import RequestValidationError
 from codex_usage_tracker.application.query_models import QueryRequest as QueryRequest
 from codex_usage_tracker.core.contracts import ScopeV1
 from codex_usage_tracker.core.contracts.serialization import payload_mapping
-from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME, DEFAULT_DB_PATH, DEFAULT_PRICING_PATH
 from codex_usage_tracker.evidence.models import EvidenceRequest as EvidenceRequest
 
 HistoryScope: TypeAlias = Literal["active", "all"]
@@ -142,10 +141,10 @@ class RequestScope:
 class StatusRequest:
     scope: RequestScope = field(default_factory=RequestScope)
     freshness_threshold_seconds: int | float = 300
-    db_path: Path = DEFAULT_DB_PATH
-    pricing_path: Path = DEFAULT_PRICING_PATH
-    codex_home: Path = DEFAULT_CODEX_HOME
-    home: Path = field(default_factory=Path.home)
+    db_path: Path | None = None
+    pricing_path: Path | None = None
+    codex_home: Path | None = None
+    home: Path | None = None
     mcp_profile: McpProfile = "core"
 
     def __post_init__(self) -> None:
