@@ -181,6 +181,7 @@ class ApplicationHttpV2Services:
             codex_home=self.codex_home,
             db_path=self.db_path,
             pricing_path=self.pricing_path,
+            source_repository=self.application.repositories.sources,
             job_service=self.job_service,
         )
         return outcome.result if outcome.result is not None else outcome.job

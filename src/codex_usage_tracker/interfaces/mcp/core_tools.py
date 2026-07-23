@@ -346,6 +346,7 @@ def build_usage_refresh(
         db_path=db_path,
         pricing_path=pricing_path,
         codex_home=codex_home,
+        source_repository=(None if container is None else container.repositories.sources),
         job_service=None if container is None else container.jobs,
     )
     context = (

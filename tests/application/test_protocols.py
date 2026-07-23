@@ -64,6 +64,7 @@ def test_protocols_accept_only_the_current_narrow_service_shapes() -> None:
     assert isinstance(_Clock(), Clock)
     assert isinstance(_UsageRepository(), UsageRepository)
     assert isinstance(_SourceRepository(), SourceRepository)
+    assert _SourceRepository().session_logs(include_archived=False) == ()
     assert isinstance(_PricingProvider(), PricingProvider)
     assert isinstance(_DashboardTargets(), DashboardTargetResolver)
     assert isinstance(JobService(), JobRepository)
@@ -77,8 +78,7 @@ def test_application_and_analytics_do_not_import_default_global_paths() -> None:
         for path in sorted(package.joinpath(root_name).rglob("*.py")):
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             if any(
-                isinstance(node, ast.ImportFrom)
-                and node.module == "codex_usage_tracker.core.paths"
+                isinstance(node, ast.ImportFrom) and node.module == "codex_usage_tracker.core.paths"
                 for node in ast.walk(tree)
             ):
                 offenders.append(str(path.relative_to(package)))

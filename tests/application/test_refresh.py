@@ -22,6 +22,16 @@ from codex_usage_tracker.jobs.service import JobService
 from codex_usage_tracker.store.sources import SourceParsePlan
 
 
+class _SourceRepository:
+    def __init__(self, logs: tuple[Path, ...]) -> None:
+        self.logs = logs
+        self.include_archived: bool | None = None
+
+    def session_logs(self, *, include_archived: bool) -> tuple[Path, ...]:
+        self.include_archived = include_archived
+        return self.logs
+
+
 def test_planner_constants_and_missing_database_have_no_side_effect(tmp_path: Path) -> None:
     db_path = tmp_path / "state" / "usage.sqlite3"
     plan = plan_refresh(RefreshRequest(), codex_home=tmp_path / ".codex", db_path=db_path)
@@ -31,6 +41,23 @@ def test_planner_constants_and_missing_database_have_no_side_effect(tmp_path: Pa
     assert plan.execution == "sync"
     assert plan.changed_source_files == 0
     assert not db_path.exists()
+
+
+def test_planner_uses_injected_source_repository(tmp_path: Path) -> None:
+    source = tmp_path / "events.jsonl"
+    source.write_text("{}\n", encoding="utf-8")
+    repository = _SourceRepository((source,))
+
+    plan = plan_refresh(
+        RefreshRequest(history="all"),
+        codex_home=tmp_path / ".codex",
+        db_path=tmp_path / "usage.sqlite3",
+        source_repository=repository,
+    )
+
+    assert repository.include_archived is True
+    assert plan.reason == "untracked_source"
+    assert plan.changed_source_files == 1
 
 
 def test_explicit_sync_preserves_history_and_aggregate_only(tmp_path: Path) -> None:
