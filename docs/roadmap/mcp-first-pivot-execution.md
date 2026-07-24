@@ -1617,8 +1617,9 @@ complete without its named focused and full verification evidence.
 
 ## Task 39 - Gate and Publish Release 0.24.0
 
-- Status: release candidate preparation and local qualification complete;
-  TestPyPI rehearsal, hosted review, merge, and public promotion remain.
+- Status: release candidate preparation, local qualification, and TestPyPI
+  promotion rehearsal complete; hosted review, merge, and public promotion
+  remain.
 - Foundation entry gate:
   - `docs/superpowers/reports/0.24-foundation-audit.md` audits
     `589e10a` and records `PROCEED`;
@@ -1637,7 +1638,7 @@ complete without its named focused and full verification evidence.
 - Focused integrity verification:
   - all `36` architecture, connection-integrity, foreign-key cascade,
     persisted-job, and byte-offset tests pass;
-  - the dedicated release, public-documentation, and CLI slice passes `48`
+  - the dedicated release, public-documentation, and CLI slice passes `51`
     tests, and source release readiness passes.
 - Complete product verification:
   - all `2,164` Python tests pass at `88.12%` coverage against the enforced
@@ -1670,10 +1671,41 @@ complete without its named focused and full verification evidence.
 - Gate-discovered correction:
   - the first distribution check proved the new JSON manifest example was
     absent from the sdist; `MANIFEST.in` now packages documentation JSON and
-    the rebuilt distribution passes the exact-member gate.
+    the rebuilt distribution passes the exact-member gate;
+  - the first prerelease source check proved the version matcher truncated
+    PEP 440 prerelease suffixes; public-smoke and MCP-launcher checks now accept
+    exact `a`, `b`, and `rc` versions, with a focused regression test.
+- TestPyPI promotion rehearsal:
+  - workflow run `30099685531` completed successfully from annotated tag
+    `v0.24.0rc1` at source
+    `8c8f427bb69f90004f7f606950820013a18bb212`;
+  - the build job passed the complete hosted test and coverage gates, produced
+    one canonical artifact bundle, and recorded manifest SHA-256
+    `1b7b2638b42fc76237065ef4f7421645298d5c8c6e1984aef18ef4d02997baba`;
+  - TestPyPI received wheel
+    `12f3afda17f4a39d9f993bef075162b2deef5a5abc7ac0d2754bc53660ff3110`
+    (`7,022,443` bytes) and sdist
+    `53e50edbe5a3e6beddf77a1900fca5767ce638306af0712c4a1e74dad70c7ec0`
+    (`32,076,624` bytes);
+  - qualification downloaded those public bytes, matched both hashes to the
+    manifest, passed the installed smoke, and recorded the same source SHA,
+    Actions run, schema `37`, `114` schemas, `73` console bundles, and
+    `7`/`59`/`64` MCP profile inventories;
+  - production PyPI promotion, GitHub Release attachment, and cross-location
+    verification were correctly skipped for the manual rehearsal.
 - Roadmap deviations:
   - the package version also required synchronized updates to the runtime
     constant, plugin manifest, source and packaged MCP launchers, and
     development smoke commands;
   - release checks and public-document tests now fail closed if the new
     release note, upgrade guide, or manifest example is absent.
+- Final review:
+  - the single read-only reviewer reported one medium finding (`R1`): version
+    prefix matching and substring changelog checks could accept malformed or
+    prerelease-only evidence;
+  - `R1` was accepted; version-bearing commands now capture and compare the
+    complete token, changelog headings match complete lines, and both trailing
+    junk and final-versus-RC regressions are covered;
+  - the bounded release/docs/CLI slice passes all `51` tests after the fix;
+  - review metrics: 1 finding, 1 accepted (`R1`); reviewer tokens `pending`;
+    tokens per accepted finding `pending`.

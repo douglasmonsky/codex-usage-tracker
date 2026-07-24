@@ -137,6 +137,57 @@ def test_release_check_rejects_stale_public_package_version_claims(tmp_path: Pat
     assert all("does not match pyproject.toml 0.4.1" in failure for failure in failures)
 
 
+def test_release_check_accepts_prerelease_package_version_claims(tmp_path: Path) -> None:
+    module = _load_release_check_module()
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "development.md").write_text(
+        "python scripts/smoke_installed_package.py --from-pypi --version 0.24.0rc1\n"
+        "python -m pip install codex-usage-tracking==0.24.0rc1\n"
+        "Verify visible as `0.24.0rc1`.\n",
+        encoding="utf-8",
+    )
+
+    original_root = module.REPO_ROOT
+    module.REPO_ROOT = tmp_path
+    try:
+        failures = module._check_public_release_doc_versions("0.24.0rc1")
+    finally:
+        module.REPO_ROOT = original_root
+
+    assert failures == []
+
+
+def test_release_check_rejects_prerelease_version_prefix_with_trailing_junk(
+    tmp_path: Path,
+) -> None:
+    module = _load_release_check_module()
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "development.md").write_text(
+        "python scripts/smoke_installed_package.py "
+        "--from-pypi --version 0.24.0rc1junk\n",
+        encoding="utf-8",
+    )
+
+    original_root = module.REPO_ROOT
+    module.REPO_ROOT = tmp_path
+    try:
+        failures = module._check_public_release_doc_versions("0.24.0rc1")
+    finally:
+        module.REPO_ROOT = original_root
+
+    assert len(failures) == 1
+    assert "public release version 0.24.0rc1junk" in failures[0]
+    assert "does not match pyproject.toml 0.24.0rc1" in failures[0]
+
+
+def test_release_check_requires_exact_changelog_version_heading() -> None:
+    module = _load_release_check_module()
+    changelog = "## 0.24.0rc1 - 2026-07-24\n"
+
+    assert module._has_changelog_version_entry(changelog, "0.24.0rc1")
+    assert not module._has_changelog_version_entry(changelog, "0.24.0")
+
+
 def test_release_check_requires_current_release_docs_and_packaged_launcher() -> None:
     module = _load_release_check_module()
     wheel_launcher = "codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py"

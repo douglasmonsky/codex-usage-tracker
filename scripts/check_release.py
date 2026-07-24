@@ -79,9 +79,9 @@ PACKAGE_NAMING_DOCS = [
     "docs/development.md",
 ]
 PUBLIC_VERSION_PATTERNS = [
-    re.compile(r"codex-usage-tracking==([0-9]+(?:\.[0-9]+){2})"),
-    re.compile(r"--from-pypi --version ([0-9]+(?:\.[0-9]+){2})"),
-    re.compile(r"visible as `([0-9]+(?:\.[0-9]+){2})`"),
+    re.compile(r"""codex-usage-tracking==([0-9][^\s"'`]*)"""),
+    re.compile(r"""--from-pypi --version ([0-9][^\s"'`]*)"""),
+    re.compile(r"visible as `([0-9][^`]*)`"),
 ]
 SECRET_PATTERNS = {
     "OpenAI API key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}"),
@@ -472,10 +472,15 @@ def _check_versions() -> list[str]:
         failures.append("__version__ does not match pyproject.toml project.version")
     if manifest.get("version") != package_version:
         failures.append(".codex-plugin/plugin.json version does not match pyproject.toml")
-    if f"## {package_version}" not in changelog:
+    if not _has_changelog_version_entry(changelog, package_version):
         failures.append("CHANGELOG.md does not contain an entry for the package version")
     failures.extend(_check_public_release_doc_versions(package_version))
     return failures
+
+
+def _has_changelog_version_entry(changelog: str, package_version: str) -> bool:
+    pattern = rf"^## {re.escape(package_version)}(?: - [^\r\n]+)?\r?$"
+    return re.search(pattern, changelog, re.MULTILINE) is not None
 
 
 def _check_docs() -> list[str]:
@@ -630,7 +635,10 @@ def _check_packaging_metadata() -> list[str]:
     if "codex-usage-tracker.git@main" in launcher:
         failures.append("MCP runtime launcher must pin the package spec instead of tracking main")
     git_package_spec = re.search(r"codex-usage-tracker\.git@([0-9a-f]{40})", launcher)
-    pypi_package_spec = re.search(r"codex-usage-tracking==([0-9]+(?:\.[0-9]+){2})", launcher)
+    pypi_package_spec = re.search(
+        r"""codex-usage-tracking==([0-9][^"',\s]*)""",
+        launcher,
+    )
     if pypi_package_spec:
         if pypi_package_spec.group(1) != str(project.get("version")):
             failures.append("MCP runtime launcher PyPI pin does not match project.version")
@@ -642,7 +650,11 @@ def _check_packaging_metadata() -> list[str]:
             "MCP runtime launcher must pin an exact codex-usage-tracking version or a "
             "40-character GitHub commit SHA"
         )
-    runtime_version = re.search(r'^RUNTIME_VERSION = "([0-9]+(?:\.[0-9]+){2})"$', launcher, re.M)
+    runtime_version = re.search(
+        r'^RUNTIME_VERSION = "([^"]+)"$',
+        launcher,
+        re.M,
+    )
     if runtime_version is None or runtime_version.group(1) != str(project.get("version")):
         failures.append("MCP runtime launcher cache version does not match project.version")
     if "importlib.metadata.version('codex-usage-tracking')" not in launcher:
