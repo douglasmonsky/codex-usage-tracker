@@ -221,3 +221,34 @@ def test_malformed_mcp_configuration_never_claims_current_task_exposure(
     assert result["conversational_readiness"]["state"] == "unavailable"  # type: ignore[index]
     assert result["mcp"]["current_task_exposure"] == "not-verified"  # type: ignore[index]
     assert result["next_action"]["code"] == "setup_plugin"  # type: ignore[index]
+
+
+def test_status_reports_integrity_as_unknown_without_running_a_blocking_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_dependencies(monkeypatch, context=_context(state="fresh"))
+
+    result = status.get_status(_request(tmp_path))
+
+    assert result["database_integrity"]["state"] == "unknown"  # type: ignore[index]
+    assert result["database_integrity"]["error"] == "not_checked"  # type: ignore[index]
+    assert "admin integrity" in str(result["database_integrity"]["next_action"])  # type: ignore[index]
+
+
+def test_status_accepts_an_explicit_integrity_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_dependencies(monkeypatch, context=_context(state="fresh"))
+
+    result = status.get_status(
+        _request(tmp_path),
+        integrity_provider=lambda _db_path: {
+            "schema": "codex-usage-tracker.database-integrity.v1",
+            "state": "pass",
+        },
+    )
+
+    assert result["database_integrity"] == {
+        "schema": "codex-usage-tracker.database-integrity.v1",
+        "state": "pass",
+    }

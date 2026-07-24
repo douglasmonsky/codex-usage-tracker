@@ -49,6 +49,7 @@ Tracked schema ids:
 | `codex-usage-tracker.subagent-usage.v1` | CLI `subagents --json`, MCP `subagent_usage(response_format="json")` |
 | `codex-usage-tracker-query-v1` | CLI `query`, MCP `usage_query(...)` |
 | `codex-usage-tracker.status.v2` | HTTP `GET /api/v2/status`; bounded application status and freshness contract |
+| `codex-usage-tracker.database-integrity.v1` | CLI `admin integrity --json`, doctor, and status; bounded read-only SQLite integrity state |
 | `codex-usage-tracker.refresh.v2` | HTTP `POST /api/v2/refresh`; completed refresh result |
 | `codex-usage-tracker.job.v1` | HTTP `GET /api/v2/jobs/{job_id}` and asynchronous v2 starts; generic process-local job status |
 | `codex-usage-tracker.capabilities.v2` | HTTP `GET /api/v2/capabilities`; immutable analysis, query, allowance, and evidence allowlists |

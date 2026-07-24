@@ -25,6 +25,7 @@ HTTP_V2_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "sources": dict,
             "pricing": dict,
             "accounting": dict,
+            "database_integrity": dict,
             "conversational_readiness": dict,
             "mcp": dict,
             "persistent_service": dict,

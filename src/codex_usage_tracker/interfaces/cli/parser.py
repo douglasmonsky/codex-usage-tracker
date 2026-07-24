@@ -250,6 +250,15 @@ def _add_admin_namespace(
 ) -> None:
     admin = subparsers.add_parser("admin", help="Run operational and maintenance commands")
     actions = admin.add_subparsers(dest="admin_action", required=True)
+    integrity = actions.add_parser(
+        "integrity",
+        help="Run read-only SQLite integrity checks",
+    )
+    integrity.add_argument("--json", action="store_true", dest="as_json")
+    integrity.set_defaults(
+        command_path=("admin", "integrity"),
+        compatibility_alias=None,
+    )
     for action_name in (
         "inspect-log",
         "rebuild-index",

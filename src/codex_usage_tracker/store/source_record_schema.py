@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import sqlite3
 
+from codex_usage_tracker.store.connection import execute_script
+
 
 def create_source_records_table(conn: sqlite3.Connection) -> None:
     """Create source-record provenance storage and its query indexes."""
 
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS source_records (
             record_id TEXT PRIMARY KEY,
@@ -34,5 +37,5 @@ def create_source_records_table(conn: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_source_records_event_timestamp
         ON source_records(event_timestamp);
-        """
+        """,
     )

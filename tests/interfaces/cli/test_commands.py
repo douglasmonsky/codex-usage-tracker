@@ -11,6 +11,7 @@ from codex_usage_tracker.application.requests import StatusRequest
 from codex_usage_tracker.interfaces.cli import commands as commands_module
 from codex_usage_tracker.interfaces.cli.commands import (
     run_analyze,
+    run_integrity,
     run_open,
     run_query,
     run_status,
@@ -49,9 +50,7 @@ def test_status_prints_the_application_contract_as_json() -> None:
 
 def test_default_services_preserve_the_configured_projects_path(tmp_path: Path) -> None:
     projects_path = tmp_path / "custom-projects.json"
-    args = build_parser().parse_args(
-        ["--projects", str(projects_path), "status", "--json"]
-    )
+    args = build_parser().parse_args(["--projects", str(projects_path), "status", "--json"])
 
     services = commands_module._default_services(args)
 
@@ -172,3 +171,46 @@ def test_legacy_warning_is_interactive_only_and_never_uses_stdout() -> None:
     assert stderr.getvalue() == (
         "Deprecated: 'summary' is a compatibility alias; use 'analyze' or 'query'.\n"
     )
+
+
+def test_integrity_json_maps_pass_fail_and_unreadable_exit_codes() -> None:
+    args = build_parser().parse_args(["--db", "usage.sqlite3", "admin", "integrity", "--json"])
+
+    def report(state: str, *, readable: bool = True) -> dict[str, object]:
+        return {
+            "schema": "codex-usage-tracker.database-integrity.v1",
+            "state": state,
+            "readable": readable,
+            "foreign_keys_enabled": readable,
+            "integrity_error_count": 0 if state == "pass" else 1,
+            "foreign_key_violation_count": 0,
+            "affected_tables": [],
+            "affected_tables_truncated": False,
+            "error": None if readable else "database_unreadable",
+        }
+
+    for expected_exit, payload in (
+        (0, report("pass")),
+        (1, report("fail")),
+        (2, report("unknown", readable=False)),
+    ):
+        stdout = StringIO()
+        seen: list[Path] = []
+
+        def provider(
+            *,
+            db_path: Path,
+            payload: dict[str, object] = payload,
+            seen: list[Path] = seen,
+        ) -> dict[str, object]:
+            seen.append(db_path)
+            return payload
+
+        exit_code = run_integrity(
+            args,
+            report_provider=provider,
+            stdout=stdout,
+        )
+        assert exit_code == expected_exit
+        assert seen == [Path("usage.sqlite3")]
+        assert json.loads(stdout.getvalue()) == payload

@@ -52,6 +52,19 @@ class JobRepository(Protocol):
 
 
 @runtime_checkable
+class CacheRepository(Protocol):
+    """Transaction-bound key/value cache operations."""
+
+    def get(self, key: str) -> str | None: ...
+
+    def set_many(self, values: Mapping[str, str]) -> None: ...
+
+    def delete(self, key: str) -> None: ...
+
+    def clear(self) -> None: ...
+
+
+@runtime_checkable
 class DashboardTargetResolver(Protocol):
     def resolve(
         self,

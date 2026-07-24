@@ -33,7 +33,11 @@ from codex_usage_tracker.application.requests import (
     RequestScope,
     StatusRequest,
 )
-from codex_usage_tracker.application.status import ConversationalReadinessProvider, get_status
+from codex_usage_tracker.application.status import (
+    ConversationalReadinessProvider,
+    DatabaseIntegrityStatusProvider,
+    get_status,
+)
 from codex_usage_tracker.evidence.models import EvidenceRequest
 
 
@@ -43,6 +47,7 @@ class ApplicationServices:
 
     container: ApplicationContainer
     readiness_provider: ConversationalReadinessProvider | None = None
+    integrity_provider: DatabaseIntegrityStatusProvider | None = None
 
     def __post_init__(self) -> None:
         self.codex_home = self.container.paths.codex_home
@@ -83,6 +88,7 @@ class ApplicationServices:
             clock=self.application.clock,
             pricing_provider=self.application.pricing,
             readiness_provider=self.readiness_provider,
+            integrity_provider=self.integrity_provider,
         )
 
     def refresh(self, request: RefreshRequest) -> object:

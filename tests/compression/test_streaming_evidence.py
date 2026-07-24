@@ -382,6 +382,27 @@ def _seed_normalized_evidence(db_path: Path) -> None:
         init_db(conn)
         conn.executemany(
             """
+            INSERT INTO conversation_turns (
+                turn_key, record_id, session_id, turn_id, turn_index, role,
+                parser_adapter, parser_version
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    f"turn-{index}",
+                    f"call-{index}",
+                    "session-1",
+                    f"turn-{index}",
+                    index,
+                    "assistant",
+                    "test",
+                    "1",
+                )
+                for index in range(3)
+            ],
+        )
+        conn.executemany(
+            """
             INSERT INTO tool_calls (
                 tool_call_key, record_id, turn_key, tool_name, status,
                 output_size_bytes, parser_adapter, parser_version, parse_warnings_json

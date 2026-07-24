@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sqlite3
 
+from codex_usage_tracker.store.connection import execute_script
+
 MIGRATION_NAMES = {
     30: "persist OTel completion tier enrichment",
     31: "persist OTel cursor continuity anchors",
@@ -28,7 +30,8 @@ def migrate_otel_completion_tiers(conn: sqlite3.Connection) -> None:
             conn.execute(  # nosec B608 - fixed migration column names
                 f"ALTER TABLE usage_events ADD COLUMN {column} {column_type}"
             )
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS otel_completion_sources (
             source_path TEXT PRIMARY KEY,
@@ -74,7 +77,7 @@ def migrate_otel_completion_tiers(conn: sqlite3.Connection) -> None:
                 output_tokens,
                 reasoning_output_tokens
             );
-        """
+        """,
     )
 
 
@@ -82,8 +85,7 @@ def add_otel_cursor_resume_anchor(conn: sqlite3.Connection) -> None:
     """Add a bounded-content continuity marker to existing OTel source cursors."""
 
     source_columns = {
-        str(row[1])
-        for row in conn.execute("PRAGMA table_info(otel_completion_sources)").fetchall()
+        str(row[1]) for row in conn.execute("PRAGMA table_info(otel_completion_sources)").fetchall()
     }
     if "resume_anchor" not in source_columns:
         conn.execute("ALTER TABLE otel_completion_sources ADD COLUMN resume_anchor TEXT")

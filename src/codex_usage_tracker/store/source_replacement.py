@@ -171,6 +171,19 @@ def _delete_source_batch(conn: sqlite3.Connection, source_batch: list[str]) -> N
             source_batch,
         )
     conn.execute(
+        f"""
+        UPDATE otel_completion_events
+        SET match_status = 'pending',
+            matched_record_id = NULL
+        WHERE matched_record_id IN (
+            SELECT record_id
+            FROM usage_events
+            WHERE source_file IN ({placeholders})
+        )
+        """,  # nosec B608 - generated placeholders
+        source_batch,
+    )
+    conn.execute(
         f"DELETE FROM usage_events WHERE source_file IN ({placeholders})",  # nosec B608
         source_batch,
     )

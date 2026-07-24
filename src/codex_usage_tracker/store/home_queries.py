@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
+from codex_usage_tracker.store.cache_repository import SQLiteCacheRepository
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.rows import row_to_dict
 
@@ -38,13 +39,10 @@ def query_home_usage_metrics(
             or int(state["source_generation"]) != int(state["current_generation"])
         ):
             return None
-        cached = conn.execute(
-            "SELECT value FROM refresh_meta WHERE key = ?",
-            (_HOME_USAGE_METRICS_KEY,),
-        ).fetchone()
+        cached = SQLiteCacheRepository(conn).get(_HOME_USAGE_METRICS_KEY)
         if cached is not None:
             try:
-                payload = json.loads(str(cached["value"]))
+                payload = json.loads(cached)
             except json.JSONDecodeError:
                 payload = None
             if (
@@ -140,16 +138,14 @@ def persist_home_usage_metrics(
         "source_generation": source_generation,
         "materialized_calls": materialized_calls,
     }
-    conn.execute(
-        """
-        INSERT INTO refresh_meta (key, value)
-        VALUES (?, ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value
-        """,
-        (
-            _HOME_USAGE_METRICS_KEY,
-            json.dumps(payload, sort_keys=True, separators=(",", ":")),
-        ),
+    SQLiteCacheRepository(conn).set_many(
+        {
+            _HOME_USAGE_METRICS_KEY: json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        }
     )
     return payload
 

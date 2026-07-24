@@ -61,6 +61,7 @@ from codex_usage_tracker.core.api_payloads import (
 )
 from codex_usage_tracker.interfaces.cli.commands import (
     run_analyze,
+    run_integrity,
     run_open,
     run_status,
     warn_legacy_alias,
@@ -184,6 +185,7 @@ _NAMESPACED_COMMAND_HANDLERS = {
     ("service", "uninstall"): run_dashboard_service,
     ("service", "serve"): run_serve_dashboard,
     ("admin", "inspect-log"): _run_inspect_log,
+    ("admin", "integrity"): run_integrity,
     ("admin", "rebuild-index"): _run_rebuild_index,
     ("admin", "reset-db"): _run_reset_db,
     ("admin", "dedupe-diagnostics"): _run_dedupe_diagnostics,

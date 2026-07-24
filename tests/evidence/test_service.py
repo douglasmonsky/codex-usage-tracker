@@ -27,6 +27,13 @@ from tests.store_dashboard_helpers import _usage_event
 def seed_evidence(db_path: Path) -> None:
     _seed(db_path)
     with connect(db_path) as connection:
+        connection.execute("PRAGMA defer_foreign_keys = ON")
+        record_ids = {
+            "call-0": "record-1",
+            "call-1": "record-4",
+            "call-2": "record-2",
+            "call-3": "record-3",
+        }
         connection.execute("UPDATE usage_events SET record_id='record-1' WHERE record_id='call-0'")
         connection.execute(
             "UPDATE usage_events SET canonical_record_id='record-1' "
@@ -35,6 +42,23 @@ def seed_evidence(db_path: Path) -> None:
         connection.execute("UPDATE usage_events SET record_id='record-4' WHERE record_id='call-1'")
         connection.execute("UPDATE usage_events SET record_id='record-2' WHERE record_id='call-2'")
         connection.execute("UPDATE usage_events SET record_id='record-3' WHERE record_id='call-3'")
+        for table_name in (
+            "allowance_observations",
+            "call_diagnostic_facts",
+            "command_runs",
+            "compression_record_facts",
+            "content_fragments",
+            "conversation_turns",
+            "file_events",
+            "recommendation_facts",
+            "source_records",
+            "tool_calls",
+        ):
+            for previous_id, record_id in record_ids.items():
+                connection.execute(
+                    f"UPDATE {table_name} SET record_id = ? WHERE record_id = ?",  # nosec B608
+                    (record_id, previous_id),
+                )
         connection.execute(
             "UPDATE usage_events SET thread_key='thread:alpha' WHERE record_id='record-3'"
         )
@@ -215,6 +239,11 @@ def test_allowance_resolves_one_exact_persisted_interval(tmp_path: Path) -> None
         connection.execute(
             "INSERT INTO allowance_source_state VALUES "
             "(1, 1, 'allowance:1', 1, '2026-07-22T00:00:00Z', 'v1', '2026-07-22T00:00:00Z')"
+        )
+        connection.execute(
+            "INSERT INTO allowance_cycles "
+            "(cycle_id, window_kind, window_key, cohort_key, source_revision) VALUES "
+            "('cycle-1', 'weekly', 'primary', 'team-a', 'allowance:1')"
         )
         connection.execute(
             "INSERT INTO allowance_intervals "

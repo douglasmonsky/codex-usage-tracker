@@ -43,6 +43,7 @@ def test_namespace_inventories_and_parsed_destinations_are_exact() -> None:
     assert CONFIG_COMMANDS == ("pricing", "allowance", "rate-card", "projects", "thresholds")
     assert SERVICE_COMMANDS == ("install", "status", "uninstall", "serve")
     assert ADMIN_COMMANDS == (
+        "integrity",
         "inspect-log",
         "rebuild-index",
         "reset-db",
@@ -63,6 +64,10 @@ def test_namespace_inventories_and_parsed_destinations_are_exact() -> None:
     assert parser.parse_args(["admin", "source-coverage"]).command_path == (
         "admin",
         "source-coverage",
+    )
+    assert parser.parse_args(["admin", "integrity", "--json"]).command_path == (
+        "admin",
+        "integrity",
     )
     assert parser.parse_args(["admin", "mcp", "serve", "--profile", "full"]).command_path == (
         "admin",

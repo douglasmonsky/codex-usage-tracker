@@ -8,10 +8,13 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
+from codex_usage_tracker.store.connection import execute_script
+
 
 def create_investigation_run_tables(conn: sqlite3.Connection) -> None:
     """Create the bounded investigation-run summary table."""
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS investigation_runs (
             run_key TEXT PRIMARY KEY,
@@ -30,7 +33,7 @@ def create_investigation_run_tables(conn: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_investigation_runs_kind_created
         ON investigation_runs(run_kind, created_at);
-        """
+        """,
     )
 
 

@@ -30,7 +30,7 @@ from codex_usage_tracker.core.dashboard_targets import build_limits_target_v2
 from codex_usage_tracker.jobs.adapters import AnalysisJobAdapter, request_hash
 from codex_usage_tracker.jobs.models import JobStatusV1
 from codex_usage_tracker.jobs.service import MAX_SEMANTIC_JOBS, JobService
-from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.connection import configure_connection, connect
 from codex_usage_tracker.store.schema import init_db
 
 _RANGE_DELTAS = {
@@ -368,7 +368,7 @@ def _open_database(db_path: Path) -> Iterator[sqlite3.Connection]:
             yield connection
         return
     connection = sqlite3.connect(":memory:")
-    connection.row_factory = sqlite3.Row
+    configure_connection(connection, enable_wal=False)
     init_db(connection)
     try:
         yield connection

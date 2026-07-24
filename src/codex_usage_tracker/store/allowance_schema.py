@@ -2,6 +2,8 @@
 
 import sqlite3
 
+from codex_usage_tracker.store.connection import execute_script
+
 MIGRATION_NAMES = {
     27: "add allowance intelligence storage",
     28: "repair allowance intelligence query indexes",
@@ -30,7 +32,8 @@ def migrate_allowance_intelligence_v2(conn: sqlite3.Connection) -> None:
     later analysis services that can establish their pricing provenance.
     """
 
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS allowance_source_state (
             state_id INTEGER PRIMARY KEY CHECK (state_id = 1),
@@ -185,7 +188,7 @@ def migrate_allowance_intelligence_v2(conn: sqlite3.Connection) -> None:
         ON allowance_analysis_snapshots(
             source_revision, model_version, archive_scope, window_kind, cohort_key, forecast_horizon
         );
-        """
+        """,
     )
 
 
@@ -203,7 +206,8 @@ def rebuild_allowance_intelligence(conn: sqlite3.Connection) -> None:
 def migrate_allowance_query_indexes_v3(conn: sqlite3.Connection) -> None:
     """Repair revision-aware allowance indexes for databases already at v26."""
 
-    conn.executescript(
+    execute_script(
+        conn,
         """
         DROP INDEX IF EXISTS idx_allowance_cycles_latest_cohort_window;
         DROP INDEX IF EXISTS idx_allowance_cycles_cohort_time_range;
@@ -250,7 +254,7 @@ def migrate_allowance_query_indexes_v3(conn: sqlite3.Connection) -> None:
         ON allowance_intervals(
             is_archived, source_revision, end_observed_at DESC, interval_id DESC
         );
-        """
+        """,
     )
 
 

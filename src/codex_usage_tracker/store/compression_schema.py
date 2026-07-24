@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Callable
 
+from codex_usage_tracker.store.connection import execute_script
+
 MIGRATION_NAMES = {
     15: "persist compression analysis runs",
     16: "persist compression detector facts",
@@ -45,7 +47,8 @@ _COMPRESSION_FACT_INDEX_DROP_STATEMENTS = (
 
 def create_compression_fact_tables(conn: sqlite3.Connection) -> None:
     """Create detector-ready record, sequence, and thread fact tables."""
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS compression_record_facts (
             record_id TEXT PRIMARY KEY,
@@ -138,7 +141,7 @@ def create_compression_fact_tables(conn: sqlite3.Connection) -> None:
             thread_count INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT NOT NULL
         );
-        """
+        """,
     )
     create_compression_fact_indexes(conn)
 
@@ -157,7 +160,8 @@ def drop_compression_fact_indexes(conn: sqlite3.Connection) -> None:
 
 def create_compression_run_tables(conn: sqlite3.Connection) -> None:
     """Create persistent run, candidate, and component-claim tables."""
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS compression_runs (
             run_id TEXT PRIMARY KEY,
@@ -273,7 +277,7 @@ def create_compression_run_tables(conn: sqlite3.Connection) -> None:
 
         INSERT OR IGNORE INTO compression_source_state(singleton, generation)
         VALUES (1, 0);
-        """
+        """,
     )
 
 
@@ -300,7 +304,8 @@ def create_compression_revision_tables(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE compression_runs ADD COLUMN revision_key TEXT NOT NULL DEFAULT ''"
         )
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS compression_revision_state (
             singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
@@ -338,7 +343,7 @@ def create_compression_revision_tables(conn: sqlite3.Connection) -> None:
             status,
             completed_at DESC
         );
-        """
+        """,
     )
 
 
