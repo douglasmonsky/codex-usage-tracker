@@ -1,7 +1,7 @@
 +++
 id = "artifact-promotion"
 kind = "cohesive-release-hardening"
-status = "active"
+status = "complete"
 base_ref = "origin/main"
 expires = 2026-08-08
 allowed_paths = [

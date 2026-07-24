@@ -2,9 +2,20 @@ import { gzipSync } from 'node:zlib';
 import { readFile, readdir } from 'node:fs/promises';
 
 const outputDir = new URL('../src/codex_usage_tracker/plugin_data/dashboard/react/', import.meta.url);
+const productBudget = JSON.parse(
+  await readFile(
+    new URL('../config/product-complexity-budget.json', import.meta.url),
+    'utf8',
+  ),
+);
+const productInitialJsBudget =
+  productBudget?.metrics?.main_initial_react_js_gzip_bytes?.maximum;
+if (!Number.isSafeInteger(productInitialJsBudget) || productInitialJsBudget < 0) {
+  throw new Error('product complexity budget must declare a non-negative initial React JS maximum');
+}
 const budgets = {
   // Equivalent bundles vary slightly across zlib builds; retain bounded platform headroom.
-  currentInitialJs: 67 * 1024,
+  currentInitialJs: productInitialJsBudget,
   currentInitialCss: 10 * 1024,
   targetInitialJs: 85 * 1024,
   targetInitialCss: 12 * 1024,

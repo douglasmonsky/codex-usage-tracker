@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "baseline": {
+    "release": "0.23.0",
+    "commit": "53483690ce4bda9f692a74d8c584472bdec34ff0",
+    "measurement_command": "python scripts/check_product_complexity.py --config config/product-complexity-budget.json [--dist dist]",
+    "rationale": "0.24 adopts a blocking ratchet from the immutable 0.23.0 release artifacts and the post-Task-36 source state."
+  },
+  "increase_policy": "A ceiling increase requires a documented architecture decision, an updated baseline fixture, and focused tests that prove the changed ceiling still fails closed.",
+  "metrics": {
+    "default_mcp_tools": {
+      "maximum": 7,
+      "baseline": 7,
+      "baseline_commit": "c75babd9fc6d1b4e4cb6efa8a1661b90ce55b2ee",
+      "rationale": "The default conversational surface remains the seven-tool 0.22 core."
+    },
+    "full_profile_mcp_tools": {
+      "maximum": 59,
+      "baseline": 59,
+      "baseline_commit": "c75babd9fc6d1b4e4cb6efa8a1661b90ce55b2ee",
+      "rationale": "The 0.22 full-profile catalog is a hard ceiling and may ratchet only downward without an architecture decision."
+    },
+    "stable_cli_top_level_commands": {
+      "maximum": 11,
+      "baseline": 11,
+      "baseline_commit": "a52338d510b731288819c169dbbd2ba412fa56ad",
+      "rationale": "The 0.24 grouped CLI exposes eleven stable top-level command families."
+    },
+    "primary_dashboard_routes": {
+      "maximum": 3,
+      "baseline": 3,
+      "baseline_commit": "53483690ce4bda9f692a74d8c584472bdec34ff0",
+      "rationale": "Home, Explore, and Limits are the complete primary Evidence Console."
+    },
+    "shell_utility_dashboard_routes": {
+      "maximum": 1,
+      "baseline": 1,
+      "baseline_commit": "53483690ce4bda9f692a74d8c584472bdec34ff0",
+      "rationale": "Settings is the only shell utility route."
+    },
+    "contextual_dashboard_routes": {
+      "maximum": 1,
+      "baseline": 1,
+      "baseline_commit": "53483690ce4bda9f692a74d8c584472bdec34ff0",
+      "rationale": "Evidence is the only contextual supporting route."
+    },
+    "unbudgeted_python_files_over_600": {
+      "maximum": 0,
+      "baseline": 0,
+      "baseline_commit": "a52338d510b731288819c169dbbd2ba412fa56ad",
+      "rationale": "No new runtime Python file may exceed 600 physical lines and grandfathered debt may not grow."
+    },
+    "unbudgeted_frontend_source_files_over_500": {
+      "maximum": 0,
+      "baseline": 0,
+      "baseline_commit": "a52338d510b731288819c169dbbd2ba412fa56ad",
+      "rationale": "No new authored frontend source may exceed 500 physical lines and grandfathered debt may not grow."
+    },
+    "wheel_bytes": {
+      "maximum": 7368106,
+      "baseline": 7017243,
+      "baseline_commit": "53483690ce4bda9f692a74d8c584472bdec34ff0",
+      "rationale": "Immutable PyPI 0.23.0 wheel size plus exactly five percent headroom, rounded up."
+    },
+    "sdist_bytes": {
+      "maximum": 33622880,
+      "baseline": 32021790,
+      "baseline_commit": "53483690ce4bda9f692a74d8c584472bdec34ff0",
+      "rationale": "Immutable PyPI 0.23.0 source distribution size plus exactly five percent headroom, rounded up."
+    },
+    "main_initial_react_js_gzip_bytes": {
+      "maximum": 67603,
+      "baseline": 61457,
+      "baseline_commit": "a52338d510b731288819c169dbbd2ba412fa56ad",
+      "rationale": "Post-constellation-removal initial React JavaScript plus exactly ten percent headroom, rounded up."
+    },
+    "stable_json_schemas": {
+      "maximum": 114,
+      "baseline": 114,
+      "baseline_commit": "a52338d510b731288819c169dbbd2ba412fa56ad",
+      "rationale": "The 95 schemas in 0.23.0 plus nineteen explicitly approved 0.24 contract additions form the adoption ceiling."
+    },
+    "sqlite_schema_increments": {
+      "maximum": 1,
+      "baseline": 0,
+      "baseline_commit": "a52338d510b731288819c169dbbd2ba412fa56ad",
+      "rationale": "The prospective release ratchet starts at schema 37; the already-approved pre-adoption 0.24 migrations from 34 to 37 are documented architecture history."
+    }
+  },
+  "source_files": {
+    "python": {
+      "roots": [
+        "src/codex_usage_tracker"
+      ],
+      "extensions": [
+        ".py"
+      ],
+      "exclude_globs": [
+        "src/codex_usage_tracker/plugin_data/**"
+      ],
+      "maximum_physical_lines": 600,
+      "grandfathered": {
+        "src/codex_usage_tracker/reports/agentic_dogfood.py": 803,
+        "src/codex_usage_tracker/store/api.py": 824,
+        "src/codex_usage_tracker/store/dashboard_queries.py": 949,
+        "src/codex_usage_tracker/store/schema.py": 750
+      }
+    },
+    "frontend": {
+      "roots": [
+        "frontend/dashboard/src"
+      ],
+      "extensions": [
+        ".ts",
+        ".tsx",
+        ".css"
+      ],
+      "exclude_globs": [
+        "**/*.test.ts",
+        "**/*.test.tsx"
+      ],
+      "maximum_physical_lines": 500,
+      "grandfathered": {
+        "frontend/dashboard/src/App.tsx": 744,
+        "frontend/dashboard/src/api/client.ts": 829,
+        "frontend/dashboard/src/app/zh-Hans/corePages.ts": 730,
+        "frontend/dashboard/src/app/zh-Hans/diagnosticsReports.ts": 773,
+        "frontend/dashboard/src/features/call-investigator/CallInvestigatorPage.tsx": 807,
+        "frontend/dashboard/src/features/diagnostics/DiagnosticFactsPanels.tsx": 537,
+        "frontend/dashboard/src/features/diagnostics/DiagnosticsPage.tsx": 510,
+        "frontend/dashboard/src/features/limits/LimitsPage.tsx": 658
+      }
+    }
+  },
+  "dashboard_routes": {
+    "catalog": "frontend/dashboard/src/routes/evidenceConsoleRoutes.ts",
+    "const": "evidenceConsoleRoutes"
+  },
+  "dashboard_bundle": {
+    "output_dir": "src/codex_usage_tracker/plugin_data/dashboard/react"
+  },
+  "sqlite_schema": {
+    "release_023_version": 34,
+    "budget_adoption_version": 37
+  }
+}

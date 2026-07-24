@@ -124,6 +124,7 @@ vulture src tests config/vulture-whitelist.py
 pip-audit -r requirements/audit.txt
 python -m agent_maintainer.runners.bandit
 zizmor --offline --no-progress .github/workflows
+python scripts/check_product_complexity.py --config config/product-complexity-budget.json
 python -m compileall src
 for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
   node --check "$file"
@@ -133,6 +134,7 @@ git diff --check
 rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info
 python -m build
 python -m twine check dist/*
+python scripts/check_product_complexity.py --config config/product-complexity-budget.json --dist dist
 python scripts/check_release.py --dist
 ```
 
@@ -151,6 +153,36 @@ The quality inventory tests are also release blockers:
 - `tests/quality/test_compatibility_inventory.py` keeps every deprecated MCP
   alias synchronized with the normative deprecation ledger and migration
   metadata.
+- `tests/quality/test_product_complexity_budget.py` proves every public-surface,
+  source-size, artifact-size, bundle-size, schema-count, and migration metric
+  fails above its committed ceiling.
+
+### Product-complexity budgets
+
+Run the source-only budget during normal development:
+
+```bash
+python scripts/check_product_complexity.py --config config/product-complexity-budget.json
+```
+
+After building exactly one wheel and one sdist, include immutable artifact
+sizes:
+
+```bash
+python scripts/check_product_complexity.py \
+  --config config/product-complexity-budget.json \
+  --dist dist
+```
+
+The checker reads authoritative registries and the named Evidence Console route
+catalog; it does not infer public surfaces from repository-wide text matches.
+Inherited oversized authored files are frozen at their adoption line counts.
+If one shrinks below its threshold or is removed, remove its grandfathered
+entry in the same change so the ratchet cannot grow back.
+
+Do not raise a ceiling to make CI green. A ceiling increase requires a
+documented architecture decision, updated baseline and rationale fields, and a
+focused fixture that still proves the new maximum fails closed.
 
 Regenerate the universal runtime audit input after changing production
 dependencies:
@@ -392,6 +424,7 @@ git diff --check
 rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info
 python -m build
 python -m twine check dist/*
+python scripts/check_product_complexity.py --config config/product-complexity-budget.json --dist dist
 python scripts/check_release.py --dist
 ```
 

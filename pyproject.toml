@@ -164,7 +164,13 @@ structure_ignore_paths = [
   "venv/**",
   "**/__pycache__/**",
 ]
-vulture_paths = ["src", "tests", "config/vulture-whitelist.py"]
+vulture_paths = [
+  "src",
+  "tests",
+  "scripts/check_product_complexity.py",
+  "scripts/check_release.py",
+  "config/vulture-whitelist.py",
+]
 require_tests = true
 coverage_fail_under = 85
 diff_cover_fail_under = 90
@@ -300,6 +306,7 @@ log_dir = ".verify-logs"
 python_version = "3.10"
 warn_unused_configs = true
 files = [
+  "scripts/check_product_complexity.py",
   "src/codex_usage_tracker/core/json_contracts.py",
   "src/codex_usage_tracker/core/models.py",
   "src/codex_usage_tracker/reports/recommendations.py",

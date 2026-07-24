@@ -123,6 +123,32 @@ Release assets are downloaded from PyPI before attachment. The last job verifies
 the same manifest hashes at TestPyPI, PyPI, and GitHub; no production job may
 rebuild the distributions.
 
+### Product-complexity budget decision
+
+`config/product-complexity-budget.json` is the versioned architecture boundary
+for public-surface counts, authored-source size, package bytes, the initial
+React JavaScript payload, stable JSON schemas, and SQLite schema growth.
+`scripts/check_product_complexity.py` measures the actual MCP registry, CLI
+parser inventory, Evidence Console route catalog, JSON contract registry, and
+SQLite schema constant. It reads built artifacts only when `--dist` is
+provided. The dashboard bundle checker reads the same committed initial-JS
+ceiling instead of maintaining a second number.
+
+The 0.24 budget adopts two explicit historical exceptions without hiding them:
+
+- Existing runtime Python files above 600 physical lines and authored frontend
+  files above 500 are enumerated at their exact adoption sizes. They may shrink
+  or be removed, but no grandfathered file may grow and no new oversized file
+  may appear.
+- Release 0.23.0 used SQLite schema 34. Approved Tasks 29 and 33 reached schema
+  37 before this gate was introduced. The blocking one-increment ceiling is
+  therefore prospective from adoption version 37; the 34-to-37 history remains
+  recorded in the budget rather than being rewritten or collapsed.
+
+A ceiling increase requires an architecture decision, a changed baseline
+fixture, and focused fail-closed tests. Ordinary feature work may ratchet a
+ceiling downward without a new decision.
+
 ## Boundaries
 
 - `parser.py` converts local JSONL events into aggregate `UsageEvent` records. It also attaches metadata-only call-origin categories, diagnostic facts from `diagnostic_facts.py`, archived-session flags, conservative thread keys, source cursors, and parser diagnostics.
@@ -222,11 +248,13 @@ Use the narrowest useful check first, then the release suite before committing s
 python -m pytest
 python -m compileall src
 python -m mypy
+python scripts/check_product_complexity.py --config config/product-complexity-budget.json
 for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
   node --check "$file"
 done
 python scripts/check_release.py
 python -m build
+python scripts/check_product_complexity.py --config config/product-complexity-budget.json --dist dist
 python scripts/check_release.py --dist
 git diff --check
 python scripts/benchmark_dashboard_routes.py --sizes 100000 --iterations 3 --skip-compression --enforce-thresholds --output-dir /tmp/dashboard-route-budget

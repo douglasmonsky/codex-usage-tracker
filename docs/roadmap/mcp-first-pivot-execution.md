@@ -1404,8 +1404,8 @@ complete without its named focused and full verification evidence.
 
 ## Task 36 - Promote One Verified Release Artifact
 
-- Status: complete locally on `pivot/36-artifact-promotion`; hosted CI and
-  merge remain.
+- Status: merged by PR #304 as `a52338d510b731288819c169dbbd2ba412fa56ad`;
+  the complete hosted CI matrix passed.
 - Build-once contract:
   - one wheel/sdist pair and one canonical manifest are uploaded as the sole
     `python-dist` build artifact;
@@ -1463,3 +1463,51 @@ complete without its named focused and full verification evidence.
     binding, and exact package-index artifact-set validation;
   - all three fixes pass the bounded recheck above. Reviewer token attribution
     is `pending` because the aggregate metrics helper timed out.
+
+## Task 37 - Budget Product and Package Complexity
+
+- Status: complete locally on `pivot/37-product-complexity-budget`; reviewed
+  PR remains.
+- Graph-guided scope:
+  - a fresh GitNexus index at `a52338d` routed measurement to the MCP
+    `tool_specs` catalog, CLI `build_parser` inventory, Evidence Console route
+    catalog, stable JSON schema registry, SQLite schema constant, and release
+    artifact boundary;
+  - Serena verified the exact symbols before implementation. Source and focused
+    tests remain authoritative.
+- Budget decisions:
+  - default/full MCP ceilings are 7/59, stable CLI families are 11, and
+    Evidence Console placements remain 3 primary, 1 contextual, and 1 utility;
+  - immutable PyPI 0.23.0 artifacts establish 7,017,243-byte wheel and
+    32,021,790-byte sdist baselines with exactly 5% rounded-up headroom;
+  - post-constellation initial React JavaScript is 61,457 deterministic gzip
+    bytes with exactly 10% rounded-up headroom;
+  - existing oversized authored files are explicitly frozen while new or
+    growing violations remain zero;
+  - 0.23 schema 34 to pre-adoption schema 37 is recorded as architecture
+    history, and the one-increment blocking ratchet starts prospectively at 37.
+- Focused verification so far:
+  - all 31 budget tests plus the focused CLI bundle-contract test pass,
+    including a reduced ceiling for every metric, strict literal route-catalog
+    parsing, recursive source exclusions, line-debt growth, and duplicate
+    distributions;
+  - source measurement, release readiness, MyPy, Ruff, format, and the
+    config-backed dashboard bundle gate pass.
+- Broad verification:
+  - one Agent Maintainer `ci` run
+    `20260724T111442082155Z-ci-c9b951763d69` passed all 2,146 tests and
+    reported only inherited repository-wide file-length, formatting, Pyright
+    test, Xenon, Pylint, Tach/config, optional TypeScript-tooling, and
+    Zizmor findings; its launch-snapshot change-plan failure was corrected and
+    the direct plan check passes;
+  - final wheel/sdist measurements are 7,077,471 and 32,160,218 bytes, both
+    under their immutable-0.23-derived ceilings.
+- Final review:
+  - the single read-only reviewer reported four findings (two medium, two
+    low); all four were accepted;
+  - the route catalog now rejects comments, nested decoys, spreads, computed
+    keys, calls, and non-object entries; critical policy values are pinned;
+    recursive exclusions are normalized; and the checker itself now satisfies
+    the Task 37 Xenon A/B complexity gate;
+  - reviewer token attribution is `pending` in the aggregate-only metrics
+    ledger.

@@ -21,6 +21,7 @@ SCRIPT_ROOT = Path(__file__).resolve().parent
 if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
+from check_product_complexity import check_product_complexity_budget  # noqa: E402
 from release_quality import (  # noqa: E402
     check_ci_workflow,
     check_compatibility_inventory,
@@ -289,6 +290,7 @@ WHEEL_REQUIRED_MEMBERS = {
     "codex_usage_tracker/plugin_data/skills/codex-usage-tracker/scripts/run_mcp.py",
 }
 SDIST_REQUIRED_MEMBERS = {
+    *("config/product-complexity-budget.json", "scripts/check_product_complexity.py"),
     "docs/cli-json-schemas.md",
     "docs/releases/0.22.0.md",
     "docs/upgrading-to-0.22.0.md",
@@ -337,6 +339,14 @@ def main() -> int:
     failures.extend(_check_tracked_files_for_secrets())
     failures.extend(_check_react_dashboard_privacy_artifacts())
     failures.extend(_check_removed_dashboard_visualization())
+    failures.extend(
+        f"product complexity budget: {failure}"
+        for failure in check_product_complexity_budget(
+            REPO_ROOT,
+            REPO_ROOT / "config/product-complexity-budget.json",
+            dist_dir=REPO_ROOT / "dist" if args.dist else None,
+        )
+    )
     if args.dist:
         failures.extend(_check_sdist())
         failures.extend(_check_wheel())
