@@ -8,6 +8,7 @@ import gzip
 import io
 import tarfile
 from pathlib import Path
+from typing import cast
 
 
 class ArtifactNormalizationError(ValueError):
@@ -71,7 +72,7 @@ def _normalized_member(member: tarfile.TarInfo, *, epoch: int) -> tarfile.TarInf
     normalized.gid = 0
     normalized.uname = ""
     normalized.gname = ""
-    normalized.pax_headers.clear()
+    cast(dict[str, str], normalized.pax_headers).clear()
     return normalized
 
 
