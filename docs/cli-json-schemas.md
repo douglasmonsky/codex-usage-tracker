@@ -126,6 +126,21 @@ Tracked schema ids:
 | `codex-usage-tracker-init-thresholds-v1` | CLI `init-thresholds --json` |
 | `codex-usage-tracker-init-projects-v1` | CLI `init-projects --json` |
 | `codex-usage-tracker-support-bundle-v1` | CLI `support-bundle --json` |
+| `codex-usage-tracker-agentic-dogfood-v1` | Aggregate agentic dogfood comparison report |
+| `codex-usage-tracker-allowance-v1` | Local allowance configuration |
+| `codex-usage-tracker-codex-rate-card-v1` | Local Codex credit rate card |
+| `codex-usage-tracker-diagnostic-snapshot-refresh-v1` | Diagnostic snapshot refresh metadata |
+| `codex-usage-tracker-health-v1` | Local dashboard server health response |
+| `codex-usage-tracker-home-summary-v1` | Bounded Home summary response |
+| `codex-usage-tracker-pricing-v2` | Local model pricing configuration |
+| `codex-usage-tracker-react-selected-report-v1` | Downloaded selected-report JSON from the React dashboard |
+| `codex-usage-tracker-refresh-job-v1` | Compatibility dashboard refresh job |
+| `codex-usage-tracker-refresh-progress-v1` | Compatibility refresh progress event |
+| `codex-usage-tracker-usage-drain-model-v1` | Aggregate usage-drain model |
+| `codex-usage-tracker.analysis-result.v1` | Persisted generic analysis job result |
+| `codex-usage-tracker.compression-profile.v1` | Persisted Compression Lab job result |
+| `codex-usage-tracker.diagnostic-result.v1` | Persisted diagnostic job result |
+| `codex-usage-tracker.refresh-result.v1` | Persisted refresh job result |
 
 ## Dashboard Targets
 

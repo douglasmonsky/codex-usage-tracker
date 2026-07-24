@@ -32,7 +32,13 @@ from codex_usage_tracker.interfaces.mcp.developer_tools import (
     DEVELOPER_TOOL_NAMES,
     developer_handler,
 )
-from codex_usage_tracker.interfaces.mcp.models import McpProfile, ToolDataClass, ToolSpec
+from codex_usage_tracker.interfaces.mcp.models import (
+    McpProfile,
+    ToolDataClass,
+    ToolSpec,
+    WorkProofContract,
+)
+from codex_usage_tracker.interfaces.mcp.work_proof import WORK_PROOFS
 
 PROFILE_ORDER: dict[McpProfile, int] = {"core": 0, "full": 1, "developer": 2}
 
@@ -78,31 +84,48 @@ def validate_tool_specs(specs: Iterable[ToolSpec]) -> None:
     names: set[str] = set()
     previous_rank = -1
     for spec in specs:
-        if spec.name in names:
-            raise ToolCatalogError(f"duplicate tool name: {spec.name}")
-        names.add(spec.name)
+        previous_rank = _validate_profile(spec, names, previous_rank)
+        _validate_work_proof(spec)
+        _validate_lifecycle(spec)
 
-        rank = PROFILE_ORDER.get(spec.minimum_profile)
-        if rank is None or rank < previous_rank:
-            raise ToolCatalogError(f"invalid minimum-profile order: {spec.name}")
-        previous_rank = rank
 
-        if spec.minimum_profile == "core":
-            if spec.disposition != "core":
-                raise ToolCatalogError(f"invalid core disposition: {spec.name}")
-        elif spec.disposition not in {"compatibility", "advanced", "developer", "deprecated"}:
-            raise ToolCatalogError(f"missing catalog disposition: {spec.name}")
-        if spec.disposition == "developer" and spec.minimum_profile != "developer":
-            raise ToolCatalogError(f"invalid developer disposition: {spec.name}")
+def _validate_profile(spec: ToolSpec, names: set[str], previous_rank: int) -> int:
+    if spec.name in names:
+        raise ToolCatalogError(f"duplicate tool name: {spec.name}")
+    names.add(spec.name)
+    rank = PROFILE_ORDER.get(spec.minimum_profile)
+    if rank is None or rank < previous_rank:
+        raise ToolCatalogError(f"invalid minimum-profile order: {spec.name}")
+    if spec.minimum_profile == "core" and spec.disposition != "core":
+        raise ToolCatalogError(f"invalid core disposition: {spec.name}")
+    allowed = {"compatibility", "advanced", "developer", "deprecated"}
+    if spec.minimum_profile != "core" and spec.disposition not in allowed:
+        raise ToolCatalogError(f"missing catalog disposition: {spec.name}")
+    if spec.disposition == "developer" and spec.minimum_profile != "developer":
+        raise ToolCatalogError(f"invalid developer disposition: {spec.name}")
+    return rank
 
-        if spec.lifecycle != "deprecated":
-            continue
-        if not spec.replacement:
-            raise ToolCatalogError(f"missing replacement: {spec.name}")
-        if not spec.deprecated_since or not spec.final_supported or not spec.remove_after:
-            raise ToolCatalogError(f"missing deprecation release: {spec.name}")
-        if _release_tuple(spec.remove_after) < _release_tuple(spec.deprecated_since):
-            raise ToolCatalogError(f"removal release precedes deprecation release: {spec.name}")
+
+def _validate_lifecycle(spec: ToolSpec) -> None:
+    if spec.lifecycle != "deprecated":
+        return
+    if not spec.replacement:
+        raise ToolCatalogError(f"missing replacement: {spec.name}")
+    if not spec.deprecated_since or not spec.final_supported or not spec.remove_after:
+        raise ToolCatalogError(f"missing deprecation release: {spec.name}")
+    if _release_tuple(spec.remove_after) < _release_tuple(spec.deprecated_since):
+        raise ToolCatalogError(f"removal release precedes deprecation release: {spec.name}")
+
+
+def _validate_work_proof(spec: ToolSpec) -> None:
+    proof = spec.work_proof
+    if proof.minimum_when_applicable < 0:
+        raise ToolCatalogError(f"invalid work-proof minimum: {spec.name}")
+    if proof.kind == "constant":
+        if proof.processed_field is not None or proof.minimum_when_applicable != 0:
+            raise ToolCatalogError(f"invalid constant work proof: {spec.name}")
+    elif not proof.processed_field or proof.minimum_when_applicable < 1:
+        raise ToolCatalogError(f"invalid measured work proof: {spec.name}")
 
 
 def _data_class(name: str) -> ToolDataClass:
@@ -130,6 +153,14 @@ def _data_class(name: str) -> ToolDataClass:
     ):
         return "administrative"
     return "aggregate"
+
+
+def _work_proof(name: str) -> WorkProofContract:
+    """Map each tool family to the response field that proves useful work."""
+    try:
+        return WORK_PROOFS[name]
+    except KeyError as exc:
+        raise ToolCatalogError(f"missing work-proof contract: {name}") from exc
 
 
 def _replacement(name: str) -> str:
@@ -193,6 +224,7 @@ def tool_specs() -> tuple[ToolSpec, ...]:
                     else "aggregate"
                 ),
                 handler=_CORE_HANDLERS[name],
+                work_proof=_work_proof(name),
             )
             for name in CORE_TOOL_NAMES
         )
@@ -206,6 +238,7 @@ def tool_specs() -> tuple[ToolSpec, ...]:
                 disposition="developer",
                 data_class=_data_class(name),
                 handler=_lazy_profile_handler(name),
+                work_proof=_work_proof(name),
             )
             for name in DEVELOPER_TOOL_NAMES
         )
@@ -366,6 +399,7 @@ def _full_tool_spec(name: str) -> ToolSpec:
         disposition="advanced" if advanced else "compatibility",
         data_class=_data_class(name),
         handler=_lazy_profile_handler(name),
+        work_proof=_work_proof(name),
         replacement=None if advanced else _replacement(name),
         deprecated_since=None if advanced else "0.22.0",
         final_supported=None if advanced else "0.24.x",

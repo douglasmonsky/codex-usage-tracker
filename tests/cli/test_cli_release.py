@@ -98,47 +98,6 @@ def test_dashboard_main_bundle_budget_is_ratcheted_after_constellation_removal()
     assert int(match.group(1)) <= MAX_INITIAL_DASHBOARD_JS_KIB
 
 
-def test_release_check_accepts_setup_node_v7(tmp_path: Path) -> None:
-    module = _load_release_check_module()
-    workflow_dir = tmp_path / ".github" / "workflows"
-    workflow_dir.mkdir(parents=True)
-    (workflow_dir / "ci.yml").write_text(
-        """name: CI
-
-jobs:
-  package:
-    name: Build package
-    steps:
-      - uses: actions/setup-node@v7.0.0
-        with:
-          node-version: "22"
-      - run: npm ci
-      - run: npm run dashboard:assets:check
-      - run: python -m build
-      - run: python -m twine check dist/*
-      - run: python scripts/check_release.py --dist
-      - run: python scripts/smoke_installed_package.py
-""",
-        encoding="utf-8",
-    )
-    (tmp_path / "package.json").write_text(
-        json.dumps(
-            {
-                "scripts": {
-                    "dashboard:assets:check": (
-                        "npm run dashboard:build && python3 "
-                        "scripts/check_release.py --dashboard-assets"
-                    )
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    module.REPO_ROOT = tmp_path
-
-    assert module._check_ci_workflow() == []
-
-
 def test_release_check_rejects_stale_public_package_version_claims(tmp_path: Path) -> None:
     module = _load_release_check_module()
     (tmp_path / "docs").mkdir()

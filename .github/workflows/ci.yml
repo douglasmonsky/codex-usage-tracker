@@ -228,6 +228,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@v6.3.0
         with:
@@ -247,10 +248,20 @@ jobs:
         if: matrix.python-version == '3.14'
         run: python -m mypy
       - name: Test
+        if: matrix.python-version != '3.14'
         run: python -m pytest
       - name: Coverage
         if: matrix.python-version == '3.14'
-        run: python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
+        run: >-
+          python -m pytest
+          --cov=codex_usage_tracker
+          --cov-report=term-missing
+          --cov-report=xml
+      - name: Changed-line coverage
+        if: matrix.python-version == '3.14' && github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: diff-cover coverage.xml --compare-branch=origin/$BASE_REF --fail-under=90
       - name: Compile
         run: python -m compileall src
       - name: Dashboard JavaScript syntax
