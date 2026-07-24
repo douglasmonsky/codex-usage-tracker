@@ -11,7 +11,7 @@ _COVERAGE_STEP = """      - name: Changed-line coverage
         if: matrix.python-version == '3.14' && github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: diff-cover coverage.xml --compare-branch=origin/$BASE_REF --fail-under=90
+        run: diff-cover coverage.xml --compare-branch="origin/$BASE_REF" --fail-under=90
 """
 
 

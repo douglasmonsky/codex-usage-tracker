@@ -1346,6 +1346,12 @@ complete without its named focused and full verification evidence.
   - the bounded post-review recheck passed `54 tests`, retained 88.05%
     aggregate coverage and 93% changed-line coverage, and passed the source
     release checker.
+- PR verification:
+  - the first PR run exposed an obsolete Vulture protocol stub and an unquoted
+    `BASE_REF` in the new shell command;
+  - the stub was removed, the branch reference and release invariant now
+    require shell-safe quoting, and the exact Vulture, Zizmor, focused pytest,
+    Ruff, and release-readiness commands pass locally.
 - Follow-up risks:
   - auxiliary schemas with intentionally flexible payloads are inventoried with
     empty required-field maps; future stabilization may tighten those shapes

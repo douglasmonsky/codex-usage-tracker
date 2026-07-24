@@ -172,7 +172,7 @@ def check_ci_workflow(
             for required in [
                 "if: matrix.python-version == '3.14' && github.event_name == 'pull_request'",
                 "BASE_REF: ${{ github.base_ref }}",
-                "run: diff-cover coverage.xml --compare-branch=origin/$BASE_REF --fail-under=90",
+                'run: diff-cover coverage.xml --compare-branch="origin/$BASE_REF" --fail-under=90',
             ]:
                 if required not in coverage_step:
                     failures.append(
