@@ -43,9 +43,9 @@ First install? Start with the [First Five Minutes guide](docs/first-five-minutes
 for setup, MCP verification, a starter analysis question, optional evidence, and
 safe issue diagnostics.
 
-Upgrading from 0.22? Read [Upgrading to 0.23.0](docs/upgrading-to-0.23.0.md) and
-the [0.23.0 release note](docs/releases/0.23.0.md) for the focused Evidence
-Console, simplified CLI, and compatibility options.
+Upgrading from 0.23? Read [Upgrading to 0.24.0](docs/upgrading-to-0.24.0.md) and
+the [0.24.0 release note](docs/releases/0.24.0.md) for the hardened architecture,
+bounded context reads, persistent analysis jobs, and compatibility timeline.
 
 The first useful workflow is:
 

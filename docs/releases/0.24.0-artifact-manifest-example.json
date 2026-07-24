@@ -1,0 +1,51 @@
+{
+  "artifacts": [
+    {
+      "path": "codex_usage_tracking-0.24.0-py3-none-any.whl",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "size": 0
+    },
+    {
+      "path": "codex_usage_tracking-0.24.0.tar.gz",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "size": 0
+    }
+  ],
+  "contract_inventory": {
+    "database_schema_version": 37,
+    "evidence_console_bundles": [
+      {
+        "path": "plugin_data/dashboard/react/index.html",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "size": 0
+      }
+    ],
+    "json_schemas": [
+      "codex-usage-tracker.mcp-envelope.v1",
+      "<all remaining ordered schema identifiers>"
+    ],
+    "mcp_tools": {
+      "core": [
+        "usage_status",
+        "usage_refresh",
+        "usage_analyze",
+        "usage_query",
+        "usage_evidence",
+        "usage_allowance",
+        "usage_job_status"
+      ],
+      "developer": [
+        "<64 ordered developer tool names>"
+      ],
+      "full": [
+        "<59 ordered full tool names>"
+      ]
+    }
+  },
+  "distribution": "codex-usage-tracking",
+  "schema": "codex-usage-tracker.release-artifact-manifest.v1",
+  "source": {
+    "git_sha": "0000000000000000000000000000000000000000"
+  },
+  "version": "0.24.0"
+}

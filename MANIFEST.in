@@ -1,7 +1,7 @@
 include README.md LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md AGENTS.md .mcp.json
 recursive-include .codex-plugin *.json
 recursive-include assets *.svg
-recursive-include docs *.md *.png
+recursive-include docs *.json *.md *.png
 exclude docs/usage-drain-research-white-paper.md
 prune output
 recursive-include skills *.md *.py

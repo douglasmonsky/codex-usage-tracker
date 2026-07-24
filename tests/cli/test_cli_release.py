@@ -147,6 +147,9 @@ def test_release_check_requires_current_release_docs_and_packaged_launcher() -> 
         "docs/upgrading-to-0.22.0.md",
         "docs/releases/0.23.0.md",
         "docs/upgrading-to-0.23.0.md",
+        "docs/releases/0.24.0.md",
+        "docs/upgrading-to-0.24.0.md",
+        "docs/releases/0.24.0-artifact-manifest-example.json",
         "docs/evidence-console-route-migration.md",
     } <= set(module.REQUIRED_FILES)
     assert wheel_launcher in module.WHEEL_REQUIRED_MEMBERS

@@ -1,4 +1,4 @@
-"""Deterministic routing checks for the 0.22 core MCP surface."""
+"""Deterministic routing checks for the stable core MCP surface."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from codex_usage_tracker.application.analyze import ANALYSIS_RESULT_SCHEMA
 from codex_usage_tracker.application.query_models import QueryResult
 from codex_usage_tracker.evidence.models import EVIDENCE_RESULT_SCHEMA
 from codex_usage_tracker.interfaces.mcp.profiles import tools_for_profile
+from codex_usage_tracker.store.schema import SCHEMA_VERSION
 
 CASES_DIR = Path(__file__).with_name("cases")
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -83,3 +84,18 @@ def test_golden_question_routes_are_supported_by_skill_and_core_metadata(
         assert inspect.getdoc(spec.handler)
         inspect.signature(spec.handler).bind(**call["arguments"])
         assert call["result_schema"] == _expected_result_schema(call)
+
+
+def test_024_release_docs_preserve_core_routes_and_the_compatibility_window() -> None:
+    release = (REPO_ROOT / "docs/releases/0.24.0.md").read_text(encoding="utf-8")
+    upgrade = (REPO_ROOT / "docs/upgrading-to-0.24.0.md").read_text(encoding="utf-8")
+
+    assert "Release 0.24.0" in release
+    assert f"schema version {SCHEMA_VERSION}" in release
+    for profile in ("core", "full", "developer"):
+        assert f"{len(tools_for_profile(profile))} {profile}" in release
+    assert "notice-only" in release
+    assert "0.25.0" in release
+    assert "codex-usage-tracker setup" in upgrade
+    assert "codex-usage-tracker doctor" in upgrade
+    assert "No manual database step is required" in upgrade
