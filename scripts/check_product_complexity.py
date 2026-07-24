@@ -10,6 +10,7 @@ import re
 import sys
 from collections import Counter
 from fnmatch import fnmatchcase
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -410,10 +411,12 @@ def measure_product_complexity(
     if str(source_root) not in sys.path:
         sys.path.insert(0, str(source_root))
 
-    from codex_usage_tracker.core.json_contracts import known_json_schemas
-    from codex_usage_tracker.interfaces.cli.parser import STABLE_TOP_LEVEL_COMMANDS
-    from codex_usage_tracker.interfaces.mcp.profiles import tools_for_profile
-    from codex_usage_tracker.store.schema import SCHEMA_VERSION
+    # Keep the release checker as its own typed boundary instead of making its
+    # focused MyPy target recursively analyze the complete runtime package.
+    json_contracts = import_module("codex_usage_tracker.core.json_contracts")
+    cli_parser = import_module("codex_usage_tracker.interfaces.cli.parser")
+    mcp_profiles = import_module("codex_usage_tracker.interfaces.mcp.profiles")
+    store_schema = import_module("codex_usage_tracker.store.schema")
 
     route_config = budget["dashboard_routes"]
     route_source = (root / route_config["catalog"]).read_text(encoding="utf-8")
@@ -421,16 +424,17 @@ def measure_product_complexity(
     python_debt = measure_line_budget(root, budget["source_files"]["python"])
     frontend_debt = measure_line_budget(root, budget["source_files"]["frontend"])
     adoption_version = budget["sqlite_schema"]["budget_adoption_version"]
-    increments = SCHEMA_VERSION - adoption_version
+    schema_version = store_schema.SCHEMA_VERSION
+    increments = schema_version - adoption_version
     if increments < 0:
         raise BudgetError(
-            f"SQLite schema version {SCHEMA_VERSION} predates budget adoption "
+            f"SQLite schema version {schema_version} predates budget adoption "
             f"version {adoption_version}"
         )
     measurements = {
-        "default_mcp_tools": len(tools_for_profile("core")),
-        "full_profile_mcp_tools": len(tools_for_profile("full")),
-        "stable_cli_top_level_commands": len(STABLE_TOP_LEVEL_COMMANDS),
+        "default_mcp_tools": len(mcp_profiles.tools_for_profile("core")),
+        "full_profile_mcp_tools": len(mcp_profiles.tools_for_profile("full")),
+        "stable_cli_top_level_commands": len(cli_parser.STABLE_TOP_LEVEL_COMMANDS),
         "primary_dashboard_routes": placements["primary"],
         "shell_utility_dashboard_routes": placements["utility"],
         "contextual_dashboard_routes": placements["contextual"],
@@ -439,7 +443,7 @@ def measure_product_complexity(
         "main_initial_react_js_gzip_bytes": measure_initial_javascript(
             root / budget["dashboard_bundle"]["output_dir"]
         ),
-        "stable_json_schemas": len(known_json_schemas()),
+        "stable_json_schemas": len(json_contracts.known_json_schemas()),
         "sqlite_schema_increments": increments,
     }
     if dist_dir is not None:
