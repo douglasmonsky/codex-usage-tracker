@@ -5,7 +5,10 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
+    import tomli as tomllib
 
 import codex_usage_tracker
 from codex_usage_tracker.allowance_intelligence.materialization import (
