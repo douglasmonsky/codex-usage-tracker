@@ -17,6 +17,36 @@ from codex_usage_tracker.core.json_contract_visualization import (
 
 NoneType = type(None)
 
+AUXILIARY_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
+    "codex-usage-tracker-agentic-dogfood-v1": {"required": {"generated_at": str}},
+    "codex-usage-tracker-allowance-v1": {"required": {}},
+    "codex-usage-tracker-codex-rate-card-v1": {"required": {}},
+    "codex-usage-tracker-diagnostic-snapshot-refresh-v1": {"required": {}},
+    "codex-usage-tracker-health-v1": {"required": {"status": str}},
+    "codex-usage-tracker-home-summary-v1": {"required": {"source_revision": str}},
+    "codex-usage-tracker-pricing-v2": {"required": {}},
+    "codex-usage-tracker-react-selected-report-v1": {
+        "required": {
+            "generated_at": (str, NoneType),
+            "source": str,
+            "report": dict,
+            "method": str,
+            "caveat": str,
+            "evidence": list,
+            "raw_context_included": bool,
+        }
+    },
+    "codex-usage-tracker-refresh-job-v1": {"required": {"job_id": str, "status": str}},
+    "codex-usage-tracker-refresh-progress-v1": {
+        "required": {"phase": str, "status": str, "message": str}
+    },
+    "codex-usage-tracker-usage-drain-model-v1": {"required": {}},
+    "codex-usage-tracker.analysis-result.v1": {"required": {}},
+    "codex-usage-tracker.compression-profile.v1": {"required": {}},
+    "codex-usage-tracker.diagnostic-result.v1": {"required": {}},
+    "codex-usage-tracker.refresh-result.v1": {"required": {}},
+}
+
 HTTP_V2_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
     "codex-usage-tracker.status.v2": {
         "required": {
@@ -253,6 +283,7 @@ MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
 MCP_EVIDENCE_SCHEMA_IDS = tuple(MCP_EVIDENCE_JSON_PAYLOAD_CONTRACTS)
 
 JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
+    **AUXILIARY_JSON_PAYLOAD_CONTRACTS,
     **HTTP_V2_JSON_PAYLOAD_CONTRACTS,
     **QUERY_JSON_PAYLOAD_CONTRACTS,
     **EVIDENCE_RESULT_JSON_PAYLOAD_CONTRACTS,

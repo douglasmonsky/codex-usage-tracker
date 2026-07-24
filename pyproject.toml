@@ -49,6 +49,7 @@ dev = [
   "agent-maintainer[core]>=0.1.0b5; python_version >= '3.11'",
   "build>=1.2",
   "check-jsonschema>=0.37.4; python_version >= '3.11'",
+  "diff-cover>=9.0",
   "git-agent-ratchet>=1.3.0; python_version >= '3.11'",
   "mypy>=1.10",
   "pip-audit>=2.10.0; python_version >= '3.11'",
@@ -108,6 +109,7 @@ branch = true
 source = ["codex_usage_tracker"]
 
 [tool.coverage.report]
+fail_under = 85
 skip_covered = true
 show_missing = true
 
@@ -164,7 +166,7 @@ structure_ignore_paths = [
 ]
 vulture_paths = ["src", "tests", "config/vulture-whitelist.py"]
 require_tests = true
-coverage_fail_under = 80
+coverage_fail_under = 85
 diff_cover_fail_under = 90
 file_length_max_physical = 600
 file_length_max_source = 450

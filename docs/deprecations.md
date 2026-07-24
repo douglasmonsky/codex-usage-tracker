@@ -37,6 +37,54 @@ fixture so the move is explicit rather than an accidental disappearance.
 
 ## MCP compatibility details
 
+The complete deprecated MCP alias inventory is:
+
+- `subagent_usage`
+- `refresh_usage_index`
+- `usage_refresh_start`
+- `usage_refresh_status`
+- `usage_doctor`
+- `usage_summary`
+- `usage_calls`
+- `usage_call_detail`
+- `usage_threads`
+- `usage_report_pack`
+- `usage_dashboard_recommendations`
+- `usage_allowance_history`
+- `usage_allowance_diagnostics`
+- `usage_allowance_status`
+- `usage_allowance_series`
+- `usage_allowance_evidence`
+- `usage_allowance_analysis`
+- `usage_allowance_analysis_status`
+- `usage_compression_start`
+- `usage_compression_status`
+- `usage_compression_profile`
+- `usage_compression_candidates`
+- `usage_compression_candidate_detail`
+- `usage_compression_simulate`
+- `usage_recommendations`
+- `session_usage`
+- `most_expensive_usage_calls`
+- `usage_pricing_coverage`
+- `usage_source_coverage`
+- `usage_repetition_scan`
+- `usage_command_loop_scan`
+- `usage_file_churn_scan`
+- `usage_repeated_file_rediscovery`
+- `usage_shell_churn`
+- `usage_large_low_output_calls`
+- `usage_suggest_investigations`
+- `usage_investigate`
+- `usage_action_brief`
+- `usage_test_hypotheses`
+- `usage_context_bloat_scan`
+- `usage_investigation_walk`
+- `generate_usage_dashboard`
+- `init_usage_pricing_config`
+- `update_usage_pricing_config`
+- `init_usage_allowance_config`
+
 - Warning starts in `0.22.0` through each deprecated tool's MCP description.
 - Direct removal is permitted no earlier than `0.25.0`, after final support in
   `0.24.x` and only when the named compatibility test remains green.

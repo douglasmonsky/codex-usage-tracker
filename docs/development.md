@@ -117,7 +117,8 @@ Run focused tests first, then broader checks. Run the full local CI gate before 
 python -m ruff check .
 python -m mypy
 python -m pytest
-python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
+python -m pytest --cov=codex_usage_tracker --cov-report=term-missing --cov-report=xml
+diff-cover coverage.xml --compare-branch=origin/main --fail-under=90
 deptry .
 vulture src tests config/vulture-whitelist.py
 pip-audit -r requirements/audit.txt
@@ -134,6 +135,22 @@ python -m build
 python -m twine check dist/*
 python scripts/check_release.py --dist
 ```
+
+Coverage is a blocking contract: aggregate branch coverage must remain at or
+above 85%, and changed Python source lines must remain at or above 90%. Pull
+request CI fetches the base branch and runs `diff-cover` directly; the local
+command above compares against `origin/main`.
+
+The quality inventory tests are also release blockers:
+
+- `tests/quality/test_tool_work_proof.py` requires every MCP tool to declare
+  constant, row, source, evidence, or job work proof and rejects synthetic
+  false-green query and refresh results.
+- `tests/quality/test_schema_inventory.py` keeps emitted schema IDs synchronized
+  across the runtime registry, public contract docs, and release catalog.
+- `tests/quality/test_compatibility_inventory.py` keeps every deprecated MCP
+  alias synchronized with the normative deprecation ledger and migration
+  metadata.
 
 Regenerate the universal runtime audit input after changing production
 dependencies:

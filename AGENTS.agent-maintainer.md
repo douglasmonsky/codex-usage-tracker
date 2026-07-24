@@ -38,7 +38,7 @@ Do not read it during normal coding unless changing guidance.
 
 ## Blocking Limits
 
-- Coverage floors: total `80%`, changed `90%`
+- Coverage floors: total `85%`, changed `90%`
 - File length: `600` physical / `450` source lines
 - Change budget blocks: `800` lines or `20` files
 - New suppression budget: `3`

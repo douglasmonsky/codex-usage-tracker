@@ -1210,11 +1210,11 @@ commit as each roadmap task.
 
 ## Remaining Planned Tasks
 
-Tasks 27.5 through 33 are complete locally. Task 33 is awaiting its reviewed PR
-and squash merge from `pivot/33-persisted-analysis-jobs`; Tasks 34 through 45
-remain planned in the approved implementation roadmap. Add a full entry using
-the format above when each task becomes active; do not mark a task complete
-without its named focused and full verification evidence.
+Tasks 27.5 through 33 are merged. Task 34 is complete locally on
+`pivot/34-blocking-quality-gates` and awaiting its final review and PR; Tasks 35
+through 45 remain planned in the approved implementation roadmap. Add a full
+entry using the format above when each task becomes active; do not mark a task
+complete without its named focused and full verification evidence.
 
 ## Task 33 - Persist Generic Analysis Jobs and Reusable Results
 
@@ -1289,3 +1289,70 @@ without its named focused and full verification evidence.
     startup or the next semantic lookup then marks it interrupted;
   - generic persistence deliberately stores no raw context and cannot resume
     unknown worker code after a process exit.
+
+## Task 34 - Make Quality and Work-Proof Gates Directly Blocking
+
+- Status: complete locally on `pivot/34-blocking-quality-gates`; final review
+  and reviewed PR remain.
+- Blocking coverage:
+  - aggregate branch coverage now fails below 85% in both Coverage.py and Agent
+    Maintainer configuration;
+  - pull-request CI writes `coverage.xml` and directly fails below 90%
+    changed-line coverage with `diff-cover`;
+  - Python 3.14 uses the coverage run as its matrix test run instead of running
+    the full suite twice.
+- Work-proof contract:
+  - every MCP tool declares explicit constant, row, source, evidence, or job
+    work proof in the validated declarative catalog;
+  - unknown tools cannot silently fall back to constant work;
+  - synthetic known-row query and changed-source refresh tests mutate successful
+    payloads to zero units and prove those false-green responses fail, while
+    constant-size status remains valid.
+- Schema and compatibility inventories:
+  - a static release inventory is checked against the runtime schema registry,
+    public schema documentation, and schema IDs emitted by Python and React
+    runtime sources;
+  - the first blocking run found and registered 14 existing Python schema IDs
+    plus the selected-report React export schema that were previously orphaned;
+  - all 45 deprecated MCP aliases are named in the normative deprecation ledger
+    and checked against exact runtime lifecycle and migration metadata.
+- Verification:
+  - focused schema, compatibility, work-proof, release, and registry slices:
+    `43 passed` and `16 passed`;
+  - complete Python suite: `2029 passed in 138.08s`;
+  - complete coverage suite: `2029 passed in 147.42s`, 88.05% aggregate branch
+    coverage;
+  - changed-line coverage initially failed at 89%, prompting four negative-path
+    registry tests; the final staged result is 93%;
+  - Ruff on changed files, MyPy, Pyright, Tach, Deptry, Vulture, Bandit,
+    compileall, release checks, wheel/sdist build, Twine validation, and the
+    clean installed-package smoke pass;
+  - the single broad Agent Maintainer `ci` profile
+    `20260724T075319219554Z-ci-5ae198abc763` reported inherited repository-wide
+    formatting, test-type, dependency-boundary, complexity, file-length, and
+    missing frontend-helper findings. Its task-local workflow injection,
+    registry-complexity, and changed-file-length findings were fixed and
+    rechecked directly without rerunning the broad profile or weakening a
+    threshold.
+- Final review:
+  - the single read-only reviewer reported two actionable findings, one high
+    and one medium; both were accepted;
+  - R1 replaced family-shaped proof guesses with per-tool paths matching core
+    envelopes, compatibility JSON payloads, persisted jobs, and concrete local
+    file results, then added representative positive and false-green tests;
+  - R2 made the release checker identify the named changed-line coverage step,
+    require its pull-request condition and command, reject
+    `continue-on-error`, and cover both disabled forms with negative tests;
+  - the bounded post-review recheck passed `54 tests`, retained 88.05%
+    aggregate coverage and 93% changed-line coverage, and passed the source
+    release checker.
+- PR verification:
+  - the first PR run exposed an obsolete Vulture protocol stub and an unquoted
+    `BASE_REF` in the new shell command;
+  - the stub was removed, the branch reference and release invariant now
+    require shell-safe quoting, and the exact Vulture, Zizmor, focused pytest,
+    Ruff, and release-readiness commands pass locally.
+- Follow-up risks:
+  - auxiliary schemas with intentionally flexible payloads are inventoried with
+    empty required-field maps; future stabilization may tighten those shapes
+    without changing their IDs when the change is additive.
