@@ -105,7 +105,7 @@ RETURN caller.name, caller.filePath ORDER BY caller.filePath
 
 ## Example: Rename `validateUser` to `authenticateUser`
 
-```
+```text
 1. rename({symbol_name: "validateUser", new_name: "authenticateUser", dry_run: true})
    → 12 edits: 10 graph (safe), 2 text_search (review)
    → Files: validator.ts, login.ts, middleware.ts, config.json...
@@ -118,4 +118,4 @@ RETURN caller.name, caller.filePath ORDER BY caller.filePath
 4. detect_changes({scope: "all"})
    → Affected: LoginFlow, TokenRefresh
    → Risk: MEDIUM — run tests for these flows
-```text
+```
