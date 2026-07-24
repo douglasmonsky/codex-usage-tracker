@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 import subprocess
@@ -13,6 +14,110 @@ try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - exercised on Python 3.10.
     import tomli as tomllib
+
+REVIEWED_ACTION_PINS = {
+    ("actions/cache", "v6.1.0"): "55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    ("actions/checkout", "v7.0.1"): "3d3c42e5aac5ba805825da76410c181273ba90b1",
+    ("actions/download-artifact", "v8.0.1"): ("3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"),
+    ("actions/setup-go", "v6.5.0"): "924ae3a1cded613372ab5595356fb5720e22ba16",
+    ("actions/setup-node", "v7.0.0"): "820762786026740c76f36085b0efc47a31fe5020",
+    ("actions/setup-python", "v6.3.0"): ("ece7cb06caefa5fff74198d8649806c4678c61a1"),
+    ("actions/upload-artifact", "v7.0.1"): ("043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"),
+    ("pypa/gh-action-pypi-publish", "v1.14.1"): ("ba38be9e461d3875417946c167d0b5f3d385a247"),
+}
+REVIEWED_PYTHON_SMOKE_IMAGE = (
+    "python:3.14-slim@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6"
+)
+_USES_KEY_PATTERN = re.compile(r"""^\s*(?:-\s*)?(?:"uses"|'uses'|uses)\s*:""")
+_USES_LINE_PATTERN = re.compile(
+    r"^\s*(?:-\s*)?uses:\s*(?P<reference>\S+)"
+    r"(?:\s+#\s*(?P<release_tag>\S+))?\s*$"
+)
+_FULL_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+_DOCKER_DIGEST_PATTERN = re.compile(r"^docker://[^@\s]+@sha256:[0-9a-f]{64}$")
+
+
+def check_immutable_action_pins(repo_root: Path) -> list[str]:
+    """Reject mutable or unreviewed third-party workflow action references."""
+    workflow_dir = repo_root / ".github" / "workflows"
+    workflow_paths = sorted(workflow_dir.glob("*.yml")) + sorted(workflow_dir.glob("*.yaml"))
+    failures: list[str] = []
+    for workflow_path in workflow_paths:
+        relative_path = workflow_path.relative_to(repo_root)
+        for line_number, line in enumerate(
+            workflow_path.read_text(encoding="utf-8").splitlines(),
+            start=1,
+        ):
+            if _USES_KEY_PATTERN.match(line) is None:
+                continue
+            match = _USES_LINE_PATTERN.match(line)
+            location = f"{relative_path}:{line_number}"
+            if match is None:
+                failures.append(f"{location} has an unsupported uses reference")
+                continue
+            reference = match.group("reference")
+            release_tag = match.group("release_tag")
+            if reference.startswith("./"):
+                continue
+            if reference.startswith("docker://"):
+                if _DOCKER_DIGEST_PATTERN.fullmatch(reference) is None:
+                    failures.append(f"{location} Docker action must use an immutable sha256 digest")
+                continue
+            if "@" not in reference:
+                failures.append(
+                    f"{location} third-party action must use a full 40-character commit SHA"
+                )
+                continue
+            action, revision = reference.rsplit("@", 1)
+            if _FULL_COMMIT_PATTERN.fullmatch(revision) is None:
+                failures.append(
+                    f"{location} third-party action must use a full 40-character commit SHA"
+                )
+                continue
+            if release_tag is None:
+                failures.append(
+                    f"{location} third-party action is missing a reviewed release comment"
+                )
+                continue
+            expected_revision = REVIEWED_ACTION_PINS.get((action, release_tag))
+            if expected_revision != revision:
+                failures.append(
+                    f"{location} does not match a reviewed action pin: "
+                    f"{action}@{revision} # {release_tag}"
+                )
+    return failures
+
+
+def check_installed_smoke_docker_image(repo_root: Path) -> list[str]:
+    """Require the smoke script's actual default assignment to use the reviewed digest."""
+    smoke_path = repo_root / "scripts" / "smoke_installed_package.py"
+    if not smoke_path.exists():
+        return ["missing installed-package smoke script"]
+    try:
+        module = ast.parse(smoke_path.read_text(encoding="utf-8"), filename=str(smoke_path))
+    except SyntaxError:
+        return ["installed-package smoke script is not valid Python"]
+    default_image: str | None = None
+    for statement in module.body:
+        if not isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
+        if not any(
+            isinstance(target, ast.Name) and target.id == "DEFAULT_DOCKER_IMAGE"
+            for target in targets
+        ):
+            continue
+        try:
+            value = ast.literal_eval(statement.value)
+        except (ValueError, TypeError):
+            value = None
+        default_image = value if isinstance(value, str) else None
+        break
+    if default_image != REVIEWED_PYTHON_SMOKE_IMAGE:
+        return [
+            "installed-package Docker smoke default should use the reviewed python:3.14-slim digest"
+        ]
+    return []
 
 
 def check_python_support_metadata(
@@ -42,11 +147,7 @@ def check_python_support_metadata(
     if "Python 3.10, 3.11, 3.12, 3.13, and 3.14" not in install_doc:
         failures.append("docs/install.md should document CI support through Python 3.14")
 
-    smoke_script = (repo_root / "scripts" / "smoke_installed_package.py").read_text(
-        encoding="utf-8"
-    )
-    if 'DEFAULT_DOCKER_IMAGE = "python:3.14-slim"' not in smoke_script:
-        failures.append("installed-package Docker smoke default should use python:3.14-slim")
+    failures.extend(check_installed_smoke_docker_image(repo_root))
     return failures
 
 
@@ -59,7 +160,7 @@ def check_publish_workflow(repo_root: Path) -> list[str]:
     for required in [
         "workflow_dispatch:",
         "release:",
-        "pypa/gh-action-pypi-publish@release/v1",
+        "pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1",
         "id-token: write",
         "repository-url: https://test.pypi.org/legacy/",
         "python -m twine check dist/*",

@@ -24,6 +24,7 @@ if str(SCRIPT_ROOT) not in sys.path:
 from release_quality import (  # noqa: E402
     check_ci_workflow,
     check_compatibility_inventory,
+    check_immutable_action_pins,
     check_publish_workflow,
     check_python_support_metadata,
     check_react_dashboard_privacy_artifacts,
@@ -42,8 +43,7 @@ CONSOLE_SCRIPT = "codex-usage-tracker"
 SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
 SUPPORTED_SETUP_NODE_ACTIONS = (
-    "actions/setup-node@v6.4.0",
-    "actions/setup-node@v7.0.0",
+    "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0",
 )
 OLD_PYPI_DISTRIBUTION_NAME = "codex-usage-tracker"
 DASHBOARD_LOCALE_CODES = [
@@ -152,6 +152,7 @@ REQUIRED_FILES = [
     "MANIFEST.in",
     "AGENTS.md",
     "docs/architecture.md",
+    "docs/release-checklist.md",
     "docs/dashboard-guide.md",
     "docs/cli-json-schemas.md",
     "docs/one-dot-oh-readiness.md",
@@ -633,6 +634,7 @@ def _check_packaging_metadata() -> list[str]:
             "MCP runtime launcher should invalidate cached runtimes when package spec changes"
         )
     failures.extend(_check_python_support_metadata(project))
+    failures.extend(check_immutable_action_pins(REPO_ROOT))
     failures.extend(_check_ci_workflow())
     failures.extend(_check_publish_workflow())
     return failures
