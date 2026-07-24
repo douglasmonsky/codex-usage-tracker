@@ -969,7 +969,9 @@ commit as each roadmap task.
   (`chore: add repository GitNexus agent workflow`), and `264df75`
   (`fix: normalize GitNexus refactoring examples`), and `0a21a71`
   (`fix: keep GitNexus refreshes index-only`), and `d3151b0`
-  (`refactor: enforce tracker architecture boundaries`).
+  (`refactor: enforce tracker architecture boundaries`), `65c2502`
+  (`docs: record Task 30 architecture commit`), and `f40d1d6`
+  (`fix: satisfy architecture CI compatibility`).
 - Boundary contract:
   - root ownership, explicit dependencies, and circular-domain enforcement are
     enabled with no ignore baseline;
@@ -995,6 +997,9 @@ commit as each roadmap task.
     passed `337` focused core, store, migration, and architecture tests;
   - the accepted-review refresh, MCP readiness, compatibility-edge, and
     architecture fixes passed `49` focused tests;
+  - the CI compatibility follow-up passed all seven architecture boundary tests
+    under Python 3.10, the reviewed Bandit baseline gate, the static-analysis
+    policy tests, and the repository TOML formatting check;
   - Ruff passed over source and the changed tests;
   - source Pyright reported 0 errors and the seven inherited lazy-export
     warnings.
