@@ -22,6 +22,16 @@ dependency update.
 Local actions under `./` remain relative. Docker actions must use a
 `sha256` digest rather than a mutable image tag.
 
+## Confirm the 0.24 foundation gate
+
+For Release 0.24.0, require the
+[foundation audit](superpowers/reports/0.24-foundation-audit.md) to record
+`PROCEED` or an approved `AMEND`, with no unassigned `BLOCKER` or `HIGH`
+finding. Confirm every assigned finding is closed in the
+[execution ledger](roadmap/mcp-first-pivot-execution.md), the architecture and
+integrity gates pass, and the five retired workbenches are notice-only before
+starting artifact promotion.
+
 ## Promote one verified build
 
 1. Use the manual `Publish Python package` workflow only for a TestPyPI dry run

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from codex_usage_tracker.core.json_contracts import known_json_schemas
@@ -157,6 +158,30 @@ def test_023_release_docs_define_the_evidence_console_and_cli_transition() -> No
     ):
         assert legacy in routes
         assert replacement in routes
+
+
+def test_024_release_docs_define_the_hardening_and_compatibility_release() -> None:
+    release = (REPO_ROOT / "docs/releases/0.24.0.md").read_text(encoding="utf-8")
+    upgrade = (REPO_ROOT / "docs/upgrading-to-0.24.0.md").read_text(encoding="utf-8")
+    audit = (REPO_ROOT / "docs/superpowers/reports/0.24-foundation-audit.md").read_text(
+        encoding="utf-8"
+    )
+    manifest = json.loads(
+        (
+            REPO_ROOT / "docs/releases/0.24.0-artifact-manifest-example.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert "Decision: **PROCEED**" in audit
+    assert "Release 0.24.0" in release
+    assert "schema version 37" in release
+    assert "notice-only" in release
+    assert "0.25.0" in release
+    assert "No manual database step is required" in upgrade
+    assert manifest["schema"] == "codex-usage-tracker.release-artifact-manifest.v1"
+    assert manifest["version"] == "0.24.0"
+    assert manifest["contract_inventory"]["database_schema_version"] == 37
+    assert len(manifest["contract_inventory"]["mcp_tools"]["core"]) == 7
 
 
 def test_data_posture_and_evidence_console_docs_define_the_stable_product() -> None:

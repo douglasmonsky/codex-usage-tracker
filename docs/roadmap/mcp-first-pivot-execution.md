@@ -1550,8 +1550,8 @@ complete without its named focused and full verification evidence.
 
 ## Task 38 - Convert Legacy Dashboard Workbenches to Notice-only Routes
 
-- Status: complete locally on `pivot/38-legacy-workbench-removal`; PR
-  verification remains.
+- Status: merged by PR #307 as `cacd3fff73acc5b4cbaa7ecb442dc993038fa25f`;
+  the complete hosted CI matrix passed.
 - Graph-guided scope:
   - a fresh GitNexus index at `b4dc219` identified
     `App -> DashboardRouteView` as the production rendering boundary;
@@ -1612,5 +1612,100 @@ complete without its named focused and full verification evidence.
 - Final review:
   - the single read-only reviewer reported one low-severity localization
     finding; it was accepted and fixed across every supported locale;
+  - review metrics: 1 finding, 1 accepted (`R1`); reviewer tokens `pending`;
+    tokens per accepted finding `pending`.
+
+## Task 39 - Gate and Publish Release 0.24.0
+
+- Status: release candidate preparation, local qualification, and TestPyPI
+  promotion rehearsal complete; hosted review, merge, and public promotion
+  remain.
+- Foundation entry gate:
+  - `docs/superpowers/reports/0.24-foundation-audit.md` audits
+    `589e10a` and records `PROCEED`;
+  - the audit has no blockers, and every high finding was assigned to Tasks
+    28-33, all of which are complete before this gate;
+  - the release keeps the five legacy workbenches notice-only through
+    `0.24.x`; their implementation and compatibility removal remain assigned
+    to Tasks 40 and 41 for `0.25.0`.
+- Architecture and contract inventory:
+  - Tach reports no dependency violations and keeps
+    `root_module = "forbid"`;
+  - the release carries SQLite schema version `37`, `114` stable JSON schemas,
+    and MCP profiles of `7` core, `59` full, and `64` developer tools;
+  - the refreshed GitNexus graph at the Task 38 merge contains `25,400` nodes,
+    `54,647` edges, `1,291` clusters, and `300` execution flows.
+- Focused integrity verification:
+  - all `36` architecture, connection-integrity, foreign-key cascade,
+    persisted-job, and byte-offset tests pass;
+  - the dedicated release, public-documentation, and CLI slice passes `51`
+    tests, and source release readiness passes.
+- Complete product verification:
+  - all `2,164` Python tests pass at `88.12%` coverage against the enforced
+    `85%` floor;
+  - Ruff, configured MyPy, Pyright with zero errors, the product-complexity
+    budget, and whitespace checks pass;
+  - the frontend gate passes all `609` tests plus ESLint, TypeScript,
+    dependency boundaries, dead-code, Stylelint, source budgets, production
+    bundle budgets, release readiness, and deterministic asset verification;
+  - the Chromium release-candidate matrix passes all `14` tests.
+- Performance evidence:
+  - the 100,000-row focused route benchmark has no budget violations;
+  - the synthetic-history gate passes every threshold and proves equivalent
+    offset-seek payloads while measuring a `27.939x` median speedup over
+    sequential fallback for the late-source ratchet.
+- Local artifact qualification:
+  - Twine and distribution release readiness pass for the wheel and sdist;
+  - the isolated installed-package smoke verifies version `0.24.0`, all `7`
+    core MCP tools, all `59` bundled resources, plugin installation,
+    setup/doctor, dashboard generation, and strict support-bundle export;
+  - local wheel:
+    `aa493c338e52c700695e9c9f888c41f2089c8ac21edbd8441a6c144f449103ff`
+    (`7,022,392` bytes);
+  - local sdist:
+    `3d13428f005d0ac95a0ff2cae353ed4e792aca93e9d29738e272a2118cd758e0`
+    (`32,121,969` bytes);
+  - these hashes are local qualification evidence only; the release-event
+    manifest remains authoritative for public TestPyPI, PyPI, and GitHub
+    artifact identity.
+- Gate-discovered correction:
+  - the first distribution check proved the new JSON manifest example was
+    absent from the sdist; `MANIFEST.in` now packages documentation JSON and
+    the rebuilt distribution passes the exact-member gate;
+  - the first prerelease source check proved the version matcher truncated
+    PEP 440 prerelease suffixes; public-smoke and MCP-launcher checks now accept
+    exact `a`, `b`, and `rc` versions, with a focused regression test.
+- TestPyPI promotion rehearsal:
+  - workflow run `30099685531` completed successfully from annotated tag
+    `v0.24.0rc1` at source
+    `8c8f427bb69f90004f7f606950820013a18bb212`;
+  - the build job passed the complete hosted test and coverage gates, produced
+    one canonical artifact bundle, and recorded manifest SHA-256
+    `1b7b2638b42fc76237065ef4f7421645298d5c8c6e1984aef18ef4d02997baba`;
+  - TestPyPI received wheel
+    `12f3afda17f4a39d9f993bef075162b2deef5a5abc7ac0d2754bc53660ff3110`
+    (`7,022,443` bytes) and sdist
+    `53e50edbe5a3e6beddf77a1900fca5767ce638306af0712c4a1e74dad70c7ec0`
+    (`32,076,624` bytes);
+  - qualification downloaded those public bytes, matched both hashes to the
+    manifest, passed the installed smoke, and recorded the same source SHA,
+    Actions run, schema `37`, `114` schemas, `73` console bundles, and
+    `7`/`59`/`64` MCP profile inventories;
+  - production PyPI promotion, GitHub Release attachment, and cross-location
+    verification were correctly skipped for the manual rehearsal.
+- Roadmap deviations:
+  - the package version also required synchronized updates to the runtime
+    constant, plugin manifest, source and packaged MCP launchers, and
+    development smoke commands;
+  - release checks and public-document tests now fail closed if the new
+    release note, upgrade guide, or manifest example is absent.
+- Final review:
+  - the single read-only reviewer reported one medium finding (`R1`): version
+    prefix matching and substring changelog checks could accept malformed or
+    prerelease-only evidence;
+  - `R1` was accepted; version-bearing commands now capture and compare the
+    complete token, changelog headings match complete lines, and both trailing
+    junk and final-versus-RC regressions are covered;
+  - the bounded release/docs/CLI slice passes all `51` tests after the fix;
   - review metrics: 1 finding, 1 accepted (`R1`); reviewer tokens `pending`;
     tokens per accepted finding `pending`.

@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## 0.24.0 - 2026-07-24
+
+- Introduce an explicit application composition root and dependency protocols,
+  remove Python dependency cycles, and enforce the architecture with Tach.
+- Enable SQLite foreign-key enforcement, make schema migrations fail
+  atomically, harden rebuild recovery, and advance the additive schema to
+  version 37.
+- Seek directly to indexed context byte offsets while preserving a bounded
+  sequential fallback for older rows and unusually large selected turns.
+- Persist reusable analysis jobs, results, progress, errors, and lease recovery
+  so interrupted work no longer depends on process-local memory.
+- Preserve focused Home, Limits, Calls, Threads, and thread-call endpoint
+  performance instead of replacing them with slower generic queries.
+- Make release quality, changed-line coverage, architecture, workflow pinning,
+  product complexity, package size, and build-once artifact promotion directly
+  blocking.
+- Convert five legacy dashboard workbenches to localized, notice-only routes
+  that start no historical queries or jobs. CLI, HTTP, CSV export, and
+  full-profile MCP compatibility remain available through 0.24.x and are due
+  for removal in 0.25.0.
+- Preserve the refresh deduplication index and make compression-status polling
+  query-only to avoid avoidable SQLite write contention.
+
 ## 0.23.0 - 2026-07-23
 
 - Focus the Evidence Console on Home, unified Calls/Threads Explore, Limits,
