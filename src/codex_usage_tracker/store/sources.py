@@ -150,11 +150,6 @@ def _source_metadata_matches(
     )
 
 
-def source_file_metadata_matches(path: Path, row: sqlite3.Row) -> bool:
-    """Validate one persisted source row against its current local file."""
-    return validated_source_file_metadata(path, row) is not None
-
-
 def validated_source_file_metadata(
     path: Path,
     row: sqlite3.Row,
