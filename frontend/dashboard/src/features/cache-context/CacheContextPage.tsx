@@ -27,11 +27,6 @@ type CacheContextPageProps = {
   onCopyCallLink: (recordId: string) => void;
 };
 
-export function cacheContextCallsForCurrentUrl(model: DashboardModel): CallRow[] {
-  const selectedThread = cacheThreadFromUrl(model.threads) ?? model.threads[0] ?? null;
-  return cacheThreadCalls(model.calls, selectedThread);
-}
-
 export function CacheContextPage({
   model,
   contextRuntime,
@@ -366,23 +361,8 @@ function suggestedCacheActions(thread: ThreadRow): string[] {
   return actions;
 }
 
-function cacheThreadCalls(calls: CallRow[], thread: ThreadRow | null): CallRow[] {
-  return thread ? calls.filter(call => threadLabelsMatch(call.thread, thread.name)).sort(compareCallTimeDescending) : [];
-}
-
-function cacheThreadNameFromUrl(threads: ThreadRow[]): string | null {
-  const threadName = cacheThreadParam();
-  if (!threadName) return null;
-  return threads.some(thread => thread.name === threadName) ? threadName : null;
-}
-
 function cacheThreadParam(): string | null {
   return new URLSearchParams(window.location.search).get('cache_thread')?.trim() || null;
-}
-
-function cacheThreadFromUrl(threads: ThreadRow[]): ThreadRow | null {
-  const threadName = cacheThreadNameFromUrl(threads);
-  return threadName ? threads.find(thread => thread.name === threadName) ?? null : null;
 }
 
 function syncCacheThreadUrl(threadName: string) {
@@ -390,10 +370,6 @@ function syncCacheThreadUrl(threadName: string) {
   url.searchParams.set('view', 'cache-context');
   url.searchParams.set('cache_thread', threadName);
   window.history.replaceState(null, '', url);
-}
-
-function compareCallTimeDescending(left: CallRow, right: CallRow): number {
-  return Date.parse(right.rawTime || right.time) - Date.parse(left.rawTime || left.time);
 }
 
 function threadLabelsMatch(callThread: string, threadName: string): boolean {

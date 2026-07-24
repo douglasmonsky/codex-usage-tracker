@@ -84,6 +84,19 @@ def test_dashboard_release_excludes_three_and_constellation_artifacts() -> None:
 
     assets = root / "src" / "codex_usage_tracker" / "plugin_data" / "dashboard" / "react" / "assets"
     assert not any("UsageConstellation" in path.name for path in assets.iterdir())
+    retired_workbench_assets = {
+        "CacheContextPage.js",
+        "CompressionLabPage.js",
+        "DiagnosticsPage.js",
+        "InvestigatorPage.js",
+        "ReportsPage.js",
+    }
+    assert retired_workbench_assets.isdisjoint(path.name for path in assets.iterdir())
+    app_bundle = (assets / "App.js").read_text(encoding="utf-8")
+    assert not any(
+        f'"assets/{name}"' in app_bundle or f'import("./{name}")' in app_bundle
+        for name in retired_workbench_assets
+    )
 
 
 def test_dashboard_main_bundle_budget_is_ratcheted_after_constellation_removal() -> None:

@@ -6,6 +6,28 @@ from codex_usage_tracker.server.route_profile import DashboardRouteProfile
 from codex_usage_tracker.server.route_profile import profile as _profile
 from codex_usage_tracker.server.v2_route_inventory import HTTP_V2_ROUTE_PROFILES
 
+LEGACY_WORKBENCH_API_EXACT_PATHS = frozenset(
+    {
+        "/api/context",
+        "/api/context-settings",
+        "/api/open-investigator",
+    }
+)
+LEGACY_WORKBENCH_API_PREFIXES = (
+    "/api/investigations/",
+    "/api/reports/",
+    "/api/diagnostics/",
+    "/api/compression/",
+)
+
+
+def is_legacy_workbench_api_path(path: str) -> bool:
+    """Return whether one retained API route belongs to a retired workbench."""
+    return path in LEGACY_WORKBENCH_API_EXACT_PATHS or path.startswith(
+        LEGACY_WORKBENCH_API_PREFIXES
+    )
+
+
 _PERSISTED_SNAPSHOT_ROUTES = (
     "overview",
     "tool-output",

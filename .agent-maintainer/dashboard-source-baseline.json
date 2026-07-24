@@ -47,8 +47,8 @@
     },
     "frontend/dashboard/src/features/diagnostics/DiagnosticsPage.tsx": {
       "group": "source",
-      "nonblank": 480,
-      "physical": 510
+      "nonblank": 475,
+      "physical": 504
     },
     "frontend/dashboard/src/features/diagnostics/diagnosticSnapshotCards.ts": {
       "group": "source",

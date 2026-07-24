@@ -18,6 +18,13 @@ compatibility test, and a concrete migration example.
 | Legacy CLI command or alias | Simplified stable command or advanced namespace equivalent | CLI interface maintainers | `0.23.0` | `0.24.x` | `0.25.0` | CLI alias parity and help snapshot tests | Replace the alias with the documented stable command or namespaced advanced operation. |
 | HTTP API v1 route | Versioned HTTP API v2 equivalent | HTTP API maintainers | `0.23.0` | `0.24.x` | `0.25.0` | v1-to-v2 semantic adapter contract tests | Change the client to the documented `/api/v2/` endpoint and its shared response contract. |
 
+The five deprecated React workbench routes are notice-only in `0.24.x`.
+Opening one renders replacement guidance without importing the retired
+workbench page, calling its historical API endpoints, or starting background
+analysis. Their HTTP, CLI, export, and full-profile MCP compatibility operations
+remain supported independently through `0.24.x`; notice-only browser routing
+does not authorize early backend removal.
+
 ## Retained advanced MCP operations
 
 The following aggregate/local operations have no one-call core parity and remain

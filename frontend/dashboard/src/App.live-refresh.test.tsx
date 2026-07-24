@@ -501,8 +501,8 @@ it('refreshes usage rows when history scope changes', async () => {
   );
 });
 
-it('refreshes aggregate report evidence through the shell live usage API', async () => {
-  window.history.replaceState(null, '', '/?view=reports');
+it('refreshes aggregate call evidence through the shell live usage API', async () => {
+  window.history.replaceState(null, '', '/?view=calls');
   window.__CODEX_USAGE_BOOT__ = {
     api_token: 'report-refresh-token',
     context_api_enabled: true,
@@ -574,7 +574,7 @@ it('refreshes aggregate report evidence through the shell live usage API', async
   render(<App />);
   expect(screen.getAllByText('Stored snapshot loaded just now').length).toBeGreaterThan(0);
 
-  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+  fireEvent.click(screen.getAllByRole('button', { name: 'Refresh' })[0]);
 
   expect((await screen.findAllByText('Refreshed index; loaded 1 of 7 calls from Most recent 500')).length).toBeGreaterThan(0);
   expect(screen.getAllByText('report-after-thread').length).toBeGreaterThan(0);

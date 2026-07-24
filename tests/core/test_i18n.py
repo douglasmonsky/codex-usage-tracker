@@ -62,6 +62,7 @@ EXPECTED_KEY_PREFIXES = (
     "maturity.",
     "readiness.",
     "evidence.",
+    "compatibility.",
 )
 
 RELEASE_N_LOCALIZATION_KEYS = {
@@ -108,6 +109,22 @@ RELEASE_N_LOCALIZATION_KEYS = {
     "evidence.aggregate_selection",
     "evidence.prompt.template",
     "evidence.prompt.launch",
+    "compatibility.eyebrow",
+    "compatibility.notice_only",
+    "compatibility.notice",
+    "compatibility.backend_support",
+    "compatibility.prior_feature",
+    "compatibility.replacement_request",
+    "compatibility.final_support",
+    "compatibility.removal_release",
+    "compatibility.copy_prompt",
+    "compatibility.prompt_copied",
+    "compatibility.prompt_copy_failed",
+    "compatibility.open_evidence",
+    "compatibility.open_explore",
+    "compatibility.open_limits",
+    "compatibility.destinations_aria",
+    "compatibility.prompt_template",
 }
 
 

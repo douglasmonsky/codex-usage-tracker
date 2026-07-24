@@ -1,0 +1,123 @@
+.page {
+  display: grid;
+  place-items: start center;
+  min-width: 0;
+  padding: var(--space-8);
+}
+
+.notice {
+  display: grid;
+  gap: var(--space-6);
+  width: min(760px, 100%);
+  padding: clamp(24px, 5vw, 44px);
+}
+
+.heading {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.heading h1 {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-strong);
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.1;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--signal-selection);
+  font-size: var(--text-metadata);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.summary {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--ink-muted);
+  line-height: 1.6;
+}
+
+.metadata {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.metadata > div {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.45fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.metadata dt {
+  color: var(--ink-muted);
+  font-size: var(--text-metadata);
+  font-weight: 700;
+}
+
+.metadata dd {
+  margin: 0;
+  color: var(--ink-strong);
+  overflow-wrap: anywhere;
+}
+
+.metadata code {
+  font-family: var(--font-numeric);
+  font-size: 0.85em;
+}
+
+.prompt {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--signal-selection-line);
+  border-radius: var(--radius-control);
+  background: var(--signal-selection-surface);
+}
+
+.prompt p {
+  margin: 0;
+  color: var(--ink-strong);
+  line-height: 1.55;
+}
+
+.prompt button {
+  justify-self: start;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.status {
+  min-height: 1.25em;
+  margin: calc(var(--space-4) * -1) 0 0;
+  color: var(--signal-positive-ink);
+  font-size: var(--text-metadata);
+  font-weight: 700;
+}
+
+@media (max-width: 680px) {
+  .page {
+    padding: var(--space-4);
+  }
+
+  .heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .metadata > div {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+}

@@ -1547,3 +1547,70 @@ complete without its named focused and full verification evidence.
     accepted and pass bounded regression checks;
   - review metrics: 2 findings, 2 accepted; reviewer tokens `pending`; tokens
     per accepted finding `pending`.
+
+## Task 38 - Convert Legacy Dashboard Workbenches to Notice-only Routes
+
+- Status: complete locally on `pivot/38-legacy-workbench-removal`; PR
+  verification remains.
+- Graph-guided scope:
+  - a fresh GitNexus index at `b4dc219` identified
+    `App -> DashboardRouteView` as the production rendering boundary;
+  - source inspection then found a second production reachability path through
+    `currentViewExport`, whose compatibility exports dynamically imported the
+    retired page modules.
+- Notice-only behavior:
+  - Investigate, Compression Lab, Cache and Context, Diagnostics Notebook, and
+    Reports now render one shared compatibility notice;
+  - each notice names the previous feature, core MCP replacement, `0.24.x`
+    compatibility window, `0.25.0` removal release, copyable prompt, and
+    Evidence/Explore/Limits destinations;
+  - direct-route component and Playwright tests prove the five routes make no
+    historical workbench API requests, and automatic refresh is disabled.
+- Compatibility preservation:
+  - HTTP, CLI, full-profile MCP, and CSV export compatibility remain supported
+    through `0.24.x`;
+  - legacy CSV selection moved into a 1.71 kB gzip compatibility chunk with
+    four parity tests, so exports no longer import retired UI modules;
+  - route inventory explicitly classifies all retained investigations,
+    reports, diagnostics, compression, context, and investigator endpoints as
+    compatibility-only.
+- Production bundle:
+  - all five retired page chunks are absent from the emitted asset directory
+    and from the `App.js` dependency map;
+  - the bundle gate and release tests now fail closed if any retired chunk is
+    emitted or referenced;
+  - the ratcheted Diagnostics page debt decreased from 510/480 to 504/475
+    physical/nonblank lines.
+- Verification:
+  - TypeScript, ESLint, dependency boundaries, dead-code, Stylelint, source
+    budgets, production build, bundle budgets, and release readiness pass;
+  - full frontend suite passes `609` tests in `117` files;
+  - focused route-inventory and release assertions pass `6` tests;
+  - Chromium release-candidate matrix passes `14` tests, including all five
+    direct notice-only routes with zero historical requests;
+  - `dashboard-verify` completed successfully as
+    `20260724T131359.371748Z`.
+- Localization:
+  - all notice copy, including the status badge and destination-group
+    accessibility label, is routed through the shell i18n layer;
+  - all 12 supported locale catalogs include the 16 compatibility keys with
+    placeholder parity;
+  - 148 i18n contract tests, 11 notice-component tests, and the Spanish
+    Chromium release-candidate assertion pass.
+- Broad verification:
+  - one Agent Maintainer `ci` run
+    `20260724T131547933321Z-ci-12d86b4eae31` passed all `2,162` Python tests
+    at 88.12% coverage and all `609` frontend tests;
+  - it reported inherited repository-wide file-length, documentation-format,
+    Pyright, Xenon, and optional TypeScript-helper findings; task-local
+    TypeScript, ESLint, dependency-boundary, source-budget, bundle, release,
+    privacy, dependency, and secret checks pass directly.
+- Roadmap deviation:
+  - `api/client.ts` and `CompressionLabPage.tsx` needed no behavioral change:
+    production routing no longer reaches their old query/job code, while the
+    source remains intentionally available for Tasks 40 and 41.
+- Final review:
+  - the single read-only reviewer reported one low-severity localization
+    finding; it was accepted and fixed across every supported locale;
+  - review metrics: 1 finding, 1 accepted (`R1`); reviewer tokens `pending`;
+    tokens per accepted finding `pending`.

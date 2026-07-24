@@ -1,4 +1,4 @@
-import { App, describe, expect, fireEvent, installAppTestHooks, it, navigateApp, render, rowsToCsv, screen, vi, waitFor, within } from './test-utils/appTestHarness';
+import { App, describe, expect, fireEvent, installAppTestHooks, it, navigateApp, render, rowsToCsv, screen, vi, waitFor } from './test-utils/appTestHarness';
 import { callCsvColumns } from './features/shared/tables';
 import { fixtureModel } from './test-fixtures/dashboardFixture';
 
@@ -65,73 +65,6 @@ it('exports overview rows filtered by global search from shell topbar', async ()
   expect(await screen.findAllByText('Exported 1 call rows')).not.toHaveLength(0);
 });
 
-it('exports investigator rows scoped by selected finding URL state', async () => {
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    window.history.replaceState(null, '', '/?view=investigator&finding=2');
-
-  render(<App />);
-
-  fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
-    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
-    expect(await screen.findAllByText('Exported 6 call rows')).not.toHaveLength(0);
-  });
-
-it('exports Cache And Context evidence rows scoped by selected thread URL state', async () => {
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    window.history.replaceState(null, '', '/?view=cache-context&cache_thread=thread-9f3a');
-
-    render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
-
-    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
-    expect(await screen.findAllByText('Exported 1 call rows')).not.toHaveLength(0);
-  });
-
-it('syncs Cache And Context selected thread to URL state', () => {
-    window.history.replaceState(null, '', '/?view=cache-context');
-
-    render(<App />);
-    const table = screen.getByRole('table', { name: 'Cache context threads overview' });
-    const row = within(table).getByText('thread-3c5d').closest('tr');
-    expect(row).not.toBeNull();
-    fireEvent.mouseEnter(row as HTMLTableRowElement);
-
-    expect(new URLSearchParams(window.location.search).get('cache_thread')).toBe('thread-3c5d');
-  });
-
-it('exports Diagnostics fact calls scoped by selected fact URL state', async () => {
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    window.history.replaceState(null, '', '/?view=diagnostics&diagnostic_fact=model:high_effort');
-
-    render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
-
-    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
-    expect(await screen.findAllByText('Exported 4 call rows')).not.toHaveLength(0);
-  });
-
-it('syncs Diagnostics selected structured fact to URL state', () => {
-    window.history.replaceState(null, '', '/?view=diagnostics');
-
-    render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /model\s*\/\s*high_effort/i }));
-
-    const params = new URLSearchParams(window.location.search);
-    expect(params.get('view')).toBe('diagnostics');
-    expect(params.get('diagnostic_fact')).toBe('model:high_effort');
-  });
-
-it('exports reports evidence rows scoped by selected report URL state', async () => {
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    window.history.replaceState(null, '', '/?view=reports&report=fast-mode-proxy');
-
-    render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
-
-    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
-    expect(await screen.findAllByText('Exported 4 call rows')).not.toHaveLength(0);
-  });
-
 it('exports Limits compatibility call rows while preserving URL-backed analysis state', async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     window.history.replaceState(
@@ -174,17 +107,6 @@ it('exports call rows behind filtered Threads rows from shell topbar', async () 
   fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
   await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
   expect(await screen.findAllByText('Exported 1 call rows')).not.toHaveLength(0);
-});
-
-it('syncs investigator selected finding to the URL', () => {
-  window.history.replaceState(null, '', '/?view=investigator');
-
-  render(<App />);
-
-  fireEvent.click(screen.getByRole('button', { name: /^Cache Misses \(Large Inputs\)/i }));
-
-  expect(new URLSearchParams(window.location.search).get('finding')).toBe('cache-misses-large-inputs-2');
-  expect(screen.getByRole('heading', { name: 'Cache Misses (Large Inputs)' })).toBeInTheDocument();
 });
 
 it('reports empty Calls shell exports without duplicated row wording', async () => {

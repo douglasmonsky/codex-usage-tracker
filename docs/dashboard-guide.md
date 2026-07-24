@@ -18,6 +18,14 @@ window, those surfaces remain compatibility entry points only:
 - the legacy static dashboard receives no new features;
 - no new dashboard workspace is added during the pivot.
 
+In `0.24.x`, direct links to Investigate, Compression Lab, Cache and Context,
+Diagnostics Notebook, and Reports render one shared notice-only page. That page
+does not load the retired workbench modules, call their historical API
+endpoints, or start their background jobs. It names the core MCP replacement,
+offers a copyable Codex prompt, and links to Evidence, Explore, and Limits.
+The underlying compatibility API and export operations remain available through
+`0.24.x`; their scheduled removal release is `0.25.0`.
+
 Open the current Evidence Console for a new workflow with:
 
 ```bash

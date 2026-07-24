@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { dashboardRenderedViewIds } from '../routes/DashboardRouteView';
 import { dashboardViewIds } from '../routes/dashboardSearch';
+import {
+  legacyWorkbenchDescriptors,
+  legacyWorkbenchViewIds,
+} from '../data/legacyWorkbenchDescriptors';
 import { navItems, settingsNavItem } from './navigation';
 import { navigationForPhase, routeCatalog, routeDefinition } from './routeCatalog';
 
@@ -33,6 +37,34 @@ describe('dashboard route catalog', () => {
     expect(routeCatalog.filter(route => route.experimentalNavigationEligible)).toEqual([]);
   });
 
+  it('keeps notice-only workbenches out of automatic refresh', () => {
+    const noticeOnlyIds = [
+      'investigator',
+      'compression-lab',
+      'cache-context',
+      'diagnostics',
+      'reports',
+    ] as const;
+
+    expect(
+      noticeOnlyIds.map(id => routeDefinition(id).capabilities.refresh),
+    ).toEqual([false, false, false, false, false]);
+  });
+
+  it('keeps notice descriptors aligned with compatibility route metadata', () => {
+    for (const id of legacyWorkbenchViewIds) {
+      const route = routeDefinition(id);
+      expect(legacyWorkbenchDescriptors[id]).toEqual({
+        label: route.label,
+        description: route.description,
+        replacementMcpOperation: route.replacementMcpOperation,
+        deprecatedIn: route.deprecatedIn,
+        noticeOnlyIn: route.noticeOnlyIn,
+        removalRelease: route.removalRelease,
+      });
+    }
+  });
+
   it('keeps every deprecated workbench direct-only with a concrete replacement', () => {
     const deprecatedWorkbenches = {
       investigator: 'usage_analyze(goal="usage_spike") → usage_evidence',
@@ -48,6 +80,9 @@ describe('dashboard route catalog', () => {
         lifecycle: 'deprecated',
         replacementMcpOperation: deprecatedWorkbenches[id],
         replacementHref: '?view=explore&mode=calls',
+        deprecatedIn: '0.23.0',
+        noticeOnlyIn: '0.24.x',
+        removalRelease: '0.25.0',
       });
     }
   });

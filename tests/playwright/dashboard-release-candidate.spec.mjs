@@ -243,19 +243,30 @@ test.describe('0.23 Evidence Console release candidate', () => {
     await expect(primary.getByRole('button', { name: 'Compression Lab', exact: true })).toHaveCount(0);
   });
 
-  test('keeps direct lifecycle routes reachable with their maturity banners', async ({ page }) => {
+  test('keeps direct lifecycle routes notice-only without historical requests', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('codex-usage-dashboard-show-compatibility-labs-v1', 'false'));
+    const historicalRequests = [];
+    page.on('request', request => {
+      if (
+        /\/api\/(?:investigations|reports|diagnostics|compression)\//.test(request.url())
+        || /\/api\/(?:context|context-settings|open-investigator)(?:\?|$)/.test(request.url())
+      ) {
+        historicalRequests.push(request.url());
+      }
+    });
     const routes = [
-      ['Investigate', '/?view=investigator&qa=release-n-direct', 'Feature maturity: Available during transition'],
-      ['Compression Lab', '/?view=compression-lab&qa=release-n-direct', 'Feature maturity: Available during transition'],
-      ['Cache And Context Lab', '/?view=cache-context&qa=release-n-direct', 'Feature maturity: Available during transition'],
-      ['Reports', '/?view=reports&qa=release-n-direct', 'Feature maturity: Available during transition'],
-      ['Diagnostics Notebook', '/?view=diagnostics&qa=release-n-direct', 'Feature maturity: Available during transition'],
+      ['Investigate', '/?view=investigator&qa=release-n-direct'],
+      ['Compression Lab', '/?view=compression-lab&qa=release-n-direct'],
+      ['Cache And Context', '/?view=cache-context&qa=release-n-direct'],
+      ['Reports', '/?view=reports&qa=release-n-direct'],
+      ['Diagnostics Notebook', '/?view=diagnostics&qa=release-n-direct'],
     ];
-    for (const [workspace, route, banner] of routes) {
+    for (const [workspace, route] of routes) {
       await openWorkspace(page, workspace, route);
-      await expect(page.getByRole('note', { name: banner })).toBeVisible();
+      await expect(page.getByText('This legacy workbench is notice-only.')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Copy replacement prompt' })).toBeVisible();
     }
+    expect(historicalRequests).toEqual([]);
     await expect(
       page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Diagnostics Notebook', exact: true }),
     ).toHaveCount(0);
@@ -426,8 +437,10 @@ test('maps conversational readiness into the Home prompt library', async ({ brow
     )).toBeVisible();
 
     await page.goto('/?view=diagnostics&qa=release-n-locale');
-    await expect(page.getByRole('note', { name: 'Madurez de la función: Disponible durante la transición' })).toBeVisible();
-    await expect(page.getByText('Disponible durante la transición', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Diagnostics Notebook' })).toBeVisible();
+    await expect(page.getByText('Solo aviso', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Copiar solicitud de reemplazo' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Destinos compatibles de la consola de evidencias' })).toBeVisible();
     await expect(page.getByText('Highly experimental', { exact: true })).toHaveCount(0);
   });
 });

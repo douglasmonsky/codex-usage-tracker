@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Download, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import type { CallRow, DashboardModel } from '../../api/types';
+import type { DashboardModel } from '../../api/types';
 import { buildDashboardTarget } from '../../app/dashboardTargets';
 import { useShellI18n } from '../../app/i18nContext';
 import {
@@ -44,10 +44,6 @@ type ReportsPageProps = {
   onOpenInvestigator: (recordId: string) => void;
   onCopyCallLink: (recordId: string) => void;
 };
-
-export function reportCallsForCurrentUrl(model: DashboardModel): CallRow[] {
-  return reportEvidenceCalls(reportFromUrl(model.reports) ?? model.reports[0], model.calls);
-}
 
 export function ReportsPage({
   model,

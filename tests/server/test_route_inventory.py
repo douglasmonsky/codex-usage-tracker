@@ -4,7 +4,10 @@ import json
 from pathlib import Path
 
 from codex_usage_tracker.core.json_contracts import known_json_schemas
-from codex_usage_tracker.server.route_inventory import DASHBOARD_ROUTE_PROFILES
+from codex_usage_tracker.server.route_inventory import (
+    DASHBOARD_ROUTE_PROFILES,
+    is_legacy_workbench_api_path,
+)
 from codex_usage_tracker.server.routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
     GET_DYNAMIC_ROUTE_METHODS,
@@ -55,6 +58,17 @@ def test_route_inventory_has_decision_ready_execution_metadata() -> None:
         profile.execution == "synchronous" and profile.workload == "heavy_analysis"
         for profile in DASHBOARD_ROUTE_PROFILES
     )
+
+
+def test_legacy_workbench_api_routes_remain_compatibility_only() -> None:
+    legacy_profiles = [
+        profile
+        for profile in DASHBOARD_ROUTE_PROFILES
+        if is_legacy_workbench_api_path(profile.path)
+    ]
+
+    assert legacy_profiles
+    assert all(profile.exposure == "compatibility" for profile in legacy_profiles)
 
     stable_v2 = [profile for profile in DASHBOARD_ROUTE_PROFILES if profile.exposure == "stable"]
     assert {(profile.method, profile.path) for profile in stable_v2} == {

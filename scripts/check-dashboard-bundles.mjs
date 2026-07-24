@@ -32,6 +32,13 @@ const initialFiles = new Set(
 
 const assetDir = new URL('assets/', outputDir);
 const assets = (await readdir(assetDir)).filter((file) => /\.(css|js)$/.test(file)).sort();
+const retiredWorkbenchAssets = [
+  'CacheContextPage.js',
+  'CompressionLabPage.js',
+  'DiagnosticsPage.js',
+  'InvestigatorPage.js',
+  'ReportsPage.js',
+];
 const rows = [];
 for (const file of assets) {
   const content = await readFile(new URL(file, assetDir));
@@ -62,6 +69,11 @@ console.log(
 );
 
 const failures = [];
+for (const file of retiredWorkbenchAssets) {
+  if (assets.includes(file)) {
+    failures.push(`retired workbench chunk is still emitted: assets/${file}`);
+  }
+}
 if (initialJsBytes > budgets.currentInitialJs) {
   failures.push(`initial javascript ${kib(initialJsBytes)} exceeds ${kib(budgets.currentInitialJs)}`);
 }

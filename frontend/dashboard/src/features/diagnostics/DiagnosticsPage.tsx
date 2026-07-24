@@ -35,12 +35,6 @@ import {
 
 const DEFAULT_FACT_SORT_STATE: FactSortState = { key: 'uncached', direction: 'desc' };
 
-export function diagnosticsCallsForCurrentUrl(model: DashboardModel): CallRow[] {
-  const facts = fallbackDiagnosticFacts(model.calls);
-  const selectedFact = diagnosticFactFromUrl(facts) ?? facts[0] ?? null;
-  return selectedFact ? fallbackDiagnosticFactCalls(selectedFact, model.calls) : [];
-}
-
 export function DiagnosticsPage({
   model,
   contextRuntime,

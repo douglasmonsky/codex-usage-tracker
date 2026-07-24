@@ -38,6 +38,9 @@ export type DashboardRouteDefinition = {
   handoffParams: readonly string[];
   replacementMcpOperation?: string;
   replacementHref?: string;
+  deprecatedIn?: string;
+  noticeOnlyIn?: string;
+  removalRelease?: string;
 };
 
 const capabilities = (refresh: boolean) => ({ refresh, export: true, copyLink: true });
@@ -54,6 +57,7 @@ const legacyRouteCatalog = [
     experimentalNavigationEligible: false, capabilities: capabilities(false), safeParams: ['finding'], handoffParams: ['finding'],
     replacementMcpOperation: 'usage_analyze(goal="usage_spike") → usage_evidence',
     replacementHref: '?view=explore&mode=calls',
+    deprecatedIn: '0.23.0', noticeOnlyIn: '0.24.x', removalRelease: '0.25.0',
   },
   {
     id: 'compression-lab', label: 'Compression Lab', description: 'Context savings', icon: BrainCircuit,
@@ -61,6 +65,7 @@ const legacyRouteCatalog = [
     experimentalNavigationEligible: false, capabilities: capabilities(false), safeParams: [], handoffParams: [],
     replacementMcpOperation: 'usage_analyze(goal="token_waste"); full-profile compression tools through 0.24.x',
     replacementHref: '?view=explore&mode=calls',
+    deprecatedIn: '0.23.0', noticeOnlyIn: '0.24.x', removalRelease: '0.25.0',
   },
   {
     id: 'calls', label: 'Calls', description: 'Model-call table', icon: Table2,
@@ -93,9 +98,10 @@ const legacyRouteCatalog = [
   {
     id: 'cache-context', label: 'Cache And Context', description: 'Cache and cold resumes', icon: Database,
     maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated', navigationGroup: null,
-    experimentalNavigationEligible: false, capabilities: capabilities(true), safeParams: ['cache_thread'], handoffParams: [],
+    experimentalNavigationEligible: false, capabilities: capabilities(false), safeParams: ['cache_thread'], handoffParams: [],
     replacementMcpOperation: 'usage_analyze(goal="context_bloat") or usage_analyze(goal="cache_failure")',
     replacementHref: '?view=explore&mode=calls',
+    deprecatedIn: '0.23.0', noticeOnlyIn: '0.24.x', removalRelease: '0.25.0',
   },
   {
     id: 'diagnostics', label: 'Diagnostics Notebook', description: 'Technical report', icon: BookOpen,
@@ -105,13 +111,15 @@ const legacyRouteCatalog = [
     handoffParams: ['diagnostic_source', 'diagnostic_fact'],
     replacementMcpOperation: 'usage_query(entity="call", measures=["tokens"]) → usage_evidence',
     replacementHref: '?view=explore&mode=calls',
+    deprecatedIn: '0.23.0', noticeOnlyIn: '0.24.x', removalRelease: '0.25.0',
   },
   {
     id: 'reports', label: 'Reports', description: 'Generated analyses', icon: BarChart3,
     maturity: 'experimental', placement: 'hidden', lifecycle: 'deprecated', navigationGroup: null,
-    experimentalNavigationEligible: false, capabilities: capabilities(true), safeParams: ['report'], handoffParams: ['report'],
+    experimentalNavigationEligible: false, capabilities: capabilities(false), safeParams: ['report'], handoffParams: ['report'],
     replacementMcpOperation: 'usage_analyze(goal="usage_spike") or usage_query(...)',
     replacementHref: '?view=explore&mode=calls',
+    deprecatedIn: '0.23.0', noticeOnlyIn: '0.24.x', removalRelease: '0.25.0',
   },
 ] as const satisfies readonly DashboardRouteDefinition[];
 

@@ -49,9 +49,9 @@ export async function currentViewCsvExport(
       case 'threads': {
       const { threadCallsForCurrentUrl } = await import('../features/threads/ThreadsPage');
       return csvExport(`codex-thread-filtered-calls-${stamp}.csv`, threadCallsForCurrentUrl(model, globalQuery), callCsvColumns, 'call rows');
-      }
+    }
     case 'cache-context': {
-      const { cacheContextCallsForCurrentUrl } = await import('../features/cache-context/CacheContextPage');
+      const { cacheContextCallsForCurrentUrl } = await import('../features/compatibility/legacyExportRows');
       return csvExport(`codex-${activeView}-calls-${stamp}.csv`, cacheContextCallsForCurrentUrl(model), callCsvColumns, 'call rows');
     }
     case 'usage-drain': {
@@ -59,11 +59,11 @@ export async function currentViewCsvExport(
       return csvExport(`codex-usage-drain-calls-${stamp}.csv`, usageDrainCallsForCurrentUrl(model), callCsvColumns, 'call rows');
     }
     case 'diagnostics': {
-      const { diagnosticsCallsForCurrentUrl } = await import('../features/diagnostics/DiagnosticsPage');
+      const { diagnosticsCallsForCurrentUrl } = await import('../features/compatibility/legacyExportRows');
       return csvExport(`codex-diagnostics-calls-${stamp}.csv`, diagnosticsCallsForCurrentUrl(model), callCsvColumns, 'call rows');
     }
     case 'reports': {
-      const { reportCallsForCurrentUrl } = await import('../features/reports/ReportsPage');
+      const { reportCallsForCurrentUrl } = await import('../features/compatibility/legacyExportRows');
       return csvExport(`codex-reports-evidence-${stamp}.csv`, reportCallsForCurrentUrl(model), callCsvColumns, 'call rows');
     }
     case 'settings':
@@ -77,7 +77,7 @@ export async function currentViewCsvExport(
       return csvExport(`codex-overview-calls-${stamp}.csv`, overviewCallsForQuery(model.calls, globalQuery), callCsvColumns, 'call rows');
     }
     case 'investigator': {
-      const { investigatorCallsForCurrentUrl } = await import('../features/investigator/InvestigatorPage');
+      const { investigatorCallsForCurrentUrl } = await import('../features/compatibility/legacyExportRows');
       return csvExport(`codex-investigator-calls-${stamp}.csv`, investigatorCallsForCurrentUrl(model), callCsvColumns, 'call rows');
     }
     case 'compression-lab':
