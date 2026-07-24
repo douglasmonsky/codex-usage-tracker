@@ -348,7 +348,7 @@ def create_compression_revision_tables(conn: sqlite3.Connection) -> None:
 
 
 def read_compression_source_generation(conn: sqlite3.Connection) -> int:
-    _ensure_compression_storage(conn)
+    """Read generation from an already initialized compression schema."""
     row = conn.execute(
         "SELECT generation FROM compression_source_state WHERE singleton = 1"
     ).fetchone()

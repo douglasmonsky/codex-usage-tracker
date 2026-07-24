@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import sqlite3
 from dataclasses import asdict
 from pathlib import Path
 
@@ -26,7 +27,8 @@ from codex_usage_tracker.pricing.config import PricingConfig, load_pricing_confi
 from codex_usage_tracker.pricing.costing import estimate_cost_usd
 from codex_usage_tracker.store.api import query_canonical_usage_v2
 from codex_usage_tracker.store.compression_schema import read_compression_source_generation
-from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.connection import connect, connect_read_only
+from codex_usage_tracker.store.schema import init_db
 
 
 def query_usage(
@@ -135,8 +137,16 @@ def _query_fingerprint(request: QueryRequest) -> str:
 
 
 def _source_revision(db_path: Path) -> str:
-    with connect(db_path) as connection:
-        generation = read_compression_source_generation(connection)
+    try:
+        with connect_read_only(db_path) as connection:
+            generation = read_compression_source_generation(connection)
+    except sqlite3.OperationalError as exc:
+        missing_generation_table = "no such table: compression_source_state"
+        if db_path.exists() and missing_generation_table not in str(exc):
+            raise
+        with connect(db_path) as connection:
+            init_db(connection)
+            generation = read_compression_source_generation(connection)
     return f"generation:{generation}"
 
 

@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from codex_usage_tracker.compression import run_builder
+from codex_usage_tracker.compression.api import compression_status
 from codex_usage_tracker.compression.jobs import CompressionJobRegistry
 from codex_usage_tracker.compression.models import CompressionScope
 from codex_usage_tracker.compression.request import prepare_compression_request
@@ -22,6 +23,21 @@ from codex_usage_tracker.store.compression_runs import (
     update_compression_run,
 )
 from tests.compression.compression_helpers import call, snapshot
+
+
+def test_status_missing_database_returns_not_found_payload(tmp_path: Path) -> None:
+    db_path = tmp_path / "missing.sqlite3"
+
+    payload = compression_status(
+        db_path,
+        run_id="missing-run",
+        registry=CompressionJobRegistry(),
+    )
+
+    error = payload["error"]
+    assert isinstance(error, dict)
+    assert error["code"] == "compression_run_not_found"
+    assert not db_path.exists()
 
 
 def test_start_returns_immediately_and_deduplicates_active_request(tmp_path: Path) -> None:

@@ -11,7 +11,8 @@ from codex_usage_tracker.store.compression_facts import backfill_compression_det
 from codex_usage_tracker.store.compression_schema import (
     read_compression_source_generation,
 )
-from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.connection import connect, connect_read_only
+from codex_usage_tracker.store.schema import init_db
 from tests.store_dashboard_helpers import (
     _entry,
     _make_codex_home,
@@ -41,6 +42,17 @@ def test_content_refresh_updates_detector_fact_exposure(tmp_path: Path) -> None:
     assert fact_row["content_exposure_tokens"] > 0
     assert fact_state is not None
     assert fact_state["source_generation"] == source_generation
+
+
+def test_source_generation_read_works_on_query_only_connection(tmp_path: Path) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    with connect(db_path) as conn:
+        init_db(conn)
+
+    with connect_read_only(db_path) as conn:
+        source_generation = read_compression_source_generation(conn)
+
+    assert source_generation == 0
 
 
 def test_direct_ingestion_facts_match_legacy_backfill(tmp_path: Path) -> None:
