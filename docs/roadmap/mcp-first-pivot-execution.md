@@ -1466,8 +1466,8 @@ complete without its named focused and full verification evidence.
 
 ## Task 37 - Budget Product and Package Complexity
 
-- Status: complete locally on `pivot/37-product-complexity-budget`; reviewed
-  PR remains.
+- Status: complete; PR #305 merged to `main` at
+  `f5cb45ac64653f29c8712a0a1ea09ddfd0674ac9`.
 - Graph-guided scope:
   - a fresh GitNexus index at `a52338d` routed measurement to the MCP
     `tool_specs` catalog, CLI `build_parser` inventory, Evidence Console route
@@ -1511,3 +1511,39 @@ complete without its named focused and full verification evidence.
     the Task 37 Xenon A/B complexity gate;
   - reviewer token attribution is `pending` in the aggregate-only metrics
     ledger.
+
+## 0.24 Release Blocker - Read-only Compression Status Polling
+
+- Status: fixed locally on `fix/compression-status-read-only`; release gate
+  remains in progress.
+- Root cause:
+  - `get_compression_run(..., touch=False)` still opened the writable
+    connection and initialized the schema while the dashboard polled job status;
+  - `read_compression_source_generation()` also performed schema setup during
+    the background evidence fold;
+  - those redundant writes could overlap and fail the compression job with
+    `sqlite3.OperationalError`.
+- Fix:
+  - non-touching status reads now use `connect_read_only`;
+  - source-generation reads require the caller's already initialized schema and
+    perform only the query.
+- Verification:
+  - deterministic regressions prove both paths work without initialization or
+    writes;
+  - two accepted reviewer findings restore missing-database status semantics
+    and fresh-database query initialization without reintroducing writes on the
+    normal initialized read path;
+  - the focused application/compression/store/dashboard slice passes 56 tests;
+  - the previously flaky end-to-end dashboard compression test passes 100
+    consecutive runs;
+  - the full Python suite passes 2,158 tests with 88.1% coverage; its broad gate
+    also exposed and hardened one frontend retry assertion whose default
+    one-second wait was unreliable under full-suite contention; ESLint,
+    TypeScript, and all 621 frontend tests then pass;
+  - Ruff lint, configured MyPy, focused Pyright, release readiness,
+    product-complexity budget, and whitespace checks pass.
+- Final review:
+  - the single read-only reviewer reported two medium findings; both were
+    accepted and pass bounded regression checks;
+  - review metrics: 2 findings, 2 accepted; reviewer tokens `pending`; tokens
+    per accepted finding `pending`.

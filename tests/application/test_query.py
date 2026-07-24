@@ -34,6 +34,22 @@ def _seed(db_path: Path) -> None:
         )
 
 
+def test_query_usage_initializes_fresh_database(tmp_path: Path) -> None:
+    db_path = tmp_path / "fresh.sqlite3"
+
+    result = query_usage(
+        QueryRequest(
+            entity="call",
+            measures=("tokens",),
+            filters=QueryFilters(),
+        ),
+        db_path=db_path,
+    )
+
+    assert result.rows == ()
+    assert db_path.is_file()
+
+
 def test_query_uses_canonical_rows_and_explicit_history(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     _seed(db_path)

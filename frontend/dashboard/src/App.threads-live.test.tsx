@@ -295,7 +295,13 @@ describe('React dashboard threads live queries', () => {
 
     expect(await screen.findByText('Stored snapshot')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Open investigator for thread call/i })).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: 'Retry loading thread calls' }));
+    fireEvent.click(
+      await screen.findByRole(
+        'button',
+        { name: 'Retry loading thread calls' },
+        { timeout: 5_000 },
+      ),
+    );
     await waitFor(() => expect(callAttempts).toBe(3));
     expect(await screen.findByText('No aggregate calls are available for this thread.')).toBeInTheDocument();
     expect(screen.queryByText('Stored snapshot')).not.toBeInTheDocument();

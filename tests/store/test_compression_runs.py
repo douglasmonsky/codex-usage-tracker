@@ -15,6 +15,7 @@ from codex_usage_tracker.compression.models import (
     EstimateRange,
 )
 from codex_usage_tracker.store import compression_candidates as candidate_store
+from codex_usage_tracker.store import compression_runs as run_store
 from codex_usage_tracker.store.compression_candidates import (
     get_compression_candidate,
     list_compression_candidates,
@@ -83,6 +84,35 @@ def test_run_updates_preserve_monotonic_progress(tmp_path: Path) -> None:
     assert run is not None
     assert run["progress_percent"] == 60
     assert run["stage"] == "stale-update"
+
+
+def test_status_read_without_touch_does_not_initialize_or_write_schema(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    create_compression_run(db_path, run_id="run-1", **cache_key("rev-1"))
+
+    def fail_if_initialized(_connection: sqlite3.Connection) -> None:
+        raise AssertionError("status read attempted schema initialization")
+
+    monkeypatch.setattr(run_store, "init_db", fail_if_initialized)
+
+    run = run_store.get_compression_run(db_path, run_id="run-1", touch=False)
+
+    assert run is not None
+    assert run["run_id"] == "run-1"
+
+
+def test_status_read_without_touch_returns_none_for_missing_database(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "missing.sqlite3"
+
+    run = run_store.get_compression_run(db_path, run_id="run-1", touch=False)
+
+    assert run is None
+    assert not db_path.exists()
 
 
 def test_candidate_replace_lists_compact_rows_and_reconstructs_detail(tmp_path: Path) -> None:

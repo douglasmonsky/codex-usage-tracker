@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
-from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.connection import connect, connect_read_only
 from codex_usage_tracker.store.schema import init_db
 
 _CACHEABLE_STATUSES = ("completed", "completed_with_warnings")
@@ -261,11 +261,17 @@ def get_compression_run(
     run_id: str,
     touch: bool = True,
 ) -> dict[str, Any] | None:
-    """Return one decoded run, optionally marking it recently accessed."""
+    """Return one decoded run; non-touching status reads stay query-only."""
+    if not touch:
+        if not db_path.is_file():
+            return None
+        with connect_read_only(db_path) as conn:
+            row = _select_run(conn, run_id)
+        return _decode_run(row) if row is not None else None
     with connect(db_path) as conn:
         init_db(conn)
         row = _select_run(conn, run_id)
-        if row is not None and touch:
+        if row is not None:
             conn.execute(
                 "UPDATE compression_runs SET last_accessed_at = ? WHERE run_id = ?",
                 (_utc_now(), run_id),
