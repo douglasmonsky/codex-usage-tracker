@@ -28,6 +28,7 @@ from release_quality import (  # noqa: E402
     check_publish_workflow,
     check_python_support_metadata,
     check_react_dashboard_privacy_artifacts,
+    check_release_artifact_contract,
     check_schema_inventory,
     check_skill_packaging,
     check_tracked_files_for_secrets,
@@ -339,6 +340,7 @@ def main() -> int:
     if args.dist:
         failures.extend(_check_sdist())
         failures.extend(_check_wheel())
+        failures.extend(check_release_artifact_contract(REPO_ROOT, _package_version()))
 
     if failures:
         for failure in failures:

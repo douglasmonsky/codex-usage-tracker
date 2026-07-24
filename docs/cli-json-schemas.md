@@ -54,6 +54,8 @@ Tracked schema ids:
 | `codex-usage-tracker.job.v1` | HTTP `GET /api/v2/jobs/{job_id}` and asynchronous v2 starts; generic process-local job status |
 | `codex-usage-tracker.capabilities.v2` | HTTP `GET /api/v2/capabilities`; immutable analysis, query, allowance, and evidence allowlists |
 | `codex-usage-tracker.error.v1` | Stable HTTP v2 error envelope with machine-readable code and message |
+| `codex-usage-tracker.release-artifact-manifest.v1` | Canonical build-once wheel/sdist hashes, source identity, contract inventories, and Evidence Console bundle hashes |
+| `codex-usage-tracker.release-promotion-evidence.v1` | TestPyPI qualification, installed smoke, GitHub Actions run, and manifest binding required before PyPI promotion |
 | `codex-usage-tracker.query.v2` | Canonical bounded application query result with deterministic cursor continuation |
 | `codex-usage-tracker.analysis.v2` | Bounded evidence-backed analysis with strategy provenance, limitations, accounting, and dashboard destinations |
 | `codex-usage-tracker.analysis-job.v1` | Process-local semantic analysis job status; active and compatible completed work may be reused |

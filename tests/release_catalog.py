@@ -288,6 +288,8 @@ RELEASE_SCHEMA_IDS = {
     "codex-usage-tracker.recommendation.v1",
     "codex-usage-tracker.refresh.v2",
     "codex-usage-tracker.refresh-result.v1",
+    "codex-usage-tracker.release-artifact-manifest.v1",
+    "codex-usage-tracker.release-promotion-evidence.v1",
     "codex-usage-tracker.scope.v1",
     "codex-usage-tracker.status.v2",
     "codex-usage-tracker.subagent-usage.v1",

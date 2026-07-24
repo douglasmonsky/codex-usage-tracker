@@ -106,6 +106,23 @@ Materialized facts may retain physical rows so source replacement and local evid
 
 Shareable outputs remain aggregate-first and must omit indexed/raw content unless an export is explicitly documented as a local raw/content export.
 
+### Release artifact promotion
+
+`release/artifact_manifest.py` is the build-once boundary for public packages. It
+accepts exactly one wheel and one sdist for one version, verifies their package
+metadata and Evidence Console files against the checked-out source, and records
+canonical SHA-256, source-commit, database-schema, JSON-schema, MCP-tool, and
+console-bundle inventories. Verification reconstructs that payload and rejects
+missing, changed, stale, multi-version, or non-canonical input.
+
+`release/promotion_evidence.py` binds a passed installed-artifact smoke and the
+GitHub Actions run identity to that manifest. The publication workflow sends the
+single uploaded `python-dist` build to TestPyPI, downloads and smokes those
+published bytes, then sends bytes downloaded from TestPyPI to PyPI. GitHub
+Release assets are downloaded from PyPI before attachment. The last job verifies
+the same manifest hashes at TestPyPI, PyPI, and GitHub; no production job may
+rebuild the distributions.
+
 ## Boundaries
 
 - `parser.py` converts local JSONL events into aggregate `UsageEvent` records. It also attaches metadata-only call-origin categories, diagnostic facts from `diagnostic_facts.py`, archived-session flags, conservative thread keys, source cursors, and parser diagnostics.
@@ -157,7 +174,7 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
 - `diagnostic_snapshots.py` owns persisted diagnostic snapshot refresh/load orchestration. Snapshot modules should stay synthetic-testable and avoid raw transcript persistence in aggregate diagnostic facts.
 - `dashboard.py` builds aggregate-first static dashboard payloads and writes HTML/assets. `server.py` adds localhost refresh, compatibility `/api/usage`, SQL-backed live API slices, and explicit lazy context loading.
 - `frontend/dashboard/` owns the React dashboard. The packaged React HTML embeds only a database-free boot payload (authentication, localization, and data-scope defaults), then hydrates aggregate data through the localhost APIs. It should render server/API payloads rather than becoming an independent source of usage calculations.
-- `plugin_installer.py`, `.mcp.json`, `skills/`, `src/codex_usage_tracker/plugin_data/skills/`, and `scripts/check_release.py` own install and packaging behavior.
+- `plugin_installer.py`, `.mcp.json`, `skills/`, `src/codex_usage_tracker/plugin_data/skills/`, `release/`, and `scripts/check_release.py` own install, packaging, and immutable artifact-promotion behavior.
 - `scripts/benchmark_synthetic_history.py` owns broad generated large-history query timing checks. `scripts/benchmark_dashboard_routes.py` owns deterministic cold/warm route budgets for the query pipeline. Both must stay synthetic-only and must not read real Codex logs.
 
 ## Extension Rules

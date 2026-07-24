@@ -1401,3 +1401,65 @@ complete without its named focused and full verification evidence.
 - Follow-up:
   - Task 36 owns build-once artifact promotion and will reuse these immutable
     workflow boundaries.
+
+## Task 36 - Promote One Verified Release Artifact
+
+- Status: complete locally on `pivot/36-artifact-promotion`; hosted CI and
+  merge remain.
+- Build-once contract:
+  - one wheel/sdist pair and one canonical manifest are uploaded as the sole
+    `python-dist` build artifact;
+  - the manifest binds exact hashes to the Git SHA, package version, database
+    schema, JSON schemas, MCP tool profiles, and Evidence Console bundles;
+  - missing, altered, multi-version, stale-asset, wrong-source, and
+    non-canonical inputs fail closed.
+- Promotion graph:
+  - TestPyPI receives the build bytes, then qualification downloads and smokes
+    those published bytes;
+  - protected PyPI publication consumes a fresh verified download from
+    TestPyPI and never rebuilds;
+  - GitHub Release attachment consumes verified PyPI bytes, and the last job
+    rechecks hashes at all three public locations.
+- Manual safety:
+  - workflow dispatch is TestPyPI-only; production publication requires an
+    exact `v<package-version>` release tag and the protected `pypi`
+    environment;
+  - manual TestPyPI dry runs use distinct prerelease versions, while a
+    production release performs TestPyPI qualification and PyPI promotion in
+    one release-event run.
+- Primary verification:
+  - the release, packaging, workflow-policy, and immutable-pin slice passes
+    `122` tests; the complete new release package passes `71` focused tests;
+  - changed-line coverage is `92%`, including `92.7%` for artifact manifests,
+    `85.7%` for artifact normalization, and `94.8%` for promotion evidence;
+  - Ruff, mypy, focused Pyright, Tach, Deptry, Bandit, actionlint, offline
+    Zizmor, schema inventory, suppression budget, change-plan budget, source
+    release readiness, and whitespace checks pass;
+  - a canonical wheel/sdist pair passed Twine, manifest create/verify, and an
+    isolated installed-wheel smoke covering the CLI, package data, MCP core
+    inventory, plugin installation, setup/doctor, dashboard generation, and a
+    strict-privacy support bundle;
+  - two independent final-source builds used the same commit-derived
+    `SOURCE_DATE_EPOCH`; the wheels and normalized sdists were byte-identical.
+- Broad verification:
+  - the full suite initially passed `2072` tests and exposed two Task 36
+    failures: missing Tach ownership and release schemas incorrectly listed in
+    the MCP-only contract document; both were fixed and their exact regressions
+    pass directly;
+  - the one broad Agent Maintainer run exposed those same Task 36 issues plus
+    file length, dependency, security, complexity, and coverage findings. All
+    Task 36 findings were repaired and bounded checks pass. Remaining
+    file-length and repository-format failures are inherited outside this
+    change.
+- Tooling note:
+  - GitNexus successfully supplied the base architecture/process orientation.
+    Its post-diff incremental refresh failed with an inconsistent `file_fts`
+    index, so final conclusions use the source, Tach, tests, and release
+    artifacts as authority rather than rebuilding the index and risking
+    generated guidance churn.
+- Final review:
+  - one read-only reviewer reported three findings and all three were accepted:
+    reproducible rerun/manual-candidate handling, release-tag/package-version
+    binding, and exact package-index artifact-set validation;
+  - all three fixes pass the bounded recheck above. Reviewer token attribution
+    is `pending` because the aggregate metrics helper timed out.

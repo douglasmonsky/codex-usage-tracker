@@ -3,8 +3,9 @@
 
 The default mode builds this checkout into a temporary dist directory, installs
 the wheel into a clean virtual environment, and verifies the installed CLI,
-package data, and plugin installer. Use ``--from-pypi`` to verify the public
-package instead, or ``--docker`` to run the same smoke in a clean Linux image.
+package data, and plugin installer. Use ``--artifact-dir`` to smoke an already
+built or downloaded wheel, ``--from-pypi`` to verify the public package, or
+``--docker`` to run the same smoke in a clean Linux image.
 """
 
 from __future__ import annotations
@@ -73,7 +74,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--version",
         default=None,
-        help="When used with --from-pypi, install this exact package version.",
+        help="Install this exact version with --from-pypi or --artifact-dir.",
+    )
+    parser.add_argument(
+        "--artifact-dir",
+        type=Path,
+        default=None,
+        help="Install the sole matching wheel from an existing artifact directory.",
     )
     parser.add_argument(
         "--docker",
@@ -86,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
         help=f"Docker image for --docker mode. Default: {DEFAULT_DOCKER_IMAGE}",
     )
     args = parser.parse_args(argv)
+    if args.from_pypi and args.artifact_dir is not None:
+        parser.error("--from-pypi and --artifact-dir cannot be used together")
 
     if args.docker:
         return _run_in_docker(args)
@@ -123,8 +132,13 @@ def _run_in_docker(args: argparse.Namespace) -> int:
         inner_args.append("--from-pypi")
     if args.version:
         inner_args.extend(["--version", args.version])
+    docker_mounts = ["-v", f"{REPO_ROOT}:/work"]
+    if args.artifact_dir is not None:
+        artifact_dir = args.artifact_dir.resolve()
+        inner_args.extend(["--artifact-dir", "/release-dist"])
+        docker_mounts.extend(["-v", f"{artifact_dir}:/release-dist:ro"])
     setup_commands = ["python -m pip install --upgrade pip >/dev/null"]
-    if not args.from_pypi:
+    if not args.from_pypi and args.artifact_dir is None:
         setup_commands.append("python -m pip install build >/dev/null")
     inner_command = " && ".join(
         setup_commands + ["python " + " ".join(shlex.quote(part) for part in inner_args)]
@@ -134,8 +148,7 @@ def _run_in_docker(args: argparse.Namespace) -> int:
             "docker",
             "run",
             "--rm",
-            "-v",
-            f"{REPO_ROOT}:/work",
+            *docker_mounts,
             "-w",
             "/work",
             args.docker_image,
@@ -149,6 +162,18 @@ def _run_in_docker(args: argparse.Namespace) -> int:
 def _resolve_install_target(args: argparse.Namespace, temp_dir: Path) -> str:
     if args.from_pypi:
         return f"{DISTRIBUTION_NAME}=={args.version}" if args.version else DISTRIBUTION_NAME
+    if args.artifact_dir is not None:
+        artifact_dir = args.artifact_dir.resolve()
+        if not artifact_dir.is_dir():
+            raise FileNotFoundError(f"artifact directory does not exist: {artifact_dir}")
+        version_pattern = args.version or "*"
+        wheels = sorted(artifact_dir.glob(f"{WHEEL_STEM}-{version_pattern}-*.whl"))
+        if len(wheels) != 1:
+            raise FileNotFoundError(
+                "expected exactly one matching wheel in artifact directory; "
+                f"found {[path.name for path in wheels]}"
+            )
+        return str(wheels[0])
 
     version = _project_version()
     dist_dir = temp_dir / "dist"
