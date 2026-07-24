@@ -77,9 +77,9 @@ ADVANCED_TOOL_NAMES = frozenset(
 OVERLAPPING_CORE_TOOL_NAMES = ("usage_status", "usage_query")
 
 _MODULE_TOOL_NAMES = (
-    ("codex_usage_tracker.cli.mcp_subagents", ("subagent_usage",)),
+    ("codex_usage_tracker.interfaces.mcp.mcp_subagents", ("subagent_usage",)),
     (
-        "codex_usage_tracker.cli.mcp_server",
+        "codex_usage_tracker.interfaces.mcp.mcp_server_tools",
         (
             "refresh_usage_index",
             "usage_refresh_start",
@@ -92,7 +92,7 @@ _MODULE_TOOL_NAMES = (
         ),
     ),
     (
-        "codex_usage_tracker.cli.mcp_dashboard",
+        "codex_usage_tracker.interfaces.mcp.mcp_dashboard",
         (
             "usage_status",
             "usage_dedupe_diagnostics",
@@ -101,6 +101,11 @@ _MODULE_TOOL_NAMES = (
             "usage_threads",
             "usage_report_pack",
             "usage_dashboard_recommendations",
+        ),
+    ),
+    (
+        "codex_usage_tracker.interfaces.mcp.mcp_local_operations",
+        (
             "generate_usage_dashboard",
             "export_usage_csv",
             "init_usage_pricing_config",
@@ -109,7 +114,7 @@ _MODULE_TOOL_NAMES = (
         ),
     ),
     (
-        "codex_usage_tracker.cli.mcp_allowance",
+        "codex_usage_tracker.interfaces.mcp.mcp_allowance",
         (
             "usage_allowance_history",
             "usage_allowance_diagnostics",
@@ -122,7 +127,7 @@ _MODULE_TOOL_NAMES = (
         ),
     ),
     (
-        "codex_usage_tracker.cli.mcp_compression",
+        "codex_usage_tracker.interfaces.mcp.mcp_compression",
         (
             "usage_compression_start",
             "usage_compression_status",
@@ -133,7 +138,7 @@ _MODULE_TOOL_NAMES = (
         ),
     ),
     (
-        "codex_usage_tracker.cli.mcp_discovery",
+        "codex_usage_tracker.interfaces.mcp.mcp_discovery",
         (
             "usage_query",
             "usage_recommendations",
@@ -150,7 +155,7 @@ _MODULE_TOOL_NAMES = (
         ),
     ),
     (
-        "codex_usage_tracker.cli.mcp_investigations",
+        "codex_usage_tracker.interfaces.mcp.mcp_investigations",
         (
             "usage_suggest_investigations",
             "usage_investigate",

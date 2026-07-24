@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import importlib.util
 import json
 import os
@@ -16,12 +15,12 @@ from codex_usage_tracker import __version__
 from codex_usage_tracker.cli.main import _COMMAND_HANDLERS
 from codex_usage_tracker.core.json_contracts import known_json_schemas
 from codex_usage_tracker.interfaces.cli.namespaces import STABLE_TOP_LEVEL_COMMANDS
+from codex_usage_tracker.interfaces.mcp.registry import tool_specs
 from tests.release_catalog import (
     ALL_MCP_TOOL_NAMES,
     FORBIDDEN_CONSTELLATION_PATHS,
     FORBIDDEN_DASHBOARD_DEPENDENCIES,
     MAX_INITIAL_DASHBOARD_JS_KIB,
-    MCP_TOOL_NAMES,
     STABLE_CLI_COMMANDS,
 )
 
@@ -383,12 +382,11 @@ def test_dashboard_asset_sync_rejects_untracked_generated_chunk(tmp_path: Path) 
 def test_mcp_tool_names_remain_documented() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     docs = (repo_root / "docs" / "mcp.md").read_text(encoding="utf-8")
-    source = repo_root / "src" / "codex_usage_tracker" / "cli" / "mcp_server.py"
 
-    actual_tools = _mcp_tool_names(source)
+    actual_tools = {tool.name for tool in tool_specs()}
     documented_tools = _documented_mcp_tools(docs)
 
-    assert actual_tools == MCP_TOOL_NAMES
+    assert actual_tools == ALL_MCP_TOOL_NAMES
     assert documented_tools == ALL_MCP_TOOL_NAMES
 
 
@@ -601,24 +599,6 @@ def _documented_cli_commands(path: Path) -> tuple[set[str], list[str]]:
         elif "--version" not in tokens:
             unresolved.append(line)
     return documented, unresolved
-
-
-def _mcp_tool_names(path: Path) -> set[str]:
-    tree = ast.parse("\n".join(candidate.read_text() for candidate in path.parent.glob("mcp_*.py")))
-    tools: set[str] = set()
-    for node in tree.body:
-        if not isinstance(node, ast.FunctionDef):
-            continue
-        for decorator in node.decorator_list:
-            if (
-                isinstance(decorator, ast.Call)
-                and isinstance(decorator.func, ast.Attribute)
-                and decorator.func.attr == "tool"
-                and isinstance(decorator.func.value, ast.Name)
-                and decorator.func.value.id == "mcp"
-            ):
-                tools.add(node.name)
-    return tools
 
 
 def _documented_mcp_tools(docs: str) -> set[str]:

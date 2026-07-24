@@ -10,6 +10,10 @@ from typing import Any, cast
 
 from codex_usage_tracker.cli.plugin_installer import install_plugin
 from codex_usage_tracker.dashboard_service import DashboardServiceStatus
+from codex_usage_tracker.interfaces.mcp import (
+    mcp_dogfood_tools,
+    mcp_local_operations,
+)
 from codex_usage_tracker.store.api import query_session_usage
 from tests.release_catalog import ALL_MCP_TOOL_NAMES
 from tests.store_dashboard_helpers import (
@@ -28,10 +32,9 @@ from tests.store_dashboard_helpers import (
 def test_legacy_imports_do_not_register_a_hidden_compatibility_server() -> None:
     from codex_usage_tracker import mcp_server
     from codex_usage_tracker.cli.mcp_runtime import mcp
-    from codex_usage_tracker.interfaces.mcp.runtime import build_mcp_server, compatibility_mcp
+    from codex_usage_tracker.interfaces.mcp.runtime import build_mcp_server
 
     assert callable(mcp.tool)
-    assert asyncio.run(compatibility_mcp.list_tools()) == []
     developer = {tool.name for tool in asyncio.run(build_mcp_server("developer").list_tools())}
     assert developer == ALL_MCP_TOOL_NAMES
     assert callable(mcp_server.main)
@@ -55,12 +58,23 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     rate_card_path = tmp_path / "rate-card.json"
     thresholds_path = tmp_path / "thresholds.json"
     monkeypatch.setattr(mcp_server, "DEFAULT_CODEX_HOME", codex_home)
-    for module in (mcp_server, mcp_dashboard, mcp_discovery, mcp_investigations):
+    for module in (
+        mcp_server,
+        mcp_dashboard,
+        mcp_discovery,
+        mcp_investigations,
+        mcp_local_operations,
+    ):
         monkeypatch.setattr(module, "DEFAULT_DB_PATH", db_path)
         monkeypatch.setattr(module, "DEFAULT_PRICING_PATH", pricing_path)
         monkeypatch.setattr(module, "DEFAULT_ALLOWANCE_PATH", allowance_path)
+    for module in (mcp_dashboard, mcp_discovery, mcp_investigations):
         monkeypatch.setattr(module, "DEFAULT_PROJECTS_PATH", projects_path)
-    monkeypatch.setattr(mcp_dashboard, "DEFAULT_DASHBOARD_PATH", dashboard_path)
+    monkeypatch.setattr(
+        mcp_local_operations,
+        "DEFAULT_DASHBOARD_PATH",
+        dashboard_path,
+    )
     monkeypatch.setattr(mcp_dashboard, "DEFAULT_CODEX_HOME", codex_home)
     monkeypatch.setattr(mcp_dashboard, "DEFAULT_RATE_CARD_PATH", rate_card_path)
     monkeypatch.setattr(mcp_dashboard, "DEFAULT_THRESHOLDS_PATH", thresholds_path)
@@ -72,7 +86,11 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         return real_status_payload(query, **kwargs)
 
     monkeypatch.setattr(mcp_dashboard, "status_payload", capture_status_payload)
-    monkeypatch.setattr(mcp_dashboard, "update_pricing_from_openai_docs", _fake_pricing_update)
+    monkeypatch.setattr(
+        mcp_local_operations,
+        "update_pricing_from_openai_docs",
+        _fake_pricing_update,
+    )
 
     refresh = mcp_server.refresh_usage_index()
     summary = mcp_server.usage_summary(group_by="thread")
@@ -165,11 +183,13 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT", "1")
     context = mcp_server.usage_call_context(record_id=record_id)
     context_json = json.loads(context)
-    dashboard = mcp_server.generate_usage_dashboard()
-    csv_export = mcp_server.export_usage_csv(str(tmp_path / "usage.csv"), privacy_mode="redacted")
-    pricing_init = mcp_server.init_usage_pricing_config(force=True)
-    pricing_update = mcp_server.update_usage_pricing_config()
-    allowance = mcp_server.init_usage_allowance_config()
+    dashboard = mcp_local_operations.generate_usage_dashboard()
+    csv_export = mcp_local_operations.export_usage_csv(
+        str(tmp_path / "usage.csv"), privacy_mode="redacted"
+    )
+    pricing_init = mcp_local_operations.init_usage_pricing_config(force=True)
+    pricing_update = mcp_local_operations.update_usage_pricing_config()
+    allowance = mcp_local_operations.init_usage_allowance_config()
     doctor = mcp_server.usage_doctor()
     doctor_json = mcp_server.usage_doctor(response_format="json")
 
@@ -589,6 +609,7 @@ def test_agentic_mcp_reports_default_active_scope_excludes_archived(
         monkeypatch.setattr(module, "DEFAULT_DB_PATH", db_path)
         monkeypatch.setattr(module, "DEFAULT_PRICING_PATH", pricing_path)
         monkeypatch.setattr(module, "DEFAULT_ALLOWANCE_PATH", allowance_path)
+    for module in (mcp_discovery, mcp_investigations):
         monkeypatch.setattr(module, "DEFAULT_PROJECTS_PATH", projects_path)
     monkeypatch.setattr(mcp_server, "DEFAULT_CODEX_HOME", codex_home)
 
@@ -720,15 +741,20 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     monkeypatch.setattr(mcp_server, "DEFAULT_DB_PATH", db_path)
     monkeypatch.setattr(mcp_server, "DEFAULT_PRICING_PATH", pricing_path)
     monkeypatch.setattr(mcp_server, "DEFAULT_ALLOWANCE_PATH", allowance_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_PROJECTS_PATH", projects_path)
     monkeypatch.setattr(mcp_server, "DEFAULT_RATE_CARD_PATH", rate_card_path)
-    monkeypatch.setattr(mcp_server, "DEFAULT_AGENTIC_DOGFOOD_DIR", output_dir)
+    monkeypatch.setattr(mcp_dogfood_tools, "DEFAULT_CODEX_HOME", codex_home)
+    monkeypatch.setattr(mcp_dogfood_tools, "DEFAULT_DB_PATH", db_path)
+    monkeypatch.setattr(mcp_dogfood_tools, "DEFAULT_PRICING_PATH", pricing_path)
+    monkeypatch.setattr(mcp_dogfood_tools, "DEFAULT_ALLOWANCE_PATH", allowance_path)
+    monkeypatch.setattr(mcp_dogfood_tools, "DEFAULT_PROJECTS_PATH", projects_path)
+    monkeypatch.setattr(mcp_dogfood_tools, "DEFAULT_RATE_CARD_PATH", rate_card_path)
+    monkeypatch.setattr(mcp_dogfood_tools, "DEFAULT_AGENTIC_DOGFOOD_DIR", output_dir)
     with mcp_server._DOGFOOD_JOB_LOCK:
         mcp_server._DOGFOOD_JOBS.clear()
         mcp_dogfood.DOGFOOD_RESULT_CACHE.clear()
     dogfood_job_service = mcp_dogfood.reset_job_service()
 
-    started = mcp_server.usage_dogfood_start(
+    started = mcp_dogfood_tools.usage_dogfood_start(
         evidence_limit=1,
         privacy_mode="strict",
         refresh=True,
@@ -740,7 +766,7 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
 
     status = started
     for _ in range(100):
-        status = mcp_server.usage_dogfood_status(job_id)
+        status = mcp_dogfood_tools.usage_dogfood_status(job_id)
         if status["status"] in {"completed", "failed"}:
             break
         time.sleep(0.05)
@@ -756,12 +782,12 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     assert generic.state == "completed"
     assert generic.result is None
 
-    result = mcp_server.usage_dogfood_result(job_id)
+    result = mcp_dogfood_tools.usage_dogfood_result(job_id)
     assert result["schema"] == "codex-usage-tracker-agentic-dogfood-v1"
     assert result["progress"]["percent_complete"] == 100
     assert result["cache"]["scope"] == "single_run_shared_reports"
 
-    cached = mcp_server.usage_dogfood_start(
+    cached = mcp_dogfood_tools.usage_dogfood_start(
         evidence_limit=1,
         privacy_mode="strict",
         refresh=False,
@@ -773,12 +799,12 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
     assert cached["result_cache"]["hit"] is True
     assert cached["result_cache"]["source"] in {"memory", "disk"}
     assert cached["stages"][-1]["stage"] == "result_cache"
-    cached_result = mcp_server.usage_dogfood_result(cached["job_id"])
+    cached_result = mcp_dogfood_tools.usage_dogfood_result(cached["job_id"])
     assert cached_result["schema"] == "codex-usage-tracker-agentic-dogfood-v1"
 
     bumped_mtime = time.time() + 60
     os.utime(db_path, (bumped_mtime, bumped_mtime))
-    mtime_cached = mcp_server.usage_dogfood_start(
+    mtime_cached = mcp_dogfood_tools.usage_dogfood_start(
         evidence_limit=1,
         privacy_mode="strict",
         refresh=False,
@@ -789,7 +815,7 @@ def test_mcp_dogfood_async_job_reports_progress(tmp_path: Path, monkeypatch) -> 
 
     with mcp_server._DOGFOOD_JOB_LOCK:
         mcp_dogfood.DOGFOOD_RESULT_CACHE.clear()
-    disk_cached = mcp_server.usage_dogfood_start(
+    disk_cached = mcp_dogfood_tools.usage_dogfood_start(
         evidence_limit=1,
         privacy_mode="strict",
         refresh=False,

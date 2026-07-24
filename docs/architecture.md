@@ -46,6 +46,22 @@ implicitly. Tests that use temporary paths build a custom container without
 monkeypatching module globals. This is manual constructor injection; the project
 does not use a dependency-injection framework.
 
+### MCP server composition
+
+`interfaces/mcp/server.py` owns the only FastMCP construction boundary.
+`create_mcp_server(profile=..., container=...)` creates a new server, selects
+the immutable catalog for one profile, binds container-backed core handlers,
+and registers each tool explicitly. Importing MCP implementation modules
+creates no server and registers no tools.
+
+Full- and developer-profile implementations live under `interfaces/mcp/` by
+concern. `transports.py` runs an already-composed server, while
+`serialization.py` owns shared MCP JSON formatting helpers. The historical
+`cli/mcp_*.py` modules are import-compatible aliases only; they contain no
+tool implementations or decorator registration. The compatibility aliases
+preserve the stable core/full/developer inventories and public tool schemas
+while callers migrate to the interface package.
+
 The aggregate index preserves every parsed row in `usage_events` for source provenance. A versioned strict fingerprint links exact copies of the same logged model call, and the `canonical_usage_events` view selects one physical representative for default totals. Only high-confidence fingerprint matches are excluded; ambiguous or merely similar calls remain canonical. If the original source disappears, the surviving physical copy is promoted without changing the logical call identity.
 
 Materialized facts may retain physical rows so source replacement and local evidence remain auditable. Unscoped aggregate and compression-fact reads join the canonical view, while explicit deduplication diagnostics report physical, canonical, and excluded counts separately.

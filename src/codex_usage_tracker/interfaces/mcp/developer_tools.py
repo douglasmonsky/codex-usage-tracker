@@ -16,11 +16,11 @@ DEVELOPER_TOOL_NAMES = (
 
 _MODULE_TOOL_NAMES = (
     (
-        "codex_usage_tracker.cli.mcp_server",
+        "codex_usage_tracker.interfaces.mcp.mcp_dogfood_tools",
         ("usage_dogfood_start", "usage_dogfood_status", "usage_dogfood_result"),
     ),
     (
-        "codex_usage_tracker.cli.mcp_visualization",
+        "codex_usage_tracker.interfaces.mcp.mcp_visualization",
         ("usage_visualization_suggest", "usage_visualization_render"),
     ),
 )

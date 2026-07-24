@@ -8,7 +8,7 @@ import pytest
 
 from codex_usage_tracker.interfaces.mcp import registry
 from codex_usage_tracker.interfaces.mcp.profiles import tools_for_profile
-from codex_usage_tracker.interfaces.mcp.runtime import build_mcp_server, compatibility_mcp
+from codex_usage_tracker.interfaces.mcp.runtime import build_mcp_server
 from tests.release_catalog import (
     ADVANCED_MCP_TOOL_NAMES,
     ALL_MCP_TOOL_NAMES,
@@ -63,13 +63,13 @@ def test_selected_profile_server_reads_the_environment(
     else:
         monkeypatch.setenv(server.PROFILE_ENV, configured)
 
-    def build(profile: str, *, container: object) -> SimpleNamespace:
+    def build(*, profile: str, container: object) -> SimpleNamespace:
         assert container is not None
         return SimpleNamespace(run=lambda: selected.append(profile))
 
     monkeypatch.setattr(
         server,
-        "build_mcp_server",
+        "create_mcp_server",
         build,
     )
 
@@ -86,20 +86,17 @@ def test_selected_profile_server_rejects_invalid_environment_before_build(
     monkeypatch.setenv(server.PROFILE_ENV, "unreviewed")
     monkeypatch.setattr(
         server,
-        "build_mcp_server",
-        lambda _profile: pytest.fail("FastMCP server built for an invalid profile"),
+        "create_mcp_server",
+        lambda **_kwargs: pytest.fail("FastMCP server built for an invalid profile"),
     )
 
     with pytest.raises(SystemExit, match="expected one of: core, full, developer"):
         server.main()
 
 
-def test_building_core_does_not_resolve_or_mutate_legacy_registration(
+def test_building_core_does_not_resolve_legacy_handlers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    compatibility_tools = compatibility_mcp._tool_manager._tools
-    before = dict(compatibility_tools)
-
     def fail_legacy_resolution(_name: str) -> object:
         raise AssertionError("core construction resolved legacy handlers")
 
@@ -110,7 +107,6 @@ def test_building_core_does_not_resolve_or_mutate_legacy_registration(
     server = build_mcp_server("core")
 
     assert [tool.name for tool in asyncio.run(server.list_tools())] == list(CORE_MCP_TOOL_NAMES)
-    assert compatibility_tools == before
 
 
 def test_core_binds_stable_adapters_once() -> None:

@@ -14,7 +14,10 @@ from codex_usage_tracker.interfaces.mcp.registry import (
     ToolCatalogError,
     tool_specs,
 )
-from codex_usage_tracker.interfaces.mcp.runtime import build_mcp_server
+from codex_usage_tracker.interfaces.mcp.server import (
+    build_mcp_server,
+    create_mcp_server,
+)
 
 __all__ = [
     "CoreToolNotImplemented",
@@ -26,6 +29,7 @@ __all__ = [
     "ToolMaturity",
     "ToolSpec",
     "build_mcp_server",
+    "create_mcp_server",
     "tool_specs",
     "tools_for_profile",
 ]

@@ -897,9 +897,73 @@ commit as each roadmap task.
   explicit adapter work remain Task 30 scope. Focused Home, Limits, Calls,
   Threads, and Thread Calls route protections are unchanged.
 
+## Task 29 - MCP Package Extraction and Explicit Registration
+
+- Status: implementation and primary verification complete on
+  `pivot/29-mcp-extraction`; final review and PR landing remain.
+- Branch: `pivot/29-mcp-extraction`.
+- Commits: `refactor: extract MCP interface package` (this task; exact SHA is
+  recorded in Git/PR history).
+- Registration contract:
+  - `interfaces/mcp/server.py:create_mcp_server` is the only FastMCP
+    construction boundary and registers immutable profile catalogs explicitly;
+  - every server instance owns an isolated registry and receives its
+    `ApplicationContainer` through the factory;
+  - importing every `interfaces.mcp` implementation and historical
+    `cli.mcp_*` compatibility module creates no global server and registers no
+    tools;
+  - historical CLI module paths remain import-compatible aliases, while
+    implementation, local-operation, dogfood, routing, transport, and
+    serialization concerns live under `interfaces/mcp/`.
+- Preserved contracts: exact ordered inventories remain 7 core, 59 full, and
+  64 developer tools. Tool names, signatures, descriptions, lifecycle
+  metadata, JSON schemas, default profile selection, and
+  `python -m codex_usage_tracker.mcp_server` remain unchanged.
+- Changed files: extracted MCP implementations and compression-routing helpers
+  from `cli/` into `interfaces/mcp/`; completed `server.py`; added
+  `transports.py`, `serialization.py`, isolated local-operation and dogfood
+  modules; reduced old paths to shims; added factory/import-side-effect tests;
+  updated architecture documentation and compatibility/profile tests.
+- Focused verification:
+  - roadmap-named factory/import/profile/CLI suite: `30 passed in 10.39s`;
+  - expanded MCP, CLI compatibility, golden-question, and store adapter suite:
+    `139 passed in 14.11s`;
+  - complete Python suite: `1,919 passed in 121.56s`;
+  - package-scoped Pyright: 0 errors and 0 warnings;
+  - repository Ruff, mypy, source-tree Pyright, compileall, Vulture, release
+    readiness, and `git diff --check`: passed;
+  - Tach reported only inherited boundary violations in untouched core, store,
+    and related modules; Task 29 added no interface-to-CLI violation.
+- Final review:
+  - one read-only reviewer reported two medium findings and both were accepted;
+  - restored the exact pre-0.24 fallback and deprecated-tool description text,
+    then strengthened import purity with a fresh-process FastMCP
+    construction/registration probe;
+  - post-review MCP, profile, CLI, and release recheck: `65 passed in 14.22s`;
+    focused Ruff and Pyright passed with zero errors and warnings;
+  - reviewer token status is pending in the aggregate-only review metrics
+    index, so tokens per accepted finding are not yet available.
+- Architecture evidence:
+  - refreshed GitNexus index at Task 28 merge commit before branch creation:
+    25,354 symbols, 54,588 relationships, 1,315 clusters, 300 processes;
+  - GitNexus exact context found one production caller of the previous server
+    builder and six upstream dependents through CLI/module entrypoints, so the
+    compatibility factory name remains as a thin alias;
+  - staged change analysis classified 40 files and 25 changed symbols as low
+    risk with no affected indexed process, and the post-extraction full index
+    completed with 25,314 nodes, 54,496 edges, 1,303 clusters, and 300 flows;
+  - implementation-package scans prove zero CLI imports, global FastMCP
+    instances, and decorator registrations.
+- Deviations from plan: Compression Lab router and payload helper modules moved
+  with their declared wrapper because leaving them under `cli/` would preserve
+  an interface-to-CLI reverse dependency. This added no tool, route, schema,
+  table, runtime dependency, or user-visible behavior.
+- Follow-up risks: Task 30 still owns the repository-wide Tach boundary and
+  remaining non-MCP import cycles. No Task 29 compatibility surface is removed.
+
 ## Remaining Planned Tasks
 
-Tasks 27.5 and 28 are complete. Tasks 29 through 45 remain planned in the
-approved implementation roadmap. Add a full entry using the format above when
-each task becomes active; do not mark a task complete without its named focused
-and full verification evidence.
+Tasks 27.5 and 28 are complete. Task 29 is awaiting final review and landing.
+Tasks 30 through 45 remain planned in the approved implementation roadmap. Add
+a full entry using the format above when each task becomes active; do not mark
+a task complete without its named focused and full verification evidence.
