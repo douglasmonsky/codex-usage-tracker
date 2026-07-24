@@ -14,8 +14,8 @@ compatibility test, and a concrete migration example.
 | Cache and Context route | Context/cache analysis plus contextual Evidence | Analysis service maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_analyze(goal="context_bloat")` or `usage_analyze(goal="cache_failure")`, then open the returned selector. |
 | Reports route | `usage_analyze`, `usage_query`, and CLI export | Analysis and CLI maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Use analysis for explanation, query for bounded rows, or the existing CLI export for automation. |
 | Experimental Usage Constellation | Bounded Home summaries plus Explore and contextual Evidence | Evidence Console maintainers | `0.23.0` | `0.22.x` | `0.23.0` | Release dependency, source, asset, and bundle-budget checks | Use Home for current status and open exact calls or threads through Explore/Evidence; the 3D view has no compatibility surface. |
-| Legacy static dashboard | Evidence Console | Evidence Console maintainers | `0.23.0` | `0.25.x` | `0.26.0` | Static-output compatibility smoke | Run the local Evidence Console and use its stable Home, Explore, Limits, Settings, and Evidence surfaces. |
-| Legacy CLI command or alias | Simplified stable command or advanced namespace equivalent | CLI interface maintainers | `0.23.0` | `0.25.x` | `0.26.0` | CLI alias parity and help snapshot tests | Replace the alias with the documented stable command or namespaced advanced operation. |
+| Legacy static dashboard | Evidence Console | Evidence Console maintainers | `0.23.0` | `0.24.x` | `0.25.0` | `tests/compatibility/test_removed_static_dashboard.py` plus installed-package server smoke | Run `codex-usage-tracker open` and use its stable Home, Explore, Limits, Settings, and Evidence surfaces. |
+| Legacy CLI command or alias | Simplified stable command or advanced namespace equivalent | CLI interface maintainers | `0.23.0` | `0.25.x` | `0.26.0` | CLI alias parity and help snapshot tests | Replace the alias with the documented stable command or namespaced advanced operation. Task 40 removes only the static `dashboard` and `open-dashboard` aliases in `0.25.0`. |
 | HTTP API v1 route | Versioned HTTP API v2 equivalent | HTTP API maintainers | `0.23.0` | `0.25.x` | `0.26.0` | v1-to-v2 semantic adapter contract tests | Change the client to the documented `/api/v2/` endpoint and its shared response contract. |
 
 The five deprecated React workbench routes are notice-only through `0.25.x`.
@@ -87,7 +87,6 @@ The complete deprecated MCP alias inventory is:
 - `usage_test_hypotheses`
 - `usage_context_bloat_scan`
 - `usage_investigation_walk`
-- `generate_usage_dashboard`
 - `init_usage_pricing_config`
 - `update_usage_pricing_config`
 - `init_usage_allowance_config`
@@ -110,7 +109,9 @@ final supported release or publish a documented breaking-change notice.
 
 The primary CLI help lists only `setup`, `status`, `doctor`, `refresh`,
 `analyze`, `query`, `open`, `export`, `config`, `service`, and `admin`.
-Historical top-level names remain accepted through `0.25.x`. When stderr is an
+Most historical top-level names remain accepted while their separate migration
+contracts are active. The static `dashboard` and `open-dashboard` aliases were
+removed in `0.25.0` and return an exact migration error. When stderr is an
 interactive terminal, an alias prints one concise migration notice to stderr;
 stdout is never used for deprecation text.
 

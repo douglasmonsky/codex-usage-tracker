@@ -13,7 +13,6 @@ from typing import Any
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_CODEX_HOME,
-    DEFAULT_DASHBOARD_PATH,
     DEFAULT_DB_PATH,
     DEFAULT_MARKETPLACE_PATH,
     DEFAULT_OTEL_COMPLETIONS_DIR,
@@ -297,7 +296,6 @@ def _support_path_replacements(
         ("rate_card_path", rate_card_path),
         ("thresholds_path", thresholds_path),
         ("projects_path", projects_path),
-        ("dashboard_path", DEFAULT_DASHBOARD_PATH),
         ("plugin_path", DEFAULT_PLUGIN_LINK),
         ("marketplace_path", DEFAULT_MARKETPLACE_PATH),
         ("python_executable", Path(sys.executable)),

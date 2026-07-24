@@ -144,14 +144,15 @@ def test_public_docs_do_not_claim_dashboard_first_or_aggregate_only_storage() ->
 def test_022_release_and_upgrade_docs_define_the_profile_transition() -> None:
     release = (REPO_ROOT / "docs/releases/0.22.0.md").read_text(encoding="utf-8")
     upgrade = (REPO_ROOT / "docs/upgrading-to-0.22.0.md").read_text(encoding="utf-8")
+    historical_counts = {"core": 7, "full": 59}
 
     assert "Release 0.22.0" in release
-    assert f"exactly {MCP_PROFILE_TOOL_COUNTS['core']}" in release
-    assert f"{MCP_PROFILE_TOOL_COUNTS['full']} tools" in release
+    assert f"exactly {historical_counts['core']}" in release
+    assert f"{historical_counts['full']} tools" in release
     assert "CODEX_USAGE_TRACKER_MCP_PROFILE=full" in upgrade
     assert "No dashboard navigation changed" in release
     assert len(CORE_MCP_TOOL_NAMES) == MCP_PROFILE_TOOL_COUNTS["core"]
-    assert len(FULL_MCP_TOOL_NAMES) == MCP_PROFILE_TOOL_COUNTS["full"]
+    assert len(FULL_MCP_TOOL_NAMES) == historical_counts["full"] - 1
     assert "tracks 96 JSON schema identifiers" in release
     assert set(known_json_schemas()) >= RELEASE_022_SCHEMA_IDS
     assert all(f"`{schema}`" in release for schema in RELEASE_022_SCHEMA_IDS)
@@ -160,9 +161,7 @@ def test_022_release_and_upgrade_docs_define_the_profile_transition() -> None:
 def test_023_release_docs_define_the_evidence_console_and_cli_transition() -> None:
     release = (REPO_ROOT / "docs/releases/0.23.0.md").read_text(encoding="utf-8")
     upgrade = (REPO_ROOT / "docs/upgrading-to-0.23.0.md").read_text(encoding="utf-8")
-    routes = (REPO_ROOT / "docs/evidence-console-route-migration.md").read_text(
-        encoding="utf-8"
-    )
+    routes = (REPO_ROOT / "docs/evidence-console-route-migration.md").read_text(encoding="utf-8")
 
     assert "Release 0.23.0" in release
     assert "Home, Explore, and Limits" in release
@@ -187,9 +186,9 @@ def test_024_release_docs_define_the_hardening_and_compatibility_release() -> No
         encoding="utf-8"
     )
     manifest = json.loads(
-        (
-            REPO_ROOT / "docs/releases/0.24.0-artifact-manifest-example.json"
-        ).read_text(encoding="utf-8")
+        (REPO_ROOT / "docs/releases/0.24.0-artifact-manifest-example.json").read_text(
+            encoding="utf-8"
+        )
     )
 
     assert "Decision: **PROCEED**" in audit

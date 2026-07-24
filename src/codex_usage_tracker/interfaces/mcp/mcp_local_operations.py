@@ -7,48 +7,15 @@ from typing import Any
 
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
-    DEFAULT_DASHBOARD_PATH,
     DEFAULT_DB_PATH,
     DEFAULT_PRICING_PATH,
 )
-from codex_usage_tracker.dashboard.api import generate_dashboard
 from codex_usage_tracker.pricing.allowance import write_allowance_template
 from codex_usage_tracker.pricing.api import (
     update_pricing_from_openai_docs,
     write_pricing_template,
 )
 from codex_usage_tracker.store.api import export_usage_csv as export_csv
-
-
-def generate_usage_dashboard(
-    output_path: str | None = None,
-    limit: int = 5000,
-    since: str | None = None,
-    privacy_mode: str = "normal",
-    include_archived: bool = False,
-) -> dict[str, Any]:
-    """Generate a local hoverable HTML dashboard from aggregate-only usage metrics."""
-    output = Path(output_path).expanduser() if output_path else DEFAULT_DASHBOARD_PATH
-    generated = generate_dashboard(
-        DEFAULT_DB_PATH,
-        output_path=output,
-        limit=limit,
-        pricing_path=DEFAULT_PRICING_PATH,
-        allowance_path=DEFAULT_ALLOWANCE_PATH,
-        since=since,
-        privacy_mode=privacy_mode,
-        include_archived=include_archived,
-    )
-    return {
-        "schema": "codex-usage-tracker-dashboard-v1",
-        "dashboard_path": str(generated),
-        "file_url": generated.resolve().as_uri(),
-        "opened": False,
-        "limit": None if limit <= 0 else limit,
-        "since": since,
-        "privacy_mode": privacy_mode,
-        "include_archived": include_archived,
-    }
 
 
 def export_usage_csv(

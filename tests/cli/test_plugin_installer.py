@@ -188,7 +188,6 @@ def test_doctor_accepts_generated_plugin_directory(tmp_path: Path) -> None:
     report = run_doctor(
         codex_home=tmp_path / ".codex",
         db_path=tmp_path / "usage.sqlite3",
-        dashboard_path=tmp_path / "dashboard.html",
         pricing_path=tmp_path / "pricing.json",
         plugin_link=plugin_dir,
         marketplace_path=marketplace_path,
@@ -216,7 +215,6 @@ def test_doctor_detects_mcp_python_that_cannot_import_server(tmp_path: Path) -> 
     report = run_doctor(
         codex_home=tmp_path / ".codex",
         db_path=tmp_path / "usage.sqlite3",
-        dashboard_path=tmp_path / "dashboard.html",
         pricing_path=tmp_path / "pricing.json",
         plugin_link=plugin_dir,
         marketplace_path=marketplace_path,

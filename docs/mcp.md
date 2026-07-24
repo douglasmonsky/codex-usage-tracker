@@ -216,7 +216,6 @@ The complete catalog across all three profiles is:
 - `usage_local_evidence_export`
 - `usage_visualization_suggest`
 - `usage_visualization_render`
-- `generate_usage_dashboard`
 - `export_usage_csv`
 - `init_usage_pricing_config`
 - `update_usage_pricing_config`

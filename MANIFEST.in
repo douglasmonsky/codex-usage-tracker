@@ -8,7 +8,8 @@ recursive-include skills *.md *.py
 recursive-include scripts *.py
 include config/product-complexity-budget.json
 recursive-include src/codex_usage_tracker/plugin_data/assets *
-recursive-include src/codex_usage_tracker/plugin_data/dashboard *
+recursive-include src/codex_usage_tracker/plugin_data/dashboard/locales *
+recursive-include src/codex_usage_tracker/plugin_data/dashboard/react *
 recursive-include src/codex_usage_tracker/plugin_data/docs *
 recursive-include src/codex_usage_tracker/plugin_data/rate_cards *
 recursive-include src/codex_usage_tracker/plugin_data/skills *

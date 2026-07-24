@@ -51,7 +51,6 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         marketplace_path=tmp_path / "marketplace.json",
     )
     db_path = tmp_path / "usage.sqlite3"
-    dashboard_path = tmp_path / "dashboard.html"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
     allowance_path = tmp_path / "allowance.json"
     projects_path = tmp_path / "projects.json"
@@ -70,11 +69,6 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         monkeypatch.setattr(module, "DEFAULT_ALLOWANCE_PATH", allowance_path)
     for module in (mcp_dashboard, mcp_discovery, mcp_investigations):
         monkeypatch.setattr(module, "DEFAULT_PROJECTS_PATH", projects_path)
-    monkeypatch.setattr(
-        mcp_local_operations,
-        "DEFAULT_DASHBOARD_PATH",
-        dashboard_path,
-    )
     monkeypatch.setattr(mcp_dashboard, "DEFAULT_CODEX_HOME", codex_home)
     monkeypatch.setattr(mcp_dashboard, "DEFAULT_RATE_CARD_PATH", rate_card_path)
     monkeypatch.setattr(mcp_dashboard, "DEFAULT_THRESHOLDS_PATH", thresholds_path)
@@ -183,7 +177,6 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT", "1")
     context = mcp_server.usage_call_context(record_id=record_id)
     context_json = json.loads(context)
-    dashboard = mcp_local_operations.generate_usage_dashboard()
     csv_export = mcp_local_operations.export_usage_csv(
         str(tmp_path / "usage.csv"), privacy_mode="redacted"
     )
@@ -221,7 +214,6 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
         report_pack_json,
         context_disabled_json,
         context_json,
-        dashboard,
         csv_export,
         pricing_init,
         pricing_update,
@@ -385,7 +377,6 @@ def test_mcp_wrappers_smoke(tmp_path: Path, monkeypatch) -> None:
     assert context_json["schema"] == "codex-usage-tracker-context-v1"
     assert "sk" + "-proj-" not in context
     assert "[REDACTED_OPENAI_KEY]" in context
-    assert dashboard["dashboard_path"] == str(dashboard_path)
     assert csv_export["privacy_mode"] == "redacted"
     assert pricing_init["pricing_path"] == str(pricing_path)
     assert pricing_update["model_count"] == 1

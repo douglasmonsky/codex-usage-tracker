@@ -34,11 +34,12 @@ Package naming: the public PyPI distribution is [`codex-usage-tracking`](https:/
 
 Restart Codex after plugin registration if you want Codex to discover the MCP tools in a fresh session. The localhost dashboard can run immediately.
 
-`serve-dashboard` and `open-dashboard` refresh active-session usage before opening by default. Add `--no-refresh` only when you intentionally want to inspect the cached local index without scanning logs first.
+`open` and `service serve` refresh active-session usage before opening by default. Add `--no-refresh` only when you intentionally want to inspect the cached local index without scanning logs first.
 
 ## Platform Support
 
-The CLI, SQLite index, dashboard generator, and localhost server are Python-based and are not macOS-only. CI runs the package on Ubuntu with Python 3.10, 3.11, 3.12, 3.13, and 3.14.
+The CLI, SQLite index, and localhost server are Python-based and are not
+macOS-only. CI runs the package on Ubuntu with Python 3.10, 3.11, 3.12, 3.13, and 3.14.
 
 The installed-package Docker smoke path uses a reviewed digest for
 `python:3.14-slim` by default, which exercises the built wheel, package data,
@@ -142,27 +143,28 @@ The login service binds promptly from the cached aggregate index. Use the
 dashboard's Refresh or Live controls when you want to rescan Codex logs; the
 initial background process does not hold the port closed during a full rescan.
 
-Generate a static dashboard:
+Open the Evidence Console:
 
 ```bash
-codex-usage-tracker open-dashboard
-codex-usage-tracker open-dashboard --no-refresh
+codex-usage-tracker open
 ```
 
-Serve the dashboard with live aggregate refresh and lazy context loading:
+Serve the Evidence Console with live aggregate refresh and lazy context loading:
 
 ```bash
-codex-usage-tracker serve-dashboard --open
-codex-usage-tracker serve-dashboard --no-context-api --open
+codex-usage-tracker service serve --open
+codex-usage-tracker service serve --no-context-api --open
 ```
 
-Foreground `serve-dashboard` remains the cross-platform, on-demand option and
-retains its existing default port `8765`.
+Foreground `service serve` is the cross-platform, on-demand option.
 
 The server binds to localhost, requires a per-server token for refresh/context endpoints, and rejects non-loopback `Host` or cross-origin `Origin` headers.
 `--no-context-api` starts context loading off; the details panel can enable it later without restarting the server.
 
-`open-dashboard` and `serve-dashboard` refresh active-session logs before opening by default. The lower-level `dashboard --open` command writes from the current SQLite index when you need a fully static file-generation step.
+`open` and `service serve` refresh active-session logs before opening by
+default. CSV and JSON exports remain available for offline workflows. The
+legacy static commands were removed in 0.25; see
+[Upgrading to 0.25.0](upgrading-to-0.25.0.md).
 
 ## Setup Checks
 

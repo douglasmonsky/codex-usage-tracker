@@ -94,7 +94,6 @@ def test_every_mcp_tool_declares_valid_work_proof() -> None:
             "usage_visualization_render",
             {"evidence": {"row_count": 1, "rows": [{"record_id": "call-1"}]}},
         ),
-        ("generate_usage_dashboard", {"dashboard_path": "/tmp/dashboard.html"}),
         ("export_usage_csv", {"rows": 1, "csv_path": "/tmp/usage.csv"}),
         ("update_usage_pricing_config", {"model_count": 1}),
         ("usage_dogfood_result", {"schema": "codex-usage-tracker-agentic-dogfood-v1"}),

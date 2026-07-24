@@ -139,36 +139,11 @@ CLI_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "notes": list,
         },
     },
-    "codex-usage-tracker-dashboard-v1": {
-        "required": {
-            "dashboard_path": str,
-            "file_url": str,
-            "opened": bool,
-            "limit": (int, NoneType),
-            "since": (str, NoneType),
-            "privacy_mode": str,
-            "include_archived": bool,
-        }
-    },
-    "codex-usage-tracker-open-dashboard-v1": {
-        "required": {
-            "dashboard_path": str,
-            "file_url": str,
-            "opened": bool,
-            "limit": (int, NoneType),
-            "since": (str, NoneType),
-            "refresh": (dict, NoneType),
-            "privacy_mode": str,
-            "include_archived": bool,
-        }
-    },
     "codex-usage-tracker-serve-dashboard-v1": {
         "required": {
             "host": str,
             "port": int,
-            "dashboard_path": str,
             "dashboard_url": str,
-            "legacy_dashboard_url": str,
             "limit": (int, NoneType),
             "since": (str, NoneType),
             "context_api": str,

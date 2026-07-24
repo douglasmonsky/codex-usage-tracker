@@ -47,8 +47,6 @@ LEGACY_TOP_LEVEL_ALIASES = (
     "diagnostics",
     "session",
     "context",
-    "dashboard",
-    "open-dashboard",
     "serve-dashboard",
     "dashboard-service",
     "dedupe-diagnostics",

@@ -327,7 +327,6 @@ def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
     project_dir = temp_dir / "synthetic-project"
     plugin_dir = home_dir / "plugins" / "codex-usage-tracker"
     marketplace = temp_dir / "setup-marketplace.json"
-    dashboard_path = temp_dir / "dashboard.html"
     support_path = temp_dir / "support-bundle.json"
     db_path = app_dir / "usage.sqlite3"
     pricing_path = app_dir / "pricing.json"
@@ -404,36 +403,25 @@ def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
         expected_version=installed_version,
     )
 
-    dashboard_result = _run(
-        [
-            str(command),
-            *global_args,
-            "dashboard",
-            "--output",
-            str(dashboard_path),
-            "--limit",
-            "5000",
-            "--json",
-        ],
-        capture_output=True,
-        env=env,
-    )
-    dashboard_payload = json.loads(dashboard_result.stdout)
-    if dashboard_payload.get("schema") != "codex-usage-tracker-dashboard-v1":
-        raise SystemExit("dashboard JSON schema mismatch")
-    if not dashboard_path.exists():
-        raise SystemExit("dashboard command did not write dashboard HTML")
-    dashboard_html = dashboard_path.read_text(encoding="utf-8")
-    if "<html" not in dashboard_html.lower() or "dashboard" not in dashboard_html.lower():
-        raise SystemExit("dashboard HTML does not look like installed dashboard")
     smoke_served_dashboard(
         command,
         global_args,
         codex_home,
-        dashboard_path,
         env,
         repo_root=REPO_ROOT,
     )
+
+    for removed_command in ("dashboard", "open-dashboard"):
+        removed_result = _run(
+            [str(command), *global_args, removed_command],
+            capture_output=True,
+            check=False,
+            env=env,
+        )
+        if removed_result.returncode != 2:
+            raise SystemExit(f"removed command {removed_command!r} did not exit 2")
+        if "codex-usage-tracker open" not in removed_result.stderr:
+            raise SystemExit(f"removed command {removed_command!r} omitted migration guidance")
 
     support_result = _run(
         [
@@ -586,6 +574,7 @@ def _run(
     command: list[str],
     *,
     capture_output: bool = False,
+    check: bool = True,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     print("+ " + " ".join(shlex.quote(part) for part in command), flush=True)
@@ -596,7 +585,7 @@ def _run(
         text=True,
         capture_output=capture_output,
     )
-    if result.returncode != 0:
+    if check and result.returncode != 0:
         if capture_output:
             if result.stdout:
                 print(result.stdout, file=sys.stdout)

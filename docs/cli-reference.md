@@ -135,16 +135,13 @@ codex-usage-tracker uninstall-plugin
 
 `upgrade-plugin` refreshes an existing wrapper in place. `uninstall-plugin` removes only the tracker-owned plugin wrapper and marketplace entry.
 
-## Dashboard
+## Evidence Console
 
 ```bash
-codex-usage-tracker dashboard --open
-codex-usage-tracker dashboard --include-archived --open
-codex-usage-tracker open-dashboard
-codex-usage-tracker open-dashboard --no-refresh
-codex-usage-tracker serve-dashboard --open
-codex-usage-tracker serve-dashboard --no-refresh --open
-codex-usage-tracker serve-dashboard --no-context-api --open
+codex-usage-tracker open
+codex-usage-tracker service serve --open
+codex-usage-tracker service serve --no-refresh --open
+codex-usage-tracker service serve --no-context-api --open
 ```
 
 Keep the live dashboard available across terminal and Codex task lifetimes on
@@ -169,7 +166,10 @@ Codex logs.
 
 `serve-dashboard --context-api explicit` is the default and keeps context loading as an explicit per-row action. `serve-dashboard --no-context-api` or `--context-api disabled` starts with context loading off; a token-protected button in the local details panel can enable it without restarting the server.
 
-`open-dashboard` and `serve-dashboard` refresh active-session logs before opening by default. `serve-dashboard --open` opens the React dashboard; the legacy dashboard remains available at `/dashboard.html` on the same localhost server. Use `--no-refresh` only for an intentionally cached snapshot. The lower-level `dashboard` command writes from the current SQLite index and does not rescan logs.
+`open` and `service serve` refresh active-session logs before opening by
+default. Use `--no-refresh` only for an intentionally cached snapshot. The
+legacy `dashboard` and `open-dashboard` commands were removed in 0.25; see
+[Upgrading to 0.25.0](upgrading-to-0.25.0.md).
 
 Dashboards default to active sessions only. Use `--include-archived` for an all-history static/opened dashboard, or switch the served dashboard's `History` control from `Active sessions only` to `All history` when you intentionally want archived logs scanned and included.
 
@@ -237,7 +237,7 @@ codex-usage-tracker diagnostics fact-calls --fact-type compaction --fact-name po
 
 Diagnostics expose structured event patterns and their associated token totals. They can show compactions, tool/function/MCP activity, safe command families, structured skill labels, patch outcomes, task completion, search/read loops, and aborted or rolled-back turns. Associated totals are not causal allocations and are not additive when one model call has multiple diagnostic facts.
 
-Snapshot diagnostics are persisted aggregate reports. Without `--refresh`, snapshot commands return the latest stored payload or a `missing` status. With `--refresh`, they recompute from indexed source logs and replace the stored section snapshot. Ordinary `refresh`, `open-dashboard`, and dashboard `Refresh` update usage rows only; they do not recompute diagnostic snapshots.
+Snapshot diagnostics are persisted aggregate reports. Without `--refresh`, snapshot commands return the latest stored payload or a `missing` status. With `--refresh`, they recompute from indexed source logs and replace the stored section snapshot. Ordinary `refresh`, `open`, and console `Refresh` update usage rows only; they do not recompute diagnostic snapshots.
 
 The snapshot sections answer different questions: `overview` summarizes usage rows and aggregate token totals, `tool-output` counts functions and terminal `Original token count` coverage, `commands` keeps command roots plus bounded safe child labels, `git-interactions` counts safe Git/GitHub CLI operations and token-count coverage, `file-reads` counts reader/path activity and allocated read-output tokens, `file-modifications` counts patch modification events and safe modified-path aggregates, `read-productivity` reports later-edit correlations for matching path keys, `concentration` shows top-N token share by source/session, cwd/project, and day, and `guided-summary` turns aggregate usage patterns into a short "what is driving usage" report.
 
@@ -326,7 +326,7 @@ These config schemas are part of the 1.0 compatibility surface. New optional fie
 `--privacy-mode` is a global option, so place it before the subcommand:
 
 ```bash
-codex-usage-tracker --privacy-mode redacted dashboard --open
+codex-usage-tracker --privacy-mode redacted open
 codex-usage-tracker --privacy-mode strict export --output usage-redacted.csv
 codex-usage-tracker --privacy-mode strict query --since 2026-06-01
 ```

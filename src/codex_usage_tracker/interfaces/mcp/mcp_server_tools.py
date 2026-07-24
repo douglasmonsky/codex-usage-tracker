@@ -119,9 +119,6 @@ from codex_usage_tracker.interfaces.mcp.mcp_local_operations import (
     export_usage_csv as export_usage_csv,
 )
 from codex_usage_tracker.interfaces.mcp.mcp_local_operations import (
-    generate_usage_dashboard as generate_usage_dashboard,
-)
-from codex_usage_tracker.interfaces.mcp.mcp_local_operations import (
     init_usage_allowance_config as init_usage_allowance_config,
 )
 from codex_usage_tracker.interfaces.mcp.mcp_local_operations import (

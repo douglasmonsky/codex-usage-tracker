@@ -48,8 +48,6 @@ from codex_usage_tracker.cli.config import (
     run_update_rate_card,
 )
 from codex_usage_tracker.cli.dashboard import (
-    run_dashboard,
-    run_open_dashboard,
     run_serve_dashboard,
 )
 from codex_usage_tracker.cli.dashboard_service import run_dashboard_service
@@ -73,6 +71,22 @@ from codex_usage_tracker.interfaces.cli.help_i18n import (
 from codex_usage_tracker.interfaces.mcp.server import main as run_mcp_server
 from codex_usage_tracker.parser.api import inspect_log, load_session_index
 
+_REMOVED_STATIC_DASHBOARD_COMMANDS = {"dashboard", "open-dashboard"}
+_STATIC_DASHBOARD_REPLACEMENT = "codex-usage-tracker open"
+_STATIC_DASHBOARD_UPGRADE_GUIDE = (
+    "https://github.com/douglasmonsky/codex-usage-tracker/blob/main/docs/upgrading-to-0.25.0.md"
+)
+_GLOBAL_OPTIONS_WITH_VALUES = {
+    "--db",
+    "--pricing",
+    "--allowance",
+    "--rate-card",
+    "--thresholds",
+    "--projects",
+    "--lang",
+    "--privacy-mode",
+}
+
 
 def main() -> int:
     try:
@@ -93,7 +107,17 @@ def main() -> int:
 
 
 def _main() -> int:
-    language = requested_cli_language(sys.argv[1:])
+    cli_args = sys.argv[1:]
+    language = requested_cli_language(cli_args)
+    removed_command = _top_level_command(cli_args)
+    if removed_command in _REMOVED_STATIC_DASHBOARD_COMMANDS:
+        print(
+            f"error: '{removed_command}' was removed in 0.25. "
+            f"Use {_STATIC_DASHBOARD_REPLACEMENT}. "
+            f"Upgrade guide: {_STATIC_DASHBOARD_UPGRADE_GUIDE}",
+            file=sys.stderr,
+        )
+        return 2
     parser = build_parser(language)
     args = parser.parse_args()
     warn_legacy_alias(args)
@@ -102,6 +126,22 @@ def _main() -> int:
         parser.error("未知命令" if language == "zh-Hans" else "unknown command")
         return 2
     return handler(args)
+
+
+def _top_level_command(args: list[str]) -> str | None:
+    skip_value = False
+    for token in args:
+        if skip_value:
+            skip_value = False
+            continue
+        option = token.split("=", 1)[0]
+        if option in _GLOBAL_OPTIONS_WITH_VALUES:
+            skip_value = "=" not in token
+            continue
+        if token.startswith("-"):
+            continue
+        return token
+    return None
 
 
 def _handler_for(args: argparse.Namespace):
@@ -145,8 +185,6 @@ _COMMAND_HANDLERS = {
     "diagnostics": run_diagnostics,
     "session": _run_session,
     "context": _run_context,
-    "dashboard": run_dashboard,
-    "open-dashboard": run_open_dashboard,
     "serve-dashboard": run_serve_dashboard,
     "dashboard-service": run_dashboard_service,
     "expensive": _run_expensive,

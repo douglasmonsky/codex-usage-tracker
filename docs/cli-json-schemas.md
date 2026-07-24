@@ -104,9 +104,8 @@ Tracked schema ids:
 | `codex-usage-tracker-call-v1` | Dashboard server `/api/call` response, MCP `usage_call_detail(record_id=...)` |
 | `codex-usage-tracker-threads-v1` | Dashboard server `/api/threads` response, MCP `usage_threads(...)` |
 | `codex-usage-tracker-thread-calls-v1` | Dashboard server `/api/thread-calls` response |
-| `codex-usage-tracker-dashboard-v1` | CLI `dashboard --json`, MCP `generate_usage_dashboard()` |
-| `codex-usage-tracker-open-dashboard-v1` | CLI `open-dashboard --json` |
-| `codex-usage-tracker-serve-dashboard-v1` | CLI `serve-dashboard --json` startup payload, including preferred React `dashboard_url`, legacy `legacy_dashboard_url` fallback, and explicit `refresh_before_start` / `refresh_in_background` state |
+| `codex-usage-tracker-dashboard-v1` | Live Evidence Console server `/api/usage` response |
+| `codex-usage-tracker-serve-dashboard-v1` | CLI `service serve --json` startup payload with the React `dashboard_url` and explicit `refresh_before_start` / `refresh_in_background` state |
 | `codex-usage-tracker-dashboard-target-v1` | Privacy-safe agent/dashboard handoff with a cataloged view, normalized reviewed selectors, and deterministic React URL |
 | `codex-usage-tracker-pricing-coverage-v1` | CLI `pricing-coverage --json`, MCP `usage_pricing_coverage(response_format="json")` |
 | `codex-usage-tracker-source-coverage-v1` | CLI `source-coverage --json`, MCP `usage_source_coverage(response_format="json")` |
@@ -1642,7 +1641,6 @@ Most setup and file-writing commands accept `--json` and return a schema-specifi
 - `refresh --json`: `codex-usage-tracker-refresh-v1`
 - `rebuild-index --json`: `codex-usage-tracker-rebuild-index-v1`
 - `reset-db --yes --json`: `codex-usage-tracker-reset-db-v1`
-- `dashboard --json`: `codex-usage-tracker-dashboard-v1`
 - `export --json`: `codex-usage-tracker-export-v1`
 - `pricing-coverage --json`
 - `source-coverage --json`

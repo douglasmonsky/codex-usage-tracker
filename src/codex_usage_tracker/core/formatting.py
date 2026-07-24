@@ -225,7 +225,6 @@ def _doctor_path_lines(environment: dict[str, Any]) -> list[str]:
     return [
         f"Codex home: {paths.get('codex_home', 'unknown')}",
         f"Database: {paths.get('db_path', 'unknown')}",
-        f"Dashboard: {paths.get('dashboard_path', 'unknown')}",
     ]
 
 

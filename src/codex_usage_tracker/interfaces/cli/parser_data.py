@@ -8,7 +8,6 @@ from pathlib import Path
 from codex_usage_tracker.context.api import DEFAULT_CONTEXT_CHARS
 from codex_usage_tracker.core.paths import (
     DEFAULT_CODEX_HOME,
-    DEFAULT_DASHBOARD_PATH,
     DEFAULT_PRICING_PATH,
     DEFAULT_SUPPORT_BUNDLE_PATH,
 )
@@ -22,50 +21,10 @@ from codex_usage_tracker.reports.api import (
 def _add_dashboard_parsers(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
-    dashboard = subparsers.add_parser("dashboard", help="Generate static dashboard")
-    dashboard.add_argument("--output", type=Path, default=DEFAULT_DASHBOARD_PATH)
-    dashboard.add_argument(
-        "--limit", type=int, default=5000, help="Maximum calls to load; use 0 for all"
-    )
-    dashboard.add_argument("--since", help="Only include calls at or after this ISO date/time")
-    dashboard.add_argument(
-        "--include-archived",
-        action="store_true",
-        help="Include archived session rows already present in the SQLite index.",
-    )
-    dashboard.add_argument("--open", action="store_true")
-    dashboard.add_argument("--json", action="store_true", dest="as_json")
-
-    open_dashboard = subparsers.add_parser(
-        "open-dashboard", help="Generate the default dashboard and open it"
-    )
-    open_dashboard.add_argument("--output", type=Path, default=DEFAULT_DASHBOARD_PATH)
-    open_dashboard.add_argument(
-        "--limit", type=int, default=5000, help="Maximum calls to load; use 0 for all"
-    )
-    open_dashboard.add_argument("--since", help="Only include calls at or after this ISO date/time")
-    open_dashboard.add_argument(
-        "--include-archived",
-        action="store_true",
-        help="Include archived sessions when refreshing and in the generated dashboard.",
-    )
-    open_dashboard.add_argument(
-        "--refresh",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help=(
-            "Refresh the SQLite index before generating the dashboard. "
-            "This is the default; use --no-refresh to open the cached index only."
-        ),
-    )
-    open_dashboard.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
-    open_dashboard.add_argument("--json", action="store_true", dest="as_json")
-
     serve = subparsers.add_parser(
         "serve-dashboard",
         help="Serve dashboard with lazy localhost context loading",
     )
-    serve.add_argument("--output", type=Path, default=DEFAULT_DASHBOARD_PATH)
     serve.add_argument(
         "--limit", type=int, default=5000, help="Initial maximum calls to load; use 0 for all"
     )

@@ -117,11 +117,6 @@ def post_route_method(path: str) -> str | None:
     )
 
 
-def is_dashboard_shell_path(path: str, dashboard_name: str) -> bool:
-    """Return whether a path should render the dashboard shell."""
-    return path in {"/", f"/{dashboard_name}"}
-
-
 def is_deprecated_http_v1_path(path: str) -> bool:
     """Return whether one local API response belongs to the retiring v1 surface."""
     return path.startswith("/api/") and not path.startswith("/api/v2/")

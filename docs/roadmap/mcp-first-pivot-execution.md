@@ -1615,6 +1615,105 @@ complete without its named focused and full verification evidence.
   - review metrics: 1 finding, 1 accepted (`R1`); reviewer tokens `pending`;
     tokens per accepted finding `pending`.
 
+## Task 40 - Remove the legacy static dashboard product and entry points
+
+- Status: complete locally on `pivot/40-remove-legacy-static-dashboard` from
+  `cad0006cb5e8435ed3a47da9fb120bc81a6e1941`; final read-only review is
+  complete.
+- Graph-guided scope:
+  - the refreshed GitNexus index at the Task 40 base contains `25,421` nodes,
+    `54,684` edges, `1,291` clusters, and `300` execution flows;
+  - exact source inspection confirms `dashboard_payload`,
+    `dashboard_load_window_payload`, the live query handlers, and the React
+    locale/assets are shared with the Evidence Console and must remain.
+- Static-only Python inventory:
+  - [x] delete `dashboard/assets.py`;
+  - [x] delete `dashboard/pricing_snapshot.py`;
+  - [x] remove `generate_dashboard`, `render_dashboard_html`, and the previous
+    static-payload reader from `dashboard/api.py` while preserving shared
+    payload construction;
+  - [x] remove CLI `dashboard` and `open-dashboard` parsers, runners, handler
+    registration, JSON schemas, and namespace aliases while preserving
+    `serve-dashboard`/`service serve`;
+  - [x] remove MCP `generate_usage_dashboard` from the implementation,
+    compatibility registry, profile catalogs, work-proof catalog, and legacy
+    import facades while preserving CSV export;
+  - [x] remove server-time static generation, legacy shell rendering,
+    configured static-filename routing, and the generated output-path contract.
+- Static-only package asset inventory:
+  - [x] delete `dashboard_template.html`;
+  - [x] delete the top-level legacy scripts `dashboard.js`,
+    `dashboard_actions.js`, `dashboard_analysis.js`,
+    `dashboard_call_diagnostics.js`, `dashboard_call_investigator.js`,
+    `dashboard_cells.js`, `dashboard_data.js`, `dashboard_details.js`,
+    `dashboard_diagnostics.js`, `dashboard_diagnostics_facts.js`,
+    `dashboard_diagnostics_snapshots.js`, `dashboard_events.js`,
+    `dashboard_filters.js`, `dashboard_format.js`, `dashboard_i18n.js`,
+    `dashboard_insights.js`, `dashboard_live.js`,
+    `dashboard_payload_cache.js`, `dashboard_state.js`,
+    `dashboard_status.js`, `dashboard_tables.js`, and
+    `dashboard_tooltips.js`;
+  - [x] delete the top-level legacy styles `dashboard.css`,
+    `dashboard_call.css`, `dashboard_detail.css`,
+    `dashboard_insights.css`, `dashboard_layout.css`,
+    `dashboard_responsive.css`, and `dashboard_tables.css`;
+  - [x] preserve `dashboard/locales/` and `dashboard/react/`, which are live
+    Evidence Console inputs and generated output respectively.
+- Static-only screenshot inventory:
+  - [x] delete the source and packaged copies of
+    `dashboard-call-investigator-evidence.png`,
+    `dashboard-call-investigator-preview.png`,
+    `dashboard-call-investigator.png`, `dashboard-calls-preview.png`,
+    `dashboard-calls.png`, `dashboard-details.png`,
+    `dashboard-diagnostics-git-expanded.png`,
+    `dashboard-diagnostics.png`, `dashboard-insights.png`, and
+    `dashboard-threads.png`;
+  - [x] preserve every `evidence-console-*.png` screenshot.
+- Preservation boundary:
+- [x] retain CSV/JSON exports, exact Evidence Console deep links, focused
+  Calls/Threads/thread-call/Home/Limits query plans, canonical accounting,
+  privacy and raw-context controls, incremental freshness, and schema
+  integrity; Task 41 endpoints and workbench code are out of scope.
+- Post-release refresh-concurrency triage:
+  - verified pipx upgrade from public `0.20.0` to `0.24.0` and
+    `setup --force-plugin` replaced the plugin/MCP bundle successfully;
+  - on an existing approximately 10 GB index, `_RefreshStreamWriter.run()`
+    holds `BEGIN IMMEDIATE` across streaming and
+    `_finalize_derived_state()`, so the long derived-state SQL phase retains
+    the SQLite writer lock by design;
+  - concurrent `service serve --no-refresh` constructs the application
+    container, whose persistent `JobService` calls
+    `AnalysisJobRepository.recover_interrupted()`; that method also requests
+    `BEGIN IMMEDIATE` and exhausts the normal five-second busy timeout,
+    producing `sqlite3.OperationalError: database is locked`;
+  - this is a startup availability/performance defect, not evidence of
+    corruption. Do not interrupt the owning refresh or weaken canonical
+    accounting, transaction integrity, or freshness semantics;
+  - follow-up fix must make stale-job recovery retryable or defer it until the
+    writer becomes available, with a synthetic two-connection regression that
+    proves service startup remains available and recovery eventually runs.
+- Verification:
+  - isolated installed-package smoke passed against the rebuilt wheel,
+    including the seven-tool core MCP catalog, React/locales package resources,
+    removed-command migration errors, plugin setup, doctor, support bundle,
+    and live server routes;
+  - the measured budget baselines are `5,141,773` wheel bytes and `28,443,941`
+    sdist bytes; the rebuilt artifacts pass `twine check`, release readiness,
+    package membership, and the ratcheted product-complexity budgets;
+  - the React dashboard remains deterministic at `61,457` gzip bytes; all 609
+    frontend tests, typecheck, lint, governance, source budget, bundle budget,
+    deterministic-asset, and Chromium release-candidate gates passed;
+  - the complete isolated Python suite, Ruff, MyPy, Pyright, product complexity,
+    release readiness, and distribution validation passed.
+- Final review:
+  - the single read-only reviewer reported four findings: asset-path
+    containment (`R1`), migration-route HEAD parity (`R2`), social-preview
+    inputs (`R3`), and current documentation drift (`R4`);
+  - all four were accepted and fixed with focused regression coverage;
+  - review metrics: 4 findings, 4 accepted (`R1`, `R2`, `R3`, `R4`); reviewer
+    tokens and tokens per accepted finding are `pending` because aggregate
+    attribution encountered the separately recorded SQLite writer lock.
+
 ## Task 39 - Gate and Publish Release 0.24.0
 
 - Status: complete and publicly published. PR `#308` merged as

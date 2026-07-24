@@ -6,7 +6,6 @@ from codex_usage_tracker.server.routes import (
     GET_ROUTE_METHODS,
     POST_ROUTE_METHODS,
     get_route_method,
-    is_dashboard_shell_path,
     is_deprecated_http_v1_path,
 )
 
@@ -81,12 +80,6 @@ def test_server_route_tables_cover_compression_lab_paths() -> None:
     assert GET_ROUTE_METHODS["/api/compression/status"] == "_handle_compression_status"
     assert GET_ROUTE_METHODS["/api/compression/profile"] == "_handle_compression_profile"
     assert POST_ROUTE_METHODS["/api/compression/start"] == "_handle_compression_start"
-
-
-def test_dashboard_shell_path_matches_root_and_generated_dashboard_name() -> None:
-    assert is_dashboard_shell_path("/", "dashboard.html")
-    assert is_dashboard_shell_path("/dashboard.html", "dashboard.html")
-    assert not is_dashboard_shell_path("/api/usage", "dashboard.html")
 
 
 def test_only_unversioned_api_routes_receive_v1_deprecation_metadata() -> None:

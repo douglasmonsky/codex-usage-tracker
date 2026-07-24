@@ -54,7 +54,6 @@ COMPATIBILITY_TOOL_NAMES = (
     "usage_context_bloat_scan",
     "usage_investigation_walk",
     "usage_local_evidence_export",
-    "generate_usage_dashboard",
     "export_usage_csv",
     "init_usage_pricing_config",
     "update_usage_pricing_config",
@@ -106,7 +105,6 @@ _MODULE_TOOL_NAMES = (
     (
         "codex_usage_tracker.interfaces.mcp.mcp_local_operations",
         (
-            "generate_usage_dashboard",
             "export_usage_csv",
             "init_usage_pricing_config",
             "update_usage_pricing_config",

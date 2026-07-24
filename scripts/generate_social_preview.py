@@ -1,7 +1,7 @@
 """Generate repository preview artwork.
 
-The images are built from exact rendered text and existing synthetic dashboard
-screenshots so marketing copy stays crisp and reproducible.
+The images are built from exact rendered text and retained synthetic Evidence
+Console screenshots so marketing copy stays crisp and reproducible.
 """
 
 from __future__ import annotations
@@ -111,9 +111,9 @@ def draw_dashboard_stack(base: Image.Image, *, x: int, y: int) -> None:
         card_box, radius=30, fill=(255, 255, 255, 246), outline=(202, 213, 232), width=2
     )
 
-    overview = cover_crop(ASSETS / "dashboard-insights.png", (486, 178), 0.20)
-    calls = cover_crop(ASSETS / "dashboard-calls.png", (232, 174), 0.56)
-    investigator = cover_crop(ASSETS / "dashboard-call-investigator.png", (232, 174), 0.34)
+    overview = cover_crop(ASSETS / "evidence-console-home.png", (486, 178), 0.20)
+    calls = cover_crop(ASSETS / "evidence-console-explore-calls.png", (232, 174), 0.56)
+    investigator = cover_crop(ASSETS / "evidence-console-evidence-call.png", (232, 174), 0.34)
 
     paste_rounded(base, overview, (x + 25, y + 32), 20)
     paste_rounded(base, calls, (x + 25, y + 232), 18)
@@ -129,11 +129,11 @@ def draw_dashboard_stack(base: Image.Image, *, x: int, y: int) -> None:
     )
 
     draw.rounded_rectangle((x + 34, y + 44, x + 178, y + 72), radius=14, fill=(37, 99, 235, 232))
-    draw.text((x + 52, y + 49), "Overview", font=font(16, "bold"), fill=(255, 255, 255))
+    draw.text((x + 52, y + 49), "Home", font=font(16, "bold"), fill=(255, 255, 255))
     draw.rounded_rectangle((x + 34, y + 244, x + 126, y + 270), radius=13, fill=(15, 23, 42, 228))
     draw.text((x + 51, y + 249), "Calls", font=font(15, "bold"), fill=(255, 255, 255))
     draw.rounded_rectangle((x + 288, y + 244, x + 426, y + 270), radius=13, fill=(6, 95, 70, 224))
-    draw.text((x + 304, y + 249), "Investigator", font=font(15, "bold"), fill=(255, 255, 255))
+    draw.text((x + 304, y + 249), "Evidence", font=font(15, "bold"), fill=(255, 255, 255))
 
 
 def draw_stat_badge(

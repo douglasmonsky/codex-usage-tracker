@@ -4,7 +4,6 @@ import json
 import sys
 from pathlib import Path
 
-from codex_usage_tracker.dashboard.api import generate_dashboard
 from codex_usage_tracker.diagnostics.api import run_doctor
 from codex_usage_tracker.pricing.api import (
     annotate_rows_with_efficiency,
@@ -17,10 +16,8 @@ from tests.store_dashboard_helpers import _make_codex_home, _write_pricing
 def test_pricing_annotation_and_doctor_pass(tmp_path: Path) -> None:
     codex_home = _make_codex_home(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
-    dashboard_path = tmp_path / "dashboard.html"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
     refresh_usage_index(codex_home=codex_home, db_path=db_path)
-    generate_dashboard(db_path=db_path, output_path=dashboard_path, pricing_path=pricing_path)
 
     rows = query_most_expensive_calls(db_path=db_path, limit=1)
     annotated = annotate_rows_with_efficiency(
@@ -59,7 +56,6 @@ def test_pricing_annotation_and_doctor_pass(tmp_path: Path) -> None:
     report = run_doctor(
         codex_home=codex_home,
         db_path=db_path,
-        dashboard_path=dashboard_path,
         pricing_path=pricing_path,
         plugin_link=plugin_link,
         marketplace_path=marketplace_path,

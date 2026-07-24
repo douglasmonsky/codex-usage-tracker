@@ -27,6 +27,7 @@ _DEVELOPER_ONLY_NAMES = {
     "usage_visualization_suggest",
     "usage_visualization_render",
 }
+_REMOVED_025_NAMES = {"generate_usage_dashboard"}
 
 
 def _baseline_names() -> set[str]:
@@ -38,8 +39,8 @@ def test_profiles_preserve_every_021_pr290_public_name() -> None:
     full_names = {spec.name for spec in tools_for_profile("full")}
     developer_names = {spec.name for spec in tools_for_profile("developer")}
 
-    assert _baseline_names() - _DEVELOPER_ONLY_NAMES <= full_names
-    assert _baseline_names() <= developer_names
+    assert _baseline_names() - _DEVELOPER_ONLY_NAMES - _REMOVED_025_NAMES <= full_names
+    assert _baseline_names() - _REMOVED_025_NAMES <= developer_names
 
 
 def test_exact_ordered_core_surface_is_unchanged() -> None:
@@ -58,7 +59,7 @@ def test_every_registered_legacy_callable_has_a_catalog_disposition() -> None:
 def test_full_profile_registers_exact_legacy_callables_without_schema_wrappers() -> None:
     registered = build_mcp_server("full")._tool_manager._tools
 
-    for name in _baseline_names() - _DEVELOPER_ONLY_NAMES:
+    for name in _baseline_names() - _DEVELOPER_ONLY_NAMES - _REMOVED_025_NAMES:
         assert registered[name].fn is compatibility_handler(name)
 
 

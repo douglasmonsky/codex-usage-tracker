@@ -297,12 +297,12 @@ def test_committed_budget_preserves_reviewed_baselines_and_exact_headroom() -> N
     assert metrics["contextual_dashboard_routes"]["maximum"] == 1
     assert metrics["unbudgeted_python_files_over_600"]["maximum"] == 0
     assert metrics["unbudgeted_frontend_source_files_over_500"]["maximum"] == 0
-    assert metrics["wheel_bytes"]["baseline"] == 7_017_243
-    assert metrics["wheel_bytes"]["maximum"] == math.ceil(7_017_243 * 1.05)
-    assert metrics["sdist_bytes"]["baseline"] == 32_021_790
-    assert metrics["sdist_bytes"]["maximum"] == math.ceil(32_021_790 * 1.05)
+    assert metrics["wheel_bytes"]["baseline"] == 5_141_773
+    assert metrics["wheel_bytes"]["maximum"] == math.ceil(5_141_773 * 1.03)
+    assert metrics["sdist_bytes"]["baseline"] == 28_443_941
+    assert metrics["sdist_bytes"]["maximum"] == math.ceil(28_443_941 * 1.03)
     assert metrics["main_initial_react_js_gzip_bytes"]["baseline"] == 61_457
-    assert metrics["main_initial_react_js_gzip_bytes"]["maximum"] == math.ceil(61_457 * 1.10)
+    assert metrics["main_initial_react_js_gzip_bytes"]["maximum"] == math.ceil(61_457 * 1.03)
     assert metrics["stable_json_schemas"]["maximum"] == 116
     assert metrics["sqlite_schema_increments"]["maximum"] == 1
     assert budget["source_files"]["python"]["roots"] == ["src/codex_usage_tracker"]

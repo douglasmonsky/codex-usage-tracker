@@ -212,17 +212,6 @@ def _parser_diagnostic_pass(metadata: dict[str, object] | dict[str, str]) -> Doc
     )
 
 
-def _check_dashboard_target(dashboard_path: Path) -> DoctorCheck:
-    if dashboard_path.exists():
-        return DoctorCheck("Dashboard", "pass", f"Dashboard exists: {dashboard_path}")
-    return DoctorCheck(
-        "Dashboard",
-        "warn",
-        f"Dashboard has not been generated yet: {dashboard_path}",
-        "Run: codex-usage-tracker dashboard",
-    )
-
-
 def _check_pricing(pricing_path: Path) -> DoctorCheck:
     config = load_pricing_config(pricing_path)
     if config.error:

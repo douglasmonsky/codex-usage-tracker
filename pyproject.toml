@@ -83,7 +83,6 @@ where = ["src"]
 [tool.setuptools.package-data]
 "codex_usage_tracker.plugin_data" = [
   "assets/*",
-  "dashboard/*",
   "dashboard/locales/*",
   "dashboard/react/*",
   "dashboard/react/assets/*",
