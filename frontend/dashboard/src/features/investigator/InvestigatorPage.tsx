@@ -16,7 +16,7 @@ import {
 import {
   type InvestigationWalkBranch,
 } from '../../api/investigations';
-import type { CallRow, ContextRuntime, DashboardModel } from '../../api/types';
+import type { ContextRuntime, DashboardModel } from '../../api/types';
 import { buildDashboardTarget } from '../../app/dashboardTargets';
 import { useShellI18n } from '../../app/i18nContext';
 import {
@@ -39,7 +39,6 @@ import traceStyles from './InvestigationTrace.module.css';
 import {
   buildInvestigationWorkspace,
   buildWasteFingerprintSpec,
-  callsForFinding,
   type InvestigationFinding,
   type InvestigationTone,
 } from './investigationModel';
@@ -58,12 +57,6 @@ type InvestigatorPageProps = {
 };
 
 const defaultQuestion = 'Where is avoidable token waste concentrated?';
-
-export function investigatorCallsForCurrentUrl(model: DashboardModel): CallRow[] {
-  const rank = Number(new URLSearchParams(window.location.search).get('finding') ?? '');
-  const finding = model.findings.find(candidate => candidate.rank === rank) ?? model.findings[0];
-  return finding ? callsForFinding(finding, model.calls) : topCalls(model.calls, 8);
-}
 
 export function InvestigatorPage({
   model,
@@ -395,10 +388,6 @@ function resolveSelectedFinding(findings: InvestigationFinding[], requested: str
 
 function readFindingParam(): string {
   return new URLSearchParams(window.location.search).get('finding') ?? '';
-}
-
-function topCalls(calls: CallRow[], limit: number): CallRow[] {
-  return [...calls].sort((left, right) => right.totalTokens - left.totalTokens).slice(0, limit);
 }
 
 function toneToBadge(tone: InvestigationTone): 'neutral' | 'positive' | 'caution' | 'risk' | 'context' {

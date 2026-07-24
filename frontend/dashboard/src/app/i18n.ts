@@ -90,6 +90,22 @@ const fallbackTranslations: Record<string, string> = {
   'evidence.aggregate_selection': 'aggregate selection',
   'evidence.prompt.template': '{question} Evidence: {identifiers}. Scope: history={history}, privacy_mode={privacy}. Target: {target}.{launch}',
   'evidence.prompt.launch': ' Launch locally with: {instruction}.',
+  'compatibility.eyebrow': 'Compatibility route',
+  'compatibility.notice_only': 'Notice only',
+  'compatibility.notice': 'This legacy workbench is notice-only. Its previous dashboard queries and background jobs are no longer loaded.',
+  'compatibility.backend_support': 'CLI, HTTP API, export, and full-profile MCP compatibility remain available through {release}.',
+  'compatibility.prior_feature': 'Previous feature',
+  'compatibility.replacement_request': 'Replacement core request',
+  'compatibility.final_support': 'Final supported release',
+  'compatibility.removal_release': 'Removal release',
+  'compatibility.copy_prompt': 'Copy replacement prompt',
+  'compatibility.prompt_copied': 'Replacement prompt copied',
+  'compatibility.prompt_copy_failed': 'Unable to copy replacement prompt',
+  'compatibility.open_evidence': 'Open Evidence',
+  'compatibility.open_explore': 'Open Explore',
+  'compatibility.open_limits': 'Open Limits',
+  'compatibility.destinations_aria': 'Supported Evidence Console destinations',
+  'compatibility.prompt_template': 'Use Codex Usage Tracker to replace the retired {feature} dashboard. Start with: {operation}. Summarize the result and cite the exact evidence identifiers.',
 };
 
 const navTranslationKeys: Partial<Record<ViewId, string>> = {

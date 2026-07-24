@@ -7,8 +7,10 @@ import type { DashboardSourceIdentity } from '../data/queryRuntime';
 import type { DashboardViewId } from './dashboardSearch';
 
 const HomePage = lazyRouteComponent(() => import('../features/home/HomePage'), 'HomePage');
-const InvestigatorPage = lazyRouteComponent(() => import('../features/investigator/InvestigatorPage'), 'InvestigatorPage');
-const CompressionLabPage = lazyRouteComponent(() => import('../features/compression-lab/CompressionLabPage'), 'CompressionLabPage');
+const LegacyWorkbenchNotice = lazyRouteComponent(
+  () => import('../features/compatibility/LegacyWorkbenchNotice'),
+  'LegacyWorkbenchNotice',
+);
 const ExplorePage = lazyRouteComponent(() => import('../features/explore/ExplorePage'), 'ExplorePage');
 const CallInvestigatorPage = lazyRouteComponent(
   () => import('../features/call-investigator/CallInvestigatorPage'),
@@ -19,9 +21,6 @@ const EvidencePage = lazyRouteComponent(
   'EvidencePage',
 );
 const UsageDrainPage = lazyRouteComponent(() => import('../features/usage-drain/UsageDrainPage'), 'UsageDrainPage');
-const CacheContextPage = lazyRouteComponent(() => import('../features/cache-context/CacheContextPage'), 'CacheContextPage');
-const DiagnosticsPage = lazyRouteComponent(() => import('../features/diagnostics/DiagnosticsPage'), 'DiagnosticsPage');
-const ReportsPage = lazyRouteComponent(() => import('../features/reports/ReportsPage'), 'ReportsPage');
 const SettingsPage = lazyRouteComponent(() => import('../features/settings/SettingsPage'), 'SettingsPage');
 
 const dashboardRouteComponents: Array<{
@@ -33,15 +32,15 @@ const dashboardRouteComponents: Array<{
   { id: 'limits', component: UsageDrainPage },
   { id: 'evidence', component: EvidencePage },
   { id: 'overview', component: HomePage },
-  { id: 'investigator', component: InvestigatorPage },
-  { id: 'compression-lab', component: CompressionLabPage },
+  { id: 'investigator', component: LegacyWorkbenchNotice },
+  { id: 'compression-lab', component: LegacyWorkbenchNotice },
   { id: 'calls', component: ExplorePage },
   { id: 'call', component: CallInvestigatorPage },
   { id: 'threads', component: ExplorePage },
   { id: 'usage-drain', component: UsageDrainPage },
-  { id: 'cache-context', component: CacheContextPage },
-  { id: 'diagnostics', component: DiagnosticsPage },
-  { id: 'reports', component: ReportsPage },
+  { id: 'cache-context', component: LegacyWorkbenchNotice },
+  { id: 'diagnostics', component: LegacyWorkbenchNotice },
+  { id: 'reports', component: LegacyWorkbenchNotice },
   { id: 'settings', component: SettingsPage },
 ];
 
@@ -118,7 +117,6 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     applicationI18n,
     backFromCallInvestigator,
     callBackLabel,
-    canLoadAllRows,
     canUseLiveApi,
     compatibilityLabs,
     contextRuntime,
@@ -127,16 +125,13 @@ function renderDashboardView(props: DashboardRouteViewProps) {
     dashboardPayload,
     globalFilters,
     globalQuery,
-    hasMoreRows,
     historyScope,
     homeSummary,
     homeStatusLoading,
     homeStatusError,
     loadWindow,
-    loadAllRows,
     loadedRowCount,
     loadLimit,
-    loadMoreRows,
     scopeSince,
     model,
     navigateView,
@@ -178,26 +173,14 @@ function renderDashboardView(props: DashboardRouteViewProps) {
         />
       );
     case 'investigator':
-      return (
-        <InvestigatorPage
-          model={model}
-          contextRuntime={contextRuntime}
-          includeArchived={historyScope === 'all'}
-          sourceKey={sourceIdentity.sourceKey}
-          sourceRevision={sourceIdentity.sourceRevision}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          onNavigateView={navigateView}
-        />
-      );
     case 'compression-lab':
+    case 'cache-context':
+    case 'diagnostics':
+    case 'reports':
       return (
-        <CompressionLabPage
-          contextRuntime={contextRuntime}
-          includeArchived={historyScope === 'all'}
-          since={scopeSince}
-          sourceKey={sourceIdentity.sourceKey}
-          sourceRevision={sourceIdentity.sourceRevision}
+        <LegacyWorkbenchNotice
+          viewId={renderedView}
+          onNavigate={navigateView}
         />
       );
     case 'explore':
@@ -252,55 +235,6 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           model={model}
           contextRuntime={contextRuntime}
           includeArchived={historyScope === 'all'}
-          sourceRevision={sourceIdentity.sourceRevision}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-        />
-      );
-    case 'cache-context':
-      return (
-        <CacheContextPage
-          model={model}
-          contextRuntime={contextRuntime}
-          includeArchived={historyScope === 'all'}
-          scopeSince={scopeSince}
-          sourceKey={sourceIdentity.sourceKey}
-          sourceRevision={sourceIdentity.sourceRevision}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-        />
-      );
-    case 'diagnostics':
-      return (
-        <DiagnosticsPage
-          model={model}
-          contextRuntime={contextRuntime}
-          includeArchived={historyScope === 'all'}
-          sourceKey={sourceIdentity.sourceKey}
-          sourceRevision={sourceIdentity.sourceRevision}
-          rowLoadControls={{
-            loadedRowCount,
-            totalAvailableRows,
-            canLoadMoreRows: canUseLiveApi && hasMoreRows,
-            canLoadAllRows,
-            refreshing,
-            onLoadMoreRows: loadMoreRows,
-            onLoadAllRows: loadAllRows,
-          }}
-          onOpenInvestigator={openCallInvestigator}
-          onCopyCallLink={copyCallInvestigatorLink}
-          globalFilters={globalFilters}
-        />
-      );
-    case 'reports':
-      return (
-        <ReportsPage
-          model={model}
-          refreshState={refreshState}
-          includeArchived={historyScope === 'all'}
-          loadWindow={loadWindow}
-          loadLimit={loadLimit}
-          sourceKey={sourceIdentity.sourceKey}
           sourceRevision={sourceIdentity.sourceRevision}
           onOpenInvestigator={openCallInvestigator}
           onCopyCallLink={copyCallInvestigatorLink}

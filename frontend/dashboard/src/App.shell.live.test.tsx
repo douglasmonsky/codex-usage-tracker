@@ -208,36 +208,6 @@ it('keeps stable Home shell boot bounded instead of hydrating compatibility rows
     expect(usageRequestCalls(fetchMock)).toHaveLength(0);
   });
 
-  it('renders Reports live boot payloads without embedded report summaries', () => {
-    window.history.replaceState(null, '', '/?view=reports&report=fast-mode-proxy');
-    window.__CODEX_USAGE_BOOT__ = {
-      loaded_row_count: 1,
-      total_available_rows: 1,
-      limit: 500,
-      history_scope: 'active',
-      rows: [
-        {
-          record_id: 'live-report-row',
-          call_started_at: '2026-07-02T10:00:00Z',
-          thread_name: 'live-report-thread',
-          model: 'codex-1',
-          effort: 'low',
-          input_tokens: 1_000,
-          cached_input_tokens: 400,
-          output_tokens: 250,
-          total_tokens: 1_250,
-          estimated_cost_usd: 0.12,
-        },
-      ],
-    };
-
-    render(<App />);
-
-    expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
-    expect(screen.getByRole('table', { name: 'Selected report evidence calls' })).toBeInTheDocument();
-    expect(screen.getAllByText('live-report-thread').length).toBeGreaterThan(0);
-  });
-
 it('hydrates legacy history scope from the URL and exposes granular row controls', () => {
     window.__CODEX_USAGE_BOOT__ = {
     api_token: 'history-url-token',
