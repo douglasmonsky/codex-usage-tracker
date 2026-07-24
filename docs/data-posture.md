@@ -22,6 +22,28 @@ These records stay in the user-owned SQLite database. The bounded content/event
 index is not a hosted collection system and does not move the original Codex
 logs.
 
+## SQLite Integrity
+
+Every tracker-owned SQLite connection enables and verifies foreign-key
+enforcement. Schema migrations run atomically, and source replacement preserves
+declared cascades while clearing optional OTel-to-usage matches before their
+usage rows are replaced.
+
+`codex-usage-tracker admin integrity` runs bounded, read-only
+`PRAGMA integrity_check` and `PRAGMA foreign_key_check` diagnostics. It never
+repairs or rebuilds the database. The command exits `0` for a passing database,
+`1` when findings exist, and `2` when the database is missing, invalid, or
+unreadable. `doctor` runs the same checks; normal status responses deliberately
+report `unknown`/`not_checked` with an `admin integrity` next action so status
+remains a low-latency capability check.
+
+Refresh and rebuild operations store only a bounded workflow marker containing
+the operation kind, phase, status, and update time. If a refresh stops between
+the primary, OTel, or metadata phases—or a rebuild stops after clearing
+aggregate rows—the next refresh safely retries the idempotent workflow. The
+marker never contains source paths, row identifiers, prompts, or indexed
+content.
+
 ## Aggregate-Only Posture
 
 Use either command when the older aggregate-only SQLite posture is required:

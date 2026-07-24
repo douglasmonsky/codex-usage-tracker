@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import sqlite3
 
+from codex_usage_tracker.store.cache_repository import SQLiteCacheRepository
+from codex_usage_tracker.store.connection import execute_script
+
 MIGRATION_NAMES = {
     20: "persist versioned recommendation facts",
     21: "materialize recommendation thread summaries",
@@ -64,7 +67,8 @@ _INDEX_DROP_STATEMENTS = tuple(
 
 def create_recommendation_fact_tables(conn: sqlite3.Connection) -> None:
     """Create versioned aggregate-only recommendation facts and state."""
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS recommendation_facts (
             record_id TEXT PRIMARY KEY,
@@ -111,7 +115,7 @@ def create_recommendation_fact_tables(conn: sqlite3.Connection) -> None:
             record_count INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT NOT NULL
         );
-        """
+        """,
     )
     create_recommendation_fact_indexes(conn)
 
@@ -177,7 +181,7 @@ def reconcile_recommendation_facts_with_canonical_usage(conn: sqlite3.Connection
         "UPDATE recommendation_fact_state SET record_count="
         "(SELECT COUNT(*) FROM recommendation_facts), thread_summaries_complete=0"
     )
-    conn.execute("DELETE FROM refresh_meta WHERE key = 'home_usage_metrics_v1'")
+    SQLiteCacheRepository(conn).delete("home_usage_metrics_v1")
     _reset_thread_recommendation_columns(conn)
 
 

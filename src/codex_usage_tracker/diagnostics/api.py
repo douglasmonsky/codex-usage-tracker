@@ -39,6 +39,7 @@ from codex_usage_tracker.diagnostics.mcp import (
     check_mcp_runtime,
 )
 from codex_usage_tracker.diagnostics.types import DoctorCheck
+from codex_usage_tracker.store.integrity import check_database_integrity
 
 DASHBOARD_REQUIRED_ASSETS = (
     "dashboard_data.js",
@@ -102,6 +103,7 @@ def _doctor_checks(
         _check_codex_sessions(codex_home),
         _check_database(db_path),
         _check_database_schema(db_path),
+        _check_database_integrity(db_path),
         _check_parser_diagnostics(db_path),
         _check_dashboard_target(dashboard_path),
         _check_pricing(pricing_path),
@@ -112,6 +114,41 @@ def _doctor_checks(
         check_mcp_runtime(root),
         check_mcp_import(),
     ]
+
+
+def run_integrity_report(*, db_path: Path = DEFAULT_DB_PATH) -> dict[str, object]:
+    """Return the read-only database-integrity contract."""
+    return check_database_integrity(db_path)
+
+
+def _check_database_integrity(db_path: Path) -> DoctorCheck:
+    report = check_database_integrity(db_path)
+    state = str(report["state"])
+    if state == "pass":
+        return DoctorCheck(
+            "Database integrity",
+            "pass",
+            "integrity_check=ok; foreign_key_check=0",
+        )
+    if state == "fail":
+        return DoctorCheck(
+            "Database integrity",
+            "fail",
+            (
+                f"integrity errors={report['integrity_error_count']}; "
+                f"foreign-key violations={report['foreign_key_violation_count']}"
+            ),
+            "Inspect with `codex-usage-tracker admin integrity --json` before repair.",
+        )
+    status = "warn" if report["error"] == "database_missing" else "fail"
+    return DoctorCheck(
+        "Database integrity",
+        status,
+        str(report["error"]),
+        "Run a refresh to create a database."
+        if status == "warn"
+        else "Restore a readable database.",
+    )
 
 
 def _doctor_report(

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sqlite3
 
+from codex_usage_tracker.store.connection import execute_script
+
 MIGRATION_NAMES = {
     18: "index usage events by source file and line",
     22: "cover diagnostic fact lookups",
@@ -69,7 +71,8 @@ def add_call_explorer_parent_lookup_indexes(conn: sqlite3.Connection) -> None:
     }
     if not required <= columns:
         return
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE INDEX IF NOT EXISTS idx_usage_parent_thread_lookup
         ON usage_events(session_id, is_archived, thread_name DESC, source_file);
@@ -79,5 +82,5 @@ def add_call_explorer_parent_lookup_indexes(conn: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_usage_cwd_scope
         ON usage_events(cwd, is_duplicate, is_archived, event_timestamp DESC, record_id);
-        """
+        """,
     )

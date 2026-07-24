@@ -198,7 +198,7 @@ def _seed_normalized_evidence(conn: sqlite3.Connection) -> int:
         SELECT
             'benchmark-tool-' || record_id,
             record_id,
-            turn_id,
+            NULL,
             'exec_command',
             'completed',
             CASE WHEN line_number % 20 = 0 THEN 20000 ELSE 800 END,
@@ -215,7 +215,7 @@ def _seed_normalized_evidence(conn: sqlite3.Connection) -> int:
         SELECT
             'benchmark-command-' || record_id,
             record_id,
-            turn_id,
+            NULL,
             CASE WHEN line_number % 10 = 0 THEN 'rg' ELSE 'echo' END,
             'synthetic benchmark command',
             0,
@@ -238,7 +238,7 @@ def _seed_normalized_evidence(conn: sqlite3.Connection) -> int:
         SELECT
             'benchmark-file-' || record_id,
             record_id,
-            turn_id,
+            NULL,
             CASE WHEN line_number % 5 = 0 THEN 'read' ELSE 'write' END,
             'path-' || (line_number % 7),
             'synthetic.py',
@@ -257,7 +257,7 @@ def _seed_normalized_evidence(conn: sqlite3.Connection) -> int:
         SELECT
             'benchmark-fragment-a-' || record_id,
             record_id,
-            turn_id,
+            NULL,
             'tool_output',
             'tool',
             'synthetic output',
@@ -276,7 +276,7 @@ def _seed_normalized_evidence(conn: sqlite3.Connection) -> int:
         SELECT
             'benchmark-fragment-b-' || record_id,
             record_id,
-            turn_id,
+            NULL,
             'assistant_message',
             'assistant',
             'synthetic response',

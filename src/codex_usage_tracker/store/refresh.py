@@ -13,6 +13,7 @@ from codex_usage_tracker.core.paths import (
 )
 from codex_usage_tracker.parser.api import find_session_logs, load_session_index
 from codex_usage_tracker.parser.state import compact_parser_diagnostics
+from codex_usage_tracker.store.cache_repository import SQLiteCacheRepository
 from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.content_index import clear_content_index_rows
@@ -24,7 +25,10 @@ from codex_usage_tracker.store.otel_reconciliation import (
 from codex_usage_tracker.store.refresh_callbacks import DerivedFactSyncCallback
 from codex_usage_tracker.store.refresh_metadata import (
     OTEL_REFRESH_COUNTER_KEYS,
+    read_refresh_workflow_state,
     record_refresh_metadata,
+    record_refresh_workflow_state,
+    set_refresh_workflow_state,
 )
 from codex_usage_tracker.store.refresh_parse import (
     RefreshProgressCallback,
@@ -43,8 +47,22 @@ def refresh_usage_index(
     otel_dir: Path | None = None,
     progress_callback: RefreshProgressCallback | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
+    _workflow_kind: str | None = None,
 ) -> RefreshResult:
     """Scan Codex logs and upsert aggregate usage events."""
+    prior_workflow = read_refresh_workflow_state(db_path)
+    workflow_kind = _workflow_kind or (
+        "rebuild"
+        if prior_workflow
+        and prior_workflow.get("kind") == "rebuild"
+        and prior_workflow.get("status") == "running"
+        else "refresh"
+    )
+    record_refresh_workflow_state(
+        db_path,
+        kind=workflow_kind,
+        phase="discovering",
+    )
 
     emit_refresh_progress(
         progress_callback,
@@ -59,6 +77,11 @@ def refresh_usage_index(
     with connect(db_path) as conn:
         init_db(conn)
         parse_plans = source_logs_requiring_parse(conn, logs)
+    record_refresh_workflow_state(
+        db_path,
+        kind=workflow_kind,
+        phase="primary",
+    )
     emit_refresh_progress(
         progress_callback,
         phase="discovering",
@@ -108,6 +131,11 @@ def refresh_usage_index(
         message="Reconciling aggregate OTel completion tiers",
     )
     resolved_otel_dir = otel_dir or db_path.parent / DEFAULT_OTEL_COMPLETIONS_DIR.name
+    record_refresh_workflow_state(
+        db_path,
+        kind=workflow_kind,
+        phase="otel",
+    )
     otel_diagnostics = _refresh_otel_completions(db_path=db_path, otel_dir=resolved_otel_dir)
     emit_refresh_progress(
         progress_callback,
@@ -126,6 +154,11 @@ def refresh_usage_index(
         total=1,
         message="Recording refresh metadata",
     )
+    record_refresh_workflow_state(
+        db_path,
+        kind=workflow_kind,
+        phase="finalizing",
+    )
     result = _finalize_refresh_result(
         db_path=db_path,
         scanned_files=len(logs),
@@ -134,6 +167,7 @@ def refresh_usage_index(
         parsed_events=stream_result.parsed_events,
         inserted=stream_result.inserted_or_updated_events,
         otel_diagnostics=otel_diagnostics,
+        workflow_kind=workflow_kind,
     )
     emit_refresh_progress(
         progress_callback,
@@ -164,6 +198,7 @@ def _finalize_refresh_result(
     parsed_events: int,
     inserted: int,
     otel_diagnostics: dict[str, int],
+    workflow_kind: str,
 ) -> RefreshResult:
     skipped_events = stats.get("skipped_events", 0)
     diagnostics = {
@@ -180,6 +215,7 @@ def _finalize_refresh_result(
         otel_diagnostics=otel_diagnostics,
         parsed_source_files=parsed_source_files,
         skipped_source_files=scanned_files - parsed_source_files,
+        workflow_kind=workflow_kind,
     )
     return RefreshResult(
         scanned_files=scanned_files,
@@ -234,9 +270,15 @@ def rebuild_usage_index(
             "usage_events",
             "thread_summaries",
             "source_files",
-            "refresh_meta",
         ):
             conn.execute(f"DELETE FROM {table}")  # nosec B608 - fixed table names
+        cache = SQLiteCacheRepository(conn)
+        cache.clear()
+        set_refresh_workflow_state(
+            conn,
+            kind="rebuild",
+            phase="cleared",
+        )
     return refresh_usage_index(
         codex_home=codex_home,
         db_path=db_path,
@@ -244,4 +286,5 @@ def rebuild_usage_index(
         aggregate_only=aggregate_only,
         otel_dir=otel_dir,
         derived_fact_sync=derived_fact_sync,
+        _workflow_kind="rebuild",
     )

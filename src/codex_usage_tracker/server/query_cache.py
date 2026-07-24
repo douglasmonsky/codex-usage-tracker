@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import parse_qsl
 
+from codex_usage_tracker.store.connection import connect_read_only
+
 CacheStatus = Literal["hit", "miss", "coalesced", "bypass"]
 
 
@@ -182,10 +184,7 @@ def current_source_revision(db_path: Path) -> str:
 
     if not db_path.exists():
         return "generation:0"
-    uri = f"{db_path.resolve().as_uri()}?mode=ro"
-    conn = sqlite3.connect(uri, uri=True, timeout=0.1)
-    try:
-        conn.execute("PRAGMA query_only = ON")
+    with connect_read_only(db_path, timeout=0.1) as conn:
         try:
             row = conn.execute(
                 "SELECT generation FROM compression_source_state WHERE singleton = 1"
@@ -194,8 +193,6 @@ def current_source_revision(db_path: Path) -> str:
             if "no such table" not in str(exc).lower():
                 raise
             row = None
-    finally:
-        conn.close()
     generation = int(row[0] if row is not None else 0)
     return f"generation:{generation}"
 

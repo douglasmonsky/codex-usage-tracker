@@ -19,6 +19,7 @@ STABLE_TOP_LEVEL_COMMANDS = (
 CONFIG_COMMANDS = ("pricing", "allowance", "rate-card", "projects", "thresholds")
 SERVICE_COMMANDS = ("install", "status", "uninstall", "serve")
 ADMIN_COMMANDS = (
+    "integrity",
     "inspect-log",
     "rebuild-index",
     "reset-db",

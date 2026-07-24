@@ -20,11 +20,16 @@ from codex_usage_tracker.core.schema import (
 from codex_usage_tracker.store.allowance_observations import (
     query_allowance_observations as query_allowance_observations,
 )
+from codex_usage_tracker.store.cache_repository import SQLiteCacheRepository
 from codex_usage_tracker.store.compression_fact_sync import (
     clear_compression_detector_facts,
 )
 from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
-from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.connection import (
+    connect,
+    connect_read_only,
+    open_read_only_connection,
+)
 from codex_usage_tracker.store.content_index import (
     clear_content_index_rows,
     search_content_fragments,
@@ -242,7 +247,7 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")
         conn.execute("DELETE FROM source_files")
-        conn.execute("DELETE FROM refresh_meta")
+        SQLiteCacheRepository(conn).clear()
         touch_compression_revisions(conn)
     return {"db_path": str(db_path), "deleted_usage_events": deleted_rows}
 
@@ -389,9 +394,8 @@ def query_request_context_facts(
     canonical_where, canonical_params = _request_context_where(scope, alias="canonical")
     pricing_sql, pricing_params = _model_coverage_sql("canonical", priced_models)
     credit_sql, credit_params = _model_coverage_sql("canonical", credit_models)
-    uri = f"{db_path.resolve().as_uri()}?mode=ro"
     try:
-        connection = sqlite3.connect(uri, uri=True, timeout=1.0)
+        connection = open_read_only_connection(db_path, timeout=1.0)
     except sqlite3.Error as exc:
         raise InvalidDatabasePathError(
             f"database path could not be opened read-only: {db_path}"
@@ -399,8 +403,6 @@ def query_request_context_facts(
     row: sqlite3.Row | None = None
     operation_error: BaseException | None = None
     try:
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA query_only = ON")
         connection.execute("BEGIN")
         row = connection.execute(
             f"""
@@ -523,11 +525,8 @@ def _query_materialized_active_context_facts(
     metrics = query_home_usage_metrics(db_path=db_path)
     if metrics is None:
         return None
-    uri = f"{db_path.resolve().as_uri()}?mode=ro"
     try:
-        with sqlite3.connect(uri, uri=True, timeout=1.0) as connection:
-            connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA query_only = ON")
+        with connect_read_only(db_path, timeout=1.0) as connection:
             row = connection.execute(
                 """
                 SELECT

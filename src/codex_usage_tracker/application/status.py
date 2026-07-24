@@ -35,6 +35,26 @@ class ConversationalReadinessProvider(Protocol):
     def __call__(self, *, codex_home: Path) -> Mapping[str, object]: ...
 
 
+class DatabaseIntegrityStatusProvider(Protocol):
+    def __call__(self, db_path: Path) -> Mapping[str, object]: ...
+
+
+def database_integrity_unknown(db_path: Path) -> dict[str, object]:
+    """Describe integrity honestly without running a blocking database scan."""
+    return {
+        "schema": "codex-usage-tracker.database-integrity.v1",
+        "state": "unknown",
+        "readable": db_path.is_file(),
+        "foreign_keys_enabled": False,
+        "integrity_error_count": 0,
+        "foreign_key_violation_count": 0,
+        "affected_tables": [],
+        "affected_tables_truncated": False,
+        "error": "not_checked",
+        "next_action": "Run `codex-usage-tracker admin integrity`.",
+    }
+
+
 def conversational_readiness(*, codex_home: Path) -> dict[str, object]:
     """Return a conservative result when no outer runtime probe was injected."""
     return {
@@ -55,6 +75,7 @@ def get_status(
     clock: Clock | None = None,
     pricing_provider: PricingProvider | None = None,
     readiness_provider: ConversationalReadinessProvider | None = None,
+    integrity_provider: DatabaseIntegrityStatusProvider | None = None,
 ) -> dict[str, object]:
     """Return codex-usage-tracker.status.v2 without starting background work."""
     result, _context = _build_status(
@@ -63,6 +84,7 @@ def get_status(
         clock=clock,
         pricing_provider=pricing_provider,
         readiness_provider=readiness_provider,
+        integrity_provider=integrity_provider,
     )
     return result
 
@@ -74,6 +96,7 @@ def _build_status(
     clock: Clock | None = None,
     pricing_provider: PricingProvider | None = None,
     readiness_provider: ConversationalReadinessProvider | None = None,
+    integrity_provider: DatabaseIntegrityStatusProvider | None = None,
 ) -> tuple[dict[str, object], RequestContext]:
     db_path = _required_path(request.db_path, "db_path")
     pricing_path = _required_path(request.pricing_path, "pricing_path")
@@ -101,6 +124,7 @@ def _build_status(
         else pricing_provider.load(pricing_path)
     )
     readiness = (readiness_provider or conversational_readiness)(codex_home=codex_home)
+    database_integrity = (integrity_provider or database_integrity_unknown)(db_path)
     service = _service_status(home)
     pricing_state = (
         "malformed"
@@ -136,6 +160,7 @@ def _build_status(
             "error": pricing_config.error,
         },
         "accounting": payload_mapping(context.accounting),
+        "database_integrity": dict(database_integrity),
         "conversational_readiness": dict(readiness),
         "mcp": {
             "active_profile": request.mcp_profile,

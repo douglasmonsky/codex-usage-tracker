@@ -131,7 +131,7 @@ def test_022_release_and_upgrade_docs_define_the_profile_transition() -> None:
     assert "No dashboard navigation changed" in release
     assert len(CORE_MCP_TOOL_NAMES) == MCP_PROFILE_TOOL_COUNTS["core"]
     assert len(FULL_MCP_TOOL_NAMES) == MCP_PROFILE_TOOL_COUNTS["full"]
-    assert f"tracks {len(known_json_schemas())} JSON schema identifiers" in release
+    assert "tracks 96 JSON schema identifiers" in release
     assert set(known_json_schemas()) >= RELEASE_022_SCHEMA_IDS
     assert all(f"`{schema}`" in release for schema in RELEASE_022_SCHEMA_IDS)
 

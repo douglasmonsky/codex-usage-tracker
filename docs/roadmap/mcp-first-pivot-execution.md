@@ -961,9 +961,9 @@ commit as each roadmap task.
 
 ## Task 30 - Enforce Python Architecture with Tach Domain Boundaries
 
-- Status: implementation, primary verification, final review,
-  accepted-finding rechecks, and local commits are complete on
-  `pivot/30-tach-boundaries`; PR landing remains.
+- Status: complete; squash-merged as PR
+  [#297](https://github.com/douglasmonsky/codex-usage-tracker/pull/297)
+  at `80e0c38`.
 - Branch: `pivot/30-tach-boundaries`.
 - Commits: `ebafb71` (`chore: close completed change plans`), `f6865ae`
   (`chore: add repository GitNexus agent workflow`), and `264df75`
@@ -1051,9 +1051,96 @@ commit as each roadmap task.
   changed; the existing conversational-readiness schema is now registered and
   documented.
 
+## Task 31 - Enforce SQLite Foreign Keys and Integrity Checks
+
+- Status: implementation, primary verification, one final review, and
+  accepted-finding rechecks are complete on `pivot/31-sqlite-integrity`; PR
+  landing remains.
+- Connection and migration contract:
+  - every runtime SQLite connection is centralized through the verified shared
+    policy or explicitly configures that policy for the in-memory allowance
+    fallback;
+  - writable and read-only connections enable and verify
+    `PRAGMA foreign_keys=ON`; read-only connections also enforce
+    `query_only=ON`;
+  - schema scripts execute statement-by-statement inside one migration
+    savepoint, so a failed migration restores its original user version,
+    migration ledger, and rows;
+  - source replacement uses declared cascades and clears optional OTel matches
+    before deleting their referenced usage rows.
+- Diagnostic contract:
+  - `codex-usage-tracker.database-integrity.v1` reports bounded pass, fail, or
+    unknown state without row identifiers or source content;
+  - doctor and `admin integrity` run read-only `integrity_check(100)` and
+    `foreign_key_check`; the command exits `0` for pass, `1` for findings, and
+    `2` for missing, invalid, or unreadable databases;
+  - normal status remains non-blocking and reports `unknown`/`not_checked` with
+    the explicit `admin integrity` next action.
+- Migration and cleanup verification:
+  - historical fixtures for v13, v15-v17, v20-v21, v24, v26-v27, v30, and
+    current-minus-one migrate in place and finish with clean integrity checks;
+  - the reviewed 18-key inventory covers usage, content, compression,
+    recommendation, allowance, and analysis-run cascades;
+  - invalid pre-enforcement fixtures and synthetic Compression Lab benchmark
+    rows now provide valid parent records rather than bypassing constraints.
+- Refresh and cache recovery:
+  - one transaction-bound cache repository owns all runtime `refresh_meta`
+    writes while refresh metadata, Home metrics, and recommendation invalidation
+    keep their existing caller-owned transactions;
+  - refresh persists bounded primary, OTel, and finalization phase state;
+    interrupted phases retry idempotently and complete the marker;
+  - rebuild clears aggregate state and writes its resumable marker in one
+    transaction, so pre-clear failure rolls back and post-clear interruption is
+    explicit and recoverable on the next refresh.
+- Focused verification:
+  - the final connection, cache ownership, interrupted workflow, retained
+    migration/refresh/rebuild, Home cache, and release-doc slice passed `48`
+    tests;
+  - the earlier connection, cascade, migration, integrity-report, status, CLI,
+    and historical-fixture slice passed `52` tests;
+  - the broader store, application, diagnostics, CLI, and evidence slice passed
+    `626` tests;
+  - Ruff and Tach pass with zero violations; source Pyright reports zero errors
+    and the seven inherited lazy-export warnings.
+- Full verification:
+  - final complete Python suite: `1977 passed in 107.37s`;
+  - final coverage suite: `1977 passed`, 88% aggregate coverage;
+  - MyPy, Deptry, Vulture, reviewed Bandit baseline, compileall, JavaScript
+    syntax, Markdown, TOML, YAML, and `git diff --check` gates passed;
+  - source and distribution release-readiness checks, sdist/wheel build, Twine,
+    and installed-package smoke checks passed.
+- Architecture evidence:
+  - after repairing a corrupted derived FTS index, a forced GitNexus rebuild
+    completed; the final incremental refresh contains 25,529 nodes, 54,900
+    edges, 1,321 clusters, and 300 flows;
+  - final change detection mapped 45 indexed files and 92 symbols to 146
+    execution flows, classifying the broad connection/migration blast radius as
+    critical;
+  - exact upstream analysis found three direct callers and 13 affected
+    processes for the shared connection policy, while the new integrity checker
+    has two direct callers and low standalone blast radius. The complete suite
+    and coverage gate exercise the identified store, compression, allowance,
+    diagnostics, reporting, server, CLI, context, and MCP paths.
+- Final review:
+  - one read-only reviewer reported six findings: five medium and one low; all
+    six were accepted;
+  - rechecks preserve short read-only busy timeouts, historical 0.22 schema
+    documentation, retained fixture coverage, one cache write owner, and
+    resumable refresh/rebuild phases;
+  - reviewer token status is `pending`; aggregate usage attribution timed out
+    and was not retried.
+- Deviations from plan: Task 31 adds no schema migration or forced database rebuild.
+  Atomic script execution replaces `sqlite3.executescript` only to preserve the
+  existing schema changes inside the migration transaction. Status deliberately
+  avoids a full integrity scan to preserve the bounded endpoint gains from the
+  0.23 blocker work.
+- Follow-up risks: no automatic repair surface is introduced. Any future schema
+  relationship must update the exact foreign-key inventory test and cleanup
+  coverage.
+
 ## Remaining Planned Tasks
 
-Tasks 27.5 through 29 are complete. Task 30 is active. Tasks 31 through 45
-remain planned in the approved implementation roadmap. Add a full entry using
-the format above when each task becomes active; do not mark a task complete
-without its named focused and full verification evidence.
+Tasks 27.5 through 31 are complete through Task 31 primary verification. Tasks
+32 through 45 remain planned in the approved implementation roadmap. Add a full
+entry using the format above when each task becomes active; do not mark a task
+complete without its named focused and full verification evidence.

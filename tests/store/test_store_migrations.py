@@ -715,11 +715,15 @@ def test_malformed_legacy_schema_reports_actionable_error_without_data_loss(
     try:
         row_count = raw.execute("SELECT COUNT(*) FROM usage_events").fetchone()[0]
         user_version = raw.execute("PRAGMA user_version").fetchone()[0]
+        migrations_table = raw.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'"
+        ).fetchone()
     finally:
         raw.close()
 
     assert row_count == 1
     assert user_version == 1
+    assert migrations_table is None
 
 
 def test_doctor_reports_malformed_legacy_schema_without_traceback(tmp_path: Path) -> None:

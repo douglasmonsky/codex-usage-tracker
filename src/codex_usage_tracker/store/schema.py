@@ -19,6 +19,7 @@ from codex_usage_tracker.core.schema import (
     USAGE_EVENT_REPAIR_COLUMNS,
     USAGE_EVENT_SCHEMA_CHECKSUM,
 )
+from codex_usage_tracker.store.connection import execute_script
 
 SCHEMA_VERSION = 34
 MIGRATION_NAMES = {
@@ -64,16 +65,25 @@ def init_db(conn: sqlite3.Connection) -> None:
     if _schema_is_current(conn, user_version):
         _validate_usage_events_schema(conn)
         return
-    _ensure_migrations_table(conn)
-    for version, migrate in _schema_migrations():
-        _apply_schema_migration(
-            conn,
-            user_version=user_version,
-            version=version,
-            migrate=migrate,
-        )
-    _validate_usage_events_schema(conn)
-    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+    conn.execute("SAVEPOINT tracker_schema_migration")
+    try:
+        _ensure_migrations_table(conn)
+        for version, migrate in _schema_migrations():
+            _apply_schema_migration(
+                conn,
+                user_version=user_version,
+                version=version,
+                migrate=migrate,
+            )
+        _validate_usage_events_schema(conn)
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+    except BaseException:
+        conn.execute("ROLLBACK TO SAVEPOINT tracker_schema_migration")
+        conn.execute("RELEASE SAVEPOINT tracker_schema_migration")
+        raise
+    else:
+        conn.execute("RELEASE SAVEPOINT tracker_schema_migration")
 
 
 def _schema_is_current(conn: sqlite3.Connection, user_version: int) -> bool:
@@ -157,7 +167,8 @@ def _ensure_migrations_table(conn: sqlite3.Connection) -> None:
 
 
 def _migrate_v1(conn: sqlite3.Connection) -> None:
-    conn.executescript(
+    execute_script(
+        conn,
         f"""
         CREATE TABLE IF NOT EXISTS usage_events (
             {USAGE_EVENT_CREATE_COLUMNS_SQL}
@@ -167,10 +178,11 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
-        """
+        """,
     )
     _ensure_columns(conn, USAGE_EVENT_REPAIR_COLUMNS)
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_events(session_id);
         CREATE INDEX IF NOT EXISTS idx_usage_timestamp ON usage_events(event_timestamp);
@@ -179,7 +191,7 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_usage_parent_thread ON usage_events(parent_thread_name);
         CREATE INDEX IF NOT EXISTS idx_usage_parent_session ON usage_events(parent_session_id);
         CREATE INDEX IF NOT EXISTS idx_usage_total_tokens ON usage_events(total_tokens);
-        """
+        """,
     )
 
 
@@ -193,7 +205,8 @@ def _migrate_v3(conn: sqlite3.Connection) -> None:
 
 def _migrate_v4(conn: sqlite3.Connection) -> None:
     _ensure_columns(conn, DASHBOARD_HELPER_REPAIR_COLUMNS)
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE INDEX IF NOT EXISTS idx_usage_archived_timestamp
             ON usage_events(is_archived, event_timestamp);
@@ -201,7 +214,7 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
             ON usage_events(is_archived, model, effort);
         CREATE INDEX IF NOT EXISTS idx_usage_thread_key_timestamp
             ON usage_events(thread_key, event_timestamp, cumulative_total_tokens);
-        """
+        """,
     )
 
 
@@ -211,7 +224,8 @@ def _migrate_v34(conn: sqlite3.Connection) -> None:
 
 
 def _migrate_v5(conn: sqlite3.Connection) -> None:
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS thread_summaries (
             thread_key TEXT NOT NULL,
@@ -243,12 +257,13 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
             ON thread_summaries(is_archived_scope, total_tokens);
         CREATE INDEX IF NOT EXISTS idx_thread_summaries_scope_latest
             ON thread_summaries(is_archived_scope, latest_event_timestamp);
-        """
+        """,
     )
 
 
 def _migrate_v6(conn: sqlite3.Connection) -> None:
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS source_files (
             source_file_id TEXT PRIMARY KEY,
@@ -270,7 +285,7 @@ def _migrate_v6(conn: sqlite3.Connection) -> None:
             ON source_files(is_archived);
         CREATE INDEX IF NOT EXISTS idx_source_files_mtime
             ON source_files(mtime_ns, size_bytes);
-        """
+        """,
     )
 
 
@@ -284,18 +299,20 @@ def _migrate_v7(conn: sqlite3.Connection) -> None:
 
 def _migrate_v8(conn: sqlite3.Connection) -> None:
     _ensure_columns(conn, USAGE_EVENT_REPAIR_COLUMNS)
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE INDEX IF NOT EXISTS idx_usage_observed_rate_limit_timestamp
             ON usage_events(event_timestamp)
             WHERE rate_limit_primary_used_percent IS NOT NULL
                OR rate_limit_secondary_used_percent IS NOT NULL;
-        """
+        """,
     )
 
 
 def _migrate_v9(conn: sqlite3.Connection) -> None:
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS call_diagnostic_facts (
             record_id TEXT NOT NULL,
@@ -318,12 +335,13 @@ def _migrate_v9(conn: sqlite3.Connection) -> None:
             ON call_diagnostic_facts(fact_type, fact_name);
         CREATE INDEX IF NOT EXISTS idx_call_diagnostic_facts_record
             ON call_diagnostic_facts(record_id);
-        """
+        """,
     )
 
 
 def _migrate_v10(conn: sqlite3.Connection) -> None:
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS diagnostic_snapshots (
             section TEXT NOT NULL,
@@ -338,7 +356,7 @@ def _migrate_v10(conn: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_diagnostic_snapshots_computed_at
             ON diagnostic_snapshots(computed_at);
-        """
+        """,
     )
 
 
@@ -363,7 +381,8 @@ def _migrate_v14(conn: sqlite3.Connection) -> None:
 
 
 def _create_content_index_tables(conn: sqlite3.Connection) -> None:
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS content_index_features (
             feature_key TEXT PRIMARY KEY,
@@ -506,7 +525,7 @@ def _create_content_index_tables(conn: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_content_fragments_kind_role
         ON content_fragments(fragment_kind, role);
-        """
+        """,
     )
     _create_content_fts_table(conn)
 
@@ -569,7 +588,8 @@ def _source_record_backfill_columns_available(conn: sqlite3.Connection) -> bool:
 
 
 def _create_allowance_observations_table(conn: sqlite3.Connection) -> None:
-    conn.executescript(
+    execute_script(
+        conn,
         """
         CREATE TABLE IF NOT EXISTS allowance_observations (
             observation_id TEXT PRIMARY KEY,
@@ -607,7 +627,7 @@ def _create_allowance_observations_table(conn: sqlite3.Connection) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_allowance_observations_limit_window_time
         ON allowance_observations(limit_id, window_kind, event_timestamp);
-        """
+        """,
     )
 
 

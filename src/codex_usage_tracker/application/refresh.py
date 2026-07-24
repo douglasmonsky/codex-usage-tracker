@@ -28,6 +28,7 @@ from codex_usage_tracker.jobs.models import JobStatusV1
 from codex_usage_tracker.jobs.service import JobService
 from codex_usage_tracker.parser.api import find_session_logs
 from codex_usage_tracker.store.api import refresh_usage_index as _refresh_usage_index
+from codex_usage_tracker.store.connection import connect_read_only
 from codex_usage_tracker.store.refresh_parse import RefreshProgressCallback
 from codex_usage_tracker.store.sources import source_logs_requiring_parse
 
@@ -211,10 +212,7 @@ def plan_refresh(
             path.stat()
             if not os.access(path, os.R_OK):
                 raise OSError("source is unreadable")
-        uri = f"{db_path.resolve().as_uri()}?mode=ro"
-        conn = sqlite3.connect(uri, uri=True)
-        conn.row_factory = sqlite3.Row
-        try:
+        with connect_read_only(db_path) as conn:
             archived_clause = "" if request.history == "all" else "WHERE is_archived = 0"
             tracked = {
                 str(row["source_file"])
@@ -226,8 +224,6 @@ def plan_refresh(
             if tracked - discovered:
                 return RefreshPlan("async", "missing_source", len(tracked - discovered), 0)
             plans = source_logs_requiring_parse(conn, logs)
-        finally:
-            conn.close()
     except (OSError, sqlite3.Error, ValueError):
         return RefreshPlan("async", "uncertain_source_state", len(logs), 0)
     if any(plan.replace_existing for plan in plans):

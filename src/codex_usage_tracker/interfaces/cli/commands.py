@@ -35,6 +35,7 @@ from codex_usage_tracker.core.contracts import payload_mapping
 from codex_usage_tracker.core.dashboard_targets import build_dashboard_target_v2
 from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME
 from codex_usage_tracker.dashboard_service import dashboard_service_status
+from codex_usage_tracker.diagnostics.api import run_integrity_report
 from codex_usage_tracker.diagnostics.conversational_readiness import conversational_readiness
 
 
@@ -42,6 +43,41 @@ class CliApplicationServices(Protocol):
     def status(self, request: StatusRequest) -> object: ...
     def analyze(self, request: AnalysisRequest) -> object: ...
     def query(self, request: QueryRequest) -> object: ...
+
+
+IntegrityReportProvider = Callable[..., Mapping[str, object]]
+
+
+def run_integrity(
+    args: argparse.Namespace,
+    *,
+    report_provider: IntegrityReportProvider = run_integrity_report,
+    stdout: TextIO | None = None,
+) -> int:
+    """Run the read-only database-integrity command."""
+    report = report_provider(db_path=args.db)
+    stream = sys.stdout if stdout is None else stdout
+    if args.as_json:
+        _write_json(report, stream)
+    else:
+        print(f"Database integrity: {report['state']}", file=stream)
+        print(
+            f"Integrity errors: {report['integrity_error_count']}; "
+            f"foreign-key violations: {report['foreign_key_violation_count']}",
+            file=stream,
+        )
+        affected_tables = report.get("affected_tables")
+        if isinstance(affected_tables, Sequence) and affected_tables:
+            print(
+                "Affected tables: " + ", ".join(map(str, affected_tables)),
+                file=stream,
+            )
+        if report.get("error"):
+            print(f"Error: {report['error']}", file=stream)
+
+    if not bool(report["readable"]):
+        return 2
+    return 1 if report["state"] == "fail" else 0
 
 
 _REPLACEMENTS = {

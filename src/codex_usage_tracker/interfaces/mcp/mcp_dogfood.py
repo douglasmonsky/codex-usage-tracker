@@ -16,6 +16,7 @@ from codex_usage_tracker.interfaces.mcp.serialization import (
 )
 from codex_usage_tracker.jobs import DogfoodJobAdapter, JobService, request_hash
 from codex_usage_tracker.reports.agentic_dogfood import build_agentic_dogfood_report
+from codex_usage_tracker.store.connection import connect_read_only
 
 DOGFOOD_JOBS: dict[str, dict[str, Any]] = {}
 DOGFOOD_RESULT_CACHE: dict[str, dict[str, Any]] = {}
@@ -72,8 +73,7 @@ def _db_fingerprint(path: Path) -> dict[str, Any]:
         "size": stat.st_size,
     }
     try:
-        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
-            connection.execute("PRAGMA query_only = ON")
+        with connect_read_only(path) as connection:
             fingerprint["tables"] = {
                 "usage_events": _db_table_signature(
                     connection,
