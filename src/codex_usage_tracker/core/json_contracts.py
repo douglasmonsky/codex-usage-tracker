@@ -40,6 +40,26 @@ AUXILIARY_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
     "codex-usage-tracker-refresh-progress-v1": {
         "required": {"phase": str, "status": str, "message": str}
     },
+    "codex-usage-tracker.release-artifact-manifest.v1": {
+        "required": {
+            "artifacts": list,
+            "contract_inventory": dict,
+            "distribution": str,
+            "source": dict,
+            "version": str,
+        }
+    },
+    "codex-usage-tracker.release-promotion-evidence.v1": {
+        "required": {
+            "artifacts": list,
+            "contract_inventory": dict,
+            "github_actions": dict,
+            "manifest_sha256": str,
+            "qualification": dict,
+            "source_sha": str,
+            "version": str,
+        }
+    },
     "codex-usage-tracker-usage-drain-model-v1": {"required": {}},
     "codex-usage-tracker.analysis-result.v1": {"required": {}},
     "codex-usage-tracker.compression-profile.v1": {"required": {}},

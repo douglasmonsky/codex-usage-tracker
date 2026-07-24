@@ -2,15 +2,6 @@ name: Publish Python package
 
 on:
   workflow_dispatch:
-    inputs:
-      target:
-        description: "Publish target"
-        required: true
-        type: choice
-        options:
-          - testpypi
-          - pypi
-        default: testpypi
   release:
     types: [published]
 
@@ -23,21 +14,53 @@ concurrency:
 
 jobs:
   build:
-    name: Build distributions
+    name: Build one release artifact
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      manifest-sha256: ${{ steps.manifest-digest.outputs.sha256 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.14"
-      - name: Install build tooling
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Install release tooling
         run: |
           python -m pip install --upgrade pip
           python -m pip install ".[dev]" twine
+          npm ci
+      - name: Verify exact release ref
+        run: |
+          echo "event=$GITHUB_EVENT_NAME"
+          echo "ref=$GITHUB_REF"
+          echo "sha=$GITHUB_SHA"
+          case "$GITHUB_REF" in
+            refs/heads/main|refs/tags/*)
+              ;;
+            *)
+              echo "Release candidates must run from main or an exact tag ref." >&2
+              exit 1
+              ;;
+          esac
+          if [ "$GITHUB_EVENT_NAME" = "release" ] && [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            echo "Published releases must resolve to an exact tag ref." >&2
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Pin reproducible build epoch
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$GITHUB_SHA")" \
+            >> "$GITHUB_ENV"
+      - name: Verify deterministic Evidence Console assets
+        run: npm run dashboard:assets:check
       - name: Ruff
         run: python -m ruff check .
       - name: Type check
@@ -57,64 +80,79 @@ jobs:
         run: python scripts/check_release.py
       - name: Whitespace
         run: git diff --check
-      - name: Build wheel and sdist
+      - name: Build wheel and sdist once
         run: |
-          rm -rf dist build ./*.egg-info src/*.egg-info
+          rm -rf dist build release-bundle ./*.egg-info src/*.egg-info
           python -m build
+          python -m codex_usage_tracker.release.artifact_normalization \
+            --source dist \
+            --epoch "$SOURCE_DATE_EPOCH"
           python -m twine check dist/*
           python scripts/check_release.py --dist
-      - name: Show distribution files
+          mkdir -p release-bundle
+          cp -R dist release-bundle/dist
+          python -m codex_usage_tracker.release.artifact_manifest create \
+            --source release-bundle/dist \
+            --output release-bundle/release-manifest.json \
+            --expected-sha "$GITHUB_SHA"
+      - name: Verify the exact built artifact
         run: |
-          ls -la dist
-          python - <<'PY'
-          from pathlib import Path
-          import hashlib
-          for path in sorted(Path("dist").iterdir()):
-              digest = hashlib.sha256(path.read_bytes()).hexdigest()
-              print(f"{digest}  {path}")
-          PY
-      - name: Upload dist artifacts
+          python -m codex_usage_tracker.release.artifact_manifest verify \
+            --source release-bundle/dist \
+            --manifest release-bundle/release-manifest.json \
+            --expected-sha "$GITHUB_SHA"
+          if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+            version="$(python -c \
+              'import json; print(json.load(open("release-bundle/release-manifest.json"))["version"])')"
+            expected_tag="v$version"
+            if [ "$GITHUB_REF_NAME" != "$expected_tag" ]; then
+              echo "Release tag $GITHUB_REF_NAME does not match package version $version." >&2
+              exit 1
+            fi
+          fi
+          python scripts/smoke_installed_package.py \
+            --artifact-dir release-bundle/dist
+      - name: Record manifest digest
+        id: manifest-digest
+        run: |
+          digest="$(python -m codex_usage_tracker.release.artifact_manifest digest \
+            --manifest release-bundle/release-manifest.json)"
+          echo "sha256=$digest" >> "$GITHUB_OUTPUT"
+          echo "$digest  release-bundle/release-manifest.json"
+      - name: Upload the sole build artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: python-dist
-          path: dist/*
+          path: release-bundle/
           if-no-files-found: error
+          overwrite: true
 
   publish-testpypi:
-    name: Publish to TestPyPI
+    name: Publish unchanged bytes to TestPyPI
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
     environment:
       name: testpypi
       url: https://test.pypi.org/project/codex-usage-tracking/
     permissions:
       id-token: write # Required for PyPI trusted publishing.
     steps:
-      - name: Verify PyPI publish ref
-        run: |
-          echo "event=$GITHUB_EVENT_NAME"
-          echo "ref=$GITHUB_REF"
-          echo "sha=$GITHUB_SHA"
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            case "$GITHUB_REF" in
-              refs/heads/main|refs/tags/*)
-                ;;
-              *)
-                echo "Manual PyPI publishing must run from main or a tag ref." >&2
-                exit 1
-                ;;
-            esac
-          fi
-      - name: Download dist artifacts
+      - name: Download the sole build artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: python-dist
-          path: dist
-      - name: Check target package version
+          path: release-bundle
+      - name: Verify manifest transfer
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.build.outputs.manifest-sha256 }}
+        run: |
+          echo "$EXPECTED_MANIFEST_SHA256  release-bundle/release-manifest.json" \
+            | sha256sum --check --strict
+      - name: Check TestPyPI target version
         id: package-version
         env:
-          PACKAGE_INDEX_JSON_URL: https://test.pypi.org/pypi/codex-usage-tracking/json
+          PACKAGE_INDEX_BASE_URL: https://test.pypi.org/pypi/codex-usage-tracking
           PACKAGE_INDEX_NAME: TestPyPI
         run: |
           python - <<'PY'
@@ -124,81 +162,159 @@ jobs:
           import urllib.request
           from pathlib import Path
 
-          versions = set()
-          for path in Path("dist").iterdir():
-              name = path.name
-              if name.endswith(".tar.gz") and name.startswith("codex_usage_tracking-"):
-                  versions.add(name.removeprefix("codex_usage_tracking-").removesuffix(".tar.gz"))
-              elif name.endswith(".whl") and name.startswith("codex_usage_tracking-"):
-                  versions.add(name.split("-")[1])
-          if len(versions) != 1:
-              raise SystemExit(f"expected one distribution version, found {sorted(versions)}")
-          version = versions.pop()
-
-          url = os.environ["PACKAGE_INDEX_JSON_URL"]
-          index_name = os.environ["PACKAGE_INDEX_NAME"]
+          manifest = json.loads(Path("release-bundle/release-manifest.json").read_text())
+          version = manifest["version"]
+          url = f"{os.environ['PACKAGE_INDEX_BASE_URL']}/{version}/json"
           try:
-              with urllib.request.urlopen(url, timeout=30) as response:
-                  payload = json.load(response)
+              with urllib.request.urlopen(url, timeout=30):
+                  exists = True
           except urllib.error.HTTPError as exc:
               if exc.code == 404:
                   exists = False
               else:
                   raise
-          else:
-              exists = version in payload.get("releases", {})
-
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"version={version}\n")
               output.write(f"exists={str(exists).lower()}\n")
-          if exists:
-              print(f"codex-usage-tracking {version} already exists on {index_name}; skipping upload.")
-          else:
-              print(f"codex-usage-tracking {version} is not present on {index_name}; upload will run.")
+          index_name = os.environ["PACKAGE_INDEX_NAME"]
+          state = "already exists; qualification will verify it" if exists else "will upload"
+          print(f"codex-usage-tracking {version} on {index_name}: {state}")
           PY
       - name: Publish package distributions to TestPyPI
         if: steps.package-version.outputs.exists != 'true'
         uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1
         with:
+          packages-dir: release-bundle/dist/
           repository-url: https://test.pypi.org/legacy/
           print-hash: true
 
-  publish-pypi:
-    name: Publish to PyPI
-    needs: build
+  qualify-testpypi:
+    name: Qualify TestPyPI artifact
+    needs: [build, publish-testpypi]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+      - name: Download the sole build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python-dist
+          path: release-bundle
+      - name: Install qualification tooling from the exact wheel
+        run: python -m pip install release-bundle/dist/*.whl
+      - name: Verify build manifest
+        env:
+          EXPECTED_MANIFEST_SHA256: ${{ needs.build.outputs.manifest-sha256 }}
+        run: |
+          echo "$EXPECTED_MANIFEST_SHA256  release-bundle/release-manifest.json" \
+            | sha256sum --check --strict
+          python -m codex_usage_tracker.release.artifact_manifest verify \
+            --source release-bundle/dist \
+            --manifest release-bundle/release-manifest.json \
+            --expected-sha "$GITHUB_SHA"
+      - name: Download and verify TestPyPI bytes
+        run: |
+          version="$(python -c \
+            'import json; print(json.load(open("release-bundle/release-manifest.json"))["version"])')"
+          python -m codex_usage_tracker.release.promotion_evidence download-index \
+            --manifest release-bundle/release-manifest.json \
+            --index-json-url \
+              "https://test.pypi.org/pypi/codex-usage-tracking/$version/json" \
+            --output qualified-dist
+          python -m codex_usage_tracker.release.artifact_manifest verify \
+            --source qualified-dist \
+            --manifest release-bundle/release-manifest.json \
+            --expected-sha "$GITHUB_SHA"
+      - name: Smoke exact TestPyPI artifact
+        run: |
+          version="$(python -c \
+            'import json; print(json.load(open("release-bundle/release-manifest.json"))["version"])')"
+          python scripts/smoke_installed_package.py \
+            --artifact-dir qualified-dist \
+            --version "$version"
+      - name: Record promotion evidence
+        run: |
+          version="$(python -c \
+            'import json; print(json.load(open("release-bundle/release-manifest.json"))["version"])')"
+          python -m codex_usage_tracker.release.promotion_evidence create \
+            --manifest release-bundle/release-manifest.json \
+            --output promotion-evidence.json \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --index-url \
+              "https://test.pypi.org/pypi/codex-usage-tracking/$version/json" \
+            --installed-smoke passed
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: promotion-evidence
+          path: promotion-evidence.json
+          if-no-files-found: error
+          overwrite: true
+
+  publish-pypi:
+    name: Promote TestPyPI bytes to PyPI
+    needs: [build, qualify-testpypi]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
     environment:
       name: pypi
       url: https://pypi.org/project/codex-usage-tracking/
     permissions:
       id-token: write # Required for PyPI trusted publishing.
+      contents: read
     steps:
-      - name: Verify PyPI publish ref
-        run: |
-          echo "event=$GITHUB_EVENT_NAME"
-          echo "ref=$GITHUB_REF"
-          echo "sha=$GITHUB_SHA"
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            case "$GITHUB_REF" in
-              refs/heads/main|refs/tags/*)
-                ;;
-              *)
-                echo "Manual PyPI publishing must run from main or a tag ref." >&2
-                exit 1
-                ;;
-            esac
-          fi
-      - name: Download dist artifacts
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+      - name: Download the sole build artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: python-dist
-          path: dist
-      - name: Check target package version
-        id: package-version
+          path: release-bundle
+      - name: Install promotion tooling from the exact wheel
+        run: python -m pip install release-bundle/dist/*.whl
+      - name: Download qualification evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: promotion-evidence
+          path: release-evidence
+      - name: Verify qualification chain
         env:
-          PACKAGE_INDEX_JSON_URL: https://pypi.org/pypi/codex-usage-tracking/json
-          PACKAGE_INDEX_NAME: PyPI
+          EXPECTED_MANIFEST_SHA256: ${{ needs.build.outputs.manifest-sha256 }}
+        run: |
+          echo "$EXPECTED_MANIFEST_SHA256  release-bundle/release-manifest.json" \
+            | sha256sum --check --strict
+          python -m codex_usage_tracker.release.promotion_evidence verify \
+            --manifest release-bundle/release-manifest.json \
+            --evidence release-evidence/promotion-evidence.json \
+            --expected-sha "$GITHUB_SHA" \
+            --run-id "$GITHUB_RUN_ID"
+      - name: Download qualified TestPyPI bytes for promotion
+        run: |
+          version="$(python -c \
+            'import json; print(json.load(open("release-bundle/release-manifest.json"))["version"])')"
+          python -m codex_usage_tracker.release.promotion_evidence download-index \
+            --manifest release-bundle/release-manifest.json \
+            --index-json-url \
+              "https://test.pypi.org/pypi/codex-usage-tracking/$version/json" \
+            --output promoted-dist
+          python -m codex_usage_tracker.release.artifact_manifest verify \
+            --source promoted-dist \
+            --manifest release-bundle/release-manifest.json \
+            --expected-sha "$GITHUB_SHA"
+      - name: Check PyPI target version
+        id: package-version
         run: |
           python - <<'PY'
           import json
@@ -207,40 +323,129 @@ jobs:
           import urllib.request
           from pathlib import Path
 
-          versions = set()
-          for path in Path("dist").iterdir():
-              name = path.name
-              if name.endswith(".tar.gz") and name.startswith("codex_usage_tracking-"):
-                  versions.add(name.removeprefix("codex_usage_tracking-").removesuffix(".tar.gz"))
-              elif name.endswith(".whl") and name.startswith("codex_usage_tracking-"):
-                  versions.add(name.split("-")[1])
-          if len(versions) != 1:
-              raise SystemExit(f"expected one distribution version, found {sorted(versions)}")
-          version = versions.pop()
-
-          url = os.environ["PACKAGE_INDEX_JSON_URL"]
-          index_name = os.environ["PACKAGE_INDEX_NAME"]
+          manifest = json.loads(Path("release-bundle/release-manifest.json").read_text())
+          version = manifest["version"]
+          url = f"https://pypi.org/pypi/codex-usage-tracking/{version}/json"
           try:
-              with urllib.request.urlopen(url, timeout=30) as response:
-                  payload = json.load(response)
+              with urllib.request.urlopen(url, timeout=30):
+                  exists = True
           except urllib.error.HTTPError as exc:
               if exc.code == 404:
                   exists = False
               else:
                   raise
-          else:
-              exists = version in payload.get("releases", {})
-
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"version={version}\n")
               output.write(f"exists={str(exists).lower()}\n")
-          if exists:
-              print(f"codex-usage-tracking {version} already exists on {index_name}; skipping upload.")
-          else:
-              print(f"codex-usage-tracking {version} is not present on {index_name}; upload will run.")
+          print(f"codex-usage-tracking {version} on PyPI: {'already exists' if exists else 'will upload'}")
           PY
-      - name: Publish package distributions to PyPI
+      - name: Publish qualified package distributions to PyPI
         if: steps.package-version.outputs.exists != 'true'
         uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1
         with:
+          packages-dir: promoted-dist/
           print-hash: true
+
+  attach-github-release:
+    name: Attach verified PyPI bytes to GitHub Release
+    needs: [build, publish-pypi]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+      - name: Download the sole build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python-dist
+          path: release-bundle
+      - name: Install attachment tooling from the exact wheel
+        run: python -m pip install release-bundle/dist/*.whl
+      - name: Download qualification evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: promotion-evidence
+          path: release-evidence
+      - name: Download and verify PyPI bytes
+        run: |
+          version="$(python -c \
+            'import json; print(json.load(open("release-bundle/release-manifest.json"))["version"])')"
+          python -m codex_usage_tracker.release.promotion_evidence download-index \
+            --manifest release-bundle/release-manifest.json \
+            --index-json-url \
+              "https://pypi.org/pypi/codex-usage-tracking/$version/json" \
+            --output release-assets
+          python -m codex_usage_tracker.release.artifact_manifest verify \
+            --source release-assets \
+            --manifest release-bundle/release-manifest.json \
+            --expected-sha "$GITHUB_SHA"
+          cp release-bundle/release-manifest.json release-assets/
+          cp release-evidence/promotion-evidence.json release-assets/
+      - name: Attach identical bytes and evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" release-assets/* \
+            --clobber \
+            --repo "$GITHUB_REPOSITORY"
+
+  verify-public-release:
+    name: Verify TestPyPI, PyPI, and GitHub Release hashes
+    needs: attach-github-release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+      - name: Download the sole build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python-dist
+          path: release-bundle
+      - name: Install verification tooling from the exact wheel
+        run: python -m pip install release-bundle/dist/*.whl
+      - name: Download qualification evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: promotion-evidence
+          path: release-evidence
+      - name: Verify every public location
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(python -c \
+            'import json; print(json.load(open("release-bundle/release-manifest.json"))["version"])')"
+          python -m codex_usage_tracker.release.promotion_evidence download-index \
+            --manifest release-bundle/release-manifest.json \
+            --index-json-url \
+              "https://test.pypi.org/pypi/codex-usage-tracking/$version/json" \
+            --output public-testpypi
+          python -m codex_usage_tracker.release.promotion_evidence download-index \
+            --manifest release-bundle/release-manifest.json \
+            --index-json-url \
+              "https://pypi.org/pypi/codex-usage-tracking/$version/json" \
+            --output public-pypi
+          gh release download "$GITHUB_REF_NAME" \
+            --dir public-github \
+            --repo "$GITHUB_REPOSITORY"
+          for source in public-testpypi public-pypi public-github; do
+            python -m codex_usage_tracker.release.artifact_manifest verify \
+              --source "$source" \
+              --manifest release-bundle/release-manifest.json \
+              --expected-sha "$GITHUB_SHA"
+          done
+          cmp release-bundle/release-manifest.json public-github/release-manifest.json
+          cmp release-evidence/promotion-evidence.json public-github/promotion-evidence.json
+          sha256sum public-testpypi/* public-pypi/* public-github/*

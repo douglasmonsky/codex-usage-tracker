@@ -15,6 +15,14 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - exercised on Python 3.10.
     import tomli as tomllib
 
+if __package__:
+    import scripts.release_promotion_quality as _release_promotion_quality
+else:  # Direct script loading adds scripts/ rather than the repository root.
+    import release_promotion_quality as _release_promotion_quality
+
+check_publish_workflow = _release_promotion_quality.check_publish_workflow
+check_release_artifact_contract = _release_promotion_quality.check_release_artifact_contract
+
 REVIEWED_ACTION_PINS = {
     ("actions/cache", "v6.1.0"): "55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
     ("actions/checkout", "v7.0.1"): "3d3c42e5aac5ba805825da76410c181273ba90b1",
@@ -148,65 +156,6 @@ def check_python_support_metadata(
         failures.append("docs/install.md should document CI support through Python 3.14")
 
     failures.extend(check_installed_smoke_docker_image(repo_root))
-    return failures
-
-
-def check_publish_workflow(repo_root: Path) -> list[str]:
-    workflow_path = repo_root / ".github" / "workflows" / "publish.yml"
-    if not workflow_path.exists():
-        return ["missing publish workflow: .github/workflows/publish.yml"]
-    workflow = workflow_path.read_text(encoding="utf-8")
-    failures: list[str] = []
-    for required in [
-        "workflow_dispatch:",
-        "release:",
-        "pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1",
-        "id-token: write",
-        "repository-url: https://test.pypi.org/legacy/",
-        "python -m twine check dist/*",
-        "if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'",
-        "if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')",
-        'echo "ref=$GITHUB_REF"',
-        'echo "sha=$GITHUB_SHA"',
-        "refs/heads/main|refs/tags/*",
-        "Manual PyPI publishing must run from main or a tag ref.",
-        "name: testpypi",
-        "name: pypi",
-        "https://test.pypi.org/project/codex-usage-tracking/",
-        "https://pypi.org/project/codex-usage-tracking/",
-        "steps.package-version.outputs.exists != 'true'",
-        "codex-usage-tracking {version} already exists on {index_name}; skipping upload.",
-    ]:
-        if required not in workflow:
-            failures.append(
-                f"publish workflow is missing required Trusted Publishing text: {required}"
-            )
-    if re.search(r"(?m)^\s*push\s*:", workflow):
-        failures.append("publish workflow must not publish on ordinary pushes")
-    if re.search(r"(?m)^\s*pull_request\s*:", workflow):
-        failures.append("publish workflow must not publish on pull requests")
-    if "secrets." in workflow or "api-token" in workflow or "password:" in workflow:
-        failures.append("publish workflow must not use token secrets or password-based publishing")
-    for job_name in ["publish-testpypi", "publish-pypi"]:
-        job_block = _workflow_job_block(workflow, job_name)
-        if job_block is None:
-            failures.append(f"publish workflow is missing job: {job_name}")
-            continue
-        for required in [
-            "Verify PyPI publish ref",
-            'echo "event=$GITHUB_EVENT_NAME"',
-            'echo "ref=$GITHUB_REF"',
-            'echo "sha=$GITHUB_SHA"',
-            "refs/heads/main|refs/tags/*",
-            "Manual PyPI publishing must run from main or a tag ref.",
-            "Check target package version",
-            "id: package-version",
-            "PACKAGE_INDEX_JSON_URL",
-            "PACKAGE_INDEX_NAME",
-            "steps.package-version.outputs.exists != 'true'",
-        ]:
-            if required not in job_block:
-                failures.append(f"publish workflow {job_name} job is missing preflight: {required}")
     return failures
 
 

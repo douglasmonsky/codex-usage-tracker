@@ -1,0 +1,1 @@
+"""Release-promotion contract tests."""

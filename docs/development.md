@@ -449,9 +449,25 @@ Before publishing a future release, confirm Trusted Publishers are still configu
 
 TestPyPI and PyPI are separate services/accounts. Configure both before publishing to both, and keep the `pypi` GitHub environment behind manual approval.
 
-To publish to TestPyPI, run the `Publish Python package` workflow manually with `target` set to `testpypi`. The job builds once, checks the artifacts with `twine`, uploads them as workflow artifacts, then publishes the same artifacts to `https://test.pypi.org/project/codex-usage-tracking/`.
+To publish a TestPyPI dry run, use a distinct prerelease version and manually
+run the `Publish Python package` workflow from `main` or its exact prerelease
+tag. Manual dispatch is TestPyPI-only. Do not manually upload the final
+production version and then create its GitHub Release: package-index versions
+are immutable, and the release event owns the final version's complete
+TestPyPI-to-production promotion run. The workflow builds one wheel/sdist pair
+with a commit-derived `SOURCE_DATE_EPOCH`, records a canonical release
+manifest, publishes those exact files, downloads them from TestPyPI, verifies
+their hashes, and smokes the downloaded wheel.
 
-To publish to PyPI, either publish a GitHub Release for the tag or manually run the workflow with `target` set to `pypi`. The final project URL is `https://pypi.org/project/codex-usage-tracking/`.
+To publish to production PyPI, publish a GitHub Release whose exact annotated
+tag is `v<package-version>`. That release-event run builds once, publishes and
+qualifies TestPyPI, then waits for the protected `pypi` environment approval.
+The PyPI job publishes files downloaded from TestPyPI rather than rebuilding.
+The workflow then downloads those files from PyPI for GitHub Release attachment
+and verifies identical hashes at TestPyPI, PyPI, and GitHub. After TestPyPI
+publication, rerun failed jobs rather than every job; any rebuild must reproduce
+the commit-bound manifest or fail closed. The final project URL is
+`https://pypi.org/project/codex-usage-tracking/`.
 
 PyPI and TestPyPI filenames and versions cannot be reused after upload. If a bad artifact is uploaded, cut the next patch version instead of trying to replace it.
 
