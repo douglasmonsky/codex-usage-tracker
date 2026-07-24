@@ -1,15 +1,20 @@
 [root]
 depends_on = [
     "//codex_usage_tracker.allowance_intelligence",
+    "//codex_usage_tracker.application",
     "//codex_usage_tracker.compression",
     "//codex_usage_tracker.context",
     "//codex_usage_tracker.core",
     "//codex_usage_tracker.dashboard",
+    "//codex_usage_tracker.dashboard_service",
     "//codex_usage_tracker.diagnostics",
+    "//codex_usage_tracker.interfaces.cli",
+    "//codex_usage_tracker.interfaces.mcp",
     "//codex_usage_tracker.parser",
     "//codex_usage_tracker.pricing",
     "//codex_usage_tracker.reports",
     "//codex_usage_tracker.recommendation_engine",
     "//codex_usage_tracker.server",
     "//codex_usage_tracker.store",
+    "//codex_usage_tracker.store.api",
 ]

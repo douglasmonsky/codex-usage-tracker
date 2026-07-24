@@ -14,11 +14,10 @@ from codex_usage_tracker.application.errors import RequestValidationError
 from codex_usage_tracker.application.query_models import QueryRequest as QueryRequest
 from codex_usage_tracker.core.contracts import ScopeV1
 from codex_usage_tracker.core.contracts.serialization import payload_mapping
+from codex_usage_tracker.core.requests import ExecutionMode, HistoryScope
 from codex_usage_tracker.evidence.models import EvidenceRequest as EvidenceRequest
 
-HistoryScope: TypeAlias = Literal["active", "all"]
 PrivacyMode: TypeAlias = Literal["normal", "redacted", "strict"]
-ExecutionMode: TypeAlias = Literal["auto", "sync", "async"]
 McpProfile: TypeAlias = Literal["core", "full", "developer"]
 
 MAX_INTERACTIVE_LIMIT = 200

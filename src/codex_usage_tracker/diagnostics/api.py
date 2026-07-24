@@ -8,7 +8,6 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
-from codex_usage_tracker import __version__
 from codex_usage_tracker.core.paths import (
     DEFAULT_CODEX_HOME,
     DEFAULT_DASHBOARD_PATH,
@@ -17,6 +16,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_PLUGIN_LINK,
     DEFAULT_PRICING_PATH,
 )
+from codex_usage_tracker.core.version import __version__
 from codex_usage_tracker.diagnostics.doctor_checks import (
     _check_codex_sessions,
     _check_dashboard_target,

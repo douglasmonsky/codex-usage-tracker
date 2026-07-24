@@ -10,8 +10,8 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from codex_usage_tracker import __version__
 from codex_usage_tracker.core.paths import DEFAULT_MARKETPLACE_PATH, DEFAULT_PLUGIN_LINK
+from codex_usage_tracker.core.version import __version__
 
 PLUGIN_NAME = "codex-usage-tracker"
 

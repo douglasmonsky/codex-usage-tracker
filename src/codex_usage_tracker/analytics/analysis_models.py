@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, TypeAlias, cast, get_args
+from typing import Literal, TypeAlias, cast, get_args
 
 from codex_usage_tracker.core.contracts import (
     AccountingContextV1,
@@ -11,10 +11,9 @@ from codex_usage_tracker.core.contracts import (
     FindingV1,
     MessageV1,
 )
-
-if TYPE_CHECKING:
-    from codex_usage_tracker.application.query_models import QueryFilters
-    from codex_usage_tracker.application.requests import ExecutionMode, HistoryScope
+from codex_usage_tracker.core.errors import RequestValidationError
+from codex_usage_tracker.core.requests import ExecutionMode, HistoryScope, QueryFilters
+from codex_usage_tracker.core.time_windows import normalize_timestamp_window
 
 AnalysisGoal: TypeAlias = Literal[
     "usage_spike",
@@ -39,8 +38,6 @@ class ComparisonWindow:
     def __post_init__(self) -> None:
         if not isinstance(self.since, str) or not isinstance(self.until, str):
             raise _request_validation_error("comparison window bounds must be strings")
-        from codex_usage_tracker.application.query_validation import normalize_timestamp_window
-
         since, until = normalize_timestamp_window(
             self.since, self.until, field_prefix="comparison."
         )
@@ -49,14 +46,10 @@ class ComparisonWindow:
 
 
 def _query_filters_factory() -> QueryFilters:
-    from codex_usage_tracker.application.query_models import QueryFilters
-
     return QueryFilters()
 
 
 def _request_validation_error(message: str) -> ValueError:
-    from codex_usage_tracker.application.errors import RequestValidationError
-
     return RequestValidationError(message)
 
 
@@ -70,8 +63,6 @@ class AnalysisRequest:
     execution: ExecutionMode = "auto"
 
     def __post_init__(self) -> None:
-        from codex_usage_tracker.application.query_models import QueryFilters
-
         if self.goal not in ANALYSIS_GOALS:
             raise _request_validation_error(f"unsupported analysis goal: {self.goal}")
         if not isinstance(self.filters, QueryFilters):

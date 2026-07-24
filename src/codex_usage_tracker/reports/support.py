@@ -10,7 +10,6 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
-from codex_usage_tracker import __version__
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_CODEX_HOME,
@@ -30,6 +29,7 @@ from codex_usage_tracker.core.projects import (
     validate_privacy_mode,
 )
 from codex_usage_tracker.core.redaction import redact_secrets
+from codex_usage_tracker.core.version import __version__
 from codex_usage_tracker.diagnostics.api import run_doctor
 from codex_usage_tracker.pricing.allowance import load_allowance_config
 from codex_usage_tracker.pricing.api import load_pricing_config

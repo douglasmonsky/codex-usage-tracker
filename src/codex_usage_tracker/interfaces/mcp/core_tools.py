@@ -34,6 +34,9 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_DB_PATH,
     DEFAULT_PRICING_PATH,
 )
+from codex_usage_tracker.diagnostics.conversational_readiness import (
+    conversational_readiness,
+)
 from codex_usage_tracker.evidence.models import EvidenceRequest
 from codex_usage_tracker.interfaces.mcp.models import McpProfile
 from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
@@ -281,7 +284,10 @@ def build_usage_status(
         mcp_profile=cast(McpProfile, profile),
     )
     if container is None:
-        result, context = _build_status(request)
+        result, context = _build_status(
+            request,
+            readiness_provider=conversational_readiness,
+        )
     else:
         context = container.request_context(
             request.scope,
@@ -292,6 +298,7 @@ def build_usage_status(
             context=context,
             clock=container.clock,
             pricing_provider=container.pricing,
+            readiness_provider=conversational_readiness,
         )
     next_action = cast(dict[str, object], result["next_action"])
     payload = envelope_payload(

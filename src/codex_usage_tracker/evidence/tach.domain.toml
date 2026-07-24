@@ -1,0 +1,5 @@
+[root]
+depends_on = [
+    "//codex_usage_tracker.analytics",
+    "//codex_usage_tracker.core",
+]

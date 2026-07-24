@@ -8,7 +8,7 @@ from codex_usage_tracker.analytics.analysis_models import (
     AnalysisRequest,
     WorkEstimate,
 )
-from codex_usage_tracker.application.context import RequestContext
+from codex_usage_tracker.analytics.context_protocols import AnalysisContext
 
 
 @runtime_checkable
@@ -22,6 +22,6 @@ class AnalysisStrategy(Protocol):
     @property
     def strategy_version(self) -> str: ...
 
-    def estimate(self, request: AnalysisRequest, context: RequestContext) -> WorkEstimate: ...
+    def estimate(self, request: AnalysisRequest, context: AnalysisContext) -> WorkEstimate: ...
 
-    def analyze(self, request: AnalysisRequest, context: RequestContext) -> AnalysisReportV2: ...
+    def analyze(self, request: AnalysisRequest, context: AnalysisContext) -> AnalysisReportV2: ...

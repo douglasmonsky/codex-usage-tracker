@@ -20,6 +20,10 @@ allowed_paths = [
 forbidden_paths = ["config/prod/**", ".env", ".env.*"]
 max_changed_files = 11
 max_changed_lines = 4600
+allow_source_without_test_change = false
+requires_tests = true
+requires_full_verify = true
+ratchet_targets = []
 +++
 
 # MCP-First Product Pivot Change Plan

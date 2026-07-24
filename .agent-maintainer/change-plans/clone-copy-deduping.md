@@ -1,7 +1,7 @@
 +++
 id = "clone-copy-deduping"
 kind = "mechanical-migration"
-status = "active"
+status = "complete"
 base_ref = "c755e8ecc20d9f3b62b9813aba4721898be01bb5"
 expires = 2026-07-28
 allowed_paths = [".github/workflows/ci.yml", "README.md", "config/vulture-whitelist.py", "docs/**", "frontend/**", "skills/**", "src/**", "tests/**"]

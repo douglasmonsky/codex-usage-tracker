@@ -15,6 +15,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generic, Literal, TypeVar
 
+from codex_usage_tracker.allowance_intelligence.materialization import (
+    sync_refresh_allowance_intelligence,
+)
 from codex_usage_tracker.application.context import build_request_context
 from codex_usage_tracker.application.protocols import SourceRepository
 from codex_usage_tracker.application.requests import RefreshRequest, RequestScope
@@ -24,7 +27,8 @@ from codex_usage_tracker.jobs.adapters import RefreshJobAdapter, request_hash
 from codex_usage_tracker.jobs.models import JobStatusV1
 from codex_usage_tracker.jobs.service import JobService
 from codex_usage_tracker.parser.api import find_session_logs
-from codex_usage_tracker.store.api import refresh_usage_index
+from codex_usage_tracker.store.api import refresh_usage_index as _refresh_usage_index
+from codex_usage_tracker.store.refresh_parse import RefreshProgressCallback
 from codex_usage_tracker.store.sources import source_logs_requiring_parse
 
 MAX_SYNC_SOURCE_FILES = 4
@@ -33,6 +37,28 @@ REFRESH_SCHEMA = "codex-usage-tracker.refresh.v2"
 REFRESH_JOB_RESULT_BUDGET = 48 * 1024
 
 T = TypeVar("T")
+
+
+def refresh_usage_index(
+    codex_home: Path,
+    db_path: Path,
+    include_archived: bool = False,
+    aggregate_only: bool = False,
+    otel_dir: Path | None = None,
+    progress_callback: RefreshProgressCallback | None = None,
+) -> RefreshResult:
+    """Refresh store state and materialize application-owned allowance facts."""
+    return _refresh_usage_index(
+        codex_home=codex_home,
+        db_path=db_path,
+        include_archived=include_archived,
+        aggregate_only=aggregate_only,
+        otel_dir=otel_dir if otel_dir is not None else db_path.parent / "otel",
+        progress_callback=progress_callback,
+        derived_fact_sync=sync_refresh_allowance_intelligence,
+    )
+
+
 RefreshFunction = Callable[..., RefreshResult]
 Planner = Callable[..., "RefreshPlan"]
 

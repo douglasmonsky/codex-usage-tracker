@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Protocol
 
 from codex_usage_tracker.application.context import RequestContext, build_request_context
 from codex_usage_tracker.application.errors import RequestContextError
 from codex_usage_tracker.application.protocols import Clock, PricingProvider
 from codex_usage_tracker.application.requests import StatusRequest
 from codex_usage_tracker.core.contracts import FreshnessV1, payload_mapping
-from codex_usage_tracker.core.conversational_readiness import conversational_readiness
 from codex_usage_tracker.dashboard_service import (
     DashboardServiceStatus,
     dashboard_service_status,
@@ -30,12 +31,30 @@ CORE_TOOL_NAMES = (
 )
 
 
+class ConversationalReadinessProvider(Protocol):
+    def __call__(self, *, codex_home: Path) -> Mapping[str, object]: ...
+
+
+def conversational_readiness(*, codex_home: Path) -> dict[str, object]:
+    """Return a conservative result when no outer runtime probe was injected."""
+    return {
+        "schema": "codex-usage-tracker-conversational-readiness-v1",
+        "state": "unknown",
+        "summary": "Conversational analysis readiness was not probed by this application caller.",
+        "next_action": "Run `codex-usage-tracker doctor` for a bounded diagnosis.",
+        "configured_profile": "unknown",
+        "runtime_version_matches": False,
+        "evidence": [],
+    }
+
+
 def get_status(
     request: StatusRequest,
     *,
     context: RequestContext | None = None,
     clock: Clock | None = None,
     pricing_provider: PricingProvider | None = None,
+    readiness_provider: ConversationalReadinessProvider | None = None,
 ) -> dict[str, object]:
     """Return codex-usage-tracker.status.v2 without starting background work."""
     result, _context = _build_status(
@@ -43,6 +62,7 @@ def get_status(
         context=context,
         clock=clock,
         pricing_provider=pricing_provider,
+        readiness_provider=readiness_provider,
     )
     return result
 
@@ -53,6 +73,7 @@ def _build_status(
     context: RequestContext | None = None,
     clock: Clock | None = None,
     pricing_provider: PricingProvider | None = None,
+    readiness_provider: ConversationalReadinessProvider | None = None,
 ) -> tuple[dict[str, object], RequestContext]:
     db_path = _required_path(request.db_path, "db_path")
     pricing_path = _required_path(request.pricing_path, "pricing_path")
@@ -79,7 +100,7 @@ def _build_status(
         if pricing_provider is None
         else pricing_provider.load(pricing_path)
     )
-    readiness = conversational_readiness(codex_home=codex_home)
+    readiness = (readiness_provider or conversational_readiness)(codex_home=codex_home)
     service = _service_status(home)
     pricing_state = (
         "malformed"
@@ -91,7 +112,7 @@ def _build_status(
     next_action = _next_action(
         freshness_state=freshness.state,
         pricing_state=pricing_state,
-        readiness_state=readiness["state"],
+        readiness_state=str(readiness["state"]),
     )
     result: dict[str, object] = {
         "schema": STATUS_SCHEMA,

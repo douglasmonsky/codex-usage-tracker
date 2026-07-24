@@ -72,6 +72,6 @@ def test_bandit_baseline_contains_only_reviewed_heuristics() -> None:
         "B310": 1,
         "B404": 1,
         "B603": 1,
-        "B608": 58,
+        "B608": 61,
     }
     assert all(finding["issue_severity"] in {"LOW", "MEDIUM"} for finding in findings)

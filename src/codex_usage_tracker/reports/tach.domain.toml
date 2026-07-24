@@ -5,4 +5,5 @@ depends_on = [
   "//codex_usage_tracker.diagnostics",
   "//codex_usage_tracker.pricing",
   "//codex_usage_tracker.store",
+  "//codex_usage_tracker.store.api",
 ]

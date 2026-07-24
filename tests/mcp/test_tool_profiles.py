@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -15,6 +17,20 @@ from tests.release_catalog import (
     CORE_MCP_TOOL_NAMES,
     FULL_MCP_TOOL_NAMES,
 )
+
+PLUGIN_NAME = "codex-usage-tracker"
+
+
+def _write_status_wrapper(codex_home: Path, server: dict[str, object]) -> Path:
+    root = codex_home.parent / "plugins" / PLUGIN_NAME
+    (root / ".codex-plugin").mkdir(parents=True)
+    (root / ".codex-plugin" / "plugin.json").write_text(
+        json.dumps({"name": PLUGIN_NAME}), encoding="utf-8"
+    )
+    (root / ".mcp.json").write_text(
+        json.dumps({"mcpServers": {PLUGIN_NAME: server}}), encoding="utf-8"
+    )
+    return root
 
 
 def test_core_profile_has_exact_names_and_order() -> None:
@@ -214,6 +230,53 @@ def test_core_status_returns_bounded_v2_envelope(
     assert payload["data_class"] == "administrative"
     assert payload["result"]["mcp"]["core_tools"] == list(CORE_MCP_TOOL_NAMES)  # type: ignore[index]
     assert serialized_size(payload) <= 16 * 1024
+
+
+def test_core_status_reports_configured_runtime_readiness(tmp_path: Path) -> None:
+    from codex_usage_tracker.interfaces.mcp.core_tools import build_usage_status
+
+    codex_home = tmp_path / ".codex"
+    _write_status_wrapper(
+        codex_home,
+        {
+            "command": sys.executable,
+            "args": ["-m", "codex_usage_tracker.interfaces.mcp.server"],
+            "env": {"CODEX_USAGE_TRACKER_MCP_PROFILE": "core"},
+        },
+    )
+
+    payload = build_usage_status(
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        codex_home=codex_home,
+        home=tmp_path,
+    )
+    readiness = payload["result"]["conversational_readiness"]  # type: ignore[index]
+
+    assert isinstance(readiness, dict)
+    assert readiness["state"] == "ready"
+    assert readiness["configured_profile"] == "core"
+    assert readiness["runtime_version_matches"] is True
+
+
+def test_core_status_reports_malformed_runtime_wrapper(tmp_path: Path) -> None:
+    from codex_usage_tracker.interfaces.mcp.core_tools import build_usage_status
+
+    codex_home = tmp_path / ".codex"
+    root = _write_status_wrapper(codex_home, {})
+    (root / ".mcp.json").write_text("{broken", encoding="utf-8")
+
+    payload = build_usage_status(
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        codex_home=codex_home,
+        home=tmp_path,
+    )
+    readiness = payload["result"]["conversational_readiness"]  # type: ignore[index]
+
+    assert isinstance(readiness, dict)
+    assert readiness["state"] == "unavailable"
+    assert "doctor" in readiness["next_action"]
 
 
 def test_core_job_status_returns_bounded_administrative_envelope(tmp_path: Path) -> None:

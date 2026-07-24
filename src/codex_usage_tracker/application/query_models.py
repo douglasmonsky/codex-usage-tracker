@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import Literal, TypeAlias
 
 from codex_usage_tracker.application.errors import RequestValidationError
+from codex_usage_tracker.core.requests import HistoryScope, QueryFilters
 
 QueryEntity: TypeAlias = Literal[
     "call", "thread", "project", "model", "effort", "origin", "service_tier", "subagent"
@@ -26,7 +27,6 @@ QueryMeasure: TypeAlias = Literal[
     "context_pressure",
 ]
 QueryOrder: TypeAlias = Literal["asc", "desc"]
-HistoryScope: TypeAlias = Literal["active", "all"]
 
 ALL_QUERY_MEASURES: frozenset[str] = frozenset(
     {
@@ -72,22 +72,6 @@ QUERY_ENTITY_CAPABILITIES: Mapping[str, QueryEntityCapability] = MappingProxyTyp
         ),
     }
 )
-
-
-@dataclass(frozen=True)
-class QueryFilters:
-    since: str | None = None
-    until: str | None = None
-    range: str | None = None
-    model: str | None = None
-    effort: str | None = None
-    thread_key: str | None = None
-    project: str | None = None
-    origin: str | None = None
-    service_tier: str | None = None
-    subagent_role: str | None = None
-    subagent_type: str | None = None
-    parent_thread_key: str | None = None
 
 
 @dataclass(frozen=True)

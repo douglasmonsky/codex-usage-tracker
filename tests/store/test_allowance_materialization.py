@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from codex_usage_tracker.allowance_intelligence import materialization
 from codex_usage_tracker.allowance_intelligence.cycles import MODEL_VERSION
 from codex_usage_tracker.allowance_intelligence.service import build_allowance_status
 from codex_usage_tracker.store import api as store_api
@@ -195,9 +196,7 @@ def test_materialization_preserves_each_window_and_cohort(tmp_path):
         assert materialize_allowance_intelligence(conn, now=_NOW)
         scopes = {
             tuple(row)
-            for row in conn.execute(
-                "SELECT window_kind, cohort_key FROM allowance_cycles"
-            )
+            for row in conn.execute("SELECT window_kind, cohort_key FROM allowance_cycles")
         }
         assert scopes == {
             ("weekly", "codex"),
@@ -215,7 +214,9 @@ def test_allowance_package_retains_report_exports_after_store_imports():
 def test_reconciliation_removes_noncanonical_evidence_without_mutating_physical_usage(tmp_path):
     db = tmp_path / "usage.sqlite3"
     canonical = _allowance_event("canonical", 10.0, 100)
-    copied = replace(canonical, record_id="copied", session_id="copied", source_file="/tmp/copy.jsonl")
+    copied = replace(
+        canonical, record_id="copied", session_id="copied", source_file="/tmp/copy.jsonl"
+    )
     upsert_usage_events([canonical, copied], db)
 
     with connect(db) as conn:
@@ -298,20 +299,30 @@ def test_empty_stream_finalization_reconciles_replaced_source_once(tmp_path, mon
     with connect(db) as conn:
         assert materialize_allowance_intelligence(conn, now=_NOW)
         calls = 0
-        real_materialize = store_api.materialize_allowance_intelligence
+        real_materialize = materialization.materialize_allowance_intelligence
 
         def counted_materialize(connection):
             nonlocal calls
             calls += 1
             return real_materialize(connection, now=_NOW)
 
-        monkeypatch.setattr(store_api, "materialize_allowance_intelligence", counted_materialize)
+        monkeypatch.setattr(
+            materialization,
+            "materialize_allowance_intelligence",
+            counted_materialize,
+        )
         result = store_api._upsert_usage_events_in_connection(
             conn, [], replace_source_files=[event.source_file]
         )
         assert result.record_ids == ()
         finalized = store_api._finalize_streamed_usage_event_upserts(
             conn, record_ids=result.record_ids, affected_thread_keys=result.affected_thread_keys
+        )
+        materialization.sync_refresh_allowance_intelligence(
+            conn,
+            finalized.record_ids,
+            finalized.affected_thread_keys,
+            False,
         )
         assert finalized.inserted_or_updated_events == 0
         assert calls == 1
@@ -325,7 +336,11 @@ _NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
 def _allowance_event(
-    record_id: str, used_percent: float, total: int, *, event_timestamp: str = "2026-01-01T00:00:00Z"
+    record_id: str,
+    used_percent: float,
+    total: int,
+    *,
+    event_timestamp: str = "2026-01-01T00:00:00Z",
 ):
     return _usage_event(
         record_id=record_id,

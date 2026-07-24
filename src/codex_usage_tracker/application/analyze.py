@@ -17,6 +17,7 @@ from codex_usage_tracker.analytics.analysis_models import (
     AnalysisReportV2,
     AnalysisRequest,
 )
+from codex_usage_tracker.analytics.context_protocols import AnalysisContext
 from codex_usage_tracker.application.context import RequestContext
 from codex_usage_tracker.application.errors import RequestContextError, RequestValidationError
 from codex_usage_tracker.application.query_validation import normalize_query_filters
@@ -85,7 +86,7 @@ class AnalysisRuntime:
         self,
         semantic_key: str,
         request: AnalysisRequest,
-        context: RequestContext,
+        context: AnalysisContext,
         entry: AnalysisCatalogEntry,
     ) -> JobStatusV1:
         with self._lock:
@@ -134,7 +135,7 @@ class AnalysisRuntime:
         self,
         record: _AnalysisRecord,
         request: AnalysisRequest,
-        context: RequestContext,
+        context: AnalysisContext,
         entry: AnalysisCatalogEntry,
         semantic_key: str,
     ) -> None:
@@ -229,7 +230,7 @@ def analysis_semantic_key(request: AnalysisRequest, context: RequestContext) -> 
 def _execute(
     entry: AnalysisCatalogEntry,
     request: AnalysisRequest,
-    context: RequestContext,
+    context: AnalysisContext,
     semantic_key: str,
 ) -> AnalysisReportV2:
     try:
@@ -241,7 +242,7 @@ def _execute(
 def _run_strategy(
     entry: AnalysisCatalogEntry,
     request: AnalysisRequest,
-    context: RequestContext,
+    context: AnalysisContext,
     semantic_key: str,
 ) -> AnalysisReportV2:
     report = entry.strategy.analyze(request, context)
@@ -254,7 +255,7 @@ def _bounded_report(
     report: AnalysisReportV2,
     entry: AnalysisCatalogEntry,
     request: AnalysisRequest,
-    context: RequestContext,
+    context: AnalysisContext,
     semantic_key: str,
 ) -> AnalysisReportV2:
     limit = min(request.evidence_limit, entry.max_evidence_records, 20)
@@ -300,7 +301,7 @@ def _bounded_report(
 
 
 def _error_report(
-    entry: AnalysisCatalogEntry, context: RequestContext, semantic_key: str
+    entry: AnalysisCatalogEntry, context: AnalysisContext, semantic_key: str
 ) -> AnalysisReportV2:
     report = AnalysisReportV2(
         analysis_id=f"analysis:{semantic_key.removeprefix('sha256:')}",

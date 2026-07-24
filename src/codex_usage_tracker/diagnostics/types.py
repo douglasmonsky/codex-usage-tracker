@@ -1,16 +1,5 @@
-"""Shared diagnostics value types."""
+"""Compatibility imports for diagnostic value types."""
 
-from __future__ import annotations
+from codex_usage_tracker.core.doctor import DoctorCheck
 
-from dataclasses import asdict, dataclass
-
-
-@dataclass(frozen=True)
-class DoctorCheck:
-    name: str
-    status: str
-    detail: str
-    remediation: str | None = None
-
-    def to_dict(self) -> dict[str, str | None]:
-        return asdict(self)
+__all__ = ["DoctorCheck"]

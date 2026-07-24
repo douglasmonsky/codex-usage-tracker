@@ -352,7 +352,7 @@ def read_compression_source_generation(conn: sqlite3.Connection) -> int:
 
 def touch_compression_source_generation(conn: sqlite3.Connection) -> int:
     """Invalidate exact compression caches once per aggregate write transaction."""
-    from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
+    from codex_usage_tracker.store.compression_revision_state import touch_compression_revisions
 
     _ensure_compression_storage(conn)
     return touch_compression_revisions(conn)

@@ -2,47 +2,38 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, fields, replace
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any, BinaryIO, Protocol, cast
 from urllib.parse import parse_qs, unquote
 
-from codex_usage_tracker.analytics.analysis_catalog import ANALYSIS_CATALOG
 from codex_usage_tracker.analytics.analysis_models import (
-    ANALYSIS_GOALS,
     AnalysisRequest,
     ComparisonWindow,
 )
-from codex_usage_tracker.application.allowance import get_allowance
 from codex_usage_tracker.application.allowance_models import AllowanceRequest
-from codex_usage_tracker.application.analyze import AnalysisRuntime, analyze_usage
 from codex_usage_tracker.application.container import (
     ApplicationContainer,
     build_application_container,
 )
 from codex_usage_tracker.application.errors import ApplicationError
-from codex_usage_tracker.application.evidence import get_evidence
-from codex_usage_tracker.application.job_status import get_job_status
 from codex_usage_tracker.application.paths import ApplicationPaths
-from codex_usage_tracker.application.query import query_usage
 from codex_usage_tracker.application.query_models import (
-    ALL_QUERY_MEASURES,
-    QUERY_ENTITY_CAPABILITIES,
     QueryFilters,
     QueryRequest,
 )
-from codex_usage_tracker.application.query_validation import normalize_query_filters
-from codex_usage_tracker.application.refresh import refresh_usage
 from codex_usage_tracker.application.requests import (
     JobStatusRequest,
     RefreshRequest,
     RequestScope,
     StatusRequest,
 )
-from codex_usage_tracker.application.status import get_status
+from codex_usage_tracker.application.services import (
+    ApplicationServices,
+)
+from codex_usage_tracker.application.status import ConversationalReadinessProvider
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_CODEX_HOME,
@@ -52,6 +43,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_RATE_CARD_PATH,
     DEFAULT_THRESHOLDS_PATH,
 )
+from codex_usage_tracker.diagnostics.conversational_readiness import conversational_readiness
 from codex_usage_tracker.evidence.models import (
     EvidenceAmbiguityError,
     EvidenceHistoryMismatchError,
@@ -107,143 +99,34 @@ class HttpV2Services(Protocol):
     def capabilities(self) -> object: ...
 
 
-@dataclass
-class ApplicationHttpV2Services:
-    """Application-service implementation shared by the live localhost server."""
+class ApplicationHttpV2Services(ApplicationServices):
+    """Application services with the local runtime-readiness adapter installed."""
 
-    db_path: Path = DEFAULT_DB_PATH
-    pricing_path: Path = DEFAULT_PRICING_PATH
-    allowance_path: Path = DEFAULT_ALLOWANCE_PATH
-    rate_card_path: Path = DEFAULT_RATE_CARD_PATH
-    thresholds_path: Path = DEFAULT_THRESHOLDS_PATH
-    codex_home: Path = DEFAULT_CODEX_HOME
-    projects_path: Path = DEFAULT_PROJECTS_PATH
-    container: ApplicationContainer | None = None
-
-    def __post_init__(self) -> None:
-        if self.container is None:
-            self.container = build_application_container(
-                ApplicationPaths(
-                    codex_home=self.codex_home,
-                    db_path=self.db_path,
-                    pricing_path=self.pricing_path,
-                    allowance_path=self.allowance_path,
-                    rate_card_path=self.rate_card_path,
-                    thresholds_path=self.thresholds_path,
-                    projects_path=self.projects_path,
-                )
+    def __init__(
+        self,
+        *,
+        db_path: Path = DEFAULT_DB_PATH,
+        pricing_path: Path = DEFAULT_PRICING_PATH,
+        allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
+        rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
+        thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
+        codex_home: Path = DEFAULT_CODEX_HOME,
+        projects_path: Path = DEFAULT_PROJECTS_PATH,
+        container: ApplicationContainer | None = None,
+        readiness_provider: ConversationalReadinessProvider | None = conversational_readiness,
+    ) -> None:
+        application = container or build_application_container(
+            ApplicationPaths(
+                codex_home=codex_home,
+                db_path=db_path,
+                pricing_path=pricing_path,
+                allowance_path=allowance_path,
+                rate_card_path=rate_card_path,
+                thresholds_path=thresholds_path,
+                projects_path=projects_path,
             )
-        else:
-            self.codex_home = self.container.paths.codex_home
-            self.db_path = self.container.paths.db_path
-            self.pricing_path = self.container.paths.pricing_path
-            self.allowance_path = self.container.paths.allowance_path
-            self.rate_card_path = self.container.paths.rate_card_path
-            self.thresholds_path = self.container.paths.thresholds_path
-            self.projects_path = self.container.paths.projects_path
-        self.job_service = self.container.jobs
-        self.analysis_runtime = AnalysisRuntime(
-            job_service=self.job_service,
-            catalog=self.container.analyses,
-            pricing_fingerprint=_path_fingerprint(self.pricing_path),
-            rate_card_fingerprint=_path_fingerprint(self.rate_card_path),
-            thresholds_fingerprint=_path_fingerprint(self.thresholds_path),
-            catalog_version=_catalog_fingerprint(),
         )
-
-    @property
-    def application(self) -> ApplicationContainer:
-        if self.container is None:
-            raise RuntimeError("application container was not initialized")
-        return self.container
-
-    def status(self, request: StatusRequest) -> object:
-        context = self.application.request_context(
-            request.scope,
-            prefer_materialized_active=True,
-        )
-        return get_status(
-            replace(
-                request,
-                db_path=self.db_path,
-                pricing_path=self.pricing_path,
-                codex_home=self.codex_home,
-                home=self.codex_home.parent,
-            ),
-            context=context,
-            clock=self.application.clock,
-            pricing_provider=self.application.pricing,
-        )
-
-    def refresh(self, request: RefreshRequest) -> object:
-        outcome = refresh_usage(
-            request,
-            codex_home=self.codex_home,
-            db_path=self.db_path,
-            pricing_path=self.pricing_path,
-            source_repository=self.application.repositories.sources,
-            job_service=self.job_service,
-        )
-        return outcome.result if outcome.result is not None else outcome.job
-
-    def analyze(self, request: AnalysisRequest) -> object:
-        normalized = replace(request, filters=normalize_query_filters(request.filters))
-        context = self.application.request_context(
-            _request_scope(normalized.filters, normalized.history)
-        )
-        outcome = analyze_usage(
-            normalized,
-            replace(context, analysis_runtime=self.analysis_runtime),
-        )
-        return outcome.completed if outcome.completed is not None else outcome.job
-
-    def query(self, request: QueryRequest) -> object:
-        normalized = replace(request, filters=normalize_query_filters(request.filters))
-        context = self.application.request_context(
-            _request_scope(normalized.filters, normalized.history)
-        )
-        return query_usage(
-            normalized,
-            db_path=self.db_path,
-            pricing_path=self.pricing_path,
-            allowance_path=self.allowance_path,
-            context=context,
-        )
-
-    def evidence(self, request: EvidenceRequest) -> object:
-        return get_evidence(
-            request,
-            db_path=self.db_path,
-            pricing_path=self.pricing_path,
-            allowance_path=self.allowance_path,
-            job_service=self.job_service,
-        )
-
-    def allowance(self, request: AllowanceRequest) -> object:
-        result = get_allowance(request, db_path=self.db_path, job_service=self.job_service)
-        payload = dict(result.payload)
-        payload.setdefault("schema", result.result_schema)
-        return payload
-
-    def job_status(self, request: JobStatusRequest) -> object:
-        return get_job_status(request, job_service=self.job_service)
-
-    def capabilities(self) -> object:
-        return {
-            "schema": "codex-usage-tracker.capabilities.v2",
-            "analysis_goals": list(ANALYSIS_GOALS),
-            "query_entities": {
-                name: {
-                    "identity": capability.identity,
-                    "measures": sorted(capability.measures),
-                    "group_by": sorted(capability.group_by),
-                }
-                for name, capability in QUERY_ENTITY_CAPABILITIES.items()
-            },
-            "query_measures": sorted(ALL_QUERY_MEASURES),
-            "allowance_operations": ["status", "series", "evidence", "analysis"],
-            "evidence_selector_kinds": ["finding", "call", "thread", "allowance", "analysis"],
-        }
+        super().__init__(container=application, readiness_provider=readiness_provider)
 
 
 @dataclass(frozen=True)
@@ -488,24 +371,6 @@ def _reject_unknown(payload: Mapping[str, object], allowed: set[str], *, prefix:
     unknown = sorted(set(payload) - allowed)
     if unknown:
         raise HttpRequestError(400, "invalid_request", f"unsupported field: {prefix}{unknown[0]}")
-
-
-def _path_fingerprint(path: Path) -> str:
-    content = path.read_bytes() if path.is_file() else b"missing"
-    return f"sha256:{hashlib.sha256(content).hexdigest()}"
-
-
-def _catalog_fingerprint() -> str:
-    payload = [
-        {
-            "goal": goal,
-            "strategy_id": entry.strategy.strategy_id,
-            "strategy_version": entry.strategy.strategy_version,
-        }
-        for goal, entry in sorted(ANALYSIS_CATALOG.items())
-    ]
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
 
 
 def _error(

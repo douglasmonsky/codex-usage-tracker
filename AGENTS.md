@@ -175,7 +175,10 @@ Confirm architectural conclusions against the source and relevant tests before c
 
 Do not repeat the same lookup in both tools unless validating an uncertain relationship or investigating conflicting results.
 
-Refresh the GitNexus index after major branch changes, file moves, or architectural refactors.
+Refresh the GitNexus index after major branch changes, file moves, or architectural
+refactors with `gitnexus analyze --index-only .`. Use the repo-local GitNexus skill
+matching the task when a client supports it; do not load every GitNexus workflow by
+default.
 
 ## Validation
 
