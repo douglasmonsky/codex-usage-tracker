@@ -6,6 +6,7 @@ exclude docs/usage-drain-research-white-paper.md
 prune output
 recursive-include skills *.md *.py
 recursive-include scripts *.py
+include config/product-complexity-budget.json
 recursive-include src/codex_usage_tracker/plugin_data/assets *
 recursive-include src/codex_usage_tracker/plugin_data/dashboard *
 recursive-include src/codex_usage_tracker/plugin_data/docs *

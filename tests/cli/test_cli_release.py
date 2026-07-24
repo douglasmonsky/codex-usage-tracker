@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-import re
 import shlex
 import subprocess
 import sys
@@ -88,12 +87,15 @@ def test_dashboard_release_excludes_three_and_constellation_artifacts() -> None:
 
 
 def test_dashboard_main_bundle_budget_is_ratcheted_after_constellation_removal() -> None:
-    script = (
-        Path(__file__).resolve().parents[2] / "scripts" / "check-dashboard-bundles.mjs"
-    ).read_text(encoding="utf-8")
-    match = re.search(r"currentInitialJs:\s*(\d+)\s*\*\s*1024", script)
-    assert match is not None
-    assert int(match.group(1)) <= MAX_INITIAL_DASHBOARD_JS_KIB
+    root = Path(__file__).resolve().parents[2]
+    script = (root / "scripts" / "check-dashboard-bundles.mjs").read_text(encoding="utf-8")
+    budget = json.loads(
+        (root / "config" / "product-complexity-budget.json").read_text(encoding="utf-8")
+    )
+    maximum = budget["metrics"]["main_initial_react_js_gzip_bytes"]["maximum"]
+
+    assert "main_initial_react_js_gzip_bytes" in script
+    assert maximum <= MAX_INITIAL_DASHBOARD_JS_KIB * 1024
 
 
 def test_release_check_rejects_stale_public_package_version_claims(tmp_path: Path) -> None:
@@ -286,10 +288,7 @@ def test_release_pipeline_rebuilds_dashboard_assets_and_smokes_installed_wheel()
     workflow = (repo_root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     package_job = workflow.split("\n  package:\n", maxsplit=1)[1]
     required_in_order = [
-        (
-            "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 "
-            "# v7.0.0",
-        ),
+        ("actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0",),
         ('node-version: "22"',),
         ("run: npm ci",),
         ("run: npm run dashboard:assets:check",),

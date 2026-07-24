@@ -98,7 +98,11 @@ jobs:
       - name: Dependency hygiene
         run: deptry .
       - name: Dead code
-        run: vulture src tests config/vulture-whitelist.py
+        run: >-
+          vulture src tests
+          scripts/check_product_complexity.py
+          scripts/check_release.py
+          config/vulture-whitelist.py
       - name: Python security
         run: python -m agent_maintainer.runners.bandit
 
@@ -247,6 +251,11 @@ jobs:
       - name: Type check
         if: matrix.python-version == '3.14'
         run: python -m mypy
+      - name: Product complexity budget
+        if: matrix.python-version == '3.14'
+        run: >-
+          python scripts/check_product_complexity.py
+          --config config/product-complexity-budget.json
       - name: Test
         if: matrix.python-version != '3.14'
         run: python -m pytest
@@ -300,6 +309,11 @@ jobs:
           python -m pip install ".[dev]" twine
       - name: Build wheel and sdist
         run: python -m build
+      - name: Product complexity distribution budget
+        run: >-
+          python scripts/check_product_complexity.py
+          --config config/product-complexity-budget.json
+          --dist dist
       - name: Check distributions
         run: python -m twine check dist/*
       - name: Verify built wheel
