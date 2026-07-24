@@ -2,20 +2,18 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from codex_usage_tracker.context import entries as context_entries
 from codex_usage_tracker.context.action_timing import (
     annotate_action_timing,
-    normalize_millisecond_value,
 )
 from codex_usage_tracker.context.constants import (
     CONTEXT_MODE_FULL,
-    CONTEXT_MODE_QUICK,
-    CONTEXT_MODES,
+    DEFAULT_CONTEXT_SEEK_BACKWARD_BYTES,
 )
 from codex_usage_tracker.context.loader import (
     LoadedContextData,
@@ -23,6 +21,7 @@ from codex_usage_tracker.context.loader import (
     bounded_context_entries,
     elapsed_ms,
 )
+from codex_usage_tracker.context.offset_window import read_context_offset_window
 from codex_usage_tracker.context.serialized import (
     collect_serialized_envelope,
     quick_serialized_context_estimate,
@@ -37,10 +36,9 @@ from codex_usage_tracker.context.token_estimates import (
     context_encoding,
 )
 from codex_usage_tracker.context.values import (
-    nonnegative_float,
     optional_str,
-    redact_text,
 )
+from codex_usage_tracker.store.sources import SourceFileMetadata
 
 
 def _read_context_for_usage_record(
@@ -48,11 +46,15 @@ def _read_context_for_usage_record(
     row: dict[str, Any],
     source_file: Path,
     line_number: int,
+    source_byte_offset: int | None,
+    context_read_reason: str,
+    source_metadata: SourceFileMetadata | None,
     max_chars: int,
     max_entries: int,
     include_tool_output: bool,
     include_compaction_history: bool,
     context_mode: str,
+    max_backward_bytes: int = DEFAULT_CONTEXT_SEEK_BACKWARD_BYTES,
 ) -> LoadedContextData:
     source_scan_started = perf_counter()
     (
@@ -62,10 +64,18 @@ def _read_context_for_usage_record(
         serialized_estimate,
         serialized_estimate_ms,
         action_timing,
+        context_read_strategy,
+        resolved_read_reason,
+        inspected_source_bytes,
     ) = _read_context_entries(
         path=source_file,
         token_line=line_number,
         target_turn_id=optional_str(row.get("turn_id")),
+        source_byte_offset=source_byte_offset,
+        context_read_reason=context_read_reason,
+        source_metadata=source_metadata,
+        target_usage_row=row,
+        max_backward_bytes=max_backward_bytes,
         max_chars=bounded_context_chars(max_chars),
         max_entries=bounded_context_entries(max_entries),
         include_tool_output=include_tool_output,
@@ -81,16 +91,10 @@ def _read_context_for_usage_record(
         serialized_estimate_ms=serialized_estimate_ms,
         action_timing=action_timing,
         source_scan_ms=elapsed_ms(source_scan_started),
+        context_read_strategy=context_read_strategy,
+        context_read_reason=resolved_read_reason,
+        inspected_source_bytes=inspected_source_bytes,
     )
-
-
-def _normalize_context_mode(mode: str) -> str:
-    normalized = str(mode or CONTEXT_MODE_QUICK).strip().lower()
-    if normalized not in CONTEXT_MODES:
-        raise ValueError(
-            f"Unsupported context mode: {mode}. Expected one of: {', '.join(sorted(CONTEXT_MODES))}"
-        )
-    return normalized
 
 
 @dataclass
@@ -107,6 +111,8 @@ class _ContextReadState:
     serialized_raw_char_count: int = 0
     omitted_parse_errors: int = 0
     current_turn_id: str | None = None
+    target_turn_found: bool = False
+    pre_target_turn_boundary_found: bool = False
     pending_compactions: list[dict[str, Any]] = field(default_factory=list)
     pending_diagnostic_events: list[dict[str, Any]] = field(default_factory=list)
 
@@ -115,6 +121,11 @@ def _read_context_entries(
     path: Path,
     token_line: int,
     target_turn_id: str | None,
+    source_byte_offset: int | None,
+    context_read_reason: str,
+    source_metadata: SourceFileMetadata | None,
+    target_usage_row: dict[str, Any],
+    max_backward_bytes: int,
     max_chars: int,
     max_entries: int,
     include_tool_output: bool,
@@ -128,24 +139,136 @@ def _read_context_entries(
     dict[str, Any],
     float,
     dict[str, Any],
+    str,
+    str,
+    int,
 ]:
-    state = _new_context_read_state(target_turn_id, model, context_mode)
+    if source_byte_offset is not None and target_turn_id is not None:
+        offset_result = _read_context_from_offset(
+            path=path,
+            token_line=token_line,
+            target_turn_id=target_turn_id,
+            source_byte_offset=source_byte_offset,
+            source_metadata=source_metadata,
+            target_usage_row=target_usage_row,
+            max_backward_bytes=max_backward_bytes,
+            include_tool_output=include_tool_output,
+            include_compaction_history=include_compaction_history,
+            model=model,
+            context_mode=context_mode,
+        )
+        state, offset_inspected_bytes, offset_failure_reason = offset_result
+        if state is not None:
+            return (
+                *_context_read_result(state, max_chars=max_chars, max_entries=max_entries),
+                "offset_seek",
+                context_read_reason,
+                offset_inspected_bytes,
+            )
+        context_read_reason = offset_failure_reason or "invalid_offset"
+    else:
+        offset_inspected_bytes = 0
+    if target_turn_id is None:
+        context_read_reason = "missing_turn_id"
 
-    with path.open(encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, 1):
+    state, inspected_source_bytes = _read_context_sequentially(
+        path=path,
+        token_line=token_line,
+        target_turn_id=target_turn_id,
+        include_tool_output=include_tool_output,
+        include_compaction_history=include_compaction_history,
+        model=model,
+        context_mode=context_mode,
+    )
+    return (
+        *_context_read_result(state, max_chars=max_chars, max_entries=max_entries),
+        "sequential_fallback",
+        context_read_reason,
+        offset_inspected_bytes + inspected_source_bytes,
+    )
+
+
+def _read_context_from_offset(
+    *,
+    path: Path,
+    token_line: int,
+    target_turn_id: str,
+    source_byte_offset: int,
+    source_metadata: SourceFileMetadata | None,
+    target_usage_row: dict[str, Any],
+    max_backward_bytes: int,
+    include_tool_output: bool,
+    include_compaction_history: bool,
+    model: str | None,
+    context_mode: str,
+) -> tuple[_ContextReadState | None, int, str | None]:
+    window = read_context_offset_window(
+        path=path,
+        token_line=token_line,
+        source_byte_offset=source_byte_offset,
+        source_metadata=source_metadata,
+        target_usage_row=target_usage_row,
+        max_backward_bytes=max_backward_bytes,
+    )
+    if window.failure_reason is not None:
+        return None, window.inspected_source_bytes, window.failure_reason
+    state = _new_context_read_state(target_turn_id, model, context_mode)
+    for line_number, raw_line in enumerate(
+        window.prefix_lines,
+        window.first_line_number,
+    ):
+        _scan_context_line(
+            state=state,
+            line_number=line_number,
+            line=raw_line.decode("utf-8"),
+            token_line=token_line,
+            include_tool_output=include_tool_output,
+            include_compaction_history=include_compaction_history,
+        )
+    target_matched = _scan_context_line(
+        state=state,
+        line_number=token_line,
+        line=window.target_line.decode("utf-8"),
+        token_line=token_line,
+        include_tool_output=include_tool_output,
+        include_compaction_history=include_compaction_history,
+    )
+    if not target_matched:
+        return None, window.inspected_source_bytes, "target_mismatch"
+    if not state.target_turn_found:
+        return None, window.inspected_source_bytes, "turn_start_outside_window"
+    if window.first_line_number > 1 and not state.pre_target_turn_boundary_found:
+        return None, window.inspected_source_bytes, "context_anchor_outside_window"
+    return state, window.inspected_source_bytes, None
+
+
+def _read_context_sequentially(
+    *,
+    path: Path,
+    token_line: int,
+    target_turn_id: str | None,
+    include_tool_output: bool,
+    include_compaction_history: bool,
+    model: str | None,
+    context_mode: str,
+) -> tuple[_ContextReadState, int]:
+    state = _new_context_read_state(target_turn_id, model, context_mode)
+    inspected_source_bytes = 0
+    with path.open("rb") as handle:
+        for line_number, raw_line in enumerate(handle, 1):
             if line_number > token_line:
                 break
+            inspected_source_bytes += len(raw_line)
             if _scan_context_line(
                 state=state,
                 line_number=line_number,
-                line=line,
+                line=raw_line.decode("utf-8"),
                 token_line=token_line,
                 include_tool_output=include_tool_output,
                 include_compaction_history=include_compaction_history,
             ):
                 break
-
-    return _context_read_result(state, max_chars=max_chars, max_entries=max_entries)
+    return state, inspected_source_bytes
 
 
 def _new_context_read_state(
@@ -168,16 +291,6 @@ def _new_context_read_state(
     )
 
 
-def _context_envelope_from_line(line: str) -> tuple[dict[str, Any] | None, bool]:
-    try:
-        envelope = json.loads(line)
-    except json.JSONDecodeError:
-        return None, True
-    if not isinstance(envelope, dict):
-        return None, False
-    return envelope, False
-
-
 def _scan_context_line(
     state: _ContextReadState,
     line_number: int,
@@ -186,13 +299,19 @@ def _scan_context_line(
     include_tool_output: bool,
     include_compaction_history: bool,
 ) -> bool:
-    envelope, parse_error = _context_envelope_from_line(line)
+    envelope, parse_error = context_entries.context_envelope_from_line(line)
     if parse_error:
         state.omitted_parse_errors += 1
         return False
     if envelope is None:
         return False
-    entry_type, payload, timestamp = _context_envelope_parts(envelope)
+    entry_type, payload, timestamp = context_entries.context_envelope_parts(envelope)
+    token_count_boundary = context_entries.is_token_count_boundary(
+        line_number,
+        token_line,
+        entry_type,
+        payload,
+    )
     if entry_type == "turn_context":
         _start_turn_context(state, line_number, line, timestamp, envelope, payload)
         return False
@@ -205,35 +324,12 @@ def _scan_context_line(
         include_compaction_history=include_compaction_history,
     )
     if _pending_summary_handled(state, line_number, timestamp, entry_type, summarized):
-        return False
+        return token_count_boundary
     if summarized is not None:
         state.candidates.append(
-            _summarized_context_entry(line_number, timestamp, entry_type, summarized)
+            context_entries.summarized_context_entry(line_number, timestamp, entry_type, summarized)
         )
-    return _is_token_count_boundary(line_number, token_line, entry_type, payload)
-
-
-def _context_envelope_parts(envelope: dict[str, Any]) -> tuple[str, dict[str, Any], str | None]:
-    raw_payload = envelope.get("payload")
-    payload: dict[str, Any] = raw_payload if isinstance(raw_payload, dict) else {}
-    return (
-        optional_str(envelope.get("type")) or "unknown",
-        payload,
-        optional_str(envelope.get("timestamp")),
-    )
-
-
-def _is_token_count_boundary(
-    line_number: int,
-    token_line: int,
-    entry_type: str,
-    payload: dict[str, Any],
-) -> bool:
-    return (
-        line_number >= token_line
-        and entry_type == "event_msg"
-        and payload.get("type") == "token_count"
-    )
+    return token_count_boundary
 
 
 def _start_turn_context(
@@ -247,7 +343,9 @@ def _start_turn_context(
     was_collecting = state.collecting
     state.current_turn_id = optional_str(payload.get("turn_id"))
     state.collecting = state.target_turn_id is None or state.current_turn_id == state.target_turn_id
+    _update_turn_parse_error_scope(state)
     if state.collecting:
+        state.target_turn_found = True
         _reset_selected_turn_context(state)
         _collect_serialized_context(state, line, envelope, "turn_context", payload)
         carried_compactions = (
@@ -256,7 +354,7 @@ def _start_turn_context(
             else []
         )
         state.candidates = [
-            _context_entry(
+            context_entries.context_entry(
                 line_number,
                 timestamp,
                 "turn_context",
@@ -269,6 +367,14 @@ def _start_turn_context(
         ]
     state.pending_compactions = []
     state.pending_diagnostic_events = []
+
+
+def _update_turn_parse_error_scope(state: _ContextReadState) -> None:
+    if state.target_turn_id is not None and not state.collecting:
+        state.pre_target_turn_boundary_found = True
+        state.omitted_parse_errors = 0
+    elif state.target_turn_id is None and state.target_turn_found:
+        state.omitted_parse_errors = 0
 
 
 def _reset_selected_turn_context(state: _ContextReadState) -> None:
@@ -312,13 +418,15 @@ def _pending_summary_handled(
         return True
     if entry_type == "compacted":
         state.pending_compactions = [
-            _summarized_context_entry(line_number, timestamp, entry_type, summarized)
+            context_entries.summarized_context_entry(line_number, timestamp, entry_type, summarized)
         ]
         return True
     if summarized.get("carry_into_next_turn") is True:
         state.pending_diagnostic_events = [
             *state.pending_diagnostic_events,
-            _summarized_context_entry(line_number, timestamp, entry_type, summarized),
+            context_entries.summarized_context_entry(
+                line_number, timestamp, entry_type, summarized
+            ),
         ][-8:]
     return True
 
@@ -353,106 +461,12 @@ def _context_read_result(
     serialized_estimate_ms = elapsed_ms(serialized_started)
     candidates = dedupe_chat_message_echoes(state.candidates)
     action_timing = annotate_action_timing(candidates)
-    limited, omitted = _limit_entries(candidates, max_chars=max_chars, max_entries=max_entries)
+    limited, omitted = context_entries.limit_entries(
+        candidates,
+        max_chars=max_chars,
+        max_entries=max_entries,
+    )
     omitted["parse_errors"] = state.omitted_parse_errors
     omitted["target_turn_id"] = state.target_turn_id
     omitted["total_entries"] = len(candidates)
     return limited, omitted, candidates, serialized_estimate, serialized_estimate_ms, action_timing
-
-
-def _summarized_context_entry(
-    line_number: int,
-    timestamp: str | None,
-    entry_type: str,
-    summarized: dict[str, Any],
-) -> dict[str, Any]:
-    return _context_entry(
-        line_number,
-        timestamp,
-        entry_type,
-        summarized["label"],
-        summarized["text"],
-        tool_output_omitted=bool(summarized.get("tool_output_omitted")),
-        token_usage=summarized.get("token_usage")
-        if isinstance(summarized.get("token_usage"), dict)
-        else None,
-        compaction=summarized.get("compaction")
-        if isinstance(summarized.get("compaction"), dict)
-        else None,
-        action_duration_ms=nonnegative_float(summarized.get("action_duration_ms")),
-    )
-
-
-def _context_entry(
-    line_number: int,
-    timestamp: str | None,
-    entry_type: str,
-    label: str,
-    text: str,
-    *,
-    tool_output_omitted: bool = False,
-    token_usage: dict[str, Any] | None = None,
-    compaction: dict[str, Any] | None = None,
-    action_duration_ms: float | None = None,
-) -> dict[str, Any]:
-    entry = {
-        "line_number": line_number,
-        "timestamp": timestamp,
-        "type": entry_type,
-        "label": label,
-        "text": redact_text(text),
-        "truncated": False,
-    }
-    if tool_output_omitted:
-        entry["tool_output_omitted"] = True
-    if token_usage:
-        entry["token_usage"] = token_usage
-    if compaction:
-        entry["compaction"] = compaction
-    if action_duration_ms is not None:
-        entry["action_timing"] = {
-            "reported_duration_ms": normalize_millisecond_value(action_duration_ms),
-            "duration_source": "event.duration_ms",
-        }
-    return entry
-
-
-def _limit_entries(
-    entries: list[dict[str, Any]],
-    max_chars: int,
-    max_entries: int,
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    limited_reversed: list[dict[str, Any]] = []
-    remaining = None if max_chars <= 0 else max_chars
-    omitted_entries = 0
-    omitted_chars = 0
-    selected = entries if max_entries <= 0 else entries[-max_entries:]
-
-    for entry in reversed(selected):
-        text = str(entry.get("text") or "")
-        if remaining is None:
-            limited_reversed.append(entry)
-            continue
-        if remaining <= 0:
-            omitted_entries += 1
-            omitted_chars += len(text)
-            continue
-        if len(text) > remaining:
-            entry = dict(entry)
-            entry["text"] = text[:remaining] + "\n[TRUNCATED]"
-            entry["truncated"] = True
-            omitted_chars += len(text) - remaining
-            remaining = 0
-        else:
-            remaining -= len(text)
-        limited_reversed.append(entry)
-
-    limited = list(reversed(limited_reversed))
-    return limited, {
-        "older_entries": 0 if max_entries <= 0 else max(0, len(entries) - max_entries),
-        "over_budget_entries": omitted_entries,
-        "over_budget_chars": omitted_chars,
-        "max_chars": max_chars,
-        "max_entries": max_entries,
-        "returned_entries": len(limited),
-    }

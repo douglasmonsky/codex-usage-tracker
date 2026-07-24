@@ -13,15 +13,10 @@ import codex_usage_tracker.store.otel_schema as otel_schema
 import codex_usage_tracker.store.recommendation_schema as recommendation_schema
 import codex_usage_tracker.store.schema_query_indexes as schema_query_indexes
 import codex_usage_tracker.store.source_record_schema as source_record_schema
-from codex_usage_tracker.core.schema import (
-    USAGE_EVENT_COLUMN_NAMES,
-    USAGE_EVENT_CREATE_COLUMNS_SQL,
-    USAGE_EVENT_REPAIR_COLUMNS,
-    USAGE_EVENT_SCHEMA_CHECKSUM,
-)
+from codex_usage_tracker.core import schema as usage_schema
 from codex_usage_tracker.store.connection import execute_script
 
-SCHEMA_VERSION = 34
+SCHEMA_VERSION = 35
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -44,14 +39,7 @@ MIGRATION_NAMES = {
     **allowance_schema.MIGRATION_NAMES,
     **otel_schema.MIGRATION_NAMES,
 }
-CALL_ORIGIN_REPAIR_COLUMNS: dict[str, str] = dict.fromkeys(
-    ("call_initiator", "call_initiator_reason", "call_initiator_confidence"), "TEXT"
-)
-DASHBOARD_HELPER_REPAIR_COLUMNS = {
-    "is_archived": "INTEGER NOT NULL DEFAULT 0",
-    "thread_call_index": "INTEGER",
-} | dict.fromkeys(("thread_key", "previous_record_id", "next_record_id"), "TEXT")
-REQUIRED_USAGE_EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
+REQUIRED_USAGE_EVENT_COLUMNS = list(usage_schema.USAGE_EVENT_COLUMN_NAMES)
 
 
 class SchemaMigrationError(RuntimeError):
@@ -133,7 +121,8 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (31, otel_schema.add_otel_cursor_resume_anchor),
         (32, allowance_schema.add_allowance_all_history_query_index),
         (33, recommendation_schema.create_recommendation_fact_indexes),
-        (34, _migrate_v34),
+        (34, schema_query_indexes.migrate_focused_call_indexes),
+        (35, schema_query_indexes.add_context_source_byte_offset),
     )
 
 
@@ -171,7 +160,7 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
         conn,
         f"""
         CREATE TABLE IF NOT EXISTS usage_events (
-            {USAGE_EVENT_CREATE_COLUMNS_SQL}
+            {usage_schema.USAGE_EVENT_CREATE_COLUMNS_SQL}
         );
 
         CREATE TABLE IF NOT EXISTS refresh_meta (
@@ -180,7 +169,7 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
         );
         """,
     )
-    _ensure_columns(conn, USAGE_EVENT_REPAIR_COLUMNS)
+    _ensure_columns(conn, usage_schema.USAGE_EVENT_REPAIR_COLUMNS)
     execute_script(
         conn,
         """
@@ -200,11 +189,11 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
 
 
 def _migrate_v3(conn: sqlite3.Connection) -> None:
-    _ensure_columns(conn, CALL_ORIGIN_REPAIR_COLUMNS)
+    _ensure_columns(conn, usage_schema.CALL_ORIGIN_REPAIR_COLUMNS)
 
 
 def _migrate_v4(conn: sqlite3.Connection) -> None:
-    _ensure_columns(conn, DASHBOARD_HELPER_REPAIR_COLUMNS)
+    _ensure_columns(conn, usage_schema.DASHBOARD_HELPER_REPAIR_COLUMNS)
     execute_script(
         conn,
         """
@@ -216,11 +205,6 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
             ON usage_events(thread_key, event_timestamp, cumulative_total_tokens);
         """,
     )
-
-
-def _migrate_v34(conn: sqlite3.Connection) -> None:
-    recommendation_schema.create_recommendation_fact_indexes(conn)
-    schema_query_indexes.add_call_explorer_parent_lookup_indexes(conn)
 
 
 def _migrate_v5(conn: sqlite3.Connection) -> None:
@@ -298,7 +282,7 @@ def _migrate_v7(conn: sqlite3.Connection) -> None:
 
 
 def _migrate_v8(conn: sqlite3.Connection) -> None:
-    _ensure_columns(conn, USAGE_EVENT_REPAIR_COLUMNS)
+    _ensure_columns(conn, usage_schema.USAGE_EVENT_REPAIR_COLUMNS)
     execute_script(
         conn,
         """
@@ -722,7 +706,7 @@ def _record_migration(conn: sqlite3.Connection, version: int) -> None:
         (
             version,
             MIGRATION_NAMES[version],
-            USAGE_EVENT_SCHEMA_CHECKSUM,
+            usage_schema.USAGE_EVENT_SCHEMA_CHECKSUM,
             datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         ),
     )

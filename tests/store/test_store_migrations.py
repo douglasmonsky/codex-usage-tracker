@@ -70,9 +70,9 @@ def test_init_db_migrates_legacy_aggregate_table_without_data_loss(tmp_path: Pat
     assert len(str(source_rows[0]["source_record_hash"])) == 64
     assert metadata["parsed_events"] == "legacy"
     assert metadata["parser_invalid_integer"] == "2"
-    assert state["schema_version"] == 34
+    assert state["schema_version"] == 35
     assert state["checksum_matches"] is True
-    assert [row["version"] for row in state["migrations"]] == list(range(1, 35))
+    assert [row["version"] for row in state["migrations"]] == list(range(1, 36))
     with connect(db_path) as conn:
         init_db(conn)
         facts = conn.execute("SELECT COUNT(*) AS count FROM call_diagnostic_facts").fetchone()
@@ -108,7 +108,7 @@ def test_refresh_is_idempotent_after_legacy_migration(tmp_path: Path) -> None:
     assert second_count == 2
     assert legacy_rows[0]["record_id"] == "legacy-record"
     assert new_rows[0]["thread_name"] == "Synthetic migration thread"
-    assert metadata["schema_version"] == "34"
+    assert metadata["schema_version"] == "35"
     assert metadata["parsed_events"] == "0"
     assert metadata["inserted_or_updated_events"] == "0"
     assert metadata["parsed_source_files"] == "0"
@@ -269,8 +269,8 @@ def test_init_db_records_all_schema_migrations_for_new_database(tmp_path: Path) 
             ).fetchall()
         ]
 
-    assert versions == list(range(1, 35))
-    assert user_version == 34
+    assert versions == list(range(1, 36))
+    assert user_version == 35
     assert "idx_usage_source_file_line" in usage_indexes
     assert {
         "idx_recommendation_facts_rank_active",
@@ -480,7 +480,7 @@ def test_init_db_upgrades_v25_database_without_changing_physical_rows(tmp_path: 
         conn.execute("DROP INDEX idx_allowance_observations_active_newest")
         conn.execute("DROP INDEX idx_allowance_observations_active_window_newest")
         conn.execute(
-            "DELETE FROM schema_migrations WHERE version IN (26, 27, 28, 29, 30, 31, 32, 33, 34)"
+            "DELETE FROM schema_migrations WHERE version IN (26, 27, 28, 29, 30, 31, 32, 33, 34, 35)"
         )
         conn.execute("PRAGMA user_version = 25")
         versions_before = [
@@ -507,7 +507,7 @@ def test_init_db_upgrades_v25_database_without_changing_physical_rows(tmp_path: 
         user_version = conn.execute("PRAGMA user_version").fetchone()[0]
 
     assert versions_before == list(range(1, 26))
-    assert user_version == 34
+    assert user_version == 35
     assert {
         "allowance_source_state",
         "allowance_cycles",
@@ -526,7 +526,7 @@ def test_init_db_upgrades_v27_allowance_indexes_to_v28(tmp_path: Path) -> None:
             """
             DROP INDEX idx_allowance_intervals_evidence_cohort;
             DROP INDEX idx_allowance_intervals_evidence_global;
-            DELETE FROM schema_migrations WHERE version IN (28, 29, 30, 31, 32, 33, 34);
+            DELETE FROM schema_migrations WHERE version IN (28, 29, 30, 31, 32, 33, 34, 35);
             PRAGMA user_version = 27;
             """
         )
@@ -539,8 +539,8 @@ def test_init_db_upgrades_v27_allowance_indexes_to_v28(tmp_path: Path) -> None:
         ]
         user_version = conn.execute("PRAGMA user_version").fetchone()[0]
 
-    assert user_version == 34
-    assert versions == list(range(1, 35))
+    assert user_version == 35
+    assert versions == list(range(1, 36))
     assert {
         "idx_allowance_intervals_evidence_cohort",
         "idx_allowance_intervals_evidence_global",
@@ -554,7 +554,7 @@ def test_init_db_upgrades_v28_with_allowance_plan_provenance(tmp_path: Path) -> 
         conn.executescript(
             """
             ALTER TABLE allowance_cycles DROP COLUMN plan_type;
-            DELETE FROM schema_migrations WHERE version IN (29, 30, 31, 32, 33, 34);
+            DELETE FROM schema_migrations WHERE version IN (29, 30, 31, 32, 33, 34, 35);
             PRAGMA user_version = 28;
             """
         )
@@ -568,8 +568,8 @@ def test_init_db_upgrades_v28_with_allowance_plan_provenance(tmp_path: Path) -> 
         ]
         user_version = conn.execute("PRAGMA user_version").fetchone()[0]
 
-    assert user_version == 34
-    assert versions == list(range(1, 35))
+    assert user_version == 35
+    assert versions == list(range(1, 36))
     assert "plan_type" in columns
 
 
@@ -578,7 +578,7 @@ def test_init_db_upgrades_v31_with_all_history_allowance_index(tmp_path: Path) -
     with connect(db_path) as conn:
         init_db(conn)
         conn.execute("DROP INDEX idx_allowance_observations_all_newest")
-        conn.execute("DELETE FROM schema_migrations WHERE version IN (32, 33, 34)")
+        conn.execute("DELETE FROM schema_migrations WHERE version IN (32, 33, 34, 35)")
         conn.execute("PRAGMA user_version = 31")
 
     with connect(db_path) as conn:
@@ -589,7 +589,7 @@ def test_init_db_upgrades_v31_with_all_history_allowance_index(tmp_path: Path) -
         }
         user_version = conn.execute("PRAGMA user_version").fetchone()[0]
 
-    assert user_version == 34
+    assert user_version == 35
     assert "idx_allowance_observations_all_newest" in indexes
 
 
@@ -620,7 +620,7 @@ def test_init_db_upgrades_v33_with_focused_call_indexes_without_data_loss(
     with connect(db_path) as conn:
         for index_name in expected_indexes:
             conn.execute(f"DROP INDEX IF EXISTS {index_name}")
-        conn.execute("DELETE FROM schema_migrations WHERE version = 34")
+        conn.execute("DELETE FROM schema_migrations WHERE version IN (34, 35)")
         conn.execute("PRAGMA user_version = 33")
 
     for _attempt in range(2):
@@ -633,13 +633,40 @@ def test_init_db_upgrades_v33_with_focused_call_indexes_without_data_loss(
                 ).fetchall()
             }
             assert expected_indexes <= actual_indexes
-            assert conn.execute("PRAGMA user_version").fetchone()[0] == 34
+            assert conn.execute("PRAGMA user_version").fetchone()[0] == 35
             assert (
                 conn.execute(
                     "SELECT COUNT(*) FROM usage_events WHERE record_id = 'migration-34-sentinel'"
                 ).fetchone()[0]
                 == 1
             )
+
+
+def test_init_db_upgrades_v34_with_nullable_source_byte_offsets(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    upsert_usage_events(
+        [_event("migration-35-sentinel", "/synthetic/migration-35.jsonl")],
+        db_path=db_path,
+    )
+    with connect(db_path) as conn:
+        conn.execute("ALTER TABLE usage_events DROP COLUMN source_byte_offset")
+        conn.execute("DELETE FROM schema_migrations WHERE version = 35")
+        conn.execute("PRAGMA user_version = 34")
+
+    with connect(db_path) as conn:
+        init_db(conn)
+        columns = {str(row["name"]) for row in conn.execute("PRAGMA table_info(usage_events)")}
+        stored_offset = conn.execute(
+            "SELECT source_byte_offset FROM usage_events WHERE record_id = ?",
+            ("migration-35-sentinel",),
+        ).fetchone()[0]
+        user_version = conn.execute("PRAGMA user_version").fetchone()[0]
+
+    assert user_version == 35
+    assert "source_byte_offset" in columns
+    assert stored_offset is None
 
 
 def test_init_db_does_not_rerun_applied_migrations(

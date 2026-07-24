@@ -16,6 +16,15 @@ class UsageColumn:
     repairable: bool = False
 
 
+CALL_ORIGIN_REPAIR_COLUMNS: dict[str, str] = dict.fromkeys(
+    ("call_initiator", "call_initiator_reason", "call_initiator_confidence"), "TEXT"
+)
+DASHBOARD_HELPER_REPAIR_COLUMNS = {
+    "is_archived": "INTEGER NOT NULL DEFAULT 0",
+    "thread_call_index": "INTEGER",
+} | dict.fromkeys(("thread_key", "previous_record_id", "next_record_id"), "TEXT")
+
+
 USAGE_EVENT_COLUMNS = (
     UsageColumn("record_id", "TEXT PRIMARY KEY", "TEXT"),
     UsageColumn("session_id", "TEXT NOT NULL", "TEXT"),
@@ -24,6 +33,7 @@ USAGE_EVENT_COLUMNS = (
     UsageColumn("event_timestamp", "TEXT NOT NULL", "TEXT"),
     UsageColumn("source_file", "TEXT NOT NULL", "TEXT"),
     UsageColumn("line_number", "INTEGER NOT NULL", "INTEGER"),
+    UsageColumn("source_byte_offset", "INTEGER", "INTEGER", repairable=True),
     UsageColumn("turn_id", "TEXT", "TEXT", repairable=True),
     UsageColumn("turn_timestamp", "TEXT", "TEXT", repairable=True),
     UsageColumn("cwd", "TEXT", "TEXT", repairable=True),

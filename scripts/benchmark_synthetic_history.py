@@ -20,7 +20,12 @@ SRC_PATH = REPO_ROOT / "src"
 if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
-from codex_usage_tracker.context.api import load_call_context  # noqa: E402
+from benchmark_context_offsets import (  # noqa: E402
+    SYNTHETIC_CONTEXT_RATCHET_LINES,
+    benchmark_context_loads,
+    record_synthetic_source_metadata,
+)
+
 from codex_usage_tracker.core.models import UsageEvent  # noqa: E402
 from codex_usage_tracker.dashboard.api import dashboard_payload  # noqa: E402
 from codex_usage_tracker.reports.api import (  # noqa: E402
@@ -87,12 +92,14 @@ T = TypeVar("T")
 class SourceLogRecord:
     source_file: Path
     line_number: int
+    source_byte_offset: int
 
 
 @dataclass(frozen=True)
 class SourceLogBundle:
     records: list[SourceLogRecord]
     paths: frozenset[Path]
+    line_counts: dict[Path, int]
     bytes_written: int
 
 
@@ -218,6 +225,8 @@ def benchmark_size(
             db_path=db_path,
             refresh_links=False,
         )
+    if source_bundle:
+        record_synthetic_source_metadata(db_path, source_bundle)
     refresh_usage_event_links(db_path=db_path)
     populate_seconds = time.perf_counter() - populate_start
 
@@ -337,7 +346,7 @@ def benchmark_size(
     context_metrics: dict[str, Any] = {}
     if source_bundle:
         timings["dashboard_payload_with_source_logs_seconds"] = dashboard_payload_active_seconds
-        context_metrics = _benchmark_context_loads(
+        context_metrics = benchmark_context_loads(
             db_path=db_path,
             row_count=row_count,
         )
@@ -347,6 +356,7 @@ def benchmark_size(
         row_count=row_count,
         threshold_scale=threshold_scale,
     )
+    threshold_failures.extend(context_metrics.get("ratchet_failures", []))
     return {
         "rows": row_count,
         "db_path": str(db_path),
@@ -380,6 +390,7 @@ def benchmark_size(
         "context_payload_json_bytes": context_metrics.get("context_payload_json_bytes"),
         "source_scan_ms": context_metrics.get("source_scan_ms"),
         "serialized_estimate_ms": context_metrics.get("serialized_estimate_ms"),
+        "context_offset_ratchet": context_metrics.get("offset_ratchet"),
         "threshold_status": "fail" if threshold_failures else "pass",
         "thresholds": threshold_results,
         "threshold_failures": threshold_failures,
@@ -465,65 +476,6 @@ def _fail_on_source_log_open(source_paths: frozenset[Path]) -> Iterator[None]:
         Path.open = original_open  # type: ignore[method-assign]
 
 
-def _benchmark_context_loads(
-    *,
-    db_path: Path,
-    row_count: int,
-) -> dict[str, Any]:
-    targets = {
-        "early": 0,
-        "middle": row_count // 2,
-        "late": row_count - 1,
-    }
-    timings: dict[str, float] = {}
-    loads: dict[str, dict[str, Any]] = {}
-    context_load_seconds: float | None = None
-    context_payload_json_bytes: int | None = None
-    source_scan_ms: float | None = None
-    serialized_estimate_ms: float | None = None
-    for label, index in targets.items():
-        record_id = f"record-{index:08d}"
-        payload, elapsed = _time_call(
-            lambda record_id=record_id: load_call_context(
-                record_id=record_id,
-                db_path=db_path,
-                max_chars=0,
-                max_entries=0,
-                include_tool_output=True,
-                include_compaction_history=True,
-                diagnostics=True,
-            )
-        )
-        timing_name = f"context_load_{label}_line_seconds"
-        timings[timing_name] = elapsed
-        diagnostics = (
-            payload.get("diagnostics") if isinstance(payload.get("diagnostics"), dict) else {}
-        )
-        loads[label] = {
-            "record_id": record_id,
-            "seconds": elapsed,
-            "entries_returned": len(payload.get("entries") or []),
-            "visible_char_count": payload.get("visible_char_count"),
-            "visible_token_estimate": payload.get("visible_token_estimate"),
-            "context_payload_json_bytes": diagnostics.get("json_bytes"),
-            "source_scan_ms": diagnostics.get("source_scan_ms"),
-            "serialized_estimate_ms": diagnostics.get("serialized_estimate_ms"),
-        }
-        if label == "middle":
-            context_load_seconds = elapsed
-            context_payload_json_bytes = _optional_int(diagnostics.get("json_bytes"))
-            source_scan_ms = _optional_float(diagnostics.get("source_scan_ms"))
-            serialized_estimate_ms = _optional_float(diagnostics.get("serialized_estimate_ms"))
-    return {
-        "timings": timings,
-        "loads": loads,
-        "context_load_seconds": context_load_seconds,
-        "context_payload_json_bytes": context_payload_json_bytes,
-        "source_scan_ms": source_scan_ms,
-        "serialized_estimate_ms": serialized_estimate_ms,
-    }
-
-
 def _evaluate_thresholds(
     timings: dict[str, float],
     *,
@@ -552,48 +504,60 @@ def _evaluate_thresholds(
     return results, failures
 
 
-def _optional_int(value: object) -> int | None:
-    try:
-        return int(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
-def _optional_float(value: object) -> float | None:
-    try:
-        return float(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
 def _write_synthetic_source_logs(source_dir: Path, row_count: int) -> SourceLogBundle:
-    events_per_file = 500
+    events_per_file = 25_000
     records: list[SourceLogRecord | None] = [None] * row_count
     lines_by_path: dict[Path, list[str]] = {}
+    bytes_by_path: dict[Path, int] = {}
     for index in range(row_count):
         path = _synthetic_source_file(source_dir, index, events_per_file=events_per_file)
         lines = lines_by_path.setdefault(path, [])
         if not lines:
-            lines.append(_jsonl_line("session_meta", {"id": f"session-{index % 2500:04d}"}))
+            session_line = _jsonl_line(
+                "session_meta",
+                {"id": f"session-{index % 2500:04d}"},
+            )
+            lines.append(session_line)
+            bytes_by_path[path] = len(session_line.encode("utf-8"))
         turn_id = f"turn-{index:08d}"
-        for envelope in _synthetic_source_envelopes(index, turn_id):
-            lines.append(json.dumps(envelope, separators=(",", ":"), sort_keys=True) + "\n")
+        token_byte_offset = 0
+        envelopes = _synthetic_source_envelopes(index, turn_id)
+        if index == row_count - 1:
+            anchor_line = _jsonl_line(
+                "turn_context",
+                {"turn_id": "synthetic-offset-anchor", "model": "gpt-5.5"},
+            )
+            padding_count = max(
+                0,
+                SYNTHETIC_CONTEXT_RATCHET_LINES - len(lines) - len(envelopes) - 1,
+            )
+            padding_line = _jsonl_line("synthetic_padding", {})
+            lines.extend([padding_line] * padding_count)
+            bytes_by_path[path] += len(padding_line.encode("utf-8")) * padding_count
+            lines.append(anchor_line)
+            bytes_by_path[path] += len(anchor_line.encode("utf-8"))
+        for envelope_index, envelope in enumerate(envelopes):
+            line = json.dumps(envelope, separators=(",", ":"), sort_keys=True) + "\n"
+            if envelope_index == len(envelopes) - 1:
+                token_byte_offset = bytes_by_path[path]
+            lines.append(line)
+            bytes_by_path[path] += len(line.encode("utf-8"))
         records[index] = SourceLogRecord(
             source_file=path,
             line_number=len(lines),
+            source_byte_offset=token_byte_offset,
         )
 
-    bytes_written = 0
     for path, lines in lines_by_path.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = "".join(lines)
         path.write_text(payload, encoding="utf-8")
-        bytes_written += len(payload.encode("utf-8"))
 
     return SourceLogBundle(
         records=[record for record in records if record is not None],
         paths=frozenset(lines_by_path),
-        bytes_written=bytes_written,
+        line_counts={path: len(lines) for path, lines in lines_by_path.items()},
+        bytes_written=sum(bytes_by_path.values()),
     )
 
 
@@ -799,6 +763,9 @@ def _synthetic_events(
             event_timestamp=f"2026-05-{day:02d}T12:{index % 60:02d}:00Z",
             source_file=source_file,
             line_number=source_record.line_number if source_record is not None else index + 1,
+            source_byte_offset=(
+                source_record.source_byte_offset if source_record is not None else None
+            ),
             turn_id=f"turn-{index:08d}",
             turn_timestamp=f"2026-05-{day:02d}T12:{index % 60:02d}:00Z",
             cwd=f"/tmp/project-{index % 50}",

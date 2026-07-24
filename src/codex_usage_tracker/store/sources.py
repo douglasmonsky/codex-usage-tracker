@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any, BinaryIO, TypeAlias
 
 from codex_usage_tracker.core.models import UsageEvent
 from codex_usage_tracker.parser.state import (
@@ -146,6 +147,37 @@ def _source_metadata_matches(
         and int(row["mtime_ns"]) == metadata.mtime_ns
         and _filesystem_id_key(row["source_inode"]) == metadata.source_inode
         and content_matches
+    )
+
+
+def validated_source_file_metadata(
+    path: Path,
+    row: sqlite3.Row,
+) -> SourceFileMetadata | None:
+    """Return the exact validated file identity snapshot, when still current."""
+    try:
+        metadata = _source_file_metadata(path)
+        if metadata is None:
+            return None
+        return metadata if _source_metadata_matches(path, row, metadata) else None
+    except OSError:
+        return None
+
+
+def source_file_handle_metadata_matches(
+    handle: BinaryIO,
+    metadata: SourceFileMetadata,
+) -> bool:
+    """Confirm an open descriptor is the file identity that was validated."""
+    try:
+        stat = os.fstat(handle.fileno())
+    except OSError:
+        return False
+    return (
+        int(stat.st_size) == metadata.size_bytes
+        and int(stat.st_mtime_ns) == metadata.mtime_ns
+        and _serialize_filesystem_id(int(stat.st_dev)) == metadata.source_device
+        and _serialize_filesystem_id(int(stat.st_ino)) == metadata.source_inode
     )
 
 

@@ -21,6 +21,9 @@ class LoadedContextData:
     serialized_estimate_ms: float
     action_timing: dict[str, Any]
     source_scan_ms: float
+    context_read_strategy: str
+    context_read_reason: str
+    inspected_source_bytes: int
 
 
 def elapsed_ms(started_at: float) -> float:
@@ -123,6 +126,9 @@ def attach_context_diagnostics(
     diagnostic_payload["serialized_estimate_ms"] = loaded.serialized_estimate_ms
     diagnostic_payload["source_file_bytes"] = source_file_bytes
     diagnostic_payload["source_line_number"] = line_number
+    diagnostic_payload["context_read_strategy"] = loaded.context_read_strategy
+    diagnostic_payload["context_read_reason"] = loaded.context_read_reason
+    diagnostic_payload["inspected_source_bytes"] = loaded.inspected_source_bytes
     diagnostic_payload["entries_before_limit"] = int(loaded.omitted.get("total_entries") or 0)
     diagnostic_payload["entries_returned"] = len(loaded.entries)
     payload["diagnostics"] = diagnostic_payload

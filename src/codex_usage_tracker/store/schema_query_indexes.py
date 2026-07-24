@@ -5,12 +5,16 @@ from __future__ import annotations
 import sqlite3
 
 from codex_usage_tracker.store.connection import execute_script
+from codex_usage_tracker.store.recommendation_schema import (
+    create_recommendation_fact_indexes,
+)
 
 MIGRATION_NAMES = {
     18: "index usage events by source file and line",
     22: "cover diagnostic fact lookups",
     23: "cover diagnostic fact aggregation",
     34: "index focused call explorer sorts, sources, and parent lookups",
+    35: "add source byte offsets to usage events",
 }
 
 
@@ -24,6 +28,17 @@ def migrate_source_file_line_index(conn: sqlite3.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_usage_source_file_line "
         "ON usage_events(source_file, line_number)"
     )
+
+
+def migrate_focused_call_indexes(conn: sqlite3.Connection) -> None:
+    create_recommendation_fact_indexes(conn)
+    add_call_explorer_parent_lookup_indexes(conn)
+
+
+def add_context_source_byte_offset(conn: sqlite3.Connection) -> None:
+    columns = {str(row["name"]) for row in conn.execute("PRAGMA table_info(usage_events)")}
+    if "source_byte_offset" not in columns:
+        conn.execute("ALTER TABLE usage_events ADD COLUMN source_byte_offset INTEGER")
 
 
 def add_diagnostic_lookup_index(conn: sqlite3.Connection) -> None:
