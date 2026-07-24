@@ -22,7 +22,7 @@ description: 'Use when the user wants to rename, extract, split, move, or restru
 4. Plan update order: interfaces → implementations → callers → tests
 ```
 
-> If "Index is stale" → run `node .gitnexus/run.cjs analyze` in terminal.
+> If "Index is stale" → run `gitnexus analyze --index-only .` in terminal.
 
 ## Checklists
 
@@ -92,7 +92,7 @@ detect_changes({scope: "all"})
 ```cypher
 MATCH (caller)-[:CodeRelation {type: 'CALLS'}]->(f:Function {name: "validateUser"})
 RETURN caller.name, caller.filePath ORDER BY caller.filePath
-```text
+```
 
 ## Risk Rules
 

@@ -7,17 +7,18 @@ description: 'Use when the user needs to run GitNexus CLI commands like analyze/
 
 Commands below use `node .gitnexus/run.cjs <command>` — the project-local runner `gitnexus analyze` drops next to the index. It auto-selects an available runner at call time (global `gitnexus`, else `pnpm dlx`, else `npx`), so no package-manager assumption and no global install is required.
 
-> **Not analyzed yet, or `node .gitnexus/run.cjs` reports `Cannot find module`** (the gitignored runner is absent — e.g. a fresh clone or `git clean`)? (Re)generate it with `npx gitnexus analyze` from the project root. On **npm 11.x**, if `npx` crashes during install (`node.target is null`), install once with `npm i -g gitnexus` (then `gitnexus analyze`) or use `pnpm --allow-build=@ladybugdb/core --allow-build=gitnexus --allow-build=tree-sitter dlx gitnexus@latest analyze`. See [#1939](https://github.com/abhigyanpatwari/GitNexus/issues/1939).
+> **Not analyzed yet, or `node .gitnexus/run.cjs` reports `Cannot find module`** (the gitignored runner is absent — e.g. a fresh clone or `git clean`)? Build only the local index with `npx gitnexus analyze --index-only .` from the project root. On **npm 11.x**, if `npx` crashes during install (`node.target is null`), install once with `npm i -g gitnexus` (then `gitnexus analyze --index-only .`) or use `pnpm --allow-build=@ladybugdb/core --allow-build=gitnexus --allow-build=tree-sitter dlx gitnexus@latest analyze --index-only .`. See [#1939](https://github.com/abhigyanpatwari/GitNexus/issues/1939).
 
 ## Commands
 
 ### analyze — Build or refresh the index
 
 ```bash
-node .gitnexus/run.cjs analyze
+node .gitnexus/run.cjs analyze --index-only .
 ```
 
-Run from the project root. This parses all source files, builds the knowledge graph, writes it to `.gitnexus/`, and generates CLAUDE.md / AGENTS.md context files.
+Run from the project root. This parses source files, builds the knowledge graph,
+and writes it to `.gitnexus/` without modifying repository guidance.
 
 | Flag                | Effect                                                                                                |
 | ------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -25,8 +26,20 @@ Run from the project root. This parses all source files, builds the knowledge gr
 | `--embeddings`      | Enable embedding generation for semantic search (off by default)                                      |
 | `--drop-embeddings` | Drop existing embeddings on rebuild. By default, an `analyze` without `--embeddings` preserves them.  |
 | `--pdg`             | Build the program-dependence layers used by `explain` and `pdg_query` (taint, CDG, and REACHING_DEF). |
+| `--index-only`      | Refresh only the graph; do not rewrite agent guidance or repo-local skills.                           |
 
-**When to run:** First time in a project, after major code changes, or when `gitnexus://repo/{name}/context` reports the index is stale. In Claude Code, a PostToolUse hook detects staleness after `git commit` and `git merge` and notifies the agent to run `analyze` — the hook does not run analyze itself, to avoid blocking the agent for up to 120s and risking KuzuDB corruption on timeout.
+**When to run:** First time in a project, after major code changes, or when
+`gitnexus://repo/{name}/context` reports the index is stale. In Claude Code, a
+PostToolUse hook detects staleness after `git commit` and `git merge` and
+notifies the agent to refresh the index; the hook does not run analysis itself,
+to avoid blocking the agent for up to 120s and risking KuzuDB corruption on
+timeout.
+
+### Regenerate agent guidance explicitly
+
+Use a full `node .gitnexus/run.cjs analyze .` only when the user explicitly
+requests regeneration of `AGENTS.md`, `CLAUDE.md`, or repo-local skills. Review
+and normalize those generated changes before committing them.
 
 ### status — Check index freshness
 

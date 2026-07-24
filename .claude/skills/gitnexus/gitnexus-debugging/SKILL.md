@@ -22,7 +22,7 @@ description: 'Use when the user is debugging a bug, tracing an error, or asking 
 4. cypher({statement: "MATCH path..."})                 → Custom traces if needed
 ```
 
-> If "Index is stale" → run `node .gitnexus/run.cjs analyze` in terminal.
+> If "Index is stale" → run `gitnexus analyze --index-only .` in terminal.
 
 ## Checklist
 
@@ -71,7 +71,7 @@ context({name: "validatePayment"})
 ```cypher
 MATCH path = (a)-[:CodeRelation {type: 'CALLS'}*1..2]->(b:Function {name: "validatePayment"})
 RETURN [n IN nodes(path) | n.name] AS chain
-```text
+```
 
 **trace** — shortest call chain between two symbols ("how does A reach B?"), one call instead of chaining `context` hops:
 
