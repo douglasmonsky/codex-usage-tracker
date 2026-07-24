@@ -1617,9 +1617,9 @@ complete without its named focused and full verification evidence.
 
 ## Task 39 - Gate and Publish Release 0.24.0
 
-- Status: release candidate preparation, local qualification, and TestPyPI
-  promotion rehearsal complete; hosted review, merge, and public promotion
-  remain.
+- Status: complete and publicly published. PR `#308` merged as
+  `cad0006cb5e8435ed3a47da9fb120bc81a6e1941`, and release `0.24.0` is
+  available from PyPI and GitHub.
 - Foundation entry gate:
   - `docs/superpowers/reports/0.24-foundation-audit.md` audits
     `589e10a` and records `PROCEED`;
@@ -1693,6 +1693,28 @@ complete without its named focused and full verification evidence.
     `7`/`59`/`64` MCP profile inventories;
   - production PyPI promotion, GitHub Release attachment, and cross-location
     verification were correctly skipped for the manual rehearsal.
+- Production publication:
+  - PR `#308` merged as
+    `cad0006cb5e8435ed3a47da9fb120bc81a6e1941` (`chore: release 0.24.0`);
+  - release-event workflow
+    `https://github.com/douglasmonsky/codex-usage-tracker/actions/runs/30101593198`
+    completed successfully from that source commit;
+  - PyPI published
+    `https://pypi.org/project/codex-usage-tracking/0.24.0/`, and GitHub
+    published
+    `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.24.0`;
+  - the public wheel SHA-256 is
+    `8c0faca4826cb46c66cc83d8b6f5d4821fc6c4813fa4fb9d6103a7524c49e91d`
+    (`7,022,392` bytes), and the public sdist SHA-256 is
+    `c4e3d25e45178ccb08210d2b6f532a561d421c8d76689eabb04aae868aab1d78`
+    (`32,075,687` bytes);
+  - the release manifest SHA-256 is
+    `5bfd5ef4d714abee8b05452c9be4d991c0ee6f063809ad9c974d1b2f59aa3881`,
+    and the promotion evidence SHA-256 is
+    `6bd8bc72a9a4137e039e4945d467932bb897e320d2e03ae2aff755f55e0c9b0c`;
+  - TestPyPI, PyPI, the production workflow, and GitHub Release assets were
+    independently verified byte-identical, and a clean installed-package smoke
+    from public PyPI completed successfully.
 - Roadmap deviations:
   - the package version also required synchronized updates to the runtime
     constant, plugin manifest, source and packaged MCP launchers, and
