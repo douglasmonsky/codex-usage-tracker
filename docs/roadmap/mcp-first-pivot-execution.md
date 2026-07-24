@@ -961,15 +961,15 @@ commit as each roadmap task.
 
 ## Task 30 - Enforce Python Architecture with Tach Domain Boundaries
 
-- Status: active on `pivot/30-tach-boundaries`; implementation, primary
-  verification, final review, and accepted-finding rechecks are complete, with
-  final commit and PR landing pending.
+- Status: implementation, primary verification, final review,
+  accepted-finding rechecks, and local commits are complete on
+  `pivot/30-tach-boundaries`; PR landing remains.
 - Branch: `pivot/30-tach-boundaries`.
 - Commits: `ebafb71` (`chore: close completed change plans`), `f6865ae`
   (`chore: add repository GitNexus agent workflow`), and `264df75`
   (`fix: normalize GitNexus refactoring examples`), and `0a21a71`
-  (`fix: keep GitNexus refreshes index-only`); architecture implementation
-  commit pending final verification.
+  (`fix: keep GitNexus refreshes index-only`), and `d3151b0`
+  (`refactor: enforce tracker architecture boundaries`).
 - Boundary contract:
   - root ownership, explicit dependencies, and circular-domain enforcement are
     enabled with no ignore baseline;
