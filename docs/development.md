@@ -223,8 +223,8 @@ python scripts/smoke_installed_package.py --docker
 To verify the public PyPI package instead of the local checkout:
 
 ```bash
-python scripts/smoke_installed_package.py --from-pypi --version 0.24.0
-python scripts/smoke_installed_package.py --docker --from-pypi --version 0.24.0
+python scripts/smoke_installed_package.py --from-pypi --version 0.24.0rc1
+python scripts/smoke_installed_package.py --docker --from-pypi --version 0.24.0rc1
 ```
 
 `scripts/check_release.py` treats these public-package smoke commands as release-state claims. Keep their `--version` and `codex-usage-tracking==...` values aligned with `pyproject.toml`; the release gate fails when the docs claim a different public version. It also checks that install docs point at the real PyPI distribution, `codex-usage-tracking`, and keep the warning that `codex-usage-tracker` is a different PyPI package.

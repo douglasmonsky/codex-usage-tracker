@@ -1,3 +1,3 @@
 """Package version owned by the dependency-free core layer."""
 
-__version__ = "0.24.0"
+__version__ = "0.24.0rc1"

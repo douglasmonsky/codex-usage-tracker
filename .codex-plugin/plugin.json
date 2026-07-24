@@ -1,6 +1,6 @@
 {
   "name": "codex-usage-tracker",
-  "version": "0.24.0",
+  "version": "0.24.0rc1",
   "description": "Unofficial local, evidence-backed Codex usage analyst with MCP tools and an Evidence Console.",
   "author": {
     "name": "Douglas Monsky"

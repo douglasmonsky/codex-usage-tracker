@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.24.0rc1 - 2026-07-24
+
+- Rehearse the 0.24.0 exact-byte promotion workflow on TestPyPI.
+
 ## 0.24.0 - 2026-07-24
 
 - Introduce an explicit application composition root and dependency protocols,

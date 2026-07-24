@@ -78,10 +78,11 @@ PACKAGE_NAMING_DOCS = [
     "docs/install.md",
     "docs/development.md",
 ]
+PACKAGE_VERSION_CAPTURE = r"([0-9]+(?:\.[0-9]+){2}(?:(?:a|b|rc)[0-9]+)?)"
 PUBLIC_VERSION_PATTERNS = [
-    re.compile(r"codex-usage-tracking==([0-9]+(?:\.[0-9]+){2})"),
-    re.compile(r"--from-pypi --version ([0-9]+(?:\.[0-9]+){2})"),
-    re.compile(r"visible as `([0-9]+(?:\.[0-9]+){2})`"),
+    re.compile(rf"codex-usage-tracking=={PACKAGE_VERSION_CAPTURE}"),
+    re.compile(rf"--from-pypi --version {PACKAGE_VERSION_CAPTURE}"),
+    re.compile(rf"visible as `{PACKAGE_VERSION_CAPTURE}`"),
 ]
 SECRET_PATTERNS = {
     "OpenAI API key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}"),
@@ -630,7 +631,10 @@ def _check_packaging_metadata() -> list[str]:
     if "codex-usage-tracker.git@main" in launcher:
         failures.append("MCP runtime launcher must pin the package spec instead of tracking main")
     git_package_spec = re.search(r"codex-usage-tracker\.git@([0-9a-f]{40})", launcher)
-    pypi_package_spec = re.search(r"codex-usage-tracking==([0-9]+(?:\.[0-9]+){2})", launcher)
+    pypi_package_spec = re.search(
+        rf"codex-usage-tracking=={PACKAGE_VERSION_CAPTURE}",
+        launcher,
+    )
     if pypi_package_spec:
         if pypi_package_spec.group(1) != str(project.get("version")):
             failures.append("MCP runtime launcher PyPI pin does not match project.version")
@@ -642,7 +646,11 @@ def _check_packaging_metadata() -> list[str]:
             "MCP runtime launcher must pin an exact codex-usage-tracking version or a "
             "40-character GitHub commit SHA"
         )
-    runtime_version = re.search(r'^RUNTIME_VERSION = "([0-9]+(?:\.[0-9]+){2})"$', launcher, re.M)
+    runtime_version = re.search(
+        rf'^RUNTIME_VERSION = "{PACKAGE_VERSION_CAPTURE}"$',
+        launcher,
+        re.M,
+    )
     if runtime_version is None or runtime_version.group(1) != str(project.get("version")):
         failures.append("MCP runtime launcher cache version does not match project.version")
     if "importlib.metadata.version('codex-usage-tracking')" not in launcher:
