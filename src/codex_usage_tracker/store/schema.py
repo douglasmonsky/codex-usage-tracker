@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 
 import codex_usage_tracker.store.allowance_schema as allowance_schema
+import codex_usage_tracker.store.analysis_job_schema as analysis_jobs
 import codex_usage_tracker.store.compression_schema as compression_schema
 import codex_usage_tracker.store.deduplication_schema as deduplication_schema
 import codex_usage_tracker.store.otel_schema as otel_schema
@@ -16,7 +17,7 @@ import codex_usage_tracker.store.source_record_schema as source_record_schema
 from codex_usage_tracker.core import schema as usage_schema
 from codex_usage_tracker.store.connection import execute_script
 
-SCHEMA_VERSION = 35
+SCHEMA_VERSION = 37
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -38,6 +39,8 @@ MIGRATION_NAMES = {
     **deduplication_schema.MIGRATION_NAMES,
     **allowance_schema.MIGRATION_NAMES,
     **otel_schema.MIGRATION_NAMES,
+    analysis_jobs.MIGRATION_VERSION: analysis_jobs.MIGRATION_NAME,
+    analysis_jobs.LEASE_MIGRATION_VERSION: analysis_jobs.LEASE_MIGRATION_NAME,
 }
 REQUIRED_USAGE_EVENT_COLUMNS = list(usage_schema.USAGE_EVENT_COLUMN_NAMES)
 
@@ -123,6 +126,8 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (33, recommendation_schema.create_recommendation_fact_indexes),
         (34, schema_query_indexes.migrate_focused_call_indexes),
         (35, schema_query_indexes.add_context_source_byte_offset),
+        (analysis_jobs.MIGRATION_VERSION, analysis_jobs.create_analysis_jobs_table),
+        (analysis_jobs.LEASE_MIGRATION_VERSION, analysis_jobs.add_analysis_job_leases),
     )
 
 

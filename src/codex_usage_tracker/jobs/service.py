@@ -9,11 +9,26 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import cast
 
-from codex_usage_tracker.core.contracts import MessageV1, enforce_payload_budget, serialized_size
+from codex_usage_tracker.core.contracts import MessageV1
 from codex_usage_tracker.jobs.adapters import request_hash
-from codex_usage_tracker.jobs.models import JobAdapter, JobHandle, JobKind, JobStatusV1
+from codex_usage_tracker.jobs.models import (
+    JobAdapter,
+    JobHandle,
+    JobKind,
+    JobPersistence,
+    JobRegistration,
+    JobStatusV1,
+)
+from codex_usage_tracker.jobs.persistence import (
+    NULL_SOURCE_REVISION,
+    compatible_completed_result,
+    enforce_status_boundaries,
+    has_completed_result,
+    is_reusable_compact,
+    message_payload,
+    persisted_status,
+)
 
-MAX_COMPACT_STATUS_BYTES = 16 * 1024
 MAX_SEMANTIC_JOBS = 256
 _STATE_RANK = {"queued": 0, "running": 1, "completed": 2, "failed": 2, "cancelled": 2}
 _EPOCH = "1970-01-01T00:00:00Z"
@@ -23,12 +38,22 @@ _REQUEST_HASH = re.compile(r"sha256:[0-9a-f]{64}\Z")
 class JobService:
     """Register adapters and normalize status without changing legacy registries."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        repository: JobPersistence | None = None,
+        *,
+        recover_interrupted: bool = False,
+    ) -> None:
         self._lock = threading.RLock()
         self._handles: dict[str, JobHandle] = {}
         self._versions: dict[str, int] = {}
         self._last: dict[str, JobStatusV1] = {}
         self._semantic: OrderedDict[str, str] = OrderedDict()
+        self._persisted_ids: set[str] = set()
+        self._repository = repository
+        if repository is not None and recover_interrupted:
+            repository.recover_interrupted()
+            repository.prune()
 
     def register(self, *, kind: JobKind, job_id: str, adapter: JobAdapter) -> None:
         result_schema = getattr(adapter, "result_schema", None)
@@ -49,12 +74,39 @@ class JobService:
             self._last.pop(job_id, None)
 
     def register_semantic(
-        self, *, kind: JobKind, job_id: str, adapter: JobAdapter, semantic_key: str
-    ) -> None:
+        self,
+        semantic_key: str,
+        *,
+        kind: JobKind,
+        job_id: str,
+        adapter: JobAdapter,
+        source_revision: str | None = None,
+        request_schema: str = "job.request.v1",
+        request: Mapping[str, object] | None = None,
+    ) -> JobRegistration:
         if not _REQUEST_HASH.fullmatch(semantic_key):
             raise ValueError("semantic_key must be a sha256 fingerprint")
+        repository = self._repository
+        if repository is not None:
+            result_schema = getattr(adapter, "result_schema", None)
+            if not isinstance(result_schema, str):
+                raise ValueError("persisted semantic jobs require a result schema")
+            row, created = repository.create_or_reuse(
+                job_id=job_id,
+                job_kind=kind,
+                semantic_key=semantic_key,
+                source_revision=source_revision or NULL_SOURCE_REVISION,
+                request_schema=request_schema,
+                request=request or {},
+                result_schema=result_schema,
+            )
+            persisted = persisted_status(row, include_result=True)
+            if not created:
+                return JobRegistration(status=persisted, should_start=False)
         self.register(kind=kind, job_id=job_id, adapter=adapter)
         with self._lock:
+            if repository is not None:
+                self._persisted_ids.add(job_id)
             self._semantic[semantic_key] = job_id
             self._semantic.move_to_end(semantic_key)
             while len(self._semantic) > MAX_SEMANTIC_JOBS:
@@ -63,26 +115,75 @@ class JobService:
                     self._handles.pop(evicted_id, None)
                     self._versions.pop(evicted_id, None)
                     self._last.pop(evicted_id, None)
+        return JobRegistration(status=self.status(job_id), should_start=True)
 
     def reusable(
-        self, semantic_key: str, *, source_revision: str | None, result_schema: str
+        self,
+        semantic_key: str,
+        *,
+        source_revision: str | None,
+        result_schema: str,
+        kind: JobKind = "analysis",
+    ) -> JobStatusV1 | None:
+        durable = self._durable_reusable(
+            semantic_key,
+            source_revision=source_revision,
+            result_schema=result_schema,
+            kind=kind,
+        )
+        if durable is not None:
+            return durable
+        return self._memory_reusable(
+            semantic_key,
+            source_revision=source_revision,
+            result_schema=result_schema,
+        )
+
+    def _durable_reusable(
+        self,
+        semantic_key: str,
+        *,
+        source_revision: str | None,
+        result_schema: str,
+        kind: JobKind,
+    ) -> JobStatusV1 | None:
+        repository = self._repository
+        if repository is None:
+            return None
+        row = repository.find_reusable(
+            job_kind=kind,
+            semantic_key=semantic_key,
+            source_revision=source_revision or NULL_SOURCE_REVISION,
+            result_schema=result_schema,
+        )
+        if row is None:
+            return None
+        status = persisted_status(row, include_result=True)
+        return status if status.state in {"queued", "running", "completed"} else None
+
+    def _memory_reusable(
+        self,
+        semantic_key: str,
+        *,
+        source_revision: str | None,
+        result_schema: str,
     ) -> JobStatusV1 | None:
         with self._lock:
             job_id = self._semantic.get(semantic_key)
             handle = self._handles.get(job_id) if job_id is not None else None
-        if job_id is None or handle is None or handle.result_schema != result_schema:
+        if job_id is None:
+            return None
+        if handle is None:
+            return None
+        if handle.result_schema != result_schema:
             return None
         compact = self.status(job_id)
-        if compact.source_revision != source_revision or compact.state in {"failed", "cancelled"}:
+        if not is_reusable_compact(compact, source_revision=source_revision):
             return None
         if compact.state in {"queued", "running"}:
             return compact
-        if compact.state != "completed":
-            return None
         completed = self.status(job_id, include_result=True)
-        if completed.result_schema != result_schema or completed.result is None:
-            return None
-        return completed
+        return completed if has_completed_result(completed, result_schema=result_schema) else None
 
     def discard_semantic_job(self, job_id: str) -> None:
         with self._lock:
@@ -92,6 +193,7 @@ class JobService:
             self._handles.pop(job_id, None)
             self._versions.pop(job_id, None)
             self._last.pop(job_id, None)
+            self._persisted_ids.discard(job_id)
 
     def completed_results(
         self,
@@ -104,6 +206,13 @@ class JobService:
         """Enumerate compatible completed results deterministically through a bounded read seam."""
         if type(limit) is not int or not 1 <= limit <= MAX_SEMANTIC_JOBS:
             raise ValueError(f"limit must be between 1 and {MAX_SEMANTIC_JOBS}")
+        if self._repository is not None:
+            return self._repository.completed_results(
+                job_kind=kind,
+                result_schema=result_schema,
+                source_revision=source_revision or NULL_SOURCE_REVISION,
+                limit=limit,
+            )
         with self._lock:
             job_ids = sorted(
                 job_id for job_id, handle in self._handles.items() if handle.kind == kind
@@ -112,23 +221,103 @@ class JobService:
         for job_id in job_ids:
             status = self.status(job_id, include_result=True)
             result = status.result
-            if (
-                status.state != "completed"
-                or status.source_revision != source_revision
-                or status.result_schema != result_schema
-                or not isinstance(result, Mapping)
+            if compatible_completed_result(
+                status,
+                source_revision=source_revision,
+                result_schema=result_schema,
             ):
-                continue
-            results.append(result)
+                results.append(cast(Mapping[str, object], result))
         return tuple(results)
 
+    def checkpoint(self, job_id: str) -> JobStatusV1:
+        """Persist one active adapter snapshot and return the durable view."""
+        repository = self._repository
+        with self._lock:
+            handle = self._handles.get(job_id)
+            persisted = job_id in self._persisted_ids
+        if repository is None or not persisted:
+            if handle is None:
+                return _not_found(job_id)
+            candidate = _read_candidate(handle, include_result=True)
+            with self._lock:
+                status = _monotonic(self._last.get(job_id), candidate)
+                self._last[job_id] = replace(status, result=None)
+            return enforce_status_boundaries(status, handle, include_result=True)
+        if handle is None:
+            row = repository.get(job_id, touch=True)
+            return (
+                persisted_status(row, include_result=True)
+                if row is not None
+                else _not_found(job_id)
+            )
+        candidate = _read_candidate(handle, include_result=True)
+        row = repository.update_status(
+            job_id,
+            state=candidate.state,
+            progress={
+                "percent": candidate.progress_percent,
+                "stage": candidate.stage,
+            },
+            result_schema=candidate.result_schema,
+            result=candidate.result,
+            error=message_payload(candidate.error),
+        )
+        persisted = persisted_status(row, include_result=True)
+        with self._lock:
+            self._last[job_id] = persisted
+        return persisted
+
+    def heartbeat(self, job_id: str) -> bool:
+        """Extend the lease for one active job owned by this process."""
+        repository = self._repository
+        with self._lock:
+            persisted = job_id in self._persisted_ids
+        return repository.heartbeat(job_id) if repository is not None and persisted else False
+
     def status(self, job_id: str, *, include_result: bool = False) -> JobStatusV1:
+        repository = self._repository
+        with self._lock:
+            has_handle = job_id in self._handles
+            is_persisted = job_id in self._persisted_ids
+        if repository is not None and (not has_handle or is_persisted):
+            durable = self._durable_status(
+                job_id,
+                has_handle=has_handle,
+                include_result=include_result,
+            )
+            if durable is not None:
+                return durable
+        return self._memory_status(job_id, include_result=include_result)
+
+    def _durable_status(
+        self,
+        job_id: str,
+        *,
+        has_handle: bool,
+        include_result: bool,
+    ) -> JobStatusV1 | None:
+        repository = self._repository
+        if repository is None:
+            return None
+        row = None if has_handle else repository.get(job_id, touch=True)
+        if row is not None:
+            status = persisted_status(row, include_result=include_result)
+            return enforce_status_boundaries(status, None, include_result=include_result)
+        if not has_handle:
+            return None
+        persisted = self.checkpoint(job_id)
+        with self._lock:
+            handle = self._handles.get(job_id)
+        status = replace(persisted, result=persisted.result if include_result else None)
+        return enforce_status_boundaries(status, handle, include_result=include_result)
+
+    def _memory_status(self, job_id: str, *, include_result: bool) -> JobStatusV1:
         for _attempt in range(3):
             with self._lock:
                 handle = self._handles.get(job_id)
                 version = self._versions.get(job_id, 0)
             if handle is None:
-                return _enforce_boundaries(_not_found(job_id), None, include_result=False)
+                return enforce_status_boundaries(_not_found(job_id), None, include_result=False)
 
             candidate = _read_candidate(handle, include_result=include_result)
 
@@ -137,8 +326,12 @@ class JobService:
                     continue
                 status = _monotonic(self._last.get(job_id), candidate)
                 self._last[job_id] = replace(status, result=None)
-            return _enforce_boundaries(status, handle, include_result=include_result)
-        return _enforce_boundaries(_registration_changed(job_id), None, include_result=False)
+            return enforce_status_boundaries(status, handle, include_result=include_result)
+        return enforce_status_boundaries(
+            _registration_changed(job_id),
+            None,
+            include_result=False,
+        )
 
 
 def _read_candidate(handle: JobHandle, *, include_result: bool) -> JobStatusV1:
@@ -183,54 +376,6 @@ def _monotonic(previous: JobStatusV1 | None, current: JobStatusV1) -> JobStatusV
     return replace(
         current, progress_percent=max(previous.progress_percent, current.progress_percent)
     )
-
-
-def _enforce_boundaries(
-    status: JobStatusV1, handle: JobHandle | None, *, include_result: bool
-) -> JobStatusV1:
-    if not include_result or status.state != "completed":
-        compact = replace(status, result=None)
-        enforce_payload_budget(compact.to_payload(), MAX_COMPACT_STATUS_BYTES, "job_status")
-        return compact
-    if status.result is None or handle is None:
-        compact = replace(
-            status,
-            result=None,
-            error=MessageV1(
-                code="job.result_unavailable",
-                severity="warning",
-                message="The completed job has no result available through this adapter.",
-            ),
-        )
-        enforce_payload_budget(compact.to_payload(), MAX_COMPACT_STATUS_BYTES, "job_status")
-        return compact
-    try:
-        actual = serialized_size(status.to_payload())
-    except (TypeError, ValueError):
-        compact = replace(
-            status,
-            result=None,
-            error=MessageV1(
-                code="job.result_unsafe",
-                severity="warning",
-                message="The completed result could not be serialized safely.",
-            ),
-        )
-        enforce_payload_budget(compact.to_payload(), MAX_COMPACT_STATUS_BYTES, "job_status")
-        return compact
-    if actual > handle.result_budget:
-        compact = replace(
-            status,
-            result=None,
-            error=MessageV1(
-                code="job.result_too_large",
-                severity="warning",
-                message="The completed result exceeds its originating tool budget.",
-            ),
-        )
-        enforce_payload_budget(compact.to_payload(), MAX_COMPACT_STATUS_BYTES, "job_status")
-        return compact
-    return status
 
 
 def _not_found(job_id: str) -> JobStatusV1:

@@ -26,6 +26,7 @@ from codex_usage_tracker.jobs.service import JobService
 from codex_usage_tracker.parser.api import find_session_logs
 from codex_usage_tracker.pricing.allowance_rate_card import load_bundled_rate_card
 from codex_usage_tracker.pricing.config import PricingConfig, load_pricing_config
+from codex_usage_tracker.store.analysis_job_repository import AnalysisJobRepository
 from codex_usage_tracker.store.api import (
     query_request_context_facts,
     query_status_context_facts,
@@ -135,7 +136,10 @@ def build_application_container(
     *,
     clock: Clock | None = None,
 ) -> ApplicationContainer:
-    jobs = JobService()
+    jobs = JobService(
+        repository=AnalysisJobRepository(paths.db_path),
+        recover_interrupted=True,
+    )
     repositories = RepositorySet(
         usage=StoreUsageRepository(paths.db_path),
         sources=LocalSourceRepository(paths.codex_home),

@@ -41,6 +41,7 @@ _RANGE_DELTAS = {
 }
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _JOB_RESULT_BUDGET = 60 * 1024
+_HEARTBEAT_SECONDS = 10.0
 
 
 @dataclass
@@ -67,12 +68,14 @@ class AllowanceAnalysisRuntime:
         semantic_key: str,
         source_revision: str,
         worker: Callable[[], Mapping[str, object]],
+        request: Mapping[str, object] | None = None,
     ) -> JobStatusV1:
         with self._lock:
             reusable = self.job_service.reusable(
                 semantic_key,
                 source_revision=source_revision,
                 result_schema=ANALYSIS_SCHEMA,
+                kind="allowance",
             )
             if reusable is not None:
                 return reusable
@@ -90,12 +93,18 @@ class AllowanceAnalysisRuntime:
                 result_schema=ANALYSIS_SCHEMA,
                 result_budget=_JOB_RESULT_BUDGET,
             )
-            self.job_service.register_semantic(
+            registration = self.job_service.register_semantic(
+                semantic_key,
                 kind="allowance",
                 job_id=job_id,
                 adapter=adapter,
-                semantic_key=semantic_key,
+                source_revision=source_revision,
+                request_schema="allowance-analysis.request.v1",
+                request=request or {},
             )
+            if not registration.should_start:
+                self._records.pop(job_id, None)
+                return registration.status
         threading.Thread(target=self._run, args=(record, worker), daemon=True).start()
         return self.job_service.status(job_id)
 
@@ -109,12 +118,25 @@ class AllowanceAnalysisRuntime:
 
     def _run(self, record: _AnalysisRecord, worker: Callable[[], Mapping[str, object]]) -> None:
         self._update(record, status="running")
+        heartbeat_stop = threading.Event()
+        threading.Thread(
+            target=self._heartbeat,
+            args=(record.job_id, heartbeat_stop),
+            daemon=True,
+        ).start()
         try:
             result = worker()
         except Exception:  # noqa: BLE001 - the generic adapter exposes a safe failure.
             self._update(record, status="failed")
         else:
             self._update(record, status="completed", result=result)
+        finally:
+            heartbeat_stop.set()
+
+    def _heartbeat(self, job_id: str, stop: threading.Event) -> None:
+        while not stop.wait(_HEARTBEAT_SECONDS):
+            if not self.job_service.heartbeat(job_id):
+                return
 
     def _update(
         self,
@@ -127,6 +149,7 @@ class AllowanceAnalysisRuntime:
             record.status = status
             record.updated_at = _utc_now()
             record.result = result
+        self.job_service.checkpoint(record.job_id)
 
     def _read(self, job_id: str, *, include_result: bool = False) -> Mapping[str, object]:
         with self._lock:
@@ -222,6 +245,7 @@ def get_allowance(
         semantic_key=semantic_key,
         source_revision=str(identity["source_revision"]),
         worker=lambda: _build_analysis(db_path),
+        request=identity,
     )
     return AllowanceResult(
         payload=job.to_payload(),
