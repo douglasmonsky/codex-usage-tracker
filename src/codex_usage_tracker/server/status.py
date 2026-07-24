@@ -9,12 +9,12 @@ from http import HTTPStatus
 from pathlib import Path
 from urllib.parse import parse_qs
 
-from codex_usage_tracker.core.conversational_readiness import conversational_readiness
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_PRICING_PATH,
     DEFAULT_RATE_CARD_PATH,
 )
+from codex_usage_tracker.diagnostics.conversational_readiness import conversational_readiness
 from codex_usage_tracker.pricing.allowance_config import load_allowance_config
 from codex_usage_tracker.pricing.config import load_pricing_config
 from codex_usage_tracker.server.query_cache import current_source_revision
@@ -161,11 +161,7 @@ def home_summary_payload(
 ) -> dict[str, object]:
     """Build the bounded active-scope summary used by the Evidence Console Home route."""
     resolved_metadata = metadata if metadata is not None else refresh_metadata(db_path)
-    resolved_dedupe = (
-        dedupe
-        if dedupe is not None
-        else query_dedupe_counts(db_path=db_path)
-    )
+    resolved_dedupe = dedupe if dedupe is not None else query_dedupe_counts(db_path=db_path)
     if latest_event_at is None:
         latest_event_at = query_usage_status(
             db_path=db_path,
@@ -187,9 +183,7 @@ def home_summary_payload(
         limit=3,
     )
     findings = [
-        finding
-        for row in findings_rows[:3]
-        if (finding := _home_finding(row)) is not None
+        finding for row in findings_rows[:3] if (finding := _home_finding(row)) is not None
     ][:3]
     recent_rows = query_home_recent_evidence_rows(
         db_path=db_path,
@@ -203,9 +197,7 @@ def home_summary_payload(
         "accounting": {
             "physical_rows": _safe_count(resolved_dedupe.get("physical_rows")),
             "canonical_rows": _safe_count(resolved_dedupe.get("canonical_rows")),
-            "excluded_copied_rows": _safe_count(
-                resolved_dedupe.get("excluded_copied_rows")
-            ),
+            "excluded_copied_rows": _safe_count(resolved_dedupe.get("excluded_copied_rows")),
         },
         "usage_metrics": query_home_usage_metrics(db_path=db_path),
         "pricing": _home_pricing_summary(pricing_path),

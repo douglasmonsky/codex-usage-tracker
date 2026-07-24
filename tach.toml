@@ -8,9 +8,13 @@ exclude = [
   "**/venv",
 ]
 source_roots = ["src"]
-root_module = "ignore"
-forbid_circular_dependencies = false
+root_module = "forbid"
+forbid_circular_dependencies = true
 layers_explicit_depends_on = true
+
+[[modules]]
+path = "codex_usage_tracker"
+depends_on = ["codex_usage_tracker.core"]
 
 [[modules]]
 path = "codex_usage_tracker.__main__"
@@ -18,16 +22,32 @@ depends_on = ["codex_usage_tracker.cli"]
 
 [[modules]]
 path = "codex_usage_tracker.allowance"
-depends_on = []
+depends_on = ["codex_usage_tracker.pricing"]
 
 [[modules]]
 path = "codex_usage_tracker.mcp_server"
-depends_on = []
+depends_on = ["codex_usage_tracker.cli"]
 
 [[modules]]
 path = "codex_usage_tracker.plugin_installer"
-depends_on = []
+depends_on = ["codex_usage_tracker.cli"]
 
 [[modules]]
 path = "codex_usage_tracker.support"
+depends_on = ["codex_usage_tracker.reports"]
+
+[[modules]]
+path = "codex_usage_tracker.store.allowance_materialization"
+depends_on = ["codex_usage_tracker.allowance_intelligence"]
+
+[[modules]]
+path = "codex_usage_tracker.store.api"
+depends_on = [
+    "codex_usage_tracker.allowance_intelligence",
+    "codex_usage_tracker.core",
+    "codex_usage_tracker.store",
+]
+
+[[modules]]
+path = "codex_usage_tracker.dashboard_service"
 depends_on = []

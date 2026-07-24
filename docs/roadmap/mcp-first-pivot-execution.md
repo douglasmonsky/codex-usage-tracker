@@ -899,11 +899,9 @@ commit as each roadmap task.
 
 ## Task 29 - MCP Package Extraction and Explicit Registration
 
-- Status: implementation and primary verification complete on
-  `pivot/29-mcp-extraction`; final review and PR landing remain.
+- Status: complete; squash-merged through PR 296.
 - Branch: `pivot/29-mcp-extraction`.
-- Commits: `refactor: extract MCP interface package` (this task; exact SHA is
-  recorded in Git/PR history).
+- Commits: `6cde2bac` (`refactor: extract MCP interface package`).
 - Registration contract:
   - `interfaces/mcp/server.py:create_mcp_server` is the only FastMCP
     construction boundary and registers immutable profile catalogs explicitly;
@@ -961,9 +959,96 @@ commit as each roadmap task.
 - Follow-up risks: Task 30 still owns the repository-wide Tach boundary and
   remaining non-MCP import cycles. No Task 29 compatibility surface is removed.
 
+## Task 30 - Enforce Python Architecture with Tach Domain Boundaries
+
+- Status: active on `pivot/30-tach-boundaries`; implementation, primary
+  verification, final review, and accepted-finding rechecks are complete, with
+  final commit and PR landing pending.
+- Branch: `pivot/30-tach-boundaries`.
+- Commits: `ebafb71` (`chore: close completed change plans`), `f6865ae`
+  (`chore: add repository GitNexus agent workflow`), and `264df75`
+  (`fix: normalize GitNexus refactoring examples`), and `0a21a71`
+  (`fix: keep GitNexus refreshes index-only`); architecture implementation
+  commit pending final verification.
+- Boundary contract:
+  - root ownership, explicit dependencies, and circular-domain enforcement are
+    enabled with no ignore baseline;
+  - every Python source module has a Tach owner;
+  - core request/error/version contracts are dependency-light and preserve old
+    application import identities;
+  - analytics consumes a read-only context protocol instead of application
+    types;
+  - CLI, HTTP, and MCP are independently owned interfaces and do not import one
+    another;
+  - runtime readiness is injected from interfaces, and allowance calculation is
+    invoked above store through the refresh derived-fact callback;
+  - exact historical helper/materialization paths remain tested compatibility
+    leaves.
+- Focused verification:
+  - `python -m tach check`: passed with zero violations and zero declared
+    cycles;
+  - architecture regression suite: `13 passed`;
+  - architecture, analytics, application status/request/query, HTTP/CLI,
+    allowance, deduplication, refresh-callback, and migration slice:
+    `145 passed in 5.73s`;
+  - the final dashboard-contract and source-record-schema ownership cleanup
+    passed `337` focused core, store, migration, and architecture tests;
+  - the accepted-review refresh, MCP readiness, compatibility-edge, and
+    architecture fixes passed `49` focused tests;
+  - Ruff passed over source and the changed tests;
+  - source Pyright reported 0 errors and the seven inherited lazy-export
+    warnings.
+- Full verification:
+  - pre-review complete Python suite: `1933 passed in 115.95s`;
+  - final post-review complete Python suite: `1936 passed in 116.05s`;
+  - pre-review coverage suite: `1933 passed`, 88% aggregate coverage;
+  - mypy, compileall, Vulture, dependency hygiene, Bandit baseline, Agent
+    Maintainer guidance drift, Ruff, Tach, source Pyright, release readiness,
+    JavaScript syntax, and `git diff --check` passed;
+  - workflow security, Actions lint, secret scan, Markdown/YAML/TOML checks,
+    and workflow schema validation passed;
+  - wheel and sdist build, Twine metadata, distribution release verification,
+    and packaged dashboard asset parity passed.
+- Architecture evidence: the initial baseline contained eight Tach violations
+  grouped as two core-to-diagnostics imports and six store-to-allowance/pricing
+  imports. The initial GitNexus snapshot identified four Python file cycles;
+  repeated fresh indexes exposed masked schema/write cycles as the graph was
+  simplified. Shared contracts, callback inversion, observation
+  synchronization, refresh metadata, and lower write/rebuild primitives were
+  split at their actual ownership boundaries rather than allowlisted. The final
+  GitNexus graph contains zero Python file cycles; its remaining three cycles
+  are two pre-existing frontend-source cycles and one generated-dashboard cycle.
+  The final staged impact scan reported high breadth across 111 files and eight
+  execution flows, matching the declared cohesive migration without touching
+  frontend sources.
+- Deviations from plan: nested `interfaces.cli`, `interfaces.http`, and
+  `interfaces.mcp` domains are required to represent independent adapters.
+  Exact compatibility leaf modules are declared separately from stable parent
+  domains so old imports remain available without weakening stable direction.
+  Agent Maintainer's full and precommit aggregate profiles remain red on
+  inherited repository-wide file-length, Markdown-code Ruff, test-suite
+  Pyright, and Xenon ratchets; its change-plan check passes, the Task 30
+  dashboard target is now below the file-length threshold, and the touched
+  legacy store schema improved from 665 to 647 source lines and from 766 to 741
+  physical lines. All named CI-equivalent gates listed above pass directly.
+- Final review:
+  - one read-only reviewer reported five actionable findings: two high, two
+    medium, and one low; all five were accepted;
+  - the public store facade now preserves allowance materialization for refresh
+    and rebuild, MCP status injects the real readiness probe, dynamic root
+    aliases and the `store.api` compatibility leaf have explicit Tach edges,
+    and GitNexus stale-index guidance is index-only with corrected fences;
+  - reviewer token status and tokens per accepted finding are `pending` because
+    aggregate usage attribution was unavailable without retrying the completed
+    review.
+- Follow-up risks: the three visible non-Python GitNexus cycles remain future
+  frontend ownership work. No route, SQLite schema, or frontend behavior
+  changed; the existing conversational-readiness schema is now registered and
+  documented.
+
 ## Remaining Planned Tasks
 
-Tasks 27.5 and 28 are complete. Task 29 is awaiting final review and landing.
-Tasks 30 through 45 remain planned in the approved implementation roadmap. Add
-a full entry using the format above when each task becomes active; do not mark
-a task complete without its named focused and full verification evidence.
+Tasks 27.5 through 29 are complete. Task 30 is active. Tasks 31 through 45
+remain planned in the approved implementation roadmap. Add a full entry using
+the format above when each task becomes active; do not mark a task complete
+without its named focused and full verification evidence.

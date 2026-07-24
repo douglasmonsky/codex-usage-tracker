@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-import codex_usage_tracker.store.api as store_api
+import codex_usage_tracker.store.usage_event_writer as usage_event_writer
 from codex_usage_tracker import store as store_module
 from codex_usage_tracker.diagnostics.reports import build_diagnostics_facts_report
 from codex_usage_tracker.store.api import (
@@ -73,6 +73,10 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
             row["key"]: row["value"]
             for row in conn.execute("SELECT key, value FROM refresh_meta").fetchall()
         }
+        allowance_cycle_count = conn.execute("SELECT COUNT(*) FROM allowance_cycles").fetchone()[0]
+        allowance_source_state_count = conn.execute(
+            "SELECT COUNT(*) FROM allowance_source_state"
+        ).fetchone()[0]
     assert meta["parsed_events"] == "0"
     assert meta["skipped_events"] == "0"
     assert meta["inserted_or_updated_events"] == "0"
@@ -81,6 +85,8 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
     assert meta["parser_adapter"] == "codex-jsonl-v2"
     assert meta["schema_version"] == "34"
     assert meta["parser_skipped_events"] == "0"
+    assert allowance_cycle_count > 0
+    assert allowance_source_state_count == 1
     state = schema_state(db_path)
     assert state["schema_version"] == 34
     assert state["checksum_matches"] is True
@@ -192,9 +198,9 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     parse_calls: list[dict[str, Any]] = []
     original_parse = store_module.parse_usage_events_from_file_with_state
     link_scopes: list[set[str]] = []
-    original_refresh_links = store_api._refresh_usage_event_links_for_threads
+    original_refresh_links = usage_event_writer._refresh_usage_event_links_for_threads
     summary_scopes: list[set[str]] = []
-    original_rebuild_summaries = store_api.rebuild_thread_summaries
+    original_rebuild_summaries = usage_event_writer.rebuild_thread_summaries
 
     def tracking_parse(*args: Any, **kwargs: Any):
         parse_calls.append(
@@ -221,12 +227,12 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
         tracking_parse,
     )
     monkeypatch.setattr(
-        store_api,
+        usage_event_writer,
         "_refresh_usage_event_links_for_threads",
         tracking_refresh_links,
     )
     monkeypatch.setattr(
-        store_api,
+        usage_event_writer,
         "rebuild_thread_summaries",
         tracking_rebuild_summaries,
     )
@@ -935,3 +941,6 @@ def test_rebuild_index_clears_aggregate_rows_before_rescan(tmp_path: Path) -> No
     assert result.parsed_events == 4
     assert query_dashboard_event_count(db_path=db_path) == 4
     assert "stale" not in refresh_metadata(db_path)
+    with connect(db_path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM allowance_cycles").fetchone()[0] > 0
+        assert conn.execute("SELECT COUNT(*) FROM allowance_source_state").fetchone()[0] == 1

@@ -1,7 +1,9 @@
 [root]
 depends_on = [
     "//codex_usage_tracker.core",
+    "//codex_usage_tracker.ingest",
     "//codex_usage_tracker.pricing",
     "//codex_usage_tracker.store",
+    "//codex_usage_tracker.store.api",
     "//codex_usage_tracker.usage_drain",
 ]

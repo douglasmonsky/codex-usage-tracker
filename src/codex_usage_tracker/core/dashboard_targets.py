@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode, urlsplit
 
-from codex_usage_tracker.dashboard_service import DashboardServiceStatus
+from codex_usage_tracker.core.dashboard_protocols import DashboardServiceStatusLike
 
 DASHBOARD_TARGET_SCHEMA = "codex-usage-tracker-dashboard-target-v1"
 DASHBOARD_TARGET_FALLBACK = "codex-usage-tracker serve-dashboard --open"
@@ -127,7 +127,7 @@ def build_dashboard_target(
     filters: Mapping[str, object] | None = None,
     privacy_mode: str = "normal",
     service_origin: str | None = None,
-    service_status: DashboardServiceStatus | None = None,
+    service_status: DashboardServiceStatusLike | None = None,
 ) -> dict[str, Any]:
     """Build a reviewed dashboard target without copying arbitrary input fields."""
 
@@ -195,7 +195,7 @@ def build_dashboard_target_v2(
     analysis_id: str | None = None,
     target_purpose: str = "evidence",
     service_origin: str | None = None,
-    service_status: DashboardServiceStatus | None = None,
+    service_status: DashboardServiceStatusLike | None = None,
 ) -> dict[str, Any]:
     """Build a deterministic evidence handoff without changing the v1 compatibility shape."""
     if evidence_kind not in {"finding", "call", "thread", "allowance", "analysis"}:
@@ -279,7 +279,7 @@ def build_limits_target_v2(
     until: str | None,
     analysis_id: str | None = None,
     service_origin: str | None = None,
-    service_status: DashboardServiceStatus | None = None,
+    service_status: DashboardServiceStatusLike | None = None,
 ) -> dict[str, Any]:
     """Build an allowlisted v2 handoff to the current Limits dashboard surface."""
     if operation not in {"status", "series", "evidence", "analysis"}:
@@ -462,7 +462,7 @@ def _query_value(value: object) -> str:
 
 def _active_origin(
     service_origin: str | None,
-    service_status: DashboardServiceStatus | None,
+    service_status: DashboardServiceStatusLike | None,
 ) -> str | None:
     if service_status is not None and service_status.reachable:
         return service_status.url

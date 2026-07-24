@@ -15,7 +15,7 @@ from codex_usage_tracker.core.call_origin import (
 )
 from codex_usage_tracker.core.models import DiagnosticFact, SessionInfo, UsageEvent
 from codex_usage_tracker.core.usage_identity import extract_upstream_usage_id
-from codex_usage_tracker.diagnostics.facts import (
+from codex_usage_tracker.ingest.facts import (
     add_diagnostic_fact,
     assign_record_id_to_diagnostic_facts,
     diagnostic_facts_from_envelope,

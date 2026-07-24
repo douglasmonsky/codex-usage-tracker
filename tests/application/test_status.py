@@ -11,6 +11,7 @@ from codex_usage_tracker.application.context import RequestContext
 from codex_usage_tracker.application.requests import RequestScope, StatusRequest
 from codex_usage_tracker.core.contracts import FreshnessV1
 from codex_usage_tracker.dashboard_service import DashboardServiceStatus
+from codex_usage_tracker.diagnostics.conversational_readiness import conversational_readiness
 
 CORE_TOOLS = [
     "usage_status",
@@ -215,7 +216,7 @@ def test_malformed_mcp_configuration_never_claims_current_task_exposure(
     )
     (plugin_root / ".mcp.json").write_text("{", encoding="utf-8")
 
-    result = status.get_status(request)
+    result = status.get_status(request, readiness_provider=conversational_readiness)
 
     assert result["conversational_readiness"]["state"] == "unavailable"  # type: ignore[index]
     assert result["mcp"]["current_task_exposure"] == "not-verified"  # type: ignore[index]

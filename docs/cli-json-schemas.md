@@ -74,6 +74,7 @@ Tracked schema ids:
 | | Includes the UTC `generated_at` timestamp, aggregate report definitions, aggregate linked-call evidence, and `raw_context_included: false`. |
 | `codex-usage-tracker-visualization-suggestions-v1` | MCP `usage_visualization_suggest(...)`; ranked semantic visualization intents |
 | `codex-usage-tracker-visualization-result-v1` | MCP `usage_visualization_render(...)`; `VisualizationSpecV1`, compact table-equivalent evidence, narrative, and caveats |
+| `codex-usage-tracker-conversational-readiness-v1` | Dashboard and status readiness for the configured local MCP/plugin runtime |
 | `codex-usage-tracker-diagnostics-v1` | CLI `diagnostics ... --json`, dashboard server `/api/diagnostics/*` |
 | `codex-usage-tracker-dedupe-diagnostics-v1` | CLI `dedupe-diagnostics --json`, MCP `usage_dedupe_diagnostics(...)`, dashboard server `/api/diagnostics/dedupe`; aggregate summary plus bounded physical duplicate provenance, never raw content |
 | `codex-usage-tracker-diagnostic-overview-v1` | CLI `diagnostics overview --json`, dashboard server `/api/diagnostics/overview` |

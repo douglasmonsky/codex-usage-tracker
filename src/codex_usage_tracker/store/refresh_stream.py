@@ -8,12 +8,6 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-from codex_usage_tracker.store.api import (
-    _deferred_usage_event_indexes,
-    _finalize_streamed_usage_event_upserts,
-    _upsert_usage_events_in_connection,
-    init_db,
-)
 from codex_usage_tracker.store.compression_fact_ingest import IngestionFactWriter
 from codex_usage_tracker.store.compression_fact_sync import (
     content_index_plans,
@@ -37,10 +31,20 @@ from codex_usage_tracker.store.refresh_parse import (
     emit_refresh_progress,
     iter_parse_refresh_plans,
 )
+from codex_usage_tracker.store.schema import init_db
 from codex_usage_tracker.store.source_records import upsert_source_records_from_events
 from codex_usage_tracker.store.sources import (
     SourceParsePlan,
     upsert_source_file_metadata,
+)
+from codex_usage_tracker.store.usage_event_writer import (
+    deferred_usage_event_indexes as _deferred_usage_event_indexes,
+)
+from codex_usage_tracker.store.usage_event_writer import (
+    finalize_streamed_usage_event_upserts as _finalize_streamed_usage_event_upserts,
+)
+from codex_usage_tracker.store.usage_event_writer import (
+    upsert_usage_events_in_connection as _upsert_usage_events_in_connection,
 )
 
 _STREAM_SOURCE_BATCH_SIZE = 16

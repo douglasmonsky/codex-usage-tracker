@@ -12,6 +12,7 @@ import codex_usage_tracker.store.deduplication_schema as deduplication_schema
 import codex_usage_tracker.store.otel_schema as otel_schema
 import codex_usage_tracker.store.recommendation_schema as recommendation_schema
 import codex_usage_tracker.store.schema_query_indexes as schema_query_indexes
+import codex_usage_tracker.store.source_record_schema as source_record_schema
 from codex_usage_tracker.core.schema import (
     USAGE_EVENT_COLUMN_NAMES,
     USAGE_EVENT_CREATE_COLUMNS_SQL,
@@ -347,7 +348,7 @@ def _migrate_v11(conn: sqlite3.Connection) -> None:
 
 
 def _migrate_v12(conn: sqlite3.Connection) -> None:
-    _create_source_records_table(conn)
+    source_record_schema.create_source_records_table(conn)
     _backfill_source_records(conn)
 
 
@@ -551,41 +552,10 @@ def _create_content_fts_table(conn: sqlite3.Connection) -> None:
     )
 
 
-def _create_source_records_table(conn: sqlite3.Connection) -> None:
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS source_records (
-            record_id TEXT PRIMARY KEY,
-            source_file_id TEXT NOT NULL,
-            source_file_hash TEXT NOT NULL,
-            line_number INTEGER NOT NULL,
-            event_timestamp TEXT NOT NULL,
-            source_record_hash TEXT NOT NULL,
-            hash_basis TEXT NOT NULL DEFAULT 'source_file_id:line_number:record_id',
-            raw_shape_label TEXT NOT NULL DEFAULT 'token_count',
-            parser_adapter TEXT NOT NULL,
-            parser_version TEXT NOT NULL,
-            parse_warnings_json TEXT NOT NULL DEFAULT '[]',
-            created_from TEXT NOT NULL DEFAULT 'usage_events',
-            FOREIGN KEY(record_id) REFERENCES usage_events(record_id) ON DELETE CASCADE
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_source_records_source_line
-        ON source_records(source_file_id, line_number);
-
-        CREATE INDEX IF NOT EXISTS idx_source_records_shape_adapter
-        ON source_records(raw_shape_label, parser_adapter, parser_version);
-
-        CREATE INDEX IF NOT EXISTS idx_source_records_event_timestamp
-        ON source_records(event_timestamp);
-        """
-    )
-
-
 def _backfill_source_records(conn: sqlite3.Connection) -> None:
     if not _source_record_backfill_columns_available(conn):
         return
-    from codex_usage_tracker.store.source_records import sync_source_records
+    from codex_usage_tracker.store.source_record_sync import sync_source_records
 
     sync_source_records(conn)
 

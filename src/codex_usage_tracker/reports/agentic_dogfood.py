@@ -9,6 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from codex_usage_tracker.allowance_intelligence import build_allowance_diagnostics_report
+from codex_usage_tracker.allowance_intelligence.materialization import (
+    sync_refresh_allowance_intelligence,
+)
 from codex_usage_tracker.core.api_payloads import refresh_result_payload
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -32,7 +35,7 @@ from codex_usage_tracker.reports.api import (
     build_repeated_file_rediscovery_report,
     build_shell_churn_report,
 )
-from codex_usage_tracker.store.api import refresh_usage_index
+from codex_usage_tracker.store.api import refresh_usage_index as _refresh_usage_index
 
 DEFAULT_AGENTIC_DOGFOOD_DIR = DEFAULT_DB_PATH.parent / "agentic-dogfood"
 
@@ -109,11 +112,12 @@ def build_agentic_dogfood_report(
 
     refresh_payload: dict[str, Any] | None = None
     if refresh:
-        refresh_result = refresh_usage_index(
+        refresh_result = _refresh_usage_index(
             codex_home=codex_home,
             db_path=db_path,
             include_archived=include_archived,
             aggregate_only=False,
+            derived_fact_sync=sync_refresh_allowance_intelligence,
         )
         refresh_payload = refresh_result_payload(
             refresh_result,

@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from codex_usage_tracker import __version__
-from codex_usage_tracker.core.conversational_readiness import conversational_readiness
+from codex_usage_tracker.diagnostics.conversational_readiness import conversational_readiness
 
 PLUGIN_NAME = "codex-usage-tracker"
 

@@ -54,7 +54,6 @@ from codex_usage_tracker.cli.dashboard import (
 )
 from codex_usage_tracker.cli.dashboard_service import run_dashboard_service
 from codex_usage_tracker.cli.diagnostics import run_diagnostics
-from codex_usage_tracker.cli.help_i18n import localized_cli_error_prefix, requested_cli_language
 from codex_usage_tracker.cli.inspect_log_output import print_inspect_log_summary
 from codex_usage_tracker.cli.parser import build_parser
 from codex_usage_tracker.core.api_payloads import (
@@ -65,6 +64,10 @@ from codex_usage_tracker.interfaces.cli.commands import (
     run_open,
     run_status,
     warn_legacy_alias,
+)
+from codex_usage_tracker.interfaces.cli.help_i18n import (
+    localized_cli_error_prefix,
+    requested_cli_language,
 )
 from codex_usage_tracker.interfaces.mcp.server import main as run_mcp_server
 from codex_usage_tracker.parser.api import inspect_log, load_session_index

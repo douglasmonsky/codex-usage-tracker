@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import sqlite3
 from functools import partial
 from pathlib import Path
 
+from codex_usage_tracker.allowance_intelligence.materialization import (
+    sync_refresh_allowance_intelligence,
+)
 from codex_usage_tracker.core.models import RefreshResult
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -43,7 +47,7 @@ def refresh_usage_index(
         aggregate_only=aggregate_only,
         progress_callback=progress_callback,
         derived_fact_sync=partial(
-            sync_refresh_recommendation_facts,
+            _sync_refresh_derived_facts,
             pricing_path=pricing_path,
             allowance_path=allowance_path,
             rate_card_path=rate_card_path,
@@ -68,10 +72,40 @@ def rebuild_usage_index(
         include_archived=include_archived,
         aggregate_only=aggregate_only,
         derived_fact_sync=partial(
-            sync_refresh_recommendation_facts,
+            _sync_refresh_derived_facts,
             pricing_path=pricing_path,
             allowance_path=allowance_path,
             rate_card_path=rate_card_path,
             thresholds_path=thresholds_path,
         ),
+    )
+
+
+def _sync_refresh_derived_facts(
+    conn: sqlite3.Connection,
+    record_ids: tuple[str, ...],
+    affected_thread_keys: frozenset[str],
+    full_rebuild: bool,
+    *,
+    pricing_path: Path,
+    allowance_path: Path,
+    rate_card_path: Path,
+    thresholds_path: Path,
+) -> None:
+    """Materialize upper-layer allowance and recommendation facts after store writes."""
+    sync_refresh_allowance_intelligence(
+        conn,
+        record_ids,
+        affected_thread_keys,
+        full_rebuild,
+    )
+    sync_refresh_recommendation_facts(
+        conn,
+        record_ids,
+        affected_thread_keys,
+        full_rebuild,
+        pricing_path=pricing_path,
+        allowance_path=allowance_path,
+        rate_card_path=rate_card_path,
+        thresholds_path=thresholds_path,
     )

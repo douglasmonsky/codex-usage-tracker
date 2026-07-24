@@ -5,9 +5,25 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from codex_usage_tracker import __version__
-from codex_usage_tracker.cli.help_i18n import argument_parser_class, localize_parser_help
-from codex_usage_tracker.cli.parser_data import (
+from codex_usage_tracker.core.paths import (
+    DEFAULT_ALLOWANCE_PATH,
+    DEFAULT_DB_PATH,
+    DEFAULT_PRICING_PATH,
+    DEFAULT_PROJECTS_PATH,
+    DEFAULT_RATE_CARD_PATH,
+    DEFAULT_THRESHOLDS_PATH,
+)
+from codex_usage_tracker.core.projects import PRIVACY_MODE_CHOICES
+from codex_usage_tracker.core.version import __version__
+from codex_usage_tracker.interfaces.cli.help_i18n import (
+    argument_parser_class,
+    localize_parser_help,
+)
+from codex_usage_tracker.interfaces.cli.namespaces import (
+    LEGACY_TOP_LEVEL_ALIASES,
+    STABLE_TOP_LEVEL_COMMANDS,
+)
+from codex_usage_tracker.interfaces.cli.parser_data import (
     _add_allowance_intelligence_parsers,
     _add_allowance_parser,
     _add_dashboard_parsers,
@@ -23,8 +39,8 @@ from codex_usage_tracker.cli.parser_data import (
     _add_support_bundle_parser,
     _add_threshold_parser,
 )
-from codex_usage_tracker.cli.parser_diagnostics import add_diagnostics_parser
-from codex_usage_tracker.cli.parser_lifecycle import (
+from codex_usage_tracker.interfaces.cli.parser_diagnostics import add_diagnostics_parser
+from codex_usage_tracker.interfaces.cli.parser_lifecycle import (
     _add_doctor_parser,
     _add_dogfood_agentic_parser,
     _add_inspect_log_parser,
@@ -36,7 +52,7 @@ from codex_usage_tracker.cli.parser_lifecycle import (
     _add_uninstall_plugin_parser,
     _add_upgrade_plugin_parser,
 )
-from codex_usage_tracker.cli.parser_reports import (
+from codex_usage_tracker.interfaces.cli.parser_reports import (
     _add_action_brief_parser,
     _add_context_parser,
     _add_query_parser,
@@ -44,19 +60,6 @@ from codex_usage_tracker.cli.parser_reports import (
     _add_session_parser,
     _add_subagents_parser,
     _add_summary_parser,
-)
-from codex_usage_tracker.core.paths import (
-    DEFAULT_ALLOWANCE_PATH,
-    DEFAULT_DB_PATH,
-    DEFAULT_PRICING_PATH,
-    DEFAULT_PROJECTS_PATH,
-    DEFAULT_RATE_CARD_PATH,
-    DEFAULT_THRESHOLDS_PATH,
-)
-from codex_usage_tracker.core.projects import PRIVACY_MODE_CHOICES
-from codex_usage_tracker.interfaces.cli.namespaces import (
-    LEGACY_TOP_LEVEL_ALIASES,
-    STABLE_TOP_LEVEL_COMMANDS,
 )
 
 

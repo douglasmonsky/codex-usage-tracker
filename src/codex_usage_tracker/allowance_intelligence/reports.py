@@ -21,7 +21,7 @@ from codex_usage_tracker.pricing.allowance import (
     annotate_rows_with_allowance,
     load_allowance_config,
 )
-from codex_usage_tracker.store.api import query_allowance_observations
+from codex_usage_tracker.store.allowance_observations import query_allowance_observations
 
 ALLOWANCE_HISTORY_SCHEMA = "codex-usage-tracker-allowance-history-v1"
 ALLOWANCE_DIAGNOSTICS_SCHEMA = "codex-usage-tracker-allowance-diagnostics-v1"

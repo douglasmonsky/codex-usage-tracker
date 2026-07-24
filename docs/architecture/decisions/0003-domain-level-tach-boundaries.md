@@ -37,3 +37,9 @@ fact loading now depends only on the store contract, and no compression module
 imports `core`. Removing the stale edge keeps the declared graph aligned with
 the implementation and lets Tach continue detecting accidental dependency
 growth.
+
+## 2026-07-23 Amendment
+
+[ADR 0012](0012-strict-python-domain-enforcement.md) supersedes the temporary
+decision to leave circular enforcement disabled. Root ownership, explicit
+dependencies, and circular-domain checks are now mandatory.

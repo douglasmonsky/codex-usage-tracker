@@ -9,7 +9,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from codex_usage_tracker.diagnostics.types import DoctorCheck
+from codex_usage_tracker.core.doctor import DoctorCheck
 
 # The doctor executes a selected local interpreter with a fixed import check and no shell.
 

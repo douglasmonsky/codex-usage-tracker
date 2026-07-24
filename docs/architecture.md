@@ -46,6 +46,44 @@ implicitly. Tests that use temporary paths build a custom container without
 monkeypatching module globals. This is manual constructor injection; the project
 does not use a dependency-injection framework.
 
+### Enforced Python dependency direction
+
+Tach owns the executable package graph. The root configuration forbids
+unowned modules and circular domain dependencies, while each product package
+declares its direct dependencies in the nearest `tach.domain.toml`.
+
+The enforced direction is:
+
+```text
+interfaces -> application -> analytics/evidence/jobs -> store/ingest/core
+server compatibility -> interfaces/http + application
+plugin -> interfaces/mcp + interfaces/cli
+compatibility leaves -> application or the historical target they re-export
+```
+
+`core` imports only `core`. Store persistence never imports application or
+transport modules. Analytics may call existing report/recommendation delegates
+during the 0.24 compatibility window, but it cannot import CLI, HTTP, MCP, or
+server transports. Application services cannot import transport
+implementations. MCP and HTTP interfaces cannot call one another.
+
+Shared request primitives and validation errors live in `core`; application
+keeps their historical import paths as identity-preserving re-exports.
+Analytics consumes a read-only context protocol rather than the concrete
+application context. Runtime readiness is supplied to application status
+through an interface-owned provider. Allowance interpretation and pricing run
+above store through the store refresh callback, so SQLite persistence no longer
+owns domain calculation.
+
+Historical module paths remain only where 0.24 compatibility requires them.
+Those exact leaf modules are declared separately from their stable parent
+domain, and secondary AST tests reject reverse imports even if Tach
+configuration is accidentally loosened. The historical `store.api` refresh
+facade is one such leaf: its lower store callback remains inverted, while the
+compatibility facade supplies the allowance materializer expected by existing
+direct callers. See
+[ADR 0012](architecture/decisions/0012-strict-python-domain-enforcement.md).
+
 ### MCP server composition
 
 `interfaces/mcp/server.py` owns the only FastMCP construction boundary.

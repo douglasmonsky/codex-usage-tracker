@@ -13,25 +13,25 @@ from codex_usage_tracker.core.paths import (
 )
 from codex_usage_tracker.parser.api import find_session_logs, load_session_index
 from codex_usage_tracker.parser.state import compact_parser_diagnostics
-from codex_usage_tracker.store.api import (
-    OTEL_REFRESH_COUNTER_KEYS,
-    clear_content_index_rows,
-    init_db,
-    record_refresh_metadata,
-)
 from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
 from codex_usage_tracker.store.connection import connect
+from codex_usage_tracker.store.content_index import clear_content_index_rows
 from codex_usage_tracker.store.otel_ingest import ingest_otel_completion_files
 from codex_usage_tracker.store.otel_reconciliation import (
     reconcile_otel_completions,
     reset_otel_completion_matches,
 )
 from codex_usage_tracker.store.refresh_callbacks import DerivedFactSyncCallback
+from codex_usage_tracker.store.refresh_metadata import (
+    OTEL_REFRESH_COUNTER_KEYS,
+    record_refresh_metadata,
+)
 from codex_usage_tracker.store.refresh_parse import (
     RefreshProgressCallback,
     emit_refresh_progress,
 )
 from codex_usage_tracker.store.refresh_stream import write_refresh_stream
+from codex_usage_tracker.store.schema import init_db
 from codex_usage_tracker.store.sources import source_logs_requiring_parse
 
 
@@ -108,9 +108,7 @@ def refresh_usage_index(
         message="Reconciling aggregate OTel completion tiers",
     )
     resolved_otel_dir = otel_dir or db_path.parent / DEFAULT_OTEL_COMPLETIONS_DIR.name
-    otel_diagnostics = _refresh_otel_completions(
-        db_path=db_path, otel_dir=resolved_otel_dir
-    )
+    otel_diagnostics = _refresh_otel_completions(db_path=db_path, otel_dir=resolved_otel_dir)
     emit_refresh_progress(
         progress_callback,
         phase="otel",

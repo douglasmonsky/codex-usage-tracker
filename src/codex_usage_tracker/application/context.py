@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from codex_usage_tracker.application.analysis_protocols import AnalysisRuntimeProtocol
 from codex_usage_tracker.application.errors import RequestContextError
 from codex_usage_tracker.application.protocols import Clock, PricingProvider, UsageRepository
 from codex_usage_tracker.application.requests import RequestScope
@@ -28,7 +29,6 @@ from codex_usage_tracker.store.api import (
 _FRESHNESS_THRESHOLD_SECONDS = 300
 
 if TYPE_CHECKING:
-    from codex_usage_tracker.application.analyze import AnalysisRuntime
     from codex_usage_tracker.application.paths import ApplicationPaths
 
 
@@ -45,7 +45,9 @@ class RequestContext:
     pricing_coverage: float | None
     credit_coverage: float | None
     service_tier_coverage: float | None
-    analysis_runtime: AnalysisRuntime | None = field(default=None, repr=False, compare=False)
+    analysis_runtime: AnalysisRuntimeProtocol | None = field(
+        default=None, repr=False, compare=False
+    )
     application_paths: ApplicationPaths | None = field(default=None, repr=False, compare=False)
 
     @property

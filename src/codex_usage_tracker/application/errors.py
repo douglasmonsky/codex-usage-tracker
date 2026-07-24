@@ -1,12 +1,8 @@
-"""Typed application-layer request errors."""
+"""Typed application-layer errors with stable compatibility imports."""
 
+from codex_usage_tracker.core.errors import ApplicationError, RequestValidationError
 
-class ApplicationError(Exception):
-    """Base error for application orchestration failures."""
-
-
-class RequestValidationError(ApplicationError, ValueError):
-    """Raised when a typed application request violates its contract."""
+__all__ = ["ApplicationError", "RequestContextError", "RequestValidationError"]
 
 
 class RequestContextError(ApplicationError):

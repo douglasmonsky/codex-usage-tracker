@@ -14,11 +14,10 @@ from codex_usage_tracker.analytics.analysis_models import (
     AnalysisRequest,
     WorkEstimate,
 )
+from codex_usage_tracker.analytics.context_protocols import AnalysisContext, AnalysisPaths
 from codex_usage_tracker.analytics.strategies.protocol import AnalysisStrategy
-from codex_usage_tracker.application.context import RequestContext
-from codex_usage_tracker.application.errors import RequestValidationError
-from codex_usage_tracker.application.paths import ApplicationPaths
 from codex_usage_tracker.core.contracts import MessageV1
+from codex_usage_tracker.core.errors import RequestValidationError
 from codex_usage_tracker.recommendation_engine import api as recommendation_api
 from codex_usage_tracker.recommendation_engine.query import RecommendationFactsUnavailableError
 from codex_usage_tracker.reports import agentic as agentic_reports
@@ -56,7 +55,7 @@ class _CompatibilityStrategy:
     strategy_version: str
     delegate: CompatibilityDelegate
 
-    def estimate(self, request: AnalysisRequest, context: RequestContext) -> WorkEstimate:
+    def estimate(self, request: AnalysisRequest, context: AnalysisContext) -> WorkEstimate:
         _require_matching_goal(self.goal, request.goal)
         entry = ANALYSIS_CATALOG[self.goal]
         selected_evidence = min(request.evidence_limit, entry.max_evidence_records)
@@ -83,7 +82,7 @@ class _CompatibilityStrategy:
             ),
         )
 
-    def analyze(self, request: AnalysisRequest, context: RequestContext) -> AnalysisReportV2:
+    def analyze(self, request: AnalysisRequest, context: AnalysisContext) -> AnalysisReportV2:
         _require_matching_goal(self.goal, request.goal)
         entry = ANALYSIS_CATALOG[self.goal]
         missing = _missing_facts(entry, request, context)
@@ -234,7 +233,7 @@ ANALYSIS_CATALOG = build_analysis_catalog(_CATALOG_ENTRIES)
 
 
 def _missing_facts(
-    entry: AnalysisCatalogEntry, request: AnalysisRequest, context: RequestContext
+    entry: AnalysisCatalogEntry, request: AnalysisRequest, context: AnalysisContext
 ) -> tuple[str, ...]:
     missing: list[str] = []
     if context.freshness.state in {"stale", "empty", "unknown"}:
@@ -256,8 +255,8 @@ def _missing_facts(
 def _run_compatibility_delegate(
     delegate: CompatibilityDelegate,
     request: AnalysisRequest,
-    context: RequestContext,
-    paths: ApplicationPaths,
+    context: AnalysisContext,
+    paths: AnalysisPaths,
 ) -> object:
     common = {
         "since": request.filters.since,
@@ -318,7 +317,7 @@ def _run_compatibility_delegate(
 
 
 def _legacy_report(
-    entry: AnalysisCatalogEntry, context: RequestContext, legacy: object
+    entry: AnalysisCatalogEntry, context: AnalysisContext, legacy: object
 ) -> AnalysisReportV2:
     payload = _legacy_payload(legacy)
     source_schema = str(payload.get("schema") or payload.get("schema_id") or "legacy-report")
@@ -348,7 +347,7 @@ def _legacy_report(
 
 
 def _fallback_report(
-    entry: AnalysisCatalogEntry, context: RequestContext, missing: tuple[str, ...]
+    entry: AnalysisCatalogEntry, context: AnalysisContext, missing: tuple[str, ...]
 ) -> AnalysisReportV2:
     return AnalysisReportV2(
         analysis_id=_analysis_id(entry, context),
@@ -382,7 +381,7 @@ def _legacy_payload(legacy: object) -> Mapping[str, object]:
     return cast(Mapping[str, object], payload) if isinstance(payload, Mapping) else {}
 
 
-def _analysis_id(entry: AnalysisCatalogEntry, context: RequestContext) -> str:
+def _analysis_id(entry: AnalysisCatalogEntry, context: AnalysisContext) -> str:
     return f"{entry.strategy.strategy_id}:{context.source_revision or 'unavailable'}"
 
 

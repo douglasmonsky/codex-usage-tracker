@@ -8,6 +8,16 @@ NoneType = type(None)
 Number = (int, float)
 
 DIAGNOSTIC_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
+    "codex-usage-tracker-conversational-readiness-v1": {
+        "required": {
+            "state": str,
+            "summary": str,
+            "next_action": (str, NoneType),
+            "configured_profile": str,
+            "runtime_version_matches": bool,
+            "evidence": list,
+        }
+    },
     "codex-usage-tracker-dedupe-diagnostics-v1": {
         "required": {
             "summary": dict,

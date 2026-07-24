@@ -1,0 +1,4 @@
+[root]
+depends_on = [
+    "//codex_usage_tracker.interfaces.mcp",
+]

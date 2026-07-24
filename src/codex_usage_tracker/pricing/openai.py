@@ -14,8 +14,8 @@ from urllib.error import URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
-from codex_usage_tracker import __version__
 from codex_usage_tracker.core.paths import DEFAULT_PRICING_PATH
+from codex_usage_tracker.core.version import __version__
 from codex_usage_tracker.pricing.config import (
     PRICING_SCHEMA,
     load_existing_aliases,
@@ -182,8 +182,7 @@ def parse_all_openai_pricing_tiers(
     """Parse every published API service-tier table from one source document."""
 
     return {
-        tier: parse_openai_pricing_markdown(markdown, tier=tier)
-        for tier in VALID_PRICING_TIERS
+        tier: parse_openai_pricing_markdown(markdown, tier=tier) for tier in VALID_PRICING_TIERS
     }
 
 

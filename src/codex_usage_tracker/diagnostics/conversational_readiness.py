@@ -8,7 +8,7 @@ import subprocess  # nosec B404 - bounded local runtime probe; no shell is invok
 from pathlib import Path
 from typing import Literal, TypedDict
 
-from codex_usage_tracker import __version__
+from codex_usage_tracker.core.version import __version__
 from codex_usage_tracker.diagnostics.mcp import check_mcp_config, check_mcp_runtime
 
 PLUGIN_NAME = "codex-usage-tracker"

@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import parse_qs
 
-from codex_usage_tracker.core.conversational_readiness import conversational_readiness
 from codex_usage_tracker.core.i18n import dashboard_i18n_payload, normalize_language
 from codex_usage_tracker.dashboard.api import dashboard_payload
 from codex_usage_tracker.dashboard.load_window import dashboard_load_window_payload
+from codex_usage_tracker.diagnostics.conversational_readiness import conversational_readiness
 from codex_usage_tracker.server.status import home_summary_payload
 from codex_usage_tracker.server.utils import first_query_value, parse_bool_query_value
 

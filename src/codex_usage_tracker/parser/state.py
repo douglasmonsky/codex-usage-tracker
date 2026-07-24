@@ -9,7 +9,7 @@ from typing import Any
 
 from codex_usage_tracker.core.call_origin import CallOriginFlags
 from codex_usage_tracker.core.models import DiagnosticFact
-from codex_usage_tracker.diagnostics.facts import (
+from codex_usage_tracker.ingest.facts import (
     diagnostic_fact_from_json,
     diagnostic_fact_to_json,
 )

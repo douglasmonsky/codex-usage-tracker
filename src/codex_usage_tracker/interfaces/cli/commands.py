@@ -30,11 +30,12 @@ from codex_usage_tracker.application.query_models import (
     QueryRequest,
 )
 from codex_usage_tracker.application.requests import HistoryScope, StatusRequest
+from codex_usage_tracker.application.services import ApplicationServices
 from codex_usage_tracker.core.contracts import payload_mapping
 from codex_usage_tracker.core.dashboard_targets import build_dashboard_target_v2
 from codex_usage_tracker.core.paths import DEFAULT_CODEX_HOME
 from codex_usage_tracker.dashboard_service import dashboard_service_status
-from codex_usage_tracker.interfaces.http.v2 import ApplicationHttpV2Services
+from codex_usage_tracker.diagnostics.conversational_readiness import conversational_readiness
 
 
 class CliApplicationServices(Protocol):
@@ -169,7 +170,10 @@ def _default_services(args: argparse.Namespace) -> CliApplicationServices:
             projects_path=args.projects,
         )
     )
-    return ApplicationHttpV2Services(container=container)
+    return ApplicationServices(
+        container=container,
+        readiness_provider=conversational_readiness,
+    )
 
 
 def _scope(args: argparse.Namespace):
