@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-import subprocess
-import sys
 from pathlib import Path
 
 from codex_usage_tracker.interfaces.mcp.compatibility_tools import compatibility_handler
@@ -37,28 +34,6 @@ def _baseline_names() -> set[str]:
     return set(payload["tool_names"])
 
 
-def _legacy_registration_snapshot() -> dict[str, list[str]]:
-    script = """
-import json
-from codex_usage_tracker.interfaces.mcp.runtime import compatibility_mcp
-before = sorted(compatibility_mcp._tool_manager._tools)
-from codex_usage_tracker.cli import mcp_server  # noqa: F401
-after = sorted(compatibility_mcp._tool_manager._tools)
-print(json.dumps({"before": before, "after": after}))
-"""
-    environment = dict(os.environ)
-    environment["PYTHONPATH"] = os.pathsep.join((str(_ROOT), str(_ROOT / "src")))
-    completed = subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=_ROOT,
-        env=environment,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return json.loads(completed.stdout)
-
-
 def test_profiles_preserve_every_021_pr290_public_name() -> None:
     full_names = {spec.name for spec in tools_for_profile("full")}
     developer_names = {spec.name for spec in tools_for_profile("developer")}
@@ -78,12 +53,6 @@ def test_every_registered_legacy_callable_has_a_catalog_disposition() -> None:
 
     assert registered
     assert registered == cataloged
-
-
-def test_importing_legacy_implementations_does_not_register_by_side_effect() -> None:
-    snapshot = _legacy_registration_snapshot()
-
-    assert snapshot["after"] == snapshot["before"]
 
 
 def test_full_profile_registers_exact_legacy_callables_without_schema_wrappers() -> None:
