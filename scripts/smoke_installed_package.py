@@ -40,7 +40,9 @@ DISTRIBUTION_NAME = "codex-usage-tracking"
 WHEEL_STEM = "codex_usage_tracking"
 IMPORT_PACKAGE = "codex_usage_tracker"
 CONSOLE_SCRIPT = "codex-usage-tracker"
-DEFAULT_DOCKER_IMAGE = "python:3.14-slim"
+DEFAULT_DOCKER_IMAGE = (
+    "python:3.14-slim@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6"
+)
 REACT_ASSET_PATTERN = re.compile(
     r"""(?:src|href)=["'](?P<path>/codex-usage-tracker-assets/react/[^"']+)["']"""
 )

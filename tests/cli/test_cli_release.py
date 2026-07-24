@@ -286,7 +286,10 @@ def test_release_pipeline_rebuilds_dashboard_assets_and_smokes_installed_wheel()
     workflow = (repo_root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     package_job = workflow.split("\n  package:\n", maxsplit=1)[1]
     required_in_order = [
-        ("actions/setup-node@v6.4.0", "actions/setup-node@v7.0.0"),
+        (
+            "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 "
+            "# v7.0.0",
+        ),
         ('node-version: "22"',),
         ("run: npm ci",),
         ("run: npm run dashboard:assets:check",),

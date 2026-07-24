@@ -40,7 +40,10 @@ Restart Codex after plugin registration if you want Codex to discover the MCP to
 
 The CLI, SQLite index, dashboard generator, and localhost server are Python-based and are not macOS-only. CI runs the package on Ubuntu with Python 3.10, 3.11, 3.12, 3.13, and 3.14.
 
-The installed-package Docker smoke path uses `python:3.14-slim` by default, which exercises the built wheel, package data, CLI entry point, and plugin installer on the newest supported runtime.
+The installed-package Docker smoke path uses a reviewed digest for
+`python:3.14-slim` by default, which exercises the built wheel, package data,
+CLI entry point, and plugin installer on the newest supported runtime without
+a mutable image reference.
 
 By default the tracker looks for Codex JSONL logs under `~/.codex`, stores its own database/config under `~/.codex-usage-tracker`, and writes the local plugin wrapper under `~/plugins/codex-usage-tracker`. Override paths with `--codex-home`, `--db`, `--plugin-dir`, or `--marketplace` if your platform or Codex installation uses a different layout.
 

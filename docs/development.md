@@ -402,7 +402,9 @@ python scripts/smoke_installed_package.py
 python scripts/smoke_installed_package.py --docker
 ```
 
-The Docker smoke uses `python:3.14-slim` by default so release prep verifies installed-package behavior on the newest supported runtime.
+The Docker smoke uses a reviewed digest for the `python:3.14-slim` image by
+default so release prep verifies installed-package behavior on the newest
+supported runtime without a mutable image reference.
 
 The release checker verifies version alignment, required public docs, packaged plugin assets, wheel contents, and obvious tracked secret patterns. It does not publish anything.
 
@@ -420,6 +422,16 @@ Do not create or push release tags without maintainer approval.
 ## Publishing
 
 Publishing uses GitHub Actions Trusted Publishing through `.github/workflows/publish.yml`; do not upload from a local machine and do not add PyPI or TestPyPI API tokens.
+
+All third-party workflow actions are pinned to a reviewed 40-character commit
+SHA with the reviewed release tag in a trailing comment. The matching
+SHA/tag catalog is `REVIEWED_ACTION_PINS` in `scripts/release_quality.py`.
+Resolve changes from the action's official GitHub release and commit records;
+never infer or abbreviate the commit. A Dependabot action update is incomplete
+until its workflow comment and the reviewed-pin catalog are updated together.
+Run the immutable-pin tests, `actionlint`, `zizmor`, and
+`python scripts/check_release.py` before merging an action update. The complete
+operator sequence is in [the release checklist](release-checklist.md).
 
 The first public package release, `0.3.0`, was published on June 8, 2026. Patch releases `0.3.1` and `0.3.2` stabilized live-dashboard launch and context loading. Minor releases `0.4.0` through `0.13.1` added Python 3.14 support, localization, SQL-backed dashboard loading, observed usage snapshots, diagnostics, usage-drain reports, maintainability refactors, onboarding hardening, and guided usage-summary diagnostics. Minor release `0.14.0` ships the React dashboard transition with legacy parity fixes, local-only safeguards, and weekly-first usage remaining displays.
 
@@ -457,7 +469,7 @@ gh run view <run-id> --log-failed
 
 Fix the branch or workflow, rerun the workflow, and keep the same version only if the failed run did not upload artifacts to TestPyPI or PyPI. If upload succeeded anywhere, cut the next patch version for follow-up validation.
 
-If Trusted Publishing or environment approval breaks, inspect `.github/workflows/publish.yml` first. The publish jobs should use `permissions: id-token: write`, `pypa/gh-action-pypi-publish@release/v1`, environment `testpypi` for TestPyPI, and environment `pypi` for PyPI. Confirm the Trusted Publisher entries in TestPyPI and PyPI still point to owner `douglasmonsky`, repository `codex-usage-tracker`, workflow `publish.yml`, and the matching environment. Do not work around a Trusted Publishing failure by adding API tokens.
+If Trusted Publishing or environment approval breaks, inspect `.github/workflows/publish.yml` first. The publish jobs should use `permissions: id-token: write`, the reviewed immutable `pypa/gh-action-pypi-publish` pin, environment `testpypi` for TestPyPI, and environment `pypi` for PyPI. Confirm the Trusted Publisher entries in TestPyPI and PyPI still point to owner `douglasmonsky`, repository `codex-usage-tracker`, workflow `publish.yml`, and the matching environment. Do not work around a Trusted Publishing failure by adding API tokens.
 
 If PyPI or TestPyPI appears stale, verify with the JSON API and simple index before assuming the upload failed:
 

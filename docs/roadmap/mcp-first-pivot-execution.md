@@ -1210,9 +1210,9 @@ commit as each roadmap task.
 
 ## Remaining Planned Tasks
 
-Tasks 27.5 through 33 are merged. Task 34 is complete locally on
-`pivot/34-blocking-quality-gates` and awaiting its final review and PR; Tasks 35
-through 45 remain planned in the approved implementation roadmap. Add a full
+Tasks 27.5 through 34 are merged. Task 35 is active on
+`pivot/35-immutable-action-pins`; Tasks 36 through 45 remain planned in the
+approved implementation roadmap. Add a full
 entry using the format above when each task becomes active; do not mark a task
 complete without its named focused and full verification evidence.
 
@@ -1292,8 +1292,7 @@ complete without its named focused and full verification evidence.
 
 ## Task 34 - Make Quality and Work-Proof Gates Directly Blocking
 
-- Status: complete locally on `pivot/34-blocking-quality-gates`; final review
-  and reviewed PR remain.
+- Status: merged through PR #301 as `0a4818e`.
 - Blocking coverage:
   - aggregate branch coverage now fails below 85% in both Coverage.py and Agent
     Maintainer configuration;
@@ -1356,3 +1355,49 @@ complete without its named focused and full verification evidence.
   - auxiliary schemas with intentionally flexible payloads are inventoried with
     empty required-field maps; future stabilization may tighten those shapes
     without changing their IDs when the change is additive.
+
+## Task 35 - Pin Workflow and Release Dependencies Immutably
+
+- Status: complete locally on `pivot/35-immutable-action-pins`; final review
+  complete and reviewed PR remains.
+- Immutable workflow contract:
+  - every third-party workflow action uses an official 40-character commit
+    SHA and a trailing reviewed release-tag comment;
+  - `REVIEWED_ACTION_PINS` validates the action, tag, and SHA as one offline
+    tuple, so mutable, abbreviated, missing-comment, and mismatched-comment
+    references fail release readiness;
+  - local actions remain relative, while Docker action references require a
+    `sha256` digest.
+- Reviewed dependency sources:
+  - action tags and commits were resolved from the official GitHub release and
+    commit APIs;
+  - the installed-package `python:3.14-slim` smoke image is pinned to the
+    reviewed multi-platform manifest digest.
+- Dependabot and operator policy:
+  - Dependabot action PRs carry CI/dependency metadata and require a human to
+    update the release comment and reviewed-pin catalog together;
+  - development and release-checklist docs record the review and verification
+    sequence for action updates.
+- Focused verification:
+  - CI policy, immutable-pin, release-quality, release CLI, and packaging slice:
+    `74 passed`;
+  - `actionlint`, offline `zizmor`, Ruff, source release readiness, and
+    `git diff --check` pass.
+- Broad verification:
+  - CI-equivalent Agent Maintainer run
+    `20260724T090631521509Z-ci-313859a133e4` completed the full suite and
+    surfaced inherited repository-wide file-length, formatting, type,
+    complexity, and boundary debt;
+  - its only task-local failure was the cohesive change-plan template, which
+    was repaired and passes the direct staged plan check.
+- Final review:
+  - the single read-only reviewer reported two medium false-green findings and
+    both were accepted;
+  - noncanonical-but-valid YAML `uses` keys are now rejected and covered;
+  - Docker smoke validation parses the actual `DEFAULT_DOCKER_IMAGE`
+    assignment, so a decoy digest cannot satisfy the gate;
+  - reviewer token attribution remains `pending` after the permitted aggregate
+    metrics helper timed out; no retry was attempted.
+- Follow-up:
+  - Task 36 owns build-once artifact promotion and will reuse these immutable
+    workflow boundaries.

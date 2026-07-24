@@ -13,6 +13,9 @@ _COVERAGE_STEP = """      - name: Changed-line coverage
           BASE_REF: ${{ github.base_ref }}
         run: diff-cover coverage.xml --compare-branch="origin/$BASE_REF" --fail-under=90
 """
+_SETUP_NODE_PIN = (
+    "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0"
+)
 
 
 def _write_release_fixture(tmp_path: Path, coverage_step: str = _COVERAGE_STEP) -> None:
@@ -25,7 +28,7 @@ jobs:
   package:
     name: Build package
     steps:
-      - uses: actions/setup-node@v7.0.0
+      - uses: {_SETUP_NODE_PIN}
         with:
           node-version: "22"
       - run: npm ci
@@ -72,7 +75,7 @@ diff_cover_fail_under = 90
 def test_release_check_accepts_blocking_coverage_and_setup_node_v7(tmp_path: Path) -> None:
     _write_release_fixture(tmp_path)
 
-    assert check_ci_workflow(tmp_path, ("actions/setup-node@v7.0.0",)) == []
+    assert check_ci_workflow(tmp_path, (_SETUP_NODE_PIN,)) == []
 
 
 @pytest.mark.parametrize(
@@ -95,6 +98,6 @@ def test_release_check_rejects_non_blocking_changed_coverage(
 ) -> None:
     _write_release_fixture(tmp_path, coverage_step)
 
-    failures = check_ci_workflow(tmp_path, ("actions/setup-node@v7.0.0",))
+    failures = check_ci_workflow(tmp_path, (_SETUP_NODE_PIN,))
 
     assert any("coverage step" in failure for failure in failures)

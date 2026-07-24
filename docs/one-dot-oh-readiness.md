@@ -31,7 +31,10 @@ Not guaranteed:
 - [x] Verify installed package resources in Linux Docker: `python scripts/smoke_installed_package.py --docker`.
 - [x] Verify public PyPI package in Docker: `python scripts/smoke_installed_package.py --docker --from-pypi --version 0.21.0`.
 - [x] Verify PyPI metadata names remain unchanged: `python scripts/check_release.py`.
-- [x] Add Python 3.14 as an official support target after CI, package classifiers, docs, and installed-package smoke coverage were added. Docker smoke coverage uses `python:3.14-slim` by default. Track this in issue #12.
+- [x] Add Python 3.14 as an official support target after CI, package
+  classifiers, docs, and installed-package smoke coverage were added. Docker
+  smoke coverage uses a reviewed `python:3.14-slim` digest by default. Track
+  this in issue #12.
 
 ## 2. Upgrade And Migration
 
