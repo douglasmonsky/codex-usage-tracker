@@ -11,15 +11,13 @@ def test_schema_migration_creates_otel_sidecar_tables(tmp_path: Path) -> None:
     with connect(tmp_path / "usage.sqlite3") as conn:
         init_db(conn)
         source_columns = {
-            str(row["name"])
-            for row in conn.execute("PRAGMA table_info(otel_completion_sources)")
+            str(row["name"]) for row in conn.execute("PRAGMA table_info(otel_completion_sources)")
         }
         event_columns = {
-            str(row["name"])
-            for row in conn.execute("PRAGMA table_info(otel_completion_events)")
+            str(row["name"]) for row in conn.execute("PRAGMA table_info(otel_completion_events)")
         }
 
-    assert SCHEMA_VERSION == 34
+    assert SCHEMA_VERSION == 35
     assert {
         "source_path",
         "device",

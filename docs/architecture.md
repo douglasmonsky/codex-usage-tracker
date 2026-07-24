@@ -140,7 +140,19 @@ Shareable outputs remain aggregate-first and must omit indexed/raw content unles
 - `interfaces/http/v2.py` is the stable localhost HTTP adapter. It decodes bounded strict requests and serializes shared application contracts; it calls `application/` services directly and never routes through MCP handlers. `server/handler.py` retains Host, Origin, and local-token enforcement at the transport boundary, while `server/route_inventory.py` records exposure, execution, history, cache, and byte budgets.
 - `costing.py`, `pricing_config.py`, `pricing_openai.py`, `pricing_estimates.py`, and `allowance.py` own cost, credit, rate-card, and allowance annotation. Keep estimate confidence and source metadata attached to rows.
 - `projects.py`, `threads.py`, and `recommendations.py` annotate aggregate rows with project identity, thread relationships, and actionable signals. Project privacy redaction belongs in `projects.py` so CLI, MCP, dashboard, CSV, and support-bundle surfaces share behavior.
-- `context.py` is the normal path for explicit selected-call raw context. It reads one selected source file on demand, applies redaction and size limits, omits tool output by default, and keeps full serialized group analysis explicit.
+- `context/` is the normal path for explicit selected-call raw context. Refresh records
+  the token event's exact UTF-8 byte offset on each new usage row. A context read
+  uses that offset only while the stored path, file identity, size, modification
+  time, and parsed-prefix provenance still match the current source and the
+  opened descriptor still matches that validated identity snapshot. It seeks a
+  configurable bounded window before the token event, verifies the target
+  timestamp and token totals, and requires either source start or a preceding
+  turn boundary so compaction, diagnostic carry state, and scoped parse-error
+  counts stay complete. Otherwise it scans sequentially. Offset and fallback
+  reads share the same parser, redaction, size limits, tool-output policy, and
+  quick/full serialized analysis. Optional diagnostics report
+  `offset_seek` or `sequential_fallback`, the fallback reason, and inspected source
+  bytes without exposing raw context.
 - `diagnostic_snapshots.py` owns persisted diagnostic snapshot refresh/load orchestration. Snapshot modules should stay synthetic-testable and avoid raw transcript persistence in aggregate diagnostic facts.
 - `dashboard.py` builds aggregate-first static dashboard payloads and writes HTML/assets. `server.py` adds localhost refresh, compatibility `/api/usage`, SQL-backed live API slices, and explicit lazy context loading.
 - `frontend/dashboard/` owns the React dashboard. The packaged React HTML embeds only a database-free boot payload (authentication, localization, and data-scope defaults), then hydrates aggregate data through the localhost APIs. It should render server/API payloads rather than becoming an independent source of usage calculations.
@@ -204,4 +216,4 @@ python scripts/benchmark_dashboard_routes.py --sizes 100000 --iterations 3 --ski
 
 Dashboard UI changes should also be opened in a browser and checked at desktop and mobile widths for overflow, overlap, stale state, and shareable-output behavior.
 
-Run the enforced dashboard route budget after changing focused query services, response caching, or frontend query orchestration. Run `python scripts/benchmark_synthetic_history.py --rows 10000 100000 --json --enforce-thresholds` after changing broader SQLite filters, dashboard payload loading, or indexes. Run `python scripts/benchmark_synthetic_history.py --rows 1000 --with-source-logs --json --enforce-thresholds` after changing source-log refresh, content indexing, explicit context loading, or source-log diagnostics. Run the 500k benchmark before release work when practical.
+Run the enforced dashboard route budget after changing focused query services, response caching, or frontend query orchestration. Run `python scripts/benchmark_synthetic_history.py --rows 10000 100000 --json --enforce-thresholds` after changing broader SQLite filters, dashboard payload loading, or indexes. Run `python scripts/benchmark_synthetic_history.py --rows 1000 --with-source-logs --json --enforce-thresholds` after changing source-log refresh, content indexing, explicit context loading, or source-log diagnostics. That source-log fixture pads its final target source to 100,000 lines; its offset ratchet requires equivalent offset/fallback payloads, less than 5% of source bytes inspected, and at least a 5x five-run median speedup. Run the 500k benchmark before release work when practical.

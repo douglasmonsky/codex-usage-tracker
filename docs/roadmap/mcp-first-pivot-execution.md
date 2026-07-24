@@ -1053,9 +1053,8 @@ commit as each roadmap task.
 
 ## Task 31 - Enforce SQLite Foreign Keys and Integrity Checks
 
-- Status: implementation, primary verification, one final review, and
-  accepted-finding rechecks are complete on `pivot/31-sqlite-integrity`; PR
-  landing remains.
+- Status: complete; `pivot/31-sqlite-integrity` landed through PR #298 as
+  squash commit `920d2dbbefacb31820877a2e04c601a6baafda83`.
 - Connection and migration contract:
   - every runtime SQLite connection is centralized through the verified shared
     policy or explicitly configures that policy for the in-memory allowance
@@ -1138,9 +1137,82 @@ commit as each roadmap task.
   relationship must update the exact foreign-key inventory test and cleanup
   coverage.
 
+## Task 32 - Add Indexed Byte Offsets for Bounded Context Retrieval
+
+- Status: implementation, final review, and verification are complete on
+  `pivot/32-indexed-context-offsets`; PR landing remains.
+- Schema and ingestion contract:
+  - schema v35 adds one nullable `usage_events.source_byte_offset`; existing
+    rows migrate in place with null offsets and retain sequential fallback;
+  - binary JSONL parsing records the exact token-event byte position for ASCII
+    and multibyte UTF-8 under LF and CRLF newlines;
+  - append-only refresh preserves existing offsets and records new offsets,
+    while rewritten and cloned files cannot reuse stale provenance.
+- Read contract:
+  - the selected-call loader validates path, size, modification time, inode,
+    device/prefix provenance, offset bounds, and the already-open descriptor
+    identity before seeking;
+  - a configurable 128 KiB pre-target window must contain the selected turn
+    plus source start or a preceding semantic turn anchor, otherwise the
+    existing sequential reader runs;
+  - the target token line must match the requested timestamp plus cumulative
+    and last-call token values, preventing another call in the same turn from
+    satisfying a corrupted offset;
+  - offset and fallback modes share parsing, redaction, limits, tool-output
+    controls, compaction handling, malformed-line behavior, and quick/full
+    serialized estimates, and neither reads beyond the target token event;
+  - opt-in diagnostics report `offset_seek` or `sequential_fallback`, a bounded
+    reason, and actual inspected source bytes.
+- Focused verification:
+  - Task 32 offset, provenance, migration, and context suites: `60 passed`;
+  - broader parser, store, context, schema, and privacy slice: `331 passed`;
+  - targeted Ruff and Pyright report zero findings.
+- Performance evidence:
+  - the prescribed synthetic source-log benchmark pads the final target source
+    to exactly 100,000 lines and compares five-run medians;
+  - latest unprofiled result: 131,478 of 9,071,823 bytes inspected (`1.4493%`),
+    `0.005884s` offset median versus `0.183515s` sequential median (`31.189x`),
+    with byte-for-byte equivalent normalized payloads and all thresholds green;
+  - Agent Perf run `20260724T043235Z-63247a16` attributes only `0.08%` of
+    application work to `_read_context_from_offset`; the deliberately forced
+    fallback remains concentrated in JSON envelope scanning. The earlier
+    baseline profile produced no attributable samples, so the identical
+    unprofiled ratchet—not profiler comparison—is the speed claim.
+- Full verification:
+  - complete Python suite: `1998 passed in 115.81s`;
+  - coverage suite: `1998 passed`, 88% aggregate coverage;
+  - source and built-distribution release checks, wheel/sdist builds, Twine
+    validation, and an installed-package smoke test all pass;
+  - Ruff, Pyright, MyPy, Tach, Deptry, Vulture, Bandit, compileall, packaged
+    dashboard JavaScript syntax, Markdown, YAML, TOML, and diff checks pass
+    with only the repository's reviewed existing Bandit/YAML warnings;
+  - the full Agent Maintainer gate still reports inherited repository-wide
+    file-length, historical-document formatting, Pyright-test, and Xenon
+    findings. The roadmap-required legacy migration inventory test remains over
+    the generic file limit, while changed production files stay within their
+    ratchets and the task-specific and named direct gates above pass without
+    suppressing or relaxing findings;
+  - the single final read-only review reported four findings (one high, two
+    medium, one low); all four were accepted and fixed with same-turn target
+    identity, descriptor TOCTOU, pre-turn carry-anchor, and parse-error scoping
+    regressions. Reviewer token attribution and tokens per accepted finding are
+    `pending` because the one permitted usage-index refresh timed out.
+- Deviations from plan:
+  - the repository's current provenance owner is `store/sources.py`, not the
+    historical `source_records.py` path named by the roadmap;
+  - context entry formatting and benchmark ratchet logic moved into focused
+    helper modules, and the additive migration uses the existing query-index
+    schema owner, keeping changed production files under their active
+    file-length ratchets.
+- Follow-up risks:
+  - pre-v35 rows use sequential fallback until their source is reindexed;
+  - a selected turn whose pre-token context exceeds 128 KiB deliberately falls
+    back rather than risking an incomplete offset result.
+
 ## Remaining Planned Tasks
 
-Tasks 27.5 through 31 are complete through Task 31 primary verification. Tasks
-32 through 45 remain planned in the approved implementation roadmap. Add a full
-entry using the format above when each task becomes active; do not mark a task
-complete without its named focused and full verification evidence.
+Tasks 27.5 through 31 are complete, and Task 32 is complete through final
+verification pending PR landing. Tasks 33 through 45 remain planned in the
+approved implementation roadmap. Add a full entry using the format above when
+each task becomes active; do not mark a task complete without its named focused
+and full verification evidence.

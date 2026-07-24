@@ -33,6 +33,7 @@ def build_usage_event(
     rate_limits: object = None,
     upstream_usage_id: str | None = None,
     stats: MutableMapping[str, int] | None = None,
+    source_byte_offset: int | None = None,
 ) -> UsageEvent:
     input_tokens = required_usage_int(last_usage, "input_tokens", stats=stats)
     cached_input_tokens = required_usage_int(last_usage, "cached_input_tokens", stats=stats)
@@ -61,6 +62,7 @@ def build_usage_event(
         event_timestamp=event_timestamp,
         source_file=str(path),
         line_number=line_number,
+        source_byte_offset=source_byte_offset,
         turn_id=optional_str(current_turn.get("turn_id")),
         turn_timestamp=optional_str(current_turn.get("turn_timestamp")),
         cwd=optional_str(current_turn.get("cwd")),

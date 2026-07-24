@@ -114,6 +114,7 @@ def parse_codex_jsonl_v1(
     with path.open("rb") as handle:
         if start_byte > 0:
             handle.seek(start_byte)
+        source_byte_offset = start_byte
         for line_number, raw_line in enumerate(handle, start_line + 1):
             final_line_number = line_number
             _handle_jsonl_line(
@@ -121,10 +122,12 @@ def parse_codex_jsonl_v1(
                 index=index,
                 state=state,
                 line_number=line_number,
+                source_byte_offset=source_byte_offset,
                 raw_line=raw_line,
                 stats=stats,
                 entry_observer=entry_observer,
             )
+            source_byte_offset += len(raw_line)
 
     return ParsedUsageFile(
         events=state.events,
@@ -175,6 +178,7 @@ def _handle_jsonl_line(
     index: dict[str, SessionInfo],
     state: _JsonlParseState,
     line_number: int,
+    source_byte_offset: int,
     raw_line: bytes,
     stats: MutableMapping[str, int] | None,
     entry_observer: JsonlEntryObserver | None,
@@ -192,6 +196,7 @@ def _handle_jsonl_line(
         index=index,
         state=state,
         line_number=line_number,
+        source_byte_offset=source_byte_offset,
         envelope=envelope,
         payload=payload,
         stats=stats,
@@ -207,6 +212,7 @@ def _handle_decoded_jsonl_entry(
     index: dict[str, SessionInfo],
     state: _JsonlParseState,
     line_number: int,
+    source_byte_offset: int,
     envelope: dict[str, Any],
     payload: dict[str, Any],
     stats: MutableMapping[str, int] | None,
@@ -239,6 +245,7 @@ def _handle_decoded_jsonl_entry(
         index=index,
         state=state,
         line_number=line_number,
+        source_byte_offset=source_byte_offset,
         timestamp=timestamp,
         envelope=envelope,
         payload=payload,
@@ -267,6 +274,7 @@ def _handle_token_count_event(
     index: dict[str, SessionInfo],
     state: _JsonlParseState,
     line_number: int,
+    source_byte_offset: int,
     timestamp: str,
     envelope: dict[str, Any],
     payload: dict[str, Any],
@@ -291,6 +299,7 @@ def _handle_token_count_event(
     event = _build_token_count_event(
         path=path,
         line_number=line_number,
+        source_byte_offset=source_byte_offset,
         timestamp=timestamp,
         envelope=envelope,
         session_id=effective_session_id,
@@ -426,6 +435,7 @@ def _build_token_count_event(
     *,
     path: Path,
     line_number: int,
+    source_byte_offset: int,
     timestamp: str,
     envelope: dict[str, Any],
     session_id: str,
@@ -443,6 +453,7 @@ def _build_token_count_event(
         return build_usage_event(
             path=path,
             line_number=line_number,
+            source_byte_offset=source_byte_offset,
             event_timestamp=timestamp,
             session_id=session_id,
             session_info=session_info,

@@ -11,6 +11,8 @@ from codex_usage_tracker.context.constants import (
     CONTEXT_MODES,
     DEFAULT_CONTEXT_CHARS,
     DEFAULT_CONTEXT_ENTRIES,
+    DEFAULT_CONTEXT_SEEK_BACKWARD_BYTES,
+    normalize_context_mode,
 )
 from codex_usage_tracker.context.loader import (
     attach_context_diagnostics,
@@ -18,10 +20,7 @@ from codex_usage_tracker.context.loader import (
     context_source_location,
     load_context_usage_record,
 )
-from codex_usage_tracker.context.reader import (
-    _normalize_context_mode,
-    _read_context_for_usage_record,
-)
+from codex_usage_tracker.context.reader import _read_context_for_usage_record
 from codex_usage_tracker.context.token_estimates import (
     estimate_visible_tokens,
 )
@@ -29,6 +28,7 @@ from codex_usage_tracker.context.values import (
     optional_str,
 )
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
+from codex_usage_tracker.store.context_offsets import resolve_context_offset
 
 __all__ = (
     "CONTEXT_MODE_FULL",
@@ -36,6 +36,7 @@ __all__ = (
     "CONTEXT_MODES",
     "DEFAULT_CONTEXT_CHARS",
     "DEFAULT_CONTEXT_ENTRIES",
+    "DEFAULT_CONTEXT_SEEK_BACKWARD_BYTES",
     "load_call_context",
 )
 
@@ -49,6 +50,7 @@ def load_call_context(
     include_compaction_history: bool = False,
     diagnostics: bool = False,
     mode: str = CONTEXT_MODE_QUICK,
+    max_backward_bytes: int = DEFAULT_CONTEXT_SEEK_BACKWARD_BYTES,
 ) -> dict[str, Any]:
     """Load logged turn context for one model call from its source JSONL file.
 
@@ -56,7 +58,7 @@ def load_call_context(
     context is not written back to SQLite or embedded in the dashboard HTML.
     """
 
-    context_mode = _normalize_context_mode(mode)
+    context_mode = normalize_context_mode(mode)
     diagnostic_payload: dict[str, Any] | None = {} if diagnostics else None
     row = load_context_usage_record(
         db_path=db_path,
@@ -64,15 +66,24 @@ def load_call_context(
         diagnostic_payload=diagnostic_payload,
     )
     source_file, source_file_bytes, line_number = context_source_location(row, record_id=record_id)
+    offset_resolution = resolve_context_offset(
+        record_id=record_id,
+        source_file=source_file,
+        db_path=db_path,
+    )
     loaded = _read_context_for_usage_record(
         row=row,
         source_file=source_file,
         line_number=line_number,
+        source_byte_offset=offset_resolution.byte_offset,
+        context_read_reason=offset_resolution.reason,
+        source_metadata=offset_resolution.source_metadata,
         max_chars=max_chars,
         max_entries=max_entries,
         include_tool_output=include_tool_output,
         include_compaction_history=include_compaction_history,
         context_mode=context_mode,
+        max_backward_bytes=max_backward_bytes,
     )
     visible_estimate = estimate_visible_tokens(
         loaded.estimate_entries, optional_str(row.get("model"))
