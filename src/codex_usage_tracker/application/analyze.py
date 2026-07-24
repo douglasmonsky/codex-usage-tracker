@@ -5,7 +5,7 @@ import secrets
 import threading
 from collections import OrderedDict
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 
 from codex_usage_tracker.analytics.analysis_catalog import (
@@ -32,6 +32,7 @@ ANALYSIS_RESULT_SCHEMA = "codex-usage-tracker.analysis.v2"
 MAX_ANALYSIS_JOB_BYTES = 64 * 1024
 ANALYSIS_JOB_ENVELOPE_RESERVE_BYTES = 4 * 1024
 MAX_ANALYSIS_REPORT_BYTES = MAX_ANALYSIS_JOB_BYTES - ANALYSIS_JOB_ENVELOPE_RESERVE_BYTES
+_HEARTBEAT_SECONDS = 10.0
 
 
 @dataclass(frozen=True)
@@ -111,9 +112,18 @@ class AnalysisRuntime:
                 result_schema=ANALYSIS_RESULT_SCHEMA,
                 result_budget=MAX_ANALYSIS_JOB_BYTES,
             )
-            self.job_service.register_semantic(
-                kind="analysis", job_id=job_id, adapter=adapter, semantic_key=semantic_key
+            registration = self.job_service.register_semantic(
+                semantic_key,
+                kind="analysis",
+                job_id=job_id,
+                adapter=adapter,
+                source_revision=context.source_revision,
+                request_schema="analysis.request.v1",
+                request=asdict(request),
             )
+            if not registration.should_start:
+                self._records.pop(job_id, None)
+                return registration.status
         thread = threading.Thread(
             target=self._run,
             args=(record, request, context, entry, semantic_key),
@@ -140,12 +150,25 @@ class AnalysisRuntime:
         semantic_key: str,
     ) -> None:
         self._update(record, status="running")
+        heartbeat_stop = threading.Event()
+        threading.Thread(
+            target=self._heartbeat,
+            args=(record.job_id, heartbeat_stop),
+            daemon=True,
+        ).start()
         try:
             report = _run_strategy(entry, request, context, semantic_key)
         except Exception:  # noqa: BLE001 - adapters expose only a privacy-safe failed status.
             self._update(record, status="failed")
         else:
             self._update(record, status="completed", result=payload_mapping(report))
+        finally:
+            heartbeat_stop.set()
+
+    def _heartbeat(self, job_id: str, stop: threading.Event) -> None:
+        while not stop.wait(_HEARTBEAT_SECONDS):
+            if not self.job_service.heartbeat(job_id):
+                return
 
     def _update(
         self,
@@ -158,6 +181,7 @@ class AnalysisRuntime:
             record.status = status
             record.updated_at = _utc_now()
             record.result = result
+        self.job_service.checkpoint(record.job_id)
 
     def _read(self, job_id: str, *, include_result: bool = False) -> dict[str, object]:
         with self._lock:

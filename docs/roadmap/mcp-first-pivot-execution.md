@@ -1139,8 +1139,7 @@ commit as each roadmap task.
 
 ## Task 32 - Add Indexed Byte Offsets for Bounded Context Retrieval
 
-- Status: implementation, final review, and verification are complete on
-  `pivot/32-indexed-context-offsets`; PR landing remains.
+- Status: complete and squash-merged to `main` as `4523c39` through PR #299.
 - Schema and ingestion contract:
   - schema v35 adds one nullable `usage_events.source_byte_offset`; existing
     rows migrate in place with null offsets and retain sequential fallback;
@@ -1211,8 +1210,82 @@ commit as each roadmap task.
 
 ## Remaining Planned Tasks
 
-Tasks 27.5 through 31 are complete, and Task 32 is complete through final
-verification pending PR landing. Tasks 33 through 45 remain planned in the
-approved implementation roadmap. Add a full entry using the format above when
-each task becomes active; do not mark a task complete without its named focused
-and full verification evidence.
+Tasks 27.5 through 33 are complete locally. Task 33 is awaiting its reviewed PR
+and squash merge from `pivot/33-persisted-analysis-jobs`; Tasks 34 through 45
+remain planned in the approved implementation roadmap. Add a full entry using
+the format above when each task becomes active; do not mark a task complete
+without its named focused and full verification evidence.
+
+## Task 33 - Persist Generic Analysis Jobs and Reusable Results
+
+- Status: complete locally on `pivot/33-persisted-analysis-jobs`; reviewed PR
+  and squash merge remain.
+- Storage contract:
+  - schema v36 adds compact `analysis_jobs` lifecycle storage and a partial
+    unique index that atomically deduplicates active semantic jobs; schema v37
+    safely adds expired owner/lease defaults for early pre-release v36 stores;
+  - normalized requests, progress, results, and errors are JSON-safe,
+    byte-bounded, schema-allowlisted where a stable schema exists, and deeply
+    reject raw-context-shaped fields;
+  - compatible completed results require the same job kind, semantic key,
+    source revision, and result schema.
+- Runtime contract:
+  - `JobService` uses the repository as the source of truth when configured and
+    retains only active worker adapters in process;
+  - analysis and allowance workers checkpoint queued, running, completed, and
+    failed states while a background heartbeat renews their process lease;
+    refresh keeps its transient generic status path;
+  - startup and semantic reuse interrupt only expired foreign leases without
+    resuming unknown worker code or disturbing a live second process;
+  - persisted state changes are owner-scoped and monotonic, so late checkpoints
+    cannot regress a terminal state or reduce progress.
+- Retention and diagnostics:
+  - terminal rows are pruned by age and count in the terminal update transaction
+    as well as during explicit maintenance;
+  - doctor reports active, queued, running, completed, failed, interrupted, and
+    cumulatively pruned counts without creating a missing database.
+- Focused verification:
+  - repository and restart coverage: `16 passed`;
+  - application, HTTP, container, migration, and doctor integration:
+    `100 passed`;
+  - pre-release v36 lease migration and original startup regressions:
+    `52 passed`;
+  - the final codec boundary slice: `12 passed`.
+- Full verification:
+  - complete Python suite: `2016 passed in 126.30s`;
+  - coverage suite: 88% aggregate and 90% changed-line coverage;
+  - Ruff format/check, MyPy, targeted Pyright, Tach, Deptry, Vulture, configured
+    Xenon complexity, Bandit, compileall, file-length ratchets, cohesive
+    change-plan validation, and `git diff --check` pass;
+  - source and distribution release checks, wheel/sdist build, Twine metadata,
+    and a clean installed-package smoke pass;
+  - one broad Agent Maintainer run
+    `20260724T063559290936Z-full-1ff4b37aa9ba` exposed inherited
+    repository-wide formatting/type/boundary noise plus task-local source
+    length, privacy, and change-budget findings. The task-local findings were
+    fixed and rechecked directly without rerunning the broad profile or
+    relaxing a threshold.
+- Final review:
+  - the single read-only reviewer reported five findings and all five were
+    accepted: live-process lease ownership, owner-scoped monotonic transitions,
+    deep privacy validation for every JSON column, transactional terminal
+    pruning, and a cold-import cycle;
+  - post-review regressions cover two live owners, heartbeat expiry, stale
+    updates, every persisted JSON column, pruning during terminal updates,
+    early v36 stores, and a cold Python import;
+  - reviewer token status and tokens per accepted finding are `pending`; the
+    one permitted local aggregate attribution call was rejected by the
+    installed plugin's privacy-mode contract and was not retried.
+- Code-intelligence verification:
+  - GitNexus's derived FTS cache was corrupt; its normal repair path also
+    failed, so an index-only forced rebuild restored a clean disposable index;
+  - the refreshed index contains 25,716 nodes, 55,445 edges, 1,299 clusters,
+    and 300 flows. It maps this 20-file change to 147 symbols and 18 affected
+    execution flows with critical expected schema/application reach; the
+    focused integration, full-suite, release, and installed-package gates above
+    validate that reach.
+- Follow-up risks:
+  - a crashed worker can remain active for at most the 30-second lease window;
+    startup or the next semantic lookup then marks it interrupted;
+  - generic persistence deliberately stores no raw context and cannot resume
+    unknown worker code after a process exit.

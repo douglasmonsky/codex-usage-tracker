@@ -26,6 +26,66 @@ class JobAdapter(Protocol):
     def status(self, job_id: str, *, include_result: bool = False) -> Mapping[str, object]: ...
 
 
+class JobPersistence(Protocol):
+    """Structural boundary implemented by the SQLite job repository."""
+
+    def create_or_reuse(
+        self,
+        *,
+        job_id: str,
+        job_kind: str,
+        semantic_key: str,
+        source_revision: str,
+        request_schema: str,
+        request: Mapping[str, object],
+        result_schema: str,
+    ) -> tuple[Mapping[str, object], bool]: ...
+
+    def update_status(
+        self,
+        job_id: str,
+        *,
+        state: str,
+        progress: Mapping[str, object],
+        result_schema: str | None = None,
+        result: object = None,
+        error: Mapping[str, object] | None = None,
+    ) -> Mapping[str, object]: ...
+
+    def get(
+        self,
+        job_id: str,
+        *,
+        touch: bool = False,
+    ) -> Mapping[str, object] | None: ...
+
+    def heartbeat(self, job_id: str) -> bool: ...
+
+    def find_reusable(
+        self,
+        *,
+        job_kind: str,
+        semantic_key: str,
+        source_revision: str,
+        result_schema: str,
+    ) -> Mapping[str, object] | None: ...
+
+    def completed_results(
+        self,
+        *,
+        job_kind: str,
+        result_schema: str,
+        source_revision: str,
+        limit: int,
+    ) -> tuple[Mapping[str, object], ...]: ...
+
+    def recover_interrupted(self) -> int: ...
+
+    def prune(self) -> int: ...
+
+    def counts(self) -> Mapping[str, int]: ...
+
+
 @dataclass(frozen=True)
 class JobStatusV1:
     """One normalized generic job status."""
@@ -127,6 +187,14 @@ class JobHandle:
             raise ValueError(
                 f"result_budget must be an integer from 1 through {MAX_RESULT_BUDGET_BYTES}"
             )
+
+
+@dataclass(frozen=True)
+class JobRegistration:
+    """Result of an atomic semantic-job registration."""
+
+    status: JobStatusV1
+    should_start: bool
 
 
 def _canonical_timestamp(value: str, field_name: str) -> str:
