@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 0.25.0.dev0 - 2026-07-25
+## 0.25.0 - 2026-07-25
 
 - Prioritize central-product reliability before compatibility removal, moving
   the existing removal and stabilization roadmap stages to 0.26 and 0.27.

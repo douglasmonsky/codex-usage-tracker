@@ -252,9 +252,8 @@ python -m pytest
 python -m compileall src
 python -m mypy
 python scripts/check_product_complexity.py --config config/product-complexity-budget.json
-for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
-  node --check "$file"
-done
+find src/codex_usage_tracker/plugin_data/dashboard \
+  -type f -name '*.js' -exec node --check '{}' ';'
 python scripts/check_release.py
 python -m build
 python scripts/check_product_complexity.py --config config/product-complexity-budget.json --dist dist

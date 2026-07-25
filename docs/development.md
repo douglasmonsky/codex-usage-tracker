@@ -126,9 +126,8 @@ python -m agent_maintainer.runners.bandit
 zizmor --offline --no-progress .github/workflows
 python scripts/check_product_complexity.py --config config/product-complexity-budget.json
 python -m compileall src
-for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
-  node --check "$file"
-done
+find src/codex_usage_tracker/plugin_data/dashboard \
+  -type f -name '*.js' -exec node --check '{}' ';'
 python scripts/check_release.py
 git diff --check
 rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info
@@ -223,8 +222,8 @@ python scripts/smoke_installed_package.py --docker
 To verify the public PyPI package instead of the local checkout:
 
 ```bash
-python scripts/smoke_installed_package.py --from-pypi --version 0.25.0.dev0
-python scripts/smoke_installed_package.py --docker --from-pypi --version 0.25.0.dev0
+python scripts/smoke_installed_package.py --from-pypi --version 0.25.0
+python scripts/smoke_installed_package.py --docker --from-pypi --version 0.25.0
 ```
 
 `scripts/check_release.py` treats these public-package smoke commands as release-state claims. Keep their `--version` and `codex-usage-tracking==...` values aligned with `pyproject.toml`; the release gate fails when the docs claim a different public version. It also checks that install docs point at the real PyPI distribution, `codex-usage-tracking`, and keep the warning that `codex-usage-tracker` is a different PyPI package.
@@ -410,9 +409,8 @@ python -m mypy
 python -m pytest
 python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
 python -m compileall src
-for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
-  node --check "$file"
-done
+find src/codex_usage_tracker/plugin_data/dashboard \
+  -type f -name '*.js' -exec node --check '{}' ';'
 python scripts/check_release.py
 git diff --check
 rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info

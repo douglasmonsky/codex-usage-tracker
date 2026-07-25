@@ -46,7 +46,7 @@ python -m ruff check .
 python -m mypy
 python -m pytest
 python -m compileall src
-for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do node --check "$file"; done
+find src/codex_usage_tracker/plugin_data/dashboard -type f -name '*.js' -exec node --check '{}' ';'
 python scripts/check_release.py
 git diff --check
 ```
