@@ -3,7 +3,7 @@ import type { DashboardDataScope, DashboardModelScope } from './dashboardDataSco
 import type { ConversationalReadiness, HomeSummaryPayload, PricingSnapshot } from './homeTypes';
 import type { CallServiceTierFields, UsageServiceTierFields } from './serviceTier';
 
-export type { ConversationalReadiness, HomeFindingPayload, HomeRecentEvidencePayload, HomeStatusPayload, HomeSummaryPayload } from './homeTypes';
+export type { ConversationalReadiness, HomeStatusPayload, HomeSummaryPayload } from './homeTypes';
 
 export type UsageRow = UsageBillingFields & UsageServiceTierFields & {
   id?: string;

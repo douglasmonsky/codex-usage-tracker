@@ -36,6 +36,7 @@ from codex_usage_tracker.server.query_cache import (  # noqa: E402
 from codex_usage_tracker.server.recommendations import (  # noqa: E402
     handle_recommendations_request,
 )
+from codex_usage_tracker.server.status import status_payload  # noqa: E402
 from codex_usage_tracker.server.summary import handle_summary_request  # noqa: E402
 from codex_usage_tracker.store.api import (  # noqa: E402
     refresh_usage_event_links,
@@ -264,9 +265,30 @@ def benchmark_fixture(
             iterations=iterations,
         )
     )
+    with connect(db_path) as conn:
+        conn.execute(
+            "UPDATE recommendation_fact_state SET source_generation = source_generation - 1 "
+            "WHERE singleton = 1"
+        )
+    routes.append(
+        route_support.benchmark_route(
+            "/api/status",
+            lambda: status_payload(
+                "include_archived=false",
+                codex_home=fixture_dir / ".codex",
+                db_path=db_path,
+                pricing_path=config["pricing_path"],
+                allowance_path=config["allowance_path"],
+                rate_card_path=rate_card_path,
+                include_archived_default=False,
+            ),
+            iterations=iterations,
+        )
+    )
     result: dict[str, object] = {
         "rows": rows,
         "populate_seconds": populate_seconds,
+        "status_analysis_generation_lag": 1,
         "recommendation_materialization": {
             "rows": materialized_rows,
             "seconds": materialize_seconds,

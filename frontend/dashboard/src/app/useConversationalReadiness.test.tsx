@@ -119,8 +119,6 @@ function homeStatus(sourceRevision: string): HomeStatusPayload {
         observed_usage: { available: false, windows: [] },
         windows: [],
       },
-      findings: [],
-      recent_evidence: [],
     },
   };
 }

@@ -135,7 +135,7 @@ Tracked schema ids:
 | `codex-usage-tracker-codex-rate-card-v1` | Local Codex credit rate card |
 | `codex-usage-tracker-diagnostic-snapshot-refresh-v1` | Diagnostic snapshot refresh metadata |
 | `codex-usage-tracker-health-v1` | Local dashboard server health response |
-| `codex-usage-tracker-home-summary-v1` | Bounded Home summary response |
+| `codex-usage-tracker-home-summary-v1` | Compact Home status and usage response |
 | `codex-usage-tracker-pricing-v2` | Local model pricing configuration |
 | `codex-usage-tracker-react-selected-report-v1` | Downloaded selected-report JSON from the React dashboard |
 | `codex-usage-tracker-refresh-job-v1` | Compatibility dashboard refresh job |

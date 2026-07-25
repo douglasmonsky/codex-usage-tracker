@@ -168,8 +168,6 @@ function renderDashboardView(props: DashboardRouteViewProps) {
           homeStatusLoading={homeStatusLoading}
           homeStatusError={homeStatusError}
           onRefresh={onRefresh}
-          onNavigate={navigateView}
-          onOpenCall={openCallInvestigator}
         />
       );
     case 'investigator':

@@ -8,25 +8,6 @@ export type ConversationalReadiness = {
   evidence: string[];
 };
 
-export type HomeFindingPayload = {
-  finding_id: string;
-  confidence: 'high' | 'review';
-  title: string;
-  summary: string;
-  action: string;
-  follow_up_prompt: string;
-  evidence: { kind: 'call'; record_id: string };
-};
-
-export type HomeRecentEvidencePayload = {
-  kind: 'call';
-  evidence_id: string;
-  label: string;
-  detail: string;
-  observed_at: string | null;
-  record_id: string;
-};
-
 export type PricingSnapshot = {
   configured?: boolean;
   model_count?: number;
@@ -97,8 +78,6 @@ export type HomeSummaryPayload = {
     observed_usage: HomeObservedUsage;
     windows: HomeAllowanceWindow[];
   };
-  findings: HomeFindingPayload[];
-  recent_evidence: HomeRecentEvidencePayload[];
 };
 
 export type HomeStatusPayload = {

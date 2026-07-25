@@ -45,23 +45,6 @@ const summary: HomeSummaryPayload = {
     observed_usage: { available: false, windows: [] },
     windows: [],
   },
-  findings: Array.from({ length: 4 }, (_, index) => ({
-    finding_id: `finding-${index}`,
-    confidence: 'high',
-    title: `Finding ${index}`,
-    summary: `Evidence summary ${index}`,
-    action: `Action ${index}`,
-    follow_up_prompt: `Investigate finding ${index}`,
-    evidence: { kind: 'call', record_id: `record-${index}` },
-  })),
-  recent_evidence: Array.from({ length: 7 }, (_, index) => ({
-    kind: 'call',
-    evidence_id: `record-${index}`,
-    label: `Thread ${index}`,
-    detail: 'gpt-5 · 1,000 tokens',
-    observed_at: `2026-07-21T0${index}:00:00Z`,
-    record_id: `record-${index}`,
-  })),
 };
 
 function renderHome(element: ReactElement) {
@@ -84,7 +67,7 @@ describe('HomePage', () => {
     });
   });
 
-  it('renders bounded status, findings, and evidence without legacy dashboard modules', () => {
+  it('renders current usage without persisted findings or legacy dashboard modules', () => {
     renderHome(
       <HomePage
         model={fixtureModel}
@@ -97,8 +80,6 @@ describe('HomePage', () => {
         scopeSince={null}
         refreshing={false}
         onRefresh={vi.fn()}
-        onNavigate={vi.fn()}
-        onOpenCall={vi.fn()}
       />,
     );
 
@@ -111,7 +92,8 @@ describe('HomePage', () => {
     expect(screen.getByText('Estimated Cost')).toBeInTheDocument();
     expect(screen.getByText('219,508')).toBeInTheDocument();
     expect(screen.getByText('30.98B')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Recent findings' })).getAllByRole('article')).toHaveLength(3);
+    expect(screen.queryByRole('region', { name: 'Recent findings' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Bounded persisted evidence')).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Home status' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Recent evidence' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Usage Constellation/i)).not.toBeInTheDocument();
@@ -179,8 +161,6 @@ describe('HomePage', () => {
         scopeSince={null}
         refreshing={false}
         onRefresh={vi.fn()}
-        onNavigate={vi.fn()}
-        onOpenCall={vi.fn()}
       />,
     );
 
@@ -193,9 +173,8 @@ describe('HomePage', () => {
     });
   });
 
-  it('offers setup guidance, copyable prompts, refresh, and contextual evidence', async () => {
+  it('offers setup guidance, copyable prompts, and refresh', async () => {
     const onRefresh = vi.fn();
-    const onOpenCall = vi.fn();
     renderHome(
       <HomePage
         model={fixtureModel}
@@ -208,8 +187,6 @@ describe('HomePage', () => {
         scopeSince={null}
         refreshing={false}
         onRefresh={onRefresh}
-        onNavigate={vi.fn()}
-        onOpenCall={onOpenCall}
       />,
     );
 
@@ -232,10 +209,8 @@ describe('HomePage', () => {
     });
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('Where did Codex use subagents'));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh data' }));
-    fireEvent.click(screen.getAllByRole('button', { name: 'Open evidence' })[0]);
 
     expect(onRefresh).toHaveBeenCalledTimes(1);
-    expect(onOpenCall).toHaveBeenCalledWith('record-0');
   });
 
   it('shows Home loading progress and omits overview-card footnotes', () => {
@@ -254,8 +229,6 @@ describe('HomePage', () => {
         refreshProgressText="Refreshing local usage index"
         homeStatusLoading={false}
         onRefresh={vi.fn()}
-        onNavigate={vi.fn()}
-        onOpenCall={vi.fn()}
       />,
     );
 
@@ -264,33 +237,6 @@ describe('HomePage', () => {
     expect(screen.queryByText('0 detailed rows available')).not.toBeInTheDocument();
     expect(screen.queryByText('reported token accounting')).not.toBeInTheDocument();
     expect(screen.queryByText('complete selected scope')).not.toBeInTheDocument();
-  });
-
-  it('copies each server-provided follow-up without generating finding text in React', async () => {
-    renderHome(
-      <HomePage
-        model={fixtureModel}
-        payload={{ pricing_configured: true }}
-        summary={summary}
-        readiness={readiness}
-        historyScope="active"
-        loadWindow="all"
-        loadLimit={500}
-        scopeSince={null}
-        refreshing={false}
-        onRefresh={vi.fn()}
-        onNavigate={vi.fn()}
-        onOpenCall={vi.fn()}
-      />,
-    );
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Copy follow-up' })[1]);
-    expect(screen.getAllByRole('button', { name: 'Copy follow-up' })[1]).toHaveAttribute(
-      'title',
-      expect.stringContaining('paste into Codex'),
-    );
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Investigate finding 1');
-    expect(await screen.findByText('Follow-up copied')).toBeInTheDocument();
   });
 
   it('labels empty usage metrics as unavailable instead of measured zeroes', () => {
@@ -306,8 +252,6 @@ describe('HomePage', () => {
         scopeSince={null}
         refreshing={false}
         onRefresh={vi.fn()}
-        onNavigate={vi.fn()}
-        onOpenCall={vi.fn()}
       />,
     );
 
@@ -342,8 +286,6 @@ describe('HomePage', () => {
         scopeSince={null}
         refreshing={false}
         onRefresh={vi.fn()}
-        onNavigate={vi.fn()}
-        onOpenCall={vi.fn()}
       />,
     );
 
