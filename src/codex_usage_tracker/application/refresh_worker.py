@@ -75,6 +75,7 @@ def run_refresh_worker(
     codex_home: Path,
     db_path: Path,
     pricing_path: Path,
+    source_revision: str,
     request: RefreshRequest,
 ) -> int:
     """Run one registered refresh and persist privacy-safe progress/results."""
@@ -124,9 +125,7 @@ def run_refresh_worker(
             observed.changed_source_files,
             observed.added_bytes,
         )
-        input_generation = str(
-            (repository.get(job_id, touch=False) or {}).get("source_revision", "source:none")
-        )
+        input_generation = source_revision
         on_progress(
             {
                 "phase": "planning",
@@ -261,6 +260,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--codex-home", type=Path, required=True)
     parser.add_argument("--db", type=Path, required=True)
     parser.add_argument("--pricing", type=Path, required=True)
+    parser.add_argument("--source-revision", required=True)
     parser.add_argument("--history", choices=("active", "all"), required=True)
     parser.add_argument("--execution", choices=("auto", "async"), required=True)
     parser.add_argument("--aggregate-only", action="store_true")
@@ -276,6 +276,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         codex_home=args.codex_home,
         db_path=args.db,
         pricing_path=args.pricing,
+        source_revision=args.source_revision,
         request=RefreshRequest(
             history=args.history,
             aggregate_only=args.aggregate_only,

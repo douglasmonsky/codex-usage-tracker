@@ -428,6 +428,7 @@ def refresh_usage(
     )
     detached_launcher = detached_refresh_launcher(
         request=request,
+        source_revision=source_revision,
         codex_home=codex_home,
         db_path=db_path,
         pricing_path=pricing_path,

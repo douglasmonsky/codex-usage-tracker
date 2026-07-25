@@ -9,6 +9,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import monotonic
 
+import pytest
+
 import codex_usage_tracker.application.refresh_launcher as launcher_module
 from codex_usage_tracker.application.container import build_application_container
 from codex_usage_tracker.application.paths import ApplicationPaths
@@ -239,6 +241,7 @@ def test_detached_worker_retries_a_transient_startup_lock(
         result_schema=REFRESH_SCHEMA,
     )
     original_update = AnalysisJobRepository.update_status
+    original_get = AnalysisJobRepository.get
     startup_attempts = 0
 
     def transiently_locked(self, *args, **kwargs):
@@ -249,6 +252,13 @@ def test_detached_worker_retries_a_transient_startup_lock(
         return original_update(self, *args, **kwargs)
 
     monkeypatch.setattr(AnalysisJobRepository, "update_status", transiently_locked)
+    monkeypatch.setattr(
+        AnalysisJobRepository,
+        "get",
+        lambda *_args, **_kwargs: pytest.fail(
+            "detached worker reread its registered source revision"
+        ),
+    )
 
     exit_code = run_refresh_worker(
         job_id=job_id,
@@ -257,12 +267,13 @@ def test_detached_worker_retries_a_transient_startup_lock(
         codex_home=tmp_path / "codex",
         db_path=tmp_path / "usage.sqlite3",
         pricing_path=tmp_path / "pricing.json",
+        source_revision="source:none",
         request=request,
     )
 
     assert exit_code == 0
     assert startup_attempts == 1
-    assert repository.get(job_id, touch=False)["status"] == "completed"
+    assert original_get(repository, job_id, touch=False)["status"] == "completed"
 
 
 def test_detached_launcher_retries_an_early_worker_exit(
@@ -312,6 +323,7 @@ def test_detached_launcher_retries_an_early_worker_exit(
     monkeypatch.setattr(launcher_module.subprocess, "Popen", popen)
     launcher = launcher_module.detached_refresh_launcher(
         request=request,
+        source_revision="source:none",
         codex_home=tmp_path / "codex",
         db_path=tmp_path / "usage.sqlite3",
         pricing_path=tmp_path / "pricing.json",
@@ -370,6 +382,7 @@ def test_detached_launcher_retries_a_transient_spawn_failure(
     monkeypatch.setattr(launcher_module.subprocess, "Popen", popen)
     launcher = launcher_module.detached_refresh_launcher(
         request=request,
+        source_revision="source:none",
         codex_home=tmp_path / "codex",
         db_path=tmp_path / "usage.sqlite3",
         pricing_path=tmp_path / "pricing.json",

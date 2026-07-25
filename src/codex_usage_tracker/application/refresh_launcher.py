@@ -23,6 +23,7 @@ _STARTUP_POLL_SECONDS = 0.01
 def detached_refresh_launcher(
     *,
     request: RefreshRequest,
+    source_revision: str,
     codex_home: Path,
     db_path: Path,
     pricing_path: Path,
@@ -52,6 +53,8 @@ def detached_refresh_launcher(
             str(db_path),
             "--pricing",
             str(pricing_path),
+            "--source-revision",
+            source_revision,
             "--history",
             request.history,
             "--execution",
