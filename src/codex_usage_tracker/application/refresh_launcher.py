@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
-import subprocess
+import subprocess  # nosec B404 - fixed local interpreter and module; no shell is invoked.
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -61,7 +61,7 @@ def detached_refresh_launcher(
             command.append("--aggregate-only")
         for _attempt in range(_STARTUP_ATTEMPTS):
             try:
-                process = subprocess.Popen(  # noqa: S603 - fixed validated local module.
+                process = subprocess.Popen(  # nosec B603  # noqa: S603 - fixed local module.
                     command,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
