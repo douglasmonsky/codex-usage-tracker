@@ -12,7 +12,10 @@ from codex_usage_tracker.cli.plugin_installer import install_plugin
 from codex_usage_tracker.core.plugin_identity import (
     PLUGIN_BUNDLE_SCHEMA,
     inspect_plugin_bundle,
+    invalidate_stale_plugin_cache,
+    packaged_plugin_bundle_digest,
     plugin_bundle_digest,
+    plugin_bundle_manifest,
 )
 from codex_usage_tracker.diagnostics.api import run_doctor
 
@@ -66,6 +69,162 @@ def test_bundle_identity_ignores_generated_python_bytecode(tmp_path: Path) -> No
     (cache_dir / "run_mcp.cpython-314.pyc").write_bytes(b"synthetic bytecode")
 
     assert plugin_bundle_digest(plugin_dir) == expected
+
+
+def test_packaged_bundle_has_a_deterministic_sha256_identity() -> None:
+    digest = packaged_plugin_bundle_digest()
+
+    assert digest.startswith("sha256:")
+    assert len(digest) == len("sha256:") + 64
+
+
+@pytest.mark.parametrize(
+    "digest",
+    [
+        "sha1:" + ("0" * 64),
+        "sha256:" + ("G" * 64),
+    ],
+)
+def test_bundle_manifest_rejects_invalid_digests(digest: str) -> None:
+    with pytest.raises(ValueError, match="sha256"):
+        plugin_bundle_manifest(digest)
+
+
+def test_bundle_digest_rejects_missing_resource_directories(tmp_path: Path) -> None:
+    (tmp_path / "assets").mkdir()
+
+    with pytest.raises(FileNotFoundError, match="skills"):
+        plugin_bundle_digest(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("cache_shape", "expected_state"),
+    [
+        ("symlink", "symlink"),
+        ("invalid-json", "invalid_manifest"),
+        ("unowned", "unowned"),
+    ],
+)
+def test_bundle_inspection_fails_closed_for_invalid_cache_shapes(
+    tmp_path: Path,
+    cache_shape: str,
+    expected_state: str,
+) -> None:
+    plugin_dir = tmp_path / "plugins" / "codex-usage-tracker"
+    cache_root = tmp_path / "cache"
+    install_plugin(
+        plugin_dir=plugin_dir,
+        marketplace_path=tmp_path / "marketplace.json",
+        python_executable=tmp_path / ".venv" / "bin" / "python",
+        plugin_cache_root=cache_root,
+    )
+    cached = cache_root / __version__
+    cache_root.mkdir(parents=True, exist_ok=True)
+    if cache_shape == "symlink":
+        cached.symlink_to(plugin_dir, target_is_directory=True)
+    else:
+        (cached / ".codex-plugin").mkdir(parents=True)
+        manifest = (
+            "{"
+            if cache_shape == "invalid-json"
+            else json.dumps({"name": "different-plugin", "version": __version__})
+        )
+        (cached / ".codex-plugin" / "plugin.json").write_text(
+            manifest,
+            encoding="utf-8",
+        )
+
+    observation = inspect_plugin_bundle(
+        plugin_dir=plugin_dir,
+        plugin_cache_root=cache_root,
+    )
+
+    assert observation["state"] == "mismatch"
+    assert observation["cache"]["state"] == expected_state
+
+
+@pytest.mark.parametrize(
+    ("cache_shape", "error"),
+    [
+        ("symlink", "symlinked"),
+        ("invalid-json", "ownership manifest"),
+        ("unowned", "not owned"),
+    ],
+)
+def test_cache_invalidation_refuses_unsafe_cache_shapes(
+    tmp_path: Path,
+    cache_shape: str,
+    error: str,
+) -> None:
+    plugin_dir = tmp_path / "plugins" / "codex-usage-tracker"
+    cache_root = tmp_path / "cache"
+    install_plugin(
+        plugin_dir=plugin_dir,
+        marketplace_path=tmp_path / "marketplace.json",
+        python_executable=tmp_path / ".venv" / "bin" / "python",
+        plugin_cache_root=cache_root,
+    )
+    cached = cache_root / __version__
+    cache_root.mkdir(parents=True, exist_ok=True)
+    if cache_shape == "symlink":
+        cached.symlink_to(plugin_dir, target_is_directory=True)
+    else:
+        (cached / ".codex-plugin").mkdir(parents=True)
+        manifest = (
+            "{"
+            if cache_shape == "invalid-json"
+            else json.dumps({"name": "different-plugin", "version": __version__})
+        )
+        (cached / ".codex-plugin" / "plugin.json").write_text(
+            manifest,
+            encoding="utf-8",
+        )
+
+    with pytest.raises(RuntimeError, match=error):
+        invalidate_stale_plugin_cache(
+            plugin_dir=plugin_dir,
+            plugin_cache_root=cache_root,
+        )
+
+
+@pytest.mark.parametrize("manifest", ["[]", "{}"])
+def test_bundle_inspection_rejects_invalid_installed_manifests(
+    tmp_path: Path,
+    manifest: str,
+) -> None:
+    plugin_dir = tmp_path / "plugin"
+    (plugin_dir / ".codex-plugin").mkdir(parents=True)
+    (plugin_dir / ".codex-plugin" / "plugin.json").write_text(
+        manifest,
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="manifest"):
+        inspect_plugin_bundle(
+            plugin_dir=plugin_dir,
+            plugin_cache_root=tmp_path / "cache",
+        )
+
+
+def test_bundle_inspection_reports_unreadable_installed_resources(
+    tmp_path: Path,
+) -> None:
+    plugin_dir = tmp_path / "plugin"
+    (plugin_dir / ".codex-plugin").mkdir(parents=True)
+    (plugin_dir / ".codex-plugin" / "plugin.json").write_text(
+        json.dumps({"name": "codex-usage-tracker", "version": __version__}),
+        encoding="utf-8",
+    )
+
+    observation = inspect_plugin_bundle(
+        plugin_dir=plugin_dir,
+        plugin_cache_root=tmp_path / "cache",
+    )
+
+    assert observation["state"] == "mismatch"
+    assert observation["installed"]["declared_digest"] is None
+    assert observation["installed"]["computed_digest"] is None
+    assert observation["installed"]["computed_launcher_digest"] is None
 
 
 def test_installer_invalidates_only_stale_same_version_tracker_cache(

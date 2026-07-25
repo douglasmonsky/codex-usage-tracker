@@ -51,6 +51,67 @@ def test_core_timing_metadata_cannot_exceed_payload_budget() -> None:
         handler()
 
 
+def test_core_timing_adapter_preserves_non_envelope_results() -> None:
+    handler = registry._timed_core_handler("usage_status", lambda: "synthetic")
+
+    assert handler() == "synthetic"
+
+
+@pytest.mark.parametrize(
+    ("name", "result", "args", "kwargs", "expected"),
+    [
+        ("usage_status", {}, (), {}, registry.MAX_STATUS_PAYLOAD_BYTES),
+        ("usage_refresh", {}, (), {}, registry.MAX_REFRESH_PAYLOAD_BYTES),
+        ("usage_analyze", {}, (), {}, registry.MAX_ANALYSIS_PAYLOAD_BYTES),
+        (
+            "usage_analyze",
+            {"result_schema": registry.ANALYSIS_JOB_SCHEMA},
+            (),
+            {},
+            registry.MAX_ANALYSIS_JOB_PAYLOAD_BYTES,
+        ),
+        ("usage_query", {}, (), {}, registry.MAX_QUERY_PAYLOAD_BYTES),
+        ("usage_evidence", {}, (), {}, registry.MAX_EVIDENCE_PAYLOAD_BYTES),
+        ("usage_allowance", {}, (), {}, registry.MAX_ALLOWANCE_PAYLOAD_BYTES),
+        (
+            "usage_job_status",
+            {},
+            ("synthetic-job", True),
+            {},
+            registry.MAX_REFRESH_PAYLOAD_BYTES,
+        ),
+        (
+            "usage_job_status",
+            {},
+            ("synthetic-job",),
+            {"include_result": False},
+            registry.MAX_STATUS_PAYLOAD_BYTES,
+        ),
+    ],
+)
+def test_core_payload_budget_matches_each_core_tool_contract(
+    name: str,
+    result: dict[str, object],
+    args: tuple[object, ...],
+    kwargs: dict[str, object],
+    expected: int,
+) -> None:
+    assert (
+        registry._core_payload_budget(
+            name,
+            result,
+            args=args,
+            kwargs=kwargs,
+        )
+        == expected
+    )
+
+
+def test_core_payload_budget_rejects_unknown_tools() -> None:
+    with pytest.raises(registry.ToolCatalogError, match="unknown core tool"):
+        registry._core_payload_budget("unknown", {}, args=(), kwargs={})
+
+
 def test_profiles_are_strict_ordered_supersets() -> None:
     core = {tool.name for tool in tools_for_profile("core")}
     full = {tool.name for tool in tools_for_profile("full")}
