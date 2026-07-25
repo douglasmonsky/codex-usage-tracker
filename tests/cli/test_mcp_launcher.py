@@ -26,7 +26,14 @@ def test_source_and_packaged_launchers_are_identical_and_default_to_core() -> No
     ]
 
     assert source_launcher.read_bytes() == packaged_launcher.read_bytes()
-    assert server["env"] == {"CODEX_USAGE_TRACKER_MCP_PROFILE": "core"}
+    manifest = json.loads(
+        (repo_root / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
+    )
+    assert server["env"] == {
+        "CODEX_USAGE_TRACKER_MCP_PROFILE": "core",
+        "CODEX_USAGE_TRACKER_PLUGIN_VERSION": manifest["version"],
+        "CODEX_USAGE_TRACKER_PLUGIN_BUNDLE_DIGEST": manifest["bundle"]["digest"],
+    }
 
 
 def test_runtime_cache_requires_matching_package_spec(tmp_path: Path, monkeypatch) -> None:

@@ -17,3 +17,12 @@ DEFAULT_PROJECTS_PATH = APP_DIR / "projects.json"
 DEFAULT_CODEX_HOME = Path.home() / ".codex"
 DEFAULT_PLUGIN_LINK = Path.home() / "plugins" / "codex-usage-tracker"
 DEFAULT_MARKETPLACE_PATH = Path.home() / ".agents" / "plugins" / "marketplace.json"
+DEFAULT_PLUGIN_CACHE_ROOT = (
+    DEFAULT_CODEX_HOME / "plugins" / "cache" / "local" / "codex-usage-tracker"
+)
+
+
+def operational_job_db_path(usage_db_path: Path) -> Path:
+    """Keep job leases/progress independent from the long-running usage writer."""
+
+    return usage_db_path.with_name(f"{usage_db_path.stem}.jobs.sqlite3")

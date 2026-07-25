@@ -6,7 +6,7 @@ import platform
 import sys
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from codex_usage_tracker.core.paths import (
     DEFAULT_CODEX_HOME,
@@ -39,6 +39,7 @@ from codex_usage_tracker.diagnostics.mcp import (
     check_mcp_runtime,
 )
 from codex_usage_tracker.diagnostics.types import DoctorCheck
+from codex_usage_tracker.plugin_identity import inspect_plugin_bundle
 from codex_usage_tracker.store.analysis_job_repository import AnalysisJobRepository
 from codex_usage_tracker.store.integrity import check_database_integrity
 
@@ -111,11 +112,69 @@ def _doctor_checks(
         _check_pricing(pricing_path),
         _check_project_root(root),
         _check_plugin_link(plugin_link, root),
+        _check_plugin_bundle_coherence(plugin_link=plugin_link, codex_home=codex_home),
         _check_marketplace(marketplace_path),
         check_mcp_config(root),
         check_mcp_runtime(root),
         check_mcp_import(),
     ]
+
+
+def _check_plugin_bundle_coherence(*, plugin_link: Path, codex_home: Path) -> DoctorCheck:
+    if not plugin_link.exists():
+        return DoctorCheck(
+            "Plugin bundle coherence",
+            "warn",
+            "Installed plugin bundle is not available for a cache identity check.",
+            "Run: codex-usage-tracker install-plugin --force",
+        )
+    plugin_dir = plugin_link.resolve() if plugin_link.is_symlink() else plugin_link
+    cache_root = (
+        codex_home.expanduser()
+        / "plugins"
+        / "cache"
+        / "local"
+        / "codex-usage-tracker"
+    )
+    try:
+        observation = inspect_plugin_bundle(
+            plugin_dir=plugin_dir,
+            plugin_cache_root=cache_root,
+        )
+    except (OSError, ValueError) as exc:
+        return DoctorCheck(
+            "Plugin bundle coherence",
+            "fail",
+            f"Plugin bundle identity is invalid: {exc}",
+            "Run: codex-usage-tracker install-plugin --force",
+        )
+    installed = cast(dict[str, object], observation["installed"])
+    cache = cast(dict[str, object], observation["cache"])
+    if observation["state"] == "coherent":
+        return DoctorCheck(
+            "Plugin bundle coherence",
+            "pass",
+            f"Installed and cached bundle digests match: {installed['computed_digest']}.",
+        )
+    if observation["state"] == "not_cached":
+        return DoctorCheck(
+            "Plugin bundle coherence",
+            "warn",
+            (
+                "Installed bundle digest is valid, but Codex has not cached this "
+                "plugin version yet."
+            ),
+            "Restart Codex and open a fresh task to populate the verified cache.",
+        )
+    return DoctorCheck(
+        "Plugin bundle coherence",
+        "fail",
+        (
+            "The installed and cached bundle digests differ or cannot be verified "
+            f"(installed={installed['computed_digest']}; cache={cache['computed_digest']})."
+        ),
+        "Run: codex-usage-tracker install-plugin --force, then restart Codex.",
+    )
 
 
 def run_integrity_report(*, db_path: Path = DEFAULT_DB_PATH) -> dict[str, object]:

@@ -75,10 +75,10 @@
       "rationale": "Post-constellation-removal initial React JavaScript plus exactly ten percent headroom, rounded up."
     },
     "stable_json_schemas": {
-      "maximum": 114,
+      "maximum": 116,
       "baseline": 114,
       "baseline_commit": "a52338d510b731288819c169dbbd2ba412fa56ad",
-      "rationale": "The 95 schemas in 0.23.0 plus nineteen explicitly approved 0.24 contract additions form the adoption ceiling."
+      "rationale": "The 114-schema 0.24 baseline plus the two explicitly approved 0.25 plugin-bundle identity and coherence contracts form the reliability ceiling."
     },
     "sqlite_schema_increments": {
       "maximum": 1,

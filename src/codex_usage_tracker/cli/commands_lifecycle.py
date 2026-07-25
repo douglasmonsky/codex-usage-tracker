@@ -43,9 +43,12 @@ def _run_setup(args: argparse.Namespace) -> int:
         plugin_dir=args.plugin_dir,
         marketplace_path=args.marketplace,
         python_executable=args.python_executable,
+        codex_home=args.codex_home,
         force=args.force_plugin,
     )
     lines.append(f"Plugin: installed at {install_result.plugin_dir}")
+    lines.append(f"Plugin bundle: {install_result.bundle_digest}")
+    lines.append(f"Plugin cache: {install_result.cache_state}")
     lines.append(f"MCP Python: {install_result.python_executable}")
     pricing_payload: dict[str, Any]
     if args.skip_pricing:
@@ -138,6 +141,7 @@ def _run_install_plugin(args: argparse.Namespace) -> int:
         plugin_dir=args.plugin_dir,
         marketplace_path=args.marketplace,
         python_executable=args.python_executable,
+        codex_home=args.codex_home,
         force=args.force,
     )
     if args.as_json:
@@ -163,6 +167,7 @@ def _run_upgrade_plugin(args: argparse.Namespace) -> int:
         plugin_dir=args.plugin_dir,
         marketplace_path=args.marketplace,
         python_executable=args.python_executable,
+        codex_home=args.codex_home,
         force=True,
     )
     if args.as_json:

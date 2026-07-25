@@ -59,7 +59,7 @@ admin support-bundle|dogfood
 admin mcp serve --profile core|full|developer
 ```
 
-Historical top-level spellings remain parseable through `0.24.x`, but normal
+Historical top-level spellings remain parseable through `0.25.x`, but normal
 help shows only the stable surface. Interactive use prints one deprecation line
 to stderr; noninteractive output and JSON stdout remain unchanged.
 

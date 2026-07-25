@@ -51,7 +51,9 @@ def test_install_plugin_writes_generated_wrapper_and_marketplace(tmp_path: Path)
         "codex_usage_tracker.interfaces.mcp.server",
     ]
     assert mcp_config["mcpServers"]["codex-usage-tracker"]["env"] == {
-        "CODEX_USAGE_TRACKER_MCP_PROFILE": "core"
+        "CODEX_USAGE_TRACKER_MCP_PROFILE": "core",
+        "CODEX_USAGE_TRACKER_PLUGIN_VERSION": __version__,
+        "CODEX_USAGE_TRACKER_PLUGIN_BUNDLE_DIGEST": manifest["bundle"]["digest"],
     }
     assert marketplace["plugins"] == [
         {
@@ -107,7 +109,7 @@ def test_install_plugin_adds_pythonpath_for_source_checkout_venv(tmp_path: Path)
     (repo_root / "pyproject.toml").write_text("[project]\nname = 'sample'\n", encoding="utf-8")
     plugin_dir = tmp_path / "plugins" / "codex-usage-tracker"
 
-    install_plugin(
+    result = install_plugin(
         plugin_dir=plugin_dir,
         marketplace_path=tmp_path / "marketplace.json",
         python_executable=python_path,
@@ -118,6 +120,8 @@ def test_install_plugin_adds_pythonpath_for_source_checkout_venv(tmp_path: Path)
 
     assert server["env"] == {
         "CODEX_USAGE_TRACKER_MCP_PROFILE": "core",
+        "CODEX_USAGE_TRACKER_PLUGIN_VERSION": __version__,
+        "CODEX_USAGE_TRACKER_PLUGIN_BUNDLE_DIGEST": result.bundle_digest,
         "PYTHONPATH": str(repo_root / "src"),
     }
 

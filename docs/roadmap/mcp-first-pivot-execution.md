@@ -1731,3 +1731,132 @@ complete without its named focused and full verification evidence.
   - the bounded release/docs/CLI slice passes all `51` tests after the fix;
   - review metrics: 1 finding, 1 accepted (`R1`); reviewer tokens `pending`;
     tokens per accepted finding `pending`.
+
+## OPS-REL-025 - Central Product Reliability and Installed Coherence
+
+- Status: in progress
+- Stable task ID: `OPS-REL-025`
+- Branch: `pivot/ops-rel-025-central-product-reliability`
+- Base: `8f7f2796f663142d0bae3a117c13708644eee472`, the focused Task 39
+  publication-closure commit whose parent is public `0.24.0` merge
+  `cad0006cb5e8435ed3a47da9fb120bc81a6e1941`
+- Release amendment:
+  - `0.25.0` is now the blocking central-product reliability release;
+  - existing Tasks 40-43 retain their numbers and scope but move to `0.26.0`;
+  - existing Tasks 44-45 retain their numbers and scope but move to `0.27.0`;
+  - pre-amendment Task 40/41 branches remain preserved and are not a release
+    base for this work.
+- Post-release operational evidence:
+  - upgrading a pipx installation from `0.20.0` to public `0.24.0` and running
+    forced setup replaced the plugin/MCP bundle successfully;
+  - refresh on an approximately 10 GB SQLite index then held
+    `BEGIN IMMEDIATE` through a derived-state SQL phase for more than 20
+    minutes;
+  - concurrent `service serve --no-refresh` startup failed in
+    `AnalysisJobRepository.recover_interrupted()` with
+    `sqlite3.OperationalError: database is locked`;
+  - later MCP dogfood could read the last committed generation concurrently,
+    but its async refresh remained at `0%` without changing stage, counters,
+    heartbeat, or an observable durable owner for several minutes;
+  - stale-data analysis abstained safely with `analysis_facts_unavailable`, but
+    did not link the caller to the active refresh or a deterministic resume;
+  - the installed source wrapper and Codex cached skill bundle both identified
+    as `0.24.0` while their skill bytes and advertised MCP surfaces differed.
+- Pre-implementation code and contract inventory:
+  - `application.refresh.RefreshCoordinator` owns `_records` and `_active` only
+    in process memory, starts a daemon thread, updates only coarse lifecycle
+    state, and discards safe exception details;
+  - `application.refresh._refresh_lock` serializes only threads in one process,
+    while `refresh_usage()` registers refreshes with `JobService.register()`
+    rather than the existing durable `register_semantic()` path;
+  - the async `execute()` call does not forward the store's supported
+    `progress_callback`, even though `store.refresh_parse` and
+    `store.refresh_stream` already emit detailed phase progress;
+  - `application.container.build_application_container()` constructs
+    `JobService(recover_interrupted=True)`, which synchronously invokes
+    `AnalysisJobRepository.recover_interrupted()` and `prune()` during every
+    process startup;
+  - `AnalysisJobRepository` already persists semantic requests, leases,
+    progress, results, and bounded errors in schema versions 36-37, but
+    `recover_interrupted()`, `find_reusable()`, and pruning acquire
+    `BEGIN IMMEDIATE`;
+  - `_RefreshStreamWriter.run()` acquires `BEGIN IMMEDIATE` before parsing and
+    retains the writer transaction through source replacement, event/content
+    indexing, derived-state finalization, compression facts, and allowance
+    intelligence materialization;
+  - `SourceParsePlan` records only a start byte/line and replacement flag.
+    Parse totals and parser reads use the file's changing current size, so an
+    append-active source has no immutable exclusive end boundary;
+  - source metadata persists the final observed file size and parse offset only
+    after the combined writer transaction, with no explicit partial-line/tail
+    continuation result;
+  - `cli.plugin_installer.install_plugin()` replaces the installed wrapper and
+    copies packaged skills, but the manifest contains only the public version
+    and no bundle digest/build identity or Codex cache coherence check;
+  - the bundled MCP launcher keys its runtime directory and package marker by
+    `RUNTIME_VERSION` and `PACKAGE_SPEC`, while Codex's separate plugin cache
+    can still reuse a same-version skill directory;
+  - `application.status` reports the seven core tool names but hard-codes
+    `current_task_exposure` as `not-verified` and exposes no package, manifest,
+    launcher, source-build, installed-bundle, or cached-bundle identity;
+  - existing tests cover in-process refresh joining, generic persisted
+    analysis jobs, source append checkpoints, launcher package-spec caching,
+    and installed-package smoke independently, but no test starts two MCP
+    processes/tasks against one database and plugin installation.
+- First failing contract:
+  - command:
+    `PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker-task-41/.venv/bin/python -m pytest tests/packaging/test_public_docs.py -q`;
+  - result: `2 failed, 10 passed`;
+  - failures proved the normative roadmap lacked `0.27.0`, the
+    `OPS-REL-025` gate, and the amended release outcomes.
+- Graph-guided scope:
+  - a fresh GitNexus index at the branch base contains `25,425` nodes,
+    `54,688` edges, `1,291` clusters, and `300` flows;
+  - `RefreshCoordinator` is directly imported by application services, job
+    status/evidence/allowance services, and the MCP query/core adapters, so its
+    lifecycle replacement is cross-cutting and must preserve the seven-tool
+    envelope boundary;
+  - source inspection confirms the existing generic job repository is the
+    intended persistence substrate; no new SQLite table is authorized.
+- Preservation and test rules:
+  - synthetic fixtures only; no real session log, prompt, tool output, source
+    path, or user database content enters tests, profiles, logs, or commits;
+  - do not weaken canonical accounting, privacy, freshness, foreign keys,
+    migration integrity, raw-context controls, or committed-generation reads;
+  - do not remove Task 40/41 surfaces or add any MCP tool, dashboard route, CLI
+    namespace, analytical goal, or statistical method;
+  - measure identical unprofiled cold/no-change/small-append/moving-tail
+    workloads before and after each performance change.
+- Verification completed:
+  - roadmap contract failure captured as required;
+  - runtime and plugin identity implementation is complete at
+    `0.25.0.dev0`: installed, cached, manifest, launcher, and runtime digests
+    are coherent and observable through setup, doctor, and `usage_status`;
+  - normal MCP and Evidence Console startup is read-only and does not recover
+    jobs or acquire a usage-index writer lock;
+  - equivalent refresh requests from separate MCP processes join one durable
+    semantic job in the `usage.jobs.sqlite3` operational sidecar, and a
+    detached refresh survives its initiating process;
+  - refresh parsing stops at a fixed newline-aligned exclusive byte boundary,
+    leaves concurrently appended and partial rows pending, and exposes the
+    input generation, committed output generation, boundary, tail counts,
+    stage, counters, heartbeat, elapsed time, and poll guidance;
+  - stale analysis names its durable refresh dependency and exact normalized
+    resume request; completed analyses are durably reusable;
+  - all seven core MCP responses expose measured server-side elapsed time;
+  - the installed-wheel two-task probe passed with `40` MCP calls across
+    three MCP processes, one shared refresh job, a query during refresh, one
+    moving-tail row, exact call evidence, durable analysis reuse, and a
+    maximum observed server handler time of `590.978 ms`;
+  - the repeated synthetic 100,000-row incremental gate passed:
+    cold `15.906 s`, no-change `0.013 s`, 100-row append `2.213 s`,
+    one-row tail follow-up `2.037 s`, and committed read during writer
+    `0.0036 s`; hydration counters were exactly `100000`, `100`, and `1`;
+  - Agent Perf baseline `20260725T153903Z-d5e18169` and candidate
+    `20260725T155929Z-12bd83a5` use the same synthetic workload; the
+    unprofiled benchmark, not profiler overhead, is the speed gate;
+  - focused refresh/application/MCP checks passed (`48 passed`), targeted Ruff
+    and MyPy passed, `git diff --check` passed, and the complete
+    installed-package smoke passed;
+  - full qualification, final review, publication, and public-PyPI rerun
+    remain pending.

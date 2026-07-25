@@ -618,8 +618,15 @@ def _check_packaging_metadata() -> list[str]:
         failures.append(
             ".mcp.json should allow enough startup time for first-run runtime bootstrap"
         )
-    if mcp_server.get("env") != {"CODEX_USAGE_TRACKER_MCP_PROFILE": "core"}:
-        failures.append(".mcp.json should configure the core MCP profile")
+    expected_mcp_env = {
+        "CODEX_USAGE_TRACKER_MCP_PROFILE": "core",
+        "CODEX_USAGE_TRACKER_PLUGIN_VERSION": str(project.get("version")),
+        "CODEX_USAGE_TRACKER_PLUGIN_BUNDLE_DIGEST": manifest.get("bundle", {}).get(
+            "digest"
+        ),
+    }
+    if mcp_server.get("env") != expected_mcp_env:
+        failures.append(".mcp.json should configure the core profile and bundle identity")
     manifest = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
     if "recursive-include skills *.md *.py" not in manifest:
         failures.append("MANIFEST.in should include Codex skill scripts in the source distribution")

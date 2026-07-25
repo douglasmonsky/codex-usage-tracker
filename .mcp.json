@@ -5,7 +5,9 @@
       "args": ["./skills/codex-usage-tracker/scripts/run_mcp.py"],
       "cwd": ".",
       "env": {
-        "CODEX_USAGE_TRACKER_MCP_PROFILE": "core"
+        "CODEX_USAGE_TRACKER_MCP_PROFILE": "core",
+        "CODEX_USAGE_TRACKER_PLUGIN_VERSION": "0.25.0.dev0",
+        "CODEX_USAGE_TRACKER_PLUGIN_BUNDLE_DIGEST": "sha256:44bafa24dfabeefd800fb5bcaf4d24f7891d8c9b562b17fde4aca281ff51924b"
       },
       "startup_timeout_sec": 120
     }

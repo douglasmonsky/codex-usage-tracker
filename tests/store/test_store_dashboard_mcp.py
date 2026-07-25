@@ -260,6 +260,59 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     assert metadata["skipped_source_files"] == "3"
 
 
+def test_refresh_checkpoints_active_jsonl_at_planned_complete_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    log_path = next(
+        path for path in (codex_home / "sessions").glob("**/*.jsonl") if SESSION_ID in path.name
+    )
+    refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    first_append = json.dumps(_token_event(650, 350)) + "\n"
+    racing_append = json.dumps(_token_event(900, 250)) + "\n"
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(first_append)
+    planned_boundary = log_path.stat().st_size
+    original_parse = store_module.parse_usage_events_from_file_with_state
+    appended_during_parse = False
+
+    def append_after_planned_parse(*args: Any, **kwargs: Any):
+        nonlocal appended_during_parse
+        parsed = original_parse(*args, **kwargs)
+        if not appended_during_parse and args[0] == log_path:
+            with log_path.open("a", encoding="utf-8") as handle:
+                handle.write(racing_append)
+            appended_during_parse = True
+        return parsed
+
+    monkeypatch.setattr(
+        store_module,
+        "parse_usage_events_from_file_with_state",
+        append_after_planned_parse,
+    )
+    second = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    with connect(db_path) as conn:
+        checkpoint_after_second = conn.execute(
+            "SELECT size_bytes, parsed_until_byte FROM source_files WHERE source_file = ?",
+            (str(log_path),),
+        ).fetchone()
+    third = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    fourth = refresh_usage_index(codex_home=codex_home, db_path=db_path)
+    rows = query_session_usage(db_path=db_path, session_id=SESSION_ID)
+
+    assert appended_during_parse is True
+    assert second.parsed_events == 1
+    assert checkpoint_after_second is not None
+    assert int(checkpoint_after_second["size_bytes"]) == planned_boundary
+    assert int(checkpoint_after_second["parsed_until_byte"]) == planned_boundary
+    assert log_path.stat().st_size > planned_boundary
+    assert third.parsed_events == 1
+    assert fourth.parsed_events == 0
+    assert [row["cumulative_total_tokens"] for row in rows] == [100, 300, 650, 900]
+
+
 def test_refresh_reparses_source_when_parser_adapter_changes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

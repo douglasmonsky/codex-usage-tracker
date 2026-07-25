@@ -1,6 +1,11 @@
 {
   "name": "codex-usage-tracker",
-  "version": "0.24.0",
+  "version": "0.25.0.dev0",
+  "bundle": {
+    "schema": "codex-usage-tracker.plugin-bundle.v1",
+    "digest": "sha256:44bafa24dfabeefd800fb5bcaf4d24f7891d8c9b562b17fde4aca281ff51924b",
+    "runtime_version": "0.25.0.dev0"
+  },
   "description": "Unofficial local, evidence-backed Codex usage analyst with MCP tools and an Evidence Console.",
   "author": {
     "name": "Douglas Monsky"

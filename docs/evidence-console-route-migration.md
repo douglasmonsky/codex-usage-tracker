@@ -42,6 +42,6 @@ present. Otherwise run `codex-usage-tracker service status` and use
 ## Transition-Only Routes
 
 Investigate, Compression Lab, Cache and Context, Reports, and Diagnostics
-remain directly routable through 0.24.x. They are absent from primary
+remain directly routable through 0.25.x. They are absent from primary
 navigation, show transition guidance, and receive no new product features.
 The legacy static dashboard follows the same removal window.

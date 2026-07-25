@@ -81,6 +81,53 @@ def test_source_logs_requiring_parse_classifies_new_unchanged_and_append_only(
     assert by_path[grown_path].initial_state == state
 
 
+def test_source_plan_leaves_incomplete_active_jsonl_tail_for_next_refresh(
+    tmp_path: Path,
+) -> None:
+    conn = _memory_db()
+    source_path = tmp_path / "events.jsonl"
+    source_path.write_bytes(b'{"complete":true}\n{"partial":')
+
+    first = source_logs_requiring_parse(conn.connection, [source_path])
+
+    assert len(first) == 1
+    assert first[0].start_byte == 0
+    assert first[0].end_byte == len(b'{"complete":true}\n')
+
+
+def test_source_plan_skips_append_until_a_complete_line_exists(tmp_path: Path) -> None:
+    conn = _memory_db()
+    source_path = tmp_path / "events.jsonl"
+    complete_prefix = b'{"complete":true}\n'
+    source_path.write_bytes(complete_prefix)
+    state = ParserState(session_id="session")
+    upsert_source_file_metadata(
+        conn.connection,
+        parsed_files=[(source_path, [], {}, state)],
+    )
+    with source_path.open("ab") as handle:
+        handle.write(b'{"partial":')
+
+    assert source_logs_requiring_parse(conn.connection, [source_path]) == []
+
+    with source_path.open("ab") as handle:
+        handle.write(b"true}\n")
+    plans = source_logs_requiring_parse(conn.connection, [source_path])
+
+    assert len(plans) == 1
+    assert plans[0].start_byte == len(complete_prefix)
+    assert plans[0].end_byte == source_path.stat().st_size
+    assert plans[0].replace_existing is False
+
+
+def test_source_plan_skips_new_file_without_a_complete_line(tmp_path: Path) -> None:
+    conn = _memory_db()
+    source_path = tmp_path / "events.jsonl"
+    source_path.write_bytes(b'{"partial":')
+
+    assert source_logs_requiring_parse(conn.connection, [source_path]) == []
+
+
 def test_source_logs_requiring_parse_accepts_device_id_change_for_unchanged_file(
     tmp_path: Path,
 ) -> None:

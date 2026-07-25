@@ -20,9 +20,6 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_RATE_CARD_PATH,
     DEFAULT_THRESHOLDS_PATH,
 )
-from codex_usage_tracker.dashboard.api import (
-    generate_dashboard,
-)
 from codex_usage_tracker.interfaces.http.v2 import ApplicationHttpV2Services, HttpV2Facade
 from codex_usage_tracker.server import compression_routes
 from codex_usage_tracker.server import utils as server_utils
@@ -79,24 +76,19 @@ def serve_dashboard(
     context_api_enabled = context_api != "disabled"
     selected_language = normalize_language(language)
     context_api_state = ContextApiState(context_api_enabled)
-    output = generate_dashboard(
+    output = output_path
+    output.parent.mkdir(parents=True, exist_ok=True)
+    application_services = ApplicationHttpV2Services(
         db_path=db_path,
-        output_path=output_path,
-        limit=limit,
         pricing_path=pricing_path,
         allowance_path=allowance_path,
         rate_card_path=rate_card_path,
-        since=since,
-        api_token=api_token,
-        context_api_enabled=context_api_enabled,
         thresholds_path=thresholds_path,
         projects_path=projects_path,
-        privacy_mode=privacy_mode,
-        include_archived=include_archived,
-        language=selected_language,
-        include_rows=False,
+        codex_home=codex_home,
     )
-    refresh_jobs = RefreshJobRegistry()
+    http_v2_facade = HttpV2Facade(application_services)
+    refresh_jobs = RefreshJobRegistry(job_service=application_services.job_service)
     refresh_lock = threading.Lock()
     analysis_jobs = AnalysisJobRegistry()
     compression_jobs = compression_routes.CompressionJobRegistry()
@@ -104,17 +96,6 @@ def serve_dashboard(
     allowance_query_cache = AggregateQueryCache(
         max_entries=4,
         max_payload_bytes=8 * 1_024 * 1_024,
-    )
-    http_v2_facade = HttpV2Facade(
-        ApplicationHttpV2Services(
-            db_path=db_path,
-            pricing_path=pricing_path,
-            allowance_path=allowance_path,
-            rate_card_path=rate_card_path,
-            thresholds_path=thresholds_path,
-            projects_path=projects_path,
-            codex_home=codex_home,
-        )
     )
     handler = partial(
         _UsageDashboardHandler,

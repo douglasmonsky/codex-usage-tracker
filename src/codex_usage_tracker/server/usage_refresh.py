@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-import secrets
 import sqlite3
-import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 from urllib.parse import parse_qs
 
+from codex_usage_tracker.application.refresh import refresh_usage
+from codex_usage_tracker.application.requests import RefreshRequest
 from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
@@ -20,7 +21,8 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_THRESHOLDS_PATH,
 )
 from codex_usage_tracker.dashboard.api import dashboard_payload
-from codex_usage_tracker.jobs import JobService, RefreshJobAdapter, request_hash
+from codex_usage_tracker.jobs import JobService
+from codex_usage_tracker.jobs.models import JobStatusV1
 from codex_usage_tracker.recommendation_engine.api import refresh_usage_index
 from codex_usage_tracker.server.utils import (
     elapsed_ms,
@@ -44,11 +46,9 @@ TokenValidator = Callable[[dict[str, list[str]]], bool]
 
 
 class RefreshJobRegistry:
-    """In-process async refresh job registry for live dashboard polling."""
+    """Compatibility adapter over the shared semantic refresh job service."""
 
     def __init__(self, *, job_service: JobService | None = None) -> None:
-        self._lock = threading.Lock()
-        self._jobs: dict[str, dict[str, object]] = {}
         self.job_service = job_service or JobService()
 
     def start_refresh(
@@ -64,131 +64,74 @@ class RefreshJobRegistry:
         aggregate_only: bool,
         refresh_lock: Any,
     ) -> dict[str, object]:
-        job_id = secrets.token_urlsafe(12)
-        started_at = utc_now()
-        job: dict[str, object] = {
-            "schema": "codex-usage-tracker-refresh-job-v1",
-            "job_id": job_id,
-            "status": "running",
-            "started_at": started_at,
-            "updated_at": started_at,
-            "include_archived": include_archived,
-            "aggregate_only": aggregate_only,
-            "progress": {
-                "schema": "codex-usage-tracker-refresh-progress-v1",
-                "phase": "queued",
-                "status": "running",
-                "message": "Refresh queued",
-                "completed": 0,
-                "total": 1,
-                "percent": 0.0,
-            },
-        }
-        with self._lock:
-            self._jobs[job_id] = job
-        self.job_service.register(
-            kind="refresh",
-            job_id=job_id,
-            adapter=RefreshJobAdapter(
-                lambda registered_id, *, include_result=False: self.status(registered_id),
-                request_hash=request_hash((str(db_path), include_archived, aggregate_only)),
+        del refresh_lock  # Compatibility parameter; semantic jobs own refresh coordination.
+        request = RefreshRequest(
+            history="all" if include_archived else "active",
+            aggregate_only=aggregate_only,
+            execution="async",
+        )
+        outcome = refresh_usage(
+            request,
+            codex_home=codex_home,
+            db_path=db_path,
+            pricing_path=pricing_path,
+            job_service=self.job_service,
+            refresh_fn=partial(
+                refresh_usage_index,
+                pricing_path=pricing_path,
+                allowance_path=allowance_path,
+                rate_card_path=rate_card_path,
+                thresholds_path=thresholds_path,
             ),
         )
-        thread = threading.Thread(
-            target=self._run_refresh,
-            kwargs={
-                "job_id": job_id,
-                "codex_home": codex_home,
-                "db_path": db_path,
-                "pricing_path": pricing_path,
-                "allowance_path": allowance_path,
-                "rate_card_path": rate_card_path,
-                "thresholds_path": thresholds_path,
-                "include_archived": include_archived,
-                "aggregate_only": aggregate_only,
-                "refresh_lock": refresh_lock,
-            },
-            daemon=True,
-        )
-        thread.start()
-        return self.status(job_id)
+        if outcome.job is None:
+            raise RuntimeError("asynchronous dashboard refresh did not register a job")
+        return _legacy_refresh_job_payload(outcome.job, include_result=False)
 
     def status(self, job_id: str) -> dict[str, object]:
-        with self._lock:
-            job = self._jobs.get(job_id)
-            if job is None:
-                return {
-                    "schema": "codex-usage-tracker-refresh-job-v1",
-                    "job_id": job_id,
-                    "status": "missing",
-                    "error": "Unknown refresh job_id. Jobs are in-process and cleared when the server restarts.",
-                }
-            return dict(job)
+        status = self.job_service.status(job_id, include_result=True)
+        if status.stage == "not_found":
+            return {
+                "schema": "codex-usage-tracker-refresh-job-v1",
+                "job_id": job_id,
+                "status": "missing",
+                "error": "Unknown refresh job_id.",
+            }
+        return _legacy_refresh_job_payload(status, include_result=True)
 
-    def _run_refresh(
-        self,
-        *,
-        job_id: str,
-        codex_home: Path,
-        db_path: Path,
-        pricing_path: Path,
-        allowance_path: Path,
-        rate_card_path: Path,
-        thresholds_path: Path,
-        include_archived: bool,
-        aggregate_only: bool,
-        refresh_lock: Any,
-    ) -> None:
-        started = perf_counter()
 
-        def on_progress(progress: dict[str, object]) -> None:
-            self._update_job(job_id, progress=progress, status="running")
-
-        try:
-            with refresh_lock:
-                result = refresh_usage_index(
-                    codex_home=codex_home,
-                    db_path=db_path,
-                    include_archived=include_archived,
-                    aggregate_only=aggregate_only,
-                    progress_callback=on_progress,
-                    pricing_path=pricing_path,
-                    allowance_path=allowance_path,
-                    rate_card_path=rate_card_path,
-                    thresholds_path=thresholds_path,
-                )
-            self._update_job(
-                job_id,
-                status="completed",
-                finished_at=utc_now(),
-                elapsed_ms=elapsed_ms(started),
-                result={
-                    "scanned_files": result.scanned_files,
-                    "parsed_events": result.parsed_events,
-                    "skipped_events": result.skipped_events,
-                    "inserted_or_updated_events": result.inserted_or_updated_events,
-                    "db_path": result.db_path,
-                    "parser_diagnostics": result.parser_diagnostics,
-                    "include_archived": include_archived,
-                    "aggregate_only": aggregate_only,
-                },
-            )
-        except BaseException as exc:  # noqa: BLE001 - background jobs must capture failures.
-            self._update_job(
-                job_id,
-                status="failed",
-                finished_at=utc_now(),
-                elapsed_ms=elapsed_ms(started),
-                error=f"{type(exc).__name__}: {exc}",
-            )
-
-    def _update_job(self, job_id: str, **updates: object) -> None:
-        with self._lock:
-            job = self._jobs.get(job_id)
-            if job is None:
-                return
-            job.update(updates)
-            job["updated_at"] = utc_now()
+def _legacy_refresh_job_payload(
+    status: JobStatusV1,
+    *,
+    include_result: bool,
+) -> dict[str, object]:
+    state = "running" if status.state == "queued" else status.state
+    payload: dict[str, object] = {
+        "schema": "codex-usage-tracker-refresh-job-v1",
+        "job_id": status.job_id,
+        "status": state,
+        "started_at": status.created_at,
+        "updated_at": status.updated_at,
+        "progress": {
+            "schema": "codex-usage-tracker-refresh-progress-v1",
+            "phase": status.stage,
+            "status": state,
+            "message": f"Refresh {status.stage.replace('_', ' ')}",
+            "completed": status.progress_percent,
+            "total": 100,
+            "percent": float(status.progress_percent),
+        },
+    }
+    if status.completed_at is not None:
+        payload["finished_at"] = status.completed_at
+    if status.error is not None:
+        payload["error"] = status.error.message
+    if include_result and status.result is not None:
+        result = status.result
+        if isinstance(result, Mapping):
+            refresh = result.get("refresh")
+            payload["result"] = dict(refresh) if isinstance(refresh, Mapping) else dict(result)
+    return payload
 
 
 def handle_refresh_job_start_request(

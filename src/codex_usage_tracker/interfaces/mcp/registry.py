@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from functools import cache, lru_cache, wraps
+from time import perf_counter
 
 from codex_usage_tracker.application.container import ApplicationContainer
 from codex_usage_tracker.interfaces.mcp.compatibility_tools import (
@@ -378,7 +379,7 @@ def bound_core_handlers(
             container=container,
         )
 
-    return {
+    handlers: dict[str, Callable[..., object]] = {
         "usage_status": bound_usage_status,
         "usage_refresh": bound_usage_refresh,
         "usage_analyze": bound_usage_analyze,
@@ -387,6 +388,23 @@ def bound_core_handlers(
         "usage_allowance": bound_usage_allowance,
         "usage_job_status": bound_usage_job_status,
     }
+    return {name: _timed_core_handler(handler) for name, handler in handlers.items()}
+
+
+def _timed_core_handler(handler: Callable[..., object]) -> Callable[..., object]:
+    @wraps(handler)
+    def timed(*args: object, **kwargs: object) -> object:
+        started = perf_counter()
+        result = handler(*args, **kwargs)
+        if not isinstance(result, dict):
+            return result
+        result = {
+            **result,
+            "server_elapsed_ms": round((perf_counter() - started) * 1_000, 3),
+        }
+        return {key: result[key] for key in sorted(result)}
+
+    return timed
 
 
 def _full_tool_spec(name: str) -> ToolSpec:

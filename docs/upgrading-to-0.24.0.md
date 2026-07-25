@@ -40,8 +40,8 @@ workbench code. Each notice supplies a replacement core request and links to
 Evidence, Explore, and Limits.
 
 CLI, HTTP API, CSV export, and full-profile MCP compatibility remain supported
-through 0.24.x. Replace those compatibility entry points before upgrading to
-0.25.0, when the deprecations ledger schedules their removal.
+through 0.25.x. Replace those compatibility entry points before upgrading to
+0.26.0, when the amended deprecations ledger schedules their removal.
 
 If a workflow cannot migrate immediately, pin this compatibility release:
 

@@ -23,7 +23,6 @@ from codex_usage_tracker.application.requests import (
 )
 from codex_usage_tracker.application.status import STATUS_SCHEMA, _build_status
 from codex_usage_tracker.core.contracts import (
-    MessageV1,
     NextActionV1,
     enforce_payload_budget,
     envelope_payload,
@@ -52,6 +51,7 @@ from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
     usage_query as usage_query,
 )
 from codex_usage_tracker.jobs.service import JobService
+from codex_usage_tracker.store.analysis_job_repository import AnalysisJobRepository
 
 MAX_STATUS_PAYLOAD_BYTES = 16 * 1024
 MAX_REFRESH_PAYLOAD_BYTES = 64 * 1024
@@ -172,7 +172,7 @@ def build_usage_allowance(
     )
     state = result.payload.get("state")
     job_id = result.payload.get("job_id")
-    next_actions = ()
+    next_actions: tuple[NextActionV1, ...] = ()
     if (
         result.result_schema == "codex-usage-tracker.job.v1"
         and state in {"queued", "running"}
@@ -300,6 +300,14 @@ def build_usage_status(
             pricing_provider=container.pricing,
             readiness_provider=conversational_readiness,
         )
+    mcp_status = cast(dict[str, object], result["mcp"])
+    mcp_status["current_task_exposure"] = "verified"
+    readiness = cast(dict[str, object], result["conversational_readiness"])
+    if readiness.get("state") == "ready":
+        readiness["summary"] = (
+            "Local installation and launcher checks passed; this usage_status "
+            "invocation proves current-task core MCP exposure."
+        )
     next_action = cast(dict[str, object], result["next_action"])
     payload = envelope_payload(
         tool="usage_status",
@@ -309,13 +317,7 @@ def build_usage_status(
         freshness=context.freshness,
         accounting=context.accounting,
         data_class="administrative",
-        limitations=(
-            MessageV1(
-                code="mcp.current_task_exposure_unverified",
-                severity="info",
-                message="Current-task MCP tool exposure is not verified by this status call.",
-            ),
-        ),
+        limitations=(),
         next_actions=(
             NextActionV1(
                 code=cast(str, next_action["code"]),
@@ -421,10 +423,17 @@ def build_usage_job_status(
             scope=RequestScope(),
         )
     )
+    result_payload = status.to_payload()
+    progress = _durable_progress(job_service, status.job_id)
+    if progress is not None:
+        result_payload["progress"] = progress
+    result_payload["poll_after_ms"] = (
+        0 if status.state in {"completed", "failed", "cancelled"} else 1_000
+    )
     payload = envelope_payload(
         tool="usage_job_status",
         result_schema="codex-usage-tracker.job.v1",
-        result=status.to_payload(),
+        result=result_payload,
         scope=context.scope,
         freshness=context.freshness,
         accounting=context.accounting,
@@ -448,3 +457,37 @@ def build_usage_job_status(
         "usage_job_status",
     )
     return payload
+
+
+def _durable_progress(
+    job_service: JobStatusService | None,
+    job_id: str,
+) -> dict[str, object] | None:
+    if not isinstance(job_service, JobService):
+        return None
+    repository = job_service.persistence
+    if not isinstance(repository, AnalysisJobRepository):
+        return None
+    row = repository.get(job_id, touch=False)
+    if row is None:
+        return None
+    raw_progress = row.get("progress")
+    if not isinstance(raw_progress, dict):
+        return None
+    allowed = {
+        "percent",
+        "stage",
+        "completed",
+        "total",
+        "parsed_events",
+        "inserted_or_updated_events",
+        "elapsed_seconds",
+        "heartbeat_at",
+        "input_generation",
+        "committed_output_generation",
+        "fixed_source_boundary",
+        "tail_pending",
+        "tail_pending_files",
+        "tail_pending_bytes",
+    }
+    return {key: value for key, value in raw_progress.items() if key in allowed}

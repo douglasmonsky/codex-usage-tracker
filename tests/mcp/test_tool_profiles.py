@@ -190,6 +190,9 @@ def test_core_can_bind_one_explicit_application_container(
 
     assert registered["usage_status"].fn is not usage_status
     assert payload["result"]["sources"]["canonical_rows"] == 0
+    assert isinstance(payload["server_elapsed_ms"], float)
+    assert payload["server_elapsed_ms"] >= 0
+    assert list(payload) == sorted(payload)
     assert container.repositories.jobs is container.jobs
 
 
@@ -295,6 +298,85 @@ def test_core_job_status_returns_bounded_administrative_envelope(tmp_path: Path)
     assert payload["result_schema"] == "codex-usage-tracker.job.v1"
     assert payload["data_class"] == "administrative"
     assert serialized_size(payload) <= 16 * 1024
+
+
+def test_core_job_status_exposes_bounded_durable_refresh_progress(tmp_path: Path) -> None:
+    from codex_usage_tracker.interfaces.mcp.core_tools import build_usage_job_status
+    from codex_usage_tracker.jobs.adapters import request_hash
+    from codex_usage_tracker.jobs.service import JobService
+    from codex_usage_tracker.store.analysis_job_repository import AnalysisJobRepository
+
+    repository = AnalysisJobRepository(
+        tmp_path / "usage.jobs.sqlite3",
+        owner_id="mcp-progress-test",
+    )
+    semantic_key = request_hash("synthetic-refresh")
+    repository.create_or_reuse(
+        job_id="refresh-progress",
+        job_kind="refresh",
+        semantic_key=semantic_key,
+        source_revision=request_hash("synthetic-source"),
+        request_schema="refresh.request.v1",
+        request={"history": "active", "aggregate_only": True, "execution": "async"},
+        result_schema="codex-usage-tracker.refresh.v2",
+    )
+    repository.update_status(
+        "refresh-progress",
+        state="running",
+        progress={
+            "percent": 67,
+            "stage": "derived_state",
+            "completed": 4,
+            "total": 6,
+            "parsed_events": 120,
+            "inserted_or_updated_events": 18,
+            "elapsed_seconds": 42,
+            "heartbeat_at": "2026-07-25T12:00:00Z",
+            "input_generation": request_hash("synthetic-source"),
+            "fixed_source_boundary": {
+                "changed_source_files": 2,
+                "added_bytes": 4_096,
+                "newline_aligned": True,
+                "exclusive_end": True,
+            },
+            "tail_pending": True,
+            "tail_pending_files": 1,
+            "tail_pending_bytes": 128,
+        },
+    )
+
+    payload = build_usage_job_status(
+        job_id="refresh-progress",
+        db_path=tmp_path / "missing-usage.sqlite3",
+        pricing_path=tmp_path / "missing-pricing.json",
+        job_service=JobService(repository=repository),
+    )
+
+    result = payload["result"]
+    assert isinstance(result, dict)
+    assert result["state"] == "running"
+    assert result["poll_after_ms"] == 1_000
+    assert result["progress"] == {
+        "completed": 4,
+        "elapsed_seconds": 42,
+        "fixed_source_boundary": {
+            "added_bytes": 4_096,
+            "changed_source_files": 2,
+            "exclusive_end": True,
+            "newline_aligned": True,
+        },
+        "heartbeat_at": "2026-07-25T12:00:00Z",
+        "input_generation": request_hash("synthetic-source"),
+        "inserted_or_updated_events": 18,
+        "parsed_events": 120,
+        "percent": 67,
+        "stage": "derived_state",
+        "tail_pending": True,
+        "tail_pending_bytes": 128,
+        "tail_pending_files": 1,
+        "total": 6,
+    }
+    assert "synthetic-refresh" not in json.dumps(payload)
 
 
 def test_core_job_result_budget_includes_envelope_overhead(tmp_path: Path) -> None:

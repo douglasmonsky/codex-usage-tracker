@@ -62,6 +62,7 @@ def _add_install_plugin_parser(
     )
     install_plugin_cmd.add_argument("--plugin-dir", type=Path, default=DEFAULT_PLUGIN_LINK)
     install_plugin_cmd.add_argument("--marketplace", type=Path, default=DEFAULT_MARKETPLACE_PATH)
+    install_plugin_cmd.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
     install_plugin_cmd.add_argument(
         "--python",
         type=Path,
@@ -86,6 +87,7 @@ def _add_upgrade_plugin_parser(
     )
     upgrade_plugin_cmd.add_argument("--plugin-dir", type=Path, default=DEFAULT_PLUGIN_LINK)
     upgrade_plugin_cmd.add_argument("--marketplace", type=Path, default=DEFAULT_MARKETPLACE_PATH)
+    upgrade_plugin_cmd.add_argument("--codex-home", type=Path, default=DEFAULT_CODEX_HOME)
     upgrade_plugin_cmd.add_argument(
         "--python",
         type=Path,

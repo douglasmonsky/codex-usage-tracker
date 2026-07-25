@@ -140,9 +140,9 @@ PARITY_CASES = (
         ("evidence-token_waste",),
         "all",
         ("evidence", "explore"),
-        'usage_analyze(goal="token_waste"); full-profile compression tools through 0.24.x',
+        'usage_analyze(goal="token_waste"); full-profile compression tools through 0.25.x',
         "Analysis service maintainers",
-        "Exact compression ranking remains a tested full-profile compatibility operation through 0.24.x.",
+        "Exact compression ranking remains a tested full-profile compatibility operation through 0.25.x.",
     ),
     ParityCase(
         "diagnostic-facts",
@@ -192,7 +192,7 @@ def test_sunset_replacement_preserves_fixture_contract(case: ParityCase) -> None
     assert signed["replacement_tool_request"] == case.replacement
     assert signed["owner"] == case.owner
     assert signed["decision"] == case.decision
-    assert signed["remove_in"] == "0.25.0"
+    assert signed["remove_in"] == "0.26.0"
     assert signed["result"] == "PASS"
 
 

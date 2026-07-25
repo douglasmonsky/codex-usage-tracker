@@ -27,8 +27,8 @@ _PARALLEL_PARSE_WORKERS_ENV = "CODEX_USAGE_TRACKER_REFRESH_WORKERS"
 _PARALLEL_CONTENT_WORKERS_ENV = "CODEX_USAGE_TRACKER_CONTENT_INDEX_WORKERS"
 _PARALLEL_PARSE_MIN_FILES = 8
 _PARALLEL_PARSE_MIN_BYTES = 32 * 1024 * 1024
-_PARALLEL_PARSE_MAX_WORKERS = 4
-_PARALLEL_PARSE_QUEUE_FACTOR = 2
+_PARALLEL_PARSE_MAX_WORKERS = 2
+_PARALLEL_PARSE_QUEUE_FACTOR = 1
 
 RefreshProgressCallback = Callable[[dict[str, object]], None]
 
@@ -386,6 +386,7 @@ def _parse_source_plan(
         "session_index": session_index,
         "stats": file_stats,
         "start_byte": plan.start_byte,
+        "end_byte": plan.end_byte,
         "start_line": plan.start_line,
         "initial_state": plan.initial_state,
     }

@@ -53,6 +53,9 @@ def plugin_install_payload(result: Any, *, schema: str) -> dict[str, Any]:
         "marketplace_path": path_payload(result.marketplace_path),
         "python_executable": path_payload(result.python_executable),
         "replaced_existing": result.replaced_existing,
+        "bundle_digest": result.bundle_digest,
+        "cache_state": result.cache_state,
+        "cache_invalidated": result.cache_invalidated,
         "restart_required": True,
     }
 

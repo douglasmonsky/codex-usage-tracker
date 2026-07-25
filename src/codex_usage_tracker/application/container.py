@@ -22,6 +22,7 @@ from codex_usage_tracker.application.protocols import (
 )
 from codex_usage_tracker.application.requests import RequestScope
 from codex_usage_tracker.core.dashboard_targets import build_dashboard_target_v2
+from codex_usage_tracker.core.paths import operational_job_db_path
 from codex_usage_tracker.jobs.service import JobService
 from codex_usage_tracker.parser.api import find_session_logs
 from codex_usage_tracker.pricing.allowance_rate_card import load_bundled_rate_card
@@ -137,8 +138,10 @@ def build_application_container(
     clock: Clock | None = None,
 ) -> ApplicationContainer:
     jobs = JobService(
-        repository=AnalysisJobRepository(paths.db_path),
-        recover_interrupted=True,
+        repository=AnalysisJobRepository(operational_job_db_path(paths.db_path)),
+        # MCP and server startup must remain read-only. Expired leases are
+        # recovered atomically when a later durable job is registered.
+        recover_interrupted=False,
     )
     repositories = RepositorySet(
         usage=StoreUsageRepository(paths.db_path),

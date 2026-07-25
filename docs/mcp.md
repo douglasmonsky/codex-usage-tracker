@@ -130,6 +130,13 @@ and effort). Both return bounded versioned envelopes. An asynchronous analysis
 returns an analysis-job handle; poll its `job_id` with `usage_job_status`.
 Allowance questions use `usage_allowance(operation=...)`. Raw-context and
 individual allowance compatibility tools are not part of this default flow.
+Every installed core-tool response includes top-level `server_elapsed_ms`, measured
+inside the MCP process around the complete application call. Use it to distinguish
+server work from client discovery, transport, polling, and model orchestration time.
+Durable refresh jobs remain pollable from later Codex tasks. Their bounded
+`progress` object reports the current phase, global percent, elapsed seconds,
+heartbeat, and available source/event counters without exposing local paths or
+raw session content.
 
 A server process registers one selected profile; it never registers every tool
 and relies on documentation to hide the others.
@@ -141,10 +148,10 @@ compatibility entrypoint for older direct integrations, while new wrappers use
 | Profile | Registered surface |
 | --- | --- |
 | `core` | Exactly `usage_status`, `usage_refresh`, `usage_analyze`, `usage_query`, `usage_evidence`, `usage_allowance`, and `usage_job_status`, in that order. |
-| `full` | Core plus the 0.21 compatibility names, except the five explicit developer experiments. Deprecated schemas and names remain unchanged through 0.24.x. |
+| `full` | Core plus the 0.21 compatibility names, except the five explicit developer experiments. Deprecated schemas and names remain unchanged through 0.25.x. |
 | `developer` | Full plus dogfood and visualization experiments. These tools are excluded from `core` and `full`. |
 
-Deprecated tool descriptions name the stable replacement and `0.25.0` as the
+Deprecated tool descriptions name the stable replacement and `0.26.0` as the
 earliest removal release. Seven local operations without one-call core parity
 remain active, advanced `full` tools; see [Deprecations](deprecations.md).
 
@@ -219,7 +226,7 @@ The complete catalog across all three profiles is:
 
 The default dashboard contains Home, Explore, and Limits, with Settings as a
 utility and Evidence opened contextually. Legacy analytical workbench URLs stay
-directly reachable through `0.24.x`, but new investigations should use these
+directly reachable through `0.25.x`, but new investigations should use these
 core requests:
 
 | Job | Core request | Evidence surface |
@@ -232,7 +239,7 @@ core requests:
 | Subagents | `usage_query(entity="subagent")` or `usage_analyze(goal="subagent_cost")` | Explore and contextual Evidence |
 
 Compression candidate ranking remains available through the full profile until
-`0.25.0`. The executable fixture, accounting, scope, caveat, and canonical-ID
+`0.26.0`. The executable fixture, accounting, scope, caveat, and canonical-ID
 record is [Dashboard Sunset Job Parity V2](dashboard-sunset-job-parity-v2.md).
 
 ## Tool Notes

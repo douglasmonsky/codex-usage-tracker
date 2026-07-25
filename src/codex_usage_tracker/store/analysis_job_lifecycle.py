@@ -13,7 +13,24 @@ from codex_usage_tracker.store.connection import open_read_only_connection
 ACTIVE_STATUSES = ("queued", "running")
 TERMINAL_STATUSES = ("completed", "failed", "cancelled", "interrupted")
 STATUSES = (*ACTIVE_STATUSES, *TERMINAL_STATUSES)
-PROGRESS_KEYS = frozenset({"percent", "stage"})
+PROGRESS_KEYS = frozenset(
+    {
+        "percent",
+        "stage",
+        "completed",
+        "total",
+        "parsed_events",
+        "inserted_or_updated_events",
+        "elapsed_seconds",
+        "heartbeat_at",
+        "input_generation",
+        "committed_output_generation",
+        "fixed_source_boundary",
+        "tail_pending",
+        "tail_pending_files",
+        "tail_pending_bytes",
+    }
+)
 ERROR_KEYS = frozenset({"code", "severity", "message", "remediation"})
 REQUEST_ROOT_KEYS = {
     "analysis.request.v1": frozenset(
@@ -36,6 +53,13 @@ REQUEST_ROOT_KEYS = {
             "parameters",
         }
     ),
+    "refresh.request.v1": frozenset(
+        {
+            "history",
+            "aggregate_only",
+            "execution",
+        }
+    ),
 }
 RESULT_ROOT_KEYS = {
     "codex-usage-tracker.analysis.v2": frozenset(
@@ -56,7 +80,17 @@ RESULT_ROOT_KEYS = {
             "limitations",
             "dashboard_destinations",
         }
-    )
+    ),
+    "codex-usage-tracker.refresh.v2": frozenset(
+        {
+            "schema",
+            "refresh",
+            "planner",
+            "scope",
+            "freshness",
+            "accounting",
+        }
+    ),
 }
 
 

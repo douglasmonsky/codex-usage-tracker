@@ -35,6 +35,8 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
 ) -> None:
     opened: list[str] = []
     handlers: list[object] = []
+    db_path = tmp_path / "usage.sqlite3"
+    output_path = tmp_path / "generated" / "dashboard.html"
 
     class FakeServer:
         def __init__(self, address: tuple[str, int], handler: object) -> None:
@@ -49,16 +51,12 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
         def server_close(self) -> None:
             self.closed = True
 
-    def generate_dashboard(**kwargs: object) -> Path:
-        return Path(str(kwargs["output_path"]))
-
-    monkeypatch.setattr(server_api, "generate_dashboard", generate_dashboard)
     monkeypatch.setattr(server_api, "ThreadingHTTPServer", FakeServer)
     monkeypatch.setattr(server_api.webbrowser, "open", opened.append)
 
     server_api.serve_dashboard(
-        db_path=tmp_path / "usage.sqlite3",
-        output_path=tmp_path / "dashboard.html",
+        db_path=db_path,
+        output_path=output_path,
         pricing_path=tmp_path / "pricing.json",
         allowance_path=tmp_path / "allowance.json",
         rate_card_path=tmp_path / "rate-card.json",
@@ -84,6 +82,11 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
     assert isinstance(facade, HttpV2Facade)
     assert isinstance(facade.services, ApplicationHttpV2Services)
     assert facade.services.application.paths.projects_path == tmp_path / "projects.json"
+    refresh_jobs = handler.keywords["refresh_jobs"]
+    assert refresh_jobs.job_service is facade.services.job_service
+    assert not db_path.exists()
+    assert not output_path.exists()
+    assert output_path.parent.is_dir()
 
 
 def test_serve_dashboard_starts_requested_refresh_after_binding(
@@ -109,11 +112,6 @@ def test_serve_dashboard_starts_requested_refresh_after_binding(
         return {"job_id": "startup-job"}
 
     monkeypatch.setattr(server_api, "ThreadingHTTPServer", FakeServer)
-    monkeypatch.setattr(
-        server_api,
-        "generate_dashboard",
-        lambda **kwargs: Path(str(kwargs["output_path"])),
-    )
     monkeypatch.setattr(server_api.RefreshJobRegistry, "start_refresh", start_refresh)
 
     server_api.serve_dashboard(

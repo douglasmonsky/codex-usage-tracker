@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.25.0.dev0 - 2026-07-25
+
+- Prioritize central-product reliability before compatibility removal, moving
+  the existing removal and stabilization roadmap stages to 0.26 and 0.27.
+- Give generated plugin bundles a deterministic skills/assets digest and
+  invalidate only a stale same-version Codex cache owned by this plugin.
+
 ## 0.24.0 - 2026-07-24
 
 - Introduce an explicit application composition root and dependency protocols,

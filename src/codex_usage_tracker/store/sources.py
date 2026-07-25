@@ -48,9 +48,11 @@ def _filesystem_id_key(value: object) -> str | None:
 class SourceParsePlan:
     path: Path
     start_byte: int = 0
+    end_byte: int | None = None
     start_line: int = 0
     initial_state: ParserState | None = None
     replace_existing: bool = True
+    source_metadata: SourceFileMetadata | None = None
 
 
 @dataclass(frozen=True)
@@ -65,6 +67,15 @@ class SourceFileMetadata:
 ParsedSourceFile: TypeAlias = (
     tuple[Path, list[UsageEvent], dict[str, int], ParserState]
     | tuple[Path, list[UsageEvent], dict[str, int], ParserState, int]
+    | tuple[
+        Path,
+        list[UsageEvent],
+        dict[str, int],
+        ParserState,
+        int,
+        SourceFileMetadata | None,
+        int,
+    ]
 )
 
 
@@ -83,9 +94,16 @@ def _source_parse_plan(conn: sqlite3.Connection, path: Path) -> SourceParsePlan 
     if metadata is None:
         return None
     row = _source_file_parse_row(conn, path)
+    end_byte = _complete_prefix_end(path, metadata.size_bytes)
     if row is None:
-        return SourceParsePlan(path=path)
-    return _source_parse_plan_from_row(path, metadata, row)
+        if end_byte == 0:
+            return None
+        return SourceParsePlan(
+            path=path,
+            end_byte=end_byte,
+            source_metadata=metadata,
+        )
+    return _source_parse_plan_from_row(path, metadata, row, end_byte=end_byte)
 
 
 def _source_file_parse_row(conn: sqlite3.Connection, path: Path) -> sqlite3.Row | None:
@@ -103,22 +121,39 @@ def _source_file_parse_row(conn: sqlite3.Connection, path: Path) -> sqlite3.Row 
 
 
 def _source_parse_plan_from_row(
-    path: Path, metadata: SourceFileMetadata, row: sqlite3.Row
+    path: Path,
+    metadata: SourceFileMetadata,
+    row: sqlite3.Row,
+    *,
+    end_byte: int,
 ) -> SourceParsePlan | None:
     previous_state = parser_state_from_json(row["parser_state_json"])
     if _requires_full_source_parse(row, previous_state):
-        return SourceParsePlan(path=path)
+        return SourceParsePlan(
+            path=path,
+            end_byte=end_byte,
+            source_metadata=metadata,
+        )
     if _source_metadata_matches(path, row, metadata):
         return None
     if _can_incrementally_parse_source(path, metadata, row):
+        parsed_until_byte = int(row["parsed_until_byte"])
+        if end_byte <= parsed_until_byte:
+            return None
         return SourceParsePlan(
             path=path,
-            start_byte=int(row["parsed_until_byte"]),
+            start_byte=parsed_until_byte,
+            end_byte=end_byte,
             start_line=int(row["parsed_until_line"]),
             initial_state=previous_state,
             replace_existing=False,
+            source_metadata=metadata,
         )
-    return SourceParsePlan(path=path)
+    return SourceParsePlan(
+        path=path,
+        end_byte=end_byte,
+        source_metadata=metadata,
+    )
 
 
 def _requires_full_source_parse(row: sqlite3.Row, previous_state: ParserState | None) -> bool:
@@ -210,9 +245,15 @@ def upsert_source_file_metadata(
     indexed_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     rows: list[dict[str, Any]] = []
     for parsed_file in parsed:
-        path, events, diagnostics, parser_state, final_line_number = _parsed_source_file_parts(
-            parsed_file
-        )
+        (
+            path,
+            events,
+            diagnostics,
+            parser_state,
+            final_line_number,
+            source_metadata,
+            parsed_until_byte,
+        ) = _parsed_source_file_parts(parsed_file)
         row = _source_file_metadata_row(
             path=path,
             events=events,
@@ -220,6 +261,8 @@ def upsert_source_file_metadata(
             parser_state=parser_state,
             indexed_at=indexed_at,
             final_line_number=final_line_number,
+            source_metadata=source_metadata,
+            parsed_until_byte=parsed_until_byte,
         )
         if row is not None:
             rows.append(row)
@@ -272,10 +315,28 @@ def upsert_source_file_metadata(
 
 def _parsed_source_file_parts(
     parsed_file: ParsedSourceFile,
-) -> tuple[Path, list[UsageEvent], dict[str, int], ParserState, int | None]:
+) -> tuple[
+    Path,
+    list[UsageEvent],
+    dict[str, int],
+    ParserState,
+    int | None,
+    SourceFileMetadata | None,
+    int | None,
+]:
     path, events, diagnostics, parser_state, *rest = parsed_file
-    final_line_number = rest[0] if rest else None
-    return path, events, diagnostics, parser_state, final_line_number
+    final_line_number = rest[0] if rest and isinstance(rest[0], int) else None
+    source_metadata = rest[1] if len(rest) > 1 and isinstance(rest[1], SourceFileMetadata) else None
+    parsed_until_byte = rest[2] if len(rest) > 2 and isinstance(rest[2], int) else None
+    return (
+        path,
+        events,
+        diagnostics,
+        parser_state,
+        final_line_number,
+        source_metadata,
+        parsed_until_byte,
+    )
 
 
 def _source_file_metadata_row(
@@ -286,13 +347,15 @@ def _source_file_metadata_row(
     parser_state: ParserState,
     indexed_at: str,
     final_line_number: int | None = None,
+    source_metadata: SourceFileMetadata | None = None,
+    parsed_until_byte: int | None = None,
 ) -> dict[str, Any] | None:
-    metadata = _source_file_metadata(path)
+    metadata = source_metadata or _source_file_metadata(path)
     if metadata is None:
         return None
     latest_event = _latest_source_usage_event(events)
     parsed_until_line = final_line_number or _count_lines(path)
-    parsed_until_byte = metadata.size_bytes
+    checkpoint_byte = metadata.size_bytes if parsed_until_byte is None else parsed_until_byte
     return {
         "source_file_id": _source_file_id(path),
         "source_file": str(path),
@@ -301,8 +364,8 @@ def _source_file_metadata_row(
         "size_bytes": metadata.size_bytes,
         "mtime_ns": metadata.mtime_ns,
         "parsed_until_line": parsed_until_line,
-        "parsed_until_byte": parsed_until_byte,
-        "parsed_prefix_tail_hash": _parsed_prefix_tail_hash(path, parsed_until_byte),
+        "parsed_until_byte": checkpoint_byte,
+        "parsed_prefix_tail_hash": _parsed_prefix_tail_hash(path, checkpoint_byte),
         "parsed_row_count": parsed_until_line,
         "source_generation": 1,
         "source_device": metadata.source_device,
@@ -377,6 +440,25 @@ def _parsed_prefix_tail_hash(path: Path, parsed_until_byte: int) -> str:
         handle.seek(start)
         payload = handle.read(parsed_until_byte - start)
     return hashlib.sha256(payload).hexdigest()
+
+
+def _complete_prefix_end(path: Path, observed_size: int) -> int:
+    """Return the last complete JSONL boundary at or before one size snapshot."""
+
+    if observed_size <= 0:
+        return 0
+    chunk_size = min(_PREFIX_TAIL_BYTES, observed_size)
+    offset = observed_size
+    with path.open("rb") as handle:
+        while offset > 0:
+            read_size = min(chunk_size, offset)
+            offset -= read_size
+            handle.seek(offset)
+            payload = handle.read(read_size)
+            newline = payload.rfind(b"\n")
+            if newline >= 0:
+                return offset + newline + 1
+    return 0
 
 
 def _count_lines(path: Path) -> int:

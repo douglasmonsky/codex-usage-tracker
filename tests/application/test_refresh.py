@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from codex_usage_tracker.application import refresh as refresh_module
+from codex_usage_tracker.application import refresh_observability
 from codex_usage_tracker.application.refresh import (
     MAX_SYNC_ADDED_BYTES,
     MAX_SYNC_SOURCE_FILES,
@@ -94,6 +95,40 @@ def test_explicit_sync_preserves_history_and_aggregate_only(tmp_path: Path) -> N
     }
     assert calls[0]["include_archived"] is True
     assert calls[0]["aggregate_only"] is False
+
+
+def test_pending_source_tail_reports_only_bounded_counts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "active.jsonl"
+    source.write_bytes(b'{"first":1}\n{"second":2}\n')
+    db_path = tmp_path / "usage.sqlite3"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "CREATE TABLE source_files (source_file TEXT, parsed_until_byte INTEGER)"
+        )
+        conn.execute(
+            "INSERT INTO source_files VALUES (?, ?)",
+            (str(source), len(b'{"first":1}\n')),
+        )
+    monkeypatch.setattr(
+        refresh_observability,
+        "find_session_logs",
+        lambda *_args, **_kwargs: [source],
+    )
+
+    tail = refresh_module._pending_source_tail(  # type: ignore[attr-defined]
+        RefreshRequest(),
+        codex_home=tmp_path / ".codex",
+        db_path=db_path,
+    )
+
+    assert tail == {
+        "tail_pending": True,
+        "tail_pending_files": 1,
+        "tail_pending_bytes": len(b'{"second":2}\n'),
+    }
+    assert str(source) not in json.dumps(tail)
 
 
 def test_same_injected_service_reuses_active_equivalent_async_job(tmp_path: Path) -> None:

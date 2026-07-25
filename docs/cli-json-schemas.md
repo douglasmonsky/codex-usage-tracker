@@ -42,6 +42,8 @@ Tracked schema ids:
 | `codex-usage-tracker-plugin-install-v1` | CLI `install-plugin --json`, setup plugin payload |
 | `codex-usage-tracker-plugin-upgrade-v1` | CLI `upgrade-plugin --json` |
 | `codex-usage-tracker-plugin-uninstall-v1` | CLI `uninstall-plugin --json` |
+| `codex-usage-tracker.plugin-bundle.v1` | Deterministic installed skills/assets digest and runtime version embedded in the plugin manifest and MCP environment |
+| `codex-usage-tracker.plugin-coherence.v1` | Status/doctor comparison of runtime, installed wrapper, and exact-version Codex cache identities |
 | `codex-usage-tracker-refresh-v1` | CLI `refresh --json`, MCP `refresh_usage_index()` |
 | `codex-usage-tracker-rebuild-index-v1` | CLI `rebuild-index --json` |
 | `codex-usage-tracker-reset-db-v1` | CLI `reset-db --yes --json` |
@@ -51,14 +53,15 @@ Tracked schema ids:
 | `codex-usage-tracker.status.v2` | HTTP `GET /api/v2/status`; bounded application status and freshness contract |
 | `codex-usage-tracker.database-integrity.v1` | CLI `admin integrity --json`, doctor, and status; bounded read-only SQLite integrity state |
 | `codex-usage-tracker.refresh.v2` | HTTP `POST /api/v2/refresh`; completed refresh result |
-| `codex-usage-tracker.job.v1` | HTTP `GET /api/v2/jobs/{job_id}` and asynchronous v2 starts; generic process-local job status |
+| `codex-usage-tracker.job.v1` | HTTP `GET /api/v2/jobs/{job_id}`, asynchronous v2 starts, and core MCP polling; durable local job state with optional bounded refresh `progress` details |
 | `codex-usage-tracker.capabilities.v2` | HTTP `GET /api/v2/capabilities`; immutable analysis, query, allowance, and evidence allowlists |
 | `codex-usage-tracker.error.v1` | Stable HTTP v2 error envelope with machine-readable code and message |
 | `codex-usage-tracker.release-artifact-manifest.v1` | Canonical build-once wheel/sdist hashes, source identity, contract inventories, and Evidence Console bundle hashes |
 | `codex-usage-tracker.release-promotion-evidence.v1` | TestPyPI qualification, installed smoke, GitHub Actions run, and manifest binding required before PyPI promotion |
 | `codex-usage-tracker.query.v2` | Canonical bounded application query result with deterministic cursor continuation |
 | `codex-usage-tracker.analysis.v2` | Bounded evidence-backed analysis with strategy provenance, limitations, accounting, and dashboard destinations |
-| `codex-usage-tracker.analysis-job.v1` | Process-local semantic analysis job status; active and compatible completed work may be reused |
+| `codex-usage-tracker.analysis-refresh-dependency.v1` | Stale-analysis dependency naming the durable refresh job and exact normalized `usage_analyze` resume request |
+| `codex-usage-tracker.analysis-job.v1` | Semantic analysis job status; active and compatible completed work may be reused through durable local job state |
 | `codex-usage-tracker.evidence-result.v1` | Bounded canonical evidence page with exact selector, immutable records, and revision-bound continuation |
 | `codex-usage-tracker-dashboard-target-v2` | Deterministic evidence-surface handoff with canonical selectors and scope |
 | `codex-usage-tracker-recommendations-v1` | CLI `recommendations --json`, MCP `usage_recommendations(response_format="json")`, MCP `usage_dashboard_recommendations(...)` |
