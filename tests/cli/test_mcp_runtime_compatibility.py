@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import json
-import sys
+import shutil
 from pathlib import Path
 
+from codex_usage_tracker import __version__
+from codex_usage_tracker.cli.plugin_installer import install_plugin
 from codex_usage_tracker.diagnostics.api import run_doctor
 from codex_usage_tracker.pricing.api import (
     annotate_rows_with_efficiency,
@@ -27,31 +28,22 @@ def test_pricing_annotation_and_doctor_pass(tmp_path: Path) -> None:
     annotated = annotate_rows_with_efficiency(rows, pricing=load_pricing_config(pricing_path))
     assert annotated[0]["estimated_cost_usd"] > 0
 
-    repo_root = tmp_path / "repo"
-    (repo_root / ".codex-plugin").mkdir(parents=True)
-    (repo_root / ".codex-plugin" / "plugin.json").write_text("{}", encoding="utf-8")
-    (repo_root / ".mcp.json").write_text(
-        json.dumps(
-            {
-                "mcpServers": {
-                    "codex-usage-tracker": {
-                        "command": sys.executable,
-                        "args": ["-m", "codex_usage_tracker.mcp_server"],
-                        "env": {"PYTHONPATH": str(Path(__file__).resolve().parents[2] / "src")},
-                    }
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
     plugin_link = tmp_path / "plugins" / "codex-usage-tracker"
-    plugin_link.parent.mkdir()
-    plugin_link.symlink_to(repo_root, target_is_directory=True)
     marketplace_path = tmp_path / "marketplace.json"
-    marketplace_path.write_text(
-        json.dumps({"plugins": [{"name": "codex-usage-tracker"}]}),
-        encoding="utf-8",
+    install_plugin(
+        plugin_dir=plugin_link,
+        marketplace_path=marketplace_path,
     )
+    cached_plugin = (
+        codex_home
+        / "plugins"
+        / "cache"
+        / "local"
+        / "codex-usage-tracker"
+        / __version__
+    )
+    cached_plugin.parent.mkdir(parents=True)
+    shutil.copytree(plugin_link, cached_plugin)
 
     report = run_doctor(
         codex_home=codex_home,
@@ -59,7 +51,9 @@ def test_pricing_annotation_and_doctor_pass(tmp_path: Path) -> None:
         pricing_path=pricing_path,
         plugin_link=plugin_link,
         marketplace_path=marketplace_path,
-        repo_root=repo_root,
+        repo_root=plugin_link,
     )
 
-    assert report["status"] == "pass"
+    assert report["status"] == "pass", [
+        check for check in report["checks"] if check["status"] != "pass"
+    ]

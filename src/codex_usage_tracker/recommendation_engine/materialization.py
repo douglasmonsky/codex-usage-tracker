@@ -154,6 +154,8 @@ def sync_refresh_recommendation_facts(
             rate_card_path=rate_card_path,
             thresholds_path=thresholds_path,
         )
+    elif not refresh_record_ids and not thread_keys:
+        return
     else:
         sync_recommendation_facts(
             conn,
@@ -174,22 +176,41 @@ def _incremental_refresh_targets(
 ) -> tuple[str, ...] | None:
     state = conn.execute(
         """
-        SELECT facts_version, algorithm_version, config_fingerprint
+        SELECT
+            facts_version,
+            algorithm_version,
+            source_generation,
+            generation_fingerprint,
+            config_fingerprint,
+            record_count
         FROM recommendation_fact_state
         WHERE singleton = 1
         """
     ).fetchone()
     if state is None:
         return None
+    source_generation = read_compression_source_generation(conn)
+    expected_generation = recommendation_generation_fingerprint(
+        source_generation=source_generation,
+        config_fingerprint=config.fingerprint,
+    )
     if (
         int(state["facts_version"]) != RECOMMENDATION_FACTS_VERSION
         or int(state["algorithm_version"]) != RECOMMENDATION_ALGORITHM_VERSION
         or str(state["config_fingerprint"]) != config.fingerprint
     ):
         return None
+    generation_matches = (
+        int(state["source_generation"]) == source_generation
+        and str(state["generation_fingerprint"]) == expected_generation
+    )
+    if not generation_matches and not record_ids:
+        return None
 
     fact_count = int(conn.execute("SELECT COUNT(*) FROM recommendation_facts").fetchone()[0])
     usage_count = int(conn.execute("SELECT COUNT(*) FROM canonical_usage_events").fetchone()[0])
+    if int(state["record_count"]) != fact_count:
+        return None
     missing_count = usage_count - fact_count
     if missing_count < 0 or missing_count > _TARGETED_FACT_REPAIR_LIMIT:
         return None

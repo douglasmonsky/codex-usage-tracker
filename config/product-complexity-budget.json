@@ -15,10 +15,10 @@
       "rationale": "The default conversational surface remains the seven-tool 0.22 core."
     },
     "full_profile_mcp_tools": {
-      "maximum": 59,
-      "baseline": 59,
-      "baseline_commit": "c75babd9fc6d1b4e4cb6efa8a1661b90ce55b2ee",
-      "rationale": "The 0.22 full-profile catalog is a hard ceiling and may ratchet only downward without an architecture decision."
+      "maximum": 58,
+      "baseline": 58,
+      "baseline_commit": "8e080ec73b6be47bfcdbe8506e894837a1105b60",
+      "rationale": "Task 40 removes generate_usage_dashboard from every profile; the measured 0.25 full-profile catalog is now the exact ceiling."
     },
     "stable_cli_top_level_commands": {
       "maximum": 11,
@@ -57,16 +57,16 @@
       "rationale": "No new authored frontend source may exceed 500 physical lines and grandfathered debt may not grow."
     },
     "wheel_bytes": {
-      "maximum": 5296027,
-      "baseline": 5141773,
-      "baseline_commit": "cad0006cb5e8435ed3a47da9fb120bc81a6e1941",
-      "rationale": "Task 40 measured wheel after static-dashboard removal plus exactly three percent headroom, rounded up."
+      "maximum": 5311351,
+      "baseline": 5156651,
+      "baseline_commit": "8e080ec73b6be47bfcdbe8506e894837a1105b60",
+      "rationale": "The combined 0.25 reliability and Task 40 wheel measurement plus exactly three percent headroom, rounded up."
     },
     "sdist_bytes": {
-      "maximum": 29297260,
-      "baseline": 28443941,
-      "baseline_commit": "cad0006cb5e8435ed3a47da9fb120bc81a6e1941",
-      "rationale": "Task 40 measured source distribution after static-dashboard removal plus exactly three percent headroom, rounded up."
+      "maximum": 29340434,
+      "baseline": 28485858,
+      "baseline_commit": "8e080ec73b6be47bfcdbe8506e894837a1105b60",
+      "rationale": "The combined 0.25 reliability and Task 40 source-distribution measurement plus exactly three percent headroom, rounded up."
     },
     "main_initial_react_js_gzip_bytes": {
       "maximum": 63301,

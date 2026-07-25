@@ -90,7 +90,7 @@ The following decisions are normative and require a new design amendment to chan
 7. **Call and thread evidence remains available through contextual routes.**
 8. **Diagnostics Notebook, Investigate, Compression Lab, Cache and Context, and Reports leave default navigation immediately in the first dashboard pivot release.**
 9. **Those routes remain direct-link compatibility surfaces for one minor release, become read-only notices for a second minor release, and are then deleted.**
-10. **The legacy static dashboard receives no new features and is removed after the same two-release compatibility window.**
+10. **The legacy static dashboard receives no new features. Its completed `0.24.x` compatibility window is explicitly closed in `0.25.0` after the central-product reliability checkpoint; this acceleration does not authorize Task 41 removals.**
 11. **The 3D Usage Constellation is removed rather than carried into the stable Evidence Console.**
 12. **Every material analytical claim has explicit claim type, confidence, limitations, and evidence references.**
 13. **Every evidence reference can produce a deterministic Evidence Console target.**

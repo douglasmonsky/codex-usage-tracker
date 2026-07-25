@@ -21,8 +21,11 @@ pre-amendment Task 40/41 branches.
 - Baseline repository state is `main` at `bf383e1f4d9e206f3ba8cb004075bc3e87bc3fa6` and published package `0.21.0`.
 - If `0.22.0` is published before execution begins, shift every planned minor version upward by the same amount without changing task order, compatibility duration, or acceptance criteria.
 - Post-`0.24.0` installed dogfood promoted central-product reliability to
-  `0.25.0`. The previous Tasks 40-43 removal release is now `0.26.0`, and the
-  previous Tasks 44-45 stabilization release is now `0.27.0`.
+  `0.25.0`. After the reliability implementation passed its installed
+  two-task and synthetic incremental checkpoints, the maintainer explicitly
+  accelerated Task 40 into the same release as the clean static-dashboard
+  sunset boundary. Tasks 41-43 remain `0.26.0`, and Tasks 44-45 remain
+  `0.27.0`.
 - No new dashboard workspace, top-level MCP concept, top-level CLI command, runtime dependency, or SQLite table may be added unless specified in this roadmap.
 - Deterministic backend code performs calculations, ranking, identity, pricing, allowance, and statistical decisions. Agents do not calculate from raw rows.
 - The installed plugin defaults to MCP profile `core`.
@@ -31,7 +34,9 @@ pre-amendment Task 40/41 branches.
 - Developer and dogfood tools are profile `developer` only.
 - The first Evidence Console release defaults to Home, Explore, and Limits. Settings is a shell action. Evidence is contextual.
 - Existing analytical pages remain direct-link compatibility routes for one minor release, notice-only routes for one further minor release, then are deleted.
-- The legacy static dashboard follows the same two-release compatibility window.
+- The legacy static dashboard's completed `0.24.x` compatibility window ends
+  in `0.25.0` under the approved Task 40 acceleration. This does not accelerate
+  Task 41 workbenches, focused APIs, or other CLI/MCP/HTTP compatibility.
 - Existing raw-context controls and loopback server request guards remain behaviorally unchanged unless a task explicitly modifies them.
 - Public documentation must accurately describe current local storage behavior. This roadmap does not redesign privacy behavior.
 - External validation programs are outside scope.
@@ -53,8 +58,8 @@ pre-amendment Task 40/41 branches.
 | `0.22.0` | Stable MCP core profile, shared contracts, truthful product positioning, generic job facade | Existing dashboard and old tools still function; old tools are `full` profile |
 | `0.23.0` | Evidence Console becomes default; CLI and HTTP v2 ship | Old dashboard pages are direct-link compatibility routes; old CLI names remain aliases |
 | `0.24.0` | Foundation audit, Python architecture refit, database integrity, context offsets, infrastructure hardening | No implementation begins before Task 27.5 records `PROCEED` or a maintainer-approved `AMEND`; old pages are notice-only and old APIs and aliases remain supported |
-| `0.25.0` | Central-product reliability, installed-bundle coherence, durable refresh ownership, and large-index incremental performance | Existing compatibility remains; the primary MCP path is dependable under concurrency, restart, and append-active logs |
-| `0.26.0` | Expired dashboard, static, MCP, CLI, and HTTP compatibility removed | Only documented stable and advanced surfaces remain |
+| `0.25.0` | Central-product reliability, installed-bundle coherence, durable refresh ownership, large-index incremental performance, and Task 40 static-dashboard sunset | The primary MCP path is dependable under concurrency, restart, and append-active logs; the live Evidence Console is the only dashboard product |
+| `0.26.0` | Remaining expired workbench, MCP, CLI, and HTTP compatibility removed after Task 41 parity gates | Only documented stable and advanced surfaces remain |
 | `0.27.0` | Feature-free stabilization release for pre-1.0 contract hardening | No new public surface; migration and package gates prove final state |
 
 ## Program dependency graph
@@ -76,9 +81,11 @@ Record PROCEED or maintainer-approved AMEND
    |
 Task 28-39 Architecture, integrity, CI/release, and 0.24 release
    |
-OPS-REL-025 Central-product reliability and 0.25 release
+OPS-REL-025 Central-product reliability
    |
-Task 40-43 Compatibility deletion and 0.26 release
+Task 40 Static-dashboard sunset and 0.25 release
+   |
+Task 41-43 Remaining compatibility deletion and 0.26 release
    |
 Task 44-45 Stabilization and 0.27 final acceptance
 ```
@@ -3185,7 +3192,7 @@ git commit -m "chore: prepare 0.24.0 hardened architecture release"
 
 ---
 
-## Release 0.25.0 - Central product reliability and installed coherence
+## Release 0.25.0 - Reliability, installed coherence, and static-dashboard sunset
 
 ### Reliability program: Make the seven-tool MCP product dependable
 
@@ -3396,8 +3403,6 @@ GitHub Actions-only.
 
 ---
 
-## Release 0.26.0 - Compatibility removal and footprint reduction
-
 ### Task 40: Remove the legacy static dashboard product and entry points
 
 **Files:**
@@ -3418,7 +3423,7 @@ GitHub Actions-only.
 - Delete or replace: tests that assert static dashboard generation
 - Create: `tests/compatibility/test_removed_static_dashboard.py`
 - Modify: `docs/deprecations.md`
-- Modify: `docs/upgrading-to-0.26.0.md`
+- Modify: `docs/upgrading-to-0.25.0.md`
 
 **Removal scope:**
 
@@ -3435,7 +3440,7 @@ GitHub Actions-only.
 - Removed CLI commands exit `2`, print the exact replacement `codex-usage-tracker open`, and link to the upgrade guide.
 - Removed MCP tools are absent rather than returning fake compatibility responses; release notes provide replacement tools.
 - Requests to `/dashboard.html` return `410 Gone` with a short local HTML page pointing to `/react-dashboard.html` for one release. No usage data is embedded in the 410 response.
-- `/` redirects with `302` during 0.26; the redirect may become permanent after 1.0.
+- `/` redirects with `302` during 0.25; the redirect may become permanent after 1.0.
 
 - [ ] **Step 1: Add failing removal and migration tests.** Assert command absence from primary/alias parser, tool absence from full profile, `410` static path, `/` redirect, no static package files, and exact replacement text.
 
@@ -3460,14 +3465,18 @@ python scripts/check_product_complexity.py --config config/product-complexity-bu
 
 Expected: PASS and wheel/source distribution sizes decrease.
 
-- [ ] **Step 6: Ratchet budgets.** Set new package/bundle ceilings to the measured 0.26 candidate rounded up by no more than 3%.
+- [ ] **Step 6: Ratchet budgets.** Set new package/bundle ceilings to the measured 0.25 candidate rounded up by no more than 3%.
 
 - [ ] **Step 7: Commit.**
 
 ```bash
-git add -A src/codex_usage_tracker frontend/dashboard tests scripts pyproject.toml config/product-complexity-budget.json docs/deprecations.md docs/upgrading-to-0.26.0.md
+git add -A src/codex_usage_tracker frontend/dashboard tests scripts pyproject.toml config/product-complexity-budget.json docs/deprecations.md docs/upgrading-to-0.25.0.md
 git commit -m "refactor: remove the legacy static dashboard"
 ```
+
+---
+
+## Release 0.26.0 - Remaining compatibility removal and footprint reduction
 
 ### Task 41: Remove expired dashboard workbenches, legacy API routes, MCP tools, and CLI aliases
 
@@ -3937,10 +3946,12 @@ Task 27.5 is an exclusive entry gate. No `0.24` implementation track may run
 in parallel with it, and no Task 28-39 branch may begin until it records
 `PROCEED` or a maintainer approves its `AMEND`.
 
-`OPS-REL-025` is an exclusive post-0.24 gate. Its runtime, installed-package,
-performance, and publication work completes before Task 40-45 implementation
-resumes. Pre-amendment Task 40/41 branches may be retained for comparison but
-must not be merged or used as the reliability release base.
+`OPS-REL-025` is the post-0.24 reliability gate. Task 40 may begin only after
+its local runtime, installed-package, and performance checkpoints pass and are
+committed; the maintainer-approved acceleration then ships Task 40 in the same
+`0.25.0` release. Tasks 41-45 remain blocked until the complete 0.25 release
+gate passes. Pre-amendment Task 40/41 branches may be retained for comparison
+but are not the reliability release base.
 
 | After completion of | Tasks that may run concurrently | Merge order constraint |
 | --- | --- | --- |
@@ -3953,7 +3964,8 @@ must not be merged or used as the reliability release base.
 | 28 | 31 and 32 | Merge both before 30 only when domain paths are stable; otherwise 30 merges first and both rebase |
 | 30 | 34 and 35 | Merge independently; 36 depends on 35 and current release checks |
 | 31-33 | 37 and 38 | Merge 38 before 39; 37 must remeasure after 38 |
-| 39 | OPS-REL-025 only | Publish 0.25 reliability before resuming Task 40-45 |
+| 39 | OPS-REL-025 only | Complete the reliability implementation and local acceptance checkpoint |
+| OPS-REL-025 local checkpoint | Task 40 only | Merge Task 40 after reliability; publish both as 0.25 |
 | 40 | 42 documentation preparation and 41 removal | Merge 41 before finalizing 42 budgets/docs |
 | 43 | 44 and draft reference documentation for 45 | Merge 44 before final contract snapshots in 45 |
 
@@ -3998,8 +4010,8 @@ Each release is independently revertible at the product layer:
 - `0.22.0`: set installed plugin profile to `full` and restore 0.21 skill guidance; no database rollback.
 - `0.23.0`: switch route exposure back to the 0.22 foundation catalog; v2 API and core tools remain additive.
 - `0.24.0`: application/architecture refactors preserve public contracts; rollback code while retaining additive database migrations.
-- `0.25.0`: reliability changes may be rolled back to `0.24.x` only after active jobs stop; additive job metadata remains forward-compatible and is not deleted.
-- `0.26.0`: users requiring removed surfaces must reinstall `0.25.x`; current database remains forward-compatible, but removed code is not reintroduced through flags.
+- `0.25.0`: reliability changes may be rolled back to `0.24.x` only after active jobs stop; this also restores the removed static dashboard for users who still require it. Additive job metadata remains forward-compatible and is not deleted.
+- `0.26.0`: users requiring the remaining removed compatibility surfaces must reinstall `0.25.x`; current database remains forward-compatible, but removed code is not reintroduced through flags.
 - `0.27.0`: feature-free stabilization can be reverted to `0.26.x` without a reverse migration when no new schema is added.
 
 Database rollback is never performed by decrementing `PRAGMA user_version` or deleting migration records. Correct forward or restore a pre-migration database backup.

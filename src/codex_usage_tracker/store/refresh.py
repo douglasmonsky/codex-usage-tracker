@@ -17,7 +17,10 @@ from codex_usage_tracker.store.cache_repository import SQLiteCacheRepository
 from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.content_index import clear_content_index_rows
-from codex_usage_tracker.store.otel_ingest import ingest_otel_completion_files
+from codex_usage_tracker.store.otel_ingest import (
+    ingest_otel_completion_files,
+    otel_sources_have_changes,
+)
 from codex_usage_tracker.store.otel_reconciliation import (
     reconcile_otel_completions,
     reset_otel_completion_matches,
@@ -58,12 +61,11 @@ def refresh_usage_index(
         and prior_workflow.get("status") == "running"
         else "refresh"
     )
-    record_refresh_workflow_state(
-        db_path,
-        kind=workflow_kind,
-        phase="discovering",
+    interrupted_otel = bool(
+        prior_workflow
+        and prior_workflow.get("phase") == "otel"
+        and prior_workflow.get("status") == "running"
     )
-
     emit_refresh_progress(
         progress_callback,
         phase="discovering",
@@ -74,14 +76,21 @@ def refresh_usage_index(
     )
     logs = find_session_logs(codex_home=codex_home, include_archived=include_archived)
     session_index = load_session_index(codex_home)
+    resolved_otel_dir = otel_dir or db_path.parent / DEFAULT_OTEL_COMPLETIONS_DIR.name
     with connect(db_path) as conn:
         init_db(conn)
         parse_plans = source_logs_requiring_parse(conn, logs)
-    record_refresh_workflow_state(
-        db_path,
-        kind=workflow_kind,
-        phase="primary",
-    )
+        otel_refresh_required = (
+            bool(parse_plans)
+            or interrupted_otel
+            or otel_sources_have_changes(conn, resolved_otel_dir)
+        )
+    if parse_plans:
+        record_refresh_workflow_state(
+            db_path,
+            kind=workflow_kind,
+            phase="primary",
+        )
     emit_refresh_progress(
         progress_callback,
         phase="discovering",
@@ -122,43 +131,61 @@ def refresh_usage_index(
             force_serial=True,
             derived_fact_sync=derived_fact_sync,
         )
-    emit_refresh_progress(
-        progress_callback,
-        phase="otel",
-        status="running",
-        completed=0,
-        total=1,
-        message="Reconciling aggregate OTel completion tiers",
-    )
-    resolved_otel_dir = otel_dir or db_path.parent / DEFAULT_OTEL_COMPLETIONS_DIR.name
-    record_refresh_workflow_state(
-        db_path,
-        kind=workflow_kind,
-        phase="otel",
-    )
-    otel_diagnostics = _refresh_otel_completions(db_path=db_path, otel_dir=resolved_otel_dir)
-    emit_refresh_progress(
-        progress_callback,
-        phase="otel",
-        status="completed",
-        completed=1,
-        total=1,
-        message="Reconciled aggregate OTel completion tiers",
-        **otel_diagnostics,
-    )
+    if otel_refresh_required:
+        emit_refresh_progress(
+            progress_callback,
+            phase="otel",
+            status="running",
+            completed=0,
+            total=1,
+            message="Reconciling aggregate OTel completion tiers",
+        )
+        record_refresh_workflow_state(
+            db_path,
+            kind=workflow_kind,
+            phase="otel",
+        )
+        otel_diagnostics = _refresh_otel_completions(
+            db_path=db_path, otel_dir=resolved_otel_dir
+        )
+        emit_refresh_progress(
+            progress_callback,
+            phase="otel",
+            status="completed",
+            completed=1,
+            total=1,
+            message="Reconciled aggregate OTel completion tiers",
+            **otel_diagnostics,
+        )
+    else:
+        otel_diagnostics = {key: 0 for key in OTEL_REFRESH_COUNTER_KEYS}
+        emit_refresh_progress(
+            progress_callback,
+            phase="otel",
+            status="skipped",
+            completed=0,
+            total=0,
+            message="No changed OTel completion sources required reconciliation",
+        )
+    usage_db_changed = stream_result.usage_db_changed or otel_refresh_required
     emit_refresh_progress(
         progress_callback,
         phase="finalizing",
         status="running",
         completed=0,
         total=1,
-        message="Recording refresh metadata",
+        message=(
+            "Recording refresh metadata"
+            if usage_db_changed
+            else "Refresh complete; canonical index unchanged"
+        ),
     )
-    record_refresh_workflow_state(
-        db_path,
-        kind=workflow_kind,
-        phase="finalizing",
-    )
+    if usage_db_changed:
+        record_refresh_workflow_state(
+            db_path,
+            kind=workflow_kind,
+            phase="finalizing",
+        )
     result = _finalize_refresh_result(
         db_path=db_path,
         scanned_files=len(logs),
@@ -168,6 +195,7 @@ def refresh_usage_index(
         inserted=stream_result.inserted_or_updated_events,
         otel_diagnostics=otel_diagnostics,
         workflow_kind=workflow_kind,
+        persist_metadata=usage_db_changed,
     )
     emit_refresh_progress(
         progress_callback,
@@ -199,24 +227,26 @@ def _finalize_refresh_result(
     inserted: int,
     otel_diagnostics: dict[str, int],
     workflow_kind: str,
+    persist_metadata: bool,
 ) -> RefreshResult:
     skipped_events = stats.get("skipped_events", 0)
     diagnostics = {
         **compact_parser_diagnostics(stats),
         **{key: value for key, value in otel_diagnostics.items() if value},
     }
-    record_refresh_metadata(
-        db_path=db_path,
-        scanned_files=scanned_files,
-        parsed_events=parsed_events,
-        skipped_events=skipped_events,
-        inserted_or_updated_events=inserted,
-        parser_diagnostics=diagnostics,
-        otel_diagnostics=otel_diagnostics,
-        parsed_source_files=parsed_source_files,
-        skipped_source_files=scanned_files - parsed_source_files,
-        workflow_kind=workflow_kind,
-    )
+    if persist_metadata:
+        record_refresh_metadata(
+            db_path=db_path,
+            scanned_files=scanned_files,
+            parsed_events=parsed_events,
+            skipped_events=skipped_events,
+            inserted_or_updated_events=inserted,
+            parser_diagnostics=diagnostics,
+            otel_diagnostics=otel_diagnostics,
+            parsed_source_files=parsed_source_files,
+            skipped_source_files=scanned_files - parsed_source_files,
+            workflow_kind=workflow_kind,
+        )
     return RefreshResult(
         scanned_files=scanned_files,
         parsed_events=parsed_events,

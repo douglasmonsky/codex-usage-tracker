@@ -171,7 +171,10 @@ default. Use `--no-refresh` only for an intentionally cached snapshot. The
 legacy `dashboard` and `open-dashboard` commands were removed in 0.25; see
 [Upgrading to 0.25.0](upgrading-to-0.25.0.md).
 
-Dashboards default to active sessions only. Use `--include-archived` for an all-history static/opened dashboard, or switch the served dashboard's `History` control from `Active sessions only` to `All history` when you intentionally want archived logs scanned and included.
+The Evidence Console defaults to active sessions only. Use
+`--include-archived` when starting the server, or switch the console's
+`History` control from `Active sessions only` to `All history` when you
+intentionally want archived logs scanned and included.
 
 Use global `--lang <code>` before the dashboard command, or set `CODEX_USAGE_TRACKER_LANG`, to choose the dashboard's initial UI language. The dashboard language selector can then override that default in the browser. Localization applies to dashboard UI text, not JSON fields, CSV columns, model names, thread names, paths, or full CLI output.
 

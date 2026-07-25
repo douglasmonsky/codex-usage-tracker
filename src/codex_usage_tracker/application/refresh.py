@@ -7,8 +7,6 @@ import json
 import os
 import secrets
 import sqlite3
-import subprocess
-import sys
 import threading
 import weakref
 from collections.abc import Callable
@@ -22,6 +20,10 @@ from codex_usage_tracker.allowance_intelligence.materialization import (
 )
 from codex_usage_tracker.application.context import build_request_context
 from codex_usage_tracker.application.protocols import SourceRepository
+from codex_usage_tracker.application.refresh_launcher import (
+    DetachedRefreshLauncher,
+    detached_refresh_launcher,
+)
 from codex_usage_tracker.application.refresh_observability import (
     pending_source_tail as _pending_source_tail,
 )
@@ -35,7 +37,6 @@ from codex_usage_tracker.jobs.adapters import RefreshJobAdapter, request_hash
 from codex_usage_tracker.jobs.models import JobStatusV1
 from codex_usage_tracker.jobs.service import JobService
 from codex_usage_tracker.parser.api import find_session_logs
-from codex_usage_tracker.store.analysis_job_repository import AnalysisJobRepository
 from codex_usage_tracker.store.api import refresh_usage_index as _refresh_usage_index
 from codex_usage_tracker.store.connection import connect_read_only
 from codex_usage_tracker.store.refresh_parse import RefreshProgressCallback
@@ -71,7 +72,6 @@ def refresh_usage_index(
 
 RefreshFunction = Callable[..., RefreshResult]
 Planner = Callable[..., "RefreshPlan"]
-DetachedRefreshLauncher = Callable[[str], None]
 
 
 @dataclass(frozen=True)
@@ -426,7 +426,7 @@ def refresh_usage(
         codex_home=codex_home,
         source_repository=source_repository,
     )
-    detached_launcher = _detached_refresh_launcher(
+    detached_launcher = detached_refresh_launcher(
         request=request,
         codex_home=codex_home,
         db_path=db_path,
@@ -534,53 +534,7 @@ def _normalized_path(path: Path) -> str:
     return os.path.normcase(str(path.expanduser().resolve(strict=False)))
 
 
-def _detached_refresh_launcher(
-    *,
-    request: RefreshRequest,
-    codex_home: Path,
-    db_path: Path,
-    pricing_path: Path,
-    job_service: JobService,
-    enabled: bool,
-) -> DetachedRefreshLauncher | None:
-    repository = job_service.persistence
-    if not enabled or not isinstance(repository, AnalysisJobRepository):
-        return None
 
-    def launch(job_id: str) -> None:
-        command = [
-            sys.executable,
-            "-m",
-            "codex_usage_tracker.application.refresh_worker",
-            "--job-id",
-            job_id,
-            "--owner-id",
-            repository.owner_id,
-            "--job-db",
-            str(repository.db_path),
-            "--codex-home",
-            str(codex_home),
-            "--db",
-            str(db_path),
-            "--pricing",
-            str(pricing_path),
-            "--history",
-            request.history,
-            "--execution",
-            request.execution,
-        ]
-        if request.aggregate_only:
-            command.append("--aggregate-only")
-        subprocess.Popen(  # noqa: S603 - fixed local module with validated typed arguments.
-            command,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True,
-            start_new_session=True,
-        )
-
-    return launch
 
 
 def _coordinator_for_service(job_service: JobService) -> RefreshCoordinator:

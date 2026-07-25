@@ -9,15 +9,20 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import monotonic
 
+import codex_usage_tracker.application.refresh_launcher as launcher_module
 from codex_usage_tracker.application.container import build_application_container
 from codex_usage_tracker.application.paths import ApplicationPaths
 from codex_usage_tracker.application.refresh import (
     REFRESH_SCHEMA,
     RefreshCoordinator,
 )
+from codex_usage_tracker.application.refresh_worker import run_refresh_worker
 from codex_usage_tracker.application.requests import RefreshRequest
 from codex_usage_tracker.jobs.adapters import request_hash
 from codex_usage_tracker.jobs.service import JobService
+from codex_usage_tracker.recommendation_engine.api import (
+    refresh_usage_index as refresh_usage_with_facts,
+)
 from codex_usage_tracker.store.analysis_job_repository import AnalysisJobRepository
 from codex_usage_tracker.store.connection import configure_connection, connect
 from codex_usage_tracker.store.schema import init_db
@@ -49,6 +54,33 @@ def test_application_container_startup_is_read_only_during_refresh_writer_lock(
         writer.close()
 
     assert container.paths.db_path == db_path
+    assert monotonic() - started_at < 0.5
+
+
+def test_no_change_refresh_is_read_only_during_usage_writer_lock(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex"
+    codex_home.mkdir()
+    db_path = tmp_path / "usage.sqlite3"
+    refresh_kwargs = {
+        "codex_home": codex_home,
+        "db_path": db_path,
+        "pricing_path": tmp_path / "pricing.json",
+        "allowance_path": tmp_path / "allowance.json",
+        "rate_card_path": tmp_path / "rate-card.json",
+        "thresholds_path": tmp_path / "thresholds.json",
+    }
+    refresh_usage_with_facts(**refresh_kwargs)
+    writer = configure_connection(sqlite3.connect(db_path, timeout=0))
+    writer.execute("BEGIN IMMEDIATE")
+    started_at = monotonic()
+    try:
+        result = refresh_usage_with_facts(**refresh_kwargs)
+    finally:
+        writer.rollback()
+        writer.close()
+
+    assert result.parsed_events == 0
+    assert result.inserted_or_updated_events == 0
     assert monotonic() - started_at < 0.5
 
 
@@ -182,6 +214,174 @@ print(outcome.job.job_id)
         ).fetchone()
     assert refresh_jobs is not None
     assert refresh_jobs[0] == 1
+
+
+def test_detached_worker_retries_a_transient_startup_lock(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    job_db = tmp_path / "usage.jobs.sqlite3"
+    owner_id = "retry-owner"
+    job_id = "retry-refresh"
+    request = RefreshRequest(execution="async")
+    repository = AnalysisJobRepository(job_db, owner_id=owner_id)
+    repository.create_or_reuse(
+        job_id=job_id,
+        job_kind="refresh",
+        semantic_key=request_hash("refresh-v1:retry"),
+        source_revision="source:none",
+        request_schema="refresh.request.v1",
+        request={
+            "history": request.history,
+            "aggregate_only": request.aggregate_only,
+            "execution": request.execution,
+        },
+        result_schema=REFRESH_SCHEMA,
+    )
+    original_update = AnalysisJobRepository.update_status
+    startup_attempts = 0
+
+    def transiently_locked(self, *args, **kwargs):
+        nonlocal startup_attempts
+        if kwargs.get("state") == "running" and startup_attempts == 0:
+            startup_attempts += 1
+            raise sqlite3.OperationalError("database is locked")
+        return original_update(self, *args, **kwargs)
+
+    monkeypatch.setattr(AnalysisJobRepository, "update_status", transiently_locked)
+
+    exit_code = run_refresh_worker(
+        job_id=job_id,
+        owner_id=owner_id,
+        job_db_path=job_db,
+        codex_home=tmp_path / "codex",
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        request=request,
+    )
+
+    assert exit_code == 0
+    assert startup_attempts == 1
+    assert repository.get(job_id, touch=False)["status"] == "completed"
+
+
+def test_detached_launcher_retries_an_early_worker_exit(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    job_db = tmp_path / "usage.jobs.sqlite3"
+    owner_id = "launcher-owner"
+    job_id = "launcher-refresh"
+    request = RefreshRequest(execution="async")
+    repository = AnalysisJobRepository(job_db, owner_id=owner_id)
+    repository.create_or_reuse(
+        job_id=job_id,
+        job_kind="refresh",
+        semantic_key=request_hash("refresh-v1:launcher-retry"),
+        source_revision="source:none",
+        request_schema="refresh.request.v1",
+        request={
+            "history": request.history,
+            "aggregate_only": request.aggregate_only,
+            "execution": request.execution,
+        },
+        result_schema=REFRESH_SCHEMA,
+    )
+    service = JobService(repository=repository)
+    launches = 0
+
+    class Process:
+        def __init__(self, exit_code: int | None) -> None:
+            self.exit_code = exit_code
+
+        def poll(self) -> int | None:
+            return self.exit_code
+
+    def popen(*_args, **_kwargs):
+        nonlocal launches
+        launches += 1
+        if launches == 1:
+            return Process(1)
+        repository.update_status(
+            job_id,
+            state="running",
+            progress={"percent": 0, "stage": "planning"},
+        )
+        return Process(None)
+
+    monkeypatch.setattr(launcher_module.subprocess, "Popen", popen)
+    launcher = launcher_module.detached_refresh_launcher(
+        request=request,
+        codex_home=tmp_path / "codex",
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        job_service=service,
+        enabled=True,
+    )
+
+    assert launcher is not None
+    launcher(job_id)
+
+    assert launches == 2
+    assert repository.get(job_id, touch=False)["status"] == "running"
+
+
+def test_detached_launcher_retries_a_transient_spawn_failure(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    job_db = tmp_path / "usage.jobs.sqlite3"
+    owner_id = "launcher-owner"
+    job_id = "launcher-refresh"
+    request = RefreshRequest(execution="async")
+    repository = AnalysisJobRepository(job_db, owner_id=owner_id)
+    repository.create_or_reuse(
+        job_id=job_id,
+        job_kind="refresh",
+        semantic_key=request_hash("refresh-v1:launcher-spawn-retry"),
+        source_revision="source:none",
+        request_schema="refresh.request.v1",
+        request={
+            "history": request.history,
+            "aggregate_only": request.aggregate_only,
+            "execution": request.execution,
+        },
+        result_schema=REFRESH_SCHEMA,
+    )
+    service = JobService(repository=repository)
+    launches = 0
+
+    class Process:
+        def poll(self) -> None:
+            return None
+
+    def popen(*_args, **_kwargs):
+        nonlocal launches
+        launches += 1
+        if launches == 1:
+            raise OSError("synthetic transient spawn failure")
+        repository.update_status(
+            job_id,
+            state="running",
+            progress={"percent": 0, "stage": "planning"},
+        )
+        return Process()
+
+    monkeypatch.setattr(launcher_module.subprocess, "Popen", popen)
+    launcher = launcher_module.detached_refresh_launcher(
+        request=request,
+        codex_home=tmp_path / "codex",
+        db_path=tmp_path / "usage.sqlite3",
+        pricing_path=tmp_path / "pricing.json",
+        job_service=service,
+        enabled=True,
+    )
+
+    assert launcher is not None
+    launcher(job_id)
+
+    assert launches == 2
+    assert repository.get(job_id, touch=False)["status"] == "running"
 
 
 def test_expired_refresh_lease_is_replaced_by_one_new_worker(tmp_path: Path) -> None:

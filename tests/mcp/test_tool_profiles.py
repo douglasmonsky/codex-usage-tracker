@@ -8,7 +8,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from codex_usage_tracker.core.contracts import serialized_size
 from codex_usage_tracker.interfaces.mcp import registry
+from codex_usage_tracker.interfaces.mcp.core_tools import MAX_STATUS_PAYLOAD_BYTES
 from codex_usage_tracker.interfaces.mcp.profiles import tools_for_profile
 from codex_usage_tracker.interfaces.mcp.runtime import build_mcp_server
 from tests.release_catalog import (
@@ -35,6 +37,18 @@ def _write_status_wrapper(codex_home: Path, server: dict[str, object]) -> Path:
 
 def test_core_profile_has_exact_names_and_order() -> None:
     assert [tool.name for tool in tools_for_profile("core")] == list(CORE_MCP_TOOL_NAMES)
+
+
+def test_core_timing_metadata_cannot_exceed_payload_budget() -> None:
+    payload = {"padding": ""}
+    payload["padding"] = "x" * (
+        MAX_STATUS_PAYLOAD_BYTES - serialized_size(payload)
+    )
+    assert serialized_size(payload) == MAX_STATUS_PAYLOAD_BYTES
+    handler = registry._timed_core_handler("usage_status", lambda: payload)
+
+    with pytest.raises(ValueError, match="payload budget"):
+        handler()
 
 
 def test_profiles_are_strict_ordered_supersets() -> None:

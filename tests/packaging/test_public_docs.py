@@ -35,12 +35,12 @@ def test_mcp_first_roadmap_prioritizes_central_product_reliability() -> None:
     )
 
     assert "`0.25.0` | Central-product reliability" in summary
-    assert "`0.26.0` | Expired dashboard, static, MCP, CLI, and HTTP compatibility" in summary
+    assert "`0.26.0` | Remaining expired workbench, MCP, CLI, and HTTP compatibility" in summary
     assert "`0.27.0` | Feature-free stabilization" in summary
-    assert "No Task 40-45 implementation work may begin" in summary
+    assert "Task 40 may begin only after" in summary
 
     assert "**Stable task ID:** `OPS-REL-025`" in plan
-    assert "## Release 0.26.0 - Compatibility removal and footprint reduction" in plan
+    assert "## Release 0.26.0 - Remaining compatibility removal" in plan
     assert "## Release 0.27.0 - Feature-free stabilization and contract freeze" in plan
     assert "## OPS-REL-025 - Central Product Reliability and Installed Coherence" in execution
 
@@ -202,6 +202,25 @@ def test_024_release_docs_define_the_hardening_and_compatibility_release() -> No
     assert manifest["version"] == "0.24.0"
     assert manifest["contract_inventory"]["database_schema_version"] == 37
     assert len(manifest["contract_inventory"]["mcp_tools"]["core"]) == 7
+
+
+def test_025_release_docs_define_reliability_and_static_sunset() -> None:
+    release = (REPO_ROOT / "docs/releases/0.25.0.md").read_text(encoding="utf-8")
+    upgrade = (REPO_ROOT / "docs/upgrading-to-0.25.0.md").read_text(encoding="utf-8")
+
+    assert "Release 0.25.0" in release
+    assert "usage.jobs.sqlite3" in release
+    assert "0.005-second no-change refresh" in release
+    assert "data-free `410`" in release
+    assert "Reopening a browser tab" in upgrade
+    assert "does not refresh or" in upgrade
+    assert "tail_pending" in upgrade
+
+
+def test_source_distribution_excludes_python_bytecode() -> None:
+    manifest = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+
+    assert "global-exclude __pycache__ *.py[cod]" in manifest
 
 
 def test_data_posture_and_evidence_console_docs_define_the_stable_product() -> None:

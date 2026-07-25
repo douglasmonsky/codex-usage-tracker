@@ -3,7 +3,7 @@
   "version": "0.25.0.dev0",
   "bundle": {
     "schema": "codex-usage-tracker.plugin-bundle.v1",
-    "digest": "sha256:44bafa24dfabeefd800fb5bcaf4d24f7891d8c9b562b17fde4aca281ff51924b",
+    "digest": "sha256:651d9d34b7dc923e6d7d82de11f7ea8aee2001b420c206114b465fd2f5bdf90f",
     "runtime_version": "0.25.0.dev0"
   },
   "description": "Unofficial local, evidence-backed Codex usage analyst with MCP tools and an Evidence Console.",

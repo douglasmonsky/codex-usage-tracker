@@ -1,4 +1,4 @@
-"""CLI runners for dashboard commands."""
+"""CLI runner for the live Evidence Console server."""
 
 from __future__ import annotations
 

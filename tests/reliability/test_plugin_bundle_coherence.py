@@ -7,12 +7,14 @@ from pathlib import Path
 import pytest
 
 from codex_usage_tracker import __version__
+from codex_usage_tracker.application.status import plugin_bundle_status
 from codex_usage_tracker.cli.plugin_installer import install_plugin
-from codex_usage_tracker.diagnostics.api import run_doctor
-from codex_usage_tracker.plugin_identity import (
+from codex_usage_tracker.core.plugin_identity import (
     PLUGIN_BUNDLE_SCHEMA,
     inspect_plugin_bundle,
+    plugin_bundle_digest,
 )
+from codex_usage_tracker.diagnostics.api import run_doctor
 
 
 def test_installer_records_one_bundle_identity_in_manifest_and_mcp_env(
@@ -37,9 +39,11 @@ def test_installer_records_one_bundle_identity_in_manifest_and_mcp_env(
     assert bundle == {
         "schema": PLUGIN_BUNDLE_SCHEMA,
         "digest": result.bundle_digest,
+        "launcher_digest": bundle["launcher_digest"],
         "runtime_version": __version__,
     }
     assert result.bundle_digest.startswith("sha256:")
+    assert bundle["launcher_digest"].startswith("sha256:")
     assert mcp_server["env"]["CODEX_USAGE_TRACKER_PLUGIN_VERSION"] == __version__
     assert (
         mcp_server["env"]["CODEX_USAGE_TRACKER_PLUGIN_BUNDLE_DIGEST"]
@@ -47,6 +51,21 @@ def test_installer_records_one_bundle_identity_in_manifest_and_mcp_env(
     )
     assert result.cache_state == "absent"
     assert result.cache_invalidated is False
+
+
+def test_bundle_identity_ignores_generated_python_bytecode(tmp_path: Path) -> None:
+    plugin_dir = tmp_path / "plugin"
+    (plugin_dir / "assets").mkdir(parents=True)
+    script_dir = plugin_dir / "skills" / "tracker" / "scripts"
+    script_dir.mkdir(parents=True)
+    (plugin_dir / "assets" / "icon.svg").write_text("<svg/>", encoding="utf-8")
+    (script_dir / "run_mcp.py").write_text("print('synthetic')\n", encoding="utf-8")
+    expected = plugin_bundle_digest(plugin_dir)
+    cache_dir = script_dir / "__pycache__"
+    cache_dir.mkdir()
+    (cache_dir / "run_mcp.cpython-314.pyc").write_bytes(b"synthetic bytecode")
+
+    assert plugin_bundle_digest(plugin_dir) == expected
 
 
 def test_installer_invalidates_only_stale_same_version_tracker_cache(
@@ -104,6 +123,71 @@ def test_installer_preserves_coherent_same_version_cache(tmp_path: Path) -> None
     assert result.cache_invalidated is False
     assert result.cache_state == "coherent"
     assert cached.is_dir()
+
+
+def test_legacy_manifest_still_detects_cached_launcher_drift(tmp_path: Path) -> None:
+    plugin_dir = tmp_path / "plugins" / "codex-usage-tracker"
+    cache_root = tmp_path / "cache"
+    install_plugin(
+        plugin_dir=plugin_dir,
+        marketplace_path=tmp_path / "marketplace.json",
+        python_executable=tmp_path / "first-venv" / "bin" / "python",
+        plugin_cache_root=cache_root,
+    )
+    cached = cache_root / __version__
+    shutil.copytree(plugin_dir, cached)
+    for root in (plugin_dir, cached):
+        manifest_path = root / ".codex-plugin" / "plugin.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["bundle"].pop("launcher_digest")
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert (
+        inspect_plugin_bundle(plugin_dir=plugin_dir, plugin_cache_root=cache_root)[
+            "state"
+        ]
+        == "coherent"
+    )
+    cached_mcp = cached / ".mcp.json"
+    cached_config = json.loads(cached_mcp.read_text(encoding="utf-8"))
+    cached_config["mcpServers"]["codex-usage-tracker"]["command"] = "/stale/python"
+    cached_mcp.write_text(json.dumps(cached_config), encoding="utf-8")
+
+    assert (
+        inspect_plugin_bundle(plugin_dir=plugin_dir, plugin_cache_root=cache_root)[
+            "state"
+        ]
+        == "mismatch"
+    )
+
+
+def test_installer_invalidates_same_version_cache_for_changed_python(
+    tmp_path: Path,
+) -> None:
+    plugin_dir = tmp_path / "plugins" / "codex-usage-tracker"
+    cache_root = tmp_path / "cache"
+    marketplace = tmp_path / "marketplace.json"
+    first_python = tmp_path / "first-venv" / "bin" / "python"
+    second_python = tmp_path / "second-venv" / "bin" / "python"
+    install_plugin(
+        plugin_dir=plugin_dir,
+        marketplace_path=marketplace,
+        python_executable=first_python,
+        plugin_cache_root=cache_root,
+    )
+    cached = cache_root / __version__
+    shutil.copytree(plugin_dir, cached)
+
+    result = install_plugin(
+        plugin_dir=plugin_dir,
+        marketplace_path=marketplace,
+        python_executable=second_python,
+        plugin_cache_root=cache_root,
+    )
+
+    assert result.cache_invalidated is True
+    assert result.cache_state == "invalidated"
+    assert not cached.exists()
 
 
 def test_installer_refuses_to_delete_unowned_same_version_cache(tmp_path: Path) -> None:
@@ -230,3 +314,17 @@ def test_usage_status_proves_current_tool_exposure_and_bundle_coherence(
         limitation["code"] != "mcp.current_task_exposure_unverified"
         for limitation in payload["limitations"]
     )
+
+
+def test_usage_status_plugin_error_does_not_expose_local_paths(tmp_path: Path) -> None:
+    plugin_dir = tmp_path / "plugins" / "codex-usage-tracker"
+    plugin_dir.mkdir(parents=True)
+
+    status = plugin_bundle_status(codex_home=tmp_path / ".codex", home=tmp_path)
+
+    assert status["state"] == "invalid"
+    assert status["error"] == {
+        "code": "plugin_bundle.invalid",
+        "message": "The installed plugin bundle could not be verified.",
+    }
+    assert str(tmp_path) not in json.dumps(status)

@@ -15,13 +15,14 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_PLUGIN_CACHE_ROOT,
     DEFAULT_PLUGIN_LINK,
 )
-from codex_usage_tracker.core.version import __version__
-from codex_usage_tracker.plugin_identity import (
+from codex_usage_tracker.core.plugin_identity import (
     invalidate_stale_plugin_cache,
     packaged_plugin_bundle_digest,
     plugin_bundle_digest,
     plugin_bundle_manifest,
+    plugin_launcher_digest,
 )
+from codex_usage_tracker.core.version import __version__
 
 PLUGIN_NAME = "codex-usage-tracker"
 
@@ -185,13 +186,21 @@ def _write_plugin_files(*, plugin_dir: Path, python_executable: Path) -> str:
     _copy_tree("assets", plugin_dir / "assets")
     _copy_tree("skills", plugin_dir / "skills")
     bundle_digest = plugin_bundle_digest(plugin_dir)
-    (plugin_dir / ".codex-plugin").mkdir(parents=True, exist_ok=True)
-    (plugin_dir / ".codex-plugin" / "plugin.json").write_text(
-        json.dumps(plugin_manifest(bundle_digest=bundle_digest), indent=2) + "\n",
-        encoding="utf-8",
-    )
     (plugin_dir / ".mcp.json").write_text(
         json.dumps(_mcp_config(python_executable, bundle_digest=bundle_digest), indent=2)
+        + "\n",
+        encoding="utf-8",
+    )
+    launcher_digest = plugin_launcher_digest(plugin_dir)
+    (plugin_dir / ".codex-plugin").mkdir(parents=True, exist_ok=True)
+    (plugin_dir / ".codex-plugin" / "plugin.json").write_text(
+        json.dumps(
+            plugin_manifest(
+                bundle_digest=bundle_digest,
+                launcher_digest=launcher_digest,
+            ),
+            indent=2,
+        )
         + "\n",
         encoding="utf-8",
     )
@@ -217,14 +226,18 @@ def _copy_resource_tree(source: Any, destination: Path) -> None:
                 shutil.copyfileobj(input_file, output_file)
 
 
-def plugin_manifest(*, bundle_digest: str | None = None) -> dict[str, Any]:
+def plugin_manifest(
+    *,
+    bundle_digest: str | None = None,
+    launcher_digest: str | None = None,
+) -> dict[str, Any]:
     """Return the package-owned Codex plugin manifest."""
 
     digest = bundle_digest or packaged_plugin_bundle_digest()
     return {
         "name": PLUGIN_NAME,
         "version": __version__,
-        "bundle": plugin_bundle_manifest(digest),
+        "bundle": plugin_bundle_manifest(digest, launcher_digest),
         "description": (
             "Unofficial local, evidence-backed Codex usage analyst with MCP tools "
             "and an Evidence Console."

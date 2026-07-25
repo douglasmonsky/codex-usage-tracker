@@ -1617,9 +1617,15 @@ complete without its named focused and full verification evidence.
 
 ## Task 40 - Remove the legacy static dashboard product and entry points
 
-- Status: complete locally on `pivot/40-remove-legacy-static-dashboard` from
-  `cad0006cb5e8435ed3a47da9fb120bc81a6e1941`; final read-only review is
-  complete.
+- Status: complete locally on the combined 0.25 reliability branch; public
+  release remains pending.
+- Integration:
+  - historical implementation commit `f2cbf08` was used as a comparison/port
+    artifact, not as the 0.25 base;
+  - reliability checkpoint `a5a3692` remains the authoritative parent;
+  - the port and reliability-aware conflict resolution are commit `8e080ec`;
+  - Task 41 focused endpoints, workbench APIs, and parity gates remain
+    untouched.
 - Graph-guided scope:
   - the refreshed GitNexus index at the Task 40 base contains `25,421` nodes,
     `54,684` edges, `1,291` clusters, and `300` execution flows;
@@ -1689,15 +1695,19 @@ complete without its named focused and full verification evidence.
   - this is a startup availability/performance defect, not evidence of
     corruption. Do not interrupt the owning refresh or weaken canonical
     accounting, transaction integrity, or freshness semantics;
-  - follow-up fix must make stale-job recovery retryable or defer it until the
-    writer becomes available, with a synthetic two-connection regression that
-    proves service startup remains available and recovery eventually runs.
+  - `OPS-REL-025` resolved the startup collision before this port: normal MCP
+    and Evidence Console startup is read-only, operational jobs live in
+    `usage.jobs.sqlite3`, and Evidence Console/MCP refreshes join one durable
+    job service;
+  - the 100,000-row gate proves a no-change refresh in `0.005 s` with zero
+    writer-lock time, exact 100-row and one-row incremental hydration, and a
+    `0.0045 s` committed read during the usage-index writer.
 - Verification:
   - isolated installed-package smoke passed against the rebuilt wheel,
     including the seven-tool core MCP catalog, React/locales package resources,
     removed-command migration errors, plugin setup, doctor, support bundle,
     and live server routes;
-  - the measured budget baselines are `5,141,773` wheel bytes and `28,443,941`
+  - the measured budget baselines are `5,156,651` wheel bytes and `28,485,858`
     sdist bytes; the rebuilt artifacts pass `twine check`, release readiness,
     package membership, and the ratcheted product-complexity budgets;
   - the React dashboard remains deterministic at `61,457` gzip bytes; all 609
@@ -1713,6 +1723,9 @@ complete without its named focused and full verification evidence.
   - review metrics: 4 findings, 4 accepted (`R1`, `R2`, `R3`, `R4`); reviewer
     tokens and tokens per accepted finding are `pending` because aggregate
     attribution encountered the separately recorded SQLite writer lock.
+  - those metrics describe the preserved historical implementation review;
+    the current combined 0.25 diff receives one final read-only review after
+    full qualification.
 
 ## Task 39 - Gate and Publish Release 0.24.0
 
@@ -1833,15 +1846,17 @@ complete without its named focused and full verification evidence.
 
 ## OPS-REL-025 - Central Product Reliability and Installed Coherence
 
-- Status: in progress
+- Status: complete locally; publication and public-PyPI rerun remain pending
 - Stable task ID: `OPS-REL-025`
 - Branch: `pivot/ops-rel-025-central-product-reliability`
 - Base: `8f7f2796f663142d0bae3a117c13708644eee472`, the focused Task 39
   publication-closure commit whose parent is public `0.24.0` merge
   `cad0006cb5e8435ed3a47da9fb120bc81a6e1941`
 - Release amendment:
-  - `0.25.0` is now the blocking central-product reliability release;
-  - existing Tasks 40-43 retain their numbers and scope but move to `0.26.0`;
+  - `0.25.0` is the blocking central-product reliability release and, after
+    the local reliability checkpoint passed, the maintainer approved Task 40
+    as the same release's static-dashboard sunset boundary;
+  - existing Tasks 41-43 retain their numbers and scope in `0.26.0`;
   - existing Tasks 44-45 retain their numbers and scope but move to `0.27.0`;
   - pre-amendment Task 40/41 branches remain preserved and are not a release
     base for this work.
@@ -1922,7 +1937,10 @@ complete without its named focused and full verification evidence.
     path, or user database content enters tests, profiles, logs, or commits;
   - do not weaken canonical accounting, privacy, freshness, foreign keys,
     migration integrity, raw-context controls, or committed-generation reads;
-  - do not remove Task 40/41 surfaces or add any MCP tool, dashboard route, CLI
+  - the reliability checkpoint itself removes no compatibility surface; the
+    subsequent maintainer-approved Task 40 commit removes only the static
+    dashboard product and its exact entry points;
+  - do not remove Task 41 surfaces or add any MCP tool, dashboard route, CLI
     namespace, analytical goal, or statistical method;
   - measure identical unprofiled cold/no-change/small-append/moving-tail
     workloads before and after each performance change.
@@ -1943,19 +1961,38 @@ complete without its named focused and full verification evidence.
   - stale analysis names its durable refresh dependency and exact normalized
     resume request; completed analyses are durably reusable;
   - all seven core MCP responses expose measured server-side elapsed time;
-  - the installed-wheel two-task probe passed with `40` MCP calls across
+  - the installed-wheel two-task probe passed with `38` MCP calls across
     three MCP processes, one shared refresh job, a query during refresh, one
     moving-tail row, exact call evidence, durable analysis reuse, and a
-    maximum observed server handler time of `590.978 ms`;
+    maximum observed server handler time of `501.483 ms`; the probe launched
+    through the exact-version cached `.mcp.json`, and its runner strips
+    `PYTHONPATH` so source-checkout metadata cannot contaminate the clean
+    install;
   - the repeated synthetic 100,000-row incremental gate passed:
-    cold `15.906 s`, no-change `0.013 s`, 100-row append `2.213 s`,
-    one-row tail follow-up `2.037 s`, and committed read during writer
-    `0.0036 s`; hydration counters were exactly `100000`, `100`, and `1`;
+    cold `16.323 s`, no-change `0.005 s` with zero writer-lock time, 100-row
+    append `2.449 s`, one-row tail follow-up `2.133 s`, and a committed read
+    during the writer in `0.0045 s`; hydration counters were exactly
+    `100000`, `100`, and `1`;
   - Agent Perf baseline `20260725T153903Z-d5e18169` and candidate
     `20260725T155929Z-12bd83a5` use the same synthetic workload; the
     unprofiled benchmark, not profiler overhead, is the speed gate;
-  - focused refresh/application/MCP checks passed (`48 passed`), targeted Ruff
-    and MyPy passed, `git diff --check` passed, and the complete
-    installed-package smoke passed;
-  - full qualification, final review, publication, and public-PyPI rerun
+  - `2,059` backend tests passed; Ruff, MyPy, Pyright with zero errors, Tach,
+    compileall, `git diff --check`, deterministic frontend/release gates, and
+    the complete installed-package smoke passed;
+  - detached-worker startup locking passed ten consecutive seven-test
+    reliability runs after transient sidecar retry and an early-exit launch
+    handshake were added;
+  - the single final read-only reviewer reported five findings and all five
+    were accepted: true lock-free no-change refresh (`R1`), executable-aware
+    plugin-cache coherence (`R2`), bounded spawn retry (`R3`), path-free
+    plugin status errors (`R4`), and post-timing MCP payload enforcement
+    (`R5`);
+  - the bounded recheck passed, including a real no-change refresh while a
+    second connection held `BEGIN IMMEDIATE`, same-version launcher drift,
+    transient `Popen` failure, malformed plugin state, and a response exactly
+    at its pre-timing payload limit;
+  - review metrics: 5 findings, 5 accepted (`R1`, `R2`, `R3`, `R4`, `R5`);
+    reviewer tokens `pending` after aggregate-only attribution timed out;
+    tokens per accepted finding `pending`;
+  - final read-only review is complete; publication and the public-PyPI rerun
     remain pending.

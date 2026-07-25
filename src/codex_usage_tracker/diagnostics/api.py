@@ -15,6 +15,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_PLUGIN_LINK,
     DEFAULT_PRICING_PATH,
 )
+from codex_usage_tracker.core.plugin_identity import inspect_plugin_bundle
 from codex_usage_tracker.core.version import __version__
 from codex_usage_tracker.diagnostics.doctor_checks import (
     _check_codex_sessions,
@@ -37,7 +38,6 @@ from codex_usage_tracker.diagnostics.mcp import (
     check_mcp_runtime,
 )
 from codex_usage_tracker.diagnostics.types import DoctorCheck
-from codex_usage_tracker.plugin_identity import inspect_plugin_bundle
 from codex_usage_tracker.store.analysis_job_repository import AnalysisJobRepository
 from codex_usage_tracker.store.integrity import check_database_integrity
 

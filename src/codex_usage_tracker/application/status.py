@@ -15,12 +15,12 @@ from codex_usage_tracker.application.protocols import Clock, PricingProvider
 from codex_usage_tracker.application.requests import StatusRequest
 from codex_usage_tracker.core.contracts import FreshnessV1, payload_mapping
 from codex_usage_tracker.core.contracts.common import FreshnessState
+from codex_usage_tracker.core.plugin_identity import inspect_plugin_bundle
 from codex_usage_tracker.core.version import __version__
 from codex_usage_tracker.dashboard_service import (
     DashboardServiceStatus,
     dashboard_service_status,
 )
-from codex_usage_tracker.plugin_identity import inspect_plugin_bundle
 from codex_usage_tracker.pricing.config import load_pricing_config
 
 STATUS_SCHEMA = "codex-usage-tracker.status.v2"
@@ -107,7 +107,7 @@ def plugin_bundle_status(*, codex_home: Path, home: Path) -> dict[str, object]:
             plugin_dir=plugin_dir,
             plugin_cache_root=cache_root,
         )
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError):
         return {
             "schema": "codex-usage-tracker.plugin-coherence.v1",
             "state": "invalid",
@@ -115,7 +115,10 @@ def plugin_bundle_status(*, codex_home: Path, home: Path) -> dict[str, object]:
             "installed": None,
             "cache": None,
             "current_process": current_process,
-            "error": str(exc),
+            "error": {
+                "code": "plugin_bundle.invalid",
+                "message": "The installed plugin bundle could not be verified.",
+            },
         }
     installed = observation.get("installed")
     installed_mapping = installed if isinstance(installed, Mapping) else {}

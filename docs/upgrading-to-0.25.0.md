@@ -28,8 +28,29 @@ codex-usage-tracker open
 ```
 
 Large existing indexes may require a long refresh while derived state is
-rebuilt. Avoid starting a second tracker process against the same SQLite
-database until that refresh finishes. A concurrent `service serve
---no-refresh` can currently encounter `database is locked` while startup job
-recovery attempts to write. This is a known post-release concurrency finding;
-do not interrupt the single refresh or bypass integrity and freshness checks.
+rebuilt once after an older parser/checkpoint format. Normal MCP and Evidence
+Console startup is read-only in 0.25, so `service serve --no-refresh` remains
+available against the last committed generation while that refresh runs.
+Operational job leases and progress use the separate `usage.jobs.sqlite3`
+sidecar instead of competing for the usage-index writer lock.
+
+After a compatible initial build, refresh is incremental:
+
+- no source, configuration, or OTel change completes without a usage-index
+  write, even when another connection holds the writer lock; canonical refresh
+  metadata continues to describe the last material index update;
+- appended complete JSONL rows hydrate from the stored byte checkpoint;
+- a partial last line remains pending;
+- rows appended after a refresh captures its fixed boundary are reported as
+  `tail_pending` and hydrate in one bounded follow-up refresh.
+
+- detached refresh workers retry transient `locked` or `busy` sidecar status
+  writes and bounded process-spawn failures, preventing a brief cross-process
+  collision from leaving an otherwise valid refresh permanently queued;
+- same-version plugin cache coherence includes the generated Python launcher,
+  so `setup --force-plugin` invalidates a cache that points at an older
+  environment.
+
+Reopening a browser tab against an already running service does not refresh or
+rebuild the index. Starting `open` or `service serve` without `--no-refresh`
+does request a refresh, but a no-change request reuses the existing build.

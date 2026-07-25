@@ -56,6 +56,7 @@ class RefreshStreamResult:
     parsed_events: int
     inserted_or_updated_events: int
     stage_timings_seconds: dict[str, float]
+    usage_db_changed: bool
 
 
 @dataclass
@@ -109,10 +110,10 @@ class _RefreshStreamWriter:
     def run(self) -> RefreshStreamResult:
         if not self.parse_plans:
             self._emit_initial_progress()
+            usage_db_changed = False
             for phase, message in (
                 ("derived_state", "No changed usage rows required derived-state refresh"),
                 ("indexing_content", "No changed source logs required content indexing"),
-                ("syncing_facts", "No changed usage rows required fact synchronization"),
             ):
                 emit_refresh_progress(
                     self.progress_callback,
@@ -122,11 +123,44 @@ class _RefreshStreamWriter:
                     total=0,
                     message=message,
                 )
+            if self.derived_fact_sync is None:
+                emit_refresh_progress(
+                    self.progress_callback,
+                    phase="syncing_facts",
+                    status="skipped",
+                    completed=0,
+                    total=0,
+                    message="No configured fact synchronizer required reconciliation",
+                )
+            else:
+                emit_refresh_progress(
+                    self.progress_callback,
+                    phase="syncing_facts",
+                    status="running",
+                    completed=0,
+                    total=1,
+                    message="Reconciling configuration-driven facts",
+                )
+                with connect(self.db_path) as conn:
+                    changes_before = conn.total_changes
+                    conn.execute("BEGIN")
+                    self.derived_fact_sync(conn, (), frozenset(), False)
+                    conn.commit()
+                    usage_db_changed = conn.total_changes > changes_before
+                emit_refresh_progress(
+                    self.progress_callback,
+                    phase="syncing_facts",
+                    status="completed",
+                    completed=1,
+                    total=1,
+                    message="Reconciled configuration-driven facts",
+                )
             return RefreshStreamResult(
                 stats={},
                 parsed_events=0,
                 inserted_or_updated_events=0,
                 stage_timings_seconds={},
+                usage_db_changed=usage_db_changed,
             )
         with connect(self.db_path) as conn:
             init_db(conn)
@@ -161,6 +195,7 @@ class _RefreshStreamWriter:
             stage_timings_seconds={
                 key: round(value, 6) for key, value in sorted(self.timings.values.items())
             },
+            usage_db_changed=True,
         )
 
     def _is_full_rebuild(self, conn: Any) -> bool:

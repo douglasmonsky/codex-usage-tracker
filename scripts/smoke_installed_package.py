@@ -380,7 +380,7 @@ def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
     if not db_path.exists():
         raise SystemExit("setup did not create tracker database")
     installed_version = _installed_version(command)
-    _prime_plugin_cache(plugin_dir, codex_home, installed_version)
+    cached_plugin_dir = _prime_plugin_cache(plugin_dir, codex_home, installed_version)
 
     doctor_result = _run(
         [str(command), *global_args, "doctor", "--json"],
@@ -399,7 +399,7 @@ def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
     _smoke_installed_mcp(
         _venv_python(command.parents[1]),
         home_dir=home_dir,
-        plugin_dir=plugin_dir,
+        plugin_dir=cached_plugin_dir,
         expected_version=installed_version,
     )
 
@@ -450,7 +450,7 @@ def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
         raise SystemExit("strict support bundle leaked local temp paths")
 
 
-def _prime_plugin_cache(plugin_dir: Path, codex_home: Path, version: str) -> None:
+def _prime_plugin_cache(plugin_dir: Path, codex_home: Path, version: str) -> Path:
     cache_dir = (
         codex_home
         / "plugins"
@@ -461,6 +461,7 @@ def _prime_plugin_cache(plugin_dir: Path, codex_home: Path, version: str) -> Non
     )
     cache_dir.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(plugin_dir, cache_dir)
+    return cache_dir
 
 
 def _smoke_installed_mcp(
@@ -578,10 +579,12 @@ def _run(
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     print("+ " + " ".join(shlex.quote(part) for part in command), flush=True)
+    isolated_env = dict(os.environ if env is None else env)
+    isolated_env.pop("PYTHONPATH", None)
     result = subprocess.run(
         command,
         cwd=REPO_ROOT,
-        env=env,
+        env=isolated_env,
         text=True,
         capture_output=capture_output,
     )

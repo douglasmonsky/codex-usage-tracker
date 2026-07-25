@@ -1,4 +1,4 @@
-"""Static dashboard generation from aggregate-only usage rows."""
+"""Shared Evidence Console payload construction from aggregate usage rows."""
 
 from __future__ import annotations
 

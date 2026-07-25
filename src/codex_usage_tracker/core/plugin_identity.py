@@ -27,12 +27,18 @@ def plugin_bundle_digest(plugin_dir: Path) -> str:
         directory = plugin_dir / directory_name
         if not directory.is_dir():
             raise FileNotFoundError(f"plugin bundle is missing {directory_name}/")
-        entries.extend(
-            (path.relative_to(plugin_dir).as_posix(), path.read_bytes())
-            for path in directory.rglob("*")
-            if path.is_file()
-        )
+        for path in directory.rglob("*"):
+            relative = path.relative_to(plugin_dir).as_posix()
+            if path.is_file() and _is_bundle_member(relative):
+                entries.append((relative, path.read_bytes()))
     return _digest_entries(entries)
+
+
+def plugin_launcher_digest(plugin_dir: Path) -> str:
+    """Hash the exact generated MCP launcher configuration."""
+
+    launcher_path = plugin_dir / ".mcp.json"
+    return _digest_entries([(".mcp.json", launcher_path.read_bytes())])
 
 
 def packaged_plugin_bundle_digest() -> str:
@@ -58,10 +64,17 @@ def _digest_entries(entries: list[tuple[str, bytes]]) -> str:
     return f"sha256:{digest.hexdigest()}"
 
 
+def _is_bundle_member(relative_path: str) -> bool:
+    parts = relative_path.split("/")
+    return "__pycache__" not in parts and not relative_path.endswith((".pyc", ".pyo"))
+
+
 def _resource_entries(resource: Any, *, prefix: str) -> list[tuple[str, bytes]]:
     entries: list[tuple[str, bytes]] = []
     for child in resource.iterdir():
         relative = f"{prefix}/{child.name}"
+        if not _is_bundle_member(relative):
+            continue
         if child.is_dir():
             entries.extend(_resource_entries(child, prefix=relative))
         elif child.is_file():
@@ -69,14 +82,21 @@ def _resource_entries(resource: Any, *, prefix: str) -> list[tuple[str, bytes]]:
     return entries
 
 
-def plugin_bundle_manifest(digest: str) -> dict[str, str]:
+def plugin_bundle_manifest(
+    digest: str,
+    launcher_digest: str | None = None,
+) -> dict[str, str]:
     """Return the manifest identity block for one immutable resource bundle."""
     _validate_digest(digest)
-    return {
+    manifest = {
         "schema": PLUGIN_BUNDLE_SCHEMA,
         "digest": digest,
         "runtime_version": __version__,
     }
+    if launcher_digest is not None:
+        _validate_digest(launcher_digest)
+        manifest["launcher_digest"] = launcher_digest
+    return manifest
 
 
 def inspect_plugin_bundle(
@@ -95,6 +115,8 @@ def inspect_plugin_bundle(
             "manifest_version": None,
             "declared_digest": None,
             "computed_digest": None,
+            "declared_launcher_digest": None,
+            "computed_launcher_digest": None,
             "matches_declared": False,
             "matches_installed": False,
         }
@@ -116,6 +138,10 @@ def inspect_plugin_bundle(
                     cache["matches_installed"] = bool(
                         cache["computed_digest"] == installed["computed_digest"]
                         and cache["declared_digest"] == installed["declared_digest"]
+                        and cache["computed_launcher_digest"]
+                        == installed["computed_launcher_digest"]
+                        and cache["declared_launcher_digest"]
+                        == installed["declared_launcher_digest"]
                         and cache["manifest_version"] == installed["manifest_version"]
                     )
         state = (
@@ -171,15 +197,29 @@ def _bundle_observation(
     manifest: Mapping[str, Any],
 ) -> dict[str, object]:
     declared = _declared_digest(manifest)
+    declared_launcher = _declared_launcher_digest(manifest)
     try:
         computed = plugin_bundle_digest(plugin_dir)
+        computed_launcher = plugin_launcher_digest(plugin_dir)
     except OSError:
         computed = None
+        computed_launcher = None
+    launcher_matches_declared = bool(
+        computed_launcher
+        and (
+            declared_launcher is None
+            or declared_launcher == computed_launcher
+        )
+    )
     return {
         "manifest_version": manifest.get("version"),
         "declared_digest": declared,
         "computed_digest": computed,
-        "matches_declared": bool(declared and declared == computed),
+        "declared_launcher_digest": declared_launcher,
+        "computed_launcher_digest": computed_launcher,
+        "matches_declared": bool(
+            declared and declared == computed and launcher_matches_declared
+        ),
     }
 
 
@@ -189,6 +229,8 @@ def _invalid_cache_observation(state: str) -> dict[str, object]:
         "manifest_version": None,
         "declared_digest": None,
         "computed_digest": None,
+        "declared_launcher_digest": None,
+        "computed_launcher_digest": None,
         "matches_declared": False,
         "matches_installed": False,
     }
@@ -217,6 +259,14 @@ def _declared_digest(manifest: Mapping[str, Any]) -> str | None:
     if not isinstance(bundle, Mapping):
         return None
     digest = bundle.get("digest")
+    return digest if isinstance(digest, str) else None
+
+
+def _declared_launcher_digest(manifest: Mapping[str, Any]) -> str | None:
+    bundle = manifest.get("bundle")
+    if not isinstance(bundle, Mapping):
+        return None
+    digest = bundle.get("launcher_digest")
     return digest if isinstance(digest, str) else None
 
 

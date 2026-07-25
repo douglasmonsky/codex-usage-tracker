@@ -40,3 +40,21 @@ By default, serving refreshes active-session logs before opening. Use
 `--no-refresh` only when you intentionally want the cached local index. The
 removal of static output does not change canonical accounting, schema
 migrations, incremental freshness, or raw-context controls.
+
+## Refresh lifecycle
+
+Reopening `/react-dashboard.html` in a browser does not rebuild the database.
+The page boots without database rows and hydrates from the last committed
+generation. A newly started `open` or `service serve` command refreshes by
+default; `--no-refresh` intentionally serves the committed snapshot.
+
+Refresh discovery compares source metadata and stored byte checkpoints. With
+no source changes it skips the writer and derived-state work. Append-only input
+starts at the existing checkpoint, stops at one fixed complete-line boundary,
+and reports any later append as `tail_pending` for a bounded follow-up.
+Evidence Console and MCP callers join the same durable refresh job, and job
+progress remains queryable after the initiating task exits.
+
+An upgrade from a much older parser/checkpoint version can require one
+compatibility rebuild. That is distinct from normal no-change or append-only
+hydration.

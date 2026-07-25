@@ -17,3 +17,9 @@ class ApplicationPaths:
     rate_card_path: Path
     thresholds_path: Path
     projects_path: Path
+
+    @property
+    def job_db_path(self) -> Path:
+        """Return the operational job sidecar beside the usage database."""
+
+        return self.db_path.with_name(f"{self.db_path.stem}.jobs.sqlite3")

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import sqlite3
 import threading
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
-from time import monotonic
+from time import monotonic, sleep
 
 from codex_usage_tracker.application.refresh import (
     REFRESH_SCHEMA,
@@ -32,6 +33,38 @@ _PHASE_RANGES = {
     "finalizing": (96, 99),
     "complete": (100, 100),
 }
+_JOB_STATUS_RETRY_SECONDS = 10.0
+_JOB_STATUS_RETRY_INTERVAL_SECONDS = 0.05
+
+
+def _update_job_status(
+    repository: AnalysisJobRepository,
+    job_id: str,
+    *,
+    state: str,
+    progress: Mapping[str, object],
+    result_schema: str | None = None,
+    result: object = None,
+    error: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Persist worker state through a transient sidecar writer collision."""
+
+    deadline = monotonic() + _JOB_STATUS_RETRY_SECONDS
+    while True:
+        try:
+            return repository.update_status(
+                job_id,
+                state=state,
+                progress=progress,
+                result_schema=result_schema,
+                result=result,
+                error=error,
+            )
+        except sqlite3.OperationalError as exc:
+            transient = any(token in str(exc).lower() for token in ("locked", "busy"))
+            if not transient or monotonic() >= deadline:
+                raise
+            sleep(_JOB_STATUS_RETRY_INTERVAL_SECONDS)
 
 
 def run_refresh_worker(
@@ -55,7 +88,7 @@ def run_refresh_worker(
     def persist_progress() -> None:
         with progress_lock:
             snapshot = dict(progress)
-        repository.update_status(job_id, state="running", progress=snapshot)
+        _update_job_status(repository, job_id, state="running", progress=snapshot)
 
     def heartbeat() -> None:
         while not stop_heartbeat.wait(5):
@@ -76,7 +109,7 @@ def run_refresh_worker(
             progress.update(normalized)
         persist_progress()
 
-    repository.update_status(job_id, state="running", progress=progress)
+    _update_job_status(repository, job_id, state="running", progress=progress)
     heartbeat_thread = threading.Thread(
         target=heartbeat,
         daemon=True,
@@ -128,7 +161,8 @@ def run_refresh_worker(
         refresh_result = refresh_payload if isinstance(refresh_payload, dict) else {}
         freshness_payload = completed.get("freshness")
         freshness_result = freshness_payload if isinstance(freshness_payload, dict) else {}
-        repository.update_status(
+        _update_job_status(
+            repository,
             job_id,
             state="completed",
             progress={
@@ -144,7 +178,8 @@ def run_refresh_worker(
             result=completed,
         )
     except Exception:  # noqa: BLE001 - persist only a bounded privacy-safe failure.
-        repository.update_status(
+        _update_job_status(
+            repository,
             job_id,
             state="failed",
             progress=_progress_payload(

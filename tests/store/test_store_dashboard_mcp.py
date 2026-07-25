@@ -77,11 +77,12 @@ def test_refresh_is_idempotent_and_summary_works(tmp_path: Path) -> None:
         allowance_source_state_count = conn.execute(
             "SELECT COUNT(*) FROM allowance_source_state"
         ).fetchone()[0]
-    assert meta["parsed_events"] == "0"
+    # A no-change refresh is read-only; metadata describes the last material update.
+    assert meta["parsed_events"] == "4"
     assert meta["skipped_events"] == "0"
-    assert meta["inserted_or_updated_events"] == "0"
-    assert meta["parsed_source_files"] == "0"
-    assert meta["skipped_source_files"] == "3"
+    assert meta["inserted_or_updated_events"] == "4"
+    assert meta["parsed_source_files"] == "3"
+    assert meta["skipped_source_files"] == "0"
     assert meta["parser_adapter"] == "codex-jsonl-v2"
     assert meta["schema_version"] == "37"
     assert meta["parser_skipped_events"] == "0"
@@ -256,8 +257,9 @@ def test_refresh_indexes_only_appended_token_events_when_source_grows(
     assert link_scopes == [{target_thread_key}]
     assert summary_scopes == [{target_thread_key}]
     assert [row["cumulative_total_tokens"] for row in rows] == [100, 300, 650]
-    assert metadata["parsed_source_files"] == "0"
-    assert metadata["skipped_source_files"] == "3"
+    # The third no-change refresh preserves metadata from the appended-row update.
+    assert metadata["parsed_source_files"] == "1"
+    assert metadata["skipped_source_files"] == "2"
 
 
 def test_refresh_checkpoints_active_jsonl_at_planned_complete_boundary(

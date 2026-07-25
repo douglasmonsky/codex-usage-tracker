@@ -14,3 +14,4 @@ recursive-include src/codex_usage_tracker/plugin_data/docs *
 recursive-include src/codex_usage_tracker/plugin_data/rate_cards *
 recursive-include src/codex_usage_tracker/plugin_data/skills *
 recursive-include tests *.py
+global-exclude __pycache__ *.py[cod]
