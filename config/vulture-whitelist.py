@@ -44,8 +44,10 @@ spans_without_candidates
 with_vs_without_median_drain_ratio
 installed
 recommended_refresh_action
+server_elapsed_ms
 
 # HTTP handlers are selected by BaseHTTPRequestHandler or route dispatch maps.
+_.redirect_request
 _.do_POST
 _._handle_diagnostics_summary
 _._handle_diagnostics_fact_calls

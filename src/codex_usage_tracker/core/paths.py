@@ -19,9 +19,3 @@ DEFAULT_MARKETPLACE_PATH = Path.home() / ".agents" / "plugins" / "marketplace.js
 DEFAULT_PLUGIN_CACHE_ROOT = (
     DEFAULT_CODEX_HOME / "plugins" / "cache" / "local" / "codex-usage-tracker"
 )
-
-
-def operational_job_db_path(usage_db_path: Path) -> Path:
-    """Keep job leases/progress independent from the long-running usage writer."""
-
-    return usage_db_path.with_name(f"{usage_db_path.stem}.jobs.sqlite3")
