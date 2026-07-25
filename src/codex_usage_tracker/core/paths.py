@@ -7,7 +7,6 @@ from pathlib import Path
 APP_DIR = Path.home() / ".codex-usage-tracker"
 DEFAULT_DB_PATH = APP_DIR / "usage.sqlite3"
 DEFAULT_OTEL_COMPLETIONS_DIR = APP_DIR / "otel"
-DEFAULT_DASHBOARD_PATH = APP_DIR / "dashboard.html"
 DEFAULT_SUPPORT_BUNDLE_PATH = APP_DIR / "support-bundle.json"
 DEFAULT_PRICING_PATH = APP_DIR / "pricing.json"
 DEFAULT_ALLOWANCE_PATH = APP_DIR / "allowance.json"
@@ -17,3 +16,6 @@ DEFAULT_PROJECTS_PATH = APP_DIR / "projects.json"
 DEFAULT_CODEX_HOME = Path.home() / ".codex"
 DEFAULT_PLUGIN_LINK = Path.home() / "plugins" / "codex-usage-tracker"
 DEFAULT_MARKETPLACE_PATH = Path.home() / ".agents" / "plugins" / "marketplace.json"
+DEFAULT_PLUGIN_CACHE_ROOT = (
+    DEFAULT_CODEX_HOME / "plugins" / "cache" / "local" / "codex-usage-tracker"
+)

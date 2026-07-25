@@ -16,7 +16,6 @@ def test_doctor_reports_first_run_environment(tmp_path: Path) -> None:
     report = run_doctor(
         codex_home=codex_home,
         db_path=tmp_path / "usage.sqlite3",
-        dashboard_path=tmp_path / "dashboard.html",
         pricing_path=tmp_path / "pricing.json",
         plugin_link=tmp_path / "plugins" / "codex-usage-tracker",
         marketplace_path=tmp_path / "marketplace.json",

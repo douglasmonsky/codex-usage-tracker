@@ -234,8 +234,48 @@ def test_parallel_parse_submission_queue_is_bounded(tmp_path: Path, monkeypatch)
     )
 
     assert len(results) == len(plans)
-    assert max(pending_sizes) <= 4
+    assert max(pending_sizes) <= 2
     assert RecordingProcessPoolExecutor.instances[0].submitted == len(plans)
+
+
+def test_refresh_streams_one_completed_source_per_write_batch() -> None:
+    assert stream_module._STREAM_SOURCE_BATCH_SIZE == 1
+
+
+def test_unchanged_refresh_skips_usage_writer_but_reconciles_config_facts(
+    tmp_path: Path,
+) -> None:
+    progress: list[dict[str, object]] = []
+    sync_calls: list[tuple[tuple[str, ...], frozenset[str], bool, bool]] = []
+
+    def sync(
+        conn,
+        record_ids: tuple[str, ...],
+        thread_keys: frozenset[str],
+        full_rebuild: bool,
+    ) -> None:
+        sync_calls.append((record_ids, thread_keys, full_rebuild, conn.in_transaction))
+
+    result = stream_module.write_refresh_stream(
+        db_path=tmp_path / "usage.sqlite3",
+        parse_plans=[],
+        session_index={},
+        aggregate_only=True,
+        progress_callback=progress.append,
+        force_serial=False,
+        derived_fact_sync=sync,
+    )
+
+    assert result.parsed_events == 0
+    assert result.inserted_or_updated_events == 0
+    assert result.stage_timings_seconds == {}
+    assert sync_calls == [((), frozenset(), False, True)]
+    skipped = {str(event["phase"]) for event in progress if event["status"] == "skipped"}
+    assert skipped == {"derived_state", "indexing_content"}
+    assert any(
+        event["phase"] == "syncing_facts" and event["status"] == "completed"
+        for event in progress
+    )
 
 
 def test_automatic_worker_count_requires_material_pending_bytes(tmp_path: Path) -> None:
@@ -247,7 +287,7 @@ def test_automatic_worker_count_requires_material_pending_bytes(tmp_path: Path) 
     )
 
     assert parse_module.parallel_parse_worker_count(small_plans) == 1
-    assert parse_module.parallel_parse_worker_count(large_plans) > 1
+    assert parse_module.parallel_parse_worker_count(large_plans) == 2
 
 
 def test_refresh_falls_back_to_serial_parse_when_worker_pool_breaks(
@@ -335,6 +375,9 @@ def test_refresh_reports_phase_progress(tmp_path: Path, monkeypatch) -> None:
     final_result = events[-1]["result"]
     assert isinstance(final_result, dict)
     assert final_result["parsed_events"] == result.parsed_events
+    stage_timings = final_result["stage_timings_seconds"]
+    assert isinstance(stage_timings, dict)
+    assert float(stage_timings["writer_lock"]) > 0
     content_events = [event for event in events if event["phase"] == "indexing_content"]
     assert content_events
     assert content_events[-1]["status"] == "completed"

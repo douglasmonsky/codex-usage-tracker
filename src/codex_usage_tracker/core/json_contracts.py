@@ -19,12 +19,32 @@ NoneType = type(None)
 
 AUXILIARY_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
     "codex-usage-tracker-agentic-dogfood-v1": {"required": {"generated_at": str}},
+    "codex-usage-tracker.analysis-refresh-dependency.v1": {
+        "required": {
+            "refresh_job": dict,
+            "resume": dict,
+        }
+    },
     "codex-usage-tracker-allowance-v1": {"required": {}},
     "codex-usage-tracker-codex-rate-card-v1": {"required": {}},
     "codex-usage-tracker-diagnostic-snapshot-refresh-v1": {"required": {}},
     "codex-usage-tracker-health-v1": {"required": {"status": str}},
     "codex-usage-tracker-home-summary-v1": {"required": {"source_revision": str}},
     "codex-usage-tracker-pricing-v2": {"required": {}},
+    "codex-usage-tracker.plugin-bundle.v1": {
+        "required": {
+            "digest": str,
+            "runtime_version": str,
+        }
+    },
+    "codex-usage-tracker.plugin-coherence.v1": {
+        "required": {
+            "state": str,
+            "runtime_version": str,
+            "installed": (dict, NoneType),
+            "cache": (dict, NoneType),
+        }
+    },
     "codex-usage-tracker-react-selected-report-v1": {
         "required": {
             "generated_at": (str, NoneType),
@@ -77,6 +97,7 @@ HTTP_V2_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
             "accounting": dict,
             "database_integrity": dict,
             "conversational_readiness": dict,
+            "plugin_bundle": dict,
             "mcp": dict,
             "persistent_service": dict,
             "next_action": dict,

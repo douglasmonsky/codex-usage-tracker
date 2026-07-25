@@ -15,7 +15,7 @@ from codex_usage_tracker.core.projects import (
     apply_project_privacy_to_rows,
     project_identity_for_cwd,
 )
-from codex_usage_tracker.dashboard.api import dashboard_payload, generate_dashboard
+from codex_usage_tracker.dashboard.api import dashboard_payload
 from codex_usage_tracker.reports.api import build_query_report
 from codex_usage_tracker.reports.support import build_support_bundle
 from codex_usage_tracker.store.api import (
@@ -49,7 +49,6 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
     fixture = _make_privacy_fixture(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
     csv_path = tmp_path / "usage.csv"
-    dashboard_path = tmp_path / "dashboard.html"
     support_path = tmp_path / "support.json"
 
     refresh_usage_index(codex_home=fixture.codex_home, db_path=db_path)
@@ -57,13 +56,6 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
     diagnostic_facts = query_diagnostic_facts(db_path=db_path, limit=0)
     strict_payload = dashboard_payload(
         db_path=db_path,
-        limit=0,
-        projects_path=fixture.projects_path,
-        privacy_mode="strict",
-    )
-    generate_dashboard(
-        db_path=db_path,
-        output_path=dashboard_path,
         limit=0,
         projects_path=fixture.projects_path,
         privacy_mode="strict",
@@ -81,7 +73,6 @@ def test_aggregate_outputs_exclude_raw_transcript_content(tmp_path: Path) -> Non
         json.dumps(raw_rows),
         json.dumps(diagnostic_facts),
         json.dumps(strict_payload),
-        dashboard_path.read_text(encoding="utf-8"),
         csv_path.read_text(encoding="utf-8"),
         support_path.read_text(encoding="utf-8"),
     ]
@@ -187,27 +178,17 @@ def test_privacy_modes_cover_dashboard_query_session_and_csv(tmp_path: Path) -> 
     assert str(fixture.cwd) not in strict_csv.read_text(encoding="utf-8")
 
 
-def test_context_loading_is_explicit_redacted_and_not_static_html(tmp_path: Path) -> None:
+def test_context_loading_is_explicit_redacted_and_not_persisted(tmp_path: Path) -> None:
     fixture = _make_privacy_fixture(tmp_path)
     db_path = tmp_path / "usage.sqlite3"
-    dashboard_path = tmp_path / "dashboard.html"
     refresh_usage_index(codex_home=fixture.codex_home, db_path=db_path)
     record_id = query_session_usage(db_path=db_path, session_id=SESSION_ID)[0]["record_id"]
 
-    generate_dashboard(
-        db_path=db_path,
-        output_path=dashboard_path,
-        context_api_enabled=True,
-        api_token="test-token",
-    )
-    static_html = dashboard_path.read_text(encoding="utf-8")
     default_context = load_call_context(record_id, db_path=db_path)
     default_context_text = json.dumps(default_context)
     tool_context = load_call_context(record_id, db_path=db_path, include_tool_output=True)
     tool_context_text = json.dumps(tool_context)
 
-    for sentinel in RAW_SENTINELS:
-        assert sentinel not in static_html
     assert default_context["loaded_on_demand"] is True
     assert default_context["raw_context_persisted"] is False
     assert default_context["context_mode"] == "quick"
@@ -216,7 +197,6 @@ def test_context_loading_is_explicit_redacted_and_not_static_html(tmp_path: Path
     assert ASSISTANT_SENTINEL in default_context_text
     assert "call_anchors" not in default_context
     assert "thread_anchors" not in default_context
-    assert PROMPT_SENTINEL not in static_html
     assert TOOL_OUTPUT_SENTINEL not in default_context_text
     assert "Tool output hidden for this request" in default_context_text
     assert any(entry.get("tool_output_omitted") is True for entry in default_context["entries"])

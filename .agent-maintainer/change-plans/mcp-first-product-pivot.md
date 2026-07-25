@@ -39,8 +39,11 @@ or product-surface changes.
 ## Scope
 
 - Adopt the approved design and implementation roadmap without adding features.
-- Record releases `0.22.0` through `0.26.0`, bounded release windows, and
+- Record releases `0.22.0` through `0.27.0`, bounded release windows, and
   the surface-growth freeze.
+- Insert post-0.24 reliability program `OPS-REL-025`, accelerate Task 40 into
+  the same 0.25 release after its local acceptance checkpoint, and shift the
+  remaining removal and stabilization stages without renumbering their tasks.
 - Establish the execution and deprecation ledgers consumed by later tasks.
 - Add focused tests for the public program contracts.
 

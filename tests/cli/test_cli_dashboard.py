@@ -8,7 +8,7 @@ from codex_usage_tracker.cli import dashboard as cli_dashboard
 from codex_usage_tracker.core.json_contracts import validate_json_payload_contract
 
 
-def test_serve_dashboard_json_reports_react_url_and_legacy_fallback(
+def test_serve_dashboard_json_reports_react_url(
     tmp_path: Path,
     monkeypatch,
     capsys,
@@ -33,7 +33,6 @@ def test_serve_dashboard_json_reports_react_url_and_legacy_fallback(
         limit=5000,
         no_context_api=False,
         open=True,
-        output=tmp_path / "dashboard.html",
         port=8765,
         pricing=tmp_path / "pricing.json",
         privacy_mode="normal",
@@ -49,8 +48,8 @@ def test_serve_dashboard_json_reports_react_url_and_legacy_fallback(
     payload = json.loads(capsys.readouterr().out)
     validate_json_payload_contract(payload)
     assert payload["dashboard_url"] == "http://127.0.0.1:8765/react-dashboard.html"
-    assert payload["legacy_dashboard_url"] == "http://127.0.0.1:8765/dashboard.html"
-    assert payload["dashboard_path"] == str(tmp_path / "dashboard.html")
+    assert "legacy_dashboard_url" not in payload
+    assert "dashboard_path" not in payload
     assert payload["refresh_before_start"] is False
     assert payload["refresh_in_background"] is False
     assert served["open_browser"] is True
@@ -81,7 +80,6 @@ def test_serve_dashboard_refreshes_in_background(
         limit=5000,
         no_context_api=False,
         open=False,
-        output=tmp_path / "dashboard.html",
         port=8765,
         pricing=tmp_path / "pricing.json",
         privacy_mode="normal",

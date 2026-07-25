@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -13,6 +14,9 @@ from codex_usage_tracker.application.errors import RequestContextError
 from codex_usage_tracker.application.protocols import Clock, PricingProvider
 from codex_usage_tracker.application.requests import StatusRequest
 from codex_usage_tracker.core.contracts import FreshnessV1, payload_mapping
+from codex_usage_tracker.core.contracts.common import FreshnessState
+from codex_usage_tracker.core.plugin_identity import inspect_plugin_bundle
+from codex_usage_tracker.core.version import __version__
 from codex_usage_tracker.dashboard_service import (
     DashboardServiceStatus,
     dashboard_service_status,
@@ -37,6 +41,10 @@ class ConversationalReadinessProvider(Protocol):
 
 class DatabaseIntegrityStatusProvider(Protocol):
     def __call__(self, db_path: Path) -> Mapping[str, object]: ...
+
+
+class PluginBundleStatusProvider(Protocol):
+    def __call__(self, *, codex_home: Path, home: Path) -> Mapping[str, object]: ...
 
 
 def database_integrity_unknown(db_path: Path) -> dict[str, object]:
@@ -68,6 +76,63 @@ def conversational_readiness(*, codex_home: Path) -> dict[str, object]:
     }
 
 
+def plugin_bundle_status(*, codex_home: Path, home: Path) -> dict[str, object]:
+    """Report one privacy-safe package, installed, cache, and process identity."""
+    plugin_dir = home.expanduser() / "plugins" / "codex-usage-tracker"
+    cache_root = (
+        codex_home.expanduser()
+        / "plugins"
+        / "cache"
+        / "local"
+        / "codex-usage-tracker"
+    )
+    process_version = os.environ.get("CODEX_USAGE_TRACKER_PLUGIN_VERSION")
+    process_digest = os.environ.get("CODEX_USAGE_TRACKER_PLUGIN_BUNDLE_DIGEST")
+    current_process = {
+        "manifest_version": process_version,
+        "bundle_digest": process_digest,
+        "matches_runtime_version": process_version == __version__,
+    }
+    if not plugin_dir.is_dir():
+        return {
+            "schema": "codex-usage-tracker.plugin-coherence.v1",
+            "state": "unavailable",
+            "runtime_version": __version__,
+            "installed": None,
+            "cache": None,
+            "current_process": current_process,
+        }
+    try:
+        observation = inspect_plugin_bundle(
+            plugin_dir=plugin_dir,
+            plugin_cache_root=cache_root,
+        )
+    except (OSError, ValueError):
+        return {
+            "schema": "codex-usage-tracker.plugin-coherence.v1",
+            "state": "invalid",
+            "runtime_version": __version__,
+            "installed": None,
+            "cache": None,
+            "current_process": current_process,
+            "error": {
+                "code": "plugin_bundle.invalid",
+                "message": "The installed plugin bundle could not be verified.",
+            },
+        }
+    installed = observation.get("installed")
+    installed_mapping = installed if isinstance(installed, Mapping) else {}
+    process_matches = bool(
+        process_version == installed_mapping.get("manifest_version")
+        and process_digest == installed_mapping.get("declared_digest")
+    )
+    current_process["matches_installed"] = process_matches
+    observation["current_process"] = current_process
+    if observation["state"] == "coherent" and not process_matches:
+        observation["state"] = "process_mismatch"
+    return observation
+
+
 def get_status(
     request: StatusRequest,
     *,
@@ -76,6 +141,7 @@ def get_status(
     pricing_provider: PricingProvider | None = None,
     readiness_provider: ConversationalReadinessProvider | None = None,
     integrity_provider: DatabaseIntegrityStatusProvider | None = None,
+    plugin_bundle_provider: PluginBundleStatusProvider | None = None,
 ) -> dict[str, object]:
     """Return codex-usage-tracker.status.v2 without starting background work."""
     result, _context = _build_status(
@@ -85,6 +151,7 @@ def get_status(
         pricing_provider=pricing_provider,
         readiness_provider=readiness_provider,
         integrity_provider=integrity_provider,
+        plugin_bundle_provider=plugin_bundle_provider,
     )
     return result
 
@@ -97,6 +164,7 @@ def _build_status(
     pricing_provider: PricingProvider | None = None,
     readiness_provider: ConversationalReadinessProvider | None = None,
     integrity_provider: DatabaseIntegrityStatusProvider | None = None,
+    plugin_bundle_provider: PluginBundleStatusProvider | None = None,
 ) -> tuple[dict[str, object], RequestContext]:
     db_path = _required_path(request.db_path, "db_path")
     pricing_path = _required_path(request.pricing_path, "pricing_path")
@@ -125,6 +193,10 @@ def _build_status(
     )
     readiness = (readiness_provider or conversational_readiness)(codex_home=codex_home)
     database_integrity = (integrity_provider or database_integrity_unknown)(db_path)
+    bundle_status = (plugin_bundle_provider or plugin_bundle_status)(
+        codex_home=codex_home,
+        home=home,
+    )
     service = _service_status(home)
     pricing_state = (
         "malformed"
@@ -162,6 +234,7 @@ def _build_status(
         "accounting": payload_mapping(context.accounting),
         "database_integrity": dict(database_integrity),
         "conversational_readiness": dict(readiness),
+        "plugin_bundle": dict(bundle_status),
         "mcp": {
             "active_profile": request.mcp_profile,
             "core_tools": list(CORE_TOOL_NAMES),
@@ -179,6 +252,7 @@ def _freshness_for_threshold(
     *,
     now: datetime,
 ) -> FreshnessV1:
+    state: FreshnessState
     if freshness.state in {"empty", "unknown"}:
         state = freshness.state
         reason = freshness.reason

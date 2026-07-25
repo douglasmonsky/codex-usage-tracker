@@ -130,6 +130,22 @@ DASHBOARD_REMOVED_VISUALIZATION_PATHS = (
     "frontend/dashboard/src/visualization/three",
     "tests/playwright/dashboard-constellation.spec.mjs",
 )
+REMOVED_STATIC_DASHBOARD_SOURCE_PATHS = (
+    "src/codex_usage_tracker/dashboard/assets.py",
+    "src/codex_usage_tracker/dashboard/pricing_snapshot.py",
+)
+REMOVED_STATIC_DASHBOARD_SCREENSHOTS = {
+    "dashboard-call-investigator-evidence.png",
+    "dashboard-call-investigator-preview.png",
+    "dashboard-call-investigator.png",
+    "dashboard-calls-preview.png",
+    "dashboard-calls.png",
+    "dashboard-details.png",
+    "dashboard-diagnostics-git-expanded.png",
+    "dashboard-diagnostics.png",
+    "dashboard-insights.png",
+    "dashboard-threads.png",
+}
 DASHBOARD_THREE_IMPORT = re.compile(r"""(?:from\s+|import\s*\()\s*["']three(?:/|["'])""")
 EVIDENCE_CONSOLE_SCREENSHOTS = (
     "evidence-console-home.png",
@@ -166,16 +182,6 @@ REQUIRED_FILES = [
     "docs/upgrading-to-0.24.0.md",
     "docs/releases/0.24.0-artifact-manifest-example.json",
     "docs/evidence-console-route-migration.md",
-    "docs/assets/dashboard-insights.png",
-    "docs/assets/dashboard-calls.png",
-    "docs/assets/dashboard-calls-preview.png",
-    "docs/assets/dashboard-threads.png",
-    "docs/assets/dashboard-diagnostics.png",
-    "docs/assets/dashboard-diagnostics-git-expanded.png",
-    "docs/assets/dashboard-details.png",
-    "docs/assets/dashboard-call-investigator.png",
-    "docs/assets/dashboard-call-investigator-preview.png",
-    "docs/assets/dashboard-call-investigator-evidence.png",
     *(f"docs/assets/{name}" for name in EVIDENCE_CONSOLE_SCREENSHOTS),
     "docs/assets/plugin-prompts.png",
     "docs/assets/plugin-thread-leaderboard.png",
@@ -192,45 +198,9 @@ REQUIRED_FILES = [
     "skills/codex-usage-tracker/SKILL.md",
     "skills/codex-usage-tracker/scripts/run_mcp.py",
     "src/codex_usage_tracker/plugin_data/assets/icon.svg",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard.css",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_call.css",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_insights.css",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_layout.css",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_tables.css",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_detail.css",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_responsive.css",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_format.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_data.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_analysis.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_cells.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_details.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_insights.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_tables.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_filters.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_i18n.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_payload_cache.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_tooltips.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_status.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_events.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_diagnostics.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_call_diagnostics.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_state.js",
-    "src/codex_usage_tracker/plugin_data/dashboard/dashboard_template.html",
     *DASHBOARD_LOCALE_SOURCE_FILES,
     "src/codex_usage_tracker/plugin_data/docs/dashboard-guide.html",
     "src/codex_usage_tracker/plugin_data/rate_cards/codex-credit-rates.json",
-    "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-insights.png",
-    "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-calls.png",
-    "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-calls-preview.png",
-    "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-threads.png",
-    "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-diagnostics.png",
-    "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-diagnostics-git-expanded.png",
-    "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-details.png",
-    "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator.png",
-    "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-preview.png",
-    "src/codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-evidence.png",
     *(
         f"src/codex_usage_tracker/plugin_data/docs/assets/{name}"
         for name in EVIDENCE_CONSOLE_SCREENSHOTS
@@ -243,45 +213,10 @@ REQUIRED_FILES = [
 ]
 WHEEL_REQUIRED_MEMBERS = {
     "codex_usage_tracker/plugin_data/assets/icon.svg",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard.css",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_call.css",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_insights.css",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_layout.css",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_tables.css",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_detail.css",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_responsive.css",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_format.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_data.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_analysis.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_cells.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_details.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_insights.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_tables.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_filters.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_call_investigator.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_i18n.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_payload_cache.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_tooltips.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_status.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_events.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_diagnostics.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_call_diagnostics.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_state.js",
-    "codex_usage_tracker/plugin_data/dashboard/dashboard_template.html",
+    "codex_usage_tracker/plugin_data/dashboard/react/index.html",
     *DASHBOARD_LOCALE_WHEEL_MEMBERS,
     "codex_usage_tracker/plugin_data/docs/dashboard-guide.html",
     "codex_usage_tracker/plugin_data/rate_cards/codex-credit-rates.json",
-    "codex_usage_tracker/plugin_data/docs/assets/dashboard-insights.png",
-    "codex_usage_tracker/plugin_data/docs/assets/dashboard-calls.png",
-    "codex_usage_tracker/plugin_data/docs/assets/dashboard-calls-preview.png",
-    "codex_usage_tracker/plugin_data/docs/assets/dashboard-threads.png",
-    "codex_usage_tracker/plugin_data/docs/assets/dashboard-diagnostics.png",
-    "codex_usage_tracker/plugin_data/docs/assets/dashboard-diagnostics-git-expanded.png",
-    "codex_usage_tracker/plugin_data/docs/assets/dashboard-details.png",
-    "codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator.png",
-    "codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-preview.png",
-    "codex_usage_tracker/plugin_data/docs/assets/dashboard-call-investigator-evidence.png",
     *(
         f"codex_usage_tracker/plugin_data/docs/assets/{name}"
         for name in EVIDENCE_CONSOLE_SCREENSHOTS
@@ -345,6 +280,7 @@ def main() -> int:
     failures.extend(_check_tracked_files_for_secrets())
     failures.extend(_check_react_dashboard_privacy_artifacts())
     failures.extend(_check_removed_dashboard_visualization())
+    failures.extend(_check_removed_static_dashboard())
     failures.extend(
         f"product complexity budget: {failure}"
         for failure in check_product_complexity_budget(
@@ -439,6 +375,45 @@ def _check_removed_dashboard_visualization() -> list[str]:
                 "removed constellation reference remains in packaged asset: "
                 + path.relative_to(REPO_ROOT).as_posix()
             )
+    return failures
+
+
+def _check_removed_static_dashboard() -> list[str]:
+    failures: list[str] = []
+    for relative_path in REMOVED_STATIC_DASHBOARD_SOURCE_PATHS:
+        if (REPO_ROOT / relative_path).exists():
+            failures.append(f"removed static dashboard source remains: {relative_path}")
+
+    dashboard_root = REPO_ROOT / "src/codex_usage_tracker/plugin_data/dashboard"
+    unexpected_assets = sorted(
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in dashboard_root.iterdir()
+        if path.name not in {"locales", "react"}
+    )
+    failures.extend(f"removed static dashboard asset remains: {path}" for path in unexpected_assets)
+
+    for screenshot_root in (
+        REPO_ROOT / "docs/assets",
+        REPO_ROOT / "src/codex_usage_tracker/plugin_data/docs/assets",
+    ):
+        for name in sorted(REMOVED_STATIC_DASHBOARD_SCREENSHOTS):
+            path = screenshot_root / name
+            if path.exists():
+                failures.append(
+                    "removed static dashboard screenshot remains: "
+                    + path.relative_to(REPO_ROOT).as_posix()
+                )
+
+    package_data = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    dashboard_patterns = set(
+        package_data["tool"]["setuptools"]["package-data"]["codex_usage_tracker.plugin_data"]
+    )
+    if "dashboard/*" in dashboard_patterns:
+        failures.append("package data still admits top-level static dashboard assets")
+
+    manifest = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+    if "recursive-include src/codex_usage_tracker/plugin_data/dashboard *" in manifest:
+        failures.append("sdist manifest still admits top-level static dashboard assets")
     return failures
 
 
@@ -618,8 +593,15 @@ def _check_packaging_metadata() -> list[str]:
         failures.append(
             ".mcp.json should allow enough startup time for first-run runtime bootstrap"
         )
-    if mcp_server.get("env") != {"CODEX_USAGE_TRACKER_MCP_PROFILE": "core"}:
-        failures.append(".mcp.json should configure the core MCP profile")
+    expected_mcp_env = {
+        "CODEX_USAGE_TRACKER_MCP_PROFILE": "core",
+        "CODEX_USAGE_TRACKER_PLUGIN_VERSION": str(project.get("version")),
+        "CODEX_USAGE_TRACKER_PLUGIN_BUNDLE_DIGEST": manifest.get("bundle", {}).get(
+            "digest"
+        ),
+    }
+    if mcp_server.get("env") != expected_mcp_env:
+        failures.append(".mcp.json should configure the core profile and bundle identity")
     manifest = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
     if "recursive-include skills *.md *.py" not in manifest:
         failures.append("MANIFEST.in should include Codex skill scripts in the source distribution")
@@ -718,11 +700,17 @@ def _check_sdist() -> list[str]:
         return [f"dist/ does not contain expected source distribution: {sdist_path.name}"]
     with tarfile.open(sdist_path) as sdist:
         names = set(sdist.getnames())
-    return [
+    failures = [
         f"sdist is missing required member: {member}"
         for member in sorted(SDIST_REQUIRED_MEMBERS)
         if not any(name.endswith(f"/{member}") for name in names)
     ]
+    failures.extend(
+        f"sdist contains removed static dashboard member: {member}"
+        for member in sorted(names)
+        if _is_removed_static_dashboard_member(member)
+    )
+    return failures
 
 
 def _check_wheel() -> list[str]:
@@ -742,7 +730,22 @@ def _check_wheel() -> list[str]:
         for member in sorted(names)
         if "__pycache__" in member or member.endswith(".pyc")
     )
+    failures.extend(
+        f"wheel contains removed static dashboard member: {member}"
+        for member in sorted(names)
+        if _is_removed_static_dashboard_member(member)
+    )
     return failures
+
+
+def _is_removed_static_dashboard_member(member: str) -> bool:
+    normalized = member.split("/", 1)[-1] if member.startswith(f"{DIST_FILE_STEM}-") else member
+    dashboard_prefix = "codex_usage_tracker/plugin_data/dashboard/"
+    if dashboard_prefix in normalized:
+        relative = normalized.split(dashboard_prefix, 1)[1]
+        if relative not in {"locales", "react"} and not relative.startswith(("locales/", "react/")):
+            return True
+    return Path(member).name in REMOVED_STATIC_DASHBOARD_SCREENSHOTS
 
 
 def _package_version() -> str:

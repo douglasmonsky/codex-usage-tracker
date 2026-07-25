@@ -4,17 +4,14 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
+from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import unquote, urlparse
 
-from codex_usage_tracker.dashboard.api import render_dashboard_html
-from codex_usage_tracker.server import utils as server_utils
 from codex_usage_tracker.server.context_settings import ContextApiState
 from codex_usage_tracker.server.dashboard_shell import (
-    dashboard_shell_payload,
     react_dashboard_boot_payload,
 )
 from codex_usage_tracker.server.responses import send_html_response
@@ -22,8 +19,6 @@ from codex_usage_tracker.server.routes import (
     HTTP_V1_DEPRECATION_LINK,
     is_deprecated_http_v1_path,
 )
-
-_first = server_utils.first_query_value
 
 _DASHBOARD_ASSET_MIME_TYPES = {
     ".css": "text/css; charset=utf-8",
@@ -33,6 +28,19 @@ _DASHBOARD_ASSET_MIME_TYPES = {
 }
 _REACT_DASHBOARD_PATH = "/react-dashboard.html"
 _REACT_DASHBOARD_INDEX_PATH = "/codex-usage-tracker-assets/react/index.html"
+_DASHBOARD_ASSET_PATH_PREFIX = "/codex-usage-tracker-assets/"
+_REMOVED_DASHBOARD_PATH = "/dashboard.html"
+_REMOVED_DASHBOARD_BODY = b"""<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Static dashboard removed</title>
+<body>
+<h1>Static dashboard removed</h1>
+<p>The live Evidence Console is available at
+<a href="/react-dashboard.html">/react-dashboard.html</a>.</p>
+</body>
+</html>
+"""
 
 
 class DashboardPageMixin(SimpleHTTPRequestHandler):
@@ -46,7 +54,6 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
         _rate_card_path: Path
         _thresholds_path: Path
         _projects_path: Path
-        _dashboard_path: Path
         _dashboard_name: str
         _privacy_mode: str
         _since: str | None
@@ -83,10 +90,43 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
             return forced_type
         return super().guess_type(path)
 
+    def translate_path(self, path: str) -> str:
+        request_path = urlparse(path).path
+        if request_path.startswith(_DASHBOARD_ASSET_PATH_PREFIX):
+            relative_path = unquote(
+                request_path.removeprefix(_DASHBOARD_ASSET_PATH_PREFIX)
+            ).replace("\\", "/")
+            relative = PurePosixPath(relative_path)
+            asset_root = Path(self.directory).resolve()
+            if (
+                relative.is_absolute()
+                or PureWindowsPath(relative_path).drive
+                or ".." in relative.parts
+            ):
+                return str(asset_root / "__invalid_asset_path__")
+            candidate = asset_root.joinpath(*relative.parts).resolve()
+            if not candidate.is_relative_to(asset_root):
+                return str(asset_root / "__invalid_asset_path__")
+            return str(candidate)
+        return super().translate_path(path)
+
     def _is_dashboard_html_request(self) -> bool:
         path = urlparse(self.path).path
-        return path in {"/", f"/{self._dashboard_name}", _REACT_DASHBOARD_PATH} or bool(
+        return path in {"/", _REMOVED_DASHBOARD_PATH, _REACT_DASHBOARD_PATH} or bool(
             getattr(self, "_serving_react_dashboard", False),
+        )
+
+    def _redirect_to_react_dashboard(self) -> None:
+        self.send_response(HTTPStatus.FOUND)
+        self.send_header("Location", _REACT_DASHBOARD_PATH)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _handle_removed_dashboard(self, *, include_body: bool = True) -> None:
+        self._send_html(
+            _REMOVED_DASHBOARD_BODY,
+            status=HTTPStatus.GONE,
+            include_body=include_body,
         )
 
     def _handle_react_dashboard(self, query: str) -> None:
@@ -125,68 +165,11 @@ class DashboardPageMixin(SimpleHTTPRequestHandler):
             self.path = original_path
             self._serving_react_dashboard = False
 
-    def _is_investigator_dashboard_request(self, path: str, query: str) -> bool:
-        if path != f"/{self._dashboard_name}":
-            return False
-        params = parse_qs(query)
-        return _first(params.get("view")) == "call" and bool(_first(params.get("record")))
-
-    def _handle_investigator_dashboard(self, query: str) -> None:
-        payload = self._dashboard_shell_payload(query)
-        if payload is None:
-            return
-        payload["investigator_boot"] = True
-        payload["pricing_snapshot_warning"] = ""
-        body = render_dashboard_html(
-            payload,
-            output_path=self._dashboard_path,
-            guide_href="codex-usage-tracker-guide/dashboard-guide.html",
-            body_attrs={
-                "data-active-view": "call",
-                "data-investigator-boot": "true",
-                "data-dashboard-shell": "true",
-            },
-        ).encode("utf-8")
-        self._send_html(body)
-
-    def _handle_dashboard_shell(self, query: str) -> None:
-        payload = self._dashboard_shell_payload(query)
-        if payload is None:
-            return
-        payload["pricing_snapshot_warning"] = ""
-        body = render_dashboard_html(
-            payload,
-            output_path=self._dashboard_path,
-            guide_href="codex-usage-tracker-guide/dashboard-guide.html",
-            body_attrs={"data-dashboard-shell": "true"},
-        ).encode("utf-8")
-        self._send_html(body)
-
-    def _dashboard_shell_payload(self, query: str) -> dict[str, object] | None:
-        try:
-            return dashboard_shell_payload(
-                query,
-                codex_home=self._codex_home,
-                db_path=self._db_path,
-                pricing_path=self._pricing_path,
-                allowance_path=self._allowance_path,
-                rate_card_path=self._rate_card_path,
-                thresholds_path=self._thresholds_path,
-                projects_path=self._projects_path,
-                privacy_mode=self._privacy_mode,
-                since=self._since,
-                api_token=self._api_token,
-                context_api_enabled=self._context_api_state.enabled,
-                include_archived_default=self._include_archived,
-                language_default=self._language,
-                limit_default=self._limit,
-            )
-        except sqlite3.Error as exc:
-            self._send_exception("Database error while preparing dashboard shell", exc)
-            return None
-        except OSError as exc:
-            self._send_exception("Could not prepare dashboard shell", exc)
-            return None
-
-    def _send_html(self, body: bytes) -> None:
-        send_html_response(self, body)
+    def _send_html(
+        self,
+        body: bytes,
+        *,
+        status: HTTPStatus = HTTPStatus.OK,
+        include_body: bool = True,
+    ) -> None:
+        send_html_response(self, body, status=status, include_body=include_body)

@@ -47,7 +47,7 @@ from codex_usage_tracker.store.usage_event_writer import (
     upsert_usage_events_in_connection as _upsert_usage_events_in_connection,
 )
 
-_STREAM_SOURCE_BATCH_SIZE = 16
+_STREAM_SOURCE_BATCH_SIZE = 1
 
 
 @dataclass(frozen=True)
@@ -56,6 +56,7 @@ class RefreshStreamResult:
     parsed_events: int
     inserted_or_updated_events: int
     stage_timings_seconds: dict[str, float]
+    usage_db_changed: bool
 
 
 @dataclass
@@ -107,12 +108,67 @@ class _RefreshStreamWriter:
         self.collect_content = not aggregate_only and default_parser_is_active()
 
     def run(self) -> RefreshStreamResult:
+        if not self.parse_plans:
+            self._emit_initial_progress()
+            usage_db_changed = False
+            for phase, message in (
+                ("derived_state", "No changed usage rows required derived-state refresh"),
+                ("indexing_content", "No changed source logs required content indexing"),
+            ):
+                emit_refresh_progress(
+                    self.progress_callback,
+                    phase=phase,
+                    status="skipped",
+                    completed=0,
+                    total=0,
+                    message=message,
+                )
+            if self.derived_fact_sync is None:
+                emit_refresh_progress(
+                    self.progress_callback,
+                    phase="syncing_facts",
+                    status="skipped",
+                    completed=0,
+                    total=0,
+                    message="No configured fact synchronizer required reconciliation",
+                )
+            else:
+                emit_refresh_progress(
+                    self.progress_callback,
+                    phase="syncing_facts",
+                    status="running",
+                    completed=0,
+                    total=1,
+                    message="Reconciling configuration-driven facts",
+                )
+                with connect(self.db_path) as conn:
+                    changes_before = conn.total_changes
+                    conn.execute("BEGIN")
+                    self.derived_fact_sync(conn, (), frozenset(), False)
+                    conn.commit()
+                    usage_db_changed = conn.total_changes > changes_before
+                emit_refresh_progress(
+                    self.progress_callback,
+                    phase="syncing_facts",
+                    status="completed",
+                    completed=1,
+                    total=1,
+                    message="Reconciled configuration-driven facts",
+                )
+            return RefreshStreamResult(
+                stats={},
+                parsed_events=0,
+                inserted_or_updated_events=0,
+                stage_timings_seconds={},
+                usage_db_changed=usage_db_changed,
+            )
         with connect(self.db_path) as conn:
             init_db(conn)
             full_rebuild = self._is_full_rebuild(conn)
             if full_rebuild:
                 _tune_full_refresh_connection(conn)
             conn.execute("BEGIN IMMEDIATE")
+            writer_lock_started = perf_counter()
             fact_writer = (
                 IngestionFactWriter(conn) if full_rebuild and self.collect_content else None
             )
@@ -130,6 +186,8 @@ class _RefreshStreamWriter:
             finalized = self._finalize_derived_state(conn)
             self._index_fallback(conn)
             self._sync_facts(conn, fact_writer, finalized, full_rebuild)
+            conn.commit()
+            self.timings.add("writer_lock", writer_lock_started)
         return RefreshStreamResult(
             stats=self.stats,
             parsed_events=self.parsed_events,
@@ -137,6 +195,7 @@ class _RefreshStreamWriter:
             stage_timings_seconds={
                 key: round(value, 6) for key, value in sorted(self.timings.values.items())
             },
+            usage_db_changed=True,
         )
 
     def _is_full_rebuild(self, conn: Any) -> bool:
@@ -147,7 +206,8 @@ class _RefreshStreamWriter:
         )
 
     def _emit_initial_progress(self) -> None:
-        status = "running" if self.parse_plans else "completed"
+        if self.parse_plans:
+            return
         for phase, message in (
             ("upserting", "Streaming source batches into the usage index"),
             ("metadata", "Updating source metadata"),
@@ -155,7 +215,7 @@ class _RefreshStreamWriter:
             emit_refresh_progress(
                 self.progress_callback,
                 phase=phase,
-                status=status,
+                status="completed",
                 completed=0,
                 total=len(self.parse_plans),
                 message=message,
@@ -281,6 +341,12 @@ class _RefreshStreamWriter:
                     parsed.stats,
                     parsed.state,
                     parsed.final_line_number,
+                    parsed.plan.source_metadata,
+                    (
+                        parsed.plan.end_byte
+                        if parsed.plan.end_byte is not None
+                        else parsed.plan.path.stat().st_size
+                    ),
                 )
                 for parsed in parsed_batch
             ],
@@ -321,6 +387,14 @@ class _RefreshStreamWriter:
         )
 
     def _finalize_derived_state(self, conn: Any) -> Any:
+        emit_refresh_progress(
+            self.progress_callback,
+            phase="derived_state",
+            status="running",
+            completed=0,
+            total=1,
+            message="Refreshing canonical links, summaries, and derived state",
+        )
         started = perf_counter()
         finalized = _finalize_streamed_usage_event_upserts(
             conn,
@@ -330,6 +404,14 @@ class _RefreshStreamWriter:
             stage_callback=self.timings.segment_callback("derived_state"),
         )
         self.timings.add("derived_state", started)
+        emit_refresh_progress(
+            self.progress_callback,
+            phase="derived_state",
+            status="completed",
+            completed=1,
+            total=1,
+            message="Refreshed canonical links, summaries, and derived state",
+        )
         return finalized
 
     def _index_fallback(self, conn: Any) -> None:

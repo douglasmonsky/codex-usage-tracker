@@ -82,8 +82,6 @@ def run_integrity(
 
 _REPLACEMENTS = {
     "summary": "analyze' or 'query",
-    "dashboard": "open",
-    "open-dashboard": "open",
     "serve-dashboard": "service serve",
     "dashboard-service": "service",
     "dogfood-agentic": "admin dogfood",

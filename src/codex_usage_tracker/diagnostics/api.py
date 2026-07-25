@@ -6,20 +6,19 @@ import platform
 import sys
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from codex_usage_tracker.core.paths import (
     DEFAULT_CODEX_HOME,
-    DEFAULT_DASHBOARD_PATH,
     DEFAULT_DB_PATH,
     DEFAULT_MARKETPLACE_PATH,
     DEFAULT_PLUGIN_LINK,
     DEFAULT_PRICING_PATH,
 )
+from codex_usage_tracker.core.plugin_identity import inspect_plugin_bundle
 from codex_usage_tracker.core.version import __version__
 from codex_usage_tracker.diagnostics.doctor_checks import (
     _check_codex_sessions,
-    _check_dashboard_target,
     _check_database,
     _check_database_schema,
     _check_marketplace,
@@ -43,10 +42,9 @@ from codex_usage_tracker.store.analysis_job_repository import AnalysisJobReposit
 from codex_usage_tracker.store.integrity import check_database_integrity
 
 DASHBOARD_REQUIRED_ASSETS = (
-    "dashboard_data.js",
-    "dashboard_live.js",
-    "dashboard_tables.js",
-    "dashboard_responsive.css",
+    "react/index.html",
+    "react/assets/dashboard-react.js",
+    "react/assets/index.css",
     "locales/en.json",
 )
 
@@ -55,7 +53,6 @@ def run_doctor(
     *,
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
-    dashboard_path: Path = DEFAULT_DASHBOARD_PATH,
     pricing_path: Path = DEFAULT_PRICING_PATH,
     plugin_link: Path = DEFAULT_PLUGIN_LINK,
     marketplace_path: Path = DEFAULT_MARKETPLACE_PATH,
@@ -67,7 +64,6 @@ def run_doctor(
     environment = _doctor_environment(
         codex_home=codex_home,
         db_path=db_path,
-        dashboard_path=dashboard_path,
         pricing_path=pricing_path,
         plugin_link=plugin_link,
         marketplace_path=marketplace_path,
@@ -76,7 +72,6 @@ def run_doctor(
     checks = _doctor_checks(
         codex_home=codex_home,
         db_path=db_path,
-        dashboard_path=dashboard_path,
         pricing_path=pricing_path,
         plugin_link=plugin_link,
         marketplace_path=marketplace_path,
@@ -93,7 +88,6 @@ def _doctor_checks(
     *,
     codex_home: Path,
     db_path: Path,
-    dashboard_path: Path,
     pricing_path: Path,
     plugin_link: Path,
     marketplace_path: Path,
@@ -107,15 +101,72 @@ def _doctor_checks(
         _check_database_integrity(db_path),
         _check_analysis_jobs(db_path),
         _check_parser_diagnostics(db_path),
-        _check_dashboard_target(dashboard_path),
         _check_pricing(pricing_path),
         _check_project_root(root),
         _check_plugin_link(plugin_link, root),
+        _check_plugin_bundle_coherence(plugin_link=plugin_link, codex_home=codex_home),
         _check_marketplace(marketplace_path),
         check_mcp_config(root),
         check_mcp_runtime(root),
         check_mcp_import(),
     ]
+
+
+def _check_plugin_bundle_coherence(*, plugin_link: Path, codex_home: Path) -> DoctorCheck:
+    if not plugin_link.exists():
+        return DoctorCheck(
+            "Plugin bundle coherence",
+            "warn",
+            "Installed plugin bundle is not available for a cache identity check.",
+            "Run: codex-usage-tracker install-plugin --force",
+        )
+    plugin_dir = plugin_link.resolve() if plugin_link.is_symlink() else plugin_link
+    cache_root = (
+        codex_home.expanduser()
+        / "plugins"
+        / "cache"
+        / "local"
+        / "codex-usage-tracker"
+    )
+    try:
+        observation = inspect_plugin_bundle(
+            plugin_dir=plugin_dir,
+            plugin_cache_root=cache_root,
+        )
+    except (OSError, ValueError) as exc:
+        return DoctorCheck(
+            "Plugin bundle coherence",
+            "fail",
+            f"Plugin bundle identity is invalid: {exc}",
+            "Run: codex-usage-tracker install-plugin --force",
+        )
+    installed = cast(dict[str, object], observation["installed"])
+    cache = cast(dict[str, object], observation["cache"])
+    if observation["state"] == "coherent":
+        return DoctorCheck(
+            "Plugin bundle coherence",
+            "pass",
+            f"Installed and cached bundle digests match: {installed['computed_digest']}.",
+        )
+    if observation["state"] == "not_cached":
+        return DoctorCheck(
+            "Plugin bundle coherence",
+            "warn",
+            (
+                "Installed bundle digest is valid, but Codex has not cached this "
+                "plugin version yet."
+            ),
+            "Restart Codex and open a fresh task to populate the verified cache.",
+        )
+    return DoctorCheck(
+        "Plugin bundle coherence",
+        "fail",
+        (
+            "The installed and cached bundle digests differ or cannot be verified "
+            f"(installed={installed['computed_digest']}; cache={cache['computed_digest']})."
+        ),
+        "Run: codex-usage-tracker install-plugin --force, then restart Codex.",
+    )
 
 
 def run_integrity_report(*, db_path: Path = DEFAULT_DB_PATH) -> dict[str, object]:
@@ -188,7 +239,6 @@ def _doctor_environment(
     *,
     codex_home: Path,
     db_path: Path,
-    dashboard_path: Path,
     pricing_path: Path,
     plugin_link: Path,
     marketplace_path: Path,
@@ -209,7 +259,6 @@ def _doctor_environment(
             "codex_home": str(codex_home.expanduser()),
             "codex_sessions": str(codex_home.expanduser() / "sessions"),
             "db_path": str(db_path.expanduser()),
-            "dashboard_path": str(dashboard_path.expanduser()),
             "pricing_path": str(pricing_path.expanduser()),
             "plugin_link": str(plugin_link.expanduser()),
             "marketplace_path": str(marketplace_path.expanduser()),

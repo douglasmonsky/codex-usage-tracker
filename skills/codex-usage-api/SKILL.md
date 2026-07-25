@@ -9,7 +9,7 @@ Act as an evidence-first analyst for Codex Usage Tracker data. Prefer MCP JSON p
 
 ## Operating Rules
 
-- For "Open dashboard" style requests, start the live localhost dashboard with `codex-usage-tracker serve-dashboard --context-api explicit --open`. Refresh is the default for dashboard launch commands. Use `open-dashboard` only when the user explicitly wants a static/offline snapshot or the environment cannot keep a server alive. Say the result is static and Live requires `serve-dashboard`.
+- For "Open dashboard" style requests, start the live localhost dashboard with `codex-usage-tracker serve-dashboard --context-api explicit --open`. Refresh is the default for dashboard launch commands.
 - Refresh with `refresh_usage_index` unless the user asks for a static historical snapshot.
 - Start with aggregate/shareable tools. Do not expose prompts, assistant messages, raw tool output, pasted secrets, raw commands, full paths, or transcript snippets unless the user explicitly asks for local content or raw context.
 - Check top-level `schema`, `content_mode`, `includes_indexed_content`, `includes_raw_fragments`, row counts, truncation, and caveats before interpreting payloads.

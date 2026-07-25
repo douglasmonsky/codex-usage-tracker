@@ -16,7 +16,7 @@ class SessionInfo:
     updated_at: str | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UsageEvent:
     """One aggregate token-count event from a Codex session log."""
 
@@ -110,7 +110,7 @@ class UsageEvent:
         return {column: row[column] for column in USAGE_EVENT_COLUMN_NAMES}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DiagnosticFact:
     """One aggregate diagnostic fact associated with a usage-event record."""
 

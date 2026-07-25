@@ -73,6 +73,12 @@ class JobService:
             self._versions[job_id] = self._versions.get(job_id, 0) + 1
             self._last.pop(job_id, None)
 
+    @property
+    def persistence(self) -> JobPersistence | None:
+        """Expose the configured durable boundary to application coordinators."""
+
+        return self._repository
+
     def register_semantic(
         self,
         semantic_key: str,

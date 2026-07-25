@@ -223,8 +223,8 @@ python scripts/smoke_installed_package.py --docker
 To verify the public PyPI package instead of the local checkout:
 
 ```bash
-python scripts/smoke_installed_package.py --from-pypi --version 0.24.0
-python scripts/smoke_installed_package.py --docker --from-pypi --version 0.24.0
+python scripts/smoke_installed_package.py --from-pypi --version 0.25.0.dev0
+python scripts/smoke_installed_package.py --docker --from-pypi --version 0.25.0.dev0
 ```
 
 `scripts/check_release.py` treats these public-package smoke commands as release-state claims. Keep their `--version` and `codex-usage-tracking==...` values aligned with `pyproject.toml`; the release gate fails when the docs claim a different public version. It also checks that install docs point at the real PyPI distribution, `codex-usage-tracking`, and keep the warning that `codex-usage-tracker` is a different PyPI package.
@@ -247,7 +247,7 @@ codex-usage-tracker update-pricing --output /tmp/codex-usage-pricing.json
 codex-usage-tracker update-rate-card --output /tmp/codex-usage-rate-card.json
 codex-usage-tracker doctor
 codex-usage-tracker doctor --suggest-repair
-codex-usage-tracker dashboard --output /tmp/codex-usage-dashboard.html
+codex-usage-tracker service serve --no-refresh
 codex-usage-tracker serve-dashboard --help
 codex-usage-tracker init-allowance --output /tmp/codex-usage-allowance.json
 codex-usage-tracker parse-allowance --output /tmp/codex-usage-allowance.json "5h 79% 6:50 PM Weekly 33% Jun 7"
@@ -292,17 +292,8 @@ The 0.23 Evidence Console release set is:
 - `evidence-console-home-reduced-motion.png`
 - `evidence-console-home-keyboard.png`
 
-The following compatibility screenshots remain tracked for earlier documentation:
+The plugin workflow screenshots remain tracked:
 
-- `dashboard-insights.png`
-- `dashboard-calls.png`
-- `dashboard-calls-preview.png`
-- `dashboard-threads.png`
-- `dashboard-diagnostics.png`
-- `dashboard-details.png`
-- `dashboard-call-investigator.png`
-- `dashboard-call-investigator-preview.png`
-- `dashboard-call-investigator-evidence.png`
 - `plugin-prompts.png`
 - `plugin-thread-leaderboard.png`
 
@@ -316,7 +307,10 @@ The repository social preview artwork is generated separately:
 python scripts/generate_social_preview.py
 ```
 
-It writes `docs/assets/social-preview.png` and `docs/assets/readme-hero.png` at 1280x640, using exact rendered text and existing synthetic dashboard screenshots. Refresh the static downloads claim only after checking a public package-download source such as PyPI Stats.
+It writes `docs/assets/social-preview.png` and `docs/assets/readme-hero.png` at
+1280x640, using exact rendered text and the retained synthetic Evidence Console
+screenshots. Refresh the static downloads claim only after checking a public
+package-download source such as PyPI Stats.
 
 ## Large-History Benchmarking
 

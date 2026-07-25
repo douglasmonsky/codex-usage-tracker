@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from functools import cache, lru_cache, wraps
+from time import perf_counter
 
 from codex_usage_tracker.application.container import ApplicationContainer
+from codex_usage_tracker.core.contracts import enforce_payload_budget
 from codex_usage_tracker.interfaces.mcp.compatibility_tools import (
     ADVANCED_TOOL_NAMES,
     COMPATIBILITY_TOOL_NAMES,
@@ -13,6 +15,10 @@ from codex_usage_tracker.interfaces.mcp.compatibility_tools import (
     compatibility_handler,
 )
 from codex_usage_tracker.interfaces.mcp.core_tools import (
+    MAX_ALLOWANCE_PAYLOAD_BYTES,
+    MAX_EVIDENCE_PAYLOAD_BYTES,
+    MAX_REFRESH_PAYLOAD_BYTES,
+    MAX_STATUS_PAYLOAD_BYTES,
     build_usage_allowance,
     build_usage_analyze,
     build_usage_evidence,
@@ -37,6 +43,12 @@ from codex_usage_tracker.interfaces.mcp.models import (
     ToolDataClass,
     ToolSpec,
     WorkProofContract,
+)
+from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
+    ANALYSIS_JOB_SCHEMA,
+    MAX_ANALYSIS_JOB_PAYLOAD_BYTES,
+    MAX_ANALYSIS_PAYLOAD_BYTES,
+    MAX_QUERY_PAYLOAD_BYTES,
 )
 from codex_usage_tracker.interfaces.mcp.work_proof import WORK_PROOFS
 
@@ -378,7 +390,7 @@ def bound_core_handlers(
             container=container,
         )
 
-    return {
+    handlers: dict[str, Callable[..., object]] = {
         "usage_status": bound_usage_status,
         "usage_refresh": bound_usage_refresh,
         "usage_analyze": bound_usage_analyze,
@@ -387,6 +399,68 @@ def bound_core_handlers(
         "usage_allowance": bound_usage_allowance,
         "usage_job_status": bound_usage_job_status,
     }
+    return {
+        name: _timed_core_handler(name, handler) for name, handler in handlers.items()
+    }
+
+
+def _timed_core_handler(
+    name: str,
+    handler: Callable[..., object],
+) -> Callable[..., object]:
+    @wraps(handler)
+    def timed(*args: object, **kwargs: object) -> object:
+        started = perf_counter()
+        result = handler(*args, **kwargs)
+        if not isinstance(result, dict):
+            return result
+        result = {
+            **result,
+            "server_elapsed_ms": round((perf_counter() - started) * 1_000, 3),
+        }
+        enforce_payload_budget(
+            result,
+            _core_payload_budget(name, result, args=args, kwargs=kwargs),
+            name,
+        )
+        return {key: result[key] for key in sorted(result)}
+
+    return timed
+
+
+def _core_payload_budget(
+    name: str,
+    result: dict[str, object],
+    *,
+    args: tuple[object, ...],
+    kwargs: dict[str, object],
+) -> int:
+    if name == "usage_status":
+        return MAX_STATUS_PAYLOAD_BYTES
+    if name == "usage_refresh":
+        return MAX_REFRESH_PAYLOAD_BYTES
+    if name == "usage_analyze":
+        return (
+            MAX_ANALYSIS_JOB_PAYLOAD_BYTES
+            if result.get("result_schema") == ANALYSIS_JOB_SCHEMA
+            else MAX_ANALYSIS_PAYLOAD_BYTES
+        )
+    if name == "usage_query":
+        return MAX_QUERY_PAYLOAD_BYTES
+    if name == "usage_evidence":
+        return MAX_EVIDENCE_PAYLOAD_BYTES
+    if name == "usage_allowance":
+        return MAX_ALLOWANCE_PAYLOAD_BYTES
+    if name == "usage_job_status":
+        include_result = kwargs.get("include_result")
+        if include_result is None and len(args) > 1:
+            include_result = args[1]
+        return (
+            MAX_REFRESH_PAYLOAD_BYTES
+            if include_result is True
+            else MAX_STATUS_PAYLOAD_BYTES
+        )
+    raise ToolCatalogError(f"unknown core tool payload budget: {name}")
 
 
 def _full_tool_spec(name: str) -> ToolSpec:

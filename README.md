@@ -151,7 +151,15 @@ More install paths: [Install Guide](docs/install.md).
 
 ## Platform Support
 
-The core app is not macOS-only. The CLI, SQLite index, dashboard generator, and localhost server are Python-based and CI-tested on Ubuntu for Python 3.10-3.14. The installed-package Docker smoke path uses `python:3.14-slim` by default so packaged resources and CLI entry points are exercised on the newest supported runtime. It defaults to `~/.codex` for local Codex logs and `~/.codex-usage-tracker` for tracker data; pass `--codex-home` or `--db` when your local layout differs. Codex plugin discovery depends on Codex's local plugin directories on your machine, so run `codex-usage-tracker doctor` after setup if plugin registration does not appear in Codex.
+The core app is not macOS-only. The CLI, SQLite index, and localhost server are
+Python-based and CI-tested on Ubuntu for Python 3.10-3.14. The installed-package
+Docker smoke path uses `python:3.14-slim` by default so packaged resources and
+CLI entry points are exercised on the newest supported runtime. It defaults to
+`~/.codex` for local Codex logs and `~/.codex-usage-tracker` for tracker data;
+pass `--codex-home` or `--db` when your local layout differs. Codex plugin
+discovery depends on Codex's local plugin directories on your machine, so run
+`codex-usage-tracker doctor` after setup if plugin registration does not appear
+in Codex.
 
 ## Why This Exists
 
@@ -201,7 +209,7 @@ Then:
    supporting records.
 5. Use explicit local context controls only when aggregate and indexed evidence
    are insufficient; selected raw context is read on demand and is not written
-   to SQLite or generated dashboard HTML.
+   to SQLite or returned by aggregate exports.
 
 Optional allowance context:
 
@@ -214,11 +222,11 @@ The tracker cannot read your logged-in ChatGPT plan or live remaining usage auto
 ## What It Includes
 
 - Local SQLite index at `~/.codex-usage-tracker/usage.sqlite3`.
-- Static dashboard generation plus localhost live refresh.
+- Localhost Evidence Console serving with live refresh.
 - Focused Evidence Console with Home, Calls/Threads Explore, Limits, utility
   Settings, and contextual Evidence.
 - Active-only dashboards by default, with an explicit `All history` toggle for archived sessions.
-- CLI summaries, queries, CSV export, dashboard generation, doctor checks, and support bundles.
+- CLI summaries, queries, CSV/JSON export, doctor checks, and support bundles.
 - MCP tools for Codex sessions that want to query local usage data.
 - Companion Codex skills for operational setup and conversational usage analysis.
 - Optional local pricing, Codex credit, allowance, threshold, project alias, and privacy-mode configuration, including per-call long-context pricing above 272K input tokens for OpenAI service tiers that publish long-context rates.
@@ -281,7 +289,7 @@ codex-usage-tracker service serve --no-context-api --open
 For shared artifacts, use:
 
 ```bash
-codex-usage-tracker --privacy-mode redacted dashboard --open
+codex-usage-tracker --privacy-mode redacted open
 codex-usage-tracker --privacy-mode strict export --output usage-redacted.csv
 ```
 

@@ -23,12 +23,19 @@ class ResponseHandler(Protocol):
     def end_headers(self) -> None: ...
 
 
-def send_html_response(handler: ResponseHandler, body: bytes) -> None:
-    handler.send_response(HTTPStatus.OK)
+def send_html_response(
+    handler: ResponseHandler,
+    body: bytes,
+    *,
+    status: HTTPStatus = HTTPStatus.OK,
+    include_body: bool = True,
+) -> None:
+    handler.send_response(status)
     handler.send_header("Content-Type", "text/html; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
-    write_response_body(handler, body)
+    if include_body:
+        write_response_body(handler, body)
 
 
 def send_json_response(

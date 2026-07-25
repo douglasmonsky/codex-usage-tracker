@@ -63,6 +63,26 @@ def discover_otel_sources(directory: Path) -> list[Path]:
     )
 
 
+def otel_sources_have_changes(conn: sqlite3.Connection, directory: Path) -> bool:
+    """Return whether a completion source differs from its persisted cursor."""
+
+    for path in discover_otel_sources(directory):
+        source_path = str(path.resolve())
+        try:
+            observed = path.stat()
+        except FileNotFoundError:
+            continue
+        state = _source_state(conn, source_path)
+        if (
+            state is None
+            or state.device != observed.st_dev
+            or state.inode != observed.st_ino
+            or state.size != observed.st_size
+        ):
+            return True
+    return False
+
+
 def ingest_otel_completion_files(
     conn: sqlite3.Connection, directory: Path
 ) -> OtelIngestResult:

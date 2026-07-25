@@ -10,7 +10,18 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from codex_usage_tracker.core.paths import DEFAULT_MARKETPLACE_PATH, DEFAULT_PLUGIN_LINK
+from codex_usage_tracker.core.paths import (
+    DEFAULT_MARKETPLACE_PATH,
+    DEFAULT_PLUGIN_CACHE_ROOT,
+    DEFAULT_PLUGIN_LINK,
+)
+from codex_usage_tracker.core.plugin_identity import (
+    invalidate_stale_plugin_cache,
+    packaged_plugin_bundle_digest,
+    plugin_bundle_digest,
+    plugin_bundle_manifest,
+    plugin_launcher_digest,
+)
 from codex_usage_tracker.core.version import __version__
 
 PLUGIN_NAME = "codex-usage-tracker"
@@ -22,6 +33,9 @@ class PluginInstallResult:
     marketplace_path: Path
     python_executable: Path
     replaced_existing: bool
+    bundle_digest: str
+    cache_state: str
+    cache_invalidated: bool
 
 
 @dataclass(frozen=True)
@@ -37,6 +51,8 @@ def install_plugin(
     plugin_dir: Path = DEFAULT_PLUGIN_LINK,
     marketplace_path: Path = DEFAULT_MARKETPLACE_PATH,
     python_executable: Path | None = None,
+    codex_home: Path | None = None,
+    plugin_cache_root: Path | None = None,
     force: bool = False,
 ) -> PluginInstallResult:
     """Create or refresh a local Codex plugin wrapper for this installed package."""
@@ -45,7 +61,23 @@ def install_plugin(
     marketplace_path = marketplace_path.expanduser()
     python_path = _absolute_path(Path(python_executable or sys.executable))
     replaced_existing = _prepare_plugin_dir(plugin_dir, force=force)
-    _write_plugin_files(plugin_dir=plugin_dir, python_executable=python_path)
+    bundle_digest = _write_plugin_files(
+        plugin_dir=plugin_dir,
+        python_executable=python_path,
+    )
+    cache_root = _resolved_plugin_cache_root(
+        plugin_dir=plugin_dir,
+        codex_home=codex_home,
+        plugin_cache_root=plugin_cache_root,
+    )
+    cache_state = (
+        invalidate_stale_plugin_cache(
+            plugin_dir=plugin_dir,
+            plugin_cache_root=cache_root,
+        )
+        if cache_root is not None
+        else "not_checked"
+    )
     marketplace_path.parent.mkdir(parents=True, exist_ok=True)
     marketplace = _load_marketplace(marketplace_path)
     _upsert_marketplace_entry(marketplace, plugin_dir)
@@ -58,6 +90,9 @@ def install_plugin(
         marketplace_path=marketplace_path,
         python_executable=python_path,
         replaced_existing=replaced_existing,
+        bundle_digest=bundle_digest,
+        cache_state=cache_state,
+        cache_invalidated=cache_state == "invalidated",
     )
 
 
@@ -147,18 +182,29 @@ def _absolute_path(path: Path) -> Path:
     return Path.cwd() / expanded
 
 
-def _write_plugin_files(*, plugin_dir: Path, python_executable: Path) -> None:
-    (plugin_dir / ".codex-plugin").mkdir(parents=True, exist_ok=True)
-    (plugin_dir / ".codex-plugin" / "plugin.json").write_text(
-        json.dumps(plugin_manifest(), indent=2) + "\n",
-        encoding="utf-8",
-    )
-    (plugin_dir / ".mcp.json").write_text(
-        json.dumps(_mcp_config(python_executable), indent=2) + "\n",
-        encoding="utf-8",
-    )
+def _write_plugin_files(*, plugin_dir: Path, python_executable: Path) -> str:
     _copy_tree("assets", plugin_dir / "assets")
     _copy_tree("skills", plugin_dir / "skills")
+    bundle_digest = plugin_bundle_digest(plugin_dir)
+    (plugin_dir / ".mcp.json").write_text(
+        json.dumps(_mcp_config(python_executable, bundle_digest=bundle_digest), indent=2)
+        + "\n",
+        encoding="utf-8",
+    )
+    launcher_digest = plugin_launcher_digest(plugin_dir)
+    (plugin_dir / ".codex-plugin").mkdir(parents=True, exist_ok=True)
+    (plugin_dir / ".codex-plugin" / "plugin.json").write_text(
+        json.dumps(
+            plugin_manifest(
+                bundle_digest=bundle_digest,
+                launcher_digest=launcher_digest,
+            ),
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return bundle_digest
 
 
 def _copy_tree(resource_name: str, destination: Path) -> None:
@@ -180,12 +226,18 @@ def _copy_resource_tree(source: Any, destination: Path) -> None:
                 shutil.copyfileobj(input_file, output_file)
 
 
-def plugin_manifest() -> dict[str, Any]:
+def plugin_manifest(
+    *,
+    bundle_digest: str | None = None,
+    launcher_digest: str | None = None,
+) -> dict[str, Any]:
     """Return the package-owned Codex plugin manifest."""
 
+    digest = bundle_digest or packaged_plugin_bundle_digest()
     return {
         "name": PLUGIN_NAME,
         "version": __version__,
+        "bundle": plugin_bundle_manifest(digest, launcher_digest),
         "description": (
             "Unofficial local, evidence-backed Codex usage analyst with MCP tools "
             "and an Evidence Console."
@@ -229,17 +281,42 @@ def plugin_manifest() -> dict[str, Any]:
     }
 
 
-def _mcp_config(python_executable: Path) -> dict[str, Any]:
+def _mcp_config(python_executable: Path, *, bundle_digest: str) -> dict[str, Any]:
     server: dict[str, Any] = {
         "command": str(python_executable),
         "args": ["-m", "codex_usage_tracker.interfaces.mcp.server"],
         "cwd": ".",
-        "env": {"CODEX_USAGE_TRACKER_MCP_PROFILE": "core"},
+        "env": {
+            "CODEX_USAGE_TRACKER_MCP_PROFILE": "core",
+            "CODEX_USAGE_TRACKER_PLUGIN_VERSION": __version__,
+            "CODEX_USAGE_TRACKER_PLUGIN_BUNDLE_DIGEST": bundle_digest,
+        },
     }
     source_root = _source_checkout_for_python(python_executable)
     if source_root:
         server["env"]["PYTHONPATH"] = str(source_root / "src")
     return {"mcpServers": {PLUGIN_NAME: server}}
+
+
+def _resolved_plugin_cache_root(
+    *,
+    plugin_dir: Path,
+    codex_home: Path | None,
+    plugin_cache_root: Path | None,
+) -> Path | None:
+    if plugin_cache_root is not None:
+        return plugin_cache_root.expanduser()
+    if codex_home is not None:
+        return (
+            codex_home.expanduser()
+            / "plugins"
+            / "cache"
+            / "local"
+            / PLUGIN_NAME
+        )
+    if plugin_dir.expanduser() == DEFAULT_PLUGIN_LINK.expanduser():
+        return DEFAULT_PLUGIN_CACHE_ROOT
+    return None
 
 
 def _source_checkout_for_python(python_executable: Path) -> Path | None:

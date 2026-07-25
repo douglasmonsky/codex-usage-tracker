@@ -7,22 +7,22 @@ compatibility test, and a concrete migration example.
 
 | Public name or route | Replacement | Owner | Deprecated release | Final supported release | Removal release | Compatibility test | Migration example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Deprecated compatibility MCP tools | The matching core tool named in each catalog entry | MCP interface maintainers | `0.22.0` | `0.24.x` | `0.25.0` | `tests/mcp/test_compatibility_tools.py` plus existing semantic adapter tests | Select profile `full` temporarily, follow each tool description to its replacement, and retain the corresponding CLI or HTTP workflow when automation needs that interface. |
-| Diagnostics Notebook route | `usage_query` plus contextual `usage_evidence` | Evidence Console maintainers | `0.23.0` | `0.24.x` | `0.25.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_query(entity="call", measures=["tokens"])`, then open the returned canonical selector with `usage_evidence`. |
-| Investigate route | `usage_analyze` and `usage_evidence` | Analysis service maintainers | `0.23.0` | `0.24.x` | `0.25.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_analyze(goal="usage_spike")` and follow its exact evidence identifiers. |
-| Compression Lab route | Core token-waste analysis; full-profile compression operations through `0.24.x` | Analysis service maintainers | `0.23.0` | `0.24.x` | `0.25.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_analyze(goal="token_waste")`; use the full-profile compression tools only when exact candidate ranking is required. |
-| Cache and Context route | Context/cache analysis plus contextual Evidence | Analysis service maintainers | `0.23.0` | `0.24.x` | `0.25.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_analyze(goal="context_bloat")` or `usage_analyze(goal="cache_failure")`, then open the returned selector. |
-| Reports route | `usage_analyze`, `usage_query`, and CLI export | Analysis and CLI maintainers | `0.23.0` | `0.24.x` | `0.25.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Use analysis for explanation, query for bounded rows, or the existing CLI export for automation. |
+| Deprecated compatibility MCP tools | The matching core tool named in each catalog entry | MCP interface maintainers | `0.22.0` | `0.25.x` | `0.26.0` | `tests/mcp/test_compatibility_tools.py` plus existing semantic adapter tests | Select profile `full` temporarily, follow each tool description to its replacement, and retain the corresponding CLI or HTTP workflow when automation needs that interface. |
+| Diagnostics Notebook route | `usage_query` plus contextual `usage_evidence` | Evidence Console maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_query(entity="call", measures=["tokens"])`, then open the returned canonical selector with `usage_evidence`. |
+| Investigate route | `usage_analyze` and `usage_evidence` | Analysis service maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_analyze(goal="usage_spike")` and follow its exact evidence identifiers. |
+| Compression Lab route | Core token-waste analysis; full-profile compression operations through `0.25.x` | Analysis service maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_analyze(goal="token_waste")`; use the full-profile compression tools only when exact candidate ranking is required. |
+| Cache and Context route | Context/cache analysis plus contextual Evidence | Analysis service maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_analyze(goal="context_bloat")` or `usage_analyze(goal="cache_failure")`, then open the returned selector. |
+| Reports route | `usage_analyze`, `usage_query`, and CLI export | Analysis and CLI maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Use analysis for explanation, query for bounded rows, or the existing CLI export for automation. |
 | Experimental Usage Constellation | Bounded Home summaries plus Explore and contextual Evidence | Evidence Console maintainers | `0.23.0` | `0.22.x` | `0.23.0` | Release dependency, source, asset, and bundle-budget checks | Use Home for current status and open exact calls or threads through Explore/Evidence; the 3D view has no compatibility surface. |
-| Legacy static dashboard | Evidence Console | Evidence Console maintainers | `0.23.0` | `0.24.x` | `0.25.0` | Static-output compatibility smoke | Run the local Evidence Console and use its stable Home, Explore, Limits, Settings, and Evidence surfaces. |
-| Legacy CLI command or alias | Simplified stable command or advanced namespace equivalent | CLI interface maintainers | `0.23.0` | `0.24.x` | `0.25.0` | CLI alias parity and help snapshot tests | Replace the alias with the documented stable command or namespaced advanced operation. |
-| HTTP API v1 route | Versioned HTTP API v2 equivalent | HTTP API maintainers | `0.23.0` | `0.24.x` | `0.25.0` | v1-to-v2 semantic adapter contract tests | Change the client to the documented `/api/v2/` endpoint and its shared response contract. |
+| Legacy static dashboard | Evidence Console | Evidence Console maintainers | `0.23.0` | `0.24.x` | `0.25.0` | `tests/compatibility/test_removed_static_dashboard.py` plus installed-package server smoke | Run `codex-usage-tracker open` and use its stable Home, Explore, Limits, Settings, and Evidence surfaces. |
+| Legacy CLI command or alias | Simplified stable command or advanced namespace equivalent | CLI interface maintainers | `0.23.0` | `0.25.x` | `0.26.0` | CLI alias parity and help snapshot tests | Replace the alias with the documented stable command or namespaced advanced operation. Task 40 removes only the static `dashboard` and `open-dashboard` aliases in `0.25.0`. |
+| HTTP API v1 route | Versioned HTTP API v2 equivalent | HTTP API maintainers | `0.23.0` | `0.25.x` | `0.26.0` | v1-to-v2 semantic adapter contract tests | Change the client to the documented `/api/v2/` endpoint and its shared response contract. |
 
-The five deprecated React workbench routes are notice-only in `0.24.x`.
+The five deprecated React workbench routes are notice-only through `0.25.x`.
 Opening one renders replacement guidance without importing the retired
 workbench page, calling its historical API endpoints, or starting background
 analysis. Their HTTP, CLI, export, and full-profile MCP compatibility operations
-remain supported independently through `0.24.x`; notice-only browser routing
+remain supported independently through `0.25.x`; notice-only browser routing
 does not authorize early backend removal.
 
 ## Retained advanced MCP operations
@@ -87,14 +87,13 @@ The complete deprecated MCP alias inventory is:
 - `usage_test_hypotheses`
 - `usage_context_bloat_scan`
 - `usage_investigation_walk`
-- `generate_usage_dashboard`
 - `init_usage_pricing_config`
 - `update_usage_pricing_config`
 - `init_usage_allowance_config`
 
 - Warning starts in `0.22.0` through each deprecated tool's MCP description.
-- Direct removal is permitted no earlier than `0.25.0`, after final support in
-  `0.24.x` and only when the named compatibility test remains green.
+- Direct removal is permitted no earlier than `0.26.0`, after final support in
+  `0.25.x` and only when the named compatibility test remains green.
 - CLI and HTTP alternatives remain supported independently during the migration
   window; moving a tool between profiles does not remove those interfaces.
 - Compatibility handlers keep their historical public names and FastMCP schemas.
@@ -110,7 +109,9 @@ final supported release or publish a documented breaking-change notice.
 
 The primary CLI help lists only `setup`, `status`, `doctor`, `refresh`,
 `analyze`, `query`, `open`, `export`, `config`, `service`, and `admin`.
-Historical top-level names remain accepted through `0.24.x`. When stderr is an
+Most historical top-level names remain accepted while their separate migration
+contracts are active. The static `dashboard` and `open-dashboard` aliases were
+removed in `0.25.0` and return an exact migration error. When stderr is an
 interactive terminal, an alias prints one concise migration notice to stderr;
 stdout is never used for deprecation text.
 
@@ -130,7 +131,7 @@ form as a v1 compatibility mode. New bounded query options return
 ## HTTP API v1 compatibility mapping
 
 All unversioned `/api/*` responses advertise `Deprecation: true` and link back
-to this ledger. They remain compatibility routes through `0.24.x`; new
+to this ledger. They remain compatibility routes through `0.25.x`; new
 dashboard code must not add dependencies on them.
 
 | Compatibility route family | v2 replacement | Current dashboard use |
@@ -140,7 +141,7 @@ dashboard code must not add dependencies on them.
 | `/api/status`, `/api/readiness`, `/api/health` | `/api/v2/status` and `/api/v2/capabilities` | The bounded Home bootstrap still uses the compatibility status envelope while its component payloads move independently. |
 | `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls` | `/api/v2/query` plus `/api/v2/evidence` | Explore Calls and Threads remain explicit compatibility exceptions until their richer display fields have v2 parity. |
 | `/api/summary`, `/api/recommendations` | `/api/v2/query` and `/api/v2/analyze` | Legacy Overview routes only. Stable Home uses the bounded status summary and focused v2 usage queries. |
-| `/api/allowance/*` | `/api/v2/allowance` and `/api/v2/jobs/{job_id}` | Limits migration is incremental; focused compatibility endpoints remain supported through `0.24.x`. |
+| `/api/allowance/*` | `/api/v2/allowance` and `/api/v2/jobs/{job_id}` | Limits migration is incremental; focused compatibility endpoints remain supported through `0.25.x`. |
 | `/api/investigations/*`, `/api/reports/*`, `/api/diagnostics/*`, `/api/compression/*` | `/api/v2/analyze`, `/api/v2/query`, and `/api/v2/evidence` where semantic parity exists | Compatibility and deprecated lab routes only; operations without proven parity remain supported through the final compatibility release. |
 | `/api/context`, `/api/context-settings`, `/api/open-investigator` | `/api/v2/evidence` or direct Evidence Console navigation | Compatibility helpers pending removal with the legacy dashboard surface. |
 

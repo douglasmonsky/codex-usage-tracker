@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.25.0.dev0 - 2026-07-25
+
+- Prioritize central-product reliability before compatibility removal, moving
+  the existing removal and stabilization roadmap stages to 0.26 and 0.27.
+- Give generated plugin bundles a deterministic skills/assets digest and
+  invalidate only a stale same-version Codex cache owned by this plugin.
+- Keep MCP and Evidence Console startup read-only while equivalent refreshes
+  join one durable cross-process job in an operational sidecar database.
+- Parse append-active JSONL only through fixed complete-line byte boundaries,
+  expose progress/generations/tails/timing, and resume stale analysis after its
+  durable refresh dependency.
+- Remove the legacy static dashboard generator, assets, screenshots, CLI
+  aliases, MCP tool, and configured static serving. The live Evidence Console,
+  CSV/JSON exports, exact deep links, and focused query plans remain.
+
 ## 0.24.0 - 2026-07-24
 
 - Introduce an explicit application composition root and dependency protocols,

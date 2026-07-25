@@ -96,6 +96,7 @@ def parse_codex_jsonl_v1(
     stats: MutableMapping[str, int] | None = None,
     *,
     start_byte: int = 0,
+    end_byte: int | None = None,
     start_line: int = 0,
     initial_state: ParserState | None = None,
     entry_observer: JsonlEntryObserver | None = None,
@@ -115,7 +116,15 @@ def parse_codex_jsonl_v1(
         if start_byte > 0:
             handle.seek(start_byte)
         source_byte_offset = start_byte
-        for line_number, raw_line in enumerate(handle, start_line + 1):
+        line_number = start_line
+        while end_byte is None or source_byte_offset < end_byte:
+            remaining = None if end_byte is None else end_byte - source_byte_offset
+            raw_line = handle.readline(-1 if remaining is None else remaining)
+            if not raw_line:
+                break
+            if end_byte is not None and not raw_line.endswith(b"\n"):
+                break
+            line_number += 1
             final_line_number = line_number
             _handle_jsonl_line(
                 path=path,

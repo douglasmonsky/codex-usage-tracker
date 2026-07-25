@@ -10,14 +10,22 @@
 
 **Approved design:** `docs/superpowers/specs/2026-07-21-mcp-first-product-pivot-design.md`
 
-**Program size:** 46 tasks: Tasks 1-45 retain their existing numbers, with the
-human-visible Task 27.5 checkpoint (`ARCH-AUDIT-00`) inserted between Tasks 27
-and 28.
+**Program size:** 46 tasks plus one post-0.24 reliability program. Tasks 1-45
+retain their existing numbers, with the human-visible Task 27.5 checkpoint
+(`ARCH-AUDIT-00`) inserted between Tasks 27 and 28. Stable program
+`OPS-REL-025` is inserted after Task 39 without renumbering or discarding
+pre-amendment Task 40/41 branches.
 
 ## Global Constraints
 
 - Baseline repository state is `main` at `bf383e1f4d9e206f3ba8cb004075bc3e87bc3fa6` and published package `0.21.0`.
 - If `0.22.0` is published before execution begins, shift every planned minor version upward by the same amount without changing task order, compatibility duration, or acceptance criteria.
+- Post-`0.24.0` installed dogfood promoted central-product reliability to
+  `0.25.0`. After the reliability implementation passed its installed
+  two-task and synthetic incremental checkpoints, the maintainer explicitly
+  accelerated Task 40 into the same release as the clean static-dashboard
+  sunset boundary. Tasks 41-43 remain `0.26.0`, and Tasks 44-45 remain
+  `0.27.0`.
 - No new dashboard workspace, top-level MCP concept, top-level CLI command, runtime dependency, or SQLite table may be added unless specified in this roadmap.
 - Deterministic backend code performs calculations, ranking, identity, pricing, allowance, and statistical decisions. Agents do not calculate from raw rows.
 - The installed plugin defaults to MCP profile `core`.
@@ -26,7 +34,9 @@ and 28.
 - Developer and dogfood tools are profile `developer` only.
 - The first Evidence Console release defaults to Home, Explore, and Limits. Settings is a shell action. Evidence is contextual.
 - Existing analytical pages remain direct-link compatibility routes for one minor release, notice-only routes for one further minor release, then are deleted.
-- The legacy static dashboard follows the same two-release compatibility window.
+- The legacy static dashboard's completed `0.24.x` compatibility window ends
+  in `0.25.0` under the approved Task 40 acceleration. This does not accelerate
+  Task 41 workbenches, focused APIs, or other CLI/MCP/HTTP compatibility.
 - Existing raw-context controls and loopback server request guards remain behaviorally unchanged unless a task explicitly modifies them.
 - Public documentation must accurately describe current local storage behavior. This roadmap does not redesign privacy behavior.
 - External validation programs are outside scope.
@@ -48,8 +58,9 @@ and 28.
 | `0.22.0` | Stable MCP core profile, shared contracts, truthful product positioning, generic job facade | Existing dashboard and old tools still function; old tools are `full` profile |
 | `0.23.0` | Evidence Console becomes default; CLI and HTTP v2 ship | Old dashboard pages are direct-link compatibility routes; old CLI names remain aliases |
 | `0.24.0` | Foundation audit, Python architecture refit, database integrity, context offsets, infrastructure hardening | No implementation begins before Task 27.5 records `PROCEED` or a maintainer-approved `AMEND`; old pages are notice-only and old APIs and aliases remain supported |
-| `0.25.0` | Expired dashboard, static, MCP, CLI, and HTTP compatibility removed | Only documented stable and advanced surfaces remain |
-| `0.26.0` | Feature-free stabilization release for pre-1.0 contract hardening | No new public surface; migration and package gates prove final state |
+| `0.25.0` | Central-product reliability, installed-bundle coherence, durable refresh ownership, large-index incremental performance, and Task 40 static-dashboard sunset | The primary MCP path is dependable under concurrency, restart, and append-active logs; the live Evidence Console is the only dashboard product |
+| `0.26.0` | Remaining expired workbench, MCP, CLI, and HTTP compatibility removed after Task 41 parity gates | Only documented stable and advanced surfaces remain |
+| `0.27.0` | Feature-free stabilization release for pre-1.0 contract hardening | No new public surface; migration and package gates prove final state |
 
 ## Program dependency graph
 
@@ -70,9 +81,13 @@ Record PROCEED or maintainer-approved AMEND
    |
 Task 28-39 Architecture, integrity, CI/release, and 0.24 release
    |
-Task 40-43 Compatibility deletion and 0.25 release
+OPS-REL-025 Central-product reliability
    |
-Task 44-45 Stabilization and final acceptance
+Task 40 Static-dashboard sunset and 0.25 release
+   |
+Task 41-43 Remaining compatibility deletion and 0.26 release
+   |
+Task 44-45 Stabilization and 0.27 final acceptance
 ```
 
 ## Execution protocol
@@ -126,7 +141,7 @@ For each task:
 - Follow-up risks:
 ```
 
-- [ ] **Step 1: Add failing public-document tests.** Assert that the roadmap names releases `0.22.0` through `0.26.0`, the deprecation document contains required columns, and the architecture document declares MCP primary and Evidence Console supporting.
+- [ ] **Step 1: Add failing public-document tests.** Assert that the roadmap names releases `0.22.0` through `0.27.0`, the deprecation document contains required columns, and the architecture document declares MCP primary and Evidence Console supporting.
 
 Run:
 
@@ -1894,7 +1909,7 @@ Tasks 28-33 foundation refactor
     |
 Remaining 0.24 hardening and release gate
     |
-0.25 deletion and sunset work
+OPS-REL-025 reliability gate, then 0.26 deletion and sunset work
 ```
 
 ### Task 27.5: Foundation Audit and 0.24 Plan Confirmation
@@ -3008,7 +3023,7 @@ git commit -m "build: promote one verified release artifact"
 - The budget file records baseline commit, measurement command, and rationale.
 - A budget increase requires an architecture decision and changed test fixture.
 - Generated assets are measured separately from authored source.
-- Removed compatibility surfaces ratchet counts downward in 0.25.
+- Removed compatibility surfaces ratchet counts downward in 0.26.
 
 - [ ] **Step 1: Implement a deterministic measurement script.** Read parser/catalog/route/schema registries rather than grepping ambiguous text. Inspect built artifacts when package sizes are requested.
 
@@ -3177,7 +3192,216 @@ git commit -m "chore: prepare 0.24.0 hardened architecture release"
 
 ---
 
-## Release 0.25.0 - Compatibility removal and footprint reduction
+## Release 0.25.0 - Reliability, installed coherence, and static-dashboard sunset
+
+### Reliability program: Make the seven-tool MCP product dependable
+
+**Stable task ID:** `OPS-REL-025`
+
+**Branch:** `pivot/ops-rel-025-central-product-reliability`
+
+**Why this blocks removal:**
+
+Installed `0.24.0` dogfood exposed a critical mismatch between the product
+contract and the real multi-task runtime:
+
+- an approximately 10 GB local index could spend more than 20 minutes in
+  derived-state SQL while holding `BEGIN IMMEDIATE`;
+- a concurrent `service serve --no-refresh` process could fail in
+  `AnalysisJobRepository.recover_interrupted()` with `database is locked`;
+- asynchronous refresh state was process-local, so callers in another Codex
+  task could not join, observe, or recover the job;
+- the job could report `0%` with no changing stage, counters, heartbeat, or
+  bounded error while continuing to consume CPU;
+- an installed source plugin and Codex's cached copy could both identify as
+  `0.24.0` while exposing different skill instructions and MCP tools;
+- a safely abstaining stale-data analysis did not give the caller a durable
+  refresh dependency or a deterministic resume path; and
+- JSONL sources continued to grow while the analysis was running, without a
+  clear fixed-boundary and follow-up increment contract.
+
+The first three released pivot stages made MCP the central product. These
+failures therefore take priority over footprint reduction. This program is
+removal-free and feature-free: it changes lifecycle, coherence, observability,
+and performance only.
+
+**Files and ownership inventory:**
+
+- Modify: `pyproject.toml`
+- Modify: `.codex-plugin/plugin.json`
+- Modify: `src/codex_usage_tracker/version.py`
+- Modify: `src/codex_usage_tracker/plugin_installer.py`
+- Modify: bundled plugin manifest, launcher, and skill synchronization checks
+- Modify: `src/codex_usage_tracker/application/refresh.py`
+- Modify: generic job service and existing persistent job repository adapters
+- Modify: refresh transaction boundaries in the store/repository layer
+- Modify: JSONL source discovery/checkpoint parsing paths
+- Modify: `src/codex_usage_tracker/application/status.py`
+- Modify: `src/codex_usage_tracker/application/analysis.py`
+- Modify: MCP core tool adapters and envelopes only for additive lifecycle,
+  identity, and timing metadata
+- Modify: `scripts/smoke_installed_package.py`
+- Create: `tests/reliability/test_plugin_bundle_coherence.py`
+- Create: `tests/reliability/test_cross_process_refresh.py`
+- Create: `tests/reliability/test_refresh_progress.py`
+- Create: `tests/reliability/test_refresh_moving_tail.py`
+- Create: `tests/reliability/test_refresh_transaction_scope.py`
+- Create: `tests/reliability/test_stale_analysis_resume.py`
+- Create: `scripts/benchmark_incremental_refresh.py`
+- Create: installed two-task MCP fixture/harness under `tests/installed/`
+- Create: `docs/releases/0.25.0.md`
+- Create: `docs/upgrading-to-0.25.0.md`
+- Modify: `docs/operations-and-recovery.md` if it already exists; otherwise
+  create the narrowly scoped operator guide authorized here
+- Modify: `docs/roadmap/mcp-first-pivot-execution.md`
+
+Before implementation, replace this path inventory with exact current symbols,
+tables, commands, schemas, and tests in the execution ledger. Reuse the
+existing generic job persistence substrate and existing source checkpoint
+metadata. A new SQLite table, new public tool, or changed accounting contract
+requires a separate approved amendment.
+
+**Preservation rules:**
+
+- Canonical accounting, pricing, allowance, identity, privacy, raw-context
+  controls, foreign keys, migrations, and exact evidence remain unchanged.
+- Freshness is not weakened. A bounded refresh reports exactly which immutable
+  source bytes it processed and whether a later append remains.
+- Committed-generation reads remain available during refresh; no caller reads
+  partially derived state.
+- SQLite writer ownership is short and explicit. Long parsing, aggregation,
+  and derived-state computation must not occur while a database-wide writer
+  transaction is held when it can be staged safely.
+- Fixtures and benchmarks are synthetic. Never copy or profile a real local
+  usage database.
+- Core MCP remains exactly seven tools. No Task 40/41 removal is included.
+
+**Installed identity contract:**
+
+- Distribution version, runtime version, plugin manifest version, launcher
+  identity, source commit/build identity, installed bundle digest, cached
+  bundle digest, and selected MCP profile are observable from `usage_status`.
+- A development installation cannot reuse a cache directory for different
+  bytes. The installer either assigns a unique PEP 440-compatible development
+  identity or invalidates/replaces the exact cache entry atomically.
+- Setup and doctor fail with one exact repair command when installed and cached
+  bundle digests differ. They do not silently mix skill text and MCP code.
+- Packaged and source skill copies remain byte-identical, and release checks
+  verify the identity chain before building.
+
+**Refresh lifecycle contract:**
+
+- At most one process owns an equivalent refresh for one database. A second
+  process receives the same durable job ID and observes the same request,
+  source boundary, stage, and progress.
+- Ownership is acquired with a bounded atomic lease and renewed by heartbeat.
+  Recovery never performs an unbounded write-lock acquisition during service
+  startup.
+- The job remains queryable after the initiating MCP task exits. A new task can
+  join it, observe terminal state, or recover a demonstrably abandoned lease.
+- `usage_job_status` exposes stage, completed and total units when knowable,
+  last heartbeat, elapsed time, recommended poll interval, safe bounded error,
+  committed input/output generations, fixed source boundary, and
+  `tail_pending`.
+- A running job updates its heartbeat at least every 10 seconds even when a
+  phase has no fine-grained counter. Terminal state is persisted before the
+  owner releases its lease.
+- Cancellation, interruption, and stale-lease recovery are explicit states.
+  They never masquerade as success or discard a valid committed generation.
+
+**Append-active input contract:**
+
+- Refresh discovery records a newline-aligned exclusive byte boundary for every
+  selected JSONL file before parsing that file.
+- The active refresh processes only complete records at or before its boundary.
+  Bytes appended afterward do not move the target or invalidate completed work.
+- Source checkpoints advance only through the last complete committed record.
+  A partial trailing line remains pending without data loss.
+- Completion reports whether a later append exists. One bounded follow-up
+  increment hydrates that tail; a continuously written file cannot make the
+  current job non-terminating.
+
+**Stale analysis and timing contract:**
+
+- When an analysis requires a fresher generation, its response names the
+  active or newly created refresh job and a deterministic retry/resume request.
+- After that refresh completes, repeating the normalized analysis reuses the
+  durable dependency and returns evidence without requiring the user to
+  reconstruct the request.
+- Every core MCP response includes server-side elapsed time. Job responses also
+  include queue, execution, and poll guidance; repeated analysis reports exact
+  result/cache reuse.
+- `usage_status` never reports current-task exposure as unverified when the
+  current request itself proves core MCP exposure.
+
+- [ ] **Step 1: Add failing reliability and identity tests.** Record their exact
+  failures plus the current refresh, job, transaction, source-checkpoint,
+  installer, cache, status, and analysis symbol inventory in the execution
+  ledger.
+
+- [ ] **Step 2: Establish unique 0.25 development and release identity.**
+  Synchronize package/runtime/plugin/launcher/skill metadata and add digest
+  coherence checks before installing any dogfood build.
+
+- [ ] **Step 3: Persist refresh request, ownership, lease, heartbeat, progress,
+  input boundary, and terminal state.** Make equivalent cross-process requests
+  join the same job. Keep startup recovery bounded and query-only unless a
+  lease is provably stale.
+
+- [ ] **Step 4: Make refresh input finite and append-safe.** Capture fixed
+  newline-aligned boundaries, commit only complete records, preserve partial
+  tails, and report the bounded continuation requirement.
+
+- [ ] **Step 5: Shorten writer transactions without weakening integrity.**
+  Measure the cold, no-change, and small-append phases first. Move safe
+  computation outside writer ownership or stage it behind generation-scoped
+  commits, then rerun the identical unprofiled workload.
+
+- [ ] **Step 6: Chain stale analysis to durable refresh completion.** Preserve
+  the original normalized request, expose exact resume metadata, and prove
+  evidence and result-cache reuse after completion.
+
+- [ ] **Step 7: Add bounded observability.** Emit privacy-safe stage, counters,
+  heartbeat, timing, cache provenance, source boundary, and poll guidance
+  through the existing envelope and job schemas.
+
+- [ ] **Step 8: Run installed two-task MCP acceptance.** From an isolated wheel
+  install and isolated Codex home, start refresh in task A, query committed data
+  and join the same job from task B, end task A, observe progress and completion
+  from task B, append one synthetic record while running, hydrate it in one
+  follow-up increment, then run analysis and exact evidence lookup. Restart the
+  MCP process and prove job/result reuse and bundle-digest coherence.
+
+- [ ] **Step 9: Enforce representative synthetic performance budgets.** Cover
+  cold build, no-change refresh, small append, moving tail, concurrent
+  status/query latency, writer-lock duration, and derived-state phase timing.
+  Budgets must be based on repeated unprofiled measurements; profiler output
+  only attributes hotspots.
+
+- [ ] **Step 10: Qualify and publish `0.25.0`.**
+
+```bash
+python -m pytest tests/reliability tests/installed tests/mcp tests/application tests/store -q
+python scripts/benchmark_incremental_refresh.py --enforce-thresholds
+python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
+python -m pyright --pythonpath "$(command -v python)" src
+python -m ruff check .
+python -m mypy
+tach check
+python scripts/check_release.py
+python -m build
+python -m twine check dist/*
+python scripts/check_release.py --dist
+python scripts/smoke_installed_package.py
+git diff --check
+```
+
+Build once, promote the exact wheel and sdist through TestPyPI, PyPI, and the
+GitHub release, then independently verify public hashes and rerun the installed
+two-task smoke from public PyPI. Publishing remains maintainer-approved and
+GitHub Actions-only.
+
+---
 
 ### Task 40: Remove the legacy static dashboard product and entry points
 
@@ -3250,6 +3474,10 @@ git add -A src/codex_usage_tracker frontend/dashboard tests scripts pyproject.to
 git commit -m "refactor: remove the legacy static dashboard"
 ```
 
+---
+
+## Release 0.26.0 - Remaining compatibility removal and footprint reduction
+
 ### Task 41: Remove expired dashboard workbenches, legacy API routes, MCP tools, and CLI aliases
 
 **Files:**
@@ -3281,7 +3509,7 @@ git commit -m "refactor: remove the legacy static dashboard"
 
 **Removal rule:**
 
-A surface can be deleted only when its row in `docs/dashboard-sunset-job-parity-v2.md` is PASS and its `remove_in` value is `0.25.0` or earlier.
+A surface can be deleted only when its row in `docs/dashboard-sunset-job-parity-v2.md` is PASS and its `remove_in` value is `0.26.0` or earlier.
 
 **Backend retention rule:**
 
@@ -3354,7 +3582,7 @@ git commit -m "refactor: remove expired analysis surfaces"
 - Modify: `docs/dashboard-guide.md`
 - Modify: `docs/deprecations.md`
 - Create: `docs/compatibility/0.21-0.24-tool-and-route-reference.md`
-- Create: `docs/compatibility/0.25-removal-map.md`
+- Create: `docs/compatibility/0.26-removal-map.md`
 - Modify: `skills/codex-usage-api/SKILL.md`
 - Modify: `skills/codex-usage-tracker/SKILL.md`
 - Modify: packaged skill copies
@@ -3389,7 +3617,7 @@ The first screenful of README must communicate:
 
 - [ ] **Step 4: Synchronize skills.** The API skill should solve broad questions with no more than three core calls in ordinary cases. The operational skill owns setup/status/open/export/admin tasks.
 
-- [ ] **Step 5: Rebuild packages and set final 0.25 budgets.** Remove unused docs assets from package data where the installed skill does not need them.
+- [ ] **Step 5: Rebuild packages and set final 0.26 budgets.** Remove unused docs assets from package data where the installed skill does not need them.
 
 - [ ] **Step 6: Verify.**
 
@@ -3411,12 +3639,12 @@ git add README.md pyproject.toml docs skills src/codex_usage_tracker/plugin_data
 git commit -m "docs: finalize the MCP-first product contract"
 ```
 
-### Task 43: Gate and publish Release 0.25.0
+### Task 43: Gate and publish Release 0.26.0
 
 **Files:**
 
-- Create: `docs/releases/0.25.0.md`
-- Complete: `docs/upgrading-to-0.25.0.md`
+- Create: `docs/releases/0.26.0.md`
+- Complete: `docs/upgrading-to-0.26.0.md`
 - Modify: `CHANGELOG.md`
 - Modify: `pyproject.toml`
 - Modify: `docs/roadmap/mcp-first-pivot-execution.md`
@@ -3470,18 +3698,18 @@ Expected: all PASS.
 
 - [ ] **Step 3: Publish through build-once promotion.** TestPyPI, PyPI, and GitHub release artifact hashes must be identical to the manifest.
 
-- [ ] **Step 4: Record before/after footprint.** Compare 0.21, 0.24, and 0.25 tool count, route count, CLI count, Python module count, JS chunks, wheel/sdist bytes, initial bundle bytes, and test runtime.
+- [ ] **Step 4: Record before/after footprint.** Compare 0.21, 0.24, 0.25, and 0.26 tool count, route count, CLI count, Python module count, JS chunks, wheel/sdist bytes, initial bundle bytes, and test runtime.
 
 - [ ] **Step 5: Commit.**
 
 ```bash
-git add CHANGELOG.md pyproject.toml docs/releases/0.25.0.md docs/upgrading-to-0.25.0.md docs/roadmap/mcp-first-pivot-execution.md tests/golden_questions
-git commit -m "chore: prepare 0.25.0 product simplification release"
+git add CHANGELOG.md pyproject.toml docs/releases/0.26.0.md docs/upgrading-to-0.26.0.md docs/roadmap/mcp-first-pivot-execution.md tests/golden_questions
+git commit -m "chore: prepare 0.26.0 product simplification release"
 ```
 
 ---
 
-## Release 0.26.0 - Feature-free stabilization and contract freeze
+## Release 0.27.0 - Feature-free stabilization and contract freeze
 
 ### Task 44: Build the deterministic golden-question, fault-injection, and recovery suite
 
@@ -3577,12 +3805,12 @@ git add tests/golden_questions tests/reliability scripts/run_core_acceptance.py 
 git commit -m "test: validate core conversational workflows"
 ```
 
-### Task 45: Freeze stable contracts, complete final documentation, and publish Release 0.26.0
+### Task 45: Freeze stable contracts, complete final documentation, and publish Release 0.27.0
 
 **Files:**
 
-- Create: `docs/releases/0.26.0.md`
-- Create: `docs/upgrading-to-0.26.0.md`
+- Create: `docs/releases/0.27.0.md`
+- Create: `docs/upgrading-to-0.27.0.md`
 - Create: `docs/stable-contracts.md`
 - Create: `docs/mcp-core-tool-reference.md`
 - Create: `docs/evidence-model.md`
@@ -3660,8 +3888,9 @@ Expected: all PASS.
 
 - [ ] **Step 5: Perform two clean upgrade smokes.**
 
-1. Install public `0.21.0`, create and populate a synthetic database, then upgrade to the 0.26 candidate and run status/query/analyze/evidence/allowance.
-2. Install public `0.24.0`, create a persisted analysis job/result fixture, upgrade to the 0.26 candidate, and verify recovery/compatibility.
+1. Install public `0.21.0`, create and populate a synthetic database, then upgrade to the 0.27 candidate and run status/query/analyze/evidence/allowance.
+2. Install public `0.25.0`, create a persisted refresh and analysis job/result fixture, upgrade to the 0.27 candidate, and verify recovery/compatibility.
+3. Install public `0.26.0`, create the post-removal surface inventory fixture, upgrade to the 0.27 candidate, and verify final contracts without a reverse migration.
 
 No real user data is used.
 
@@ -3682,8 +3911,8 @@ No real user data is used.
 - [ ] **Step 8: Commit.**
 
 ```bash
-git add README.md CHANGELOG.md pyproject.toml docs/releases/0.26.0.md docs/upgrading-to-0.26.0.md docs/stable-contracts.md docs/mcp-core-tool-reference.md docs/evidence-model.md docs/operations-and-recovery.md docs/architecture.md docs/roadmap/mcp-first-pivot-execution.md docs/deprecations.md scripts/check_release.py tests/release_catalog.py config/product-complexity-budget.json
-git commit -m "chore: prepare 0.26.0 contract-stabilization release"
+git add README.md CHANGELOG.md pyproject.toml docs/releases/0.27.0.md docs/upgrading-to-0.27.0.md docs/stable-contracts.md docs/mcp-core-tool-reference.md docs/evidence-model.md docs/operations-and-recovery.md docs/architecture.md docs/roadmap/mcp-first-pivot-execution.md docs/deprecations.md scripts/check_release.py tests/release_catalog.py config/product-complexity-budget.json
+git commit -m "chore: prepare 0.27.0 contract-stabilization release"
 ```
 
 ---
@@ -3693,21 +3922,21 @@ git commit -m "chore: prepare 0.26.0 contract-stabilization release"
 | Design concern | Primary tasks | Release proof |
 | --- | --- | --- |
 | MCP-first product positioning and accurate public claims | 1-2, 17, 27, 42, 45 | Public-doc tests, package metadata, release notes |
-| Seven-tool default profile and compatibility isolation | 3, 12-16, 41, 45 | Tool inventory snapshots and installed-plugin smoke |
+| Seven-tool default profile and compatibility isolation | 3, 12-16, OPS-REL-025, 41, 45 | Tool inventory snapshots, bundle coherence, and installed-plugin smoke |
 | Shared envelope, scope, messages, findings, and evidence | 4-5, 9-14, 25, 45 | JSON contract registry and exact fixtures |
-| Generic job lifecycle | 7-8, 11, 14, 27.5, 33, 44 | Audit ownership map, job adapter, persistence, recovery, and fault tests |
+| Generic job lifecycle | 7-8, 11, 14, 27.5, 33, OPS-REL-025, 44 | Audit ownership map, durable refresh ownership, persistence, recovery, and fault tests |
 | Evidence Console route model | 18-23, 27 | Route catalog, URL aliases, browser acceptance |
 | Dashboard feature sunset | 23-24, 38, 40-43 | Parity record, zero-network notices, removed-source inventory |
 | CLI simplification | 26, 41-43, 45 | Parser inventories, alias lifecycle, help snapshots |
 | HTTP API v2 and public-contract isolation | 25, 27.5, 28-30, 41, 45 | Audit leakage map, route inventory, schema equality, architecture gates |
-| Focused dashboard query performance and freshness | 19-20, 25, 27, 34, 41, 45 | Filter/sort/count parity, 100k route budgets, incremental-refresh visibility |
+| Focused dashboard query performance and freshness | 19-20, 25, 27, 34, OPS-REL-025, 41, 45 | Filter/sort/count parity, 100k route budgets, bounded refresh, and incremental visibility |
 | Application composition root and dependency direction | 27.5, 28-30 | Foundation audit, container tests, Tach, secondary import regression |
-| SQLite ownership, integrity, and migration safety | 27.5, 31-33, 39, 45 | Table/write-owner audit, foreign-key checks, migration fixtures, upgrade smokes |
-| Context indexing and read performance | 27.5, 32, 39, 45 | Audit ownership map, payload equivalence, inspected-byte performance ratchet |
+| SQLite ownership, integrity, and migration safety | 27.5, 31-33, 39, OPS-REL-025, 45 | Table/write-owner audit, writer-lock budgets, foreign-key checks, migration fixtures, upgrade smokes |
+| Context indexing and read performance | 27.5, 32, 39, OPS-REL-025, 45 | Audit ownership map, finite source boundaries, payload equivalence, inspected-byte performance ratchet |
 | Coverage and false-green prevention | 34, 39, 43-45 | 85% branch coverage, 90% changed lines, work-proof contracts |
 | Immutable CI and release promotion | 35-36, 39, 43, 45 | Action-pin tests and identical public artifact hashes |
 | Product/package complexity reduction | 24, 37-43, 45 | Blocking budgets and baseline/final comparison |
-| Internal synthetic acceptance | 17, 27, 44-45 | Golden questions, fault injection, clean upgrade smokes |
+| Internal synthetic acceptance | 17, 27, OPS-REL-025, 44-45 | Installed two-task MCP, golden questions, fault injection, clean upgrade smokes |
 
 ## Safe parallelization map
 
@@ -3716,6 +3945,13 @@ Tasks may run in parallel only when they do not edit the same contracts or depen
 Task 27.5 is an exclusive entry gate. No `0.24` implementation track may run
 in parallel with it, and no Task 28-39 branch may begin until it records
 `PROCEED` or a maintainer approves its `AMEND`.
+
+`OPS-REL-025` is the post-0.24 reliability gate. Task 40 may begin only after
+its local runtime, installed-package, and performance checkpoints pass and are
+committed; the maintainer-approved acceleration then ships Task 40 in the same
+`0.25.0` release. Tasks 41-45 remain blocked until the complete 0.25 release
+gate passes. Pre-amendment Task 40/41 branches may be retained for comparison
+but are not the reliability release base.
 
 | After completion of | Tasks that may run concurrently | Merge order constraint |
 | --- | --- | --- |
@@ -3728,6 +3964,8 @@ in parallel with it, and no Task 28-39 branch may begin until it records
 | 28 | 31 and 32 | Merge both before 30 only when domain paths are stable; otherwise 30 merges first and both rebase |
 | 30 | 34 and 35 | Merge independently; 36 depends on 35 and current release checks |
 | 31-33 | 37 and 38 | Merge 38 before 39; 37 must remeasure after 38 |
+| 39 | OPS-REL-025 only | Complete the reliability implementation and local acceptance checkpoint |
+| OPS-REL-025 local checkpoint | Task 40 only | Merge Task 40 after reliability; publish both as 0.25 |
 | 40 | 42 documentation preparation and 41 removal | Merge 41 before finalizing 42 budgets/docs |
 | 43 | 44 and draft reference documentation for 45 | Merge 44 before final contract snapshots in 45 |
 
@@ -3739,6 +3977,8 @@ The pivot is complete only when all statements below are true:
 
 - [ ] `main` contains the approved design, roadmap, execution ledger, and closed deprecation inventory.
 - [ ] Clean plugin installs expose exactly seven core tools.
+- [ ] Installed and cached plugin bundles have one exact identity and matching
+  skill/MCP digests.
 - [ ] Core tool implementations are thin adapters over application services.
 - [ ] All deterministic calculations remain outside the model-facing transport layer.
 - [ ] Every material finding links to exact evidence.
@@ -3752,6 +3992,10 @@ The pivot is complete only when all statements below are true:
 - [ ] SQLite foreign keys and integrity checks are enabled and tested.
 - [ ] Context reads use validated byte offsets with a correct fallback.
 - [ ] Generic jobs persist reusable analysis and recover interrupted state explicitly.
+- [ ] Refresh ownership, progress, fixed source boundaries, and terminal state
+  survive initiating-task exit and are joinable from another process.
+- [ ] Concurrent committed-generation queries stay responsive while synthetic
+  cold and incremental refreshes meet writer-lock and elapsed-time budgets.
 - [ ] Coverage, work-proof, schema, compatibility, route, package, and complexity gates are directly blocking.
 - [ ] GitHub Actions are pinned immutably.
 - [ ] Release artifacts are built once and promoted unchanged.
@@ -3766,8 +4010,9 @@ Each release is independently revertible at the product layer:
 - `0.22.0`: set installed plugin profile to `full` and restore 0.21 skill guidance; no database rollback.
 - `0.23.0`: switch route exposure back to the 0.22 foundation catalog; v2 API and core tools remain additive.
 - `0.24.0`: application/architecture refactors preserve public contracts; rollback code while retaining additive database migrations.
-- `0.25.0`: users requiring removed surfaces must reinstall `0.24.x`; current database remains forward-compatible, but removed code is not reintroduced through flags.
-- `0.26.0`: feature-free stabilization can be reverted to `0.25.x` without a reverse migration when no new schema is added.
+- `0.25.0`: reliability changes may be rolled back to `0.24.x` only after active jobs stop; this also restores the removed static dashboard for users who still require it. Additive job metadata remains forward-compatible and is not deleted.
+- `0.26.0`: users requiring the remaining removed compatibility surfaces must reinstall `0.25.x`; current database remains forward-compatible, but removed code is not reintroduced through flags.
+- `0.27.0`: feature-free stabilization can be reverted to `0.26.x` without a reverse migration when no new schema is added.
 
 Database rollback is never performed by decrementing `PRAGMA user_version` or deleting migration records. Correct forward or restore a pre-migration database backup.
 

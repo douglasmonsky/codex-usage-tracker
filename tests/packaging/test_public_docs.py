@@ -19,10 +19,30 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def test_mcp_first_roadmap_names_the_normative_release_sequence() -> None:
     roadmap = (REPO_ROOT / "docs/roadmap/mcp-first-pivot.md").read_text(encoding="utf-8")
 
-    releases = ["0.22.0", "0.23.0", "0.24.0", "0.25.0", "0.26.0"]
+    releases = ["0.22.0", "0.23.0", "0.24.0", "0.25.0", "0.26.0", "0.27.0"]
     positions = [roadmap.index(release) for release in releases]
 
     assert positions == sorted(positions)
+
+
+def test_mcp_first_roadmap_prioritizes_central_product_reliability() -> None:
+    summary = (REPO_ROOT / "docs/roadmap/mcp-first-pivot.md").read_text(encoding="utf-8")
+    execution = (REPO_ROOT / "docs/roadmap/mcp-first-pivot-execution.md").read_text(
+        encoding="utf-8"
+    )
+    plan = (REPO_ROOT / "docs/superpowers/plans/2026-07-21-mcp-first-product-pivot.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "`0.25.0` | Central-product reliability" in summary
+    assert "`0.26.0` | Remaining expired workbench, MCP, CLI, and HTTP compatibility" in summary
+    assert "`0.27.0` | Feature-free stabilization" in summary
+    assert "Task 40 may begin only after" in summary
+
+    assert "**Stable task ID:** `OPS-REL-025`" in plan
+    assert "## Release 0.26.0 - Remaining compatibility removal" in plan
+    assert "## Release 0.27.0 - Feature-free stabilization and contract freeze" in plan
+    assert "## OPS-REL-025 - Central Product Reliability and Installed Coherence" in execution
 
 
 def test_mcp_first_roadmap_gates_024_on_foundation_audit() -> None:
@@ -124,14 +144,15 @@ def test_public_docs_do_not_claim_dashboard_first_or_aggregate_only_storage() ->
 def test_022_release_and_upgrade_docs_define_the_profile_transition() -> None:
     release = (REPO_ROOT / "docs/releases/0.22.0.md").read_text(encoding="utf-8")
     upgrade = (REPO_ROOT / "docs/upgrading-to-0.22.0.md").read_text(encoding="utf-8")
+    historical_counts = {"core": 7, "full": 59}
 
     assert "Release 0.22.0" in release
-    assert f"exactly {MCP_PROFILE_TOOL_COUNTS['core']}" in release
-    assert f"{MCP_PROFILE_TOOL_COUNTS['full']} tools" in release
+    assert f"exactly {historical_counts['core']}" in release
+    assert f"{historical_counts['full']} tools" in release
     assert "CODEX_USAGE_TRACKER_MCP_PROFILE=full" in upgrade
     assert "No dashboard navigation changed" in release
     assert len(CORE_MCP_TOOL_NAMES) == MCP_PROFILE_TOOL_COUNTS["core"]
-    assert len(FULL_MCP_TOOL_NAMES) == MCP_PROFILE_TOOL_COUNTS["full"]
+    assert len(FULL_MCP_TOOL_NAMES) == historical_counts["full"] - 1
     assert "tracks 96 JSON schema identifiers" in release
     assert set(known_json_schemas()) >= RELEASE_022_SCHEMA_IDS
     assert all(f"`{schema}`" in release for schema in RELEASE_022_SCHEMA_IDS)
@@ -140,16 +161,14 @@ def test_022_release_and_upgrade_docs_define_the_profile_transition() -> None:
 def test_023_release_docs_define_the_evidence_console_and_cli_transition() -> None:
     release = (REPO_ROOT / "docs/releases/0.23.0.md").read_text(encoding="utf-8")
     upgrade = (REPO_ROOT / "docs/upgrading-to-0.23.0.md").read_text(encoding="utf-8")
-    routes = (REPO_ROOT / "docs/evidence-console-route-migration.md").read_text(
-        encoding="utf-8"
-    )
+    routes = (REPO_ROOT / "docs/evidence-console-route-migration.md").read_text(encoding="utf-8")
 
     assert "Release 0.23.0" in release
     assert "Home, Explore, and Limits" in release
     assert "exactly 11" in release
     assert "codex-usage-tracker-dashboard-target-v2" in release
     assert "codex-usage-tracker open" in upgrade
-    assert "through 0.24.x" in upgrade
+    assert "through 0.25.x" in upgrade
     for legacy, replacement in (
         ("view=overview", "view=home"),
         ("view=calls", "view=explore&mode=calls"),
@@ -167,9 +186,9 @@ def test_024_release_docs_define_the_hardening_and_compatibility_release() -> No
         encoding="utf-8"
     )
     manifest = json.loads(
-        (
-            REPO_ROOT / "docs/releases/0.24.0-artifact-manifest-example.json"
-        ).read_text(encoding="utf-8")
+        (REPO_ROOT / "docs/releases/0.24.0-artifact-manifest-example.json").read_text(
+            encoding="utf-8"
+        )
     )
 
     assert "Decision: **PROCEED**" in audit
@@ -177,11 +196,31 @@ def test_024_release_docs_define_the_hardening_and_compatibility_release() -> No
     assert "schema version 37" in release
     assert "notice-only" in release
     assert "0.25.0" in release
+    assert "0.26.0" in release
     assert "No manual database step is required" in upgrade
     assert manifest["schema"] == "codex-usage-tracker.release-artifact-manifest.v1"
     assert manifest["version"] == "0.24.0"
     assert manifest["contract_inventory"]["database_schema_version"] == 37
     assert len(manifest["contract_inventory"]["mcp_tools"]["core"]) == 7
+
+
+def test_025_release_docs_define_reliability_and_static_sunset() -> None:
+    release = (REPO_ROOT / "docs/releases/0.25.0.md").read_text(encoding="utf-8")
+    upgrade = (REPO_ROOT / "docs/upgrading-to-0.25.0.md").read_text(encoding="utf-8")
+
+    assert "Release 0.25.0" in release
+    assert "usage.jobs.sqlite3" in release
+    assert "0.005-second no-change refresh" in release
+    assert "data-free `410`" in release
+    assert "Reopening a browser tab" in upgrade
+    assert "does not refresh or" in upgrade
+    assert "tail_pending" in upgrade
+
+
+def test_source_distribution_excludes_python_bytecode() -> None:
+    manifest = (REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+
+    assert "global-exclude __pycache__ *.py[cod]" in manifest
 
 
 def test_data_posture_and_evidence_console_docs_define_the_stable_product() -> None:

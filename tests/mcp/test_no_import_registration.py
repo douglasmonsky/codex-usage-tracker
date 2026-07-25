@@ -128,4 +128,4 @@ def test_legacy_module_paths_reexport_the_extracted_handlers() -> None:
 
     dashboard = import_module("codex_usage_tracker.cli.mcp_dashboard")
     assert callable(dashboard.usage_status)
-    assert callable(dashboard.generate_usage_dashboard)
+    assert not hasattr(dashboard, "generate_usage_dashboard")

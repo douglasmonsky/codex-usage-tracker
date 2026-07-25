@@ -28,8 +28,14 @@ from codex_usage_tracker.application.paths import ApplicationPaths
 from codex_usage_tracker.application.query import query_usage
 from codex_usage_tracker.application.query_models import QueryFilters, QueryRequest, QueryResult
 from codex_usage_tracker.application.query_validation import normalize_query_filters
-from codex_usage_tracker.application.requests import HistoryScope, RequestScope
+from codex_usage_tracker.application.refresh import refresh_usage
+from codex_usage_tracker.application.requests import (
+    HistoryScope,
+    RefreshRequest,
+    RequestScope,
+)
 from codex_usage_tracker.core.contracts import (
+    MessageV1,
     NextActionV1,
     enforce_payload_budget,
     envelope_payload,
@@ -54,6 +60,9 @@ MAX_QUERY_PAYLOAD_BYTES = 256 * 1024
 MAX_ANALYSIS_PAYLOAD_BYTES = 64 * 1024
 MAX_ANALYSIS_JOB_PAYLOAD_BYTES = 16 * 1024
 ANALYSIS_JOB_SCHEMA = "codex-usage-tracker.analysis-job.v1"
+ANALYSIS_REFRESH_DEPENDENCY_SCHEMA = (
+    "codex-usage-tracker.analysis-refresh-dependency.v1"
+)
 QueryService = Callable[..., QueryResult]
 AnalysisService = Callable[[AnalysisRequest, RequestContext], AnalyzeResult]
 ContextBuilder = Callable[..., RequestContext]
@@ -193,6 +202,7 @@ def build_usage_analyze(
     analysis_service: AnalysisService = analyze_usage,
     context_builder: ContextBuilder = build_request_context,
     container: ApplicationContainer | None = None,
+    enable_refresh_dependency: bool | None = None,
 ) -> dict[str, object]:
     paths = (
         container.paths
@@ -231,6 +241,19 @@ def build_usage_analyze(
     runtime = runtime or _analysis_runtime(
         pricing_path, rate_card_path, thresholds_path, catalog, job_service
     )
+    chain_refresh = container is not None if enable_refresh_dependency is None else (
+        enable_refresh_dependency
+    )
+    if chain_refresh and context.freshness.state in {"stale", "empty", "unknown"}:
+        payload = _stale_analysis_dependency_envelope(
+            request,
+            context,
+            paths=paths,
+            job_service=job_service,
+            container=container,
+        )
+        enforce_payload_budget(payload, MAX_ANALYSIS_JOB_PAYLOAD_BYTES, "usage_analyze")
+        return payload
     outcome = analysis_service(request, replace(context, analysis_runtime=runtime))
     payload = _analysis_envelope(outcome, context)
     enforce_payload_budget(
@@ -239,6 +262,89 @@ def build_usage_analyze(
         "usage_analyze",
     )
     return payload
+
+
+def _stale_analysis_dependency_envelope(
+    request: AnalysisRequest,
+    context: RequestContext,
+    *,
+    paths: ApplicationPaths,
+    job_service: JobService | None,
+    container: ApplicationContainer | None,
+) -> dict[str, object]:
+    dependency = refresh_usage(
+        RefreshRequest(
+            history=request.history,
+            aggregate_only=False,
+            execution="async",
+        ),
+        codex_home=paths.codex_home,
+        db_path=paths.db_path,
+        pricing_path=paths.pricing_path,
+        source_repository=(None if container is None else container.repositories.sources),
+        job_service=job_service,
+    )
+    if dependency.job is None:
+        raise RuntimeError("stale analysis refresh dependency did not register a job")
+    job = dependency.job
+    resume_arguments = _analysis_resume_arguments(request)
+    result = {
+        "schema": ANALYSIS_REFRESH_DEPENDENCY_SCHEMA,
+        "state": "waiting_for_refresh",
+        "refresh_job": job.to_payload(),
+        "resume": {
+            "tool": "usage_analyze",
+            "arguments": resume_arguments,
+        },
+    }
+    return envelope_payload(
+        tool="usage_analyze",
+        result_schema=ANALYSIS_REFRESH_DEPENDENCY_SCHEMA,
+        result=result,
+        scope=context.scope,
+        freshness=context.freshness,
+        accounting=context.accounting,
+        data_class="aggregate",
+        limitations=(
+            MessageV1(
+                code="analysis.refresh_required",
+                severity="warning",
+                message="Analysis is waiting for a fresher committed usage generation.",
+                remediation="Poll the named refresh job, then repeat the included resume request.",
+            ),
+        ),
+        next_actions=(
+            NextActionV1(
+                code="job.poll",
+                label="Poll required refresh job",
+                tool="usage_job_status",
+                arguments={"job_id": job.job_id, "include_result": True},
+            ),
+            NextActionV1(
+                code="analysis.resume",
+                label="Resume the normalized analysis after refresh completion",
+                tool="usage_analyze",
+                arguments=resume_arguments,
+            ),
+        ),
+    )
+
+
+def _analysis_resume_arguments(request: AnalysisRequest) -> dict[str, object]:
+    filters = {
+        key: value
+        for key, value in asdict(request.filters).items()
+        if value is not None and value != ()
+    }
+    comparison = None if request.comparison is None else asdict(request.comparison)
+    return {
+        "goal": request.goal,
+        "filters": filters,
+        "history": request.history,
+        "evidence_limit": request.evidence_limit,
+        "comparison": comparison,
+        "execution": request.execution,
+    }
 
 
 def _query_request(
@@ -343,11 +449,12 @@ def _analysis_envelope(outcome: AnalyzeResult, context: RequestContext) -> dict[
             raise RuntimeError("analysis outcome contained neither a result nor a job")
         job = outcome.job
         result_schema = ANALYSIS_JOB_SCHEMA
-        result = job.to_payload()
-        result["schema"] = ANALYSIS_JOB_SCHEMA
-        errors = validate_json_payload_contract(result)
+        job_payload = job.to_payload()
+        job_payload["schema"] = ANALYSIS_JOB_SCHEMA
+        errors = validate_json_payload_contract(job_payload)
         if errors:
             raise ValueError(f"analysis job contract invalid: {errors[0]}")
+        result = job_payload
         targets = ()
         actions = (
             NextActionV1(

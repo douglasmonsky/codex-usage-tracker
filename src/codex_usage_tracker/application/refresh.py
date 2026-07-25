@@ -20,6 +20,16 @@ from codex_usage_tracker.allowance_intelligence.materialization import (
 )
 from codex_usage_tracker.application.context import build_request_context
 from codex_usage_tracker.application.protocols import SourceRepository
+from codex_usage_tracker.application.refresh_launcher import (
+    DetachedRefreshLauncher,
+    detached_refresh_launcher,
+)
+from codex_usage_tracker.application.refresh_observability import (
+    pending_source_tail as _pending_source_tail,
+)
+from codex_usage_tracker.application.refresh_observability import (
+    refresh_source_revision as _refresh_source_revision,
+)
 from codex_usage_tracker.application.requests import RefreshRequest, RequestScope
 from codex_usage_tracker.core.contracts import payload_mapping
 from codex_usage_tracker.core.models import RefreshResult
@@ -97,11 +107,13 @@ class _JobRecord:
     status: str
     created_at: str
     updated_at: str
+    progress_percent: int = 0
+    stage: str = "queued"
     result: dict[str, object] | None = None
 
 
 class RefreshCoordinator:
-    """Small process-local coordinator for core refresh jobs."""
+    """Coordinate refresh work through the generic durable job boundary."""
 
     def __init__(self, job_service: JobService | None = None) -> None:
         self.job_service = job_service or JobService()
@@ -109,7 +121,15 @@ class RefreshCoordinator:
         self._records: dict[str, _JobRecord] = {}
         self._active: dict[str, str] = {}
 
-    def start(self, request_key: str, worker: Callable[[], dict[str, object]]) -> JobStatusV1:
+    def start(
+        self,
+        request_key: str,
+        worker: Callable[[RefreshProgressCallback], dict[str, object]],
+        *,
+        source_revision: str,
+        request: RefreshRequest,
+        detached_launcher: DetachedRefreshLauncher | None = None,
+    ) -> JobStatusV1:
         with self._lock:
             active_id = self._active.get(request_key)
             if active_id is not None:
@@ -120,25 +140,78 @@ class RefreshCoordinator:
             now = _utc_now()
             record = _JobRecord(job_id, request_key, "queued", now, now)
             self._records[job_id] = record
-            self._active[request_key] = job_id
             adapter = RefreshJobAdapter(
                 self._reader,
                 request_hash=request_hash(request_key),
                 result_schema=REFRESH_SCHEMA,
                 result_budget=REFRESH_JOB_RESULT_BUDGET,
             )
-            self.job_service.register(kind="refresh", job_id=job_id, adapter=adapter)
-        threading.Thread(target=self._run, args=(record, worker), daemon=True).start()
-        return self.job_service.status(job_id)
+            registration = self.job_service.register_semantic(
+                request_hash(request_key),
+                kind="refresh",
+                job_id=job_id,
+                adapter=adapter,
+                source_revision=source_revision,
+                request_schema="refresh.request.v1",
+                request={
+                    "history": request.history,
+                    "aggregate_only": request.aggregate_only,
+                    "execution": request.execution,
+                },
+            )
+            if not registration.should_start:
+                self._records.pop(job_id, None)
+                return registration.status
+            if detached_launcher is not None:
+                self._records.pop(job_id, None)
+                self.job_service.discard_semantic_job(job_id)
+                detached_launcher(job_id)
+                return registration.status
+            self._active[request_key] = job_id
+        threading.Thread(
+            target=self._run,
+            args=(record, worker),
+            daemon=False,
+            name=f"usage-refresh-{job_id[:8]}",
+        ).start()
+        return registration.status
 
-    def _run(self, record: _JobRecord, worker: Callable[[], dict[str, object]]) -> None:
-        self._update(record, status="running")
+    def _run(
+        self,
+        record: _JobRecord,
+        worker: Callable[[RefreshProgressCallback], dict[str, object]],
+    ) -> None:
+        self._update(record, status="running", stage="planning", progress_percent=0)
+
+        def progress(payload: dict[str, object]) -> None:
+            raw_percent = payload.get("percent", record.progress_percent)
+            percent = int(raw_percent) if isinstance(raw_percent, int | float) else 0
+            phase = payload.get("phase")
+            stage = str(phase) if isinstance(phase, str) else record.stage
+            self._update(
+                record,
+                status="running",
+                stage=stage,
+                progress_percent=max(0, min(99, percent)),
+            )
+
         try:
-            result = worker()
+            result = worker(progress)
         except Exception:  # noqa: BLE001 - job errors cross a privacy-safe adapter boundary.
-            self._update(record, status="failed")
+            self._update(
+                record,
+                status="failed",
+                stage="failed",
+                progress_percent=record.progress_percent,
+            )
         else:
-            self._update(record, status="completed", result=result)
+            self._update(
+                record,
+                status="completed",
+                stage="complete",
+                progress_percent=100,
+                result=result,
+            )
         finally:
             with self._lock:
                 if self._active.get(record.request_key) == record.job_id:
@@ -149,12 +222,17 @@ class RefreshCoordinator:
         record: _JobRecord,
         *,
         status: str,
+        stage: str,
+        progress_percent: int,
         result: dict[str, object] | None = None,
     ) -> None:
         with self._lock:
             record.status = status
             record.updated_at = _utc_now()
+            record.stage = stage
+            record.progress_percent = progress_percent
             record.result = result
+        self.job_service.checkpoint(record.job_id)
 
     def _reader(self, job_id: str, *, include_result: bool = False) -> dict[str, object]:
         with self._lock:
@@ -162,9 +240,13 @@ class RefreshCoordinator:
             return {
                 "job_id": record.job_id,
                 "status": record.status,
-                "stage": record.status,
+                "stage": record.stage,
                 "created_at": record.created_at,
                 "updated_at": record.updated_at,
+                "progress": {
+                    "phase": record.stage,
+                    "percent": record.progress_percent,
+                },
                 "completed_at": (
                     record.updated_at if record.status in {"completed", "failed"} else None
                 ),
@@ -229,7 +311,14 @@ def plan_refresh(
     if any(plan.replace_existing for plan in plans):
         return RefreshPlan("async", "unsafe_source_change", len(plans), 0)
     try:
-        added_bytes = sum(plan.path.stat().st_size - plan.start_byte for plan in plans)
+        added_bytes = sum(
+            max(
+                0,
+                (plan.end_byte if plan.end_byte is not None else plan.path.stat().st_size)
+                - plan.start_byte,
+            )
+            for plan in plans
+        )
     except OSError:
         return RefreshPlan("async", "uncertain_source_state", len(plans), 0)
     if len(plans) > MAX_SYNC_SOURCE_FILES:
@@ -263,14 +352,25 @@ def refresh_usage(
         raise ValueError("coordinator and job_service must share one service")
     lock = _refresh_lock(db_path)
 
-    def execute(plan: RefreshPlan) -> dict[str, object]:
+    def execute(
+        plan: RefreshPlan,
+        progress_callback: RefreshProgressCallback | None = None,
+    ) -> dict[str, object]:
         result = refresh_fn(
             codex_home=codex_home,
             db_path=db_path,
             include_archived=request.history == "all",
             aggregate_only=request.aggregate_only,
+            progress_callback=progress_callback,
         )
-        return _completed_payload(request, result, plan, db_path, pricing_path)
+        return _completed_payload(
+            request,
+            result,
+            plan,
+            codex_home,
+            db_path,
+            pricing_path,
+        )
 
     if request.execution == "sync":
         with lock:
@@ -304,7 +404,7 @@ def refresh_usage(
         pricing_path=pricing_path,
     )
 
-    def worker() -> dict[str, object]:
+    def worker(progress_callback: RefreshProgressCallback) -> dict[str, object]:
         with lock:
             observed = _plan_refresh(
                 planner,
@@ -319,9 +419,31 @@ def refresh_usage(
                 observed.changed_source_files,
                 observed.added_bytes,
             )
-            return execute(async_plan)
+            return execute(async_plan, progress_callback)
 
-    return CompletedOrJob(job=runtime.start(key, worker))
+    source_revision = _refresh_source_revision(
+        request,
+        codex_home=codex_home,
+        source_repository=source_repository,
+    )
+    detached_launcher = detached_refresh_launcher(
+        request=request,
+        source_revision=source_revision,
+        codex_home=codex_home,
+        db_path=db_path,
+        pricing_path=pricing_path,
+        job_service=runtime.job_service,
+        enabled=refresh_fn is refresh_usage_index and planner is plan_refresh,
+    )
+    return CompletedOrJob(
+        job=runtime.start(
+            key,
+            worker,
+            source_revision=source_revision,
+            request=request,
+            detached_launcher=detached_launcher,
+        )
+    )
 
 
 def _plan_refresh(
@@ -346,6 +468,7 @@ def _completed_payload(
     request: RefreshRequest,
     result: RefreshResult,
     plan: RefreshPlan,
+    codex_home: Path,
     db_path: Path,
     pricing_path: Path,
 ) -> dict[str, object]:
@@ -353,6 +476,17 @@ def _completed_payload(
         db_path=db_path,
         pricing_path=pricing_path,
         scope=RequestScope(history=request.history),
+    )
+    source_boundary = {
+        "changed_source_files": plan.changed_source_files,
+        "added_bytes": plan.added_bytes,
+        "newline_aligned": True,
+        "exclusive_end": True,
+    }
+    tail = _pending_source_tail(
+        request,
+        codex_home=codex_home,
+        db_path=db_path,
     )
     return {
         "schema": REFRESH_SCHEMA,
@@ -362,6 +496,8 @@ def _completed_payload(
             "skipped_events": result.skipped_events,
             "inserted_or_updated_events": result.inserted_or_updated_events,
             "parser_diagnostics": dict(result.parser_diagnostics),
+            "fixed_source_boundary": source_boundary,
+            **tail,
         },
         "planner": plan.to_payload(),
         "scope": payload_mapping(context.scope),
@@ -397,6 +533,9 @@ def _refresh_request_identity(
 
 def _normalized_path(path: Path) -> str:
     return os.path.normcase(str(path.expanduser().resolve(strict=False)))
+
+
+
 
 
 def _coordinator_for_service(job_service: JobService) -> RefreshCoordinator:

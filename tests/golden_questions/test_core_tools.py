@@ -92,8 +92,9 @@ def test_024_release_docs_preserve_core_routes_and_the_compatibility_window() ->
 
     assert "Release 0.24.0" in release
     assert f"schema version {SCHEMA_VERSION}" in release
-    for profile in ("core", "full", "developer"):
-        assert f"{len(tools_for_profile(profile))} {profile}" in release
+    historical_profile_counts = {"core": 7, "full": 59, "developer": 64}
+    for profile, count in historical_profile_counts.items():
+        assert f"{count} {profile}" in release
     assert "notice-only" in release
     assert "0.25.0" in release
     assert "codex-usage-tracker setup" in upgrade

@@ -11,30 +11,28 @@ from codex_usage_tracker.server.query_cache import AggregateQueryCache
 
 
 @pytest.mark.parametrize(
-    ("language", "dashboard_message", "legacy_message"),
+    ("language", "dashboard_message"),
     [
         (
             None,
             "Serving Codex usage dashboard at http://127.0.0.1:8765/react-dashboard.html",
-            "Legacy dashboard fallback remains available at http://127.0.0.1:8765/dashboard.html",
         ),
         (
             "zh-Hans",
             "Codex 用量仪表盘正在运行：http://127.0.0.1:8765/react-dashboard.html",
-            "旧版仪表盘备用入口：http://127.0.0.1:8765/dashboard.html",
         ),
     ],
 )
-def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
+def test_serve_dashboard_opens_react_dashboard(
     tmp_path: Path,
     monkeypatch,
     capsys,
     language: str | None,
     dashboard_message: str,
-    legacy_message: str,
 ) -> None:
     opened: list[str] = []
     handlers: list[object] = []
+    db_path = tmp_path / "usage.sqlite3"
 
     class FakeServer:
         def __init__(self, address: tuple[str, int], handler: object) -> None:
@@ -49,16 +47,11 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
         def server_close(self) -> None:
             self.closed = True
 
-    def generate_dashboard(**kwargs: object) -> Path:
-        return Path(str(kwargs["output_path"]))
-
-    monkeypatch.setattr(server_api, "generate_dashboard", generate_dashboard)
     monkeypatch.setattr(server_api, "ThreadingHTTPServer", FakeServer)
     monkeypatch.setattr(server_api.webbrowser, "open", opened.append)
 
     server_api.serve_dashboard(
-        db_path=tmp_path / "usage.sqlite3",
-        output_path=tmp_path / "dashboard.html",
+        db_path=db_path,
         pricing_path=tmp_path / "pricing.json",
         allowance_path=tmp_path / "allowance.json",
         rate_card_path=tmp_path / "rate-card.json",
@@ -73,7 +66,7 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
     output = capsys.readouterr().out
     assert opened == ["http://127.0.0.1:8765/react-dashboard.html"]
     assert dashboard_message in output
-    assert legacy_message in output
+    assert "Legacy dashboard" not in output
     assert handlers
     handler = handlers[0]
     assert isinstance(handler, partial)
@@ -84,6 +77,9 @@ def test_serve_dashboard_opens_react_dashboard_and_prints_legacy_fallback(
     assert isinstance(facade, HttpV2Facade)
     assert isinstance(facade.services, ApplicationHttpV2Services)
     assert facade.services.application.paths.projects_path == tmp_path / "projects.json"
+    refresh_jobs = handler.keywords["refresh_jobs"]
+    assert refresh_jobs.job_service is facade.services.job_service
+    assert not db_path.exists()
 
 
 def test_serve_dashboard_starts_requested_refresh_after_binding(
@@ -109,16 +105,10 @@ def test_serve_dashboard_starts_requested_refresh_after_binding(
         return {"job_id": "startup-job"}
 
     monkeypatch.setattr(server_api, "ThreadingHTTPServer", FakeServer)
-    monkeypatch.setattr(
-        server_api,
-        "generate_dashboard",
-        lambda **kwargs: Path(str(kwargs["output_path"])),
-    )
     monkeypatch.setattr(server_api.RefreshJobRegistry, "start_refresh", start_refresh)
 
     server_api.serve_dashboard(
         db_path=tmp_path / "usage.sqlite3",
-        output_path=tmp_path / "dashboard.html",
         codex_home=tmp_path / "codex-home",
         host="127.0.0.1",
         port=8765,

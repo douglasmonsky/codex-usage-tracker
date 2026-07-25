@@ -90,7 +90,7 @@ The following decisions are normative and require a new design amendment to chan
 7. **Call and thread evidence remains available through contextual routes.**
 8. **Diagnostics Notebook, Investigate, Compression Lab, Cache and Context, and Reports leave default navigation immediately in the first dashboard pivot release.**
 9. **Those routes remain direct-link compatibility surfaces for one minor release, become read-only notices for a second minor release, and are then deleted.**
-10. **The legacy static dashboard receives no new features and is removed after the same two-release compatibility window.**
+10. **The legacy static dashboard receives no new features. Its completed `0.24.x` compatibility window is explicitly closed in `0.25.0` after the central-product reliability checkpoint; this acceleration does not authorize Task 41 removals.**
 11. **The 3D Usage Constellation is removed rather than carried into the stable Evidence Console.**
 12. **Every material analytical claim has explicit claim type, confidence, limitations, and evidence references.**
 13. **Every evidence reference can produce a deterministic Evidence Console target.**
@@ -775,10 +775,15 @@ After the Usage Constellation and legacy routes are removed:
 | Pivot Release 1 | Core MCP profile ships; existing dashboard remains but product copy becomes MCP-first. |
 | Pivot Release 2 | Simplified Evidence Console becomes default; old pages are direct-link compatibility routes with replacement notices. |
 | Pivot Release 3 | Old pages become notice-only routes; old MCP tools and CLI commands remain in compatibility profiles. |
+| Reliability Release | Installed plugin identity, durable cross-process refresh ownership, append-safe source boundaries, progress, and large-index incremental performance are hardened without removing compatibility. |
 | Pivot Release 4 | Deprecated dashboard code, legacy static dashboard, old API routes, and expired aliases are removed. |
 | Stabilization Release | No new feature surface; contracts, migrations, docs, and package footprint are stabilized for 1.0. |
 
-Starting from the current `0.21.0` baseline, these are intended to be `0.22.0` through `0.26.0`. If another release is published before execution begins, the version numbers shift upward while the stage order and compatibility duration remain unchanged.
+Starting from the current `0.21.0` baseline, these are `0.22.0` through
+`0.27.0`. The Reliability Release was inserted as `0.25.0` after installed
+`0.24.0` dogfood exposed central-product concurrency, progress, incremental
+refresh, and bundle-coherence failures. Pivot Release 4 shifted to `0.26.0`,
+and the Stabilization Release shifted to `0.27.0`.
 
 ### 18.2 Deprecation record
 

@@ -41,6 +41,8 @@ class _ReleaseCheckModule(Protocol):
 
     def _check_tracked_files_for_secrets(self) -> list[str]: ...
 
+    def _is_removed_static_dashboard_member(self, member: str) -> bool: ...
+
 
 def test_module_cli_version() -> None:
     result = subprocess.run(
@@ -163,8 +165,7 @@ def test_release_check_rejects_prerelease_version_prefix_with_trailing_junk(
     module = _load_release_check_module()
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "development.md").write_text(
-        "python scripts/smoke_installed_package.py "
-        "--from-pypi --version 0.24.0rc1junk\n",
+        "python scripts/smoke_installed_package.py --from-pypi --version 0.24.0rc1junk\n",
         encoding="utf-8",
     )
 
@@ -377,7 +378,7 @@ def test_release_pipeline_rebuilds_dashboard_assets_and_smokes_installed_wheel()
     served = (repo_root / "scripts/smoke_dashboard_server.py").read_text(encoding="utf-8")
     assert "smoke_served_dashboard(" in smoke
     assert "REACT_ASSET_PATTERN" in smoke
-    assert 'dashboard_path = temp_dir / "dashboard.html"' in smoke
+    assert 'for removed_command in ("dashboard", "open-dashboard")' in smoke
     for path in (
         "/react-dashboard.html",
         "/react/assets/dashboard-react.js",
@@ -403,6 +404,16 @@ def test_dashboard_asset_sync_rejects_untracked_generated_chunk(tmp_path: Path) 
         "dashboard React assets include untracked generated files: "
         "src/codex_usage_tracker/plugin_data/dashboard/react/assets/omitted-new-chunk.js"
     ]
+
+
+def test_static_dashboard_package_check_allows_live_asset_directories() -> None:
+    module = _load_release_check_module()
+
+    for member in (
+        "codex_usage_tracking-0.24.0/src/codex_usage_tracker/plugin_data/dashboard/locales",
+        "codex_usage_tracking-0.24.0/src/codex_usage_tracker/plugin_data/dashboard/react",
+    ):
+        assert not module._is_removed_static_dashboard_member(member)
 
 
 def test_mcp_tool_names_remain_documented() -> None:
@@ -499,27 +510,12 @@ def test_known_limitations_are_documented() -> None:
 
 def test_dashboard_history_scope_labels_remain_user_facing() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    template = (
-        repo_root
-        / "src"
-        / "codex_usage_tracker"
-        / "plugin_data"
-        / "dashboard"
-        / "dashboard_template.html"
-    ).read_text(encoding="utf-8")
-    live_runtime = (
-        repo_root
-        / "src"
-        / "codex_usage_tracker"
-        / "plugin_data"
-        / "dashboard"
-        / "dashboard_live.js"
+    history_scope = (
+        repo_root / "frontend" / "dashboard" / "src" / "app" / "historyScope.ts"
     ).read_text(encoding="utf-8")
 
-    assert "Active sessions only" in template
-    assert "All history" in template
-    assert "history.active_only" in live_runtime
-    assert "history.all_includes" in live_runtime
+    assert "Active sessions only" in history_scope
+    assert "All history" in history_scope
 
     from codex_usage_tracker.core.i18n import translations_for
 
@@ -552,13 +548,11 @@ def test_usage_skills_prefer_live_dashboard_for_open_requests() -> None:
     for skill_path in skill_paths:
         skill_text = skill_path.read_text(encoding="utf-8")
         live_command_index = skill_text.find("serve-dashboard --context-api explicit --open")
-        static_command_index = skill_text.find("open-dashboard")
 
         assert live_command_index != -1, skill_path
-        assert static_command_index != -1, skill_path
-        assert live_command_index < static_command_index, skill_path
+        assert "open-dashboard" not in skill_text, skill_path
+        assert "generate_usage_dashboard" not in skill_text, skill_path
         assert "Refresh is the default" in skill_text
-        assert "Live requires `serve-dashboard`" in skill_text
 
 
 def test_dashboard_launch_commands_refresh_by_default() -> None:
@@ -566,9 +560,6 @@ def test_dashboard_launch_commands_refresh_by_default() -> None:
 
     parser = build_parser()
 
-    assert parser.parse_args(["open-dashboard"]).refresh is True
-    assert parser.parse_args(["open-dashboard", "--refresh"]).refresh is True
-    assert parser.parse_args(["open-dashboard", "--no-refresh"]).refresh is False
     assert parser.parse_args(["serve-dashboard"]).refresh is True
     assert parser.parse_args(["serve-dashboard", "--refresh"]).refresh is True
     assert parser.parse_args(["serve-dashboard", "--no-refresh"]).refresh is False

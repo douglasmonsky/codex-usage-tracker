@@ -1,68 +1,13 @@
-"""CLI runners for dashboard commands."""
+"""CLI runner for the live Evidence Console server."""
 
 from __future__ import annotations
 
 import argparse
-import webbrowser
-from pathlib import Path
-from typing import Any
 
 from codex_usage_tracker.cli.output import print_json
-from codex_usage_tracker.core.api_payloads import path_payload, refresh_result_payload
 from codex_usage_tracker.core.i18n import normalize_language
-from codex_usage_tracker.dashboard.api import generate_dashboard
-from codex_usage_tracker.recommendation_engine.api import refresh_usage_index
 from codex_usage_tracker.server.api import serve_dashboard
 from codex_usage_tracker.server.utils import url_host
-
-
-def run_dashboard(args: argparse.Namespace) -> int:
-    """Generate a static dashboard file."""
-    output = _generate_dashboard(args)
-    if args.as_json:
-        print_json(
-            _dashboard_payload(
-                args,
-                output=output,
-                schema="codex-usage-tracker-dashboard-v1",
-                opened=args.open,
-            )
-        )
-    else:
-        print(
-            f"仪表盘已写入 {output}"
-            if _language(args) == "zh-Hans"
-            else f"Wrote dashboard to {output}"
-        )
-    if args.open:
-        webbrowser.open(output.resolve().as_uri())
-    return 0
-
-
-def run_open_dashboard(args: argparse.Namespace) -> int:
-    """Generate and open a static dashboard file."""
-    refresh_payload = _refresh_payload(args) if args.refresh else None
-    output = _generate_dashboard(args)
-    if args.as_json:
-        print_json(
-            {
-                **_dashboard_payload(
-                    args,
-                    output=output,
-                    schema="codex-usage-tracker-open-dashboard-v1",
-                    opened=True,
-                ),
-                "refresh": refresh_payload,
-            }
-        )
-    else:
-        print(
-            f"正在打开仪表盘：{output}"
-            if _language(args) == "zh-Hans"
-            else f"Opening dashboard at {output}"
-        )
-    webbrowser.open(output.resolve().as_uri())
-    return 0
 
 
 def run_serve_dashboard(args: argparse.Namespace) -> int:
@@ -73,11 +18,7 @@ def run_serve_dashboard(args: argparse.Namespace) -> int:
                 "schema": "codex-usage-tracker-serve-dashboard-v1",
                 "host": args.host,
                 "port": args.port,
-                "dashboard_path": path_payload(args.output),
                 "dashboard_url": _served_dashboard_url(args.host, args.port),
-                "legacy_dashboard_url": _served_legacy_dashboard_url(
-                    args.host, args.port, args.output.name
-                ),
                 "limit": _limit_value(args),
                 "since": args.since,
                 "context_api": _context_api(args),
@@ -90,7 +31,6 @@ def run_serve_dashboard(args: argparse.Namespace) -> int:
         )
     serve_dashboard(
         db_path=args.db,
-        output_path=args.output,
         pricing_path=args.pricing,
         allowance_path=args.allowance,
         rate_card_path=args.rate_card,
@@ -112,64 +52,8 @@ def run_serve_dashboard(args: argparse.Namespace) -> int:
     return 0
 
 
-def _generate_dashboard(args: argparse.Namespace) -> Path:
-    return generate_dashboard(
-        db_path=args.db,
-        output_path=args.output,
-        limit=args.limit,
-        pricing_path=args.pricing,
-        allowance_path=args.allowance,
-        rate_card_path=args.rate_card,
-        since=args.since,
-        thresholds_path=args.thresholds,
-        projects_path=args.projects,
-        privacy_mode=args.privacy_mode,
-        include_archived=args.include_archived,
-        language=_language(args),
-    )
-
-
 def _served_dashboard_url(host: str, port: int) -> str:
     return f"http://{url_host(host)}:{port}/react-dashboard.html"
-
-
-def _served_legacy_dashboard_url(host: str, port: int, dashboard_name: str) -> str:
-    return f"http://{url_host(host)}:{port}/{dashboard_name}"
-
-
-def _dashboard_payload(
-    args: argparse.Namespace,
-    *,
-    output: Path,
-    schema: str,
-    opened: bool,
-) -> dict[str, Any]:
-    return {
-        "schema": schema,
-        "dashboard_path": path_payload(output),
-        "file_url": output.resolve().as_uri(),
-        "opened": opened,
-        "limit": _limit_value(args),
-        "since": args.since,
-        "privacy_mode": args.privacy_mode,
-        "include_archived": args.include_archived,
-        "language": _language(args),
-    }
-
-
-def _refresh_payload(args: argparse.Namespace) -> dict[str, Any]:
-    return refresh_result_payload(
-        refresh_usage_index(
-            codex_home=args.codex_home,
-            db_path=args.db,
-            include_archived=args.include_archived,
-            pricing_path=args.pricing,
-            allowance_path=args.allowance,
-            rate_card_path=args.rate_card,
-            thresholds_path=args.thresholds,
-        ),
-        schema="codex-usage-tracker-refresh-v1",
-    )
 
 
 def _context_api(args: argparse.Namespace) -> str:

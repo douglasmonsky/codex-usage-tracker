@@ -62,7 +62,6 @@ from codex_usage_tracker.server.responses import (
 from codex_usage_tracker.server.routes import (
     GET_DIAGNOSTIC_FACT_ROUTES,
     get_route_method,
-    is_dashboard_shell_path,
     post_route_method,
 )
 from codex_usage_tracker.server.status import handle_readiness_request, handle_status_request
@@ -100,7 +99,6 @@ class _UsageDashboardHandler(
         query_cache: AggregateQueryCache | None = None,
         allowance_query_cache: AggregateQueryCache | None = None,
         http_v2_facade: HttpV2Facade | None = None,
-        dashboard_path: Path | None = None,
         context_api_enabled: bool = False,
         context_api_state: ContextApiState | None = None,
         privacy_mode: str = "normal",
@@ -121,11 +119,6 @@ class _UsageDashboardHandler(
         self._codex_home = codex_home
         self._include_archived = include_archived
         self._dashboard_name = dashboard_name
-        self._dashboard_path = (
-            Path(dashboard_path)
-            if dashboard_path is not None
-            else Path(str(kwargs.get("directory", "."))) / dashboard_name
-        )
         self._context_chars = context_chars
         self._api_token = api_token
         self._context_api_state = context_api_state or ContextApiState(context_api_enabled)
@@ -158,16 +151,33 @@ class _UsageDashboardHandler(
         if fact_filters is not None:
             self._handle_diagnostics_facts(parsed.query, **fact_filters)
             return
-        if self._is_investigator_dashboard_request(parsed.path, parsed.query):
-            self._handle_investigator_dashboard(parsed.query)
+        if parsed.path == "/":
+            self._redirect_to_react_dashboard()
             return
-        if is_dashboard_shell_path(parsed.path, self._dashboard_name):
-            self._handle_dashboard_shell(parsed.query)
+        if parsed.path == "/dashboard.html":
+            self._handle_removed_dashboard()
             return
         if parsed.path == _REACT_DASHBOARD_PATH:
             self._handle_react_dashboard(parsed.query)
             return
         super().do_GET()
+
+    def do_HEAD(self) -> None:  # noqa: N802 - stdlib hook name
+        self._request_started_at = perf_counter()
+        parsed = urlparse(self.path)
+        if not self._request_origin_allowed():
+            self._send_error(
+                HTTPStatus.FORBIDDEN,
+                "Request host or origin is not allowed",
+            )
+            return
+        if parsed.path == "/":
+            self._redirect_to_react_dashboard()
+            return
+        if parsed.path == "/dashboard.html":
+            self._handle_removed_dashboard(include_body=False)
+            return
+        super().do_HEAD()
 
     def do_POST(self) -> None:  # noqa: N802 - stdlib hook name
         self._request_started_at = perf_counter()

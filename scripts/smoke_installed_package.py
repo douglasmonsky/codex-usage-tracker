@@ -325,9 +325,8 @@ def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
     codex_home = home_dir / ".codex"
     app_dir = home_dir / ".codex-usage-tracker"
     project_dir = temp_dir / "synthetic-project"
-    plugin_dir = temp_dir / "setup-plugin"
+    plugin_dir = home_dir / "plugins" / "codex-usage-tracker"
     marketplace = temp_dir / "setup-marketplace.json"
-    dashboard_path = temp_dir / "dashboard.html"
     support_path = temp_dir / "support-bundle.json"
     db_path = app_dir / "usage.sqlite3"
     pricing_path = app_dir / "pricing.json"
@@ -380,6 +379,8 @@ def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
         raise SystemExit("setup did not parse synthetic usage event")
     if not db_path.exists():
         raise SystemExit("setup did not create tracker database")
+    installed_version = _installed_version(command)
+    cached_plugin_dir = _prime_plugin_cache(plugin_dir, codex_home, installed_version)
 
     doctor_result = _run(
         [str(command), *global_args, "doctor", "--json"],
@@ -395,37 +396,32 @@ def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
         raise SystemExit("doctor environment did not report installed package version")
     if "dashboard_assets" not in environment:
         raise SystemExit("doctor environment did not report dashboard asset health")
-
-    dashboard_result = _run(
-        [
-            str(command),
-            *global_args,
-            "dashboard",
-            "--output",
-            str(dashboard_path),
-            "--limit",
-            "5000",
-            "--json",
-        ],
-        capture_output=True,
-        env=env,
+    _smoke_installed_mcp(
+        _venv_python(command.parents[1]),
+        home_dir=home_dir,
+        plugin_dir=cached_plugin_dir,
+        expected_version=installed_version,
     )
-    dashboard_payload = json.loads(dashboard_result.stdout)
-    if dashboard_payload.get("schema") != "codex-usage-tracker-dashboard-v1":
-        raise SystemExit("dashboard JSON schema mismatch")
-    if not dashboard_path.exists():
-        raise SystemExit("dashboard command did not write dashboard HTML")
-    dashboard_html = dashboard_path.read_text(encoding="utf-8")
-    if "<html" not in dashboard_html.lower() or "dashboard" not in dashboard_html.lower():
-        raise SystemExit("dashboard HTML does not look like installed dashboard")
+
     smoke_served_dashboard(
         command,
         global_args,
         codex_home,
-        dashboard_path,
         env,
         repo_root=REPO_ROOT,
     )
+
+    for removed_command in ("dashboard", "open-dashboard"):
+        removed_result = _run(
+            [str(command), *global_args, removed_command],
+            capture_output=True,
+            check=False,
+            env=env,
+        )
+        if removed_result.returncode != 2:
+            raise SystemExit(f"removed command {removed_command!r} did not exit 2")
+        if "codex-usage-tracker open" not in removed_result.stderr:
+            raise SystemExit(f"removed command {removed_command!r} omitted migration guidance")
 
     support_result = _run(
         [
@@ -452,6 +448,59 @@ def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
     support_text = json.dumps(support_bundle)
     if str(temp_dir) in support_text or str(home_dir) in support_text:
         raise SystemExit("strict support bundle leaked local temp paths")
+
+
+def _prime_plugin_cache(plugin_dir: Path, codex_home: Path, version: str) -> Path:
+    cache_dir = (
+        codex_home
+        / "plugins"
+        / "cache"
+        / "local"
+        / "codex-usage-tracker"
+        / version
+    )
+    cache_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(plugin_dir, cache_dir)
+    return cache_dir
+
+
+def _smoke_installed_mcp(
+    python: Path,
+    *,
+    home_dir: Path,
+    plugin_dir: Path,
+    expected_version: str,
+) -> None:
+    probe = REPO_ROOT / "tests" / "installed" / "mcp_two_task_probe.py"
+    result = _run(
+        [
+            str(python),
+            str(probe),
+            "--python",
+            str(python),
+            "--home",
+            str(home_dir),
+            "--plugin-config",
+            str(plugin_dir / ".mcp.json"),
+            "--expected-version",
+            expected_version,
+        ],
+        capture_output=True,
+        env=_isolated_home_env(home_dir),
+    )
+    payload = json.loads(result.stdout)
+    if payload.get("schema") != "codex-usage-tracker.installed-two-task-probe.v1":
+        raise SystemExit("installed two-task MCP probe schema mismatch")
+    if payload.get("hydrated_followup_tail") != 1:
+        raise SystemExit("installed two-task MCP probe did not hydrate the moving tail")
+    if payload.get("analysis_cache_reused") is not True:
+        raise SystemExit("installed two-task MCP probe did not reuse durable analysis")
+    print(
+        "Installed two-task MCP probe passed: "
+        f"{payload.get('mcp_calls')} calls, "
+        f"{payload.get('max_server_elapsed_ms')} ms max server time, "
+        "one moving-tail row, durable analysis reused"
+    )
 
 
 def _isolated_home_env(home_dir: Path) -> dict[str, str]:
@@ -526,17 +575,20 @@ def _run(
     command: list[str],
     *,
     capture_output: bool = False,
+    check: bool = True,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     print("+ " + " ".join(shlex.quote(part) for part in command), flush=True)
+    isolated_env = dict(os.environ if env is None else env)
+    isolated_env.pop("PYTHONPATH", None)
     result = subprocess.run(
         command,
         cwd=REPO_ROOT,
-        env=env,
+        env=isolated_env,
         text=True,
         capture_output=capture_output,
     )
-    if result.returncode != 0:
+    if check and result.returncode != 0:
         if capture_output:
             if result.stdout:
                 print(result.stdout, file=sys.stdout)

@@ -12,10 +12,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Protocol, cast
 
-import pytest
-
 from codex_usage_tracker.cli.plugin_installer import install_plugin
-from codex_usage_tracker.dashboard.api import dashboard_payload, generate_dashboard
+from codex_usage_tracker.dashboard.api import dashboard_payload
 from codex_usage_tracker.store.api import (
     connect,
     query_dashboard_events,
@@ -97,11 +95,14 @@ def test_dashboard_server_forces_dashboard_asset_mime_types(
         registry_text_plain_guess_type,
     )
 
-    asset_dir = tmp_path / "codex-usage-tracker-assets"
-    locale_dir = asset_dir / "locales"
+    asset_dir = tmp_path / "react" / "assets"
+    locale_dir = tmp_path / "locales"
+    asset_dir.mkdir(parents=True)
     locale_dir.mkdir(parents=True)
-    (asset_dir / "dashboard.js").write_text("window.__dashboardLoaded = true;\n", encoding="utf-8")
-    (asset_dir / "dashboard.css").write_text("body { color: black; }\n", encoding="utf-8")
+    (asset_dir / "dashboard-react.js").write_text(
+        "window.__dashboardLoaded = true;\n", encoding="utf-8"
+    )
+    (asset_dir / "index.css").write_text("body { color: black; }\n", encoding="utf-8")
     (locale_dir / "en.json").write_text('{"dashboard": "Usage"}\n', encoding="utf-8")
 
     handler = partial(
@@ -129,8 +130,8 @@ def test_dashboard_server_forces_dashboard_asset_mime_types(
     try:
         base_url = f"http://127.0.0.1:{server.server_port}/codex-usage-tracker-assets"
         expected_assets = {
-            "dashboard.js": "text/javascript",
-            "dashboard.css": "text/css",
+            "react/assets/dashboard-react.js": "text/javascript",
+            "react/assets/index.css": "text/css",
             "locales/en.json": "application/json",
         }
         for asset_path, expected_content_type in expected_assets.items():
@@ -153,127 +154,6 @@ def test_dashboard_server_forces_dashboard_asset_mime_types(
         assert nosniff == "nosniff"
 
 
-def test_dashboard_server_serves_react_dashboard_alias(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from codex_usage_tracker.server import dashboard_pages
-    from codex_usage_tracker.server.api import _UsageDashboardHandler
-
-    aggregate_shell = dashboard_pages.dashboard_shell_payload
-
-    def slow_aggregate_shell(*args: object, **kwargs: object) -> dict[str, object]:
-        del args, kwargs
-        time.sleep(1)
-        return {"rows": [], "shell_boot": True}
-
-    monkeypatch.setattr(dashboard_pages, "dashboard_shell_payload", slow_aggregate_shell)
-
-    react_dir = tmp_path / "codex-usage-tracker-assets" / "react"
-    react_asset_dir = react_dir / "assets"
-    react_asset_dir.mkdir(parents=True)
-    (react_dir / "index.html").write_text(
-        "\n".join(
-            [
-                "<!doctype html>",
-                "<title>Codex Usage Tracker React Dashboard</title>",
-                '<script type="module" src="/codex-usage-tracker-assets/react/assets/dashboard-react.js"></script>',
-            ],
-        ),
-        encoding="utf-8",
-    )
-    (react_asset_dir / "dashboard-react.js").write_text(
-        "window.__reactDashboard = true;\n", encoding="utf-8"
-    )
-    (tmp_path / "dashboard.html").write_text(
-        "<!doctype html><title>Legacy Dashboard</title>", encoding="utf-8"
-    )
-
-    handler = partial(
-        _UsageDashboardHandler,
-        directory=str(tmp_path),
-        db_path=tmp_path / "usage.sqlite3",
-        pricing_path=tmp_path / "pricing.json",
-        allowance_path=tmp_path / "allowance.json",
-        thresholds_path=tmp_path / "thresholds.json",
-        projects_path=tmp_path / "projects.json",
-        limit=5000,
-        since=None,
-        codex_home=tmp_path / "codex-home",
-        include_archived=False,
-        dashboard_name="dashboard.html",
-        context_chars=2000,
-        api_token="test-token",
-        context_api_enabled=True,
-        refresh_lock=threading.Lock(),
-    )
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        base_url = f"http://127.0.0.1:{server.server_port}"
-        request_started = time.perf_counter()
-        with urllib.request.urlopen(  # noqa: S310 - local test server only
-            f"{base_url}/react-dashboard.html?view=diagnostics",
-            timeout=5,
-        ) as response:
-            react_html = response.read().decode("utf-8")
-            react_content_type = response.headers.get("Content-Type")
-            react_cache_control = response.headers.get("Cache-Control")
-        first_response_seconds = time.perf_counter() - request_started
-        monkeypatch.setattr(dashboard_pages, "dashboard_shell_payload", aggregate_shell)
-
-        with urllib.request.urlopen(  # noqa: S310 - local test server only
-            f"{base_url}/codex-usage-tracker-assets/react/assets/dashboard-react.js",
-            timeout=5,
-        ) as response:
-            react_asset = response.read().decode("utf-8")
-            react_asset_cache_control = response.headers.get("Cache-Control")
-        with urllib.request.urlopen(  # noqa: S310 - local test server only
-            f"{base_url}/api/readiness",
-            timeout=5,
-        ) as response:
-            readiness_payload = json.loads(response.read().decode("utf-8"))
-        with urllib.request.urlopen(  # noqa: S310 - local test server only
-            f"{base_url}/dashboard.html",
-            timeout=5,
-        ) as response:
-            legacy_html = response.read().decode("utf-8")
-
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=5)
-
-    assert react_content_type is not None
-    assert react_content_type.split(";", 1)[0] == "text/html"
-    assert react_cache_control == "no-store"
-    assert first_response_seconds < 0.5
-    assert "Codex Usage Tracker React Dashboard" in react_html
-    assert 'src="/codex-usage-tracker-assets/react/assets/dashboard-react.js"' in react_html
-    assert "dashboard-react.js?v=" not in react_html
-    assert react_asset_cache_control == "no-cache"
-    assert readiness_payload["schema"] == "codex-usage-tracker-conversational-readiness-v1"
-    assert "window.__reactDashboard = true" in react_asset
-    assert '<script id="usage-data" type="application/json">' in react_html
-    react_payload = json.loads(
-        react_html.split('<script id="usage-data" type="application/json">', 1)[1].split(
-            "</script>",
-            1,
-        )[0],
-    )
-    assert react_payload["api_token"] == "test-token"
-    assert react_payload["context_api_enabled"] is True
-    assert react_payload["rows"] == []
-    assert react_payload["loaded_row_count"] == 0
-    assert react_payload["shell_boot"] is True
-    assert react_payload["readiness_deferred"] is True
-    assert react_payload["limit"] == 5000
-    assert react_payload["limit_label"] == "5000"
-    assert "<!doctype html>" in legacy_html
-    assert "Usage Dashboard" in legacy_html
-
-
 def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> None:
     from codex_usage_tracker.server.analysis_jobs import AnalysisJobRegistry
     from codex_usage_tracker.server.api import _UsageDashboardHandler
@@ -285,9 +165,9 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     )
     db_path = tmp_path / "usage.sqlite3"
     pricing_path = _write_pricing(tmp_path / "pricing.json")
-    (tmp_path / "dashboard.html").write_text(
-        "<!doctype html><title>Dashboard</title>", encoding="utf-8"
-    )
+    react_dir = tmp_path / "react"
+    react_dir.mkdir()
+    (react_dir / "index.html").write_text('<!doctype html><div id="root"></div>', encoding="utf-8")
     handler = partial(
         _UsageDashboardHandler,
         directory=str(tmp_path),
@@ -312,7 +192,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
     thread.start()
     try:
         with urllib.request.urlopen(  # noqa: S310 - local test server only
-            f"http://127.0.0.1:{server.server_port}/dashboard.html",
+            f"http://127.0.0.1:{server.server_port}/react-dashboard.html",
             timeout=5,
         ) as response:
             dashboard_cache_control = response.headers.get("Cache-Control")
@@ -423,7 +303,7 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
             timeout=5,
         ) as response:
             all_payload = json.loads(response.read().decode("utf-8"))
-        status_payload = _read_json(f"http://127.0.0.1:{server.server_port}/api/status")
+        _read_json(f"http://127.0.0.1:{server.server_port}/api/status")
         with urllib.request.urlopen(  # noqa: S310 - local test server only
             f"http://127.0.0.1:{server.server_port}/api/usage?limit=2&offset=2",
             timeout=5,
@@ -451,16 +331,9 @@ def test_dashboard_server_usage_api_refreshes_aggregate_rows(tmp_path: Path) -> 
         1,
     )[1].split("</script>", 1)[0]
     dashboard_shell_payload = json.loads(shell_raw_payload)
-    assert 'data-dashboard-shell="true"' in dashboard_html
+    assert dashboard_shell_payload["shell_boot"] is True
     assert dashboard_shell_payload["shell_boot"] is True
     assert dashboard_shell_payload["rows"] == []
-    assert dashboard_shell_payload["summary"]["visible_calls"] == 0
-    assert dashboard_shell_payload["conversational_analysis"]["state"] == "ready"
-    assert str(codex_home) not in json.dumps(dashboard_shell_payload["conversational_analysis"])
-    assert (
-        status_payload["conversational_analysis"]
-        == dashboard_shell_payload["conversational_analysis"]
-    )
     assert limited_payload["refresh_result"]["parsed_events"] == 4
     assert limited_payload["refresh_result"]["skipped_events"] == 0
     assert limited_payload["refresh_result"]["parser_diagnostics"] == {}
@@ -907,75 +780,6 @@ def test_dashboard_server_api_timing_diagnostics_are_opt_in_and_technical(
     assert "SECRET RAW PROMPT" not in context_diagnostics_text
     assert str(codex_home) not in context_diagnostics_text
     assert ".jsonl" not in context_diagnostics_text
-
-
-def test_dashboard_server_serves_lightweight_call_investigator_boot_html(
-    tmp_path: Path,
-) -> None:
-    from codex_usage_tracker.server.api import _UsageDashboardHandler
-
-    codex_home = _make_codex_home(tmp_path)
-    db_path = tmp_path / "usage.sqlite3"
-    pricing_path = _write_pricing(tmp_path / "pricing.json")
-    refresh_usage_index(codex_home=codex_home, db_path=db_path)
-    dashboard_path = tmp_path / "dashboard.html"
-    generate_dashboard(
-        db_path=db_path,
-        output_path=dashboard_path,
-        pricing_path=pricing_path,
-        api_token="test-token",
-        context_api_enabled=True,
-        include_archived=True,
-    )
-    record_id = query_dashboard_events(db_path=db_path, include_archived=True)[0]["record_id"]
-    static_html = dashboard_path.read_text(encoding="utf-8")
-    handler = partial(
-        _UsageDashboardHandler,
-        directory=str(tmp_path),
-        db_path=db_path,
-        pricing_path=pricing_path,
-        allowance_path=tmp_path / "allowance.json",
-        thresholds_path=tmp_path / "thresholds.json",
-        projects_path=tmp_path / "projects.json",
-        limit=5000,
-        since=None,
-        codex_home=codex_home,
-        include_archived=False,
-        dashboard_name="dashboard.html",
-        dashboard_path=dashboard_path,
-        context_chars=2000,
-        api_token="test-token",
-        context_api_enabled=True,
-        refresh_lock=threading.Lock(),
-    )
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        url = (
-            f"http://127.0.0.1:{server.server_port}/dashboard.html"
-            f"?view=call&record={urllib.parse.quote(record_id)}&history=all"
-        )
-        with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - local test server only
-            html = response.read().decode("utf-8")
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=5)
-
-    raw_payload = html.split('<script id="usage-data" type="application/json">', 1)[1].split(
-        "</script>",
-        1,
-    )[0]
-    payload = json.loads(raw_payload)
-    assert 'data-active-view="call"' in html
-    assert 'data-investigator-boot="true"' in html
-    assert 'data-dashboard-shell="true"' in html
-    assert payload["investigator_boot"] is True
-    assert payload["rows"] == []
-    assert payload["include_archived"] is True
-    assert payload["api_token"] == "test-token"
-    assert len(html) < len(static_html)
 
 
 def test_dashboard_call_api_returns_adjacent_records_for_investigator(

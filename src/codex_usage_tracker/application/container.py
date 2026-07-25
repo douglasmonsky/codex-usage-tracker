@@ -137,8 +137,10 @@ def build_application_container(
     clock: Clock | None = None,
 ) -> ApplicationContainer:
     jobs = JobService(
-        repository=AnalysisJobRepository(paths.db_path),
-        recover_interrupted=True,
+        repository=AnalysisJobRepository(paths.job_db_path),
+        # MCP and server startup must remain read-only. Expired leases are
+        # recovered atomically when a later durable job is registered.
+        recover_interrupted=False,
     )
     repositories = RepositorySet(
         usage=StoreUsageRepository(paths.db_path),

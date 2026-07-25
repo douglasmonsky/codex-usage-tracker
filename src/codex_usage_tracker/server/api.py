@@ -7,6 +7,7 @@ import threading
 import webbrowser
 from functools import partial
 from http.server import ThreadingHTTPServer
+from importlib import resources
 from pathlib import Path
 
 from codex_usage_tracker.context.api import DEFAULT_CONTEXT_CHARS
@@ -14,14 +15,10 @@ from codex_usage_tracker.core.i18n import normalize_language
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
     DEFAULT_CODEX_HOME,
-    DEFAULT_DASHBOARD_PATH,
     DEFAULT_PRICING_PATH,
     DEFAULT_PROJECTS_PATH,
     DEFAULT_RATE_CARD_PATH,
     DEFAULT_THRESHOLDS_PATH,
-)
-from codex_usage_tracker.dashboard.api import (
-    generate_dashboard,
 )
 from codex_usage_tracker.interfaces.http.v2 import ApplicationHttpV2Services, HttpV2Facade
 from codex_usage_tracker.server import compression_routes
@@ -52,7 +49,6 @@ _validate_loopback_host = server_utils.validate_loopback_host
 
 def serve_dashboard(
     db_path: Path,
-    output_path: Path = DEFAULT_DASHBOARD_PATH,
     pricing_path: Path = DEFAULT_PRICING_PATH,
     allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
     rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
@@ -71,7 +67,7 @@ def serve_dashboard(
     language: str | None = None,
     refresh_on_start: bool = False,
 ) -> None:
-    """Generate and serve the dashboard plus a localhost-only context endpoint."""
+    """Serve the Evidence Console plus localhost-only data endpoints."""
 
     _validate_loopback_host(host)
     _validate_context_api_mode(context_api)
@@ -79,24 +75,18 @@ def serve_dashboard(
     context_api_enabled = context_api != "disabled"
     selected_language = normalize_language(language)
     context_api_state = ContextApiState(context_api_enabled)
-    output = generate_dashboard(
+    dashboard_assets = resources.files("codex_usage_tracker.plugin_data").joinpath("dashboard")
+    application_services = ApplicationHttpV2Services(
         db_path=db_path,
-        output_path=output_path,
-        limit=limit,
         pricing_path=pricing_path,
         allowance_path=allowance_path,
         rate_card_path=rate_card_path,
-        since=since,
-        api_token=api_token,
-        context_api_enabled=context_api_enabled,
         thresholds_path=thresholds_path,
         projects_path=projects_path,
-        privacy_mode=privacy_mode,
-        include_archived=include_archived,
-        language=selected_language,
-        include_rows=False,
+        codex_home=codex_home,
     )
-    refresh_jobs = RefreshJobRegistry()
+    http_v2_facade = HttpV2Facade(application_services)
+    refresh_jobs = RefreshJobRegistry(job_service=application_services.job_service)
     refresh_lock = threading.Lock()
     analysis_jobs = AnalysisJobRegistry()
     compression_jobs = compression_routes.CompressionJobRegistry()
@@ -105,20 +95,9 @@ def serve_dashboard(
         max_entries=4,
         max_payload_bytes=8 * 1_024 * 1_024,
     )
-    http_v2_facade = HttpV2Facade(
-        ApplicationHttpV2Services(
-            db_path=db_path,
-            pricing_path=pricing_path,
-            allowance_path=allowance_path,
-            rate_card_path=rate_card_path,
-            thresholds_path=thresholds_path,
-            projects_path=projects_path,
-            codex_home=codex_home,
-        )
-    )
     handler = partial(
         _UsageDashboardHandler,
-        directory=str(output.parent),
+        directory=str(dashboard_assets),
         db_path=db_path,
         pricing_path=pricing_path,
         allowance_path=allowance_path,
@@ -130,8 +109,7 @@ def serve_dashboard(
         since=since,
         codex_home=codex_home,
         include_archived=include_archived,
-        dashboard_name=output.name,
-        dashboard_path=output,
+        dashboard_name="dashboard.html",
         context_chars=context_chars,
         api_token=api_token,
         context_api_state=context_api_state,
@@ -145,24 +123,25 @@ def serve_dashboard(
         http_v2_facade=http_v2_facade,
     )
     server = ThreadingHTTPServer((host, port), handler)
-    legacy_url = f"http://{_url_host(host)}:{port}/{output.name}"
     dashboard_url = f"http://{_url_host(host)}:{port}/react-dashboard.html"
     if selected_language == "zh-Hans":
         print(f"Codex 用量仪表盘正在运行：{dashboard_url}")
-        print(f"旧版仪表盘备用入口：{legacy_url}")
-        context_mode = "已启用，可按记录显式加载" if context_api_enabled else "已禁用，可稍后在仪表盘中启用"
+        context_mode = (
+            "已启用，可按记录显式加载" if context_api_enabled else "已禁用，可稍后在仪表盘中启用"
+        )
         print("聚合记录通过带服务器专用令牌的 /api/usage 接口刷新。")
         print(f"原始上下文 API {context_mode}；仪表盘 HTML 中不会嵌入上下文。")
     else:
         print(f"Serving Codex usage dashboard at {dashboard_url}")
-        print(f"Legacy dashboard fallback remains available at {legacy_url}")
         context_mode = (
             "enabled for explicit row actions"
             if context_api_enabled
             else "disabled until enabled from the dashboard"
         )
         print("Aggregate rows refresh through /api/usage with a per-server token.")
-        print(f"Raw context API is {context_mode}; context is never embedded in the dashboard HTML.")
+        print(
+            f"Raw context API is {context_mode}; context is never embedded in the dashboard HTML."
+        )
     if refresh_on_start:
         refresh_job = refresh_jobs.start_refresh(
             codex_home=codex_home,
@@ -185,6 +164,10 @@ def serve_dashboard(
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n正在停止仪表盘服务器。" if selected_language == "zh-Hans" else "\nStopping dashboard server.")
+        print(
+            "\n正在停止仪表盘服务器。"
+            if selected_language == "zh-Hans"
+            else "\nStopping dashboard server."
+        )
     finally:
         server.server_close()

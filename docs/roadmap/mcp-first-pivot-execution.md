@@ -1615,11 +1615,123 @@ complete without its named focused and full verification evidence.
   - review metrics: 1 finding, 1 accepted (`R1`); reviewer tokens `pending`;
     tokens per accepted finding `pending`.
 
+## Task 40 - Remove the legacy static dashboard product and entry points
+
+- Status: complete locally on the combined 0.25 reliability branch; public
+  release remains pending.
+- Integration:
+  - historical implementation commit `f2cbf08` was used as a comparison/port
+    artifact, not as the 0.25 base;
+  - reliability checkpoint `a5a3692` remains the authoritative parent;
+  - the port and reliability-aware conflict resolution are commit `8e080ec`;
+  - Task 41 focused endpoints, workbench APIs, and parity gates remain
+    untouched.
+- Graph-guided scope:
+  - the refreshed GitNexus index at the Task 40 base contains `25,421` nodes,
+    `54,684` edges, `1,291` clusters, and `300` execution flows;
+  - exact source inspection confirms `dashboard_payload`,
+    `dashboard_load_window_payload`, the live query handlers, and the React
+    locale/assets are shared with the Evidence Console and must remain.
+- Static-only Python inventory:
+  - [x] delete `dashboard/assets.py`;
+  - [x] delete `dashboard/pricing_snapshot.py`;
+  - [x] remove `generate_dashboard`, `render_dashboard_html`, and the previous
+    static-payload reader from `dashboard/api.py` while preserving shared
+    payload construction;
+  - [x] remove CLI `dashboard` and `open-dashboard` parsers, runners, handler
+    registration, JSON schemas, and namespace aliases while preserving
+    `serve-dashboard`/`service serve`;
+  - [x] remove MCP `generate_usage_dashboard` from the implementation,
+    compatibility registry, profile catalogs, work-proof catalog, and legacy
+    import facades while preserving CSV export;
+  - [x] remove server-time static generation, legacy shell rendering,
+    configured static-filename routing, and the generated output-path contract.
+- Static-only package asset inventory:
+  - [x] delete `dashboard_template.html`;
+  - [x] delete the top-level legacy scripts `dashboard.js`,
+    `dashboard_actions.js`, `dashboard_analysis.js`,
+    `dashboard_call_diagnostics.js`, `dashboard_call_investigator.js`,
+    `dashboard_cells.js`, `dashboard_data.js`, `dashboard_details.js`,
+    `dashboard_diagnostics.js`, `dashboard_diagnostics_facts.js`,
+    `dashboard_diagnostics_snapshots.js`, `dashboard_events.js`,
+    `dashboard_filters.js`, `dashboard_format.js`, `dashboard_i18n.js`,
+    `dashboard_insights.js`, `dashboard_live.js`,
+    `dashboard_payload_cache.js`, `dashboard_state.js`,
+    `dashboard_status.js`, `dashboard_tables.js`, and
+    `dashboard_tooltips.js`;
+  - [x] delete the top-level legacy styles `dashboard.css`,
+    `dashboard_call.css`, `dashboard_detail.css`,
+    `dashboard_insights.css`, `dashboard_layout.css`,
+    `dashboard_responsive.css`, and `dashboard_tables.css`;
+  - [x] preserve `dashboard/locales/` and `dashboard/react/`, which are live
+    Evidence Console inputs and generated output respectively.
+- Static-only screenshot inventory:
+  - [x] delete the source and packaged copies of
+    `dashboard-call-investigator-evidence.png`,
+    `dashboard-call-investigator-preview.png`,
+    `dashboard-call-investigator.png`, `dashboard-calls-preview.png`,
+    `dashboard-calls.png`, `dashboard-details.png`,
+    `dashboard-diagnostics-git-expanded.png`,
+    `dashboard-diagnostics.png`, `dashboard-insights.png`, and
+    `dashboard-threads.png`;
+  - [x] preserve every `evidence-console-*.png` screenshot.
+- Preservation boundary:
+- [x] retain CSV/JSON exports, exact Evidence Console deep links, focused
+  Calls/Threads/thread-call/Home/Limits query plans, canonical accounting,
+  privacy and raw-context controls, incremental freshness, and schema
+  integrity; Task 41 endpoints and workbench code are out of scope.
+- Post-release refresh-concurrency triage:
+  - verified pipx upgrade from public `0.20.0` to `0.24.0` and
+    `setup --force-plugin` replaced the plugin/MCP bundle successfully;
+  - on an existing approximately 10 GB index, `_RefreshStreamWriter.run()`
+    holds `BEGIN IMMEDIATE` across streaming and
+    `_finalize_derived_state()`, so the long derived-state SQL phase retains
+    the SQLite writer lock by design;
+  - concurrent `service serve --no-refresh` constructs the application
+    container, whose persistent `JobService` calls
+    `AnalysisJobRepository.recover_interrupted()`; that method also requests
+    `BEGIN IMMEDIATE` and exhausts the normal five-second busy timeout,
+    producing `sqlite3.OperationalError: database is locked`;
+  - this is a startup availability/performance defect, not evidence of
+    corruption. Do not interrupt the owning refresh or weaken canonical
+    accounting, transaction integrity, or freshness semantics;
+  - `OPS-REL-025` resolved the startup collision before this port: normal MCP
+    and Evidence Console startup is read-only, operational jobs live in
+    `usage.jobs.sqlite3`, and Evidence Console/MCP refreshes join one durable
+    job service;
+  - the 100,000-row gate proves a no-change refresh in `0.005 s` with zero
+    writer-lock time, exact 100-row and one-row incremental hydration, and a
+    `0.0045 s` committed read during the usage-index writer.
+- Verification:
+  - isolated installed-package smoke passed against the rebuilt wheel,
+    including the seven-tool core MCP catalog, React/locales package resources,
+    removed-command migration errors, plugin setup, doctor, support bundle,
+    and live server routes;
+  - the measured budget baselines are `5,156,651` wheel bytes and `28,485,858`
+    sdist bytes; the rebuilt artifacts pass `twine check`, release readiness,
+    package membership, and the ratcheted product-complexity budgets;
+  - the React dashboard remains deterministic at `61,457` gzip bytes; all 609
+    frontend tests, typecheck, lint, governance, source budget, bundle budget,
+    deterministic-asset, and Chromium release-candidate gates passed;
+  - the complete isolated Python suite, Ruff, MyPy, Pyright, product complexity,
+    release readiness, and distribution validation passed.
+- Final review:
+  - the single read-only reviewer reported four findings: asset-path
+    containment (`R1`), migration-route HEAD parity (`R2`), social-preview
+    inputs (`R3`), and current documentation drift (`R4`);
+  - all four were accepted and fixed with focused regression coverage;
+  - review metrics: 4 findings, 4 accepted (`R1`, `R2`, `R3`, `R4`); reviewer
+    tokens and tokens per accepted finding are `pending` because aggregate
+    attribution encountered the separately recorded SQLite writer lock.
+  - those metrics describe the preserved historical implementation review;
+    the current combined 0.25 diff receives one final read-only review after
+    full qualification.
+
 ## Task 39 - Gate and Publish Release 0.24.0
 
-- Status: release candidate preparation, local qualification, and TestPyPI
-  promotion rehearsal complete; hosted review, merge, and public promotion
-  remain.
+- Status: complete and publicly published. PR `#308` merged as
+  `cad0006cb5e8435ed3a47da9fb120bc81a6e1941`, and release `0.24.0` is
+  available from PyPI and GitHub.
 - Foundation entry gate:
   - `docs/superpowers/reports/0.24-foundation-audit.md` audits
     `589e10a` and records `PROCEED`;
@@ -1693,6 +1805,28 @@ complete without its named focused and full verification evidence.
     `7`/`59`/`64` MCP profile inventories;
   - production PyPI promotion, GitHub Release attachment, and cross-location
     verification were correctly skipped for the manual rehearsal.
+- Production publication:
+  - PR `#308` merged as
+    `cad0006cb5e8435ed3a47da9fb120bc81a6e1941` (`chore: release 0.24.0`);
+  - release-event workflow
+    `https://github.com/douglasmonsky/codex-usage-tracker/actions/runs/30101593198`
+    completed successfully from that source commit;
+  - PyPI published
+    `https://pypi.org/project/codex-usage-tracking/0.24.0/`, and GitHub
+    published
+    `https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.24.0`;
+  - the public wheel SHA-256 is
+    `8c0faca4826cb46c66cc83d8b6f5d4821fc6c4813fa4fb9d6103a7524c49e91d`
+    (`7,022,392` bytes), and the public sdist SHA-256 is
+    `c4e3d25e45178ccb08210d2b6f532a561d421c8d76689eabb04aae868aab1d78`
+    (`32,075,687` bytes);
+  - the release manifest SHA-256 is
+    `5bfd5ef4d714abee8b05452c9be4d991c0ee6f063809ad9c974d1b2f59aa3881`,
+    and the promotion evidence SHA-256 is
+    `6bd8bc72a9a4137e039e4945d467932bb897e320d2e03ae2aff755f55e0c9b0c`;
+  - TestPyPI, PyPI, the production workflow, and GitHub Release assets were
+    independently verified byte-identical, and a clean installed-package smoke
+    from public PyPI completed successfully.
 - Roadmap deviations:
   - the package version also required synchronized updates to the runtime
     constant, plugin manifest, source and packaged MCP launchers, and
@@ -1709,3 +1843,156 @@ complete without its named focused and full verification evidence.
   - the bounded release/docs/CLI slice passes all `51` tests after the fix;
   - review metrics: 1 finding, 1 accepted (`R1`); reviewer tokens `pending`;
     tokens per accepted finding `pending`.
+
+## OPS-REL-025 - Central Product Reliability and Installed Coherence
+
+- Status: complete locally; publication and public-PyPI rerun remain pending
+- Stable task ID: `OPS-REL-025`
+- Branch: `pivot/ops-rel-025-central-product-reliability`
+- Base: `8f7f2796f663142d0bae3a117c13708644eee472`, the focused Task 39
+  publication-closure commit whose parent is public `0.24.0` merge
+  `cad0006cb5e8435ed3a47da9fb120bc81a6e1941`
+- Release amendment:
+  - `0.25.0` is the blocking central-product reliability release and, after
+    the local reliability checkpoint passed, the maintainer approved Task 40
+    as the same release's static-dashboard sunset boundary;
+  - existing Tasks 41-43 retain their numbers and scope in `0.26.0`;
+  - existing Tasks 44-45 retain their numbers and scope but move to `0.27.0`;
+  - pre-amendment Task 40/41 branches remain preserved and are not a release
+    base for this work.
+- Post-release operational evidence:
+  - upgrading a pipx installation from `0.20.0` to public `0.24.0` and running
+    forced setup replaced the plugin/MCP bundle successfully;
+  - refresh on an approximately 10 GB SQLite index then held
+    `BEGIN IMMEDIATE` through a derived-state SQL phase for more than 20
+    minutes;
+  - concurrent `service serve --no-refresh` startup failed in
+    `AnalysisJobRepository.recover_interrupted()` with
+    `sqlite3.OperationalError: database is locked`;
+  - later MCP dogfood could read the last committed generation concurrently,
+    but its async refresh remained at `0%` without changing stage, counters,
+    heartbeat, or an observable durable owner for several minutes;
+  - stale-data analysis abstained safely with `analysis_facts_unavailable`, but
+    did not link the caller to the active refresh or a deterministic resume;
+  - the installed source wrapper and Codex cached skill bundle both identified
+    as `0.24.0` while their skill bytes and advertised MCP surfaces differed.
+- Pre-implementation code and contract inventory:
+  - `application.refresh.RefreshCoordinator` owns `_records` and `_active` only
+    in process memory, starts a daemon thread, updates only coarse lifecycle
+    state, and discards safe exception details;
+  - `application.refresh._refresh_lock` serializes only threads in one process,
+    while `refresh_usage()` registers refreshes with `JobService.register()`
+    rather than the existing durable `register_semantic()` path;
+  - the async `execute()` call does not forward the store's supported
+    `progress_callback`, even though `store.refresh_parse` and
+    `store.refresh_stream` already emit detailed phase progress;
+  - `application.container.build_application_container()` constructs
+    `JobService(recover_interrupted=True)`, which synchronously invokes
+    `AnalysisJobRepository.recover_interrupted()` and `prune()` during every
+    process startup;
+  - `AnalysisJobRepository` already persists semantic requests, leases,
+    progress, results, and bounded errors in schema versions 36-37, but
+    `recover_interrupted()`, `find_reusable()`, and pruning acquire
+    `BEGIN IMMEDIATE`;
+  - `_RefreshStreamWriter.run()` acquires `BEGIN IMMEDIATE` before parsing and
+    retains the writer transaction through source replacement, event/content
+    indexing, derived-state finalization, compression facts, and allowance
+    intelligence materialization;
+  - `SourceParsePlan` records only a start byte/line and replacement flag.
+    Parse totals and parser reads use the file's changing current size, so an
+    append-active source has no immutable exclusive end boundary;
+  - source metadata persists the final observed file size and parse offset only
+    after the combined writer transaction, with no explicit partial-line/tail
+    continuation result;
+  - `cli.plugin_installer.install_plugin()` replaces the installed wrapper and
+    copies packaged skills, but the manifest contains only the public version
+    and no bundle digest/build identity or Codex cache coherence check;
+  - the bundled MCP launcher keys its runtime directory and package marker by
+    `RUNTIME_VERSION` and `PACKAGE_SPEC`, while Codex's separate plugin cache
+    can still reuse a same-version skill directory;
+  - `application.status` reports the seven core tool names but hard-codes
+    `current_task_exposure` as `not-verified` and exposes no package, manifest,
+    launcher, source-build, installed-bundle, or cached-bundle identity;
+  - existing tests cover in-process refresh joining, generic persisted
+    analysis jobs, source append checkpoints, launcher package-spec caching,
+    and installed-package smoke independently, but no test starts two MCP
+    processes/tasks against one database and plugin installation.
+- First failing contract:
+  - command:
+    `PYTHONPATH=src /Users/Monsky/Developer/Codex/codex-usage-tracker-task-41/.venv/bin/python -m pytest tests/packaging/test_public_docs.py -q`;
+  - result: `2 failed, 10 passed`;
+  - failures proved the normative roadmap lacked `0.27.0`, the
+    `OPS-REL-025` gate, and the amended release outcomes.
+- Graph-guided scope:
+  - a fresh GitNexus index at the branch base contains `25,425` nodes,
+    `54,688` edges, `1,291` clusters, and `300` flows;
+  - `RefreshCoordinator` is directly imported by application services, job
+    status/evidence/allowance services, and the MCP query/core adapters, so its
+    lifecycle replacement is cross-cutting and must preserve the seven-tool
+    envelope boundary;
+  - source inspection confirms the existing generic job repository is the
+    intended persistence substrate; no new SQLite table is authorized.
+- Preservation and test rules:
+  - synthetic fixtures only; no real session log, prompt, tool output, source
+    path, or user database content enters tests, profiles, logs, or commits;
+  - do not weaken canonical accounting, privacy, freshness, foreign keys,
+    migration integrity, raw-context controls, or committed-generation reads;
+  - the reliability checkpoint itself removes no compatibility surface; the
+    subsequent maintainer-approved Task 40 commit removes only the static
+    dashboard product and its exact entry points;
+  - do not remove Task 41 surfaces or add any MCP tool, dashboard route, CLI
+    namespace, analytical goal, or statistical method;
+  - measure identical unprofiled cold/no-change/small-append/moving-tail
+    workloads before and after each performance change.
+- Verification completed:
+  - roadmap contract failure captured as required;
+  - runtime and plugin identity implementation is complete at
+    `0.25.0.dev0`: installed, cached, manifest, launcher, and runtime digests
+    are coherent and observable through setup, doctor, and `usage_status`;
+  - normal MCP and Evidence Console startup is read-only and does not recover
+    jobs or acquire a usage-index writer lock;
+  - equivalent refresh requests from separate MCP processes join one durable
+    semantic job in the `usage.jobs.sqlite3` operational sidecar, and a
+    detached refresh survives its initiating process;
+  - refresh parsing stops at a fixed newline-aligned exclusive byte boundary,
+    leaves concurrently appended and partial rows pending, and exposes the
+    input generation, committed output generation, boundary, tail counts,
+    stage, counters, heartbeat, elapsed time, and poll guidance;
+  - stale analysis names its durable refresh dependency and exact normalized
+    resume request; completed analyses are durably reusable;
+  - all seven core MCP responses expose measured server-side elapsed time;
+  - the installed-wheel two-task probe passed with `38` MCP calls across
+    three MCP processes, one shared refresh job, a query during refresh, one
+    moving-tail row, exact call evidence, durable analysis reuse, and a
+    maximum observed server handler time of `501.483 ms`; the probe launched
+    through the exact-version cached `.mcp.json`, and its runner strips
+    `PYTHONPATH` so source-checkout metadata cannot contaminate the clean
+    install;
+  - the repeated synthetic 100,000-row incremental gate passed:
+    cold `16.323 s`, no-change `0.005 s` with zero writer-lock time, 100-row
+    append `2.449 s`, one-row tail follow-up `2.133 s`, and a committed read
+    during the writer in `0.0045 s`; hydration counters were exactly
+    `100000`, `100`, and `1`;
+  - Agent Perf baseline `20260725T153903Z-d5e18169` and candidate
+    `20260725T155929Z-12bd83a5` use the same synthetic workload; the
+    unprofiled benchmark, not profiler overhead, is the speed gate;
+  - `2,059` backend tests passed; Ruff, MyPy, Pyright with zero errors, Tach,
+    compileall, `git diff --check`, deterministic frontend/release gates, and
+    the complete installed-package smoke passed;
+  - detached-worker startup locking passed ten consecutive seven-test
+    reliability runs after transient sidecar retry and an early-exit launch
+    handshake were added;
+  - the single final read-only reviewer reported five findings and all five
+    were accepted: true lock-free no-change refresh (`R1`), executable-aware
+    plugin-cache coherence (`R2`), bounded spawn retry (`R3`), path-free
+    plugin status errors (`R4`), and post-timing MCP payload enforcement
+    (`R5`);
+  - the bounded recheck passed, including a real no-change refresh while a
+    second connection held `BEGIN IMMEDIATE`, same-version launcher drift,
+    transient `Popen` failure, malformed plugin state, and a response exactly
+    at its pre-timing payload limit;
+  - review metrics: 5 findings, 5 accepted (`R1`, `R2`, `R3`, `R4`, `R5`);
+    reviewer tokens `pending` after aggregate-only attribution timed out;
+    tokens per accepted finding `pending`;
+  - final read-only review is complete; publication and the public-PyPI rerun
+    remain pending.

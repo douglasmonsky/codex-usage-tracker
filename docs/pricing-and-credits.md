@@ -28,7 +28,7 @@ For reproducible historical reports, pin the current pricing cache and pass the 
 
 ```bash
 codex-usage-tracker pin-pricing --output ~/.codex-usage-tracker/pricing-2026-06-05.json
-codex-usage-tracker dashboard --pricing ~/.codex-usage-tracker/pricing-2026-06-05.json
+codex-usage-tracker --pricing ~/.codex-usage-tracker/pricing-2026-06-05.json open
 ```
 
 For a manual template:

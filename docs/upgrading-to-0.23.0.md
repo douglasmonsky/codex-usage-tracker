@@ -47,7 +47,7 @@ codex-usage-tracker admin source-coverage --json
 codex-usage-tracker admin mcp serve --profile full
 ```
 
-Historical top-level spellings remain parseable through 0.24.x. Interactive
+Historical top-level spellings remain parseable through 0.25.x. Interactive
 aliases print a migration notice to stderr; JSON stdout remains valid. Existing
 query scripts using old-only pricing, credit, token, or unbounded filters retain
 their v1 output contract during the compatibility window.
@@ -60,5 +60,5 @@ available but no longer appear in primary navigation. See the exact mapping in
 [Evidence Console Route Migration](evidence-console-route-migration.md).
 
 If a workflow cannot migrate immediately, pin 0.23.x and replace compatibility
-entry points before their final supported release, 0.24.x. The normative dates
+entry points before their final supported release, 0.25.x. The normative dates
 and owners are in the [Deprecations ledger](deprecations.md).

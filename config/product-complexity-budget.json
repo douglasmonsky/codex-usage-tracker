@@ -15,10 +15,10 @@
       "rationale": "The default conversational surface remains the seven-tool 0.22 core."
     },
     "full_profile_mcp_tools": {
-      "maximum": 59,
-      "baseline": 59,
-      "baseline_commit": "c75babd9fc6d1b4e4cb6efa8a1661b90ce55b2ee",
-      "rationale": "The 0.22 full-profile catalog is a hard ceiling and may ratchet only downward without an architecture decision."
+      "maximum": 58,
+      "baseline": 58,
+      "baseline_commit": "8e080ec73b6be47bfcdbe8506e894837a1105b60",
+      "rationale": "Task 40 removes generate_usage_dashboard from every profile; the measured 0.25 full-profile catalog is now the exact ceiling."
     },
     "stable_cli_top_level_commands": {
       "maximum": 11,
@@ -57,28 +57,28 @@
       "rationale": "No new authored frontend source may exceed 500 physical lines and grandfathered debt may not grow."
     },
     "wheel_bytes": {
-      "maximum": 7368106,
-      "baseline": 7017243,
-      "baseline_commit": "53483690ce4bda9f692a74d8c584472bdec34ff0",
-      "rationale": "Immutable PyPI 0.23.0 wheel size plus exactly five percent headroom, rounded up."
+      "maximum": 5311351,
+      "baseline": 5156651,
+      "baseline_commit": "8e080ec73b6be47bfcdbe8506e894837a1105b60",
+      "rationale": "The combined 0.25 reliability and Task 40 wheel measurement plus exactly three percent headroom, rounded up."
     },
     "sdist_bytes": {
-      "maximum": 33622880,
-      "baseline": 32021790,
-      "baseline_commit": "53483690ce4bda9f692a74d8c584472bdec34ff0",
-      "rationale": "Immutable PyPI 0.23.0 source distribution size plus exactly five percent headroom, rounded up."
+      "maximum": 29340434,
+      "baseline": 28485858,
+      "baseline_commit": "8e080ec73b6be47bfcdbe8506e894837a1105b60",
+      "rationale": "The combined 0.25 reliability and Task 40 source-distribution measurement plus exactly three percent headroom, rounded up."
     },
     "main_initial_react_js_gzip_bytes": {
-      "maximum": 67603,
+      "maximum": 63301,
       "baseline": 61457,
-      "baseline_commit": "a52338d510b731288819c169dbbd2ba412fa56ad",
-      "rationale": "Post-constellation-removal initial React JavaScript plus exactly ten percent headroom, rounded up."
+      "baseline_commit": "cad0006cb5e8435ed3a47da9fb120bc81a6e1941",
+      "rationale": "Task 40 measured initial React JavaScript plus exactly three percent headroom, rounded up."
     },
     "stable_json_schemas": {
-      "maximum": 114,
+      "maximum": 116,
       "baseline": 114,
       "baseline_commit": "a52338d510b731288819c169dbbd2ba412fa56ad",
-      "rationale": "The 95 schemas in 0.23.0 plus nineteen explicitly approved 0.24 contract additions form the adoption ceiling."
+      "rationale": "The 114-schema 0.24 baseline plus the two explicitly approved 0.25 plugin-bundle identity and coherence contracts form the reliability ceiling."
     },
     "sqlite_schema_increments": {
       "maximum": 1,

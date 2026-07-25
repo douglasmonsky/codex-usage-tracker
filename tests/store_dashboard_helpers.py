@@ -15,20 +15,6 @@ AUTO_REVIEW_SESSION_ID = "019e37d5-01fd-71df-87f4-ae3e8d60df7a"
 ARCHIVED_SESSION_ID = "019e37d5-bb36-76ba-aa33-ed0beaf4f9ce"
 
 
-def _extract_js_function(source: str, name: str) -> str:
-    start = source.index(f"function {name}(")
-    brace = source.index("{", start)
-    depth = 0
-    for offset, char in enumerate(source[brace:], start=brace):
-        if char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                return source[start : offset + 1]
-    raise AssertionError(f"could not extract function {name}")
-
-
 def _make_codex_home(tmp_path: Path) -> Path:
     codex_home = tmp_path / ".codex"
     log_dir = codex_home / "sessions" / "2026" / "05" / "17"

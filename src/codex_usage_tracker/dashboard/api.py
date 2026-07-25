@@ -1,19 +1,16 @@
-"""Static dashboard generation from aggregate-only usage rows."""
+"""Shared Evidence Console payload construction from aggregate usage rows."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-import re
-from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
 
 from codex_usage_tracker.core.call_origin import ensure_call_origin
-from codex_usage_tracker.core.i18n import dashboard_i18n_payload, language_direction
+from codex_usage_tracker.core.i18n import dashboard_i18n_payload
 from codex_usage_tracker.core.paths import (
     DEFAULT_ALLOWANCE_PATH,
-    DEFAULT_DASHBOARD_PATH,
     DEFAULT_PRICING_PATH,
     DEFAULT_PROJECTS_PATH,
     DEFAULT_RATE_CARD_PATH,
@@ -27,18 +24,8 @@ from codex_usage_tracker.core.projects import (
     validate_privacy_mode,
 )
 from codex_usage_tracker.core.threads import annotate_thread_attachments
-from codex_usage_tracker.dashboard.assets import (
-    DASHBOARD_STYLESHEETS,
-    dashboard_assets_href,
-    dashboard_guide_href,
-    dashboard_script_srcs,
-    format_body_attrs,
-    render_dashboard_template,
-    versioned_asset_href,
-)
 from codex_usage_tracker.dashboard.cache_identity import dashboard_payload_cache_key
 from codex_usage_tracker.dashboard.load_window import dashboard_load_window_payload
-from codex_usage_tracker.dashboard.pricing_snapshot import pricing_snapshot_warning
 from codex_usage_tracker.pricing.allowance import (
     annotate_rows_with_allowance,
     load_allowance_config,
@@ -260,142 +247,6 @@ def _parser_diagnostics_payload(metadata: dict[str, str]) -> dict[str, int]:
     }
 
 
-def generate_dashboard(
-    db_path: Path,
-    output_path: Path = DEFAULT_DASHBOARD_PATH,
-    limit: int | None = 5000,
-    pricing_path: Path = DEFAULT_PRICING_PATH,
-    allowance_path: Path = DEFAULT_ALLOWANCE_PATH,
-    rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
-    since: str | None = None,
-    api_token: str | None = None,
-    context_api_enabled: bool = False,
-    thresholds_path: Path = DEFAULT_THRESHOLDS_PATH,
-    projects_path: Path = DEFAULT_PROJECTS_PATH,
-    privacy_mode: str = "normal",
-    include_archived: bool = False,
-    language: str | None = None,
-    include_rows: bool = True,
-) -> Path:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    guide_href = dashboard_guide_href(output_path)
-    asset_base = dashboard_assets_href(output_path)
-    stylesheet_hrefs = [
-        versioned_asset_href(output_path, asset_base, stylesheet)
-        for stylesheet in DASHBOARD_STYLESHEETS
-    ]
-    script_srcs = dashboard_script_srcs(output_path, asset_base)
-    previous_payload = _previous_dashboard_payload(output_path)
-    payload_dict = dashboard_payload(
-        db_path=db_path,
-        limit=limit,
-        pricing_path=pricing_path,
-        allowance_path=allowance_path,
-        rate_card_path=rate_card_path,
-        since=since,
-        api_token=api_token,
-        context_api_enabled=context_api_enabled,
-        thresholds_path=thresholds_path,
-        projects_path=projects_path,
-        privacy_mode=privacy_mode,
-        include_archived=include_archived,
-        language=language,
-        include_rows=include_rows,
-    )
-    payload_dict["pricing_snapshot_warning"] = pricing_snapshot_warning(
-        previous_payload, payload_dict
-    )
-    output_path.write_text(
-        render_dashboard_html(
-            payload_dict,
-            output_path=output_path,
-            guide_href=guide_href,
-            stylesheet_hrefs=stylesheet_hrefs,
-            **cast(Any, script_srcs),
-        ),
-        encoding="utf-8",
-    )
-    return output_path
-
-
-def render_dashboard_html(
-    payload_dict: dict[str, object],
-    output_path: Path = DEFAULT_DASHBOARD_PATH,
-    guide_href: str | None = None,
-    *,
-    body_attrs: dict[str, str] | None = None,
-    stylesheet_hrefs: Sequence[str] | None = None,
-    format_script_src: str | None = None,
-    data_script_src: str | None = None,
-    analysis_script_src: str | None = None,
-    cells_script_src: str | None = None,
-    details_script_src: str | None = None,
-    insights_script_src: str | None = None,
-    tables_script_src: str | None = None,
-    filters_script_src: str | None = None,
-    state_script_src: str | None = None,
-    payload_cache_script_src: str | None = None,
-    i18n_script_src: str | None = None,
-    tooltips_script_src: str | None = None,
-    status_script_src: str | None = None,
-    actions_script_src: str | None = None,
-    live_script_src: str | None = None,
-    events_script_src: str | None = None,
-    diagnostics_snapshots_script_src: str | None = None,
-    diagnostics_facts_script_src: str | None = None,
-    diagnostics_script_src: str | None = None,
-    call_diagnostics_script_src: str | None = None,
-    call_investigator_script_src: str | None = None,
-    script_src: str | None = None,
-) -> str:
-    """Render dashboard HTML for a prepared aggregate payload."""
-
-    asset_base = "codex-usage-tracker-assets"
-    payload = json.dumps(payload_dict, ensure_ascii=True).replace("</", "<\\/")
-    script_srcs = dashboard_script_srcs(output_path, asset_base)
-    script_overrides = {
-        "format_script_src": format_script_src,
-        "data_script_src": data_script_src,
-        "analysis_script_src": analysis_script_src,
-        "cells_script_src": cells_script_src,
-        "details_script_src": details_script_src,
-        "insights_script_src": insights_script_src,
-        "tables_script_src": tables_script_src,
-        "filters_script_src": filters_script_src,
-        "state_script_src": state_script_src,
-        "payload_cache_script_src": payload_cache_script_src,
-        "i18n_script_src": i18n_script_src,
-        "tooltips_script_src": tooltips_script_src,
-        "status_script_src": status_script_src,
-        "actions_script_src": actions_script_src,
-        "live_script_src": live_script_src,
-        "events_script_src": events_script_src,
-        "diagnostics_snapshots_script_src": diagnostics_snapshots_script_src,
-        "diagnostics_facts_script_src": diagnostics_facts_script_src,
-        "diagnostics_script_src": diagnostics_script_src,
-        "call_diagnostics_script_src": call_diagnostics_script_src,
-        "call_investigator_script_src": call_investigator_script_src,
-        "script_src": script_src,
-    }
-    script_srcs.update({key: value for key, value in script_overrides.items() if value is not None})
-    return render_dashboard_template(
-        payload,
-        guide_href=guide_href,
-        language=str(payload_dict.get("language") or "en"),
-        direction=str(
-            payload_dict.get("language_direction")
-            or language_direction(str(payload_dict.get("language") or "en"))
-        ),
-        body_attrs=format_body_attrs(body_attrs),
-        stylesheet_hrefs=stylesheet_hrefs
-        or [
-            versioned_asset_href(output_path, asset_base, stylesheet)
-            for stylesheet in DASHBOARD_STYLESHEETS
-        ],
-        script_srcs=script_srcs,
-    )
-
-
 def _dashboard_summary(
     *,
     db_path: Path,
@@ -498,31 +349,8 @@ def _pricing_snapshot(
     }
 
 
-def _previous_dashboard_payload(output_path: Path) -> dict[str, Any] | None:
-    if not output_path.exists():
-        return None
-    try:
-        text = output_path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    match = _USAGE_DATA_RE.search(text)
-    if not match:
-        return None
-    try:
-        raw = json.loads(match.group("payload"))
-    except json.JSONDecodeError:
-        return None
-    return raw if isinstance(raw, dict) else None
-
-
 def _safe_int(value: object) -> int:
     try:
         return int(str(value))
     except (TypeError, ValueError):
         return 0
-
-
-_USAGE_DATA_RE = re.compile(
-    r'<script id="usage-data" type="application/json">(?P<payload>.*?)</script>',
-    re.DOTALL,
-)

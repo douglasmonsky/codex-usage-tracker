@@ -198,7 +198,10 @@ ceiling downward without a new decision.
   `offset_seek` or `sequential_fallback`, the fallback reason, and inspected source
   bytes without exposing raw context.
 - `diagnostic_snapshots.py` owns persisted diagnostic snapshot refresh/load orchestration. Snapshot modules should stay synthetic-testable and avoid raw transcript persistence in aggregate diagnostic facts.
-- `dashboard.py` builds aggregate-first static dashboard payloads and writes HTML/assets. `server.py` adds localhost refresh, compatibility `/api/usage`, SQL-backed live API slices, and explicit lazy context loading.
+- `dashboard/api.py` builds the shared aggregate-first payload used by
+  compatibility `/api/usage` and exports. `server/` owns localhost refresh,
+  SQL-backed live API slices, packaged React asset delivery, and explicit lazy
+  context loading.
 - `frontend/dashboard/` owns the React dashboard. The packaged React HTML embeds only a database-free boot payload (authentication, localization, and data-scope defaults), then hydrates aggregate data through the localhost APIs. It should render server/API payloads rather than becoming an independent source of usage calculations.
 - `plugin_installer.py`, `.mcp.json`, `skills/`, `src/codex_usage_tracker/plugin_data/skills/`, `release/`, and `scripts/check_release.py` own install, packaging, and immutable artifact-promotion behavior.
 - `scripts/benchmark_synthetic_history.py` owns broad generated large-history query timing checks. `scripts/benchmark_dashboard_routes.py` owns deterministic cold/warm route budgets for the query pipeline. Both must stay synthetic-only and must not read real Codex logs.

@@ -134,7 +134,6 @@ WORK_PROOFS: dict[str, WorkProofContract] = {
         "summary.export_branch_count",
     ),
     # Local file and configuration operations prove their concrete output.
-    "generate_usage_dashboard": _measured("evidence", "dashboard_path"),
     "export_usage_csv": _measured("rows", "rows"),
     "init_usage_pricing_config": _measured("evidence", "pricing_path"),
     "update_usage_pricing_config": _measured("rows", "model_count"),

@@ -93,12 +93,13 @@ def _sync_refresh_derived_facts(
     thresholds_path: Path,
 ) -> None:
     """Materialize upper-layer allowance and recommendation facts after store writes."""
-    sync_refresh_allowance_intelligence(
-        conn,
-        record_ids,
-        affected_thread_keys,
-        full_rebuild,
-    )
+    if record_ids or affected_thread_keys or full_rebuild:
+        sync_refresh_allowance_intelligence(
+            conn,
+            record_ids,
+            affected_thread_keys,
+            full_rebuild,
+        )
     sync_refresh_recommendation_facts(
         conn,
         record_ids,
