@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from collections.abc import Callable, Mapping
 from http import HTTPStatus
@@ -23,18 +22,12 @@ from codex_usage_tracker.server.utils import (
     parse_bool_query_value,
     safe_int,
 )
-from codex_usage_tracker.store.api import (
-    query_latest_observed_usage,
-    query_usage_status,
-    refresh_metadata,
-)
-from codex_usage_tracker.store.dedupe_queries import (
-    query_dedupe_counts,
-    query_dedupe_diagnostics,
+from codex_usage_tracker.store.home_observed_queries import (
+    query_home_latest_observed_usage,
 )
 from codex_usage_tracker.store.home_queries import (
-    query_home_finding_rows,
-    query_home_recent_evidence_rows,
+    query_home_refresh_metadata,
+    query_home_status_counts,
     query_home_usage_metrics,
 )
 
@@ -92,32 +85,38 @@ def status_payload(
         first_query_value(params.get("include_archived")),
         include_archived_default,
     )
-    counts = query_usage_status(
+    status_counts = query_home_status_counts(db_path=db_path)
+    counts = _scoped_usage_counts(status_counts, include_archived=include_archived)
+    home_counts = _scoped_usage_counts(status_counts, include_archived=False)
+    observed_usage = query_home_latest_observed_usage(
         db_path=db_path,
         include_archived=include_archived,
-        legacy_archive_path_fallback=False,
-    )
-    observed_usage = query_latest_observed_usage(
-        db_path=db_path,
-        include_archived=include_archived,
-        legacy_archive_path_fallback=False,
     )
     if include_archived:
-        home_counts = query_usage_status(
+        home_observed_usage = query_home_latest_observed_usage(
             db_path=db_path,
             include_archived=False,
-            legacy_archive_path_fallback=False,
-        )
-        home_observed_usage = query_latest_observed_usage(
-            db_path=db_path,
-            include_archived=False,
-            legacy_archive_path_fallback=False,
         )
     else:
-        home_counts = counts
         home_observed_usage = observed_usage
-    dedupe = query_dedupe_diagnostics(db_path=db_path, limit=0)["summary"]
-    metadata = refresh_metadata(db_path)
+    dedupe = {
+        "dedupe_enabled": bool(status_counts.get("dedupe_enabled")),
+        "fingerprint_version": str(status_counts.get("fingerprint_version") or ""),
+        **{
+            key: _safe_count(status_counts.get(key))
+            for key in (
+                "physical_rows",
+                "canonical_rows",
+                "excluded_copied_rows",
+                "duplicate_fingerprint_groups",
+                "physical_total_tokens",
+                "canonical_total_tokens",
+                "excluded_total_tokens",
+            )
+        },
+        "duplicate_reasons": dict(status_counts.get("duplicate_reasons") or {}),
+    }
+    metadata = query_home_refresh_metadata(db_path)
     parser_diagnostics = {
         key.removeprefix("parser_"): safe_int(value)
         for key, value in metadata.items()
@@ -148,6 +147,24 @@ def status_payload(
     }
 
 
+def _scoped_usage_counts(
+    counts: Mapping[str, object],
+    *,
+    include_archived: bool,
+) -> dict[str, object]:
+    total_rows = _safe_count(counts.get("total_rows"))
+    active_rows = _safe_count(counts.get("active_rows"))
+    max_event_timestamp = counts.get(
+        "total_max_event_timestamp" if include_archived else "active_max_event_timestamp"
+    )
+    return {
+        "total_rows": total_rows,
+        "active_rows": active_rows,
+        "scoped_rows": total_rows if include_archived else active_rows,
+        "max_event_timestamp": max_event_timestamp,
+    }
+
+
 def home_summary_payload(
     *,
     db_path: Path,
@@ -160,34 +177,19 @@ def home_summary_payload(
     rate_card_path: Path = DEFAULT_RATE_CARD_PATH,
 ) -> dict[str, object]:
     """Build the bounded active-scope summary used by the Evidence Console Home route."""
-    resolved_metadata = metadata if metadata is not None else refresh_metadata(db_path)
-    resolved_dedupe = dedupe if dedupe is not None else query_dedupe_counts(db_path=db_path)
+    resolved_metadata = metadata if metadata is not None else query_home_refresh_metadata(db_path)
+    resolved_dedupe = dedupe if dedupe is not None else query_home_status_counts(db_path=db_path)
     if latest_event_at is None:
-        latest_event_at = query_usage_status(
-            db_path=db_path,
-            include_archived=False,
-            legacy_archive_path_fallback=False,
-        ).get("max_event_timestamp")
+        latest_event_at = query_home_status_counts(db_path=db_path).get(
+            "active_max_event_timestamp"
+        )
     resolved_observed_usage = (
         observed_usage
         if observed_usage is not None
-        else query_latest_observed_usage(
+        else query_home_latest_observed_usage(
             db_path=db_path,
             include_archived=False,
-            legacy_archive_path_fallback=False,
         )
-    )
-    findings_rows = query_home_finding_rows(
-        db_path=db_path,
-        min_score=80,
-        limit=3,
-    )
-    findings = [
-        finding for row in findings_rows[:3] if (finding := _home_finding(row)) is not None
-    ][:3]
-    recent_rows = query_home_recent_evidence_rows(
-        db_path=db_path,
-        limit=5,
     )
     return {
         "schema": "codex-usage-tracker-home-summary-v1",
@@ -206,62 +208,6 @@ def home_summary_payload(
             rate_card_path=rate_card_path,
             observed_usage=resolved_observed_usage,
         ),
-        "findings": findings,
-        "recent_evidence": [_recent_evidence(row) for row in recent_rows[:5]],
-    }
-
-
-def _home_finding(row: dict[str, object]) -> dict[str, object] | None:
-    record_id = str(row.get("record_id") or "").strip()
-    if not record_id:
-        return None
-    try:
-        recommendations = json.loads(str(row.get("fact_recommendations_json") or "[]"))
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(recommendations, list):
-        return None
-    primary_key = str(row.get("fact_primary_recommendation_key") or "")
-    primary = next(
-        (
-            item
-            for item in recommendations
-            if isinstance(item, dict) and str(item.get("key") or "") == primary_key
-        ),
-        recommendations[0] if recommendations else None,
-    )
-    if not isinstance(primary, dict) or primary.get("severity") != "high":
-        return None
-    title = str(primary.get("title") or "High-confidence usage finding").strip()
-    summary = str(primary.get("why") or "Aggregate usage evidence needs review.").strip()
-    action = str(primary.get("action") or "Open the supporting call evidence.").strip()
-    finding_key = str(primary.get("key") or "usage-finding").strip()
-    return {
-        "finding_id": f"{finding_key}:{record_id}",
-        "confidence": "high",
-        "title": title,
-        "summary": summary,
-        "action": action,
-        "follow_up_prompt": (
-            f"Investigate this Codex usage finding: {title}. "
-            "Explain the supporting evidence, likely cause, and next action."
-        ),
-        "evidence": {"kind": "call", "record_id": record_id},
-    }
-
-
-def _recent_evidence(row: dict[str, object]) -> dict[str, object]:
-    record_id = str(row.get("record_id") or "")
-    thread = str(row.get("thread_name") or row.get("session_id") or "Recent call")
-    model = str(row.get("model") or "Unknown model")
-    tokens = _safe_count(row.get("total_tokens"))
-    return {
-        "kind": "call",
-        "evidence_id": record_id,
-        "label": thread,
-        "detail": f"{model} · {tokens:,} tokens",
-        "observed_at": row.get("event_timestamp"),
-        "record_id": record_id,
     }
 
 

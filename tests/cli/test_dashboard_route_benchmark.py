@@ -38,6 +38,7 @@ def test_dashboard_route_benchmark_emits_compact_synthetic_measurements(tmp_path
     assert set(routes) == {
         "/api/summary",
         "/api/recommendations",
+        "/api/status",
         "/api/calls",
         "/api/threads",
         "/api/thread-calls",
@@ -47,6 +48,8 @@ def test_dashboard_route_benchmark_emits_compact_synthetic_measurements(tmp_path
         "/api/allowance/diagnostics",
     }
     assert routes["/api/summary"]["cold_seconds"] >= 0
+    assert payload["fixtures"][0]["status_analysis_generation_lag"] == 1
+    assert routes["/api/status"]["p95_seconds"] >= 0
     assert routes["/api/summary"]["cold_samples_seconds"]
     assert routes["/api/summary"]["cold_p95_seconds"] >= 0
     assert (

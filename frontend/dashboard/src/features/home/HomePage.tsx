@@ -1,4 +1,4 @@
-import { ArrowRight, Copy, RefreshCw } from 'lucide-react';
+import { Copy, RefreshCw } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
@@ -17,11 +17,9 @@ import {
   type LoadWindow,
 } from '../../data/dataScope';
 import { Button, PageLoadProgress, StatusBadge } from '../../design';
-import type { DashboardViewId } from '../../routes/dashboardSearch';
 import { copyText } from '../shared/copyText';
 import { OverviewMetrics } from '../overview/OverviewMetrics';
 import { buildOverviewMetrics, type OverviewLoadedMetrics } from '../overview/overviewModel';
-import { buildHomeModel } from './homeModel';
 import styles from './HomePage.module.css';
 
 export const followUpPromptHelp =
@@ -73,7 +71,6 @@ export function HomePage({
   homeStatusLoading = false,
   homeStatusError = null,
   onRefresh,
-  onOpenCall,
 }: {
   model: DashboardModel;
   payload: DashboardBootPayload | null;
@@ -89,13 +86,7 @@ export function HomePage({
   homeStatusLoading?: boolean;
   homeStatusError?: string | null;
   onRefresh: () => void;
-  onNavigate: (view: DashboardViewId) => void;
-  onOpenCall: (recordId: string) => void;
 }) {
-  const home = useMemo(
-    () => buildHomeModel({ payload, summary, readiness }),
-    [payload, readiness, summary],
-  );
   const usesStoredAllTime = historyScope === 'active' && loadWindow === 'all';
   const usesEmbeddedRecent =
     loadWindow === 'rows'
@@ -235,43 +226,6 @@ export function HomePage({
         <p className={styles.copyStatus} role="status" aria-live="polite">{copyStatus}</p>
       </section>
 
-      <section className={styles.section} aria-label="Recent findings">
-        <div className={styles.sectionHeading}>
-          <div>
-            <p className={styles.eyebrow}>Bounded persisted evidence</p>
-            <h2>Recent findings</h2>
-          </div>
-          <span>Up to 3 high-confidence findings</span>
-        </div>
-        {home.findings.length ? (
-          <div className={styles.findings}>
-            {home.findings.map(finding => (
-              <article className={styles.finding} key={finding.finding_id}>
-                <div className={styles.cardHeading}>
-                  <h3>{finding.title}</h3>
-                  <StatusBadge tone="positive">High confidence</StatusBadge>
-                </div>
-                <p>{finding.summary}</p>
-                <strong>{finding.action}</strong>
-                <div className={styles.inlineActions}>
-                  <Button variant="secondary" onClick={() => onOpenCall(finding.evidence.record_id)}>
-                    Open evidence <ArrowRight size={15} />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => void copyPrompt(finding.follow_up_prompt, 'Follow-up copied')}
-                    title={followUpPromptHelp}
-                  >
-                    <Copy size={15} /> Copy follow-up
-                  </Button>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className={styles.empty}>No high-confidence findings are persisted for the current index.</p>
-        )}
-      </section>
     </div>
   );
 }

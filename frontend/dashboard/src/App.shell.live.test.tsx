@@ -87,8 +87,6 @@ it('keeps stable Home shell boot bounded instead of hydrating compatibility rows
               observed_usage: { available: false, windows: [] },
               windows: [],
             },
-            findings: [],
-            recent_evidence: [],
           },
         }),
       } as Response;
@@ -182,8 +180,6 @@ it('keeps stable Home shell boot bounded instead of hydrating compatibility rows
                 observed_usage: { available: false, windows: [] },
                 windows: [],
               },
-              findings: [],
-              recent_evidence: [],
             },
           }),
         } as Response;

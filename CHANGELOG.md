@@ -16,6 +16,9 @@
 - Remove the legacy static dashboard generator, assets, screenshots, CLI
   aliases, MCP tool, and configured static serving. The live Evidence Console,
   CSV/JSON exports, exact deep links, and focused query plans remain.
+- Keep Home call, token, and cache totals current when recommendation analysis
+  lags the incremental index, and remove persisted findings/evidence from the
+  Home load path.
 
 ## 0.24.0 - 2026-07-24
 

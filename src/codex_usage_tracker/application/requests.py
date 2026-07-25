@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal, TypeAlias, cast
+from typing import Literal, TypeAlias
 
 from codex_usage_tracker.analytics.analysis_models import AnalysisRequest as AnalysisRequest
 from codex_usage_tracker.application.allowance_models import AllowanceRequest as AllowanceRequest
@@ -20,7 +20,6 @@ from codex_usage_tracker.evidence.models import EvidenceRequest as EvidenceReque
 PrivacyMode: TypeAlias = Literal["normal", "redacted", "strict"]
 McpProfile: TypeAlias = Literal["core", "full", "developer"]
 
-MAX_INTERACTIVE_LIMIT = 200
 _HISTORY_VALUES = {"active", "all"}
 _PRIVACY_VALUES = {"normal", "redacted", "strict"}
 _EXECUTION_VALUES = {"auto", "sync", "async"}
@@ -30,13 +29,6 @@ _MCP_PROFILE_VALUES = {"core", "full", "developer"}
 def _choice(value: str, choices: set[str], field_name: str) -> None:
     if value not in choices:
         raise RequestValidationError(f"unsupported {field_name}: {value}")
-
-
-def _bounded_limit(value: object, *, field_name: str = "limit") -> None:
-    if type(value) is not int:
-        raise RequestValidationError(f"{field_name} must be an integer")
-    if not 1 <= cast(int, value) <= MAX_INTERACTIVE_LIMIT:
-        raise RequestValidationError(f"{field_name} must be between 1 and {MAX_INTERACTIVE_LIMIT}")
 
 
 def _safe_identifier(value: str, field_name: str) -> str:
