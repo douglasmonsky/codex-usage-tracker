@@ -16,6 +16,7 @@ def check_publish_workflow(repo_root: Path) -> list[str]:
     workflow = workflow_path.read_text(encoding="utf-8")
     failures = _required_text_failures(workflow)
     failures.extend(_event_policy_failures(workflow))
+    failures.extend(_dashboard_syntax_failures(workflow))
     failures.extend(_promotion_job_failures(workflow))
     return failures
 
@@ -117,6 +118,17 @@ def _event_policy_failures(workflow: str) -> list[str]:
             "in every verification stage"
         )
     return failures
+
+
+def _dashboard_syntax_failures(workflow: str) -> list[str]:
+    packaged_javascript_check = "-type f -name '*.js' -exec node --check '{}' ';'"
+    static_dashboard_glob = "plugin_data/dashboard/dashboard*.js"
+    if packaged_javascript_check not in workflow or static_dashboard_glob in workflow:
+        return [
+            "publish workflow must syntax-check all packaged JavaScript "
+            "without relying on removed static-dashboard filenames"
+        ]
+    return []
 
 
 def _promotion_job_failures(workflow: str) -> list[str]:

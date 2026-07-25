@@ -215,9 +215,8 @@ python -m mypy
 python -m pytest
 python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
 python -m compileall src
-for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
-  node --check "$file"
-done
+find src/codex_usage_tracker/plugin_data/dashboard \
+  -type f -name '*.js' -exec node --check '{}' ';'
 python scripts/check_release.py
 git diff --check
 rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info
@@ -231,9 +230,8 @@ Additional smoke checks for touched CLI surfaces:
 ```bash
 python -m pytest
 python -m compileall src
-for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
-  node --check "$file"
-done
+find src/codex_usage_tracker/plugin_data/dashboard \
+  -type f -name '*.js' -exec node --check '{}' ';'
 python -m build
 python scripts/check_release.py --dist
 git diff --check
@@ -289,9 +287,8 @@ python -m mypy
 python -m pytest
 python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
 python -m compileall src
-for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do
-  node --check "$file"
-done
+find src/codex_usage_tracker/plugin_data/dashboard \
+  -type f -name '*.js' -exec node --check '{}' ';'
 python scripts/check_release.py
 git diff --check
 rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info
