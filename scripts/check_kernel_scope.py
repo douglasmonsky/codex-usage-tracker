@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Fail closed when the integration tree escapes the K1 quarantine contract."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+from pathlib import Path
+from typing import Any
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+INTEGRATION_ADDITIONS = frozenset(
+    {
+        ".agent-maintainer/change-plans/k1a-legacy-quarantine.md",
+        "docs/kernel-development-scope.md",
+        "scripts/check_kernel_scope.py",
+        "src/codex_usage_tracker/kernel/AGENTS.md",
+        "src/codex_usage_tracker/kernel/__init__.py",
+        "tests/kernel/test_kernel_scope.py",
+    }
+)
+_BLOCKED_TASK_REF = re.compile(
+    r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"
+)
+
+
+def load_disposition_manifest(path: Path) -> dict[str, Any]:
+    """Load the frozen K1 path inventory."""
+
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def active_paths(repo_root: Path) -> set[str]:
+    """Return tracked and non-ignored untracked paths in the active worktree."""
+
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return {line for line in result.stdout.splitlines() if line}
+
+
+def scope_failures(repo_root: Path, manifest: dict[str, Any]) -> list[str]:
+    """Return deterministic violations of the K1A active-tree contract."""
+
+    entries = manifest["entries"]
+    current = active_paths(repo_root)
+    classified = {entry["path"] for entry in entries}
+    kept = {entry["path"] for entry in entries if entry["disposition"] == "keep"}
+    removed = {
+        entry["path"] for entry in entries if entry["disposition"] != "keep"
+    }
+    failures: list[str] = []
+
+    physically_present = {
+        path
+        for path in classified
+        if (repo_root / path).exists() or (repo_root / path).is_symlink()
+    }
+
+    for path in sorted(kept - physically_present):
+        failures.append(f"required keep path is absent: {path}")
+    for path in sorted(removed & physically_present):
+        failures.append(f"quarantined path remains active: {path}")
+    for path in sorted(current - classified - INTEGRATION_ADDITIONS):
+        failures.append(f"unclassified integration path: {path}")
+
+    for entry in entries:
+        disposition = entry["disposition"]
+        status = entry["status"]
+        if disposition != "keep" and status != "removed":
+            failures.append(
+                f"{entry['path']}: {disposition} status must be removed, got {status}"
+            )
+        if disposition == "transplant":
+            if not entry["source_ref"].startswith("v0.25.1:"):
+                failures.append(f"{entry['path']}: transplant lacks tag provenance")
+            if not entry["target_path"] or not entry["owner_task"]:
+                failures.append(f"{entry['path']}: transplant lacks owner or target")
+    return failures
+
+
+def publication_ref_failure(ref: str, package_version: str) -> str | None:
+    """Explain why a ref/version combination must not publish."""
+
+    if _BLOCKED_TASK_REF.match(ref):
+        return f"publication is forbidden from integration ref {ref}"
+    if ref.startswith("refs/heads/kernel/"):
+        return f"publication is forbidden from kernel task ref {ref}"
+    if ref in {"refs/heads/main"} or ref.startswith("refs/tags/"):
+        if ".dev" in package_version:
+            return f"development version {package_version} cannot publish from {ref}"
+        return None
+    return f"publication requires main or an exact tag ref, got {ref}"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo-root", type=Path, default=_REPO_ROOT)
+    parser.add_argument("--publication-ref")
+    parser.add_argument("--package-version")
+    args = parser.parse_args()
+
+    if args.publication_ref:
+        if not args.package_version:
+            parser.error("--package-version is required with --publication-ref")
+        failure = publication_ref_failure(
+            args.publication_ref,
+            args.package_version,
+        )
+        if failure:
+            print(failure)
+            return 1
+        print("Publication ref is eligible.")
+        return 0
+
+    manifest = load_disposition_manifest(
+        args.repo_root / "config" / "kernel-code-disposition-v1.json"
+    )
+    failures = scope_failures(args.repo_root, manifest)
+    if failures:
+        print("\n".join(failures))
+        return 1
+    print("Kernel integration scope passed.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

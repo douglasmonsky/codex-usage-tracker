@@ -3,27 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from codex_usage_tracker.interfaces.mcp.registry import tool_specs
-from scripts.generate_kernel_manifests import (
-    _cli_command_paths,
-    _console_routes,
-    _frontend_assets,
-    _package_data_rules,
-    _release_schema_ids,
-    _schema_tables,
-)
-
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _MANIFEST_PATH = _REPO_ROOT / "config" / "kernel-retired-surfaces-v1.json"
-_KERNEL_MCP_TOOLS = {
-    "usage_status",
-    "usage_refresh",
-    "usage_query",
-    "usage_evidence",
-    "usage_allowance",
-    "usage_job_status",
-}
-_ALREADY_REMOVED_MCP_TOOLS = {"generate_usage_dashboard"}
 _SURFACE_TYPES = {
     "mcp_tool",
     "http_route",
@@ -66,37 +47,32 @@ def test_retired_surface_manifest_has_complete_versioned_entries() -> None:
         assert entry["absence_or_migration_test"]
 
 
-def test_retired_mcp_inventory_is_exact() -> None:
-    manifest = _manifest()
-    documented = {
-        entry["public_name"]
-        for entry in manifest["entries"]
-        if entry["surface_type"] == "mcp_tool"
-    }
-    expected = (
-        {spec.name for spec in tool_specs()} - _KERNEL_MCP_TOOLS
-    ) | _ALREADY_REMOVED_MCP_TOOLS
-
-    assert documented == expected
-
-
-def test_retired_non_mcp_inventories_are_exact() -> None:
+def test_retired_inventory_preserves_k1_counts() -> None:
     entries = _manifest()["entries"]
-    expected_by_type = {
-        "cli_command": set(_cli_command_paths()),
-        "schema_id": _release_schema_ids(),
-        "table": set(_schema_tables()),
-        "console_route": set(_console_routes()),
-        "frontend_asset": set(_frontend_assets()),
-        "package_data_rule": set(_package_data_rules()),
+    expected_counts = {
+        "mcp_tool": 58,
+        "http_route": 69,
+        "cli_command": 91,
+        "schema_id": 87,
+        "table": 38,
+        "console_route": 17,
+        "frontend_asset": 508,
+        "package_data_rule": 28,
+        "source_module": 298,
     }
-    for surface_type, expected in expected_by_type.items():
-        observed = {
-            entry["public_name"]
-            for entry in entries
-            if entry["surface_type"] == surface_type
-        }
-        assert observed == expected
+    assert {
+        surface_type: sum(
+            entry["surface_type"] == surface_type for entry in entries
+        )
+        for surface_type in _SURFACE_TYPES
+    } == expected_counts
+
+
+def test_retired_source_and_frontend_paths_are_absent() -> None:
+    for entry in _manifest()["entries"]:
+        if entry["surface_type"] not in {"source_module", "frontend_asset"}:
+            continue
+        assert not (_REPO_ROOT / entry["public_name"]).exists(), entry["public_name"]
 
 
 def test_retired_surface_manifest_matches_generator() -> None:

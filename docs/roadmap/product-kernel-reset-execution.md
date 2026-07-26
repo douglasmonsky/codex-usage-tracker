@@ -61,7 +61,7 @@ progress.
 | --- | --- | --- | --- | --- |
 | K0 | documentation baseline | Complete | — | Archive former program and approve reset |
 | K1 | 0.25.x bridge | Complete | K0 | Freeze accounting oracle |
-| K1A | 0.26 integration | Not started | K1 | Quarantine legacy code and freeze agent scope |
+| K1A | 0.26 integration | Complete | K1 | Quarantine legacy code and freeze agent scope |
 | K2 | 0.26.0 | Not started | K1A | Kernel schema v1 and stable identity |
 | K3 | 0.26.0 | Not started | K2 | Incremental/live ingestion |
 | K4 | 0.26.0 | Not started | K3 | Bounded query engine |
@@ -393,7 +393,116 @@ by the primary agent. No second review pass was run.
   entry through its declared state machine, and only `verified` is terminal.
 - Performance evidence describes the synthetic v0.25.1 path on one machine and
   is comparison evidence, not a production latency claim.
-- K1A is unblocked after this task passes review, PR CI, and merge to `main`.
+- K1A started from merged K1 commit
+  `d8da9bccdb6674e7dca4c0872c36a1346949dc13`.
+
+## K1A — Quarantine Legacy Code And Freeze Agent Scope
+
+**State:** Complete
+**Branch:** `kernel/k1a-legacy-quarantine`
+**Base:** `d8da9bccdb6674e7dca4c0872c36a1346949dc13`
+**Commits:** this changeset
+
+### K1A contract added first
+
+- Added a failing active-tree contract before deletion. It required every K1
+  keep path, rejected every active retire/transplant/historical path, bounded
+  new K1A files to one exact allowlist, imported the isolated kernel skeleton,
+  and rejected publication from integration and every K1A-K9 task ref.
+- The first run failed because the scope checker did not exist. The second
+  failed with the 1,473 expected manifest-named legacy paths still active.
+
+### K1A implementation
+
+- Created detached policy-read-only reference worktree
+  `codex-usage-tracker-v025-reference` at `v0.25.1` commit `0a558dd` and
+  preserved it clean.
+- Created and pushed `kernel/0.26-integration` at merged K1 commit `d8da9bc`,
+  then created this K1A task branch from that exact head.
+- Removed exactly 1,473 K1-classified non-keep paths: 1,063 retire, 231
+  transplant, and 179 historical. All were clean tracked files before the
+  manifest-driven deletion; no glob or user-modified target was used.
+- Advanced every removed path to `removed`, preserved its source reference,
+  owner, target, oracle, and absence test, and pinned the manifest quarantine
+  base to the merged K1 SHA.
+- Added the isolated `codex_usage_tracker.kernel` skeleton and kernel-local
+  instructions. The active tree now contains 105 retained K1 paths plus six
+  explicit K1A additions.
+- Set integration identity to `0.26.0.dev0`, removed runtime dependencies,
+  console scripts, MCP servers, plugin bundle claims, skills, package data, and
+  legacy frontend tooling. Pricing and allowance scheduled workflows are
+  paused until K8.
+- Replaced legacy CI with the K1A phase gate and made the publish workflow call
+  the persistent branch/ref guard before any release tooling.
+- Replaced runtime-derived K1 manifest generation with frozen-inventory
+  canonicalization and progressive transition validation.
+
+### K1A verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Scope and inventories | Pass | 26 phase tests; exact 1,473-path removal; all non-keep states `removed`; no unclassified or physically present quarantined path |
+| Static correctness | Pass | focused Ruff, MyPy, Pyright 0 errors/warnings, 600-line and Xenon-B kernel budget |
+| Package isolation | Pass | `just vc` plus package-only rebuilds; wheel 13,512 bytes with 5 Python modules and metadata only; sdist remains below 200,000 bytes with an exact fail-closed member set; no CLI entry point, runtime dependency, MCP server, legacy runtime, frontend, skills, or plugin data |
+| Development footprint | Pass | active paths 1,578 -> 111 (93.0% reduction); code-bearing files 1,248 -> 33 (97.4% reduction); tracked/active bytes 41,670,579 -> 3,830,579 (90.8% reduction); clean Python 3.10 dev resolution 117 -> 30 packages (74.4% reduction) |
+| Privacy | Pass | synthetic K1 fixtures only; no live database, Codex log, prompt, tool output, secret, or full user path entered the repository |
+| Reference safety | Pass | detached `v0.25.1` reference remains clean and was never built, tested, indexed, or activated |
+
+### K1A development-efficiency comparison
+
+| Metric | K1 | K1A final local | Change |
+| --- | ---: | ---: | ---: |
+| Non-behavioral blocking groups | 6 | 5 | 16.7% lower |
+| Gate-remediation lines | 74 | 60 | 18.9% lower |
+| Verification wall time | 966.0 s | 52.7 s | 94.5% lower |
+| Style-only commits | 0 | 0 | unchanged |
+| Duplicate unchanged-state broad runs | 0 | 1 | one regression |
+
+The duplicate was explicit: after `just v` passed, `just vc` reran it before
+building the package. K2 must call the package-only step after an already-green
+phase check. K1A also narrowed Ruff from the retained K10 tree to phase-owned
+files after one unrelated release-smoke style finding. Correctness, privacy,
+release-ref, package-content, and maintainability gates remain blocking.
+
+### K1A review metrics
+
+- Total findings: 4
+- Accepted findings: 4 (`K1A-R1` through `K1A-R4`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+The single final reviewer found four contract defects. K1A now proves every
+retained release primitive is byte-identical to merged K1 and importable,
+compares immutable disposition decisions and paths directly with the merged
+K1 tree, checks physical keep/removal state independently of the Git index,
+and enforces exact wheel/sdist member and dependency metadata. The retained
+0.25 release tests remain byte-identical historical K10 inputs; they are
+explicitly not collected on integration because they import quarantined
+runtime and release-smoke helpers. Their applicable dependency-free primitive
+contracts now run in the K1A kernel suite. No second review pass was run.
+
+### K1A deviations and decisions
+
+- Serena activation remains unavailable because its IDE broker points to a
+  deleted local Agent Maintainer helper root. The K1A scope checker and exact
+  Git path inventory are authoritative; the detached reference was not
+  activated.
+- GitNexus had indexed only older sibling worktrees. It was used to confirm the
+  stale scope and was not refreshed from the reference. Integration indexing
+  follows after K1A merge, as required by the quarantine design.
+- Historical paths had no approved archive target, so all 179 were removed and
+  remain accessible only through their manifest source refs and Git history.
+
+### K1A residual risk and next task
+
+- Retained K10 release primitives remain active but are not public-runtime
+  entry points. Their 0.25 release suite remains intentionally excluded
+  because it imports quarantined runtime and smoke helpers; K10 must port its
+  applicable contracts and remove remaining dynamic 0.25 identity imports
+  before release qualification.
+- K2 must implement and verify only its owned transplant entries; all other
+  removed paths remain forbidden.
+- K2 is unblocked after K1A review, integration-targeting PR CI, and merge.
 
 ## Task Entry Template
 
