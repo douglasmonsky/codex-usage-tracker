@@ -92,20 +92,24 @@ def test_deprecated_tool_descriptions_name_replacement_and_removal_release() -> 
         assert spec.remove_after in description
 
 
-def test_profile_and_deprecation_docs_name_the_bounded_migration() -> None:
+def test_profile_and_deprecation_docs_name_the_beta_kernel_cutover() -> None:
     mcp_docs = (_ROOT / "docs" / "mcp.md").read_text(encoding="utf-8")
     deprecations = (_ROOT / "docs" / "deprecations.md").read_text(encoding="utf-8")
 
     assert "one selected profile" in mcp_docs
-    assert "Retained advanced MCP operations" in deprecations
-    assert "CLI and HTTP alternatives" in deprecations
-    for name in (
-        "usage_dedupe_diagnostics",
-        "usage_allowance_export",
-        "usage_call_context",
-        "usage_content_search",
-        "usage_thread_trace",
-        "usage_local_evidence_export",
-        "export_usage_csv",
-    ):
-        assert f"`{name}`" in deprecations
+    assert "does not ship runtime adapters for retired tools" in deprecations
+    assert "Exactly six default tools" in deprecations
+    assert "## Exact Retired MCP Inventory" in deprecations
+    inventory = deprecations.split("## Exact Retired MCP Inventory", maxsplit=1)[
+        1
+    ].split("\n## ", maxsplit=1)[0]
+    documented_names = {
+        line.removeprefix("- `").removesuffix("`")
+        for line in inventory.splitlines()
+        if line.startswith("- `") and line.endswith("`")
+    }
+    kernel_names = set(_CORE_NAMES) - {"usage_analyze"}
+
+    assert documented_names == (
+        {spec.name for spec in tool_specs()} - kernel_names
+    ) | _REMOVED_025_NAMES
