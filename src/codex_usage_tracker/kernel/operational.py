@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .database import (
     analytical_digest,
+    analytical_generation_digest,
     analytical_generation_exists,
 )
 from .models import (
@@ -135,7 +136,7 @@ def register_source(path: Path, identifier: str, source: Path) -> None:
     with _connect(path) as connection:
         connection.execute(
             """
-            INSERT INTO source_registry(
+            INSERT OR REPLACE INTO source_registry(
                 source_id, source_location, first_seen_at, last_seen_at, state
             )
             VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'tracked')
@@ -248,6 +249,54 @@ def transition_cutover(
             failure_code=failure_code,
         )
         _write_control(connection, next_control)
+    return load_cutover_control(path)
+
+
+def promote_cutover(
+    path: Path,
+    *,
+    active_kernel_path: Path,
+    generation: int,
+    integrity_digest: str,
+) -> CutoverControl:
+    """Validate one generation once and atomically publish its control record."""
+
+    _validate_artifact(
+        active_kernel_path,
+        generation=generation,
+        digest=integrity_digest,
+    )
+    with _connect(path) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        row = connection.execute(
+            "SELECT * FROM cutover_control WHERE singleton = 1"
+        ).fetchone()
+        if row is None:
+            raise ValueError("operational sidecar is missing cutover control")
+        current = _control_from_row(row)
+        if current.state not in {CutoverState.BUILDING, CutoverState.READY}:
+            raise ValueError("promotion requires a building or ready cutover")
+        if current.staging_kernel_path != active_kernel_path.resolve():
+            raise ValueError("active kernel must equal the staging artifact")
+        ready = _ready_control(
+            current,
+            None,
+            None,
+            None,
+            None,
+            integrity_digest,
+            None,
+        )
+        active = _active_control(
+            ready,
+            active_kernel_path.resolve(),
+            generation,
+            None,
+            None,
+            None,
+            None,
+        )
+        _write_control(connection, active)
     return load_cutover_control(path)
 
 
@@ -585,7 +634,12 @@ def _validate_artifact(
     digest: str,
     generation: int | None = None,
 ) -> None:
-    if analytical_digest(path) != digest:
+    observed = (
+        analytical_generation_digest(path, generation)
+        if digest.startswith("generation-sha256:") and generation is not None
+        else analytical_digest(path)
+    )
+    if observed != digest:
         raise ValueError("analytical artifact digest does not match")
     if generation is not None and not analytical_generation_exists(path, generation):
         raise ValueError("analytical artifact does not contain generation")

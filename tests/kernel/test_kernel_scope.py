@@ -7,6 +7,7 @@ from scripts.check_kernel_scope import (
     INTEGRATION_ADDITIONS,
     K1A_ADDITIONS,
     K2_ADDITIONS,
+    K3_ADDITIONS,
     load_disposition_manifest,
     publication_ref_failure,
     scope_failures,
@@ -77,7 +78,29 @@ def test_k2_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/test_schema.py",
         "tests/kernel/test_source_registry_privacy.py",
     } == K2_ADDITIONS
-    assert INTEGRATION_ADDITIONS == K1A_ADDITIONS | K2_ADDITIONS
+
+
+def test_k3_additions_are_explicit_and_bounded() -> None:
+    assert {
+        ".agent-maintainer/change-plans/k3-incremental-ingestion.md",
+        "src/codex_usage_tracker/kernel/discovery.py",
+        "src/codex_usage_tracker/kernel/ingest.py",
+        "src/codex_usage_tracker/kernel/lease.py",
+        "src/codex_usage_tracker/kernel/normalize.py",
+        "src/codex_usage_tracker/kernel/parser.py",
+        "src/codex_usage_tracker/kernel/watcher.py",
+        "src/codex_usage_tracker/kernel/writer.py",
+        "tests/kernel/test_ingest_concurrency.py",
+        "tests/kernel/test_ingest_jobs.py",
+        "tests/kernel/test_ingest_lifecycle.py",
+        "tests/kernel/test_ingest_oracle.py",
+        "tests/kernel/test_ingest_performance.py",
+        "tests/kernel/test_ingest_pipeline.py",
+        "tests/kernel/test_ingest_privacy.py",
+        "tests/kernel/test_ingest_reconciliation.py",
+        "tests/kernel/test_watcher.py",
+    } == K3_ADDITIONS
+    assert INTEGRATION_ADDITIONS == K1A_ADDITIONS | K2_ADDITIONS | K3_ADDITIONS
 
 
 def test_kernel_skeleton_imports_without_legacy_runtime() -> None:

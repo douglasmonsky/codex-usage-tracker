@@ -95,6 +95,141 @@ _K2_TRANSPLANTS = {
     ),
 }
 
+_K3_TRANSPLANTS = {
+    "src/codex_usage_tracker/application/job_status.py": (
+        "src/codex_usage_tracker/kernel/lease.py",
+        ("tests/kernel/test_ingest_jobs.py",),
+    ),
+    "src/codex_usage_tracker/application/refresh.py": (
+        "src/codex_usage_tracker/kernel/ingest.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "src/codex_usage_tracker/ingest/fact_classifiers.py": (
+        "src/codex_usage_tracker/kernel/normalize.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "src/codex_usage_tracker/ingest/facts.py": (
+        "src/codex_usage_tracker/kernel/normalize.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "src/codex_usage_tracker/parser/api.py": (
+        "src/codex_usage_tracker/kernel/parser.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "src/codex_usage_tracker/parser/jsonl_v1.py": (
+        "src/codex_usage_tracker/kernel/parser.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "src/codex_usage_tracker/parser/jsonl_values.py": (
+        "src/codex_usage_tracker/kernel/parser.py",
+        ("tests/kernel/test_ingest_privacy.py",),
+    ),
+    "src/codex_usage_tracker/parser/state.py": (
+        "src/codex_usage_tracker/kernel/parser.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "src/codex_usage_tracker/store/refresh.py": (
+        "src/codex_usage_tracker/kernel/writer.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "src/codex_usage_tracker/store/refresh_metadata.py": (
+        "src/codex_usage_tracker/kernel/lease.py",
+        ("tests/kernel/test_ingest_jobs.py",),
+    ),
+    "src/codex_usage_tracker/store/refresh_parse.py": (
+        "src/codex_usage_tracker/kernel/parser.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "src/codex_usage_tracker/store/refresh_stream.py": (
+        "src/codex_usage_tracker/kernel/watcher.py",
+        ("tests/kernel/test_watcher.py",),
+    ),
+    "src/codex_usage_tracker/store/source_record_schema.py": (
+        "src/codex_usage_tracker/kernel/schema.py",
+        ("tests/kernel/test_ingest_reconciliation.py",),
+    ),
+    "src/codex_usage_tracker/store/source_record_sync.py": (
+        "src/codex_usage_tracker/kernel/writer.py",
+        ("tests/kernel/test_ingest_reconciliation.py",),
+    ),
+    "src/codex_usage_tracker/store/source_records.py": (
+        "src/codex_usage_tracker/kernel/discovery.py",
+        ("tests/kernel/test_source_lifecycle_oracle.py",),
+    ),
+    "src/codex_usage_tracker/store/source_replacement.py": (
+        "src/codex_usage_tracker/kernel/writer.py",
+        ("tests/kernel/test_ingest_reconciliation.py",),
+    ),
+    "src/codex_usage_tracker/store/sources.py": (
+        "src/codex_usage_tracker/kernel/discovery.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "tests/application/test_refresh.py": (
+        "tests/kernel/test_ingest_pipeline.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "tests/cli/test_cli_parser_diagnostics.py": (
+        "tests/kernel/test_ingest_privacy.py",
+        ("tests/kernel/test_ingest_privacy.py",),
+    ),
+    "tests/interfaces/cli/test_parser.py": (
+        "tests/kernel/test_ingest_oracle.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "tests/parser/test_parser.py": (
+        "tests/kernel/test_ingest_oracle.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "tests/parser/test_parser_deduplication.py": (
+        "tests/kernel/test_ingest_reconciliation.py",
+        ("tests/kernel/test_oracle_equivalence.py",),
+    ),
+    "tests/parser/test_parser_observer.py": (
+        "tests/kernel/test_watcher.py",
+        ("tests/kernel/test_watcher.py",),
+    ),
+    "tests/parser/test_parser_state.py": (
+        "tests/kernel/test_ingest_pipeline.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "tests/reliability/test_read_during_refresh.py": (
+        "tests/kernel/test_ingest_concurrency.py",
+        ("tests/kernel/test_ingest_concurrency.py",),
+    ),
+    "tests/reliability/test_refresh_locking.py": (
+        "tests/kernel/test_ingest_jobs.py",
+        ("tests/kernel/test_ingest_jobs.py",),
+    ),
+    "tests/server/test_refresh_jobs.py": (
+        "tests/kernel/test_ingest_jobs.py",
+        ("tests/kernel/test_ingest_jobs.py",),
+    ),
+    "tests/store/test_foreign_key_cascades.py": (
+        "tests/kernel/test_ingest_reconciliation.py",
+        ("tests/kernel/test_ingest_reconciliation.py",),
+    ),
+    "tests/store/test_refresh_parallel.py": (
+        "tests/kernel/test_ingest_jobs.py",
+        ("tests/kernel/test_ingest_jobs.py",),
+    ),
+    "tests/store/test_refresh_workflow.py": (
+        "tests/kernel/test_ingest_pipeline.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "tests/store/test_source_records.py": (
+        "tests/kernel/test_ingest_reconciliation.py",
+        ("tests/kernel/test_ingest_reconciliation.py",),
+    ),
+    "tests/store/test_store_sources.py": (
+        "tests/kernel/test_ingest_pipeline.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "tests/store/test_usage_deduplication.py": (
+        "tests/kernel/test_ingest_reconciliation.py",
+        ("tests/kernel/test_oracle_equivalence.py",),
+    ),
+}
+
 
 def build_retired_surface_manifest() -> dict[str, Any]:
     """Return the immutable K1 public-surface inventory."""
@@ -135,6 +270,21 @@ def apply_k2_transition() -> None:
     _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
+def apply_k3_transition() -> None:
+    """Resolve every K3 assignment to bounded ingestion or explicit retirement."""
+
+    payload = build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    payload["entries"] = [
+        _expected_current_entry(base_by_path[entry["path"]])
+        if entry["owner_task"] == "K3"
+        else entry
+        for entry in payload["entries"]
+    ]
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
+
+
 def manifest_failures(
     disposition: dict[str, Any] | None = None,
 ) -> list[str]:
@@ -167,11 +317,7 @@ def manifest_failures(
         base_entry = base_by_path.get(path)
         if base_entry is None:
             continue
-        expected_entry = (
-            _expected_k2_entry(base_entry)
-            if base_entry["owner_task"] == "K2"
-            else base_entry
-        )
+        expected_entry = _expected_current_entry(base_entry)
         immutable = {key: value for key, value in entry.items() if key != "status"}
         base_immutable = {
             key: value for key, value in expected_entry.items() if key != "status"
@@ -183,6 +329,11 @@ def manifest_failures(
             and entry["status"] != "verified"
         ):
             failures.append(f"{path}: K2 disposition is not verified")
+        if (
+            expected_entry["owner_task"] == "K3"
+            and entry["status"] != "verified"
+        ):
+            failures.append(f"{path}: K3 disposition is not verified")
 
     surface_keys = [
         (entry["surface_type"], entry["public_name"])
@@ -268,6 +419,55 @@ def _expected_k2_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
     return entry
 
 
+def _expected_k3_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = dict(base_entry)
+    transplant = _K3_TRANSPLANTS.get(entry["path"])
+    if transplant is None:
+        entry.update(
+            {
+                "disposition": "retire",
+                "reason": (
+                    "Legacy refresh, content-index, or interface orchestration "
+                    "is not required by the bounded K3 ingestion contract."
+                ),
+                "required_oracle_tests": [
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ],
+                "removal_or_absence_test": (
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ),
+                "status": "verified",
+                "target_path": "",
+            }
+        )
+        return entry
+    target, tests = transplant
+    entry.update(
+        {
+            "reason": (
+                "Incremental ingestion behavior survives through one bounded "
+                "kernel owner."
+            ),
+            "required_oracle_tests": list(tests),
+            "removal_or_absence_test": tests[0],
+            "status": "verified",
+            "target_path": target,
+        }
+    )
+    return entry
+
+
+def _expected_current_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = (
+        _expected_k2_entry(base_entry)
+        if base_entry["owner_task"] == "K2"
+        else dict(base_entry)
+    )
+    if entry["owner_task"] == "K3":
+        return _expected_k3_entry(entry)
+    return entry
+
+
 def _git_lines(*args: str) -> list[str]:
     return subprocess.run(
         ["git", "-C", str(_REPO_ROOT), *args],
@@ -297,6 +497,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply-quarantine", action="store_true")
     parser.add_argument("--apply-k2", action="store_true")
+    parser.add_argument("--apply-k3", action="store_true")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
@@ -304,6 +505,8 @@ def main() -> int:
         apply_quarantine_transition()
     if args.apply_k2:
         apply_k2_transition()
+    if args.apply_k3:
+        apply_k3_transition()
     failures = manifest_failures()
     if failures:
         print("\n".join(failures), file=sys.stderr)

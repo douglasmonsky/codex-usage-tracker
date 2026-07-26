@@ -29,7 +29,7 @@ def test_source_lifecycle_oracle_names_every_required_state() -> None:
 
 def test_current_source_planner_reproduces_lifecycle_oracle(tmp_path: Path) -> None:
     lifecycle = _lifecycle()
-    from tests.kernel.oracle_support import export_source_lifecycle_oracle
+    from tests.kernel.test_ingest_lifecycle import export_source_lifecycle_oracle
 
     observed = export_source_lifecycle_oracle(workspace=tmp_path)
 

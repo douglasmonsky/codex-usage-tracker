@@ -67,6 +67,7 @@ CREATE TABLE sources (
     replacement_fingerprint TEXT NOT NULL,
     parser_adapter TEXT NOT NULL,
     parser_version TEXT NOT NULL,
+    parser_state_json TEXT NOT NULL,
     first_observed_at TEXT,
     last_observed_at TEXT,
     last_generation INTEGER REFERENCES generations(generation),
@@ -78,7 +79,8 @@ CREATE TABLE sources (
 
 CREATE TABLE threads (
     thread_id TEXT PRIMARY KEY,
-    source_id TEXT NOT NULL REFERENCES sources(source_id),
+    source_id TEXT NOT NULL REFERENCES sources(source_id) ON DELETE CASCADE,
+    logical_thread_id TEXT NOT NULL,
     session_identity_hash TEXT NOT NULL,
     display_label TEXT NOT NULL,
     project_label TEXT,
@@ -88,7 +90,7 @@ CREATE TABLE threads (
     archive_state TEXT NOT NULL CHECK (
         archive_state IN ('active', 'archived', 'unknown')
     ),
-    parent_thread_id TEXT REFERENCES threads(thread_id),
+    parent_logical_thread_id TEXT,
     subagent_type TEXT,
     subagent_role TEXT,
     subagent_nickname TEXT,
@@ -103,7 +105,7 @@ CREATE TABLE threads (
 CREATE TABLE turns (
     turn_id TEXT PRIMARY KEY,
     source_turn_id_hash TEXT,
-    thread_id TEXT NOT NULL REFERENCES threads(thread_id),
+    thread_id TEXT NOT NULL REFERENCES threads(thread_id) ON DELETE CASCADE,
     ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
     started_at TEXT,
     ended_at TEXT,
@@ -133,9 +135,9 @@ CREATE TABLE turns (
 CREATE TABLE model_calls (
     model_call_id TEXT PRIMARY KEY,
     canonical_call_id TEXT NOT NULL,
-    source_id TEXT NOT NULL REFERENCES sources(source_id),
-    thread_id TEXT NOT NULL REFERENCES threads(thread_id),
-    turn_id TEXT REFERENCES turns(turn_id),
+    source_id TEXT NOT NULL REFERENCES sources(source_id) ON DELETE CASCADE,
+    thread_id TEXT NOT NULL REFERENCES threads(thread_id) ON DELETE CASCADE,
+    turn_id TEXT REFERENCES turns(turn_id) ON DELETE SET NULL,
     event_at TEXT NOT NULL,
     turn_ordinal INTEGER NOT NULL CHECK (turn_ordinal >= 0),
     model TEXT NOT NULL,
@@ -162,10 +164,10 @@ CREATE TABLE model_calls (
 CREATE TABLE tool_calls (
     tool_call_id TEXT PRIMARY KEY,
     upstream_call_id_hash TEXT,
-    source_id TEXT NOT NULL REFERENCES sources(source_id),
-    thread_id TEXT NOT NULL REFERENCES threads(thread_id),
-    turn_id TEXT REFERENCES turns(turn_id),
-    nearest_model_call_id TEXT REFERENCES model_calls(model_call_id),
+    source_id TEXT NOT NULL REFERENCES sources(source_id) ON DELETE CASCADE,
+    thread_id TEXT NOT NULL REFERENCES threads(thread_id) ON DELETE CASCADE,
+    turn_id TEXT REFERENCES turns(turn_id) ON DELETE SET NULL,
+    nearest_model_call_id TEXT REFERENCES model_calls(model_call_id) ON DELETE SET NULL,
     tool_name TEXT NOT NULL,
     server_name TEXT,
     namespace TEXT,
@@ -191,9 +193,9 @@ CREATE TABLE tool_calls (
 
 CREATE TABLE activity_events (
     activity_event_id TEXT PRIMARY KEY,
-    source_id TEXT NOT NULL REFERENCES sources(source_id),
-    thread_id TEXT NOT NULL REFERENCES threads(thread_id),
-    turn_id TEXT REFERENCES turns(turn_id),
+    source_id TEXT NOT NULL REFERENCES sources(source_id) ON DELETE CASCADE,
+    thread_id TEXT NOT NULL REFERENCES threads(thread_id) ON DELETE CASCADE,
+    turn_id TEXT REFERENCES turns(turn_id) ON DELETE SET NULL,
     event_kind TEXT NOT NULL,
     event_at TEXT NOT NULL,
     safe_label TEXT,
@@ -204,6 +206,7 @@ CREATE TABLE activity_events (
 
 CREATE TABLE allowance_observations (
     allowance_observation_id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL REFERENCES sources(source_id) ON DELETE CASCADE,
     observed_at TEXT NOT NULL,
     window_kind TEXT NOT NULL,
     limit_id TEXT,
@@ -213,7 +216,7 @@ CREATE TABLE allowance_observations (
     resets_at TEXT,
     model TEXT,
     service_tier TEXT,
-    source_model_call_id TEXT REFERENCES model_calls(model_call_id),
+    source_model_call_id TEXT REFERENCES model_calls(model_call_id) ON DELETE SET NULL,
     generation INTEGER NOT NULL REFERENCES generations(generation),
     duplicate_state TEXT NOT NULL CHECK (
         duplicate_state IN ('canonical', 'copied', 'excluded', 'unknown')
@@ -227,7 +230,7 @@ ON sources(last_generation);
 CREATE INDEX idx_threads_source
 ON threads(source_id, last_generation);
 CREATE INDEX idx_threads_parent
-ON threads(parent_thread_id);
+ON threads(parent_logical_thread_id);
 CREATE INDEX idx_turns_thread
 ON turns(thread_id, ordinal);
 CREATE INDEX idx_turns_generation

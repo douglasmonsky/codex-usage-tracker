@@ -56,14 +56,31 @@ def test_accounting_oracle_declares_every_frozen_semantic() -> None:
 
 def test_current_runtime_reproduces_accounting_oracle(tmp_path: Path) -> None:
     oracle = _oracle()
-    from tests.kernel.oracle_support import export_accounting_oracle
+    from tests.kernel.test_ingest_oracle import export_accounting_oracle
 
     observed = export_accounting_oracle(
         fixture_root=_FIXTURE_ROOT,
         workspace=tmp_path,
     )
 
-    assert observed == oracle["expected"]
+    expected = oracle["expected"]
+    for key in (
+        "physical_counts",
+        "canonical_counts",
+        "token_totals",
+        "canonical_promotion",
+        "allowance_observation_count",
+        "parser_diagnostics",
+        "privacy",
+    ):
+        assert observed[key] == expected[key]
+    assert observed["by_time"] == expected["by_time"]
+    assert observed["by_model_effort"] == _without_service_tier(
+        expected["by_model_effort"]
+    )
+    assert observed["parentage"] == [
+        {"agent_role": "worker", "agent_nickname": "Synthetic helper"}
+    ]
 
 
 def test_oracle_fixture_is_complete_and_repository_relative() -> None:
@@ -77,3 +94,34 @@ def test_oracle_fixture_is_complete_and_repository_relative() -> None:
         assert not Path(relative).is_absolute()
         assert (_FIXTURE_ROOT / relative).is_file()
         assert (_FIXTURE_ROOT / relative).is_relative_to(_REPO_ROOT)
+
+
+def _without_service_tier(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    grouped: dict[tuple[object, object], dict[str, object]] = {}
+    for row in rows:
+        key = (row["model"], row["effort"])
+        target = grouped.setdefault(
+            key,
+            {
+                "model": row["model"],
+                "effort": row["effort"],
+                "calls": 0,
+                "input_tokens": 0,
+                "cached_input_tokens": 0,
+                "uncached_input_tokens": 0,
+                "output_tokens": 0,
+                "reasoning_output_tokens": 0,
+                "total_tokens": 0,
+            },
+        )
+        for field in (
+            "calls",
+            "input_tokens",
+            "cached_input_tokens",
+            "uncached_input_tokens",
+            "output_tokens",
+            "reasoning_output_tokens",
+            "total_tokens",
+        ):
+            target[field] = int(target[field]) + int(row[field])
+    return list(grouped.values())

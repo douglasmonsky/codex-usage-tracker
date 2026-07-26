@@ -36,7 +36,29 @@ K2_ADDITIONS = frozenset(
         "tests/kernel/test_source_registry_privacy.py",
     }
 )
-INTEGRATION_ADDITIONS = K1A_ADDITIONS | K2_ADDITIONS
+K3_ADDITIONS = frozenset(
+    {
+        ".agent-maintainer/change-plans/k3-incremental-ingestion.md",
+        "src/codex_usage_tracker/kernel/discovery.py",
+        "src/codex_usage_tracker/kernel/ingest.py",
+        "src/codex_usage_tracker/kernel/lease.py",
+        "src/codex_usage_tracker/kernel/normalize.py",
+        "src/codex_usage_tracker/kernel/parser.py",
+        "src/codex_usage_tracker/kernel/watcher.py",
+        "src/codex_usage_tracker/kernel/writer.py",
+        "tests/kernel/test_ingest_concurrency.py",
+        "tests/kernel/test_ingest_jobs.py",
+        "tests/kernel/test_ingest_lifecycle.py",
+        "tests/kernel/test_ingest_oracle.py",
+        "tests/kernel/test_ingest_performance.py",
+        "tests/kernel/test_ingest_pipeline.py",
+        "tests/kernel/test_ingest_privacy.py",
+        "tests/kernel/test_ingest_reconciliation.py",
+        "tests/kernel/test_watcher.py",
+    }
+)
+
+INTEGRATION_ADDITIONS = K1A_ADDITIONS | K2_ADDITIONS | K3_ADDITIONS
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"
 )

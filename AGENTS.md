@@ -101,6 +101,8 @@ then run broader validation in proportion to risk.
   direction. Split code when ownership or testability becomes clearer, and keep
   cohesive behavior together when an extraction would only add forwarding
   layers.
+- Judge module boundaries by responsibility, dependency direction, complexity,
+  and testability. Do not split cohesive code solely to satisfy a line count.
 - Prefer direct functions, explicit data structures, and existing repository
   patterns. Add an abstraction only when it removes current duplication,
   isolates an external boundary, or gives a concrete test seam needed now.
