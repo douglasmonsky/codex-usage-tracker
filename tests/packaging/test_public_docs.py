@@ -16,73 +16,165 @@ from tests.release_catalog import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_mcp_first_roadmap_names_the_normative_release_sequence() -> None:
-    roadmap = (REPO_ROOT / "docs/roadmap/mcp-first-pivot.md").read_text(encoding="utf-8")
+def test_product_kernel_reset_names_the_normative_release_sequence() -> None:
+    roadmap = (REPO_ROOT / "docs/roadmap/product-kernel-reset.md").read_text(
+        encoding="utf-8"
+    )
 
-    releases = ["0.22.0", "0.23.0", "0.24.0", "0.25.0", "0.26.0", "0.27.0"]
+    releases = ["0.25.x", "0.26.0", "0.27.0", "0.28.0"]
     positions = [roadmap.index(release) for release in releases]
 
     assert positions == sorted(positions)
+    assert "after Release 0.25.1" in roadmap
 
 
-def test_mcp_first_roadmap_prioritizes_central_product_reliability() -> None:
-    summary = (REPO_ROOT / "docs/roadmap/mcp-first-pivot.md").read_text(encoding="utf-8")
-    execution = (REPO_ROOT / "docs/roadmap/mcp-first-pivot-execution.md").read_text(
+def test_product_kernel_reset_freezes_the_six_tool_factual_surface() -> None:
+    roadmap = (REPO_ROOT / "docs/roadmap/product-kernel-reset.md").read_text(
         encoding="utf-8"
     )
-    plan = (REPO_ROOT / "docs/superpowers/plans/2026-07-21-mcp-first-product-pivot.md").read_text(
-        encoding="utf-8"
-    )
-
-    assert "`0.25.0` | Central-product reliability" in summary
-    assert "`0.26.0` | Remaining expired workbench, MCP, CLI, and HTTP compatibility" in summary
-    assert "`0.27.0` | Feature-free stabilization" in summary
-    assert "Task 40 may begin only after" in summary
-
-    assert "**Stable task ID:** `OPS-REL-025`" in plan
-    assert "## Release 0.26.0 - Remaining compatibility removal" in plan
-    assert "## Release 0.27.0 - Feature-free stabilization and contract freeze" in plan
-    assert "## OPS-REL-025 - Central Product Reliability and Installed Coherence" in execution
-
-
-def test_mcp_first_roadmap_gates_024_on_foundation_audit() -> None:
-    summary = (REPO_ROOT / "docs/roadmap/mcp-first-pivot.md").read_text(encoding="utf-8")
-    execution = (REPO_ROOT / "docs/roadmap/mcp-first-pivot-execution.md").read_text(
-        encoding="utf-8"
-    )
-    plan = (REPO_ROOT / "docs/superpowers/plans/2026-07-21-mcp-first-product-pivot.md").read_text(
-        encoding="utf-8"
-    )
+    execution = (
+        REPO_ROOT / "docs/roadmap/product-kernel-reset-execution.md"
+    ).read_text(encoding="utf-8")
+    plan = (
+        REPO_ROOT / "docs/superpowers/plans/2026-07-26-product-kernel-reset.md"
+    ).read_text(encoding="utf-8")
     design = (
-        REPO_ROOT / "docs/superpowers/specs/2026-07-21-mcp-first-product-pivot-design.md"
+        REPO_ROOT / "docs/superpowers/specs/2026-07-26-product-kernel-reset-design.md"
     ).read_text(encoding="utf-8")
 
+    target_tools = [
+        "usage_status",
+        "usage_refresh",
+        "usage_query",
+        "usage_evidence",
+        "usage_allowance",
+        "usage_job_status",
+    ]
+    mcp_section = roadmap.split("### MCP", maxsplit=1)[1].split(
+        "### Evidence Console", maxsplit=1
+    )[0]
+    numbered_tools = [
+        line.split("`", maxsplit=2)[1]
+        for line in mcp_section.splitlines()
+        if line[:1].isdigit() and ". `" in line
+    ]
+    assert numbered_tools == target_tools
+    assert "`usage_analyze` is removed" in roadmap
+    assert "The tracker owns:" in roadmap
+    assert "Codex owns:" in roadmap
+    assert "## 7. Query Contract" in design
+    assert "## 13. Deletion Boundary" in design
+    assert "**Published baseline:** `codex-usage-tracking==0.25.1`" in design
+    assert "## Task K6 — Build Kernel Interfaces In The Integration Tree" in plan
+    assert "| K1A | 0.26 integration | Not started | K1 |" in execution
+    assert "2026-07-26-kernel-code-quarantine-design.md" in roadmap
+    assert "| K16 | 0.28.0 | Not started" in execution
+
+
+def test_archived_mcp_first_program_remains_available_without_authority() -> None:
+    redirect_paths = [
+        "docs/roadmap/mcp-first-pivot.md",
+        "docs/roadmap/mcp-first-pivot-execution.md",
+        "docs/superpowers/plans/2026-07-21-mcp-first-product-pivot.md",
+        "docs/superpowers/specs/2026-07-21-mcp-first-product-pivot-design.md",
+        ".agent-maintainer/change-plans/mcp-first-product-pivot.md",
+    ]
+    for relative_path in redirect_paths:
+        redirect = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+        assert "Archived" in redirect
+        assert "product-kernel-reset" in redirect
+
+    roadmap_redirect = (REPO_ROOT / redirect_paths[0]).read_text(encoding="utf-8")
+    assert "does not authorize new MCP-first pivot tasks" in " ".join(
+        roadmap_redirect.split()
+    )
+
+    archived_markers = {
+        "docs/roadmap/archive/2026-07-21-mcp-first-pivot/README.md": (
+            "# MCP-First Product Pivot Archive"
+        ),
+        "docs/roadmap/archive/2026-07-21-mcp-first-pivot/roadmap.md": (
+            "## Release Sequence"
+        ),
+        "docs/roadmap/archive/2026-07-21-mcp-first-pivot/execution-ledger.md": (
+            "## Task 27.5 - Foundation Audit and 0.24 Plan Confirmation"
+        ),
+        "docs/roadmap/archive/2026-07-21-mcp-first-pivot/deprecations.md": (
+            "# Archived MCP-First Deprecation Ledger"
+        ),
+        "docs/superpowers/plans/archive/2026-07-21-mcp-first-product-pivot.md": (
+            "**Program size:** 46 tasks"
+        ),
+        "docs/superpowers/specs/archive/2026-07-21-mcp-first-product-pivot-design.md": (
+            "## 1. Executive decision"
+        ),
+        ".agent-maintainer/change-plans/archive/mcp-first-product-pivot.md": (
+            "# Archived: MCP-First Product Pivot Change Plan"
+        ),
+    }
+    for relative_path, marker in archived_markers.items():
+        archive = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+        assert marker in archive
+
+
+def test_kernel_reset_design_and_plan_are_decision_complete() -> None:
+    plan = (
+        REPO_ROOT / "docs/superpowers/plans/2026-07-26-product-kernel-reset.md"
+    ).read_text(encoding="utf-8")
+    design = (
+        REPO_ROOT / "docs/superpowers/specs/2026-07-26-product-kernel-reset-design.md"
+    ).read_text(encoding="utf-8")
+    quarantine = (
+        REPO_ROOT
+        / "docs/superpowers/specs/2026-07-26-kernel-code-quarantine-design.md"
+    ).read_text(encoding="utf-8")
+    release_checklist = (REPO_ROOT / "docs/release-checklist.md").read_text(
+        encoding="utf-8"
+    )
+
     task_headings = [
-        line.split(":", maxsplit=1)[0].removeprefix("### Task ")
+        line.split(" — ", maxsplit=1)[0].removeprefix("## ")
         for line in plan.splitlines()
-        if line.startswith("### Task ")
+        if line.startswith("## ") and "Task K" in line
     ]
-    expected_task_headings = [
-        *(str(task_number) for task_number in range(1, 28)),
-        "27.5",
-        *(str(task_number) for task_number in range(28, 46)),
+    assert task_headings == [
+        "Task K0",
+        "Task K1",
+        "Task K1A",
+        *[f"Task K{index}" for index in range(2, 17)],
     ]
-
-    assert task_headings == expected_task_headings
-    assert "**Stable task ID:** `ARCH-AUDIT-00`" in plan
-    assert "**Program size:** 46 tasks" in plan
-    assert (
-        "**Depends on:** Task 27.5 with a `PROCEED` decision or a\nmaintainer-approved `AMEND`"
-    ) in plan
-
-    assert "## Pre-0.24 Foundation Gate" in summary
-    assert "No Task 28-39 implementation work may begin" in summary
-    assert "## Task 27.5 - Foundation Audit and 0.24 Plan Confirmation" in execution
-    assert "### 13.4 Pre-0.24 foundation audit" in design
+    assert "A query never starts a refresh." in plan
+    assert "Browser open or reopen never starts an initial build." in plan
+    assert "New cache, not migration 40" in design
+    assert "The old source remains available through Git history" in design
+    assert "kernel/0.26-integration" in quarantine
+    assert "non-publishable" in quarantine
+    assert "policy-read-only" in quarantine
+    assert "v0.25.1" in quarantine
+    for disposition in ("keep", "transplant", "retire", "historical"):
+        assert f"`{disposition}`" in quarantine
+        assert f"| `{disposition}` |" in quarantine
+    assert "exactly every path returned by `git ls-files`" in quarantine
+    assert "`verified` is the only terminal status" in quarantine
+    assert "`kernel/k<owner>-mainline-port-<issue>`" in quarantine
+    assert "branch/ref publication guard" in quarantine
+    assert "`release/0.26.0` from an audited current-`main` SHA" in quarantine
+    assert plan.index("## Task K1A") < plan.index("## Task K2")
+    assert "Build Kernel Interfaces In The Integration Tree" in plan
+    assert "config/kernel-code-disposition-v1.json" in plan
+    assert "**Branch:** `release/0.26.0`, created from the audited" in plan
+    assert "**PR:** `release/0.26.0` -> `main`" in plan
+    assert "publication rejection from the K9 integration release candidate" in plan
+    assert "branch/ref publication-rejection" in release_checklist
+    assert "If `main` moves, restart the audit" in release_checklist
+    assert "2026-07-26-kernel-code-quarantine-design.md" in design
 
 
 def test_deprecation_ledger_has_required_compatibility_columns() -> None:
-    deprecations = (REPO_ROOT / "docs/deprecations.md").read_text(encoding="utf-8")
+    deprecations = (REPO_ROOT / "docs/deprecations.md").read_text(
+        encoding="utf-8"
+    )
+    normalized_deprecations = " ".join(deprecations.split())
 
     for column in (
         "Public name or route",
@@ -95,22 +187,42 @@ def test_deprecation_ledger_has_required_compatibility_columns() -> None:
         "Migration example",
     ):
         assert f"| {column} " in deprecations
+    assert "does not ship runtime adapters" in deprecations
+    assert "`usage_analyze` and `analysis.v2`" in deprecations
+    assert "config/kernel-retired-surfaces-v1.json" in deprecations
+    assert "config/kernel-code-disposition-v1.json" in deprecations
+    assert "kernel/0.26-integration" in deprecations
+    assert "Every path returned by `git ls-files` at K1" in normalized_deprecations
+    assert "`verified` is the only terminal" in normalized_deprecations
+    assert "creates `release/0.26.0` from audited current" in normalized_deprecations
+    assert "## Cutover State Machine" in deprecations
 
 
-def test_agent_branch_prefixes_allow_the_required_pivot_branches() -> None:
+def test_agent_branch_prefixes_allow_the_required_kernel_branches() -> None:
     guidance = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
     allowed_prefixes = next(
         line for line in guidance.splitlines() if line.startswith("- Use branch prefixes ")
     )
 
-    assert "`pivot/`" in allowed_prefixes
+    assert "`kernel/`" in allowed_prefixes
+    assert "`pivot/`" not in allowed_prefixes
+    assert "kernel/0.26-integration" in guidance
+    assert "non-publishable" in guidance
+    assert "policy-read-only" in guidance
+    assert "K1A–K9" in guidance
+    assert "kernel/k<owner>-mainline-port-<issue>" in guidance
+    assert "`release/0.26.0` from an audited current-`main` SHA" in guidance
+    assert "branch/ref publication guard" in guidance
 
 
-def test_architecture_declares_mcp_primary_and_evidence_console_supporting() -> None:
+def test_architecture_declares_facts_below_model_inference() -> None:
     architecture = (REPO_ROOT / "docs/architecture.md").read_text(encoding="utf-8")
+    normalized_architecture = " ".join(architecture.split())
 
-    assert "MCP is the primary analysis interface" in architecture
-    assert "Evidence Console is the supporting verification interface" in architecture
+    assert "The tracker owns exact facts" in architecture
+    assert "Codex owns inference" in architecture
+    assert "Queries and browser opens never start refresh" in normalized_architecture
+    assert "`usage_analyze` and runtime compatibility profiles are" in architecture
 
 
 def test_package_and_readme_position_mcp_before_the_evidence_console() -> None:

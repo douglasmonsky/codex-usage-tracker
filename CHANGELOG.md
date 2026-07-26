@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Archive the completed MCP-first roadmap and establish the Product Kernel
+  Reset program around exact incremental facts, model-owned inference, live
+  evidence, a six-tool MCP surface, side-by-side cache cutover, and removal of
+  the beta analysis and compatibility shell.
+- Add an early K1A code-quarantine gate, four-way per-path disposition, and a
+  non-publishable integration branch so retired beta code leaves the active
+  agent worktree before kernel implementation.
+
 ## 0.25.1 - 2026-07-25
 
 - Remove the experimental local telemetry parser, cursor, staging,

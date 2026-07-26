@@ -337,15 +337,25 @@ This is optional. The normal shell install above is the fastest trusted path for
 
 ## Roadmap
 
-The next phase is adoption hardening: better first-run setup, safer support bundles, clearer guided diagnostics, and scale/reliability checks now that more people are trying the project. See [Adoption Hardening Roadmap](docs/adoption-hardening-roadmap.md) for the branch-by-branch plan.
+The active [Product Kernel Reset](docs/roadmap/product-kernel-reset.md) turns the
+tracker into a lean local observability kernel:
 
-- Keep Python runtime support validated with CI matrix coverage, package classifiers, release docs, and installed-package smoke tests.
-- Improve the `Set limits` flow with a paste/import experience for 5-hour and weekly allowance snapshots.
-- Track allowance snapshot history so local Codex credits can be compared against visible remaining-usage changes over time.
-- Clarify top-card token accounting by showing output tokens and reasoning output as a subset instead of implying all token cards add together.
-- Add more insight presets for cache drift, context growth, subagent-heavy workflows, and pricing/credit confidence gaps.
-- Keep the allowance provider boundary ready for an official usage or allowance API if one becomes available.
-- Continue reducing setup friction for pipx installs, local plugin discovery, and Codex companion skill usage.
+- the tracker owns exact incremental facts, bounded calculations, freshness,
+  and evidence;
+- Codex owns inference, explanation, and recommendations;
+- K1A quarantines retired beta code from the active integration tree so kernel
+  agents work against a lean, classified surface while v0.25.1 remains a
+  separate read-only reference;
+- Release 0.26.0 cuts over to a side-by-side schema-v1 cache, a six-tool MCP
+  surface, live evidence timelines, and a focused Evidence Console;
+- Release 0.27.0 adds guided exploration and optional, separately stored
+  context-composition estimates; and
+- Release 0.28.0 is feature-free stabilization and contract freeze.
+
+The former MCP-first program is
+[archived with its execution evidence](docs/roadmap/archive/2026-07-21-mcp-first-pivot/README.md).
+The reset preserves its accounting, privacy, identity, packaging, and release
+lessons while deleting the beta analysis and compatibility shell.
 
 ## Development
 

@@ -22,15 +22,34 @@ dependency update.
 Local actions under `./` remain relative. Docker actions must use a
 `sha256` digest rather than a mutable image tag.
 
-## Confirm the 0.24 foundation gate
+## Confirm the active product-program gate
 
-For Release 0.24.0, require the
+Release 0.24.0 historically required the
 [foundation audit](superpowers/reports/0.24-foundation-audit.md) to record
 `PROCEED` or an approved `AMEND`, with no unassigned `BLOCKER` or `HIGH`
-finding. Confirm every assigned finding is closed in the
-[execution ledger](roadmap/mcp-first-pivot-execution.md), the architecture and
-integrity gates pass, and the five retired workbenches are notice-only before
-starting artifact promotion.
+finding. Its completed evidence remains in the
+[archived execution ledger](roadmap/archive/2026-07-21-mcp-first-pivot/execution-ledger.md).
+
+For post-0.25 releases, confirm the applicable Product Kernel Reset task and all
+dependencies are terminal in the
+[active execution ledger](roadmap/product-kernel-reset-execution.md). Require
+the task's accounting, incremental, performance, privacy, recovery, package,
+installed-smoke, and review gates before artifact promotion. A release may not
+substitute compatibility work from the archived roadmap for a missing active
+kernel gate.
+
+For Release 0.26.0, also require every
+`config/kernel-code-disposition-v1.json` entry to be `verified` with its
+disposition-specific proof. The manifest must equal the frozen K1
+`git ls-files` inventory plus every reviewed current-main delta. Require the K9
+retired-surface/package-absence audit and branch/ref publication-rejection
+proof through K9.
+
+K10 must record the full main-delta classification and any named
+integration-targeting port/requalification. It creates `release/0.26.0` from
+the audited current-`main` SHA, incorporates qualified integration once, and
+opens that release branch to `main`. If `main` moves, restart the audit. The
+protected release workflow starts only from the merged release source.
 
 ## Promote one verified build
 

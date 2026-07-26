@@ -1,150 +1,194 @@
-# Deprecations
+# Deprecations And Kernel Cutover
 
-This is the normative compatibility ledger for the
-[MCP-first product pivot](roadmap/mcp-first-pivot.md). Every deprecated public
-surface must have an owner through its final supported release, a deterministic
-compatibility test, and a concrete migration example.
+This is the normative removal and upgrade ledger for the
+[Product Kernel Reset](roadmap/product-kernel-reset.md). The previous
+compatibility ledger is preserved as
+[historical evidence](roadmap/archive/2026-07-21-mcp-first-pivot/deprecations.md).
+
+Codex Usage Tracker is still beta. Release 0.26.0 is an intentional breaking
+cutover to a smaller factual data kernel. It provides migration documentation,
+side-by-side cache construction, rollback metadata, and preservation of the old
+cache file, but it does not ship runtime adapters for retired tools, routes,
+commands, profiles, tables, or payloads.
+
+## Removal Ledger
 
 | Public name or route | Replacement | Owner | Deprecated release | Final supported release | Removal release | Compatibility test | Migration example |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Deprecated compatibility MCP tools | The matching core tool named in each catalog entry | MCP interface maintainers | `0.22.0` | `0.25.x` | `0.26.0` | `tests/mcp/test_compatibility_tools.py` plus existing semantic adapter tests | Select profile `full` temporarily, follow each tool description to its replacement, and retain the corresponding CLI or HTTP workflow when automation needs that interface. |
-| Diagnostics Notebook route | `usage_query` plus contextual `usage_evidence` | Evidence Console maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_query(entity="call", measures=["tokens"])`, then open the returned canonical selector with `usage_evidence`. |
-| Investigate route | `usage_analyze` and `usage_evidence` | Analysis service maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_analyze(goal="usage_spike")` and follow its exact evidence identifiers. |
-| Compression Lab route | Core token-waste analysis; full-profile compression operations through `0.25.x` | Analysis service maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_analyze(goal="token_waste")`; use the full-profile compression tools only when exact candidate ranking is required. |
-| Cache and Context route | Context/cache analysis plus contextual Evidence | Analysis service maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Run `usage_analyze(goal="context_bloat")` or `usage_analyze(goal="cache_failure")`, then open the returned selector. |
-| Reports route | `usage_analyze`, `usage_query`, and CLI export | Analysis and CLI maintainers | `0.23.0` | `0.25.x` | `0.26.0` | `test_dashboard_sunset_parity.py` plus direct-route browser compatibility | Use analysis for explanation, query for bounded rows, or the existing CLI export for automation. |
-| Experimental Usage Constellation | Bounded Home summaries plus Explore and contextual Evidence | Evidence Console maintainers | `0.23.0` | `0.22.x` | `0.23.0` | Release dependency, source, asset, and bundle-budget checks | Use Home for current status and open exact calls or threads through Explore/Evidence; the 3D view has no compatibility surface. |
-| Legacy static dashboard | Evidence Console | Evidence Console maintainers | `0.23.0` | `0.24.x` | `0.25.0` | `tests/compatibility/test_removed_static_dashboard.py` plus installed-package server smoke | Run `codex-usage-tracker open` and use its stable Home, Explore, Limits, Settings, and Evidence surfaces. |
-| Legacy CLI command or alias | Simplified stable command or advanced namespace equivalent | CLI interface maintainers | `0.23.0` | `0.25.x` | `0.26.0` | CLI alias parity and help snapshot tests | Replace the alias with the documented stable command or namespaced advanced operation. Task 40 removes only the static `dashboard` and `open-dashboard` aliases in `0.25.0`. |
-| HTTP API v1 route | Versioned HTTP API v2 equivalent | HTTP API maintainers | `0.23.0` | `0.25.x` | `0.26.0` | v1-to-v2 semantic adapter contract tests | Change the client to the documented `/api/v2/` endpoint and its shared response contract. |
+| `usage_analyze` and `analysis.v2` | Batched `usage_query`, exact `usage_evidence`, and model-authored inference | Kernel query and skill maintainers | `0.26.0` upgrade notice | `0.25.x` | `0.26.0` | Six-tool catalog, forbidden-name, golden-query, and installed-plugin tests | Query rankings or comparisons, narrow the candidates, resolve exact selectors with `usage_evidence`, and let Codex explain the graded facts. |
+| `full` and `developer` MCP profiles, deprecated aliases, compression tools, diagnostic tools, and recommendation tools | Exactly six default tools: status, refresh, query, evidence, allowance, and job status | MCP interface maintainers | `0.22.0`–`0.26.0` upgrade notice | `0.25.x` | `0.26.0` | Installed catalog and package forbidden-inventory tests | Remove the profile environment variable and use the matching bounded `usage_query` dataset or operational core tool. |
+| Analysis, investigation, diagnostics, reports, recommendations, compression, and usage-drain HTTP routes | New versioned kernel query, evidence, allowance, refresh/job, status, and live-stream routes | HTTP interface maintainers | `0.23.0`–`0.26.0` upgrade notice | `0.25.x` | `0.26.0` | Route inventory, direct kernel API contract, and forbidden-route tests | Replace server-authored findings with a bounded query batch and open returned selectors in the Evidence Console. |
+| Historical unversioned and `/api/v2/` route families | New kernel API version selected and frozen in K6 | HTTP interface maintainers | `0.23.0`–`0.26.0` upgrade notice | `0.25.x` | `0.26.0` | New-route schema fixtures plus absence tests for old route families | Update local clients to the 0.26 API reference; do not assume v2 payload names carry forward. |
+| CLI command or alias: `analyze` and historical top-level names | `query`, `export`, `open`, explicit `refresh`, service, configuration, and repair operations | CLI interface maintainers | `0.26.0` upgrade notice | `0.25.x` | `0.26.0` | Primary-help snapshot, removed-alias, and installed CLI smoke tests | Use `query` for structured facts, `export` for durable data, and `open` for the exact Evidence Console. |
+| Experimental schema-version-39 cache and its migration chain | Side-by-side kernel schema-v1 cache | Kernel storage maintainers | `0.26.0` upgrade notice | `0.25.x` | `0.26.0` active-runtime use | Staging-build, equivalence, integrity, atomic-promotion, rollback, and old-file-preservation tests | Allow 0.26 to build the new cache beside the old file; keep the old file until qualification succeeds and delete it only through an explicit user action. |
+| Default content fragments, FTS, context search, and content-index refresh | Base structural facts; optional separate content-evidence database no earlier than 0.27 | Privacy and evidence maintainers | `0.26.0` upgrade notice | `0.25.x` | `0.26.0` | Default-schema, package forbidden-inventory, privacy, and optional-database isolation tests | Use exact structural bytes and activity facts in 0.26; explicitly opt in to the separately stored 0.27 content-composition capability if needed. |
+| Persisted findings, analysis results/jobs, compression runs, diagnostic snapshots, recommendation state, and usage-drain state | Generation-consistent query results and disposable generation-keyed read caches only when measured | Kernel application maintainers | `0.26.0` upgrade notice | `0.25.x` | `0.26.0` | Table inventory, import-boundary, forbidden-schema, and no-implicit-job tests | Save a typed query specification or export its rows; do not persist a server interpretation as product truth. |
+| Retired Console workbenches and compatibility routes | `Live`, `Explore`, `Evidence`, `Limits`, and `Settings` | Evidence Console maintainers | `0.23.0`–`0.26.0` upgrade notice | `0.25.x` | `0.26.0` | Browser route inventory, deep-link, warm-reopen, and forbidden-asset tests | Open the focused Console and use Explore for bounded data or Evidence for an exact selector. |
+| Legacy static dashboard | Evidence Console | Evidence Console maintainers | `0.23.0` | `0.24.x` | `0.25.0` | `tests/compatibility/test_removed_static_dashboard.py` and installed server smoke | Run `codex-usage-tracker open`. The 0.26 cutover removes any remaining redirect or migration-only static route. |
 
-The five deprecated React workbench routes are notice-only through `0.25.x`.
-Opening one renders replacement guidance without importing the retired
-workbench page, calling its historical API endpoints, or starting background
-analysis. Their HTTP, CLI, export, and full-profile MCP compatibility operations
-remain supported independently through `0.25.x`; notice-only browser routing
-does not authorize early backend removal.
+## Exact Retired MCP Inventory
 
-## Retained advanced MCP operations
+The profile row above covers every name in this inventory. They remain listed
+so package and release checks can distinguish an intentional beta removal from
+an accidental catalog omission. Listing a name does not preserve its runtime
+handler.
 
-The following aggregate/local operations have no one-call core parity and remain
-active in `full`; they are not part of the 0.22 deprecation set:
-
-- `usage_dedupe_diagnostics`
-- `usage_allowance_export`
-- `usage_call_context`
-- `usage_content_search`
-- `usage_thread_trace`
-- `usage_local_evidence_export`
 - `export_usage_csv`
-
-Dogfood and visualization tools have `developer` disposition and are available
-only in the `developer` profile. Their names remain in the historical 0.21
-fixture so the move is explicit rather than an accidental disappearance.
-
-## MCP compatibility details
-
-The complete deprecated MCP alias inventory is:
-
-- `subagent_usage`
+- `generate_usage_dashboard`
+- `init_usage_allowance_config`
+- `init_usage_pricing_config`
+- `most_expensive_usage_calls`
 - `refresh_usage_index`
-- `usage_refresh_start`
-- `usage_refresh_status`
-- `usage_doctor`
-- `usage_summary`
-- `usage_calls`
-- `usage_call_detail`
-- `usage_threads`
-- `usage_report_pack`
-- `usage_dashboard_recommendations`
-- `usage_allowance_history`
-- `usage_allowance_diagnostics`
-- `usage_allowance_status`
-- `usage_allowance_series`
-- `usage_allowance_evidence`
+- `session_usage`
+- `subagent_usage`
+- `update_usage_pricing_config`
+- `usage_action_brief`
 - `usage_allowance_analysis`
 - `usage_allowance_analysis_status`
+- `usage_allowance_diagnostics`
+- `usage_allowance_evidence`
+- `usage_allowance_export`
+- `usage_allowance_history`
+- `usage_allowance_series`
+- `usage_allowance_status`
+- `usage_analyze`
+- `usage_call_context`
+- `usage_call_detail`
+- `usage_calls`
+- `usage_command_loop_scan`
+- `usage_compression_candidate_detail`
+- `usage_compression_candidates`
+- `usage_compression_profile`
+- `usage_compression_simulate`
 - `usage_compression_start`
 - `usage_compression_status`
-- `usage_compression_profile`
-- `usage_compression_candidates`
-- `usage_compression_candidate_detail`
-- `usage_compression_simulate`
-- `usage_recommendations`
-- `session_usage`
-- `most_expensive_usage_calls`
-- `usage_pricing_coverage`
-- `usage_source_coverage`
-- `usage_repetition_scan`
-- `usage_command_loop_scan`
-- `usage_file_churn_scan`
-- `usage_repeated_file_rediscovery`
-- `usage_shell_churn`
-- `usage_large_low_output_calls`
-- `usage_suggest_investigations`
-- `usage_investigate`
-- `usage_action_brief`
-- `usage_test_hypotheses`
+- `usage_content_search`
 - `usage_context_bloat_scan`
+- `usage_dashboard_recommendations`
+- `usage_dedupe_diagnostics`
+- `usage_doctor`
+- `usage_dogfood_result`
+- `usage_dogfood_start`
+- `usage_dogfood_status`
+- `usage_file_churn_scan`
+- `usage_investigate`
 - `usage_investigation_walk`
-- `init_usage_pricing_config`
-- `update_usage_pricing_config`
-- `init_usage_allowance_config`
+- `usage_large_low_output_calls`
+- `usage_local_evidence_export`
+- `usage_pricing_coverage`
+- `usage_recommendations`
+- `usage_refresh_start`
+- `usage_refresh_status`
+- `usage_repeated_file_rediscovery`
+- `usage_repetition_scan`
+- `usage_report_pack`
+- `usage_shell_churn`
+- `usage_source_coverage`
+- `usage_suggest_investigations`
+- `usage_summary`
+- `usage_test_hypotheses`
+- `usage_thread_trace`
+- `usage_threads`
+- `usage_visualization_render`
+- `usage_visualization_suggest`
 
-- Warning starts in `0.22.0` through each deprecated tool's MCP description.
-- Direct removal is permitted no earlier than `0.26.0`, after final support in
-  `0.25.x` and only when the named compatibility test remains green.
-- CLI and HTTP alternatives remain supported independently during the migration
-  window; moving a tool between profiles does not remove those interfaces.
-- Compatibility handlers keep their historical public names and FastMCP schemas.
-  The declarative catalog supplies profile and lifecycle metadata without wrapping
-  the callable in a generic `*args, **kwargs` signature.
+## Exact Cross-Surface Inventory
 
-No CLI compatibility surface may be removed before its removal release. The
-same rule applies to MCP tools, dashboard routes, static output, and HTTP APIs.
-If semantic equivalence cannot be proven, preserve the old behavior through its
-final supported release or publish a documented breaking-change notice.
+K1 creates `config/kernel-retired-surfaces-v1.json` before kernel implementation.
+It is the versioned exact inventory for MCP names, HTTP routes, CLI commands and
+aliases, schemas, tables, Console routes, source/assets, and package data. Every
+entry records its surface type, exact name, replacement or `none`, final
+supported release, removal release, and absence or migration test.
 
-## CLI compatibility mapping
+K1 also creates `config/kernel-code-disposition-v1.json`. Every path returned
+by `git ls-files` at K1 is classified exactly once as `keep`, `transplant`,
+`retire`, or `historical`, with an owner, target or deletion task, provenance,
+and verification oracle. Workflows, root metadata, configuration, and agent
+instructions are included.
+K1A consumes that manifest to remove retired paths and active copies of
+transplant paths from the integration worktree before kernel implementation.
 
-The primary CLI help lists only `setup`, `status`, `doctor`, `refresh`,
-`analyze`, `query`, `open`, `export`, `config`, `service`, and `admin`.
-Most historical top-level names remain accepted while their separate migration
-contracts are active. The static `dashboard` and `open-dashboard` aliases were
-removed in `0.25.0` and return an exact migration error. When stderr is an
-interactive terminal, an alias prints one concise migration notice to stderr;
-stdout is never used for deprecation text.
+K6 must map every new adapter to the retired-surface manifest. `verified` is the
+only terminal code-disposition status. K9 must fail if the integration source
+contains an unclassified public surface, any tracked path or reviewed main
+delta is unrepresented, any of the four disposition classes is not verified,
+or a manifest entry lacks its named proof. The 0.26 upgrade guide is generated
+or checked against the same entries.
 
-| Historical operation | Stable replacement |
-| --- | --- |
-| Static dashboard and report entry points | `open`, `analyze`, `query`, or `export` |
-| `dashboard-service install/status/uninstall` | `service install/status/uninstall` |
-| `serve-dashboard` | `service serve` |
-| Pricing, allowance, rate-card, projects, and thresholds commands | The matching `config` namespace |
-| Index repair, source coverage, support bundle, and dogfood commands | The matching `admin` namespace |
-| Manual MCP process | `admin mcp serve --profile core\|full\|developer` |
+## Cutover Rules
 
-The stable `query` spelling keeps its old-only filters and unbounded `--limit 0`
-form as a v1 compatibility mode. New bounded query options return
-`codex-usage-tracker.query.v2`.
+- `main` remains a releasable 0.25.1 line while the kernel is built. A detached,
+  policy-read-only v0.25.1 worktree is the compatibility oracle, not an active
+  development dependency.
+- K1A–K9 land only on the temporary, non-publishable
+  `kernel/0.26-integration` branch. K1A performs the broad active-tree
+  quarantine; K2–K8 transplant only explicitly assigned behavior and verify
+  it against the tag-backed oracle.
+- No CLI compatibility surface may be removed before its removal release on
+  releasable `main`; its early absence is confined to the non-publishable
+  integration tree.
+- Historical schema identifiers cannot be reused with changed semantics. The
+  branch/ref publication guard rejects integration and every K1A-K9 task ref
+  through K9.
+- K9 owns final absence, unresolved-disposition, package, and release-candidate
+  audits. A retired runtime name or unclassified path still present after K9
+  is a release blocker unless the roadmap is amended.
+- K10 must audit every tracked-path delta from the frozen K1 main SHA, port
+  required behavior through a named integration-targeting branch, and
+  requalify affected gates. It creates `release/0.26.0` from audited current
+  `main`, incorporates qualified integration once, and opens that release
+  branch to `main`; a moving main head restarts the audit.
+- K10 must prove side-by-side construction, accounting equivalence, integrity,
+  atomic promotion, rollback, and the reviewed release-branch
+  conflict/classification audit before Release 0.26.0.
+- The old cache file is retained for rollback and is never silently deleted.
+  Retaining the file does not require shipping code that reads its old schema.
+- CSV/JSON exports selected by the K6 contract remain supported. Export
+  semantics are tested against the accounting oracle, not assumed from old
+  implementation paths.
+- Exact Evidence Console logical selectors survive rebuild. SQLite row IDs and
+  historical route URLs do not.
+- Removal documentation is the beta migration surface. Runtime compatibility is
+  not.
 
-## HTTP API v1 compatibility mapping
+## Cutover State Machine
 
-All unversioned `/api/*` responses advertise `Deprecation: true` and link back
-to this ledger. They remain compatibility routes through `0.25.x`; new
-dashboard code must not add dependencies on them.
+The operational sidecar owns one atomically replaced control record:
 
-| Compatibility route family | v2 replacement | Current dashboard use |
-| --- | --- | --- |
-| `/api/usage` | `/api/v2/query` for bounded reads; `/api/v2/refresh` for index refresh | Removed from stable Home timeframe changes in `0.23.0`; retained by legacy snapshot hydration and legacy routes only. |
-| `/api/refresh/start`, `/api/refresh/status` | `/api/v2/refresh`, then `/api/v2/jobs/{job_id}` | Compatibility refresh flow pending migration. |
-| `/api/status`, `/api/readiness`, `/api/health` | `/api/v2/status` and `/api/v2/capabilities` | The bounded Home bootstrap still uses the compatibility status envelope while its component payloads move independently. |
-| `/api/calls`, `/api/call`, `/api/threads`, `/api/thread-calls` | `/api/v2/query` plus `/api/v2/evidence` | Explore Calls and Threads remain explicit compatibility exceptions until their richer display fields have v2 parity. |
-| `/api/summary`, `/api/recommendations` | `/api/v2/query` and `/api/v2/analyze` | Legacy Overview routes only. Stable Home uses the bounded status summary and focused v2 usage queries. |
-| `/api/allowance/*` | `/api/v2/allowance` and `/api/v2/jobs/{job_id}` | Limits migration is incremental; focused compatibility endpoints remain supported through `0.25.x`. |
-| `/api/investigations/*`, `/api/reports/*`, `/api/diagnostics/*`, `/api/compression/*` | `/api/v2/analyze`, `/api/v2/query`, and `/api/v2/evidence` where semantic parity exists | Compatibility and deprecated lab routes only; operations without proven parity remain supported through the final compatibility release. |
-| `/api/context`, `/api/context-settings`, `/api/open-investigator` | `/api/v2/evidence` or direct Evidence Console navigation | Compatibility helpers pending removal with the legacy dashboard surface. |
+- `absent`: no active kernel; status reports that an explicit first build is
+  required.
+- `building`: a staging path and refresh job are visible, but queries never open
+  staging.
+- `ready`: staging passed equivalence, integrity, privacy, and performance gates
+  but is not active.
+- `active`: reads use the named kernel path and committed generation.
+- `failed`: the failure is visible and the prior active pointer, if any, is
+  unchanged.
 
-Deprecation does not mean an endpoint may be removed early. Each family keeps
-its current contract until the final supported release, and removal still
-requires the parity and direct-route checks named above.
+Only CLI `refresh`, MCP `usage_refresh`, or the Console Refresh action starts the
+first build. Install, setup, status, query, evidence, allowance, service
+startup, and browser mount do not.
+
+Promotion changes the active pointer only after `ready`. An explicit kernel
+rollback may atomically restore a prior validated kernel path. On the first
+0.26 upgrade, there is no prior kernel: rollback to schema 39 means reinstalling
+0.25.1 and using the untouched old cache. The 0.26 runtime does not read the old
+schema.
+
+## User Upgrade Shape
+
+The 0.26 upgrade is designed to be visible and recoverable:
+
+1. Install a coherent package and plugin bundle.
+2. Explicitly run CLI `refresh`, invoke MCP `usage_refresh`, or press Console
+   Refresh to start the kernel staging build.
+3. Continue reading the last valid committed data or show an explicit build
+   state; never show false zeroes.
+4. Catch up complete lines appended during the build.
+5. Validate oracle totals, foreign keys, integrity, privacy, and performance.
+6. Atomically promote the new cache and record any prior-kernel rollback
+   pointer.
+7. Keep the old cache until the user explicitly removes it.
+
+No query, model call, browser mount, or evidence read may start this build
+implicitly.
