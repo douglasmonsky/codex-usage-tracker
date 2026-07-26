@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
+from copy import deepcopy
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -21,29 +21,7 @@ def _manifest() -> dict[str, object]:
     return json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
-def _tracked_paths() -> set[str]:
-    result = subprocess.run(
-        ["git", "ls-files"],
-        cwd=_REPO_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return set(result.stdout.splitlines())
-
-
-def _non_ignored_untracked_paths() -> set[str]:
-    result = subprocess.run(
-        ["git", "ls-files", "--others", "--exclude-standard"],
-        cwd=_REPO_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return set(result.stdout.splitlines())
-
-
-def test_code_disposition_resolves_entire_tracked_tree_once() -> None:
+def test_code_disposition_preserves_the_frozen_k1_tree_once() -> None:
     manifest = _manifest()
     entries = manifest["entries"]
     paths = [entry["path"] for entry in entries]
@@ -51,13 +29,13 @@ def test_code_disposition_resolves_entire_tracked_tree_once() -> None:
     assert manifest["schema"] == "codex-usage-tracker.kernel-code-disposition.v1"
     assert manifest["resolver"] == "git ls-files"
     assert len(paths) == len(set(paths))
-    assert set(paths) == _tracked_paths()
     assert {entry["disposition"] for entry in entries} == _DISPOSITIONS
     expected_inventory_hash = __import__("hashlib").sha256(
-        ("\n".join(sorted(_tracked_paths())) + "\n").encode()
+        ("\n".join(sorted(paths)) + "\n").encode()
     ).hexdigest()
     assert manifest["resolver_input_sha256"] == expected_inventory_hash
-    assert not _non_ignored_untracked_paths()
+    assert manifest["source_ref"] == "d8da9bccdb6674e7dca4c0872c36a1346949dc13"
+    assert manifest["quarantine_base"] == manifest["source_ref"]
 
 
 def test_code_disposition_entries_are_decision_complete() -> None:
@@ -112,9 +90,30 @@ def test_verified_is_the_only_terminal_status() -> None:
 
 
 def test_code_disposition_manifest_matches_generator() -> None:
-    from scripts.generate_kernel_manifests import build_code_disposition_manifest
+    from scripts.generate_kernel_manifests import (
+        build_code_disposition_manifest,
+        manifest_failures,
+    )
 
     assert _manifest() == build_code_disposition_manifest()
+    assert manifest_failures() == []
+
+
+def test_code_disposition_rejects_immutable_k1_decision_drift() -> None:
+    from scripts.generate_kernel_manifests import manifest_failures
+
+    changed = deepcopy(_manifest())
+    changed["entries"][0]["owner_task"] = "K9"
+
+    failures = manifest_failures(changed)
+
+    assert any("immutable K1 disposition decision changed" in item for item in failures)
+
+
+def test_k1a_advanced_every_non_keep_path_to_removed() -> None:
+    for entry in _manifest()["entries"]:
+        if entry["disposition"] != "keep":
+            assert entry["status"] == "removed"
 
 
 def test_code_disposition_preserves_and_retires_semantic_boundaries() -> None:

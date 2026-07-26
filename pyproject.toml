@@ -4,27 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-usage-tracking"
-version = "0.25.1"
-description = "Local, evidence-backed Codex usage analyst with MCP tools and an Evidence Console."
+version = "0.26.0.dev0"
+description = "Non-publishable integration skeleton for the Codex Usage Tracker data kernel."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Douglas Monsky" }]
 license = "MIT"
 license-files = ["LICENSE"]
-keywords = [
-  "codex",
-  "mcp",
-  "tokens",
-  "usage",
-  "dashboard",
-  "openai",
-  "prompt-caching",
-  "cost-analysis",
-]
+keywords = ["codex", "tokens", "usage", "local-first"]
 classifiers = [
-  "Development Status :: 4 - Beta",
-  "Environment :: Console",
-  "Framework :: Pytest",
+  "Development Status :: 2 - Pre-Alpha",
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
@@ -33,83 +22,43 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
-  "Topic :: Software Development :: Libraries :: Python Modules",
-  "Topic :: System :: Monitoring",
 ]
-dependencies = ["mcp>=1.2.0", "tiktoken>=0.13.0"]
+dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/douglasmonsky/codex-usage-tracker"
 Repository = "https://github.com/douglasmonsky/codex-usage-tracker"
 Issues = "https://github.com/douglasmonsky/codex-usage-tracker/issues"
-Changelog = "https://github.com/douglasmonsky/codex-usage-tracker/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
-  "agent-maintainer[core]>=0.1.0b5; python_version >= '3.11'",
   "build>=1.2",
-  "check-jsonschema>=0.37.4; python_version >= '3.11'",
-  "diff-cover>=9.0",
   "mypy>=1.10",
-  "pip-audit>=2.10.0; python_version >= '3.11'",
-  "pillow>=10",
   "pytest>=8.0",
-  "pytest-cov>=5.0",
   "pyright>=1.1.405",
   "ruff>=0.8",
-  "tach>=0.35.0; python_version >= '3.11'",
   "tomli>=2.0; python_version < '3.11'",
   "xenon>=0.9.3",
-  "yamllint>=1.38.0; python_version >= '3.11'",
-  "zizmor>=1.26.1; python_version >= '3.11'",
 ]
-
-[dependency-groups]
-performance = [
-  "agent-perf @ git+https://github.com/douglasmonsky/agent-perf.git@132158e9e1848c6c1f04cbf309f9786603fb52b9; python_version >= '3.11'",
-  "scalene==2.3.0; python_version >= '3.11'",
-]
-
-[project.scripts]
-codex-usage-tracker = "codex_usage_tracker.cli:main"
 
 [tool.setuptools]
 include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-"codex_usage_tracker.plugin_data" = [
-  "assets/*",
-  "dashboard/locales/*",
-  "dashboard/react/*",
-  "dashboard/react/assets/*",
-  "docs/*",
-  "docs/examples/*",
-  "docs/assets/*",
-  "rate_cards/*",
-  "skills/codex-usage-api/*",
-  "skills/codex-usage-tracker/*",
-  "skills/codex-usage-tracker/scripts/*.py",
+include = [
+  "codex_usage_tracker.kernel*",
+  "codex_usage_tracker.release*",
 ]
+namespaces = true
 
 [tool.setuptools.exclude-package-data]
 "*" = ["__pycache__/*", "*.py[cod]"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/kernel", "tests/release"]
 pythonpath = [".", "src"]
 addopts = ["--import-mode=importlib"]
-
-[tool.coverage.run]
-branch = true
-source = ["codex_usage_tracker"]
-
-[tool.coverage.report]
-fail_under = 85
-skip_covered = true
-show_missing = true
 
 [tool.ruff]
 line-length = 100
@@ -119,198 +68,22 @@ target-version = "py310"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501"]
 
-[tool.pylint."messages control"]
-disable = ["all"]
-enable = [
-  "F",
-  "E",
-  "W0101", # unreachable
-  "W0102", # dangerous-default-value
-  "W0120", # useless-else-on-loop
-  "W0123", # eval-used
-  "W0129", # assert-on-string-literal
-  "W0150", # lost-exception
-  "W0199", # assert-on-tuple
-  "W0702", # bare-except
-  "W0705", # duplicate-except
-  "W0707", # raise-missing-from
-  "W0711", # binary-op-exception
-  "W1404", # implicit-str-concat
-  "W1501", # bad-open-mode
-  "W1508", # invalid-envvar-default
-  "W1510", # subprocess-run-check
-  "R0124", # comparison-with-itself
-  "R1716", # chained-comparison
-  "R1730", # consider-using-min-builtin
-  "R1731", # consider-using-max-builtin
-]
-
-[tool.agent_maintainer]
-mode = "legacy-ratchet"
-architecture_tool = "tach"
-source_roots = ["src"]
-test_roots = ["tests"]
-package_paths = ["src"]
-coverage_source = ["src"]
-file_length_paths = ["src", "tests", "scripts", "skills"]
-structure_paths = ["src"]
-structure_ignore_paths = [
-  "tests/**",
-  "migrations/**",
-  "generated/**",
-  ".venv/**",
-  "venv/**",
-  "**/__pycache__/**",
-]
-vulture_paths = [
-  "src",
-  "tests",
-  "scripts/check_product_complexity.py",
-  "scripts/check_release.py",
-  "config/vulture-whitelist.py",
-]
-require_tests = true
-coverage_fail_under = 85
-diff_cover_fail_under = 90
-file_length_max_physical = 600
-file_length_max_source = 600
-file_length_baseline = ".agent-maintainer/file-length-baseline.json"
-change_warn_lines = 1500
-change_block_lines = 5000
-change_warn_files = 30
-change_block_files = 100
-source_without_test_change_error_profiles = []
-allow_source_without_test_change = false
-suppression_max_new = 3
-xenon_max_absolute = "B"
-xenon_max_modules = "B"
-xenon_max_average = "B"
-ruff_max_complexity = 10
-pyright_type_checking_mode = "standard"
-enable_pip_audit = true
-pip_audit_args = ["-r", "requirements/audit.txt"]
-enable_secret_scanning = true
-enable_yamllint = true
-enable_taplo = true
-enable_markdownlint = true
-enable_check_jsonschema = true
-enable_typescript = true
-typescript_lint_command = [
-  "npm",
-  "--workspace",
-  "frontend/dashboard",
-  "run",
-  "lint",
-  "--",
-  "--format",
-  "json",
-]
-typescript_typecheck_command = ["npm", "run", "dashboard:typecheck"]
-typescript_test_command = [
-  "npm",
-  "--workspace",
-  "frontend/dashboard",
-  "run",
-  "test",
-  "--",
-  "--reporter=json",
-]
-check_jsonschema_args = [
-  "--builtin-schema",
-  "vendor.github-workflows",
-  ".github/workflows/ci.yml",
-  ".github/workflows/pricing-compat.yml",
-  ".github/workflows/publish.yml",
-]
-enable_wemake = false
-enable_interrogate = false
-
-[tool.agent_maintainer.file_baselines]
-enabled = true
-mode = "advisory"
-
-[tool.agent_maintainer.file_baselines.groups.dashboard-source]
-include = ["frontend/dashboard/src/**/*.ts", "frontend/dashboard/src/**/*.tsx"]
-exclude = [
-  "frontend/dashboard/src/**/*.test.ts",
-  "frontend/dashboard/src/**/*.test.tsx",
-  "frontend/dashboard/src/vite-env.d.ts",
-]
-role = "source"
-max_physical_lines = 500
-max_nonblank_lines = 400
-changed_file_warn = 10
-changed_line_warn = 800
-
-[tool.agent_maintainer.file_baselines.groups.dashboard-tests]
-include = [
-  "frontend/dashboard/src/**/*.test.ts",
-  "frontend/dashboard/src/**/*.test.tsx",
-  "tests/playwright/**/*.mjs",
-]
-role = "test"
-max_physical_lines = 600
-max_nonblank_lines = 500
-changed_file_warn = 12
-changed_line_warn = 1000
-
-[tool.agent_maintainer.file_baselines.groups.dashboard-styles]
-include = [
-  "frontend/dashboard/src/**/*.css",
-  "frontend/dashboard/src/**/*.scss",
-]
-role = "source"
-max_physical_lines = 600
-max_nonblank_lines = 500
-changed_file_warn = 8
-changed_line_warn = 700
-
-[tool.agent_maintainer.file_baselines.groups.dashboard-redesign-core]
-include = [
-  "frontend/dashboard/src/data/**/*.ts",
-  "frontend/dashboard/src/data/**/*.tsx",
-  "frontend/dashboard/src/design/**/*.ts",
-  "frontend/dashboard/src/design/**/*.tsx",
-  "frontend/dashboard/src/entities/**/*.ts",
-  "frontend/dashboard/src/entities/**/*.tsx",
-  "frontend/dashboard/src/routes/**/*.ts",
-  "frontend/dashboard/src/routes/**/*.tsx",
-  "frontend/dashboard/src/visualization/**/*.ts",
-  "frontend/dashboard/src/visualization/**/*.tsx",
-]
-exclude = [
-  "frontend/dashboard/src/**/*.test.ts",
-  "frontend/dashboard/src/**/*.test.tsx",
-]
-role = "source"
-max_physical_lines = 400
-max_nonblank_lines = 300
-changed_file_warn = 10
-changed_line_warn = 800
-
-[tool.deptry]
-known_first_party = ["codex_usage_tracker"]
-optional_dependencies_dev_groups = ["dev"]
-extend_exclude = ["scripts"]
-
-[tool.vulture]
-min_confidence = 60
-
-[tool.agent_maintainer.diagnostics]
-enabled = true
-log_dir = ".verify-logs"
-
 [tool.mypy]
 python_version = "3.10"
 warn_unused_configs = true
 files = [
-  "scripts/check_product_complexity.py",
-  "src/codex_usage_tracker/core/json_contracts.py",
-  "src/codex_usage_tracker/core/models.py",
-  "src/codex_usage_tracker/reports/recommendations.py",
-  "src/codex_usage_tracker/reports/api.py",
-  "src/codex_usage_tracker/core/schema.py",
-  "src/codex_usage_tracker/store/api.py",
-  "src/codex_usage_tracker/usage_drain/reports.py",
-  "src/codex_usage_tracker/usage_drain/time_series.py",
+  "scripts/check_kernel_maintainability.py",
+  "scripts/check_kernel_scope.py",
+  "scripts/generate_kernel_manifests.py",
+  "src/codex_usage_tracker/kernel",
 ]
+
+[tool.pyright]
+include = [
+  "scripts/check_kernel_maintainability.py",
+  "scripts/check_kernel_scope.py",
+  "scripts/generate_kernel_manifests.py",
+  "src/codex_usage_tracker/kernel",
+]
+pythonVersion = "3.10"
+typeCheckingMode = "standard"
