@@ -59,6 +59,7 @@ dev = [
   "ruff>=0.8",
   "tach>=0.35.0; python_version >= '3.11'",
   "tomli>=2.0; python_version < '3.11'",
+  "xenon>=0.9.3",
   "yamllint>=1.38.0; python_version >= '3.11'",
   "zizmor>=1.26.1; python_version >= '3.11'",
 ]
