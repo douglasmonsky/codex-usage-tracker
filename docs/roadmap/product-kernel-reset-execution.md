@@ -280,7 +280,7 @@ or block on usage indexing.
 **State:** Complete
 **Branch:** `kernel/k1-oracle-baseline`
 **Base:** `62726189c05d423f08abdec6ad1454434188d734`
-**Commits:** this changeset
+**Commits:** `c62c3a6`, this changeset
 
 ### K1 contract added first
 
@@ -339,13 +339,13 @@ or block on usage indexing.
 ### Development-efficiency baseline
 
 - Contract red-test runs: 1
-- Focused test runs: 25
-- Broad verification runs: 3
+- Focused test runs: 31
+- Broad verification runs: 4
 - Duplicate unchanged-state broad runs: 0
-- Blocking check groups: 6
+- Blocking check groups: 7
 - Non-behavioral blocking check groups: 6
 - Gate-remediation lines: 74
-- Recorded verification wall time: 659.0 seconds
+- Recorded verification wall time: 704.0 seconds
 - Style-only commits: 0
 
 The first broad run used Agent Maintainer's generic CI profile and exposed four
@@ -356,6 +356,12 @@ rewritten. The repository acceptance wrappers were corrected, and the second
 broad run passed. A redundant frontend-governance invocation was also removed
 from `just vc`; `dashboard:verify` remains the single owner of that gate. K2 is
 the first task eligible for a churn-reduction comparison.
+
+The first GitHub CI run added one behavioral finding: the two new TOML readers
+used Python 3.11's `tomllib` without the repository's Python 3.10 `tomli`
+fallback. The compatibility correction passed a Python 3.10 import probe and
+the complete focused kernel suite. It is counted as a blocking finding, not as
+non-behavioral gate churn.
 
 ### K1 review metrics
 

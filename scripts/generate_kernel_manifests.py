@@ -14,7 +14,10 @@ from argparse import _SubParsersAction
 from pathlib import Path
 from typing import Any
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
+    import tomli as tomllib
 
 from codex_usage_tracker.interfaces.cli.parser import build_parser
 from codex_usage_tracker.interfaces.mcp.registry import tool_specs

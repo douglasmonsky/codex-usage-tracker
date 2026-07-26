@@ -58,15 +58,15 @@
       "task_id": "K1",
       "state": "complete",
       "contract_red_test_runs": 1,
-      "focused_test_runs": 25,
-      "broad_verification_runs": 3,
+      "focused_test_runs": 31,
+      "broad_verification_runs": 4,
       "duplicate_broad_runs": 0,
-      "blocking_gate_findings": 6,
+      "blocking_gate_findings": 7,
       "non_behavioral_gate_findings": 6,
       "gate_remediation_lines": 74,
-      "verification_wall_seconds": 659.0,
+      "verification_wall_seconds": 704.0,
       "style_only_commits": 0,
-      "notes": "First post-policy baseline. Six blocking check groups changed no product behavior: two focused import/style checks plus four generic Agent Maintainer CI-profile groups. Broad runs followed implementation or review fixes; none repeated an unchanged source/configuration state."
+      "notes": "First post-policy baseline. Six blocking check groups changed no product behavior: two focused import/style checks plus four generic Agent Maintainer CI-profile groups. GitHub CI found one behavioral Python 3.10 compatibility defect in new tomllib imports; the existing tomli fallback pattern corrected it. Broad runs followed implementation, review fixes, or the CI compatibility fix; none repeated an unchanged source/configuration state."
     }
   ]
 }
