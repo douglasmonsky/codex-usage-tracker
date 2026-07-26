@@ -81,6 +81,20 @@
       "verification_wall_seconds": 57.3,
       "style_only_commits": 0,
       "notes": "K1A final local measurement, including a clean Python 3.10 phase run, four accepted reviewer contract findings, and one clean-checkout sdist determinism defect found by CI. Five non-behavioral findings narrowed Ruff to phase-owned files, isolated pytest from a stale local Tach plugin, updated the wrapper-policy test, and corrected two test/import mistakes during reviewer remediation. One unchanged-state broad pass was duplicated when just vc reran just v before the package build; future tasks should use the package-only step after an already-green just v. Review-token attribution is pending and was not retried."
+    },
+    {
+      "task_id": "K2",
+      "state": "reviewed",
+      "contract_red_test_runs": 2,
+      "focused_test_runs": 18,
+      "broad_verification_runs": 11,
+      "duplicate_broad_runs": 0,
+      "blocking_gate_findings": 18,
+      "non_behavioral_gate_findings": 10,
+      "gate_remediation_lines": 230,
+      "verification_wall_seconds": 49.5,
+      "style_only_commits": 0,
+      "notes": "Final local K2 measurement before integration CI. Recorded verification wall time is 13.6% lower than K1A and 94.9% lower than K1, with no duplicate broad run or style-only commit. Non-behavioral findings and remediation lines increased: two Xenon-B findings caused most of the 230-line structural rewrite, while environment/path invocation mistakes, Ruff forms, one MyPy import form, one Pyright interpreter path, one over-broad privacy assertion, and one attempt to collect later-task oracle adapters made up the remainder. Six accepted final-review findings and two implementation defects found while remediating them count as blocking findings but not non-behavioral churn. The phase-owned suite remains explicit because four K1 oracle adapters intentionally depend on quarantined runtime until their K3 owners replace them."
     }
   ]
 }

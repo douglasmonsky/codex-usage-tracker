@@ -24,7 +24,7 @@ def test_development_efficiency_policy_is_decision_complete() -> None:
     assert payload["schema"] == "codex-usage-tracker.kernel-development-efficiency.v1"
     assert payload["baseline_task"] == "K1"
     assert set(payload["metric_definitions"]) == _METRICS
-    assert [task["task_id"] for task in payload["tasks"]] == ["K1", "K1A"]
+    assert [task["task_id"] for task in payload["tasks"]] == ["K1", "K1A", "K2"]
     assert all(task.keys() >= _METRICS for task in payload["tasks"])
 
 

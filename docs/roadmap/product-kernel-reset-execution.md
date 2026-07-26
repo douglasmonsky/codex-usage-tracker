@@ -62,7 +62,7 @@ progress.
 | K0 | documentation baseline | Complete | — | Archive former program and approve reset |
 | K1 | 0.25.x bridge | Complete | K0 | Freeze accounting oracle |
 | K1A | 0.26 integration | Complete | K1 | Quarantine legacy code and freeze agent scope |
-| K2 | 0.26.0 | Not started | K1A | Kernel schema v1 and stable identity |
+| K2 | 0.26.0 | In progress | K1A | Kernel schema v1 and stable identity |
 | K3 | 0.26.0 | Not started | K2 | Incremental/live ingestion |
 | K4 | 0.26.0 | Not started | K3 | Bounded query engine |
 | K5 | 0.26.0 | Not started | K3 | Evidence timeline and live stream |
@@ -503,6 +503,124 @@ contracts now run in the K1A kernel suite. No second review pass was run.
 - K2 must implement and verify only its owned transplant entries; all other
   removed paths remain forbidden.
 - K2 is unblocked after K1A review, integration-targeting PR CI, and merge.
+
+## K2 — Schema V1 And Stable Identity
+
+**State:** In progress (implementation, final review, and local validation
+complete; integration CI and merge pending)
+**Branch:** `kernel/k2-schema-identity`
+**Base:** `bb11bcbef30a37e5fefa483ec7f240cf4a79468a`
+**Commits:** this changeset
+
+### K2 contract added first
+
+- Five new contract files initially failed collection because the kernel
+  schema, identity, database-lifecycle, cutover-control, and source-registry
+  modules did not exist.
+- A second contract-red run proved three primary-review findings before their
+  fixes: reopened databases retained permissive modes, operational schema
+  version drift was accepted, and failure codes were not actually bounded.
+
+### K2 implementation
+
+- Added the exact eight-table analytical schema:
+  `sources`, `generations`, `threads`, `turns`, `model_calls`, `tool_calls`,
+  `activity_events`, and `allowance_observations`, with 16 targeted indices
+  under the 18-index budget.
+- Added the exact three-table owner-only operational sidecar:
+  `refresh_runs`, `source_registry`, and `cutover_control`. Full source paths,
+  refresh leases/results, legacy-cache location, and activation state never
+  enter analytical bytes.
+- Chose the side-by-side filenames `codex-usage-kernel-v1.sqlite3` and
+  `codex-usage-kernel-operational-v1.sqlite3`.
+- Added stable namespaced IDs, canonical semantic fingerprints, bounded safe
+  labels, atomic staging/install, read-only snapshots, short WAL writer
+  transactions, integrity/version checks, 0600 permission repair, and explicit
+  build/ready/active/failed cutover transitions.
+- The K1 manifest had assigned 80 generic legacy paths to K2 despite the
+  approved five-module design. Exact provenance review retained 16 relevant
+  assignments as verified transplants, deferred two unproved
+  cascade/deduplication lifecycle oracles to K3, and corrected 62 compression,
+  diagnostics, dashboard, migration-chain, and other spike assignments to
+  verified retirement. No legacy database is opened or migrated.
+
+### K2 verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | 31 schema, identity, real-artifact cutover/rollback, permission, version, and privacy tests; Ruff, MyPy, Pyright, and Xenon/file-size budget pass |
+| Broader | Pass | `just v`: 59 phase-owned tests, manifest/scope, static, release-safety, and privacy gates in 3.92 s |
+| Package | Pass | package-only build plus `check_release.py --dist`; exact 10-module wheel, no CLI/MCP/plugin/runtime dependencies, and bounded fail-closed sdist |
+| Privacy | Pass | synthetic fixtures only; full synthetic source path occurs only in the 0600 operational sidecar |
+
+The retained K1 oracle-adapter implementation tests are not collected in K2:
+four deliberately import quarantined 0.25 runtime modules and are assigned to
+the K3 ingestion replacement. A trial whole-directory run failed those exact
+four adapters and passed the other 54 tests. K2 neither restored legacy code
+nor converted those contracts to misleading skips.
+
+### K2 development-efficiency comparison
+
+| Metric | K1 | K1A | K2 final local | K2 vs K1 | K2 vs K1A |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Contract-red runs | 1 | 2 | 2 | 100.0% higher | unchanged |
+| Focused verifier runs | 33 | 18 | 18 | 45.5% lower | unchanged |
+| Broad verifier runs | 6 | 11 | 11 | 83.3% higher | unchanged |
+| Blocking findings | 8 | 10 | 18 | 125.0% higher | 80.0% higher |
+| Non-behavioral blocking groups | 6 | 5 | 10 | 66.7% higher | 100.0% higher |
+| Gate-remediation lines | 74 | 60 | 230 | 210.8% higher | 283.3% higher |
+| Verification wall time | 966.0 s | 57.3 s | 49.5 s | 94.9% lower | 13.6% lower |
+| Style-only commits | 0 | 0 | 0 | unchanged | unchanged |
+| Duplicate broad runs | 0 | 1 | 0 | unchanged | one lower |
+
+K2 is substantially faster and eliminated duplicate broad verification, but it
+did not reduce non-behavioral finding count or remediation volume. Two
+Xenon-B findings caused most of the structural rewrite; the remaining churn
+was invocation/configuration form, one Ruff form, one import form, one
+over-broad test assertion, and the rejected whole-directory collection
+experiment. This is a measured regression, not a claimed reduction. K3 must
+use these figures to decide whether the absolute Xenon-B function ceiling
+still has a favorable maintainability-to-churn ratio while preserving the
+600-line bound, module budget, types, tests, privacy, and review.
+
+### K2 review metrics
+
+- Total findings: 6
+- Accepted findings: 6 (`R1` through `R6`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+The sole reviewer found two high-, three medium-, and one low-severity defect.
+All were accepted. K2 now binds readiness to the digest of one fully validated
+artifact, activates only that artifact and a generation it contains, supports
+validated atomic rollback, rejects schema drift on every normal connection
+with bounded header/catalog checks, reserves full `quick_check` for lifecycle
+boundaries, repairs operational permissions on every access, defers two
+unproved lifecycle oracles to K3, and records every required churn metric. The
+review-metrics helper was called once but reported no pending K2 attribution,
+so token metrics remain pending without retry.
+
+### K2 deviations and decisions
+
+- The task design lists `refresh_runs` among cache tables while separately
+  requiring jobs, leases, source paths, and cutover metadata to remain outside
+  analytical facts. K2 resolves that tension by placing `refresh_runs` only in
+  the operational sidecar.
+- Serena activation remained unavailable after one guarded recovery because
+  the IDE broker still resolved a deleted Agent Maintainer helper root.
+  GitNexus and exact native searches were used without further broker retries.
+- The 62 corrected manifest assignments remain available through immutable
+  source refs. A later task may amend one explicitly only when its oracle
+  demonstrates a current kernel need; generic spike ownership is not carried
+  forward.
+
+### K2 residual risk and next task
+
+- K3 owns ingestion semantics, the two explicitly deferred cascade/deduplication
+  oracles, and the four quarantined runtime adapters before collecting their
+  implementation assertions.
+- K2 is not complete until integration-targeting CI and merge. K3 remains
+  blocked.
 
 ## Task Entry Template
 

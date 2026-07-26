@@ -5,6 +5,8 @@ from typing import Any
 
 from scripts.check_kernel_scope import (
     INTEGRATION_ADDITIONS,
+    K1A_ADDITIONS,
+    K2_ADDITIONS,
     load_disposition_manifest,
     publication_ref_failure,
     scope_failures,
@@ -58,7 +60,24 @@ def test_k1a_additions_are_explicit_and_bounded() -> None:
             "src/codex_usage_tracker/kernel/__init__.py",
             "tests/kernel/test_kernel_scope.py",
         }
-    ) == INTEGRATION_ADDITIONS
+    ) == K1A_ADDITIONS
+
+
+def test_k2_additions_are_explicit_and_bounded() -> None:
+    assert {
+        ".agent-maintainer/change-plans/k2-schema-identity.md",
+        "src/codex_usage_tracker/kernel/database.py",
+        "src/codex_usage_tracker/kernel/identity.py",
+        "src/codex_usage_tracker/kernel/models.py",
+        "src/codex_usage_tracker/kernel/operational.py",
+        "src/codex_usage_tracker/kernel/schema.py",
+        "tests/kernel/test_cutover_control.py",
+        "tests/kernel/test_database_lifecycle.py",
+        "tests/kernel/test_identity.py",
+        "tests/kernel/test_schema.py",
+        "tests/kernel/test_source_registry_privacy.py",
+    } == K2_ADDITIONS
+    assert INTEGRATION_ADDITIONS == K1A_ADDITIONS | K2_ADDITIONS
 
 
 def test_kernel_skeleton_imports_without_legacy_runtime() -> None:

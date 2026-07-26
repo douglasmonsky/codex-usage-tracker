@@ -32,11 +32,6 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _VERSION = "0.26.0.dev0"
 _PLUGIN_VERSION = "0.26.0-dev.0"
-_ALLOWED_WHEEL_PREFIXES = (
-    "codex_usage_tracker/kernel/",
-    "codex_usage_tracker/release/",
-    "codex_usage_tracking-0.26.0.dev0.dist-info/",
-)
 _K1_MERGE = "d8da9bccdb6674e7dca4c0872c36a1346949dc13"
 _FROZEN_RELEASE_PATHS = (
     "scripts/release_promotion_quality.py",
@@ -113,17 +108,20 @@ def _distribution_failures(dist_dir: Path) -> list[str]:
         ).decode("utf-8")
     dist_info = f"codex_usage_tracking-{_VERSION}.dist-info"
     expected_wheel_names = {
-        "codex_usage_tracker/kernel/__init__.py",
-        "codex_usage_tracker/release/__init__.py",
-        "codex_usage_tracker/release/artifact_manifest.py",
-        "codex_usage_tracker/release/artifact_normalization.py",
-        "codex_usage_tracker/release/promotion_evidence.py",
         f"{dist_info}/licenses/LICENSE",
         f"{dist_info}/METADATA",
         f"{dist_info}/RECORD",
         f"{dist_info}/WHEEL",
         f"{dist_info}/top_level.txt",
     }
+    expected_wheel_names.update(
+        path.relative_to(_REPO_ROOT / "src").as_posix()
+        for root in (
+            _REPO_ROOT / "src" / "codex_usage_tracker" / "kernel",
+            _REPO_ROOT / "src" / "codex_usage_tracker" / "release",
+        )
+        for path in root.glob("*.py")
+    )
     if wheel_names != expected_wheel_names:
         failures.append(
             "integration wheel member set differs from the exact K1A package"
