@@ -110,10 +110,51 @@ def test_code_disposition_rejects_immutable_k1_decision_drift() -> None:
     assert any("immutable K1 disposition decision changed" in item for item in failures)
 
 
-def test_k1a_advanced_every_non_keep_path_to_removed() -> None:
+def test_progressive_tasks_advance_non_keep_paths_without_restoring_source() -> None:
     for entry in _manifest()["entries"]:
-        if entry["disposition"] != "keep":
+        if entry["owner_task"] == "K2":
+            assert entry["status"] == "verified"
+        elif entry["disposition"] != "keep":
             assert entry["status"] == "removed"
+
+
+def test_k2_generic_assignments_resolve_to_clean_schema_contract() -> None:
+    entries = [
+        entry for entry in _manifest()["entries"] if entry["owner_task"] == "K2"
+    ]
+    transplanted = [
+        entry for entry in entries if entry["disposition"] == "transplant"
+    ]
+    retired = [entry for entry in entries if entry["disposition"] == "retire"]
+
+    assert len(entries) == 78
+    assert len(transplanted) == 16
+    assert len(retired) == 62
+    assert all(entry["status"] == "verified" for entry in entries)
+    assert {
+        entry["target_path"] for entry in transplanted
+    } <= {
+        "src/codex_usage_tracker/kernel/database.py",
+        "src/codex_usage_tracker/kernel/identity.py",
+        "src/codex_usage_tracker/kernel/models.py",
+        "src/codex_usage_tracker/kernel/operational.py",
+        "src/codex_usage_tracker/kernel/schema.py",
+        "tests/kernel/test_database_lifecycle.py",
+        "tests/kernel/test_identity.py",
+        "tests/kernel/test_schema.py",
+    }
+    by_path = {entry["path"]: entry for entry in entries}
+    assert by_path["tests/store/test_compression_facts.py"]["disposition"] == "retire"
+    assert by_path["tests/store/test_historical_integrity_migrations.py"][
+        "disposition"
+    ] == "retire"
+    all_entries = {entry["path"]: entry for entry in _manifest()["entries"]}
+    for path in (
+        "tests/store/test_foreign_key_cascades.py",
+        "tests/store/test_usage_deduplication.py",
+    ):
+        assert all_entries[path]["owner_task"] == "K3"
+        assert all_entries[path]["status"] == "removed"
 
 
 def test_code_disposition_preserves_and_retires_semantic_boundaries() -> None:

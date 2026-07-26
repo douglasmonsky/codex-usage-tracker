@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-INTEGRATION_ADDITIONS = frozenset(
+K1A_ADDITIONS = frozenset(
     {
         ".agent-maintainer/change-plans/k1a-legacy-quarantine.md",
         "docs/kernel-development-scope.md",
@@ -21,6 +21,22 @@ INTEGRATION_ADDITIONS = frozenset(
         "tests/kernel/test_kernel_scope.py",
     }
 )
+K2_ADDITIONS = frozenset(
+    {
+        ".agent-maintainer/change-plans/k2-schema-identity.md",
+        "src/codex_usage_tracker/kernel/database.py",
+        "src/codex_usage_tracker/kernel/identity.py",
+        "src/codex_usage_tracker/kernel/models.py",
+        "src/codex_usage_tracker/kernel/operational.py",
+        "src/codex_usage_tracker/kernel/schema.py",
+        "tests/kernel/test_cutover_control.py",
+        "tests/kernel/test_database_lifecycle.py",
+        "tests/kernel/test_identity.py",
+        "tests/kernel/test_schema.py",
+        "tests/kernel/test_source_registry_privacy.py",
+    }
+)
+INTEGRATION_ADDITIONS = K1A_ADDITIONS | K2_ADDITIONS
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"
 )
@@ -80,9 +96,17 @@ def scope_failures(repo_root: Path, manifest: dict[str, Any]) -> list[str]:
     for entry in entries:
         disposition = entry["disposition"]
         status = entry["status"]
-        if disposition != "keep" and status != "removed":
+        valid_absent_statuses = {
+            "historical": {"removed", "archived", "verified"},
+            "retire": {"removed", "verified"},
+            "transplant": {"removed", "implemented", "verified"},
+        }
+        if (
+            disposition != "keep"
+            and status not in valid_absent_statuses[disposition]
+        ):
             failures.append(
-                f"{entry['path']}: {disposition} status must be removed, got {status}"
+                f"{entry['path']}: invalid absent {disposition} status {status}"
             )
         if disposition == "transplant":
             if not entry["source_ref"].startswith("v0.25.1:"):

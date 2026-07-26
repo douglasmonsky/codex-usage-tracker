@@ -1,4 +1,4 @@
-name: Kernel integration CI
+name: Kernel K2 integration CI
 
 on:
   push:
@@ -16,8 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  k1a-scope:
-    name: K1A scope and package isolation
+  k2-schema:
+    name: K2 schema and package isolation
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -48,11 +48,16 @@ jobs:
             scripts/generate_kernel_manifests.py \
             src/codex_usage_tracker/kernel \
             tests/kernel/test_code_disposition_manifest.py \
+            tests/kernel/test_cutover_control.py \
+            tests/kernel/test_database_lifecycle.py \
             tests/kernel/test_development_efficiency_policy.py \
+            tests/kernel/test_identity.py \
             tests/kernel/test_kernel_maintainability.py \
             tests/kernel/test_kernel_scope.py \
             tests/kernel/test_repository_quality_policy.py \
-            tests/kernel/test_retired_surface_manifest.py
+            tests/kernel/test_retired_surface_manifest.py \
+            tests/kernel/test_schema.py \
+            tests/kernel/test_source_registry_privacy.py
           python -m mypy
           python scripts/check_kernel_maintainability.py
           python -m pytest -p no:tach \
@@ -61,8 +66,13 @@ jobs:
             tests/kernel/test_retired_surface_manifest.py \
             tests/kernel/test_development_efficiency_policy.py \
             tests/kernel/test_kernel_maintainability.py \
-            tests/kernel/test_repository_quality_policy.py
-          python -m pyright
+            tests/kernel/test_repository_quality_policy.py \
+            tests/kernel/test_schema.py \
+            tests/kernel/test_identity.py \
+            tests/kernel/test_database_lifecycle.py \
+            tests/kernel/test_cutover_control.py \
+            tests/kernel/test_source_registry_privacy.py
+          python -m pyright --pythonpath "$(command -v python)"
           python scripts/check_release.py
       - name: Build isolated development package
         if: matrix.python-version == '3.14'
