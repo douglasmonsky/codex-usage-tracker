@@ -1,0 +1,209 @@
+# Product Kernel Reset Execution Ledger
+
+This is the durable execution record for the
+[Product Kernel Reset](product-kernel-reset.md). The approved
+[design](../superpowers/specs/2026-07-26-product-kernel-reset-design.md) and
+[implementation plan](../superpowers/plans/2026-07-26-product-kernel-reset.md)
+define scope and acceptance.
+
+Update the applicable entry in the same changeset as each task. Do not mark a
+task complete from intent, partial implementation, an unreviewed benchmark, or
+an unpublished release.
+
+## Ledger Rules
+
+Every terminal task entry records:
+
+- branch, base, and commits;
+- exact files or modules owned;
+- failing contract or benchmark added first;
+- focused and broader verification with outcomes;
+- before/after latency, lock, row, size, or surface measurements where
+  applicable;
+- privacy and synthetic-fixture confirmation;
+- deviations and approved amendments;
+- independent review findings, accepted findings, reviewer token count, and
+  tokens per accepted finding; and
+- residual risk and the exact next task unblocked.
+
+Use `pending` for unavailable reviewer-token indexing. Never start extra
+analysis or refresh work solely to populate review metrics.
+
+## Program Status
+
+| Task | Release | State | Depends on | Outcome |
+| --- | --- | --- | --- | --- |
+| K0 | documentation baseline | In progress | — | Archive former program and approve reset |
+| K1 | 0.25.x bridge | Not started | K0 | Freeze accounting oracle |
+| K2 | 0.26.0 | Not started | K1 | Kernel schema v1 and stable identity |
+| K3 | 0.26.0 | Not started | K2 | Incremental/live ingestion |
+| K4 | 0.26.0 | Not started | K3 | Bounded query engine |
+| K5 | 0.26.0 | Not started | K3 | Evidence timeline and live stream |
+| K6 | 0.26.0 | Not started | K4, K5 | Six-tool and adapter cutover |
+| K7 | 0.26.0 | Not started | K6 | Focused Evidence Console |
+| K8 | 0.26.0 | Not started | K7 | Allowance efficiency |
+| K9 | 0.26.0 | Not started | K8 | Experimental-spike deletion |
+| K10 | 0.26.0 | Not started | K9 | Release qualification |
+| K11 | 0.27.0 | Not started | K10 | Guided exploration |
+| K12 | 0.27.0 | Not started | K11 | Optional context composition |
+| K13 | 0.27.0 | Not started | K11 | Read-only overlay boundary |
+| K14 | 0.27.0 | Not started | K12, K13 | Release qualification |
+| K15 | 0.28.0 | Not started | K14 | Fault, recovery, and scale |
+| K16 | 0.28.0 | Not started | K15 | Contract freeze and release |
+
+## Baseline Evidence
+
+### Published and repository baseline
+
+- Published package: `codex-usage-tracking==0.25.1`.
+- Documentation base: `origin/main` at
+  `0a558dd328c1519c77fffe68b71a8bccdbd1a731`.
+- Operational evidence branch: `fix/313-core-fast-path` at
+  `96cc1546aa20b36d1a93945dc11cc88e6b19aa42`.
+- Current experimental cache schema: version 39.
+- Approximate authored surface: 90,500 Python source lines and 52,000
+  TypeScript/TSX source lines.
+
+### Synthetic 10,000-event refresh evidence
+
+| Mode | Parallel cold refresh | Writer lock | Important result |
+| --- | ---: | ---: | --- |
+| Current normal default | 3.073 s | 3.040 s | Captures tools/turns but also builds fragments, FTS, compression, and diagnostics |
+| Current aggregate-only | 1.742 s | 1.711 s | Omits structural tools/turns needed by the target product |
+
+The target seam is to retain privacy-safe structural facts while removing
+content indexing and interpretation-specific materialization from normal
+ingestion. These measurements are comparison evidence, not claimed production
+latency.
+
+### Profile evidence
+
+- Agent-perf run: `20260726T170258Z-5d2d8174`.
+- Workload: bounded synthetic refresh.
+- Finding: no single parser CPU hotspot dominated. Leading owned entries
+  included compression-manifest accumulation, refresh orchestration, content
+  persistence, and deferred index maintenance.
+- Interpretation: the reset must remove coupled work and shorten writer
+  ownership, not merely micro-optimize one parser function.
+
+No live usage database or raw session content was inspected.
+
+## K0 — Roadmap Reset
+
+**State:** Complete
+**Branch:** `docs/kernel-reset-roadmap`
+**Base:** `origin/main` at
+`0a558dd328c1519c77fffe68b71a8bccdbd1a731`
+**Commit:** this changeset
+
+### Scope
+
+- Archive the 2026-07-21 MCP-first roadmap, design, plan, execution ledger, and
+  Agent Maintainer change plan.
+- Leave stable redirect documents at published paths.
+- Adopt the Product Kernel Reset roadmap, design, implementation plan,
+  execution ledger, deprecation ledger, and task-branch convention.
+- Update public architecture, release, and repository guidance.
+- Add focused public-document contract tests.
+
+### Evidence before editing
+
+- 0.24 foundation audit: `PROCEED`; healthy accounting core, overgrown product
+  shell.
+- Installed dogfood: exact queries useful; automatic narrative analysis,
+  optional derived-state refresh work, duplicate/long-running job behavior, and
+  compatibility weight undermined the central product.
+- The user explicitly approved beta removal rather than runtime legacy support.
+
+### Verification
+
+- `python -m pytest tests/packaging/test_public_docs.py
+  tests/cli/test_cli_release.py -q`: 44 passed.
+- `python scripts/check_release.py`: passed.
+- `npx markdownlint-cli2 README.md "docs/**/*.md"
+  ".agent-maintainer/change-plans/*.md"`: 159 files, 0 errors.
+- Changed-document local-link check: 23 Markdown files, all targets exist.
+- `git diff --check`: passed.
+- One final read-only review: 6 findings; all 6 accepted, addressed, and
+  rechecked by the primary implementation pass.
+
+### Review metrics
+
+- Total findings: 6
+- Accepted findings: 6
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Review resolution
+
+- K6 and K7 now build non-public kernel compositions while the 0.25 defaults
+  remain releasable; K9 owns atomic public activation and removal.
+- The cutover has explicit `absent`, `building`, `ready`, `active`, and `failed`
+  states, three authorized build triggers, atomic pointers, and distinct kernel
+  versus installed-package rollback.
+- Full paths live only in a non-exportable operational registry.
+- K1 freezes an exact cross-surface retirement manifest consumed by K6/K9.
+- K4 owns the pure versioned phase segmenter and golden tests.
+- Public-document tests require the exact six-tool list and every archive
+  redirect/artifact.
+
+### Deviations
+
+- The optional external Agent OS planning CLI was unavailable in the active
+  environment, so the repository-native roadmap, design, implementation plan,
+  change plan, and execution ledger are the durable handoff.
+- Serena JetBrains activation encountered a stale workspace registration. Exact
+  documentation paths and edits used repository-native tools; no semantic code
+  edit depended on the stale IDE registration.
+
+### Residual risk
+
+This task changes authority and future intent only. Current 0.25 runtime
+behavior remains unchanged until separately reviewed K1–K10 work lands. K1 is
+now unblocked.
+
+## Task Entry Template
+
+Copy this section for each task and replace every placeholder.
+
+```markdown
+## KX — Title
+
+**State:** In progress | Blocked | Complete
+**Branch:** `kernel/kx-slug`
+**Base:** `<sha>`
+**Commits:** `<sha and subject>`
+
+### Contract added first
+
+- `<failing test, invariant, or benchmark>`
+
+### Implementation
+
+- `<owned modules and behavior>`
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass/Fail | `<command and summary>` |
+| Broader | Pass/Fail | `<command and summary>` |
+| Performance | Pass/Fail/N/A | `<before and after>` |
+| Privacy | Pass/Fail | `synthetic fixtures; no private content` |
+
+### Review metrics
+
+- Total findings: `<n>`
+- Accepted findings: `<n>`
+- Reviewer tokens: `<n or pending>`
+- Tokens per accepted finding: `<value, N/A, or pending>`
+
+### Deviations and decisions
+
+- `<none or approved change with owner/date>`
+
+### Residual risk and next task
+
+- `<remaining risk>`
+- `<exact task unblocked>`
+```

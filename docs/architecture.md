@@ -1,23 +1,54 @@
 # Architecture
 
-Codex Usage Tracker is a local sidecar app. It reads Codex session JSONL logs, stores tracker-owned indexes in SQLite, and exposes usage data through CLI commands, MCP tools, CSV export, generated dashboards, and the localhost React dashboard.
+Codex Usage Tracker is a local sidecar that reads Codex session JSONL logs,
+stores tracker-owned facts in a rebuildable SQLite cache, and exposes bounded
+local query, evidence, allowance, refresh, export, and live-viewing workflows.
 
-## MCP-First Product Layers
+## Target Product Kernel
 
-MCP is the primary analysis interface. The conversational agent selects bounded
-tools and explains results, while deterministic application services remain the
-source of accounting, classification, ranking, pricing, allowance, and evidence
-selection.
+The [Product Kernel Reset](roadmap/product-kernel-reset.md) is the active target
+architecture. Its approved
+[design](superpowers/specs/2026-07-26-product-kernel-reset-design.md) defines
+the physical and public contracts.
 
-The Evidence Console is the supporting verification interface. It displays
-exact supporting records and time-series evidence and manages local setup; it
-does not independently invent analytical conclusions. The CLI remains the
-interface for setup, automation, scripting, recovery, export, and compatibility.
+The tracker owns exact facts, deterministic calculations, freshness, provenance,
+and evidence selection. Codex owns inference, explanation, and recommendations.
+The Evidence Console is a thin Live, Explore, Evidence, Limits, and Settings
+client over the same kernel services. It does not own a second analysis or
+refresh pipeline.
 
-The [MCP-first roadmap](roadmap/mcp-first-pivot.md) freezes unplanned surface
-growth during the pivot. New dashboard workspaces, top-level MCP concepts,
-top-level CLI commands, runtime dependencies, and SQLite tables require an
-approved roadmap task or design amendment.
+```text
+Codex JSONL sources
+        |
+        v
+one cursor + normalizer path
+        |
+        v
+schema-v1 facts -- generation snapshot --> bounded query/evidence/allowance
+        |                                      |          |
+        +-- committed event journal -----------+------> SSE/live Console
+                                               |
+                                  MCP / HTTP / CLI adapters
+                                               |
+                                      Codex model inference
+```
+
+Initial build, explicit refresh, moving-tail catch-up, and live watch share one
+ingestion path and one bounded writer. Queries and browser opens never start
+refresh. Optional content evidence, if enabled after the kernel cutover, uses a
+separate database and failure lifecycle.
+
+The target MCP catalog contains exactly six tools: `usage_status`,
+`usage_refresh`, `usage_query`, `usage_evidence`, `usage_allowance`, and
+`usage_job_status`. `usage_analyze` and runtime compatibility profiles are
+removed at the 0.26 cutover.
+
+## Current 0.25 Runtime Reference
+
+The remainder of this document describes the shipping 0.25 implementation where
+it differs from the target. It is retained as a transplant and deletion map,
+not as authority for new product surface. Its analysis, compatibility,
+content-index, and derived-state layers are explicitly scheduled for removal.
 
 The current storage model has three layers:
 

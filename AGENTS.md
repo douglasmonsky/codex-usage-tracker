@@ -51,23 +51,30 @@ codex-usage-tracker install-plugin --python .venv/bin/python
 
 This project is now a published PyPI package with user-facing docs, JSON/MCP contracts, a release workflow, and privacy guarantees. Treat `main` as always releasable.
 
-### MCP-First Pivot Execution
+### Product Kernel Reset Execution
 
-Work in the MCP-first pivot must follow
-`docs/roadmap/mcp-first-pivot.md` and its approved detailed implementation
-roadmap. Use one focused `pivot/<task-number>-<slug>` branch per task, implement
-only the task's declared interfaces, and update
-`docs/roadmap/mcp-first-pivot-execution.md` in the same commit with branch,
-commits, focused and full verification, deviations, and follow-up risks.
+All post-0.25 product work must follow
+`docs/roadmap/product-kernel-reset.md`, its approved
+`docs/superpowers/specs/2026-07-26-product-kernel-reset-design.md`, and the
+decision-complete implementation plan. Use one focused
+`kernel/<task-id>-<slug>` branch per task, implement only the task's declared
+contract, and update `docs/roadmap/product-kernel-reset-execution.md` in the
+same changeset with branch, commits, verification, measurements, deviations,
+review metrics, and residual risk.
 
-Do not add a dashboard workspace, top-level MCP concept, top-level CLI command,
-runtime dependency, or SQLite table unless the roadmap names it or an approved
-design amendment authorizes it. Compatibility removal must also be due in
-`docs/deprecations.md`.
+The tracker owns exact facts, deterministic calculations, freshness, and
+evidence. The consuming model owns inference, explanation, and recommendations.
+Do not add server-authored narrative analysis, another MCP tool, a default fact
+table, a compatibility profile, default content indexing, or an overlay unless
+the active roadmap names it or an approved design amendment authorizes it.
+Removal and upgrade behavior must also be due in `docs/deprecations.md`.
+
+The former MCP-first roadmap is archived historical evidence. Its stable
+redirects do not authorize new `pivot/` work.
 
 - Do not commit directly to `main`.
 - Start each coherent task from current `main` with a short-lived branch.
-- Use branch prefixes `feature/`, `fix/`, `docs/`, `chore/`, `test/`, `release/`, `hotfix/`, or `pivot/`. Reserve `pivot/` for tasks in the approved MCP-first roadmap.
+- Use branch prefixes `feature/`, `fix/`, `docs/`, `chore/`, `test/`, `release/`, `hotfix/`, or `kernel/`. Reserve `kernel/` for tasks in the approved Product Kernel Reset roadmap.
 - Keep each branch focused on one issue, one reviewable task, or one release.
 - Do not create a long-lived `develop` branch.
 - Do not mix release prep with unrelated feature work.
@@ -85,6 +92,7 @@ chore/<issue-number>-short-description
 test/<issue-number>-short-description
 release/0.4.0
 hotfix/0.3.3
+kernel/k3-ingest-tail
 ```
 
 Before starting a task branch:
