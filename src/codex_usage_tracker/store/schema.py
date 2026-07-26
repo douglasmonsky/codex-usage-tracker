@@ -17,7 +17,7 @@ import codex_usage_tracker.store.source_record_schema as source_record_schema
 from codex_usage_tracker.core import schema as usage_schema
 from codex_usage_tracker.store.connection import execute_script
 
-SCHEMA_VERSION = 38
+SCHEMA_VERSION = 39
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -50,7 +50,6 @@ class SchemaMigrationError(RuntimeError):
 
 def init_db(conn: sqlite3.Connection) -> None:
     """Create or repair the aggregate usage schema in-place."""
-
     user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
     if _schema_is_current(conn, user_version):
         _validate_usage_events_schema(conn)
@@ -128,6 +127,7 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (analysis_jobs.MIGRATION_VERSION, analysis_jobs.create_analysis_jobs_table),
         (analysis_jobs.LEASE_MIGRATION_VERSION, analysis_jobs.add_analysis_job_leases),
         (38, service_tier_schema.drop_retired_telemetry_tables),
+        (39, schema_query_indexes.add_model_effort_aggregate_index),
     )
 
 

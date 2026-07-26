@@ -268,7 +268,6 @@ RELEASE_SCHEMA_IDS = {
     "codex-usage-tracker-visualization-suggestions-v1",
     "codex-usage-tracker.accounting-context.v1",
     "codex-usage-tracker.analysis-job.v1",
-    "codex-usage-tracker.analysis-refresh-dependency.v1",
     "codex-usage-tracker.analysis-result.v1",
     "codex-usage-tracker.analysis.v2",
     "codex-usage-tracker.capabilities.v2",

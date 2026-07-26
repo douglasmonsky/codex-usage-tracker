@@ -24,6 +24,7 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 from codex_usage_tracker.store.api import (  # noqa: E402
+    query_canonical_usage_v2,
     query_dashboard_event_count,
     refresh_metadata,
     refresh_usage_index,
@@ -31,12 +32,15 @@ from codex_usage_tracker.store.api import (  # noqa: E402
 
 DEFAULT_ROWS = 10_000
 DEFAULT_APPEND_ROWS = 100
+DEFAULT_NEW_TASK_FILES = 25
 THRESHOLDS_SECONDS = {
     "cold_refresh": 30.0,
     "no_change_refresh": 1.0,
     "append_refresh": 5.0,
+    "new_tasks_refresh": 5.0,
     "tail_followup_refresh": 3.0,
     "read_during_writer": 0.25,
+    "model_effort_query": 0.25,
 }
 SESSION_ID = "019fa20a-9460-7e21-b38a-000000000025"
 
@@ -45,6 +49,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--rows", type=int, default=DEFAULT_ROWS)
     parser.add_argument("--append-rows", type=int, default=DEFAULT_APPEND_ROWS)
+    parser.add_argument("--new-task-files", type=int, default=DEFAULT_NEW_TASK_FILES)
     parser.add_argument("--work-dir", type=Path)
     parser.add_argument("--keep", action="store_true")
     parser.add_argument("--json", action="store_true", dest="as_json")
@@ -55,6 +60,8 @@ def main() -> int:
         parser.error("--rows must be positive")
     if args.append_rows <= 0:
         parser.error("--append-rows must be positive")
+    if args.new_task_files <= 0:
+        parser.error("--new-task-files must be positive")
     if args.threshold_scale <= 0:
         parser.error("--threshold-scale must be positive")
 
@@ -70,6 +77,7 @@ def main() -> int:
             work_dir,
             rows=args.rows,
             append_rows=args.append_rows,
+            new_task_files=args.new_task_files,
             threshold_scale=args.threshold_scale,
         )
         if args.as_json:
@@ -87,6 +95,7 @@ def run_benchmark(
     *,
     rows: int,
     append_rows: int,
+    new_task_files: int = DEFAULT_NEW_TASK_FILES,
     threshold_scale: float = 1.0,
 ) -> dict[str, Any]:
     codex_home = work_dir / ".codex"
@@ -110,7 +119,20 @@ def run_benchmark(
     append_count = query_dashboard_event_count(db_path=db_path, include_archived=True)
     append_allowance_count = _allowance_observation_count(db_path)
 
-    pending_row = _token_row(rows + append_rows)
+    _write_new_task_files(
+        codex_home,
+        file_count=new_task_files,
+        total_rows=append_rows,
+        timestamp_start=rows + append_rows,
+    )
+    new_tasks = _timed_refresh(codex_home, db_path)
+    new_tasks_count = query_dashboard_event_count(db_path=db_path, include_archived=True)
+    new_tasks_allowance_count = _allowance_observation_count(db_path)
+
+    pending_row = _token_row(
+        rows + append_rows,
+        observed_index=rows + append_rows * 2 + new_task_files,
+    )
     with source_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(pending_row))
     incomplete_tail = _timed_refresh(codex_home, db_path)
@@ -121,12 +143,15 @@ def run_benchmark(
     final_allowance_count = _allowance_observation_count(db_path)
 
     read_during_writer = _measure_last_committed_read(db_path)
+    model_effort_query = _measure_model_effort_query(db_path)
     timings = {
         "cold_refresh": cold["elapsed_seconds"],
         "no_change_refresh": no_change["elapsed_seconds"],
         "append_refresh": append["elapsed_seconds"],
+        "new_tasks_refresh": new_tasks["elapsed_seconds"],
         "tail_followup_refresh": tail_followup["elapsed_seconds"],
         "read_during_writer": read_during_writer,
+        "model_effort_query": model_effort_query,
     }
     thresholds = {
         key: round(value * threshold_scale, 6)
@@ -140,8 +165,9 @@ def run_benchmark(
     invariants = {
         "cold_rows": cold_count,
         "append_rows_added": append_count - cold_count,
+        "new_task_rows_added": new_tasks_count - append_count,
         "incomplete_tail_parsed_events": incomplete_tail["parsed_events"],
-        "tail_followup_rows_added": final_count - append_count,
+        "tail_followup_rows_added": final_count - new_tasks_count,
         "no_change_parsed_events": no_change["parsed_events"],
         "no_change_writer_lock_seconds": no_change["stage_timings_seconds"].get(
             "writer_lock",
@@ -150,18 +176,22 @@ def run_benchmark(
         "cold_allowance_observations": cold_allowance_count,
         "append_allowance_observations_added": append_allowance_count
         - cold_allowance_count,
-        "tail_allowance_observations_added": final_allowance_count
+        "new_task_allowance_observations_added": new_tasks_allowance_count
         - append_allowance_count,
+        "tail_allowance_observations_added": final_allowance_count
+        - new_tasks_allowance_count,
     }
     expected = {
         "cold_rows": rows,
         "append_rows_added": append_rows,
+        "new_task_rows_added": append_rows,
         "incomplete_tail_parsed_events": 0,
         "tail_followup_rows_added": 1,
         "no_change_parsed_events": 0,
         "no_change_writer_lock_seconds": 0.0,
         "cold_allowance_observations": rows,
         "append_allowance_observations_added": append_rows,
+        "new_task_allowance_observations_added": append_rows,
         "tail_allowance_observations_added": 1,
     }
     for name, expected_value in expected.items():
@@ -175,11 +205,13 @@ def run_benchmark(
             "synthetic": True,
             "rows": rows,
             "append_rows": append_rows,
+            "new_task_files": new_task_files,
         },
         "refreshes": {
             "cold": cold,
             "no_change": no_change,
             "append": append,
+            "new_tasks": new_tasks,
             "incomplete_tail": incomplete_tail,
             "tail_followup": tail_followup,
         },
@@ -233,6 +265,33 @@ def _measure_last_committed_read(db_path: Path) -> float:
         writer.close()
 
 
+def _measure_model_effort_query(db_path: Path) -> float:
+    started = perf_counter()
+    rows = query_canonical_usage_v2(
+        db_path=db_path,
+        entity="model",
+        measures=(
+            "tokens",
+            "uncached_tokens",
+            "cached_tokens",
+            "output_tokens",
+            "reasoning_tokens",
+        ),
+        filters={},
+        group_by=("effort",),
+        order_by="tokens",
+        order="desc",
+        include_archived=False,
+        limit=10,
+        cursor_sort=None,
+        cursor_identity=None,
+    )
+    elapsed = perf_counter() - started
+    if not rows:
+        raise RuntimeError("model-by-effort query returned no aggregate rows")
+    return round(elapsed, 6)
+
+
 def _allowance_observation_count(db_path: Path) -> int:
     with sqlite3.connect(db_path) as connection:
         row = connection.execute("SELECT COUNT(*) FROM allowance_observations").fetchone()
@@ -279,10 +338,70 @@ def _append_events(source_path: Path, *, start: int, count: int) -> None:
             handle.write(json.dumps(_token_row(index)) + "\n")
 
 
-def _token_row(index: int) -> dict[str, object]:
+def _write_new_task_files(
+    codex_home: Path,
+    *,
+    file_count: int,
+    total_rows: int,
+    timestamp_start: int,
+) -> None:
+    sessions_dir = codex_home / "sessions" / "2026" / "07"
+    session_index = codex_home / "session_index.jsonl"
+    remaining = total_rows
+    with session_index.open("a", encoding="utf-8") as index_handle:
+        for file_index in range(file_count):
+            files_left = file_count - file_index
+            row_count = remaining // files_left
+            remaining -= row_count
+            session_id = f"019fa20a-9460-7e21-b38a-{file_index + 1:012x}"
+            source_path = (
+                sessions_dir
+                / f"rollout-2026-07-25T10-{file_index:02d}-00-{session_id}.jsonl"
+            )
+            index_handle.write(
+                json.dumps(
+                    {
+                        "id": session_id,
+                        "thread_name": f"Synthetic new task {file_index + 1}",
+                        "updated_at": "2026-07-25T10:00:00Z",
+                    }
+                )
+                + "\n"
+            )
+            with source_path.open("w", encoding="utf-8") as handle:
+                handle.write(json.dumps(_entry("session_meta", {"id": session_id})) + "\n")
+                handle.write(
+                    json.dumps(
+                        _entry(
+                            "turn_context",
+                            {
+                                "turn_id": f"synthetic-new-task-{file_index + 1}",
+                                "model": "gpt-5.5",
+                                "effort": "medium",
+                                "cwd": "/synthetic/codex-usage-tracker",
+                            },
+                        )
+                    )
+                    + "\n"
+                )
+                for row_index in range(row_count):
+                    handle.write(
+                        json.dumps(
+                            _token_row(
+                                row_index,
+                                observed_index=(
+                                    timestamp_start + row_index * file_count + file_index
+                                ),
+                            )
+                        )
+                        + "\n"
+                    )
+
+
+def _token_row(index: int, *, observed_index: int | None = None) -> dict[str, object]:
     cumulative = (index + 1) * 100
     observed_at = datetime(2026, 7, 25, 9, tzinfo=timezone.utc) + timedelta(
-        seconds=index
+        seconds=index if observed_index is None else observed_index
     )
     return _entry(
         "event_msg",
@@ -336,13 +455,16 @@ def _print_summary(result: Mapping[str, Any]) -> None:
         f"cold={timings['cold_refresh']:.3f}s, "
         f"no-change={timings['no_change_refresh']:.3f}s, "
         f"append={timings['append_refresh']:.3f}s, "
+        f"new-tasks={timings['new_tasks_refresh']:.3f}s, "
         f"tail-followup={timings['tail_followup_refresh']:.3f}s, "
         f"read-during-writer={timings['read_during_writer']:.4f}s"
+        f", model-effort-query={timings['model_effort_query']:.4f}s"
     )
     print(
         "hydration counters: "
         f"cold={invariants['cold_rows']}, "
         f"append={invariants['append_rows_added']}, "
+        f"new-tasks={invariants['new_task_rows_added']}, "
         f"pending-tail={invariants['incomplete_tail_parsed_events']}, "
         f"followup={invariants['tail_followup_rows_added']}"
     )

@@ -103,7 +103,7 @@ For experiment-style answers, use this structure:
 - Use `usage_status` for dashboard/index freshness, active/scoped/total row counts, latest refresh timestamp, and observed allowance windows.
 - Use `usage_allowance(operation="status")` as the default Limits polling entry point. It is canonical/deduped, constant-size, reports copied clone rows excluded, and returns the next refresh or polling action.
 - Use `usage_allowance(operation="series", window="weekly", range="8w")` for a finite reset-aware timeline and `usage_allowance(operation="evidence", window="weekly", range="8w", limit=50)` for latest-first bounded transitions. Treat weekly windows as primary and 5-hour windows as noisy rolling-window context.
-- Use `usage_allowance(operation="analysis", execution="auto")` for persisted change evidence; if it returns a generic job handle, poll `usage_job_status(job_id, include_result=True)`.
+- Use `usage_allowance(operation="analysis", execution="auto")` for persisted change evidence; if it returns a generic job handle, let the host wait with `usage_job_status(job_id, include_result=True, wait_ms=30000)`. Do not model-poll at short intervals.
 - The old `usage_allowance_status`, `usage_allowance_series`, `usage_allowance_evidence`, `usage_allowance_analysis`, and `usage_allowance_analysis_status` names remain full-profile compatibility tools through 0.24, not the default workflow.
 - Use `usage_dedupe_diagnostics` to explain copied clone rows excluded from canonical totals while preserving aggregate/source provenance.
 - Treat `usage_allowance_history`, `usage_allowance_diagnostics`, and `usage_allowance_export` as compatibility or explicit offline-diagnostic surfaces, not the default Limits workflow.

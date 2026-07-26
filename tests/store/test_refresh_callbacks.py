@@ -15,6 +15,7 @@ from tests.store_dashboard_helpers import (
     _make_codex_home,
     _token_event,
     _usage_event,
+    _write_jsonl,
 )
 
 
@@ -67,6 +68,61 @@ def test_refresh_derived_fact_callback_receives_full_and_append_targets(
     assert len(calls[1][0]) == 1
     assert calls[0][1]
     assert calls[1][1]
+
+
+def test_new_source_file_does_not_request_full_derived_fact_rebuild(
+    tmp_path: Path,
+) -> None:
+    codex_home = _make_codex_home(tmp_path)
+    db_path = tmp_path / "usage.sqlite3"
+    full_rebuild_flags: list[bool] = []
+
+    def sync(
+        _conn: sqlite3.Connection,
+        _record_ids: tuple[str, ...],
+        _thread_keys: frozenset[str],
+        full_rebuild: bool,
+    ) -> None:
+        full_rebuild_flags.append(full_rebuild)
+
+    refresh_usage_index(
+        codex_home=codex_home,
+        db_path=db_path,
+        derived_fact_sync=sync,
+    )
+    session_id = "019e3812-5715-7018-a7bb-2232b46a5671"
+    new_source = (
+        codex_home
+        / "sessions"
+        / "2026"
+        / "05"
+        / "18"
+        / f"rollout-2026-05-18T10-00-00-{session_id}.jsonl"
+    )
+    _write_jsonl(
+        new_source,
+        [
+            _entry("session_meta", {"id": session_id}),
+            _entry(
+                "turn_context",
+                {
+                    "turn_id": "turn-new-source",
+                    "model": "gpt-5.5",
+                    "effort": "high",
+                    "cwd": "/tmp/synthetic-new-source",
+                },
+            ),
+            _token_event(1_000, 1_000),
+        ],
+    )
+
+    refresh_usage_index(
+        codex_home=codex_home,
+        db_path=db_path,
+        derived_fact_sync=sync,
+    )
+
+    assert full_rebuild_flags == [True, False]
 
 
 def test_stream_refresh_does_not_resync_source_records_after_direct_upsert(

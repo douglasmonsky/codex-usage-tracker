@@ -238,8 +238,9 @@ def test_parallel_parse_submission_queue_is_bounded(tmp_path: Path, monkeypatch)
     assert RecordingProcessPoolExecutor.instances[0].submitted == len(plans)
 
 
-def test_refresh_streams_one_completed_source_per_write_batch() -> None:
-    assert stream_module._STREAM_SOURCE_BATCH_SIZE == 1
+def test_refresh_write_batches_bound_sources_and_events() -> None:
+    assert stream_module._STREAM_SOURCE_BATCH_SIZE == 16
+    assert stream_module._STREAM_EVENT_BATCH_SIZE == 10_000
 
 
 def test_unchanged_refresh_skips_usage_writer_but_reconciles_config_facts(

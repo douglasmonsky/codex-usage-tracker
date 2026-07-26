@@ -101,7 +101,11 @@ def _mcp_config_env_detail(server: dict[str, object]) -> str:
     return ""
 
 
-def check_mcp_runtime(repo_root: Path | None) -> DoctorCheck:
+def check_mcp_runtime(
+    repo_root: Path | None,
+    *,
+    verify_import: bool = True,
+) -> DoctorCheck:
     if repo_root is None:
         return DoctorCheck(
             "MCP runtime",
@@ -127,6 +131,12 @@ def check_mcp_runtime(repo_root: Path | None) -> DoctorCheck:
     command = _resolve_mcp_command(server.get("command"), repo_root)
     if command is None:
         return _mcp_runtime_command_error(server)
+    if not verify_import:
+        return DoctorCheck(
+            "MCP runtime",
+            "pass",
+            "MCP command is executable; the current tool call proves runtime import.",
+        )
     return _check_mcp_import_runtime(command, server, repo_root)
 
 

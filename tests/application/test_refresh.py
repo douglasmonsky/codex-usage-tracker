@@ -218,10 +218,30 @@ def _planner_db(path: Path, tracked: list[tuple[str, int]] | None = None) -> Non
     ("case", "plans"),
     [
         ("untracked", lambda path: [SourceParsePlan(path)]),
-        ("truncated", lambda path: [SourceParsePlan(path, replace_existing=True)]),
-        ("identity_changed", lambda path: [SourceParsePlan(path, replace_existing=True)]),
-        ("prefix_mismatch", lambda path: [SourceParsePlan(path, replace_existing=True)]),
-        ("parser_state_changed", lambda path: [SourceParsePlan(path, replace_existing=True)]),
+        (
+            "truncated",
+            lambda path: [
+                SourceParsePlan(path, replace_existing=True, replaces_tracked_source=True)
+            ],
+        ),
+        (
+            "identity_changed",
+            lambda path: [
+                SourceParsePlan(path, replace_existing=True, replaces_tracked_source=True)
+            ],
+        ),
+        (
+            "prefix_mismatch",
+            lambda path: [
+                SourceParsePlan(path, replace_existing=True, replaces_tracked_source=True)
+            ],
+        ),
+        (
+            "parser_state_changed",
+            lambda path: [
+                SourceParsePlan(path, replace_existing=True, replaces_tracked_source=True)
+            ],
+        ),
     ],
 )
 def test_full_replacement_classifications_are_async(

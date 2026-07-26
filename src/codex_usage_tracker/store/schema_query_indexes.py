@@ -15,6 +15,7 @@ MIGRATION_NAMES = {
     23: "cover diagnostic fact aggregation",
     34: "index focused call explorer sorts, sources, and parent lookups",
     35: "add source byte offsets to usage events",
+    39: "index canonical model effort aggregate queries",
 }
 
 
@@ -98,4 +99,19 @@ def add_call_explorer_parent_lookup_indexes(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_usage_cwd_scope
         ON usage_events(cwd, is_duplicate, is_archived, event_timestamp DESC, record_id);
         """,
+    )
+
+
+def add_model_effort_aggregate_index(conn: sqlite3.Connection) -> None:
+    """Index the common active-history model-by-effort token aggregation."""
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_usage_model_effort_aggregate
+        ON usage_events(
+            is_duplicate,
+            is_archived,
+            coalesce(model, 'unknown'),
+            coalesce(effort, 'unknown')
+        )
+        """
     )

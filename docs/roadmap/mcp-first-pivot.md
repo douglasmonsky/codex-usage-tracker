@@ -24,7 +24,7 @@ continues to support setup, automation, recovery, export, and compatibility.
 | `0.23.0` | Evidence Console becomes the default; CLI and HTTP v2 ship | Old pages remain direct-link routes and old CLI names remain aliases. |
 | `0.24.0` | Task 27.5 foundation audit, then architecture, database integrity, context offsets, and infrastructure hardening | Implementation starts only after `PROCEED` or a maintainer-approved `AMEND`; old pages are notice-only and old APIs and aliases remain supported. |
 | `0.25.0` | Central-product reliability, installed-bundle coherence, durable refresh ownership, incremental performance, and Task 40 static-dashboard sunset | The seven core tools become dependable across task restarts, concurrent use, and append-active logs; the live Evidence Console becomes the only dashboard product. |
-| `0.26.0` | Remaining expired workbench, MCP, CLI, and HTTP compatibility is removed after Task 41 parity gates | Only documented stable and advanced surfaces remain. |
+| `0.26.0` | Core fast-path redesign removes hidden enrichment from canonical operations, then remaining expired workbench, MCP, CLI, and HTTP compatibility is removed after Task 41 parity gates | The seven core tools remain; legacy compression persistence and compatibility surfaces are removed. |
 | `0.27.0` | Feature-free stabilization and pre-1.0 contract hardening | No new public surface; migration and package gates prove the final state. |
 
 If another minor release ships before program execution begins, every planned
@@ -108,6 +108,26 @@ appended source event and advances the source revision/latest-event timestamp.
 A compatibility endpoint cannot be removed while its stable replacement fails
 functional parity, performs an unbounded dashboard scan, or regresses the
 recorded route budget.
+
+## 0.26 Core Fast-Path Amendment
+
+Public `0.25.1` dogfood proved that installed coherence and small synthetic
+append tests were insufficient for a many-task large-index workload. Stable
+program `OPS-CORE-026` therefore precedes Task 41 in `0.26.0` and follows the
+approved
+[core fast-path redesign](../superpowers/plans/2026-07-26-core-fast-path-redesign.md).
+
+The amendment preserves the seven public core tools while:
+
+- making job status operational-sidecar-only and host-waitable;
+- making analysis read committed data without implicitly starting refresh;
+- committing canonical refresh before optional analytical enrichment;
+- adding focused common-query plans; and
+- removing retired Compression Lab persistence and compatibility routing.
+
+Canonical accounting, allowance integrity, exact evidence selectors and deep
+links, source provenance, compact thread/Home summaries, privacy controls, and
+append-active freshness remain required release gates.
 
 ## Pre-0.24 Foundation Gate
 

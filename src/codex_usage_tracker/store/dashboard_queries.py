@@ -615,7 +615,7 @@ def query_canonical_usage_v2(
         WITH result_rows AS (
             SELECT {", ".join([*dimensions, *selected_measures, *_pricing_selects(grouped)])}
             FROM canonical_usage_events AS usage_events
-            {USAGE_TIMING_JOIN_SQL}
+            {USAGE_TIMING_JOIN_SQL if "duration" in measures else ""}
             {where}
             {grouping}
         ), counted AS (

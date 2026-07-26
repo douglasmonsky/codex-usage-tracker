@@ -35,7 +35,7 @@ def test_mcp_first_roadmap_prioritizes_central_product_reliability() -> None:
     )
 
     assert "`0.25.0` | Central-product reliability" in summary
-    assert "`0.26.0` | Remaining expired workbench, MCP, CLI, and HTTP compatibility" in summary
+    assert "`0.26.0` | Core fast-path redesign" in summary
     assert "`0.27.0` | Feature-free stabilization" in summary
     assert "Task 40 may begin only after" in summary
 

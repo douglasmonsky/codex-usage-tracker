@@ -2076,3 +2076,54 @@ complete without its named focused and full verification evidence.
   - the measured wheel is `5,152,350` bytes and source distribution is
     `28,460,311` bytes; both package ceilings were ratcheted to exactly three
     percent headroom.
+
+## OPS-CORE-026 - Make the seven-tool product lightweight
+
+- Status: Slice A implemented and locally qualified on branch
+  `fix/313-core-fast-path`; Compression removal and derived-state slimming
+  remain separate follow-up slices.
+- Triggering evidence:
+  - public `0.25.1` dogfood required `29` MCP calls and `22` polls over
+    `15m29s`;
+  - refreshes adding only `33` and `45` canonical rows took roughly `379s` and
+    `318s`, dominated by `syncing_facts`;
+  - identical analysis calls consumed `42.6s` and `61.2s` without usable
+    findings, evidence, job, or limitation;
+  - a later grouped model/effort query took `13.6s` server-side and about
+    `29.7s` wall-clock;
+  - aggregate-only storage inventory measured compression at about `2.36 GiB`,
+    recommendation facts at `889 MiB`, and diagnostic facts at `771 MiB`,
+    versus `1.28 GiB` for canonical usage and its indexes.
+- Approved contract:
+  - preserve exactly seven public core MCP tools;
+  - make job status sidecar-only and host-waitable;
+  - make analysis read one committed generation and never start refresh;
+  - commit canonical refresh before optional enrichment;
+  - make new task files additive rather than global-derived rebuild triggers;
+  - add focused fast plans for common product query shapes;
+  - remove retired Compression Lab persistence and compatibility routing;
+  - preserve canonical accounting, allowance integrity, source provenance,
+    exact evidence selectors/deep links, compact thread/Home summaries,
+    privacy, raw-context controls, and moving-tail freshness.
+- Detailed implementation and qualification:
+  [core fast-path redesign](../superpowers/plans/2026-07-26-core-fast-path-redesign.md).
+- First implementation slice:
+  - failing new-task incremental, sidecar-only job-status,
+    analysis-without-refresh, and grouped model/effort query-plan tests;
+  - identical unprofiled synthetic many-task baselines before optimization;
+  - no compression/schema deletion until the critical read and refresh path is
+    independently green.
+- Slice A measurements and verification:
+  - the unprofiled `100,000`-row synthetic gate completed cold refresh in
+    `24.533s`, no-change refresh in `0.004s`, same-source append in `3.714s`,
+    `100` new task files in `1.916s`, and moving-tail catch-up in `0.420s`;
+  - the indexed model/effort aggregate completed in `0.102s`, and a committed
+    generation remained readable during its writer phase in `0.004s`;
+  - the expression index preserves canonical `NULL`/`unknown` grouping while
+    avoiding SQLite's temporary grouping table;
+  - all `2,062` runnable Python tests passed; two environment-only cases were
+    deselected because the Codex macOS sandbox denies `ps -axo` and
+    multiprocessing semaphore discovery;
+  - Ruff, MyPy, Pyright (`0` errors, `7` existing export warnings), complexity,
+    release readiness, built wheel/sdist inspection, and clean installed-wheel
+    smoke passed.

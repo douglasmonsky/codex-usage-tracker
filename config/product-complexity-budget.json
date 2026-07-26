@@ -81,10 +81,10 @@
       "rationale": "The 114-schema 0.24 baseline plus the two explicitly approved 0.25 plugin-bundle identity and coherence contracts form the reliability ceiling."
     },
     "sqlite_schema_increments": {
-      "maximum": 1,
-      "baseline": 0,
+      "maximum": 2,
+      "baseline": 2,
       "baseline_commit": "a52338d510b731288819c169dbbd2ba412fa56ad",
-      "rationale": "The prospective release ratchet starts at schema 37; the already-approved pre-adoption 0.24 migrations from 34 to 37 are documented architecture history."
+      "rationale": "OPS-CORE-026 approves schema 39 for the model-effort aggregate expression index; the architecture decision and focused migration/query-plan tests are recorded in the 0.26 core fast-path plan."
     }
   },
   "source_files": {

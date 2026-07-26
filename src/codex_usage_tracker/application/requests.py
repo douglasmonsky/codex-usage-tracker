@@ -167,6 +167,9 @@ class RefreshRequest:
 class JobStatusRequest:
     job_id: str
     include_result: bool = False
+    wait_ms: int = 0
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "job_id", _safe_identifier(self.job_id, "job_id"))
+        if type(self.wait_ms) is not int or not 0 <= self.wait_ms <= 30_000:
+            raise RequestValidationError("wait_ms must be between 0 and 30000")

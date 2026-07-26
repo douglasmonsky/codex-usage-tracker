@@ -10,6 +10,32 @@ MIGRATION_VERSION = 36
 MIGRATION_NAME = "persisted generic analysis jobs"
 LEASE_MIGRATION_VERSION = 37
 LEASE_MIGRATION_NAME = "lease persisted generic analysis jobs"
+_REQUIRED_INDEXES = {
+    "idx_analysis_jobs_active_semantic",
+    "idx_analysis_jobs_reusable",
+    "idx_analysis_jobs_retention",
+}
+
+
+def init_analysis_job_db(conn: sqlite3.Connection) -> None:
+    """Create or repair only the operational job-sidecar schema."""
+    tables = {
+        str(row["name"])
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' "
+            "AND name IN ('analysis_jobs', 'analysis_job_stats')"
+        )
+    }
+    if tables != {"analysis_jobs", "analysis_job_stats"}:
+        create_analysis_jobs_table(conn)
+    indexes = {
+        str(row["name"])
+        for row in conn.execute("PRAGMA index_list(analysis_jobs)")
+        if row["name"] is not None
+    }
+    if not _REQUIRED_INDEXES.issubset(indexes):
+        create_analysis_jobs_table(conn)
+    add_analysis_job_leases(conn)
 
 
 def create_analysis_jobs_table(conn: sqlite3.Connection) -> None:

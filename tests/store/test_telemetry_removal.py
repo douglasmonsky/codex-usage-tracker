@@ -24,7 +24,7 @@ def test_current_schema_and_refresh_surface_exclude_retired_telemetry(tmp_path: 
             ).fetchall()
         }
 
-    assert SCHEMA_VERSION == 38
+    assert SCHEMA_VERSION == 39
     assert "otel_completion_sources" not in tables
     assert "otel_completion_events" not in tables
     assert "otel_dir" not in inspect.signature(refresh_usage_index).parameters

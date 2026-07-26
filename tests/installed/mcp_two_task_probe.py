@@ -363,28 +363,6 @@ async def _analyze_token_waste(
         _analysis_arguments(),
         timeout_seconds=30,
     )
-    if started.get("result_schema") == (
-        "codex-usage-tracker.analysis-refresh-dependency.v1"
-    ):
-        dependency = _result(started)
-        refresh_job = dependency.get("refresh_job")
-        if not isinstance(refresh_job, Mapping):
-            raise AssertionError("stale analysis dependency omitted its refresh job")
-        refresh_job_id = refresh_job.get("job_id")
-        if not isinstance(refresh_job_id, str):
-            raise AssertionError("stale analysis dependency omitted a refresh job id")
-        await _poll_terminal_job(ledger, task, session, refresh_job_id)
-        resume = dependency.get("resume")
-        if not isinstance(resume, Mapping) or not isinstance(resume.get("arguments"), Mapping):
-            raise AssertionError("stale analysis dependency omitted its exact resume request")
-        started = await _call(
-            ledger,
-            task,
-            session,
-            "usage_analyze",
-            dict(resume["arguments"]),
-            timeout_seconds=30,
-        )
     analysis_job_id = _job_id(started)
     completed = await _poll_terminal_job(
         ledger,
@@ -406,13 +384,18 @@ async def _poll_terminal_job(
     session: ClientSession,
     job_id: str,
 ) -> dict[str, Any]:
-    for _attempt in range(400):
+    for _attempt in range(20):
         payload = await _call(
             ledger,
             task,
             session,
             "usage_job_status",
-            {"job_id": job_id, "include_result": True},
+            {
+                "job_id": job_id,
+                "include_result": True,
+                "wait_ms": 30_000,
+            },
+            timeout_seconds=35,
         )
         result = _result(payload)
         state = result.get("state")
@@ -420,13 +403,6 @@ async def _poll_terminal_job(
             return result
         if state in {"failed", "cancelled"}:
             raise AssertionError(f"job {job_id} failed: {result.get('error')!r}")
-        poll_after = result.get("poll_after_ms", 100)
-        delay = (
-            max(10, min(250, int(poll_after))) / 1_000
-            if isinstance(poll_after, int) and not isinstance(poll_after, bool)
-            else 0.1
-        )
-        await asyncio.sleep(delay)
     raise AssertionError(f"job {job_id} did not reach a terminal state")
 
 

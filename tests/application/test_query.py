@@ -72,6 +72,54 @@ def test_query_uses_canonical_rows_and_explicit_history(tmp_path: Path) -> None:
     assert sum(row["call_count"] for row in all_history.rows) == 3
 
 
+def test_model_effort_grouping_keeps_missing_and_unknown_labels_canonical(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "usage.sqlite3"
+    missing = replace(
+        _usage_event(
+            record_id="missing-labels",
+            session_id="session-missing",
+            thread_key="thread:missing",
+            event_timestamp="2026-07-20T12:00:00Z",
+            cumulative_total_tokens=110,
+        ),
+        model=None,
+        effort=None,
+    )
+    explicit = replace(
+        _usage_event(
+            record_id="explicit-unknown",
+            session_id="session-explicit",
+            thread_key="thread:explicit",
+            event_timestamp="2026-07-21T12:00:00Z",
+            cumulative_total_tokens=110,
+        ),
+        model="unknown",
+        effort="unknown",
+    )
+    upsert_usage_events([missing, explicit], db_path)
+
+    result = query_usage(
+        QueryRequest(
+            entity="model",
+            measures=("tokens", "call_count"),
+            filters=QueryFilters(),
+            group_by=("effort",),
+        ),
+        db_path=db_path,
+    )
+
+    assert result.rows == (
+        {
+            "model": "unknown",
+            "effort": "unknown",
+            "tokens": 220,
+            "call_count": 2,
+        },
+    )
+
+
 @pytest.mark.parametrize("order", ["asc", "desc"])
 def test_query_has_stable_keyset_pagination_and_no_matches(tmp_path: Path, order: str) -> None:
     db_path = tmp_path / "usage.sqlite3"

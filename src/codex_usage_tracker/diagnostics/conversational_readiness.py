@@ -32,7 +32,11 @@ class ConversationalReadiness(TypedDict):
     evidence: list[str]
 
 
-def conversational_readiness(*, codex_home: Path) -> ConversationalReadiness:
+def conversational_readiness(
+    *,
+    codex_home: Path,
+    verify_runtime_import: bool = True,
+) -> ConversationalReadiness:
     """Report what can be proven from one explicitly selected local Codex home."""
     plugin_root = codex_home.expanduser().parent / "plugins" / PLUGIN_NAME
     server = _configured_server(plugin_root)
@@ -56,7 +60,10 @@ def conversational_readiness(*, codex_home: Path) -> ConversationalReadiness:
         )
 
     config = check_mcp_config(plugin_root)
-    runtime = check_mcp_runtime(plugin_root)
+    runtime = check_mcp_runtime(
+        plugin_root,
+        verify_import=verify_runtime_import,
+    )
     evidence = [
         f"Configured MCP profile: {configured_profile}",
         f"{config.name}: {config.status}",
@@ -82,6 +89,7 @@ def conversational_readiness(*, codex_home: Path) -> ConversationalReadiness:
         runtime_ready, version_matches, runtime_evidence = _bootstrap_runtime_ready(
             plugin_root=plugin_root,
             codex_home=codex_home,
+            verify_runtime_import=verify_runtime_import,
         )
         evidence.extend(runtime_evidence)
         if runtime_ready:
@@ -137,7 +145,10 @@ def _uses_bootstrap_launcher(plugin_root: Path) -> bool:
 
 
 def _bootstrap_runtime_ready(
-    *, plugin_root: Path, codex_home: Path
+    *,
+    plugin_root: Path,
+    codex_home: Path,
+    verify_runtime_import: bool = True,
 ) -> tuple[bool, bool, list[str]]:
     server = _configured_server(plugin_root)
     configured_env = server.get("env")
@@ -168,6 +179,11 @@ def _bootstrap_runtime_ready(
         marker_matches = False
     if not marker_matches:
         return False, False, ["Bootstrap runtime marker: missing or mismatched"]
+    if not verify_runtime_import:
+        return True, True, [
+            "Bootstrap runtime marker: pass",
+            "Current MCP process exposure: pass",
+        ]
 
     runtime_python = runtime_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     try:

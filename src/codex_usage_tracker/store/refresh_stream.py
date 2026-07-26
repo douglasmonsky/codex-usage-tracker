@@ -47,7 +47,8 @@ from codex_usage_tracker.store.usage_event_writer import (
     upsert_usage_events_in_connection as _upsert_usage_events_in_connection,
 )
 
-_STREAM_SOURCE_BATCH_SIZE = 1
+_STREAM_SOURCE_BATCH_SIZE = 16
+_STREAM_EVENT_BATCH_SIZE = 10_000
 
 
 @dataclass(frozen=True)
@@ -468,7 +469,8 @@ class _RefreshStreamWriter:
         if self.derived_fact_sync is not None:
             recommendation_started = perf_counter()
             derived_facts_require_rebuild = full_rebuild or any(
-                plan.replace_existing for plan in self.parse_plans
+                plan.replace_existing and plan.replaces_tracked_source
+                for plan in self.parse_plans
             )
             self.derived_fact_sync(
                 conn,
@@ -512,11 +514,17 @@ def _batched_refresh_files(
     parsed_stream: Iterator[ParsedRefreshFile],
 ) -> Iterator[list[ParsedRefreshFile]]:
     batch: list[ParsedRefreshFile] = []
+    batch_events = 0
     for parsed in parsed_stream:
         batch.append(parsed)
-        if len(batch) >= _STREAM_SOURCE_BATCH_SIZE:
+        batch_events += len(parsed.events)
+        if (
+            len(batch) >= _STREAM_SOURCE_BATCH_SIZE
+            or batch_events >= _STREAM_EVENT_BATCH_SIZE
+        ):
             yield batch
             batch = []
+            batch_events = 0
     if batch:
         yield batch
 

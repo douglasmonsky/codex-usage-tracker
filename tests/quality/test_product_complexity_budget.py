@@ -304,7 +304,7 @@ def test_committed_budget_preserves_reviewed_baselines_and_exact_headroom() -> N
     assert metrics["main_initial_react_js_gzip_bytes"]["baseline"] == 61_457
     assert metrics["main_initial_react_js_gzip_bytes"]["maximum"] == math.ceil(61_457 * 1.03)
     assert metrics["stable_json_schemas"]["maximum"] == 116
-    assert metrics["sqlite_schema_increments"]["maximum"] == 1
+    assert metrics["sqlite_schema_increments"]["maximum"] == 2
     assert budget["source_files"]["python"]["roots"] == ["src/codex_usage_tracker"]
     assert budget["source_files"]["python"]["extensions"] == [".py"]
     assert budget["source_files"]["python"]["exclude_globs"] == [

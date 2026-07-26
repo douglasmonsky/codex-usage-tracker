@@ -19,12 +19,6 @@ NoneType = type(None)
 
 AUXILIARY_JSON_PAYLOAD_CONTRACTS: dict[str, dict[str, Any]] = {
     "codex-usage-tracker-agentic-dogfood-v1": {"required": {"generated_at": str}},
-    "codex-usage-tracker.analysis-refresh-dependency.v1": {
-        "required": {
-            "refresh_job": dict,
-            "resume": dict,
-        }
-    },
     "codex-usage-tracker-allowance-v1": {"required": {}},
     "codex-usage-tracker-codex-rate-card-v1": {"required": {}},
     "codex-usage-tracker-diagnostic-snapshot-refresh-v1": {"required": {}},

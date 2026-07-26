@@ -383,10 +383,12 @@ def bound_core_handlers(
     def bound_usage_job_status(
         job_id: str,
         include_result: bool = False,
+        wait_ms: int = 0,
     ) -> dict[str, object]:
         return build_usage_job_status(
             job_id=job_id,
             include_result=include_result,
+            wait_ms=wait_ms,
             container=container,
         )
 

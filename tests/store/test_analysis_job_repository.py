@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -73,6 +74,27 @@ def test_create_and_active_semantic_deduplication(tmp_path: Path) -> None:
         "interrupted": 0,
         "pruned": 0,
     }
+
+
+def test_job_repository_initializes_only_the_operational_sidecar_schema(
+    tmp_path: Path,
+) -> None:
+    repository = _repository(tmp_path)
+
+    _create(repository)
+
+    with sqlite3.connect(repository.db_path) as conn:
+        tables = {
+            str(row[0])
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+        user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+
+    assert {"analysis_jobs", "analysis_job_stats"} <= tables
+    assert "usage_events" not in tables
+    assert user_version == 0
 
 
 def test_concurrent_creators_claim_one_active_semantic_job(tmp_path: Path) -> None:

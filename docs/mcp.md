@@ -130,7 +130,9 @@ and effort). Both return bounded versioned envelopes. An asynchronous analysis
 returns an analysis-job handle; poll its `job_id` with `usage_job_status`.
 Allowance questions use `usage_allowance(operation=...)`. Raw-context and
 individual allowance compatibility tools are not part of this default flow.
-Every installed core-tool response includes top-level `server_elapsed_ms`, measured
+Use `usage_job_status(job_id, include_result=True, wait_ms=30000)` so the MCP
+host waits for terminal work instead of spending model turns on short-interval
+polling. Every installed core-tool response includes top-level `server_elapsed_ms`, measured
 inside the MCP process around the complete application call. Use it to distinguish
 server work from client discovery, transport, polling, and model orchestration time.
 Durable refresh jobs remain pollable from later Codex tasks. Their bounded
@@ -313,7 +315,7 @@ claiming MCP availability.
   limits are 1–200 and the cursor remains bound to the selected window and range.
 - `usage_allowance(operation="analysis", execution="auto")` returns an exact
   compatible persisted analysis or a generic job handle. Poll a returned handle
-  with `usage_job_status(job_id, include_result=True)`. Analysis currently supports
+  with `usage_job_status(job_id, include_result=True, wait_ms=30000)`. Analysis currently supports
   the weekly window.
 - `usage_allowance_history(...)` returns normalized observed weekly and 5-hour allowance snapshots.
 - `usage_allowance_diagnostics(...)` returns evidence grades comparing observed usage movement against estimated local credits. Weekly windows are the primary long-range signal; 5-hour windows are noisy rolling-window context.
@@ -339,7 +341,7 @@ usage_allowance(operation="status")
 usage_allowance(operation="series", window="weekly", range="8w")
 usage_allowance(operation="evidence", window="weekly", range="8w", limit=50)
 usage_allowance(operation="analysis", execution="auto")
-usage_job_status(job_id="allowance-analysis-example", include_result=True)
+usage_job_status(job_id="allowance-analysis-example", include_result=True, wait_ms=30000)
 ```
 
 Follow the returned next action for refresh or polling cadence. Poll an analysis

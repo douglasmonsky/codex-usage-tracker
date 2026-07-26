@@ -60,7 +60,6 @@ Tracked schema ids:
 | `codex-usage-tracker.release-promotion-evidence.v1` | TestPyPI qualification, installed smoke, GitHub Actions run, and manifest binding required before PyPI promotion |
 | `codex-usage-tracker.query.v2` | Canonical bounded application query result with deterministic cursor continuation |
 | `codex-usage-tracker.analysis.v2` | Bounded evidence-backed analysis with strategy provenance, limitations, accounting, and dashboard destinations |
-| `codex-usage-tracker.analysis-refresh-dependency.v1` | Stale-analysis dependency naming the durable refresh job and exact normalized `usage_analyze` resume request |
 | `codex-usage-tracker.analysis-job.v1` | Semantic analysis job status; active and compatible completed work may be reused through durable local job state |
 | `codex-usage-tracker.evidence-result.v1` | Bounded canonical evidence page with exact selector, immutable records, and revision-bound continuation |
 | `codex-usage-tracker-dashboard-target-v2` | Deterministic evidence-surface handoff with canonical selectors and scope |

@@ -275,6 +275,8 @@ def _smoke_plugin_install(command: Path, temp_dir: Path) -> None:
             str(plugin_dir),
             "--marketplace",
             str(marketplace),
+            "--codex-home",
+            str(temp_dir / "codex"),
             "--force",
             "--json",
         ],

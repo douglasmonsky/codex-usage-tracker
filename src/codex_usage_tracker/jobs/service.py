@@ -270,10 +270,10 @@ class JobService:
             result=candidate.result,
             error=message_payload(candidate.error),
         )
-        persisted = persisted_status(row, include_result=True)
+        durable_status = persisted_status(row, include_result=True)
         with self._lock:
-            self._last[job_id] = persisted
-        return persisted
+            self._last[job_id] = durable_status
+        return durable_status
 
     def heartbeat(self, job_id: str) -> bool:
         """Extend the lease for one active job owned by this process."""

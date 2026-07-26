@@ -36,8 +36,8 @@ from codex_usage_tracker.store.analysis_job_lifecycle import (
     monotonic_progress,
     prune_in_connection,
 )
+from codex_usage_tracker.store.analysis_job_schema import init_analysis_job_db
 from codex_usage_tracker.store.connection import connect
-from codex_usage_tracker.store.schema import init_db
 
 _PROCESS_OWNER_ID = f"process:{secrets.token_urlsafe(18)}"
 
@@ -98,7 +98,7 @@ class AnalysisJobRepository:
         timestamp = _timestamp(current)
         lease_expires_at = _timestamp(current + self.lease_ttl)
         with connect(self.db_path) as conn:
-            init_db(conn)
+            init_analysis_job_db(conn)
             conn.execute("BEGIN IMMEDIATE")
             active = _select_active(conn, job_kind, semantic_key)
             if active is not None and lease_expired(active, current):
@@ -210,7 +210,7 @@ class AnalysisJobRepository:
         timestamp = _timestamp(current_time)
         lease_expires_at = _timestamp(current_time + self.lease_ttl)
         with connect(self.db_path) as conn:
-            init_db(conn)
+            init_analysis_job_db(conn)
             conn.execute("BEGIN IMMEDIATE")
             current = _select_job(conn, job_id)
             if current is None:
@@ -289,7 +289,7 @@ class AnalysisJobRepository:
         now: datetime | None = None,
     ) -> dict[str, object] | None:
         with connect(self.db_path) as conn:
-            init_db(conn)
+            init_analysis_job_db(conn)
             row = _select_job(conn, job_id)
             if row is None:
                 return None
@@ -306,7 +306,7 @@ class AnalysisJobRepository:
             return False
         current = _as_utc(now)
         with connect(self.db_path) as conn:
-            init_db(conn)
+            init_analysis_job_db(conn)
             cursor = conn.execute(
                 """
                 UPDATE analysis_jobs
@@ -335,7 +335,7 @@ class AnalysisJobRepository:
     ) -> dict[str, object] | None:
         current = _as_utc(now)
         with connect(self.db_path) as conn:
-            init_db(conn)
+            init_analysis_job_db(conn)
             conn.execute("BEGIN IMMEDIATE")
             active = _select_active(conn, job_kind, semantic_key)
             if active is not None and lease_expired(active, current):
@@ -375,7 +375,7 @@ class AnalysisJobRepository:
         limit: int,
     ) -> tuple[Mapping[str, object], ...]:
         with connect(self.db_path) as conn:
-            init_db(conn)
+            init_analysis_job_db(conn)
             rows = conn.execute(
                 """
                 SELECT *
@@ -402,7 +402,7 @@ class AnalysisJobRepository:
         current = _as_utc(now)
         timestamp = _timestamp(current)
         with connect(self.db_path) as conn:
-            init_db(conn)
+            init_analysis_job_db(conn)
             conn.execute("BEGIN IMMEDIATE")
             rows = conn.execute(
                 """
@@ -423,7 +423,7 @@ class AnalysisJobRepository:
             return 0
         current = _as_utc(now)
         with connect(self.db_path) as conn:
-            init_db(conn)
+            init_analysis_job_db(conn)
             conn.execute("BEGIN IMMEDIATE")
             return prune_in_connection(
                 conn,

@@ -5,6 +5,7 @@ import shlex
 import sys
 from pathlib import Path
 
+import codex_usage_tracker.diagnostics.conversational_readiness as readiness_module
 from codex_usage_tracker import __version__
 from codex_usage_tracker.diagnostics.conversational_readiness import conversational_readiness
 
@@ -80,6 +81,41 @@ def test_bootstrap_runtime_with_matching_marker_and_import_is_ready(tmp_path: Pa
     assert result["configured_profile"] == "core"
     assert result["runtime_version_matches"] is True
     assert "current task tool exposure is not verified" in result["summary"].lower()
+
+
+def test_current_process_readiness_does_not_spawn_runtime_import(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    codex_home = tmp_path / ".codex"
+    runtime = tmp_path / ".cache" / "codex-usage-tracker" / "mcp-runtime" / __version__
+    root = _write_wrapper(
+        codex_home,
+        {
+            "command": "python3",
+            "args": ["skills/codex-usage-tracker/scripts/run_mcp.py"],
+        },
+    )
+    launcher = root / "skills" / "codex-usage-tracker" / "scripts" / "run_mcp.py"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("# launcher\n", encoding="utf-8")
+    runtime.mkdir(parents=True)
+    (runtime / ".codex-usage-tracker-package-spec").write_text(
+        f"codex-usage-tracking=={__version__}\n", encoding="utf-8"
+    )
+
+    def unexpected_run(*_args, **_kwargs):
+        raise AssertionError("current MCP status must not spawn a runtime import")
+
+    monkeypatch.setattr(readiness_module.subprocess, "run", unexpected_run)
+
+    result = conversational_readiness(
+        codex_home=codex_home,
+        verify_runtime_import=False,
+    )
+
+    assert result["state"] == "ready"
+    assert "Current MCP process exposure: pass" in result["evidence"]
 
 
 def test_bootstrap_runtime_wrong_marker_or_failed_import_requires_restart(tmp_path: Path) -> None:

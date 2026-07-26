@@ -5,12 +5,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
+from time import monotonic, sleep
 from typing import Any, cast
 
 from codex_usage_tracker.application.allowance import AllowanceAnalysisRuntime, get_allowance
 from codex_usage_tracker.application.allowance_models import AllowanceRequest
 from codex_usage_tracker.application.container import ApplicationContainer
-from codex_usage_tracker.application.context import build_request_context
+from codex_usage_tracker.application.context import RequestContext, build_request_context
 from codex_usage_tracker.application.evidence import get_evidence
 from codex_usage_tracker.application.job_status import JobStatusService, get_job_status
 from codex_usage_tracker.application.refresh import REFRESH_SCHEMA, refresh_usage
@@ -24,6 +25,7 @@ from codex_usage_tracker.application.requests import (
 )
 from codex_usage_tracker.application.status import STATUS_SCHEMA, _build_status
 from codex_usage_tracker.core.contracts import (
+    FreshnessV1,
     NextActionV1,
     enforce_payload_budget,
     envelope_payload,
@@ -35,6 +37,7 @@ from codex_usage_tracker.core.paths import (
     DEFAULT_PRICING_PATH,
 )
 from codex_usage_tracker.diagnostics.conversational_readiness import (
+    ConversationalReadiness,
     conversational_readiness,
 )
 from codex_usage_tracker.evidence.models import EvidenceRequest
@@ -51,12 +54,20 @@ from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
 from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
     usage_query as usage_query,
 )
+from codex_usage_tracker.jobs.models import JobStatusV1
 from codex_usage_tracker.jobs.service import JobService
 
 MAX_STATUS_PAYLOAD_BYTES = 16 * 1024
 MAX_REFRESH_PAYLOAD_BYTES = 64 * 1024
 MAX_EVIDENCE_PAYLOAD_BYTES = 128 * 1024
 MAX_ALLOWANCE_PAYLOAD_BYTES = 128 * 1024
+
+
+def _current_process_readiness(*, codex_home: Path) -> ConversationalReadiness:
+    return conversational_readiness(
+        codex_home=codex_home,
+        verify_runtime_import=False,
+    )
 
 
 def usage_status() -> dict[str, object]:
@@ -77,9 +88,17 @@ def usage_refresh(
     )
 
 
-def usage_job_status(job_id: str, include_result: bool = False) -> dict[str, object]:
-    """Poll one registered generic job through the shared core service."""
-    return build_usage_job_status(job_id=job_id, include_result=include_result)
+def usage_job_status(
+    job_id: str,
+    include_result: bool = False,
+    wait_ms: int = 0,
+) -> dict[str, object]:
+    """Read a job immediately or let the host wait up to 30 seconds for terminal state."""
+    return build_usage_job_status(
+        job_id=job_id,
+        include_result=include_result,
+        wait_ms=wait_ms,
+    )
 
 
 def usage_evidence(
@@ -286,7 +305,7 @@ def build_usage_status(
     if container is None:
         result, context = _build_status(
             request,
-            readiness_provider=conversational_readiness,
+            readiness_provider=_current_process_readiness,
         )
     else:
         context = container.request_context(
@@ -298,7 +317,7 @@ def build_usage_status(
             context=context,
             clock=container.clock,
             pricing_provider=container.pricing,
-            readiness_provider=conversational_readiness,
+            readiness_provider=_current_process_readiness,
         )
     mcp_status = cast(dict[str, object], result["mcp"])
     mcp_status["current_task_exposure"] = "verified"
@@ -403,33 +422,22 @@ def build_usage_job_status(
     *,
     job_id: str,
     include_result: bool = False,
+    wait_ms: int = 0,
     db_path: Path = DEFAULT_DB_PATH,
     pricing_path: Path = DEFAULT_PRICING_PATH,
     job_service: JobStatusService | None = None,
     container: ApplicationContainer | None = None,
 ) -> dict[str, object]:
     if container is not None:
-        db_path = container.paths.db_path
-        pricing_path = container.paths.pricing_path
         job_service = job_service or container.jobs
-    request = JobStatusRequest(job_id=job_id, include_result=include_result)
-    durable_row: Mapping[str, object] | None = None
-    if isinstance(job_service, JobService):
-        status, durable_row = job_service.status_snapshot(
-            request.job_id,
-            include_result=request.include_result,
-        )
-    else:
-        status = get_job_status(request, job_service=job_service)
-    context = (
-        container.request_context(RequestScope())
-        if container is not None
-        else build_request_context(
-            db_path=db_path,
-            pricing_path=pricing_path,
-            scope=RequestScope(),
-        )
+    _ = (db_path, pricing_path)
+    request = JobStatusRequest(
+        job_id=job_id,
+        include_result=include_result,
+        wait_ms=wait_ms,
     )
+    status, durable_row = _wait_for_job_status(request, job_service)
+    context = _job_status_context(status.source_revision)
     result_payload = status.to_payload()
     progress = _bounded_progress(durable_row)
     if progress is not None:
@@ -450,10 +458,14 @@ def build_usage_job_status(
             if status.state in {"completed", "failed", "cancelled"}
             else (
                 NextActionV1(
-                    code="job.poll",
-                    label="Poll job again",
+                    code="job.wait",
+                    label="Wait for job completion",
                     tool="usage_job_status",
-                    arguments={"job_id": status.job_id, "include_result": include_result},
+                    arguments={
+                        "job_id": status.job_id,
+                        "include_result": include_result,
+                        "wait_ms": 30_000,
+                    },
                 ),
             )
         ),
@@ -464,6 +476,55 @@ def build_usage_job_status(
         "usage_job_status",
     )
     return payload
+
+
+def _wait_for_job_status(
+    request: JobStatusRequest,
+    job_service: JobStatusService | None,
+) -> tuple[JobStatusV1, Mapping[str, object] | None]:
+    deadline = monotonic() + request.wait_ms / 1_000
+    while True:
+        durable_row: Mapping[str, object] | None = None
+        if isinstance(job_service, JobService):
+            status, durable_row = job_service.status_snapshot(
+                request.job_id,
+                include_result=request.include_result,
+            )
+        else:
+            status = get_job_status(request, job_service=job_service)
+        if (
+            request.wait_ms == 0
+            or status.state in {"completed", "failed", "cancelled"}
+        ):
+            return status, durable_row
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            return status, durable_row
+        sleep(min(1.0, remaining))
+
+
+def _job_status_context(source_revision: str | None) -> RequestContext:
+    """Build operational job context without opening the aggregate usage database."""
+    scope = RequestScope().to_contract()
+    return RequestContext(
+        source_revision=source_revision,
+        freshness=FreshnessV1(
+            latest_indexed_event_at=None,
+            source_revision=source_revision,
+            refresh_completed_at=None,
+            state="unknown",
+            reason="Job status is operational and does not inspect the usage index.",
+            threshold_seconds=None,
+            recommended_refresh_action=None,
+        ),
+        scope=scope,
+        physical_rows=0,
+        canonical_rows=0,
+        copied_rows_excluded=0,
+        pricing_coverage=None,
+        credit_coverage=None,
+        service_tier_coverage=None,
+    )
 
 
 def _bounded_progress(

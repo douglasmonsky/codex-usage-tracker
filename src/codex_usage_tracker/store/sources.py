@@ -52,6 +52,7 @@ class SourceParsePlan:
     start_line: int = 0
     initial_state: ParserState | None = None
     replace_existing: bool = True
+    replaces_tracked_source: bool = False
     source_metadata: SourceFileMetadata | None = None
 
 
@@ -132,6 +133,7 @@ def _source_parse_plan_from_row(
         return SourceParsePlan(
             path=path,
             end_byte=end_byte,
+            replaces_tracked_source=True,
             source_metadata=metadata,
         )
     if _source_metadata_matches(path, row, metadata):
@@ -152,6 +154,7 @@ def _source_parse_plan_from_row(
     return SourceParsePlan(
         path=path,
         end_byte=end_byte,
+        replaces_tracked_source=True,
         source_metadata=metadata,
     )
 

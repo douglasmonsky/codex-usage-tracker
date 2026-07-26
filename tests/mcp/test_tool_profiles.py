@@ -355,11 +355,19 @@ def test_core_status_reports_malformed_runtime_wrapper(tmp_path: Path) -> None:
     assert "doctor" in readiness["next_action"]
 
 
-def test_core_job_status_returns_bounded_administrative_envelope(tmp_path: Path) -> None:
+def test_core_job_status_returns_bounded_sidecar_only_envelope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import codex_usage_tracker.interfaces.mcp.core_tools as core_tools
     from codex_usage_tracker.core.contracts import serialized_size
     from codex_usage_tracker.interfaces.mcp.core_tools import build_usage_job_status
     from codex_usage_tracker.jobs.service import JobService
 
+    def unexpected_context(**_kwargs: object) -> object:
+        raise AssertionError("job status must not read the main usage context")
+
+    monkeypatch.setattr(core_tools, "build_request_context", unexpected_context)
     payload = build_usage_job_status(
         job_id="missing-job",
         db_path=tmp_path / "missing.sqlite3",
@@ -371,6 +379,59 @@ def test_core_job_status_returns_bounded_administrative_envelope(tmp_path: Path)
     assert payload["result_schema"] == "codex-usage-tracker.job.v1"
     assert payload["data_class"] == "administrative"
     assert serialized_size(payload) <= 16 * 1024
+
+
+def test_core_job_status_can_wait_host_side_until_terminal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import codex_usage_tracker.interfaces.mcp.core_tools as core_tools
+    from codex_usage_tracker.interfaces.mcp.core_tools import build_usage_job_status
+    from codex_usage_tracker.jobs.adapters import AnalysisJobAdapter, request_hash
+    from codex_usage_tracker.jobs.service import JobService
+
+    reads = 0
+    waits: list[float] = []
+
+    def read_job(_job_id: str, *, include_result: bool = False) -> dict[str, object]:
+        nonlocal reads
+        reads += 1
+        completed = reads >= 2
+        return {
+            "status": "completed" if completed else "running",
+            "stage": "completed" if completed else "analyzing",
+            "created_at": "2026-07-26T12:00:00Z",
+            "updated_at": "2026-07-26T12:00:01Z",
+            "result": {"ok": True} if completed and include_result else None,
+        }
+
+    service = JobService()
+    service.register(
+        kind="analysis",
+        job_id="host-wait",
+        adapter=AnalysisJobAdapter(
+            read_job,
+            kind="analysis",
+            request_hash=request_hash("host-wait"),
+            result_budget=4_096,
+        ),
+    )
+    monkeypatch.setattr(core_tools, "sleep", waits.append)
+
+    payload = build_usage_job_status(
+        job_id="host-wait",
+        include_result=True,
+        wait_ms=30_000,
+        db_path=tmp_path / "missing.sqlite3",
+        pricing_path=tmp_path / "missing-pricing.json",
+        job_service=service,
+    )
+
+    assert reads >= 2
+    assert waits == [1.0]
+    assert payload["result"]["state"] == "completed"  # type: ignore[index]
+    assert payload["result"]["result"] == {"ok": True}  # type: ignore[index]
+    assert payload["next_actions"] == []
 
 
 def test_core_job_status_exposes_bounded_durable_refresh_progress(
