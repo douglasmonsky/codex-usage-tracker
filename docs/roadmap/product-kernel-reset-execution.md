@@ -625,13 +625,16 @@ so token metrics remain pending without retry.
 
 ## K3 — Incremental And Live Ingestion
 
-**State:** Implementation qualified
+**State:** Complete
 
 **Branch:** `kernel/k3-ingest-tail`
 
 **Base:** `6145437bcc3c8943f5b8318bd5350617f111b441`
 
 **Implementation commit:** `6d804be` (`feat: add incremental kernel ingestion`)
+
+**Merged:** [PR #320](https://github.com/douglasmonsky/codex-usage-tracker/pull/320)
+as `f5d988621f0cf3e130cf02ddc3a3681f9822be3d`
 
 ### Contract added first
 
@@ -682,6 +685,7 @@ so token metrics remain pending without retry.
 | Performance | Pass | Final local 100,000-call run: 15.828 s, 804 bounded writer transactions, p95 36.609 ms against 50 ms budget; CI 3.10 exposed and drove removal of per-fingerprint SELECT amplification |
 | Package | Pass | isolated 0.26.0.dev0 wheel and sdist pass exact release checks; isolated installed-wheel first-build plus no-change kernel smoke passed |
 | Privacy | Pass | synthetic fixtures only; raw private sentinels and full source paths absent from analytical facts and oracle output |
+| Integration CI | Pass | Python 3.10 in 51 s and Python 3.14 in 56 s on merge head `9fecb1e`; PR #320 squash-merged |
 
 Agent-perf run `20260726T225506Z-ec362ecb` was incomplete because pinned
 Scalene 2.3.0 on Python 3.14 exited without producing JSON. The identical
@@ -738,7 +742,8 @@ the bounded digest owner and explicit repository guidance/policy coverage; the
 - K4 must resolve the active generation from the operational sidecar and bind
   every batch to that one generation; reads never infer readiness from
   `MAX(generation)`.
-- K3 remains non-publishable and targets `kernel/0.26-integration`.
+- K3 is merged into the non-publishable `kernel/0.26-integration` branch and
+  unblocks K4.
 
 ## Task Entry Template
 
