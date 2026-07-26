@@ -38,6 +38,19 @@ installed-smoke, and review gates before artifact promotion. A release may not
 substitute compatibility work from the archived roadmap for a missing active
 kernel gate.
 
+For Release 0.26.0, also require every
+`config/kernel-code-disposition-v1.json` entry to be `verified` with its
+disposition-specific proof. The manifest must equal the frozen K1
+`git ls-files` inventory plus every reviewed current-main delta. Require the K9
+retired-surface/package-absence audit and branch/ref publication-rejection
+proof through K9.
+
+K10 must record the full main-delta classification and any named
+integration-targeting port/requalification. It creates `release/0.26.0` from
+the audited current-`main` SHA, incorporates qualified integration once, and
+opens that release branch to `main`. If `main` moves, restart the audit. The
+protected release workflow starts only from the merged release source.
+
 ## Promote one verified build
 
 1. Use the manual `Publish Python package` workflow only for a TestPyPI dry run

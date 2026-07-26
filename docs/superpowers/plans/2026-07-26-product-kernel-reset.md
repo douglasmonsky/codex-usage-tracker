@@ -5,6 +5,8 @@
 **Normative roadmap:** `docs/roadmap/product-kernel-reset.md`
 **Approved design:**
 `docs/superpowers/specs/2026-07-26-product-kernel-reset-design.md`
+**Code-quarantine amendment:**
+`docs/superpowers/specs/2026-07-26-kernel-code-quarantine-design.md`
 **Execution ledger:** `docs/roadmap/product-kernel-reset-execution.md`
 **Starting baseline:** `origin/main` at
 `0a558dd328c1519c77fffe68b71a8bccdbd1a731`
@@ -31,7 +33,10 @@ privacy, and performance contracts.
 
 For every task:
 
-1. Start from current `main` on `kernel/<task-id>-<slug>`.
+1. K1 starts from current `main`. K1A-K9 start from the latest
+   `kernel/0.26-integration` head on `kernel/<task-id>-<slug>`. K10 creates
+   `release/0.26.0` from an audited current-`main` SHA, incorporates the
+   qualified integration head, and opens the release-to-`main` cutover PR.
 2. Read the active roadmap, design section, task entry, and latest execution
    ledger entry. Do not reopen the archived program as authority.
 3. Measure the current synthetic baseline where the task has a latency, size,
@@ -43,10 +48,16 @@ For every task:
    risk in the execution ledger in the same changeset.
 8. Give a meaningful stable diff one final read-only independent review after
    primary validation.
-9. Merge only while `main` remains releasable. Through K8, public 0.25 defaults
-   remain active and the kernel composition is reachable only through direct
-   tests and an internal development selector. K9 activates the kernel and
-   deletes the old runtime in one changeset.
+9. Keep `main` releasable as the 0.25.1 line. The temporary integration branch
+   is non-publishable and may be feature-incomplete; it must pass the phased
+   gates named for its current task.
+
+Before each K1A-K9 task and again before K10, diff the frozen K1 main SHA
+against current `main`. Any added, changed, renamed, or deleted tracked path
+without a reviewed disposition entry fails closed. Required blocker behavior
+is ported on `kernel/k<owner>-mainline-port-<issue>`, based on and targeting the
+integration branch, with manifest/oracle/ledger updates and affected phase
+requalification. Never merge the legacy main line into integration.
 
 Use synthetic fixtures only. Never inspect, print, commit, or profile the
 maintainer's live usage database or raw session content.
@@ -57,6 +68,8 @@ maintainer's live usage database or raw session content.
 K0
  |
 K1
+ |
+K1A
  |
 K2
  |
@@ -87,7 +100,8 @@ K4    K5
 
 K4 and K5 may proceed in parallel after K3 only if they touch separate modules
 and use the same frozen identities. K12 and K13 may proceed in parallel after
-K11. No other task may skip its dependency.
+K11. No other task may skip its dependency. K1A-K9 target the temporary
+integration branch; all other task branches follow their named release base.
 
 ## 4. Program-Wide Invariants
 
@@ -190,6 +204,8 @@ transplanting before new storage work starts.
 - `tests/kernel/test_privacy_oracle.py`
 - `config/kernel-retired-surfaces-v1.json`
 - `tests/kernel/test_retired_surface_manifest.py`
+- `config/kernel-code-disposition-v1.json`
+- `tests/kernel/test_code_disposition_manifest.py`
 - `scripts/benchmark_kernel.py`
 - `config/kernel-performance-budget.json`
 - execution ledger
@@ -222,6 +238,13 @@ Each entry has `surface_type`, exact public name or route, current owner,
 replacement or `none`, final supported release, removal release, and the
 absence or migration test that will prove removal.
 
+Classify every path returned by `git ls-files` at the frozen K1 commit as
+`keep`, `transplant`, `retire`, or `historical`, including workflows, root
+metadata, configuration, and agent instructions. Each path has one owner task,
+tag source, target path, reason, oracle tests, removal/absence test, and
+disposition-valid state. Resolution must reject gaps, overlaps, exclusions,
+and non-Git-ignored release input.
+
 **Implementation:**
 
 1. Select the smallest existing synthetic fixtures that express proven
@@ -234,6 +257,10 @@ absence or migration test that will prove removal.
 6. Generate and review the retired-surface manifest from the current MCP
    catalog, HTTP routes, CLI parser, schemas, tables, frontend routes/assets,
    package data, and documented aliases. Commit the frozen result.
+7. Generate the deterministic per-file code-disposition manifest. Review every
+   `keep` and `transplant` decision; default an unjustified path to `retire`.
+   Encode the allowed transition for all four dispositions with `verified` as
+   the sole terminal status.
 
 **Verification:**
 
@@ -241,19 +268,105 @@ absence or migration test that will prove removal.
 - fixture contains no absolute user path or real content;
 - current runtime produces the frozen expected values;
 - benchmark output includes environment and seed;
+- code disposition resolves the exact `git ls-files` inventory once, including
+  workflows, release metadata, configuration, and agent instructions;
+- all four disposition transition and terminal-proof tests;
 - release checks remain green.
 
-**Acceptance:** K2 can implement from contracts without importing current table
-definitions. K6 and K9 can consume a complete exact removal inventory. No
-current oracle failure or surface omission is waived without a written semantic
-decision.
+**Acceptance:** K1A can construct a clean integration worktree without losing
+an unrecorded behavior or path. K6 and K9 can consume complete exact removal
+inventories. No oracle failure, unclassified path, or surface omission is
+waived without a written semantic decision.
+
+## Task K1A — Quarantine Legacy Code And Freeze Agent Scope
+
+**Outcome:** Active kernel development occurs in a physically smaller,
+non-publishable 0.26 integration worktree. Retired and transplant source remain
+available only through the v0.25.1 tag/reference, not normal agent search.
+
+**Depends on:** K1
+**Branch:** `kernel/k1a-legacy-quarantine`
+**PR base:** `kernel/0.26-integration`
+**Suggested commit:** `refactor: quarantine legacy runtime for kernel work`
+
+**Approved design:**
+`docs/superpowers/specs/2026-07-26-kernel-code-quarantine-design.md`
+
+**Create or modify:**
+
+- temporary `kernel/0.26-integration` branch and worktree;
+- detached policy-read-only v0.25.1 reference worktree;
+- `docs/kernel-development-scope.md`;
+- `src/codex_usage_tracker/kernel/AGENTS.md`;
+- `src/codex_usage_tracker/kernel/__init__.py`;
+- `scripts/check_kernel_scope.py`;
+- `tests/kernel/test_kernel_scope.py`;
+- phased CI and architecture configuration;
+- integration-only unpublished version/package metadata;
+- code-disposition and retired-surface manifests; and
+- every deletion named by a `retire`, `transplant`, or non-archive
+  `historical` entry.
+
+**Contract first:**
+
+- every tracked path at the K1 commit resolves to one disposition and the
+  resolver rejects exclusions or non-ignored release input;
+- `keep` paths remain and have final owners;
+- `retire` paths are absent;
+- active copies of `transplant` paths are absent after tag provenance, oracle,
+  owner task, and target path are recorded;
+- `historical` runtime code is absent and approved archive/fixture paths are
+  non-importable;
+- the kernel package cannot import an absent or retired path;
+- Serena, GitNexus, and default search guidance target only the integration
+  worktree;
+- the reference worktree is clean and unmodified;
+- a branch/ref publication guard rejects integration and every K1A-K9 task
+  build, remains active through K9, and prevents them from presenting as a
+  public 0.25/0.26 release; and
+- no deleted path contains uncommitted user work.
+
+**Implementation:**
+
+1. Resolve and review both K1 manifests against the K1 commit.
+2. Create `kernel/0.26-integration` from that commit and create the detached
+   v0.25.1 reference worktree. Preserve both until explicit deletion approval.
+3. Create the K1A task branch from the integration head.
+4. Add the minimal kernel skeleton, kernel-local agent instructions, scope
+   checker, integration-only package identity, persistent branch/ref
+   publication guard, and phased CI.
+5. Delete every `retire` path after validating its exact target.
+6. Delete active copies of every `transplant` path after validating provenance
+   and future ownership.
+7. Retain only approved `keep` and archive/fixture `historical` paths.
+8. Regenerate dependency, package-data, schema, route, table, and asset
+   inventories from the smaller tree.
+9. Activate the integration worktree in code-intelligence tools and prove the
+   v0.25.1 reference is not the default project.
+
+**Verification:**
+
+- tracked-tree disposition completeness, uniqueness, source-ref, owner,
+  allowed-transition, and terminal-proof tests;
+- forbidden path/import/public-surface/package-data inventories;
+- kernel skeleton import and phased CI smoke;
+- integration and K1A-K9 task-ref publication rejection;
+- v0.25.1 reference `git status` remains clean;
+- no private fixture, raw log, local database, or secret pattern;
+- copy-aware deletion review and exact diff target audit; and
+- release checks applicable to documentation, metadata, workflow safety, and
+  retained package infrastructure.
+
+**Acceptance:** Normal K2-K9 search cannot see retired runtime code. The
+integration branch is intentionally non-publishable but has useful phased
+gates. `main` and v0.25.1 remain untouched and releasable. K2 is unblocked.
 
 ## Task K2 — Define Kernel Schema V1 And Stable Identity
 
 **Outcome:** A side-by-side schema-v1 database stores only foundational facts
 and has an explicit operational sidecar boundary.
 
-**Depends on:** K1
+**Depends on:** K1A
 **Branch:** `kernel/k2-schema-identity`
 **Suggested commit:** `feat: add kernel schema v1 and stable identities`
 
@@ -494,11 +607,11 @@ local event stream.
 **Acceptance:** “Launch evidence timeline for this thread” and “Live watch run
 evidence” use the same selector and route, differing only by live mode.
 
-## Task K6 — Build Kernel Interfaces Behind The Cutover
+## Task K6 — Build Kernel Interfaces In The Integration Tree
 
 **Outcome:** A complete kernel plugin, localhost API, and operational CLI
-composition exists behind a non-public internal selector. The shipping 0.25
-composition and defaults remain unchanged until K9.
+composition exists in the non-publishable integration tree. The v0.25.1
+reference and releasable `main` remain separate.
 
 **Depends on:** K4 and K5
 **Branch:** `kernel/k6-interface-cutover`
@@ -510,8 +623,8 @@ composition and defaults remain unchanged until K9.
 - `src/codex_usage_tracker/interfaces/http/`
 - `src/codex_usage_tracker/interfaces/cli/`
 - `src/codex_usage_tracker/kernel/plugin_manifest.py`
-- kernel skill source and staged bundle, excluded from the public package until
-  K9
+- kernel skill source and staged integration bundle, with publication disabled
+  until K10
 - public JSON schemas and contract fixtures
 - interface tests
 
@@ -522,7 +635,6 @@ composition and defaults remain unchanged until K9.
   `usage_allowance`, and `usage_job_status`;
 - that composition contains no `usage_analyze`, `full`, `developer`, or
   historical tool aliases;
-- the default installed/public 0.25 composition remains unchanged through K8;
 - `usage_status`, query, evidence, and allowance are read-only;
 - `usage_refresh` returns or joins one durable job;
 - `usage_job_status` returns one internally consistent snapshot and optionally
@@ -540,11 +652,12 @@ composition and defaults remain unchanged until K9.
 3. Generate small public schemas from typed contracts.
 4. Rewrite the plugin skill around batched exploration, fact grades, evidence,
    and model-owned inference.
-5. Build a kernel manifest and composition selected only by direct tests or an
-   explicitly internal development selector; do not change public defaults.
+5. Build the integration-only kernel manifest and composition; keep publication
+   disabled through K9. Only K10 may publish.
 6. Add host-side bounded await support without making the model poll.
 7. Validate the new adapters against the frozen retired-surface manifest
-   without deleting handlers yet.
+   and prove every retired handler name remains absent from the integration
+   tree.
 
 **Verification:**
 
@@ -554,20 +667,19 @@ composition and defaults remain unchanged until K9.
 - read-only calls during active refresh;
 - two-process compatible refresh join;
 - isolated kernel wheel/plugin smoke in two fresh test tasks;
-- installed public 0.25 smoke proving defaults remain unchanged;
+- installed v0.25.1 reference smoke proving the release line remains usable;
 - package asset digest and same-version cache replacement; and
 - CLI/help/public-doc snapshots.
 
-**Acceptance:** An isolated kernel task sees exactly six coherent tools, while
-the normal installed 0.25 task still sees the unchanged public runtime. An
-existing kernel generation is queryable even if refresh, watcher, or another
-task is active.
+**Acceptance:** An integration-task install sees exactly six coherent tools.
+The separate installed v0.25.1 reference remains usable. An existing kernel
+generation is queryable even if refresh, watcher, or another task is active.
 
-## Task K7 — Build The Focused Console Behind The Cutover
+## Task K7 — Build The Focused Console In The Integration Tree
 
 **Outcome:** A focused kernel Console becomes a thin client for Live, Explore,
-Evidence, Limits, and Settings and renders committed data immediately. It
-remains behind the same internal cutover selector until K9.
+Evidence, Limits, and Settings and renders committed data immediately in the
+integration tree.
 
 **Depends on:** K6
 **Branch:** `kernel/k7-console-cutover`
@@ -575,9 +687,8 @@ remains behind the same internal cutover selector until K9.
 
 **Target modules:**
 
-- `frontend/dashboard/src/kernel/`
-- generated deterministic kernel dashboard assets excluded from the default
-  package until K9
+- `frontend/dashboard/src/`
+- generated deterministic kernel dashboard assets
 - dashboard route and browser tests
 - frontend bundle budgets
 - Console guides and screenshots
@@ -598,8 +709,8 @@ remains behind the same internal cutover selector until K9.
 **Implementation:**
 
 1. Create one small API client around K6 contracts.
-2. Build a parallel kernel Console entrypoint with snapshot-first reads; leave
-   the public 0.25 entrypoint and packaged target unchanged.
+2. Build the kernel Console entrypoint with snapshot-first reads. The old
+   Console remains only in the v0.25.1 reference.
 3. Implement live timeline bands and four token classes without inventing
    context-category attribution.
 4. Implement guided query controls and saved local query specifications.
@@ -615,8 +726,8 @@ remains behind the same internal cutover selector until K9.
 - meaningful warm render <=1 second p95 on the synthetic benchmark;
 - zero POST/refresh from browser reopen;
 - exact deep-link round trips; and
-- isolated kernel Console smoke; and
-- installed public 0.25 Console smoke proving its default remains unchanged.
+- isolated kernel Console smoke;
+- installed v0.25.1 reference Console smoke.
 
 **Acceptance:** Closing and reopening the browser shows the prior committed
 generation immediately and then visibly catches up, without a rebuild.
@@ -666,17 +777,17 @@ claiming unsupported causal billing attribution.
 **Acceptance:** The Console and model can discuss usage per allowance percentage
 with exact wording about what was observed and what remains estimated.
 
-## Task K9 — Activate The Kernel And Delete The Experimental Spike
+## Task K9 — Complete The Kernel Release Candidate And Prove Absence
 
-**Outcome:** The kernel package/plugin/HTTP/CLI/Console composition becomes the
-public default and retired runtime code, persistence, assets, tests, routes,
-tools, schemas, and packages are removed in the same audited changeset.
+**Outcome:** The integration tree becomes a complete 0.26 release candidate.
+Every retired path remains absent, every transplant is verified, and temporary
+quarantine/development scaffolding is removed.
 
 **Depends on:** K8
-**Branch:** `kernel/k9-spike-deletion`
-**Suggested commit:** `refactor: remove retired analysis product`
+**Branch:** `kernel/k9-release-candidate`
+**Suggested commit:** `refactor: finalize lean kernel release candidate`
 
-**Deletion manifest:**
+**Final absence manifest:**
 
 - analysis catalog, strategies, application orchestration, results, and
   `usage_analyze`;
@@ -715,6 +826,8 @@ tools, schemas, and packages are removed in the same audited changeset.
 - six-tool installed catalog;
 - exact equality with `config/kernel-retired-surfaces-v1.json`, including an
   absence or migration test for every entry;
+- exact equality with the frozen tracked-path inventory plus reviewed
+  current-main deltas, with every disposition entry `verified`;
 - package-data allowlist;
 - old-cache non-deletion and rollback metadata;
 - export and evidence parity;
@@ -722,35 +835,39 @@ tools, schemas, and packages are removed in the same audited changeset.
 
 **Implementation:**
 
-1. Reconcile the K1 retired-surface manifest against current source and fail on
-   an unclassified addition or omission.
-2. Switch `.codex-plugin/plugin.json`, `.mcp.json`, the public application
-   composition, HTTP server, CLI, skill bundle, and Console assets to the
-   validated kernel implementation.
-3. Remove leaves, compatibility adapters, and then unused domain modules in the
-   same branch; no merge contains a half-migrated public default.
-4. Delete old runtime migration code after the kernel composition is active in
-   the staged artifact.
-5. Update the upgrade guide with every manifest replacement or `none`.
-6. Measure final outputs and set budgets no more than three percent above them.
+1. Reconcile the K1 retired-surface and code-disposition manifests against
+   current source; fail on an unclassified path, unresolved transplant, or
+   reintroduced retired surface.
+2. Switch `.codex-plugin/plugin.json`, `.mcp.json`, the application composition,
+   HTTP server, CLI, skill bundle, and Console assets from integration-only
+   development state to the validated release-candidate implementation.
+3. Remove phase-only selectors, disposable skeleton metadata, and newly
+   obsolete retained leaves. Retain the branch/ref publication guard and the
+   development version throughout K9.
+4. Update the upgrade guide with every manifest replacement or `none`.
+5. Measure final outputs and set budgets no more than three percent above them.
 
 **Verification:**
 
 - forbidden inventory and dead-code/import scans;
+- every `keep`, `transplant`, `retire`, and `historical` entry has reached
+  `verified` with its disposition-specific proof;
 - full Python/frontend/architecture/privacy/release suites;
 - built wheel and sdist contents;
 - installed CLI/plugin/Console smoke;
 - old cache remains present and rollback metadata is valid;
-- 0.25 defaults pass before activation and the six-tool kernel defaults pass
-  after activation in the same cutover test;
+- the separate v0.25.1 artifact and six-tool kernel release candidate pass
+  their installed smokes;
 - every retired-surface manifest entry is absent or emits only its documented
   install-time migration error;
+- publication rejection from the K9 integration release candidate;
 - oracle, query, evidence, export, refresh, live, and allowance suites; and
 - complexity/package/bundle budgets.
 
 **Acceptance:** No runtime code path can start or import analysis, compression,
 recommendations, diagnostics, content FTS, or compatibility profiles. Git
-history and the retained old database—not shipping adapters—are the archive.
+history, the tagged reference, and the retained old database—not shipping
+adapters—are the archive. K10 is unblocked.
 
 ## Task K10 — Qualify And Publish 0.26.0
 
@@ -758,12 +875,36 @@ history and the retained old database—not shipping adapters—are the archive.
 evidence and installed dogfood.
 
 **Depends on:** K9
-**Branch:** `release/0.26.0`
+**Branch:** `release/0.26.0`, created from the audited current-`main` SHA
+**Integration source:** qualified `kernel/0.26-integration` head, incorporated
+once into the release branch
+**PR:** `release/0.26.0` -> `main`
 **Suggested commits:** release preparation plus the repository's protected
 release flow
 
+**Cutover topology:**
+
+1. Diff the frozen K1 main SHA against current `main`.
+2. Fail on every unrepresented tracked-path delta. Port required behavior
+   through a named integration-targeting mainline-port branch, update the
+   manifests/oracle/ledger, and rerun affected K9 gates.
+3. Record and hold the audited current-`main` SHA.
+4. Create `release/0.26.0` from that SHA and incorporate the qualified
+   integration head once.
+5. Resolve only classified conflicts, run the full qualification matrix, and
+   set the final version on the release branch.
+6. Open `release/0.26.0` to `main`. If `main` moves, fail closed and restart
+   the audit rather than merging an unclassified delta.
+7. Publish only from the merged `main` result through the protected workflow.
+
 **Release evidence:**
 
+- final K1-to-current-`main` tracked-path delta and classification audit;
+- mainline-port PRs, affected phase requalification, and qualified integration
+  SHA;
+- reviewed PR from `release/0.26.0` to `main`;
+- proof the branch/ref guard rejected integration through K9 and the protected
+  workflow accepted only the merged release source;
 - clean staging build beside an old 0.25 cache;
 - clean install remains `absent` until an explicit refresh action;
 - 0.25.1 upgrade preserves schema 39 without reading it from 0.26;
@@ -791,7 +932,10 @@ release flow
 
 **Acceptance:** No duplicate writer, lock error, implicit refresh, false zero,
 nonterminal optional phase, or model polling loop. Every reported claim is
-exactly traceable or explicitly graded.
+exactly traceable or explicitly graded. The final PR contains only classified
+kernel work plus audited current-`main` release fixes, `main` did not move after
+its recorded audit, and publication uses the protected build-once promotion
+workflow.
 
 ## Task K11 — Add Guided Model-Driven Exploration
 

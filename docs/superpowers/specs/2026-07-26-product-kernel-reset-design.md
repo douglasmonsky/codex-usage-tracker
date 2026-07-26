@@ -10,6 +10,8 @@
 **Companion roadmap:** `docs/roadmap/product-kernel-reset.md`
 **Companion implementation plan:**
 `docs/superpowers/plans/2026-07-26-product-kernel-reset.md`
+**Code-quarantine amendment:**
+`docs/superpowers/specs/2026-07-26-kernel-code-quarantine-design.md`
 **Supersedes:** the 2026-07-21 MCP-first design for all post-0.25 work
 
 ## 1. Task Card
@@ -644,10 +646,12 @@ Settings owns:
 
 ### 11.1 MCP
 
-Exactly six default tools ship after K9. There are no compatibility profiles.
-K6 builds and tests this catalog behind an internal development selector while
-the public 0.25 composition remains unchanged. K9 activates the catalog and
-removes the former one atomically.
+Exactly six default tools ship from the K10-qualified artifact. There are no
+compatibility profiles. K6 builds and tests this catalog in the
+non-publishable integration tree, where K1A has already removed the former
+catalog and handlers. K9 proves the final catalog and forbidden-name absence;
+K10 combines qualified integration with audited current `main` on
+`release/0.26.0` and opens that release branch to `main`.
 
 ### 11.2 HTTP
 
@@ -686,7 +690,32 @@ core use case.
 
 ## 13. Deletion Boundary
 
-After the new kernel, adapters, and Console pass cutover gates, delete:
+### 13.1 Early active-tree quarantine
+
+The
+[code-quarantine amendment](2026-07-26-kernel-code-quarantine-design.md)
+governs development topology and path ownership.
+
+K1 classifies every path returned by `git ls-files` at its frozen commit,
+including workflow, release, configuration, and agent-control paths. K1A
+creates a non-publishable 0.26 integration worktree, deletes all `retire` paths,
+removes active copies of every `transplant` path after recording tag provenance
+and task ownership, and keeps v0.25.1 in a separate read-only reference
+worktree. K2-K8 work only in the smaller integration tree and implement assigned
+transplants from oracle contracts and bounded tagged source inspection.
+
+`verified` is the sole terminal disposition state. K9 requires terminal proof
+for `keep`, `transplant`, `retire`, and `historical`, plus exact reconciliation
+with every reviewed post-K1 tracked-path delta from `main`. The branch/ref
+publication guard remains active through K9.
+
+The integration branch may be feature-incomplete. `main` stays the releasable
+0.25.1 line until K10. This prevents release risk without forcing agents to
+navigate the retired product during kernel development.
+
+### 13.2 Final release deletion
+
+The combined K1A-K9 deletion program removes:
 
 - analysis catalog/strategies/application service and `usage_analyze`;
 - Compression Lab domain, persistence, routes, tools, jobs, benchmarks, and UI;
@@ -719,8 +748,10 @@ Preserve or transplant:
 - release artifact promotion; and
 - package/plugin installation coherence checks.
 
-The old source remains available through Git history and release tags. Runtime
-compatibility code is not an archive.
+K9 verifies the lists above rather than discovering them for the first time.
+The old source remains available through Git history, the v0.25.1 tag, and the
+policy-read-only reference worktree. Runtime compatibility code is not an
+archive.
 
 ## 14. Performance And Reliability
 
@@ -768,12 +799,28 @@ The wheel excludes retired assets and code. Package, Python, frontend, MCP,
 route, schema, and database-table budgets ratchet downward from measured output
 with at most three percent headroom.
 
+The branch/ref guard prevents `kernel/0.26-integration` and K1A-K9 task refs
+from publishing through K9. K10 audits every tracked-path delta from the frozen
+K1 main SHA, ports required classified behavior through integration, and
+requalifies affected gates. It then creates `release/0.26.0` from the audited
+current-`main` SHA, incorporates the qualified integration head once, resolves
+only classified conflicts, and opens `release/0.26.0` to `main`. If `main`
+moves, the audit restarts. The protected release workflow runs only from the
+merged release source.
+
 ## 16. Rejected Alternatives
 
 ### Continue incremental cleanup only
 
 Rejected because optional interpretation systems remain coupled to ingestion and
 compatibility remains the dominant development constraint.
+
+### Keep the old runtime beside the kernel until K9
+
+Rejected because it preserves code-intelligence noise and makes accidental
+legacy dependencies likely. Release safety comes from keeping `main` and the
+v0.25.1 reference intact, not from retaining the old runtime in the active
+kernel worktree.
 
 ### Rewrite everything from a blank repository
 

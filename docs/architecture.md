@@ -9,7 +9,15 @@ local query, evidence, allowance, refresh, export, and live-viewing workflows.
 The [Product Kernel Reset](roadmap/product-kernel-reset.md) is the active target
 architecture. Its approved
 [design](superpowers/specs/2026-07-26-product-kernel-reset-design.md) defines
-the physical and public contracts.
+the physical and public contracts. The
+[code-quarantine design](superpowers/specs/2026-07-26-kernel-code-quarantine-design.md)
+defines the development boundary: K1 classifies every tracked path, K1A
+removes retired and not-yet-transplanted code from the non-publishable
+integration tree, and the tagged v0.25.1 reference remains outside normal agent
+search.
+K2–K8 add back only behavior assigned by the disposition manifest; K9 proves
+final absence before K10 combines qualified integration with audited current
+`main` on `release/0.26.0` and opens the release-to-`main` cutover.
 
 The tracker owns exact facts, deterministic calculations, freshness, provenance,
 and evidence selection. Codex owns inference, explanation, and recommendations.

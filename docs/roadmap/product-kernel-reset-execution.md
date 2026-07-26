@@ -33,17 +33,18 @@ analysis or refresh work solely to populate review metrics.
 
 | Task | Release | State | Depends on | Outcome |
 | --- | --- | --- | --- | --- |
-| K0 | documentation baseline | In progress | — | Archive former program and approve reset |
+| K0 | documentation baseline | Complete | — | Archive former program and approve reset |
 | K1 | 0.25.x bridge | Not started | K0 | Freeze accounting oracle |
-| K2 | 0.26.0 | Not started | K1 | Kernel schema v1 and stable identity |
+| K1A | 0.26 integration | Not started | K1 | Quarantine legacy code and freeze agent scope |
+| K2 | 0.26.0 | Not started | K1A | Kernel schema v1 and stable identity |
 | K3 | 0.26.0 | Not started | K2 | Incremental/live ingestion |
 | K4 | 0.26.0 | Not started | K3 | Bounded query engine |
 | K5 | 0.26.0 | Not started | K3 | Evidence timeline and live stream |
-| K6 | 0.26.0 | Not started | K4, K5 | Six-tool and adapter cutover |
+| K6 | 0.26.0 | Not started | K4, K5 | Six-tool integration interfaces |
 | K7 | 0.26.0 | Not started | K6 | Focused Evidence Console |
 | K8 | 0.26.0 | Not started | K7 | Allowance efficiency |
-| K9 | 0.26.0 | Not started | K8 | Experimental-spike deletion |
-| K10 | 0.26.0 | Not started | K9 | Release qualification |
+| K9 | 0.26.0 | Not started | K8 | Release candidate and final absence audit |
+| K10 | 0.26.0 | Not started | K9 | Audited release-branch cutover and qualification |
 | K11 | 0.27.0 | Not started | K10 | Guided exploration |
 | K12 | 0.27.0 | Not started | K11 | Optional context composition |
 | K13 | 0.27.0 | Not started | K11 | Read-only overlay boundary |
@@ -94,7 +95,7 @@ No live usage database or raw session content was inspected.
 **Branch:** `docs/kernel-reset-roadmap`
 **Base:** `origin/main` at
 `0a558dd328c1519c77fffe68b71a8bccdbd1a731`
-**Commit:** this changeset
+**Commit:** `e6d6b76 docs: reset product roadmap around lean data kernel`
 
 ### Scope
 
@@ -136,8 +137,9 @@ No live usage database or raw session content was inspected.
 
 ### Review resolution
 
-- K6 and K7 now build non-public kernel compositions while the 0.25 defaults
-  remain releasable; K9 owns atomic public activation and removal.
+- The original baseline kept K6 and K7 non-public while the 0.25 defaults
+  remained releasable. The K0A amendment supersedes its wait-until-K9 deletion
+  sequence with early K1A active-tree quarantine.
 - The cutover has explicit `absent`, `building`, `ready`, `active`, and `failed`
   states, three authorized build triggers, atomic pointers, and distinct kernel
   versus installed-package rollback.
@@ -161,6 +163,91 @@ No live usage database or raw session content was inspected.
 This task changes authority and future intent only. Current 0.25 runtime
 behavior remains unchanged until separately reviewed K1–K10 work lands. K1 is
 now unblocked.
+
+## K0A — Early Code Quarantine Amendment
+
+**State:** Complete
+**Branch:** `docs/kernel-reset-roadmap`
+**Base:** `e6d6b76 docs: reset product roadmap around lean data kernel`
+**Commit:** this changeset
+
+### Contract added first
+
+- The roadmap must put K1A before K2 and classify every K1 `git ls-files` path
+  as exactly one of `keep`, `transplant`, `retire`, or `historical`.
+- `verified` is the sole terminal status, with proof for all four
+  dispositions.
+- `main` remains the releasable 0.25.1 line; K1A–K9 use the non-publishable
+  `kernel/0.26-integration` branch; K10 creates `release/0.26.0` from audited
+  current `main`, incorporates qualified integration once, and opens the
+  release-to-`main` cutover.
+- Normal agent search after K1A sees only the integration worktree. Tagged
+  v0.25.1 source is a bounded, policy-read-only oracle.
+
+### Implementation
+
+- Added the decision-complete code-quarantine design and linked it from the
+  roadmap, architecture, detailed design, and implementation plan.
+- Added K1 code-disposition inventory, K1A physical quarantine, progressive
+  transplant, K9 final-absence, and K10 current-`main` reconciliation
+  contracts.
+- Defined full tracked-tree scope, disposition state transitions, persistent
+  publication rejection, named mainline-port handling, and one exact K10
+  release-branch topology.
+- Updated repository, deprecation, release, README, changelog, and public-doc
+  test guidance for the temporary integration topology.
+- Added an Agent Maintainer change plan for this documentation-only amendment.
+
+### K0A Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused docs | Pass | 44 public-doc and release-CLI tests |
+| Release contract | Pass | `scripts/check_release.py` |
+| Markdown and links | Pass | 161 Markdown files, 0 errors; 12 changed documents, all local links exist |
+| Diff and disclosure | Pass | whitespace, secret-pattern, and absolute-user-path scans |
+| Privacy | Pass | documentation and synthetic contract assertions only; no usage data inspected |
+
+### K0A Review metrics
+
+- Total findings: 6
+- Accepted findings: 6
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+Token measurement timed out without inspecting private usage content. Per the
+review policy, the review result remains recorded and completion does not retry
+or block on usage indexing.
+
+### K0A Review resolution
+
+- Expanded the disposition manifest from selected product paths to the entire
+  K1 tracked tree and made `verified` the sole terminal state for all four
+  dispositions.
+- Replaced the contradictory K10 branch descriptions with one audited
+  current-`main` release-branch topology.
+- Kept the branch/ref publication guard active through K9 and made its
+  rejection checks part of the release-candidate evidence.
+- Added a fail-closed workflow for changes that land on `main` after K1,
+  including named port branches, manifest/oracle updates, and requalification.
+- Strengthened public-document tests to enforce these safety contracts instead
+  of checking vocabulary alone.
+
+### Deviations and decisions
+
+- Serena's guarded recovery reported the worktree and language services
+  healthy, but this task's bridge continued resolving a stale unrelated
+  project path. Documentation edits used exact repository-native tools; no
+  semantic source edit depended on Serena.
+- The temporary integration branch is an explicit, narrowly scoped exception
+  to the repository's no-long-lived-development-branch rule.
+
+### Residual risk and next task
+
+- Physical deletion is intentionally deferred to K1A, after K1 freezes the
+  exact manifests and rollback oracle.
+- K1 remains the next task; K1A is blocked on its two machine-readable
+  inventories.
 
 ## Task Entry Template
 

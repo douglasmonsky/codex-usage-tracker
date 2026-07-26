@@ -86,22 +86,47 @@ aliases, schemas, tables, Console routes, source/assets, and package data. Every
 entry records its surface type, exact name, replacement or `none`, final
 supported release, removal release, and absence or migration test.
 
-K6 must map every new adapter to that manifest. K9 must fail if the live source
-contains an unclassified public surface or if a manifest entry lacks its named
-test. The 0.26 upgrade guide is generated or checked against the same entries.
+K1 also creates `config/kernel-code-disposition-v1.json`. Every path returned
+by `git ls-files` at K1 is classified exactly once as `keep`, `transplant`,
+`retire`, or `historical`, with an owner, target or deletion task, provenance,
+and verification oracle. Workflows, root metadata, configuration, and agent
+instructions are included.
+K1A consumes that manifest to remove retired paths and active copies of
+transplant paths from the integration worktree before kernel implementation.
+
+K6 must map every new adapter to the retired-surface manifest. `verified` is the
+only terminal code-disposition status. K9 must fail if the integration source
+contains an unclassified public surface, any tracked path or reviewed main
+delta is unrepresented, any of the four disposition classes is not verified,
+or a manifest entry lacks its named proof. The 0.26 upgrade guide is generated
+or checked against the same entries.
 
 ## Cutover Rules
 
-- K6 freezes the new route prefix and machine-readable contracts behind an
-  internal cutover selector. Historical schema identifiers cannot be reused
-  with changed semantics, and public 0.25 defaults stay unchanged through K8.
-- No CLI compatibility surface may be removed before its removal release. K9
-  activates the kernel defaults and performs the documented removals in the
-  same changeset, only after the replacement contracts pass.
-- K9 owns the exact deletion/preservation inventory. A deprecated runtime name
-  still present after K9 is a release blocker unless the roadmap is amended.
+- `main` remains a releasable 0.25.1 line while the kernel is built. A detached,
+  policy-read-only v0.25.1 worktree is the compatibility oracle, not an active
+  development dependency.
+- K1A–K9 land only on the temporary, non-publishable
+  `kernel/0.26-integration` branch. K1A performs the broad active-tree
+  quarantine; K2–K8 transplant only explicitly assigned behavior and verify
+  it against the tag-backed oracle.
+- No CLI compatibility surface may be removed before its removal release on
+  releasable `main`; its early absence is confined to the non-publishable
+  integration tree.
+- Historical schema identifiers cannot be reused with changed semantics. The
+  branch/ref publication guard rejects integration and every K1A-K9 task ref
+  through K9.
+- K9 owns final absence, unresolved-disposition, package, and release-candidate
+  audits. A retired runtime name or unclassified path still present after K9
+  is a release blocker unless the roadmap is amended.
+- K10 must audit every tracked-path delta from the frozen K1 main SHA, port
+  required behavior through a named integration-targeting branch, and
+  requalify affected gates. It creates `release/0.26.0` from audited current
+  `main`, incorporates qualified integration once, and opens that release
+  branch to `main`; a moving main head restarts the audit.
 - K10 must prove side-by-side construction, accounting equivalence, integrity,
-  atomic promotion, and rollback before Release 0.26.0.
+  atomic promotion, rollback, and the reviewed release-branch
+  conflict/classification audit before Release 0.26.0.
 - The old cache file is retained for rollback and is never silently deleted.
   Retaining the file does not require shipping code that reads its old schema.
 - CSV/JSON exports selected by the K6 contract remain supported. Export

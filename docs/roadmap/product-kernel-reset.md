@@ -6,6 +6,9 @@ Tracker after Release 0.25.1. The approved
 [implementation plan](../superpowers/plans/2026-07-26-product-kernel-reset.md)
 define the detailed contracts. Progress is recorded in the
 [execution ledger](product-kernel-reset-execution.md).
+The approved
+[code-quarantine amendment](../superpowers/specs/2026-07-26-kernel-code-quarantine-design.md)
+defines how active kernel development physically excludes the retired spike.
 
 The prior MCP-first program is complete historical input, not active authority.
 Its [roadmap and evidence](archive/2026-07-21-mcp-first-pivot/README.md) remain
@@ -199,7 +202,7 @@ context is estimated unless the source provides exact category counters.
 
 | Release | Outcome | Runtime state |
 | --- | --- | --- |
-| `0.25.x` | Operational bridge and roadmap reset | Existing runtime remains supported only long enough to complete the side-by-side kernel and installed dogfood. No new analysis feature is added. |
+| `0.25.x` | Operational bridge and roadmap reset | `main` remains the releasable 0.25.1 line while a non-publishable integration worktree builds the clean kernel. No new analysis feature is added. |
 | `0.26.0` | Kernel cutover and live evidence foundation | New schema-v1 database, incremental/live ingestion, exact query engine, six-tool MCP, exact evidence timelines, focused Console, and legacy spike deletion. |
 | `0.27.0` | Guided exploration and measured context composition | Batched model-driven exploration, expanded tool/phase/turn metrics, allowance efficiency views, optional content-composition estimates, and overlay adapter contract. |
 | `0.28.0` | Feature-free stabilization and contract freeze | Fault injection, upgrade/recovery proof, performance ratchets, installed dogfood, public-contract freeze, and pre-1.0 decision. |
@@ -214,6 +217,8 @@ K0  Archive old roadmap and approve kernel reset
  |
 K1  Freeze oracle fixtures and measurable invariants
  |
+K1A Quarantine the old tree and create the clean 0.26 integration worktree
+ |
 K2  Define schema-v1 facts, identities, and privacy contract
  |
 K3  Build side-by-side incremental and live ingestion
@@ -222,24 +227,26 @@ K4  Build bounded generation-consistent query engine
  |\
  | K5  Build evidence timeline and live event stream
  |/
-K6  Build kernel MCP, CLI, and HTTP adapters behind the cutover boundary
+K6  Build kernel MCP, CLI, and HTTP adapters in the integration tree
  |
-K7  Build the focused Evidence Console behind the cutover boundary
+K7  Build the focused Evidence Console in the integration tree
  |
 K8  Prove allowance and efficiency calculations
  |
-K9  Activate the kernel and delete the retired spike atomically
+K9  Complete the release candidate and prove retired surfaces absent
  |
-K10 Qualify and publish 0.26.0
+K10 Build audited release branch, qualify, and publish 0.26.0
  |
 K11-K14 Guided exploration, optional estimates, and 0.27.0
  |
 K15-K16 Stabilization, contract freeze, and 0.28.0
 ```
 
-Tasks K2-K9 may not be combined into one unreviewable rewrite. They may run only
-where the detailed dependency graph permits separate ownership and where every
-intermediate branch keeps `main` releasable.
+Tasks K1A-K9 may not be combined into one unreviewable rewrite. K1A-K9 use
+short-lived branches targeting the temporary `kernel/0.26-integration` branch;
+`main` remains the releasable 0.25.1 line. K10 creates the audited
+`release/0.26.0` cutover branch that combines current `main` with qualified
+integration and opens that branch to `main`.
 
 ## Non-Negotiable Gates
 
@@ -256,6 +263,26 @@ approved oracle for:
 - allowance observation selection.
 
 Differences require an explicit semantic decision and golden fixture update.
+
+### Active-worktree quarantine
+
+- K1 classifies every path returned by `git ls-files` at its frozen commit as
+  `keep`, `transplant`, `retire`, or `historical`, including workflows, root
+  metadata, configuration, and agent instructions.
+- K1A deletes `retire` and active `transplant` source from the temporary
+  integration tree after recording tag provenance, oracle coverage, owner task,
+  and target path.
+- The detached v0.25.1 reference worktree is read-only and never the default
+  code-intelligence project.
+- Kernel agents search and edit only the integration worktree and their
+  task-specific allowlist.
+- Kernel code cannot import a retired, historical, or removed transplant path.
+- Each K2-K8 task verifies its assigned transplants and deletes any newly
+  obsolete retained leaf immediately.
+- `verified` is the only terminal state, with proof required for all four
+  dispositions before K9 completes.
+- The branch/ref publication guard rejects every integration artifact through
+  K9.
 
 ### Incremental and live behavior
 
@@ -332,16 +359,29 @@ Until 0.28.0:
 
 ## Execution
 
-Use one `kernel/<task-id>-<slug>` branch per task. Start from current `main`,
-write the named failing contract or benchmark first, implement only the task
-contract, and update the
+K1 starts from current `main`. It freezes the oracle, retired-surface inventory,
+and per-path code disposition. K1A then creates:
+
+- a detached, policy-read-only v0.25.1 reference worktree; and
+- the temporary `kernel/0.26-integration` branch and active development
+  worktree.
+
+Use one `kernel/<task-id>-<slug>` branch per K1A-K9 task. Start from the latest
+integration head, write the named failing contract or benchmark first,
+implement only the task contract, and update the
 [execution ledger](product-kernel-reset-execution.md) in the same changeset.
 
-Through K8, the shipping 0.25 public defaults remain active and the new kernel
-composition is reachable only through direct tests and an explicitly internal
-development selector. K9 activates the new package/plugin/HTTP/CLI/Console
-composition and removes the old one in the same reviewable changeset. No
-intermediate merge exposes a half-migrated public product.
+The integration branch is explicitly non-publishable and may be
+feature-incomplete. `main` continues serving 0.25.1. K9 produces the first
+complete kernel release candidate. K10 audits current `main`, creates
+`release/0.26.0` from that recorded SHA, incorporates the qualified integration
+head once, and opens `release/0.26.0` to `main`.
+
+Every post-K1 tracked-path delta on `main` must be represented in the
+disposition manifest. Required blocker behavior is ported through a named
+integration-targeting branch with oracle and ledger updates; the legacy line is
+never merged into integration. If `main` moves after the K10 audit, cutover
+fails closed and restarts against the new head.
 
 Repository-changing tasks with meaningful diffs receive one final independent
 read-only review after primary validation. Release, privacy, schema, identity,

@@ -65,7 +65,9 @@ def test_product_kernel_reset_freezes_the_six_tool_factual_surface() -> None:
     assert "## 7. Query Contract" in design
     assert "## 13. Deletion Boundary" in design
     assert "**Published baseline:** `codex-usage-tracking==0.25.1`" in design
-    assert "## Task K6 — Build Kernel Interfaces Behind The Cutover" in plan
+    assert "## Task K6 — Build Kernel Interfaces In The Integration Tree" in plan
+    assert "| K1A | 0.26 integration | Not started | K1 |" in execution
+    assert "2026-07-26-kernel-code-quarantine-design.md" in roadmap
     assert "| K16 | 0.28.0 | Not started" in execution
 
 
@@ -122,23 +124,57 @@ def test_kernel_reset_design_and_plan_are_decision_complete() -> None:
     design = (
         REPO_ROOT / "docs/superpowers/specs/2026-07-26-product-kernel-reset-design.md"
     ).read_text(encoding="utf-8")
+    quarantine = (
+        REPO_ROOT
+        / "docs/superpowers/specs/2026-07-26-kernel-code-quarantine-design.md"
+    ).read_text(encoding="utf-8")
+    release_checklist = (REPO_ROOT / "docs/release-checklist.md").read_text(
+        encoding="utf-8"
+    )
 
     task_headings = [
         line.split(" — ", maxsplit=1)[0].removeprefix("## ")
         for line in plan.splitlines()
         if line.startswith("## ") and "Task K" in line
     ]
-    assert task_headings == [f"Task K{index}" for index in range(17)]
+    assert task_headings == [
+        "Task K0",
+        "Task K1",
+        "Task K1A",
+        *[f"Task K{index}" for index in range(2, 17)],
+    ]
     assert "A query never starts a refresh." in plan
     assert "Browser open or reopen never starts an initial build." in plan
     assert "New cache, not migration 40" in design
     assert "The old source remains available through Git history" in design
+    assert "kernel/0.26-integration" in quarantine
+    assert "non-publishable" in quarantine
+    assert "policy-read-only" in quarantine
+    assert "v0.25.1" in quarantine
+    for disposition in ("keep", "transplant", "retire", "historical"):
+        assert f"`{disposition}`" in quarantine
+        assert f"| `{disposition}` |" in quarantine
+    assert "exactly every path returned by `git ls-files`" in quarantine
+    assert "`verified` is the only terminal status" in quarantine
+    assert "`kernel/k<owner>-mainline-port-<issue>`" in quarantine
+    assert "branch/ref publication guard" in quarantine
+    assert "`release/0.26.0` from an audited current-`main` SHA" in quarantine
+    assert plan.index("## Task K1A") < plan.index("## Task K2")
+    assert "Build Kernel Interfaces In The Integration Tree" in plan
+    assert "config/kernel-code-disposition-v1.json" in plan
+    assert "**Branch:** `release/0.26.0`, created from the audited" in plan
+    assert "**PR:** `release/0.26.0` -> `main`" in plan
+    assert "publication rejection from the K9 integration release candidate" in plan
+    assert "branch/ref publication-rejection" in release_checklist
+    assert "If `main` moves, restart the audit" in release_checklist
+    assert "2026-07-26-kernel-code-quarantine-design.md" in design
 
 
 def test_deprecation_ledger_has_required_compatibility_columns() -> None:
     deprecations = (REPO_ROOT / "docs/deprecations.md").read_text(
         encoding="utf-8"
     )
+    normalized_deprecations = " ".join(deprecations.split())
 
     for column in (
         "Public name or route",
@@ -154,6 +190,11 @@ def test_deprecation_ledger_has_required_compatibility_columns() -> None:
     assert "does not ship runtime adapters" in deprecations
     assert "`usage_analyze` and `analysis.v2`" in deprecations
     assert "config/kernel-retired-surfaces-v1.json" in deprecations
+    assert "config/kernel-code-disposition-v1.json" in deprecations
+    assert "kernel/0.26-integration" in deprecations
+    assert "Every path returned by `git ls-files` at K1" in normalized_deprecations
+    assert "`verified` is the only terminal" in normalized_deprecations
+    assert "creates `release/0.26.0` from audited current" in normalized_deprecations
     assert "## Cutover State Machine" in deprecations
 
 
@@ -165,6 +206,13 @@ def test_agent_branch_prefixes_allow_the_required_kernel_branches() -> None:
 
     assert "`kernel/`" in allowed_prefixes
     assert "`pivot/`" not in allowed_prefixes
+    assert "kernel/0.26-integration" in guidance
+    assert "non-publishable" in guidance
+    assert "policy-read-only" in guidance
+    assert "K1A–K9" in guidance
+    assert "kernel/k<owner>-mainline-port-<issue>" in guidance
+    assert "`release/0.26.0` from an audited current-`main` SHA" in guidance
+    assert "branch/ref publication guard" in guidance
 
 
 def test_architecture_declares_facts_below_model_inference() -> None:

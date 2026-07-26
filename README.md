@@ -343,6 +343,9 @@ tracker into a lean local observability kernel:
 - the tracker owns exact incremental facts, bounded calculations, freshness,
   and evidence;
 - Codex owns inference, explanation, and recommendations;
+- K1A quarantines retired beta code from the active integration tree so kernel
+  agents work against a lean, classified surface while v0.25.1 remains a
+  separate read-only reference;
 - Release 0.26.0 cuts over to a side-by-side schema-v1 cache, a six-tool MCP
   surface, live evidence timelines, and a focused Evidence Console;
 - Release 0.27.0 adds guided exploration and optional, separately stored
