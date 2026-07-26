@@ -39,8 +39,8 @@ Do not read it during normal coding unless changing guidance.
 ## Blocking Limits
 
 - Coverage floors: total `85%`, changed `90%`
-- File length: `600` physical / `450` source lines
-- Change budget blocks: `800` lines or `20` files
+- File length: `600` physical / `600` source lines
+- Change budget blocks: `5000` lines or `100` files
 - New suppression budget: `3`
 - Complexity: Ruff `10`, Xenon `B`
 - Source-only changes without test-file changes: `blocked`

@@ -23,18 +23,44 @@ Every terminal task entry records:
 - privacy and synthetic-fixture confirmation;
 - deviations and approved amendments;
 - independent review findings, accepted findings, reviewer token count, and
-  tokens per accepted finding; and
+  tokens per accepted finding;
+- development-efficiency metrics from
+  `config/kernel-development-efficiency-v1.json`, including focused and broad
+  verifier runs, blocking and non-behavioral gate findings, gate-remediation
+  lines, duplicate broad runs, verification wall time, and style-only commits;
+  and
 - residual risk and the exact next task unblocked.
 
 Use `pending` for unavailable reviewer-token indexing. Never start extra
 analysis or refresh work solely to populate review metrics.
+
+### Churn monitoring
+
+K1 is the first post-policy baseline. Do not claim a historical percentage
+reduction from estimates. Beginning with K2, report each task against K1 and
+the immediately preceding completed task. A reduction claim must name the
+numerator, denominator, and task range.
+
+Count an intentional failing contract test separately from a gate failure.
+Count a gate finding as non-behavioral only when the implementation's behavior,
+types, privacy, security, dependency direction, package contents, and public
+contracts were already correct and the edit existed solely to satisfy a style
+or overlapping metric. `gate_remediation_lines` is the added plus deleted lines
+in those edits. A broad profile repeated on unchanged code counts as a
+`duplicate_broad_run`; a retry after code, configuration, or environment repair
+does not. A `style_only_commit` changes no behavior, contract, test expectation,
+schema, documentation meaning, or generated source input.
+
+The task entry and machine-readable record must agree before merge. Report zero
+when a measured category did not occur and `pending` only while the task is in
+progress.
 
 ## Program Status
 
 | Task | Release | State | Depends on | Outcome |
 | --- | --- | --- | --- | --- |
 | K0 | documentation baseline | Complete | — | Archive former program and approve reset |
-| K1 | 0.25.x bridge | Not started | K0 | Freeze accounting oracle |
+| K1 | 0.25.x bridge | Complete | K0 | Freeze accounting oracle |
 | K1A | 0.26 integration | Not started | K1 | Quarantine legacy code and freeze agent scope |
 | K2 | 0.26.0 | Not started | K1A | Kernel schema v1 and stable identity |
 | K3 | 0.26.0 | Not started | K2 | Incremental/live ingestion |
@@ -171,7 +197,7 @@ now unblocked.
 **Base:** `e6d6b76 docs: reset product roadmap around lean data kernel`
 **Commit:** this changeset
 
-### Contract added first
+### K0A contract added first
 
 - The roadmap must put K1A before K2 and classify every K1 `git ls-files` path
   as exactly one of `keep`, `transplant`, `retire`, or `historical`.
@@ -184,7 +210,7 @@ now unblocked.
 - Normal agent search after K1A sees only the integration worktree. Tagged
   v0.25.1 source is a bounded, policy-read-only oracle.
 
-### Implementation
+### K0A implementation
 
 - Added the decision-complete code-quarantine design and linked it from the
   roadmap, architecture, detailed design, and implementation plan.
@@ -248,6 +274,119 @@ or block on usage indexing.
   exact manifests and rollback oracle.
 - K1 remains the next task; K1A is blocked on its two machine-readable
   inventories.
+
+## K1 — Accounting Oracle Baseline
+
+**State:** Complete
+**Branch:** `kernel/k1-oracle-baseline`
+**Base:** `62726189c05d423f08abdec6ad1454434188d734`
+**Commits:** this changeset
+
+### K1 contract added first
+
+- Added 14 intentionally failing K1 contract tests before implementation.
+  They required the accounting and source-lifecycle oracles, privacy boundary,
+  exact retired-surface inventory, full-tree code disposition, fixed-seed
+  benchmark evidence, and repository gate policy.
+
+### K1 implementation
+
+- Added a versioned synthetic-JSONL accounting oracle covering physical and
+  canonical rows, copied-event deduplication and canonical promotion, four
+  token classes, thread/model/effort/service-tier/time groupings, stable
+  identity, delayed parent/subagent attachment, competing allowance
+  observations and selection, local tool and MCP calls, skills, patches,
+  tests, errors, compaction, completion, abort, rollback, and parsed malformed
+  or unknown-event skipping.
+- Exercised current source planning for new, appended, partially appended,
+  replaced, truncated, archived, and restored sources without reading live
+  Codex data.
+- Generated 1,578 full-tree disposition entries and 1,194 retiring surface
+  entries. Every staged `git ls-files` path resolves exactly once with one
+  owner and a path-relevant proof. The retired inventory exactly derives 58 MCP
+  tools, 69 HTTP routes, 91 CLI command paths, 87 schemas, all 38 tables, 17
+  Console routes/aliases, 508 frontend assets, 28 package-data rules, and 298
+  retired source modules from authoritative catalogs.
+- Added fixed-seed old-runtime benchmarks and `agent-perf` attribution. The
+  benchmark includes derived-state maintenance so K2–K9 comparisons cannot
+  hide the legacy work.
+- Retired wemake and the standalone duplicate-helper, private-import, and
+  file-length ratchets. Aligned Agent Maintainer's remaining file bounds,
+  widened roadmap change budgets, relaxed Xenon only to a B ceiling, and
+  replaced generic verifier profiles with repository-owned `just` checks.
+- Added constructive repository guidance for contract-first implementation,
+  cohesive responsibility boundaries, direct code, deterministic generation,
+  synthetic fixtures, focused iteration, and proportionate broad validation.
+- Added a versioned development-efficiency ledger so K2 onward must report
+  exact gate churn against K1 and the preceding task.
+- Added a repository-owned replacement-kernel maintainability gate. It enforces
+  600 physical/source lines and Xenon B absolute/module/average ceilings on the
+  clean kernel while the existing product-complexity ratchet protects the
+  legacy runtime until quarantine.
+
+### K1 verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused oracle | Pass | final `pytest tests/kernel -q`: 26 tests |
+| Determinism | Pass | both manifest generators matched `--check`; repeated oracle exports matched byte-for-byte semantic JSON |
+| Repository CI-equivalent | Pass | final `just vc`: 2,085 Python tests; Ruff, MyPy, source Pyright 0 errors, Tach, dependency/dead-code/security/release/product/kernel-maintainability budget checks; 599 frontend tests, governance, bundle, and deterministic assets |
+| Performance | Pass | cold 10k: 1.536 s wall / 1.063 s held lock; cold 100k: 20.633 s wall / 16.170 s held lock; 100,000 physical / 95,001 canonical rows |
+| Profile | Pass | `agent-perf` run `20260726T194642Z-9b3625c3`; insertion, source records, links, and legacy compression facts were leading owned work; attribution only |
+| Privacy | Pass | repository-only synthetic fixtures; no live database, real log, prompt, tool output, credential, or absolute user path inspected or stored |
+| Release and guidance | Pass | `scripts/check_release.py`, generated guidance drift, manifest drift, and `git diff --check` passed |
+
+### Development-efficiency baseline
+
+- Contract red-test runs: 1
+- Focused test runs: 25
+- Broad verification runs: 3
+- Duplicate unchanged-state broad runs: 0
+- Blocking check groups: 6
+- Non-behavioral blocking check groups: 6
+- Gate-remediation lines: 74
+- Recorded verification wall time: 659.0 seconds
+- Style-only commits: 0
+
+The first broad run used Agent Maintainer's generic CI profile and exposed four
+non-product blockers: stale file-length baselines, stale/multiple change plans,
+formatting of Python snippets embedded in archived Markdown plans, and a
+test-wide Pyright scope that did not match GitHub CI. No application code was
+rewritten. The repository acceptance wrappers were corrected, and the second
+broad run passed. A redundant frontend-governance invocation was also removed
+from `just vc`; `dashboard:verify` remains the single owner of that gate. K2 is
+the first task eligible for a churn-reduction comparison.
+
+### K1 review metrics
+
+- Total findings: 6
+- Accepted findings: 6
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+The single final reviewer identified six actionable gaps: semantic
+misclassification, heuristic retirement inventories, parser-bypassing oracle
+coverage, incomplete disposition ownership/proofs, unenforced maintainability
+claims, and a warm/reused benchmark path. All six were accepted and corrected
+by the primary agent. No second review pass was run.
+
+### K1 deviations and decisions
+
+- Serena's repository doctor passed, but JetBrains semantics remained
+  unavailable because the worktree is outside the configured IDE helper roots.
+  GitNexus selected cross-cutting paths; exact repository search and focused
+  tests supplied authoritative symbol and contract evidence.
+- The original K1 contract did not include gate-churn governance. The user
+  explicitly approved retiring or adjusting low-value gates and requested
+  ongoing reduction reporting on 2026-07-26.
+
+### K1 residual risk and next task
+
+- The disposition manifest begins in `classified`; K1A–K9 must advance each
+  entry through its declared state machine, and only `verified` is terminal.
+- Performance evidence describes the synthetic v0.25.1 path on one machine and
+  is comparison evidence, not a production latency claim.
+- K1A is unblocked after this task passes review, PR CI, and merge to `main`.
 
 ## Task Entry Template
 

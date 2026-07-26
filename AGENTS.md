@@ -103,6 +103,54 @@ Removal and upgrade behavior must also be due in `docs/deprecations.md`.
 The former MCP-first roadmap is archived historical evidence. Its stable
 redirects do not authorize new `pivot/` work.
 
+### Engineering Working Style
+
+Start each change from an observable contract: name the behavior, add or select
+the focused test that proves it, implement the smallest complete change, and
+then run broader validation in proportion to risk.
+
+- Organize modules around one stable responsibility and a clear dependency
+  direction. Split code when ownership or testability becomes clearer, and keep
+  cohesive behavior together when an extraction would only add forwarding
+  layers.
+- Prefer direct functions, explicit data structures, and existing repository
+  patterns. Add an abstraction only when it removes current duplication,
+  isolates an external boundary, or gives a concrete test seam needed now.
+- Preserve working names and interfaces unless the task changes their contract.
+  When moving code, keep behavior changes separate from mechanical relocation
+  so reviewers can verify both.
+- Diagnose a failing check from its exact evidence before editing. Fix the
+  behavioral, type, privacy, security, dependency, packaging, or release defect
+  it identifies; if it identifies none, correct the check or policy rather than
+  reshaping unrelated code.
+- Use one focused test loop while implementing. At the stable checkpoint, run
+  the smallest broad profile that covers every touched contract; reuse that
+  evidence instead of rerunning overlapping profiles.
+- For approved roadmap-scale work, declare the exact paths, contract, and
+  validation once in a change plan. Keep the implementation cohesive and the
+  commit focused even when the complete inventory or migration spans many
+  files.
+- Generate exhaustive inventories, fixtures, schemas, and migration ledgers
+  from deterministic scripts. Review their inputs, schema, counts, and semantic
+  summaries; do not hand-edit generated output.
+- Keep synthetic fixtures small but semantically complete. Include edge states,
+  expected failures, privacy assertions, and stable identifiers without copying
+  local usage content.
+- Treat Ruff, Pyright, Tach, tests, privacy checks, security checks, public
+  contract checks, deterministic asset checks, package checks, and release
+  readiness as correctness gates.
+
+Wemake is retired from repository governance. Do not install, invoke, or add it
+to local or CI workflows without a new explicit maintainer decision.
+
+Use the repository-owned `just vp`, `just v`, and `just vc` recipes for broad
+local verification. They intentionally mirror maintained repository and GitHub
+checks without Agent Maintainer's generic style, file-length, change-budget,
+Markdown-code-formatting, or expanded test-typecheck profiles. Do not invoke
+`agent_maintainer verify` as a repository acceptance gate. Agent Maintainer
+remains available for doctor, guidance, change-plan, context, and host-side wait
+workflows.
+
 - Do not commit directly to `main`.
 - Start ordinary work and K1 from current `main` with a short-lived branch.
   For the approved reset only, start K1A–K9 from

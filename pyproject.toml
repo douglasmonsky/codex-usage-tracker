@@ -50,7 +50,6 @@ dev = [
   "build>=1.2",
   "check-jsonschema>=0.37.4; python_version >= '3.11'",
   "diff-cover>=9.0",
-  "git-agent-ratchet>=1.3.0; python_version >= '3.11'",
   "mypy>=1.10",
   "pip-audit>=2.10.0; python_version >= '3.11'",
   "pillow>=10",
@@ -60,7 +59,6 @@ dev = [
   "ruff>=0.8",
   "tach>=0.35.0; python_version >= '3.11'",
   "tomli>=2.0; python_version < '3.11'",
-  "wemake-python-styleguide>=1.6.2; python_version >= '3.11'",
   "yamllint>=1.38.0; python_version >= '3.11'",
   "zizmor>=1.26.1; python_version >= '3.11'",
 ]
@@ -174,18 +172,18 @@ require_tests = true
 coverage_fail_under = 85
 diff_cover_fail_under = 90
 file_length_max_physical = 600
-file_length_max_source = 450
+file_length_max_source = 600
 file_length_baseline = ".agent-maintainer/file-length-baseline.json"
-change_warn_lines = 300
-change_block_lines = 800
-change_warn_files = 8
-change_block_files = 20
+change_warn_lines = 1500
+change_block_lines = 5000
+change_warn_files = 30
+change_block_files = 100
 source_without_test_change_error_profiles = []
 allow_source_without_test_change = false
 suppression_max_new = 3
 xenon_max_absolute = "B"
-xenon_max_modules = "A"
-xenon_max_average = "A"
+xenon_max_modules = "B"
+xenon_max_average = "B"
 ruff_max_complexity = 10
 pyright_type_checking_mode = "standard"
 enable_pip_audit = true
