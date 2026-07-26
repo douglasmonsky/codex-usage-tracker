@@ -631,7 +631,7 @@ so token metrics remain pending without retry.
 
 **Base:** `6145437bcc3c8943f5b8318bd5350617f111b441`
 
-**Commit:** pending remediation commit
+**Implementation commit:** `6d804be` (`feat: add incremental kernel ingestion`)
 
 ### Contract added first
 
