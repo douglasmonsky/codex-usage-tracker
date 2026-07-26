@@ -168,8 +168,6 @@ def _distribution_failures(dist_dir: Path) -> list[str]:
 
 def _expected_sdist_names() -> set[str]:
     names = {
-        ".codex-plugin/plugin.json",
-        ".mcp.json",
         "AGENTS.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
@@ -178,7 +176,6 @@ def _expected_sdist_names() -> set[str]:
         "PKG-INFO",
         "README.md",
         "SECURITY.md",
-        "assets/icon.svg",
         "pyproject.toml",
         "setup.cfg",
         "src/codex_usage_tracking.egg-info/PKG-INFO",
@@ -202,7 +199,6 @@ def _expected_sdist_names() -> set[str]:
             (_REPO_ROOT / "src" / "codex_usage_tracker" / "kernel", ("*.py",)),
             (_REPO_ROOT / "src" / "codex_usage_tracker" / "release", ("*.py",)),
             (_REPO_ROOT / "tests" / "kernel", ("**/*.py", "**/*.json", "**/*.jsonl")),
-            (_REPO_ROOT / "tests" / "release", ("*.py",)),
         )
         for pattern in patterns
         for path in root.glob(pattern)

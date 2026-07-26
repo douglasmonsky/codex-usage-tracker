@@ -454,7 +454,7 @@ by the primary agent. No second review pass was run.
 | --- | ---: | ---: | ---: |
 | Non-behavioral blocking groups | 6 | 5 | 16.7% lower |
 | Gate-remediation lines | 74 | 60 | 18.9% lower |
-| Verification wall time | 966.0 s | 52.7 s | 94.5% lower |
+| Verification wall time | 966.0 s | 57.3 s | 94.1% lower |
 | Style-only commits | 0 | 0 | unchanged |
 | Duplicate unchanged-state broad runs | 0 | 1 | one regression |
 

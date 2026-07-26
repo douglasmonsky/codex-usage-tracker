@@ -72,15 +72,15 @@
       "task_id": "K1A",
       "state": "complete",
       "contract_red_test_runs": 2,
-      "focused_test_runs": 17,
-      "broad_verification_runs": 10,
+      "focused_test_runs": 18,
+      "broad_verification_runs": 11,
       "duplicate_broad_runs": 1,
-      "blocking_gate_findings": 9,
+      "blocking_gate_findings": 10,
       "non_behavioral_gate_findings": 5,
       "gate_remediation_lines": 60,
-      "verification_wall_seconds": 52.7,
+      "verification_wall_seconds": 57.3,
       "style_only_commits": 0,
-      "notes": "K1A final local measurement, including a clean Python 3.10 phase run and four accepted reviewer contract findings. Five non-behavioral findings narrowed Ruff to phase-owned files, isolated pytest from a stale local Tach plugin, updated the wrapper-policy test, and corrected two test/import mistakes during reviewer remediation. One unchanged-state broad pass was duplicated when just vc reran just v before the package build; future tasks should use the package-only step after an already-green just v. Review-token attribution is pending and was not retried."
+      "notes": "K1A final local measurement, including a clean Python 3.10 phase run, four accepted reviewer contract findings, and one clean-checkout sdist determinism defect found by CI. Five non-behavioral findings narrowed Ruff to phase-owned files, isolated pytest from a stale local Tach plugin, updated the wrapper-policy test, and corrected two test/import mistakes during reviewer remediation. One unchanged-state broad pass was duplicated when just vc reran just v before the package build; future tasks should use the package-only step after an already-green just v. Review-token attribution is pending and was not retried."
     }
   ]
 }

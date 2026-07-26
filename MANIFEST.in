@@ -1,4 +1,7 @@
 include README.md LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md AGENTS.md
+exclude .mcp.json
+prune .codex-plugin
+prune assets
 include config/kernel-code-disposition-v1.json
 include config/kernel-development-efficiency-v1.json
 include config/kernel-performance-budget.json
@@ -11,4 +14,5 @@ include scripts/check_kernel_scope.py
 include scripts/check_release.py
 include scripts/generate_kernel_manifests.py
 recursive-include tests/kernel *.json *.jsonl *.py
+prune tests/release
 global-exclude __pycache__ *.py[cod]
