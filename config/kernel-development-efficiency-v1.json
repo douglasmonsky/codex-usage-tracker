@@ -84,7 +84,7 @@
     },
     {
       "task_id": "K2",
-      "state": "reviewed",
+      "state": "complete",
       "contract_red_test_runs": 2,
       "focused_test_runs": 18,
       "broad_verification_runs": 11,

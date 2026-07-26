@@ -62,7 +62,7 @@ progress.
 | K0 | documentation baseline | Complete | — | Archive former program and approve reset |
 | K1 | 0.25.x bridge | Complete | K0 | Freeze accounting oracle |
 | K1A | 0.26 integration | Complete | K1 | Quarantine legacy code and freeze agent scope |
-| K2 | 0.26.0 | In progress | K1A | Kernel schema v1 and stable identity |
+| K2 | 0.26.0 | Complete | K1A | Kernel schema v1 and stable identity |
 | K3 | 0.26.0 | Not started | K2 | Incremental/live ingestion |
 | K4 | 0.26.0 | Not started | K3 | Bounded query engine |
 | K5 | 0.26.0 | Not started | K3 | Evidence timeline and live stream |
@@ -506,11 +506,11 @@ contracts now run in the K1A kernel suite. No second review pass was run.
 
 ## K2 — Schema V1 And Stable Identity
 
-**State:** In progress (implementation, final review, and local validation
-complete; integration CI and merge pending)
+**State:** Complete
 **Branch:** `kernel/k2-schema-identity`
 **Base:** `bb11bcbef30a37e5fefa483ec7f240cf4a79468a`
-**Commits:** this changeset
+**Commits:** `629b612 feat: add kernel schema v1 and stable identities`;
+integration merge `a32fbab8306f827c5d7e7161e1d6913f73e67452`
 
 ### K2 contract added first
 
@@ -552,6 +552,7 @@ complete; integration CI and merge pending)
 | Broader | Pass | `just v`: 59 phase-owned tests, manifest/scope, static, release-safety, and privacy gates in 3.92 s |
 | Package | Pass | package-only build plus `check_release.py --dist`; exact 10-module wheel, no CLI/MCP/plugin/runtime dependencies, and bounded fail-closed sdist |
 | Privacy | Pass | synthetic fixtures only; full synthetic source path occurs only in the 0600 operational sidecar |
+| Integration CI | Pass | Python 3.10 and 3.14 jobs in workflow run `30222635517`; PR #318 merged to integration |
 
 The retained K1 oracle-adapter implementation tests are not collected in K2:
 four deliberately import quarantined 0.25 runtime modules and are assigned to
@@ -619,8 +620,8 @@ so token metrics remain pending without retry.
 - K3 owns ingestion semantics, the two explicitly deferred cascade/deduplication
   oracles, and the four quarantined runtime adapters before collecting their
   implementation assertions.
-- K2 is not complete until integration-targeting CI and merge. K3 remains
-  blocked.
+- K2 is complete after integration-targeting CI and merge. K3 is unblocked
+  from merge `a32fbab8306f827c5d7e7161e1d6913f73e67452`.
 
 ## Task Entry Template
 
