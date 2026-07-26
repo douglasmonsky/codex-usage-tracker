@@ -88,12 +88,16 @@ def load_capacity_cycles(
     ratios = {
         str(row["cycle_id"]): float(row["credits"]) / float(row["movement"])
         for row in connection.execute(
-            "SELECT cycle_id, SUM(estimated_credits) AS credits, "
-            "SUM(visible_percent_delta) AS movement FROM allowance_intervals "
-            "WHERE source_revision = ? AND window_kind = ? AND cohort_key = ? "
-            "AND eligible_for_change_detection = 1 AND point_kind = 'positive' "
-            "AND (? OR is_archived = 0) "
-            "GROUP BY cycle_id HAVING credits > 0 AND movement > 0",
+            "SELECT intervals.cycle_id, SUM(intervals.estimated_credits) AS credits, "
+            "SUM(intervals.visible_percent_delta) AS movement "
+            "FROM allowance_intervals AS intervals "
+            "JOIN allowance_cycles AS cycles ON cycles.cycle_id = intervals.cycle_id "
+            "WHERE cycles.source_revision = ? AND intervals.window_kind = ? "
+            "AND intervals.cohort_key = ? "
+            "AND intervals.eligible_for_change_detection = 1 "
+            "AND intervals.point_kind = 'positive' "
+            "AND (? OR intervals.is_archived = 0) "
+            "GROUP BY intervals.cycle_id HAVING credits > 0 AND movement > 0",
             interval_parameters,
         )
     }

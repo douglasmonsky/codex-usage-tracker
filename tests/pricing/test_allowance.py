@@ -18,9 +18,7 @@ from codex_usage_tracker.pricing.allowance import (
 )
 
 
-def _credit_row(
-    *, model: str, fast: int | None, service_tier: str | None
-) -> dict[str, object]:
+def _credit_row(*, model: str, fast: int | None, service_tier: str | None) -> dict[str, object]:
     return {
         "model": model,
         "input_tokens": 100,
@@ -30,7 +28,7 @@ def _credit_row(
         "total_tokens": 110,
         "fast": fast,
         "service_tier": service_tier,
-        "service_tier_source": "otel_response_completed" if fast is not None else None,
+        "service_tier_source": "usage_event" if fast is not None else None,
         "service_tier_confidence": "exact" if fast is not None else None,
     }
 
@@ -82,14 +80,10 @@ def _synthetic_allowance_config() -> UsageAllowanceConfig:
         ("gpt-5.4", 2.0),
     ],
 )
-def test_confirmed_fast_multiplies_standard_credit_estimate(
-    model: str, multiplier: float
-) -> None:
+def test_confirmed_fast_multiplies_standard_credit_estimate(model: str, multiplier: float) -> None:
     row = _credit_row(model=model, fast=1, service_tier="fast")
 
-    annotated = annotate_rows_with_allowance(
-        [row], _synthetic_allowance_config()
-    )[0]
+    annotated = annotate_rows_with_allowance([row], _synthetic_allowance_config())[0]
 
     assert annotated["usage_credits"] == pytest.approx(
         annotated["standard_usage_credits"] * multiplier
@@ -119,15 +113,13 @@ def test_fast_multiplier_provenance_comes_from_rate_card() -> None:
 
     assert annotated["usage_credit_multiplier"] == 2.5
     assert annotated["usage_credit_multiplier_source"] == "OpenAI Codex Fast mode docs"
-    assert annotated["usage_credit_multiplier_source_url"].endswith(
-        "/agent-configuration/speed"
-    )
+    assert annotated["usage_credit_multiplier_source_url"].endswith("/agent-configuration/speed")
     assert annotated["usage_credit_multiplier_fetched_at"] == "2026-07-16"
     assert annotated["usage_credit_multiplier_confidence"] == "exact"
     assert annotated["fast_usage_credits"] == pytest.approx(
         annotated["standard_usage_credits"] * 2.5
     )
-    assert annotated["service_tier_source"] == "otel_response_completed"
+    assert annotated["service_tier_source"] == "usage_event"
 
 
 @pytest.mark.parametrize("fast", [0, None])
@@ -138,9 +130,7 @@ def test_standard_and_unknown_rows_keep_multiplier_one(fast: int | None) -> None
         service_tier="standard" if fast == 0 else None,
     )
 
-    annotated = annotate_rows_with_allowance(
-        [row], _synthetic_allowance_config()
-    )[0]
+    annotated = annotate_rows_with_allowance([row], _synthetic_allowance_config())[0]
 
     assert annotated["usage_credits"] == annotated["standard_usage_credits"]
     assert annotated["usage_credit_multiplier"] == 1.0
@@ -149,31 +139,21 @@ def test_standard_and_unknown_rows_keep_multiplier_one(fast: int | None) -> None
 def test_confirmed_fast_unknown_model_does_not_invent_multiplier() -> None:
     row = _credit_row(model="synthetic-unknown", fast=1, service_tier="fast")
 
-    annotated = annotate_rows_with_allowance(
-        [row], _synthetic_allowance_config()
-    )[0]
+    annotated = annotate_rows_with_allowance([row], _synthetic_allowance_config())[0]
 
     assert annotated["usage_credit_multiplier"] == 1.0
-    assert (
-        annotated["usage_credit_multiplier_source"]
-        == "no_documented_fast_multiplier"
-    )
+    assert annotated["usage_credit_multiplier_source"] == "no_documented_fast_multiplier"
 
 
 def test_unpriced_rows_include_bounded_multiplier_annotations() -> None:
     row = _credit_row(model="not-in-rate-card", fast=1, service_tier="fast")
 
-    annotated = annotate_rows_with_allowance(
-        [row], _synthetic_allowance_config()
-    )[0]
+    annotated = annotate_rows_with_allowance([row], _synthetic_allowance_config())[0]
 
     assert annotated["usage_credits"] is None
     assert annotated["standard_usage_credits"] is None
     assert annotated["usage_credit_multiplier"] == 1.0
-    assert (
-        annotated["usage_credit_multiplier_source"]
-        == "no_documented_fast_multiplier"
-    )
+    assert annotated["usage_credit_multiplier_source"] == "no_documented_fast_multiplier"
 
 
 def test_allowance_estimates_exact_codex_credit_usage() -> None:

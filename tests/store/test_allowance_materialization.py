@@ -1,10 +1,14 @@
+import builtins
 import sqlite3
 from dataclasses import replace
 from datetime import datetime, timezone
 
 import pytest
 
-from codex_usage_tracker.allowance_intelligence import materialization
+from codex_usage_tracker.allowance_intelligence import (
+    materialization,
+    materialization_support,
+)
 from codex_usage_tracker.allowance_intelligence.cycles import MODEL_VERSION
 from codex_usage_tracker.allowance_intelligence.service import build_allowance_status
 from codex_usage_tracker.store import api as store_api
@@ -119,6 +123,183 @@ def test_materialized_interval_sums_all_calls_between_allowance_anchors(tmp_path
         ).fetchone()
         assert cycle[0] == cycle[1] and cycle[0] > 0
         assert tuple(cycle[2:]) == (0.0, 1.0)
+
+
+def test_materialization_indexes_interval_anchors_once_per_cycle(tmp_path, monkeypatch):
+    db = tmp_path / "usage.sqlite3"
+    events = [
+        _allowance_event(
+            f"record-{index}",
+            float(index % 100),
+            (index + 1) * 100,
+            event_timestamp=f"2026-01-01T{index // 3600:02d}:{index // 60 % 60:02d}:{index % 60:02d}Z",
+        )
+        for index in range(240)
+    ]
+    upsert_usage_events(events, db)
+    visited = 0
+
+    def counting_enumerate(iterable):
+        nonlocal visited
+        for item in builtins.enumerate(iterable):
+            visited += 1
+            yield item
+
+    monkeypatch.setattr(
+        materialization_support,
+        "enumerate",
+        counting_enumerate,
+        raising=False,
+    )
+    with connect(db) as conn:
+        assert materialize_allowance_intelligence(conn, now=_NOW)
+
+    assert visited <= len(events) * 2
+
+
+def test_unchanged_refresh_allowance_sync_stays_read_only_during_writer(tmp_path):
+    db = tmp_path / "usage.sqlite3"
+    upsert_usage_events([_allowance_event("current", 10, 100)], db)
+    with connect(db) as conn:
+        assert materialize_allowance_intelligence(conn, now=_NOW)
+
+    writer = sqlite3.connect(db, timeout=0)
+    writer.execute("BEGIN IMMEDIATE")
+    try:
+        with connect(db) as reader:
+            materialization.sync_refresh_allowance_intelligence(
+                reader,
+                (),
+                frozenset(),
+                False,
+            )
+    finally:
+        writer.rollback()
+        writer.close()
+
+
+def test_no_change_and_append_sync_do_not_run_history_aggregate_scans(tmp_path):
+    db = tmp_path / "usage.sqlite3"
+    initial = [
+        _allowance_event(
+            f"history-{index}",
+            10 + index / 100,
+            100 + index,
+            event_timestamp=f"2026-01-01T00:{index:02d}:00Z",
+        )
+        for index in range(60)
+    ]
+    upsert_usage_events(initial, db)
+    with connect(db) as conn:
+        assert materialize_allowance_intelligence(conn, now=_NOW)
+
+    with connect(db) as conn:
+        statements: list[str] = []
+        progress_steps = 0
+
+        def count_step() -> int:
+            nonlocal progress_steps
+            progress_steps += 1
+            return 0
+
+        conn.set_trace_callback(statements.append)
+        conn.set_progress_handler(count_step, 1)
+        materialization.sync_refresh_allowance_intelligence(
+            conn,
+            (),
+            frozenset(),
+            False,
+        )
+        conn.set_progress_handler(None, 0)
+        conn.set_trace_callback(None)
+
+    assert progress_steps < 100
+    assert not any(
+        "COUNT(*)" in statement.upper()
+        and "ALLOWANCE_OBSERVATIONS" in statement.upper()
+        for statement in statements
+    )
+    assert not any(
+        "MAX(EVENT_TIMESTAMP)" in statement.upper()
+        and "ALLOWANCE_OBSERVATIONS" in statement.upper()
+        for statement in statements
+    )
+
+    appended = _allowance_event(
+        "history-tail",
+        11,
+        500,
+        event_timestamp="2026-01-01T01:00:00Z",
+    )
+    upsert_usage_events([appended], db)
+    with connect(db) as conn:
+        statements = []
+        conn.set_trace_callback(statements.append)
+        materialization.sync_refresh_allowance_intelligence(
+            conn,
+            (appended.record_id,),
+            frozenset(),
+            False,
+        )
+        conn.set_trace_callback(None)
+        state = conn.execute(
+            "SELECT observation_count, latest_observed_at "
+            "FROM allowance_source_state WHERE state_id = 1"
+        ).fetchone()
+
+    assert state is not None
+    assert tuple(state) == (61, appended.event_timestamp)
+    assert not any(
+        (
+            "COUNT(*)" in statement.upper()
+            or "MAX(EVENT_TIMESTAMP)" in statement.upper()
+        )
+        and "ALLOWANCE_OBSERVATIONS" in statement.upper()
+        for statement in statements
+    )
+
+
+def test_append_refresh_matches_full_allowance_materialization(tmp_path, monkeypatch):
+    fast_db = tmp_path / "fast.sqlite3"
+    full_db = tmp_path / "full.sqlite3"
+    initial = [
+        _allowance_event("anchor", 10, 100, event_timestamp="2026-01-01T00:00:00Z"),
+        _allowance_event("prior-positive", 15, 200, event_timestamp="2026-01-01T00:01:00Z"),
+        _allowance_event("prior-flat", 15, 300, event_timestamp="2026-01-01T00:02:00Z"),
+    ]
+    appended = [
+        _allowance_event("positive", 20, 500, event_timestamp="2026-01-01T00:03:00Z"),
+        _allowance_event("new-flat", 20, 800, event_timestamp="2026-01-01T00:04:00Z"),
+        _allowance_event("reversal", 15, 1000, event_timestamp="2026-01-01T00:05:00Z"),
+    ]
+    for db in (fast_db, full_db):
+        upsert_usage_events(initial, db)
+        with connect(db) as conn:
+            assert materialize_allowance_intelligence(conn, now=_NOW)
+        upsert_usage_events(appended, db)
+
+    def unexpected_full_materialization(*_args, **_kwargs):
+        raise AssertionError("append-safe refresh fell back to full materialization")
+
+    with connect(fast_db) as conn:
+        monkeypatch.setattr(
+            materialization,
+            "materialize_allowance_intelligence",
+            unexpected_full_materialization,
+        )
+        materialization.sync_refresh_allowance_intelligence(
+            conn,
+            tuple(event.record_id for event in appended),
+            frozenset(),
+            False,
+        )
+        fast_snapshot = _derived_allowance_snapshot(conn)
+
+    with connect(full_db) as conn:
+        assert materialize_allowance_intelligence(conn, now=_NOW)
+        full_snapshot = _derived_allowance_snapshot(conn)
+
+    assert fast_snapshot == full_snapshot
 
 
 def test_unpriced_interval_stays_ineligible_for_calibration(tmp_path):
@@ -322,7 +503,7 @@ def test_empty_stream_finalization_reconciles_replaced_source_once(tmp_path, mon
             conn,
             finalized.record_ids,
             finalized.affected_thread_keys,
-            False,
+            True,
         )
         assert finalized.inserted_or_updated_events == 0
         assert calls == 1
@@ -381,4 +562,30 @@ def _allowance_snapshot(conn):
             "allowance_analysis_snapshots",
             "allowance_source_state",
         )
+    }
+
+
+def _derived_allowance_snapshot(conn):
+    interval_rows = []
+    for row in conn.execute(
+        "SELECT intervals.*, cycles.source_revision AS current_source_revision "
+        "FROM allowance_intervals AS intervals "
+        "JOIN allowance_cycles AS cycles ON cycles.cycle_id = intervals.cycle_id "
+        "ORDER BY intervals.interval_id"
+    ):
+        interval = dict(row)
+        interval["source_revision"] = interval.pop("current_source_revision")
+        interval_rows.append(tuple(interval.values()))
+    return {
+        "cycles": [
+            tuple(row) for row in conn.execute("SELECT * FROM allowance_cycles ORDER BY cycle_id")
+        ],
+        "intervals": interval_rows,
+        "state": [
+            tuple(row)
+            for row in conn.execute(
+                "SELECT allowance_generation, source_revision, observation_count, "
+                "latest_observed_at, model_version FROM allowance_source_state"
+            )
+        ],
     }

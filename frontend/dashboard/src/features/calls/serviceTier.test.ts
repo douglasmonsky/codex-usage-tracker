@@ -15,7 +15,7 @@ describe('service tier labels', () => {
     const call = usageRowToCall({
       service_tier: serviceTier,
       fast: fast ? 1 : 0,
-      service_tier_source: 'otel_response_completed',
+      service_tier_source: 'usage_event',
       service_tier_confidence: 'exact',
     });
 
@@ -27,7 +27,7 @@ describe('service tier labels', () => {
     const call = usageRowToCall({
       service_tier: 'standard',
       fast: 0,
-      service_tier_source: 'otel_response_completed',
+      service_tier_source: 'usage_event',
       service_tier_confidence: 'protocol',
       duration_seconds: 1,
       total_tokens: 9000,

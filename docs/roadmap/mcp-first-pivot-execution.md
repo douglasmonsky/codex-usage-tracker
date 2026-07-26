@@ -1994,5 +1994,85 @@ complete without its named focused and full verification evidence.
   - review metrics: 5 findings, 5 accepted (`R1`, `R2`, `R3`, `R4`, `R5`);
     reviewer tokens `pending` after aggregate-only attribution timed out;
     tokens per accepted finding `pending`;
-  - final read-only review is complete; publication and the public-PyPI rerun
-    remain pending.
+- final read-only review is complete; publication and the public-PyPI rerun
+  remain pending.
+
+## OPS-OTEL-025 - Retire the telemetry sidecar
+
+- Status: implementation and local 0.25.1 release qualification complete on
+  `fix/remove-otel-refresh-blocker`; publication is pending.
+- Triggering public-0.25.0 dogfood evidence:
+  - one incremental refresh committed generation `130` to `131` and increased
+    canonical rows from `213,858` to `215,756`, then remained nonterminal at
+    `92%` in the telemetry phase for more than `663` seconds;
+  - two identical stale `usage_analyze` requests created separate refresh jobs
+    instead of reusing the active refresh; both failed with `refresh.failed`;
+  - one job-status poll combined an outer `running`/`discovering` state with
+    nested `failed` progress;
+  - the bounded suite required `28` MCP calls, including `22` polls, and
+    produced no analysis findings or evidence links in `11m31s`.
+- Follow-up installed-0.25.1 dogfood evidence:
+  - generation `134` to `135` added only `33` canonical rows but took roughly
+    `379` seconds; the next `45` moving-tail rows took roughly `318` seconds,
+    with most time reported in `syncing_facts`;
+  - completed refresh polling did not expose durable refresh counters after
+    restart, while two `execution="auto"` analyses blocked for `42.6s` and
+    `61.2s` and returned no result, job, findings, warnings, or evidence;
+  - the suite required `29` MCP calls, including `22` polls, and took
+    `15m29s`, so installed coherence alone was not accepted as release
+    qualification.
+- Local aggregate-only inventory:
+  - the approximately `9.5 GB` usage database contained `535,770` physical
+    usage rows and zero rows in either telemetry staging table;
+  - the local exporter directory contained `11` files, approximately `105 MB`
+    and `92,354` lines, but no committed source cursor, so every interrupted
+    refresh restarted that phase from byte zero.
+- Removal contract:
+  - delete the telemetry parser, ingest, reconciliation, cursor, refresh phase,
+    counters, support-bundle fields, package code, and focused fixture suite;
+  - do not retain a runtime compatibility layer: fresh databases never create
+    the retired tables and current documentation exposes no telemetry surface;
+  - schema 38 performs only a one-way drop for existing indexes so upgrading
+    does not force a full rebuild or discard canonical accounting;
+  - preserve shared nullable `service_tier`, `fast`, provenance, pricing, and
+    credit fields already used by the Evidence Console and exports;
+  - stale analysis requests the same aggregate-only refresh semantics as the
+    public refresh tool and reuses one active compatible refresh across
+    moving-tail source revisions;
+  - each job-status response derives outer state and detailed progress from one
+    durable row snapshot.
+- Required verification:
+  - fresh-schema and schema-37 migration tests prove the retired tables are
+    absent while canonical rows and shared tier fields survive;
+  - focused refresh, locking, job, MCP, pricing, export, server, support, and
+    package tests pass on synthetic fixtures;
+  - measured cold, no-change, append, moving-tail, concurrent-read, built-wheel,
+    installed-plugin, and seven-tool dogfood gates complete without a telemetry
+    phase or duplicate refresh job.
+- Verification evidence:
+  - schema 38 removal/migration, refresh reuse, atomic status, support, pricing,
+    export, server, and package tests passed as part of `2,058` Python tests;
+    Ruff, MyPy, configured Pyright, Tach, release readiness, and product
+    complexity checks passed;
+  - all `599` frontend tests, lint, typecheck, dependency/dead-code/style/source
+    governance, deterministic production assets, bundle budgets, and all `14`
+    Chromium release-candidate tests passed;
+  - the realistic synthetic 100,000-row refresh benchmark passed at
+    `23.263824s` cold, `0.003999s` no-change, `1.416816s` 45-row append,
+    `1.027582s` moving-tail follow-up, and `0.003857s` concurrent read;
+  - the 216,000-row scale check measured `54.356171s` for the one-time cold
+    build, then `0.004112s` no-change, `3.871973s` 45-row append,
+    `2.290849s` one-row moving-tail follow-up, and `0.006584s` concurrent read;
+  - the 0.25.1 installed-wheel smoke exposed exactly seven core tools and its
+    two independent MCP tasks completed `39`-`40` calls with `604.045ms` maximum
+    server time, hydrated one moving-tail row, preserved completed refresh and
+    analysis results across restart, and reused durable analysis;
+  - five consecutive clean installed-wheel stress runs passed after detached
+    startup was changed to return the durable post-handshake state and mismatch
+    diagnostics were changed to expose the first job's terminal state and error;
+  - final read-only review produced three findings and all three were accepted
+    (`R1`, `R2`, `R3`); reviewer token attribution remains `pending`, so tokens
+    per accepted finding remain `pending`;
+  - the measured wheel is `5,152,350` bytes and source distribution is
+    `28,460,311` bytes; both package ceilings were ratcheted to exactly three
+    percent headroom.

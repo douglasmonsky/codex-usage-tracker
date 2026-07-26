@@ -87,38 +87,3 @@ def test_interrupted_rebuild_records_resumable_state(
     assert completed["status"] == "completed"
     with connect(db_path) as conn:
         assert conn.execute("SELECT COUNT(*) FROM usage_events").fetchone()[0] > 0
-
-
-def test_interrupted_otel_phase_is_visible_and_retryable(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    codex_home = _make_codex_home(tmp_path)
-    db_path = tmp_path / "usage.sqlite3"
-    original_otel_refresh = refresh_module._refresh_otel_completions
-
-    def fail_otel(**_kwargs: object) -> dict[str, int]:
-        raise RuntimeError("synthetic OTel interruption")
-
-    monkeypatch.setattr(refresh_module, "_refresh_otel_completions", fail_otel)
-    with pytest.raises(RuntimeError, match="synthetic OTel interruption"):
-        refresh_module.refresh_usage_index(codex_home=codex_home, db_path=db_path)
-
-    state = read_refresh_workflow_state(db_path)
-    assert state is not None
-    assert state["kind"] == "refresh"
-    assert state["phase"] == "otel"
-    assert state["status"] == "running"
-
-    monkeypatch.setattr(
-        refresh_module,
-        "_refresh_otel_completions",
-        original_otel_refresh,
-    )
-    refresh_module.refresh_usage_index(codex_home=codex_home, db_path=db_path)
-
-    completed = read_refresh_workflow_state(db_path)
-    assert completed is not None
-    assert completed["kind"] == "refresh"
-    assert completed["phase"] == "complete"
-    assert completed["status"] == "completed"

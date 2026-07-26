@@ -39,6 +39,7 @@ class JobPersistence(Protocol):
         request_schema: str,
         request: Mapping[str, object],
         result_schema: str,
+        reuse_active_across_revisions: bool = False,
     ) -> tuple[Mapping[str, object], bool]: ...
 
     def update_status(

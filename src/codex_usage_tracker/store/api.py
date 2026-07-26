@@ -81,9 +81,6 @@ from codex_usage_tracker.store.investigation_runs import insert_investigation_ru
 from codex_usage_tracker.store.recommendation_schema import clear_recommendation_fact_tables
 from codex_usage_tracker.store.refresh_callbacks import DerivedFactSyncCallback
 from codex_usage_tracker.store.refresh_metadata import (
-    OTEL_REFRESH_COUNTER_KEYS as OTEL_REFRESH_COUNTER_KEYS,
-)
-from codex_usage_tracker.store.refresh_metadata import (
     record_refresh_metadata as record_refresh_metadata,
 )
 from codex_usage_tracker.store.rows import (
@@ -170,7 +167,6 @@ def refresh_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
-    otel_dir: Path | None = None,
     progress_callback: RefreshProgressCallback | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
@@ -185,7 +181,6 @@ def refresh_usage_index(
         db_path=db_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
-        otel_dir=otel_dir,
         progress_callback=progress_callback,
         derived_fact_sync=_public_refresh_sync(derived_fact_sync),
     )
@@ -196,7 +191,6 @@ def rebuild_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
-    otel_dir: Path | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
     """Drop and rebuild the usage index from all selected Codex logs."""
@@ -210,7 +204,6 @@ def rebuild_usage_index(
         db_path=db_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
-        otel_dir=otel_dir,
         derived_fact_sync=_public_refresh_sync(derived_fact_sync),
     )
 
@@ -241,8 +234,6 @@ def reset_usage_database(db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any]:
         conn.execute("DELETE FROM call_diagnostic_facts")
         conn.execute("DELETE FROM diagnostic_snapshots")
         conn.execute("DELETE FROM allowance_observations")
-        conn.execute("DELETE FROM otel_completion_events")
-        conn.execute("DELETE FROM otel_completion_sources")
         conn.execute("DELETE FROM source_records")
         conn.execute("DELETE FROM usage_events")
         conn.execute("DELETE FROM thread_summaries")

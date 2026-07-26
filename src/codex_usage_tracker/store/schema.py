@@ -10,14 +10,14 @@ import codex_usage_tracker.store.allowance_schema as allowance_schema
 import codex_usage_tracker.store.analysis_job_schema as analysis_jobs
 import codex_usage_tracker.store.compression_schema as compression_schema
 import codex_usage_tracker.store.deduplication_schema as deduplication_schema
-import codex_usage_tracker.store.otel_schema as otel_schema
 import codex_usage_tracker.store.recommendation_schema as recommendation_schema
 import codex_usage_tracker.store.schema_query_indexes as schema_query_indexes
+import codex_usage_tracker.store.service_tier_schema as service_tier_schema
 import codex_usage_tracker.store.source_record_schema as source_record_schema
 from codex_usage_tracker.core import schema as usage_schema
 from codex_usage_tracker.store.connection import execute_script
 
-SCHEMA_VERSION = 37
+SCHEMA_VERSION = 38
 MIGRATION_NAMES = {
     1: "create usage_events aggregate fact table",
     2: "track schema migration checksum metadata",
@@ -38,11 +38,10 @@ MIGRATION_NAMES = {
     **schema_query_indexes.MIGRATION_NAMES,
     **deduplication_schema.MIGRATION_NAMES,
     **allowance_schema.MIGRATION_NAMES,
-    **otel_schema.MIGRATION_NAMES,
+    **service_tier_schema.MIGRATION_NAMES,
     analysis_jobs.MIGRATION_VERSION: analysis_jobs.MIGRATION_NAME,
     analysis_jobs.LEASE_MIGRATION_VERSION: analysis_jobs.LEASE_MIGRATION_NAME,
 }
-REQUIRED_USAGE_EVENT_COLUMNS = list(usage_schema.USAGE_EVENT_COLUMN_NAMES)
 
 
 class SchemaMigrationError(RuntimeError):
@@ -120,14 +119,15 @@ def _schema_migrations() -> tuple[tuple[int, Callable[[sqlite3.Connection], None
         (27, allowance_schema.migrate_allowance_intelligence_v2),
         (28, allowance_schema.migrate_allowance_query_indexes_v3),
         (29, allowance_schema.add_allowance_plan_provenance),
-        (30, otel_schema.migrate_otel_completion_tiers),
-        (31, otel_schema.add_otel_cursor_resume_anchor),
+        (30, service_tier_schema.migrate_service_tier_fields),
+        (31, service_tier_schema.reserved_schema_checkpoint),
         (32, allowance_schema.add_allowance_all_history_query_index),
         (33, recommendation_schema.create_recommendation_fact_indexes),
         (34, schema_query_indexes.migrate_focused_call_indexes),
         (35, schema_query_indexes.add_context_source_byte_offset),
         (analysis_jobs.MIGRATION_VERSION, analysis_jobs.create_analysis_jobs_table),
         (analysis_jobs.LEASE_MIGRATION_VERSION, analysis_jobs.add_analysis_job_leases),
+        (38, service_tier_schema.drop_retired_telemetry_tables),
     )
 
 
@@ -739,7 +739,7 @@ def _ensure_table_columns(
 def _validate_usage_events_schema(conn: sqlite3.Connection) -> None:
     rows = conn.execute("PRAGMA table_info(usage_events)").fetchall()
     existing = {str(row["name"]) for row in rows}
-    missing = [column for column in REQUIRED_USAGE_EVENT_COLUMNS if column not in existing]
+    missing = [column for column in usage_schema.USAGE_EVENT_COLUMN_NAMES if column not in existing]
     if missing:
         missing_text = ", ".join(missing)
         raise SchemaMigrationError(

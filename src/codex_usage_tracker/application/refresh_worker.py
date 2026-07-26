@@ -29,8 +29,7 @@ _PHASE_RANGES = {
     "derived_state": (57, 76),
     "indexing_content": (76, 84),
     "syncing_facts": (84, 92),
-    "otel": (92, 96),
-    "finalizing": (96, 99),
+    "finalizing": (92, 99),
     "complete": (100, 100),
 }
 _JOB_STATUS_RETRY_SECONDS = 10.0

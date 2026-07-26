@@ -114,8 +114,25 @@ async def run_probe(
             {"history": "active", "aggregate_only": True, "execution": "async"},
             timeout_seconds=30,
         )
-        if _job_id(joined) != job_id:
-            raise AssertionError("independent MCP tasks did not join one refresh job")
+        joined_job_id = _job_id(joined)
+        if joined_job_id != job_id:
+            first_durable = await _call(
+                ledger,
+                "B",
+                task_b,
+                "usage_job_status",
+                {"job_id": job_id, "include_result": True},
+                timeout_seconds=30,
+            )
+            first_job = _result(first_durable)
+            raise AssertionError(
+                "independent MCP tasks did not join one refresh job: "
+                f"started={job_id!r}, joined={joined_job_id!r}, "
+                f"started_state={_result(started).get('state')!r}, "
+                f"joined_state={_result(joined).get('state')!r}, "
+                f"started_durable_state={first_job.get('state')!r}, "
+                f"started_error={first_job.get('error')!r}"
+            )
 
         tail_appended = False
         observed_running_stage = ""
@@ -228,8 +245,15 @@ async def run_probe(
             "usage_job_status",
             {"job_id": job_id, "include_result": True},
         )
-        if _result(restarted_status).get("state") != "completed":
+        restarted_refresh = _result(restarted_status)
+        if restarted_refresh.get("state") != "completed":
             raise AssertionError("completed refresh was not durable across MCP restart")
+        restarted_refresh_result = restarted_refresh.get("result")
+        if not isinstance(restarted_refresh_result, Mapping) or not isinstance(
+            restarted_refresh_result.get("refresh"),
+            Mapping,
+        ):
+            raise AssertionError("restarted MCP omitted the durable refresh result")
         _assert_identity(
             await _call(ledger, "C", restarted, "usage_status", {}),
             expected_version,
@@ -241,8 +265,14 @@ async def run_probe(
             "usage_job_status",
             {"job_id": analysis_job_id, "include_result": True},
         )
-        if _result(durable_analysis).get("state") != "completed":
+        restarted_analysis = _result(durable_analysis)
+        if restarted_analysis.get("state") != "completed":
             raise AssertionError("completed analysis was not durable across MCP restart")
+        restarted_analysis_result = restarted_analysis.get("result")
+        if not isinstance(restarted_analysis_result, Mapping) or (
+            restarted_analysis_result.get("goal") != "token_waste"
+        ):
+            raise AssertionError("restarted MCP omitted the durable analysis result")
 
     max_server_ms = max(float(call["server_elapsed_ms"]) for call in ledger.calls)
     max_payload_bytes = max(int(call["payload_bytes"]) for call in ledger.calls)
@@ -407,7 +437,7 @@ def _analysis_arguments() -> dict[str, object]:
         "history": "active",
         "evidence_limit": 4,
         "comparison": None,
-        "execution": "async",
+        "execution": "auto",
     }
 
 

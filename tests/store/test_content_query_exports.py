@@ -15,7 +15,7 @@ from codex_usage_tracker.store.content_search import (
     search_content_fragments,
 )
 from codex_usage_tracker.store.content_trace import ContentTraceResult, trace_thread_content
-from tests.otel_helpers import synthetic_usage_event
+from tests.usage_helpers import synthetic_usage_event
 
 
 def test_content_index_preserves_query_exports() -> None:
@@ -35,11 +35,7 @@ def test_content_index_preserves_query_exports() -> None:
 def test_csv_export_includes_additive_service_tier_fields(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     upsert_usage_events(
-        [
-            synthetic_usage_event(
-                "record-a", "conversation-a", (100, 40, 30, 10), fast=1
-            )
-        ],
+        [synthetic_usage_event("record-a", "conversation-a", (100, 40, 30, 10), fast=1)],
         db_path=db_path,
     )
     output_path = tmp_path / "usage.csv"
@@ -47,9 +43,7 @@ def test_csv_export_includes_additive_service_tier_fields(tmp_path: Path) -> Non
     export_usage_csv(output_path, db_path=db_path)
 
     header = next(csv.reader(output_path.read_text(encoding="utf-8").splitlines()))
-    assert [
-        name for name in header if name.startswith("service_tier") or name == "fast"
-    ] == [
+    assert [name for name in header if name.startswith("service_tier") or name == "fast"] == [
         "service_tier",
         "fast",
         "service_tier_source",

@@ -11,7 +11,7 @@ from typing import Any
 
 from .contracts import AllowanceCohort, AllowanceCycle, AllowanceInterval, AllowancePointKind
 
-MODEL_VERSION = "reset-aware-v4"
+MODEL_VERSION = "reset-aware-v5"
 RESET_JITTER_SECONDS = 60
 AGING_SECONDS = {"weekly": 6 * 60 * 60, "five_hour": 15 * 60}
 
@@ -160,6 +160,29 @@ def derive_allowance_cycles(
         cycles.append(cycle)
         intervals.extend(_intervals(cycle, conflict))
     return cycles, intervals
+
+
+def derive_appended_intervals(
+    cycle: AllowanceCycle,
+    *,
+    anchor: dict[str, Any],
+    observations: Iterable[dict[str, Any]],
+) -> list[AllowanceInterval]:
+    """Derive only intervals introduced by append-ordered observations."""
+    appended = tuple(dict(row) for row in observations)
+    if not appended:
+        return []
+    tail = AllowanceCycle(
+        cycle.cycle_id,
+        cycle.cohort,
+        cycle.reset_at,
+        (dict(anchor), *appended),
+        cycle.status,
+    )
+    return _intervals(
+        tail,
+        cycle.status == "ambiguous" or _has_conflict(tail.observations),
+    )
 
 
 def _intervals(cycle: AllowanceCycle, conflict: bool) -> list[AllowanceInterval]:

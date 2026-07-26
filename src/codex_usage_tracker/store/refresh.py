@@ -9,25 +9,14 @@ from codex_usage_tracker.core.models import RefreshResult
 from codex_usage_tracker.core.paths import (
     DEFAULT_CODEX_HOME,
     DEFAULT_DB_PATH,
-    DEFAULT_OTEL_COMPLETIONS_DIR,
 )
 from codex_usage_tracker.parser.api import find_session_logs, load_session_index
 from codex_usage_tracker.parser.state import compact_parser_diagnostics
 from codex_usage_tracker.store.cache_repository import SQLiteCacheRepository
-from codex_usage_tracker.store.compression_revisions import touch_compression_revisions
 from codex_usage_tracker.store.connection import connect
 from codex_usage_tracker.store.content_index import clear_content_index_rows
-from codex_usage_tracker.store.otel_ingest import (
-    ingest_otel_completion_files,
-    otel_sources_have_changes,
-)
-from codex_usage_tracker.store.otel_reconciliation import (
-    reconcile_otel_completions,
-    reset_otel_completion_matches,
-)
 from codex_usage_tracker.store.refresh_callbacks import DerivedFactSyncCallback
 from codex_usage_tracker.store.refresh_metadata import (
-    OTEL_REFRESH_COUNTER_KEYS,
     read_refresh_workflow_state,
     record_refresh_metadata,
     record_refresh_workflow_state,
@@ -47,7 +36,6 @@ def refresh_usage_index(
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
-    otel_dir: Path | None = None,
     progress_callback: RefreshProgressCallback | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
     _workflow_kind: str | None = None,
@@ -61,11 +49,6 @@ def refresh_usage_index(
         and prior_workflow.get("status") == "running"
         else "refresh"
     )
-    interrupted_otel = bool(
-        prior_workflow
-        and prior_workflow.get("phase") == "otel"
-        and prior_workflow.get("status") == "running"
-    )
     emit_refresh_progress(
         progress_callback,
         phase="discovering",
@@ -76,15 +59,9 @@ def refresh_usage_index(
     )
     logs = find_session_logs(codex_home=codex_home, include_archived=include_archived)
     session_index = load_session_index(codex_home)
-    resolved_otel_dir = otel_dir or db_path.parent / DEFAULT_OTEL_COMPLETIONS_DIR.name
     with connect(db_path) as conn:
         init_db(conn)
         parse_plans = source_logs_requiring_parse(conn, logs)
-        otel_refresh_required = (
-            bool(parse_plans)
-            or interrupted_otel
-            or otel_sources_have_changes(conn, resolved_otel_dir)
-        )
     if parse_plans:
         record_refresh_workflow_state(
             db_path,
@@ -131,43 +108,7 @@ def refresh_usage_index(
             force_serial=True,
             derived_fact_sync=derived_fact_sync,
         )
-    if otel_refresh_required:
-        emit_refresh_progress(
-            progress_callback,
-            phase="otel",
-            status="running",
-            completed=0,
-            total=1,
-            message="Reconciling aggregate OTel completion tiers",
-        )
-        record_refresh_workflow_state(
-            db_path,
-            kind=workflow_kind,
-            phase="otel",
-        )
-        otel_diagnostics = _refresh_otel_completions(
-            db_path=db_path, otel_dir=resolved_otel_dir
-        )
-        emit_refresh_progress(
-            progress_callback,
-            phase="otel",
-            status="completed",
-            completed=1,
-            total=1,
-            message="Reconciled aggregate OTel completion tiers",
-            **otel_diagnostics,
-        )
-    else:
-        otel_diagnostics = {key: 0 for key in OTEL_REFRESH_COUNTER_KEYS}
-        emit_refresh_progress(
-            progress_callback,
-            phase="otel",
-            status="skipped",
-            completed=0,
-            total=0,
-            message="No changed OTel completion sources required reconciliation",
-        )
-    usage_db_changed = stream_result.usage_db_changed or otel_refresh_required
+    usage_db_changed = stream_result.usage_db_changed
     emit_refresh_progress(
         progress_callback,
         phase="finalizing",
@@ -193,7 +134,6 @@ def refresh_usage_index(
         stats=stream_result.stats,
         parsed_events=stream_result.parsed_events,
         inserted=stream_result.inserted_or_updated_events,
-        otel_diagnostics=otel_diagnostics,
         workflow_kind=workflow_kind,
         persist_metadata=usage_db_changed,
     )
@@ -225,15 +165,11 @@ def _finalize_refresh_result(
     stats: dict[str, int],
     parsed_events: int,
     inserted: int,
-    otel_diagnostics: dict[str, int],
     workflow_kind: str,
     persist_metadata: bool,
 ) -> RefreshResult:
     skipped_events = stats.get("skipped_events", 0)
-    diagnostics = {
-        **compact_parser_diagnostics(stats),
-        **{key: value for key, value in otel_diagnostics.items() if value},
-    }
+    diagnostics = compact_parser_diagnostics(stats)
     if persist_metadata:
         record_refresh_metadata(
             db_path=db_path,
@@ -242,7 +178,6 @@ def _finalize_refresh_result(
             skipped_events=skipped_events,
             inserted_or_updated_events=inserted,
             parser_diagnostics=diagnostics,
-            otel_diagnostics=otel_diagnostics,
             parsed_source_files=parsed_source_files,
             skipped_source_files=scanned_files - parsed_source_files,
             workflow_kind=workflow_kind,
@@ -257,39 +192,17 @@ def _finalize_refresh_result(
     )
 
 
-def _refresh_otel_completions(*, db_path: Path, otel_dir: Path) -> dict[str, int]:
-    with connect(db_path) as conn:
-        init_db(conn)
-        ingest = ingest_otel_completion_files(conn, otel_dir)
-        reconciled = reconcile_otel_completions(conn)
-        if reconciled.updated_usage_rows:
-            touch_compression_revisions(conn, {"calls", "threads"})
-    counters = {
-        "otel_files_scanned": ingest.files_scanned,
-        "otel_imported": ingest.imported,
-        "otel_duplicates": ingest.duplicates,
-        "otel_matched": reconciled.matched,
-        "otel_pending": reconciled.pending,
-        "otel_ambiguous": reconciled.ambiguous,
-        "otel_conflicts": reconciled.conflicts,
-        **ingest.diagnostics,
-    }
-    return {key: int(counters.get(key, 0)) for key in OTEL_REFRESH_COUNTER_KEYS}
-
-
 def rebuild_usage_index(
     codex_home: Path = DEFAULT_CODEX_HOME,
     db_path: Path = DEFAULT_DB_PATH,
     include_archived: bool = False,
     aggregate_only: bool = False,
-    otel_dir: Path | None = None,
     derived_fact_sync: DerivedFactSyncCallback | None = None,
 ) -> RefreshResult:
     """Clear aggregate rows and rescan local Codex logs."""
 
     with connect(db_path) as conn:
         init_db(conn)
-        reset_otel_completion_matches(conn)
         clear_content_index_rows(conn)
         for table in (
             "allowance_observations",
@@ -314,7 +227,6 @@ def rebuild_usage_index(
         db_path=db_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
-        otel_dir=otel_dir,
         derived_fact_sync=derived_fact_sync,
         _workflow_kind="rebuild",
     )

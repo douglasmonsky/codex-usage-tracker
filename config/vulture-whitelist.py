@@ -45,6 +45,8 @@ with_vs_without_median_drain_ratio
 installed
 recommended_refresh_action
 server_elapsed_ms
+service_tier_source
+service_tier_confidence
 
 # HTTP handlers are selected by BaseHTTPRequestHandler or route dispatch maps.
 _.redirect_request

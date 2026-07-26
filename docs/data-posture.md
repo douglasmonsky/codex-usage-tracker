@@ -26,8 +26,7 @@ logs.
 
 Every tracker-owned SQLite connection enables and verifies foreign-key
 enforcement. Schema migrations run atomically, and source replacement preserves
-declared cascades while clearing optional OTel-to-usage matches before their
-usage rows are replaced.
+declared cascades and shared accounting fields while usage rows are replaced.
 
 `codex-usage-tracker admin integrity` runs bounded, read-only
 `PRAGMA integrity_check` and `PRAGMA foreign_key_check` diagnostics. It never
@@ -39,10 +38,10 @@ remains a low-latency capability check.
 
 Refresh and rebuild operations store only a bounded workflow marker containing
 the operation kind, phase, status, and update time. If a refresh stops between
-the primary, OTel, or metadata phases—or a rebuild stops after clearing
-aggregate rows—the next refresh safely retries the idempotent workflow. The
-marker never contains source paths, row identifiers, prompts, or indexed
-content.
+primary hydration, derived-state, or metadata work—or a rebuild stops after
+clearing aggregate rows—the next refresh safely retries the idempotent
+workflow. The marker never contains source paths, row identifiers, prompts, or
+indexed content.
 
 ## Aggregate-Only Posture
 
