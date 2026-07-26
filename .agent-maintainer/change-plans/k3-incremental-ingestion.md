@@ -55,8 +55,8 @@ work.
   transaction and promotion is fenced by the durable refresh lease.
 - Refresh ownership lives in `lease.py`; its host heartbeat protects long
   parse phases without holding the analytical writer lock.
-- The final 100,000-call synthetic build measured 16.051 seconds end to end and
-  35.510 ms writer-transaction p95 across 804 transactions.
+- The final local 100,000-call synthetic build measured 15.828 seconds end to
+  end and 36.609 ms writer-transaction p95 across 804 transactions.
 - K3 changed exactly 37 files and 4,899 lines. The original 32-file
   estimate was amended for required ledger/gate records, `database.py`'s
   bounded generation digest, and repository guidance that retires arbitrary

@@ -679,7 +679,7 @@ so token metrics remain pending without retry.
 | --- | --- | --- |
 | Focused | Pass | Reviewer-remediation lifecycle, concurrency, reconciliation, privacy, oracle, and pipeline suites pass; final focused slice 23/23 |
 | CI-equivalent | Pass | `just v`: 99 phase-owned tests in 20.08 s, Ruff, MyPy, Pyright 0 errors, complexity, manifests, scope, release safety, and diff checks pass |
-| Performance | Pass | 100,000 calls in 16.051 s; 804 bounded writer transactions; p95 35.510 ms against 50 ms budget |
+| Performance | Pass | Final local 100,000-call run: 15.828 s, 804 bounded writer transactions, p95 36.609 ms against 50 ms budget; CI 3.10 exposed and drove removal of per-fingerprint SELECT amplification |
 | Package | Pass | isolated 0.26.0.dev0 wheel and sdist pass exact release checks; isolated installed-wheel first-build plus no-change kernel smoke passed |
 | Privacy | Pass | synthetic fixtures only; raw private sentinels and full source paths absent from analytical facts and oracle output |
 
@@ -693,13 +693,13 @@ profiler retries were started.
 | Metric | K2 | K3 | Change |
 | --- | ---: | ---: | ---: |
 | Contract-red runs | 2 | 1 | 50.0% lower |
-| Focused runs | 18 | 60 | 233.3% higher |
-| Broad runs | 11 | 5 | 54.5% lower |
+| Focused runs | 18 | 62 | 244.4% higher |
+| Broad runs | 11 | 6 | 45.5% lower |
 | Duplicate broad runs | 0 | 0 | unchanged |
-| Blocking findings | 18 | 34 | 88.9% higher |
-| Non-behavioral findings | 10 | 15 | 50.0% higher |
+| Blocking findings | 18 | 35 | 94.4% higher |
+| Non-behavioral findings | 10 | 16 | 60.0% higher |
 | Gate-remediation lines | 230 | 53 | 77.0% lower |
-| Verification wall time | 49.5 s | 138.6 s | 180.0% higher |
+| Verification wall time | 49.5 s | 155.0 s | 213.1% higher |
 | Style-only commits | 0 | 0 | unchanged |
 
 K3 achieved the targeted reduction in meaningless edit volume and broad-gate

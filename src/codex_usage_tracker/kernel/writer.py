@@ -385,41 +385,51 @@ def _canonicalize(
     *,
     reselect: bool,
 ) -> None:
-    for fingerprint in fingerprints:
-        rows = connection.execute(
-            """
-            SELECT model_calls.model_call_id
-            FROM model_calls
-            JOIN sources USING (source_id)
-            WHERE canonical_call_id = ?
-            ORDER BY CASE
-                         WHEN ? = 0
-                              AND model_calls.duplicate_state = 'canonical'
-                         THEN 0
-                         ELSE 1
-                     END,
-                     CASE sources.archive_state
-                         WHEN 'active' THEN 0
-                         WHEN 'archived' THEN 1
-                         ELSE 2
-                     END,
-                     model_calls.model_call_id
-            """,
-            (fingerprint, int(reselect)),
-        ).fetchall()
-        for index, row in enumerate(rows):
-            connection.execute(
-                """
-                UPDATE model_calls
-                SET duplicate_state = ?,
-                    duplicate_reason = ?
-                WHERE model_call_id = ?
-                """,
-                (
-                    "canonical" if index == 0 else "copied",
-                    None if index == 0 else "copied_usage_fingerprint",
-                    row[0],
-                ),
+    if not fingerprints:
+        return
+    placeholders = ", ".join("?" for _ in fingerprints)
+    rows = connection.execute(
+        f"""
+        SELECT model_calls.model_call_id, model_calls.canonical_call_id
+        FROM model_calls
+        JOIN sources USING (source_id)
+        WHERE canonical_call_id IN ({placeholders})
+        ORDER BY model_calls.canonical_call_id,
+                 CASE
+                     WHEN ? = 0
+                          AND model_calls.duplicate_state = 'canonical'
+                     THEN 0
+                     ELSE 1
+                 END,
+                 CASE sources.archive_state
+                     WHEN 'active' THEN 0
+                     WHEN 'archived' THEN 1
+                     ELSE 2
+                 END,
+                 model_calls.model_call_id
+        """,
+        (*fingerprints, int(reselect)),
+    ).fetchall()
+    updates: list[tuple[str, str | None, str]] = []
+    prior_fingerprint: str | None = None
+    for row in rows:
+        fingerprint = str(row[1])
+        canonical = fingerprint != prior_fingerprint
+        updates.append(
+            (
+                "canonical" if canonical else "copied",
+                None if canonical else "copied_usage_fingerprint",
+                str(row[0]),
             )
+        )
+        prior_fingerprint = fingerprint
+    connection.executemany(
+        """
+        UPDATE model_calls
+        SET duplicate_state = ?, duplicate_reason = ?
+        WHERE model_call_id = ?
+        """,
+        updates,
+    )
 def _small_digest(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode()).hexdigest()
