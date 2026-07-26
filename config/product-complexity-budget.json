@@ -57,16 +57,16 @@
       "rationale": "No new authored frontend source may exceed 500 physical lines and grandfathered debt may not grow."
     },
     "wheel_bytes": {
-      "maximum": 5311351,
-      "baseline": 5156651,
+      "maximum": 5306921,
+      "baseline": 5152350,
       "baseline_commit": "8e080ec73b6be47bfcdbe8506e894837a1105b60",
-      "rationale": "The combined 0.25 reliability and Task 40 wheel measurement plus exactly three percent headroom, rounded up."
+      "rationale": "The 0.25.1 telemetry-sunset wheel measurement plus exactly three percent headroom, rounded up."
     },
     "sdist_bytes": {
-      "maximum": 29340434,
-      "baseline": 28485858,
+      "maximum": 29314121,
+      "baseline": 28460311,
       "baseline_commit": "8e080ec73b6be47bfcdbe8506e894837a1105b60",
-      "rationale": "The combined 0.25 reliability and Task 40 source-distribution measurement plus exactly three percent headroom, rounded up."
+      "rationale": "The 0.25.1 telemetry-sunset source-distribution measurement plus exactly three percent headroom, rounded up."
     },
     "main_initial_react_js_gzip_bytes": {
       "maximum": 63301,
@@ -101,7 +101,7 @@
       "maximum_physical_lines": 600,
       "grandfathered": {
         "src/codex_usage_tracker/reports/agentic_dogfood.py": 803,
-        "src/codex_usage_tracker/store/api.py": 824,
+        "src/codex_usage_tracker/store/api.py": 815,
         "src/codex_usage_tracker/store/dashboard_queries.py": 949,
         "src/codex_usage_tracker/store/schema.py": 750
       }

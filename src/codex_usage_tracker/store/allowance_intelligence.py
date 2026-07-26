@@ -143,11 +143,14 @@ def query_allowance_evidence_record(
     archives = (0, 1) if include_archived else (0,)
     placeholders = ",".join("?" for _item in archives)
     row = connection.execute(
-        f"SELECT * FROM allowance_intervals WHERE interval_id = ? "
-        f"AND source_revision = ? AND is_archived IN ({placeholders}) LIMIT 1",  # nosec B608
+        "SELECT intervals.*, cycles.source_revision AS current_source_revision "
+        "FROM allowance_intervals AS intervals "
+        "JOIN allowance_cycles AS cycles ON cycles.cycle_id = intervals.cycle_id "
+        f"WHERE intervals.interval_id = ? AND cycles.source_revision = ? "
+        f"AND intervals.is_archived IN ({placeholders}) LIMIT 1",  # nosec B608
         (interval_id, revision, *archives),
     ).fetchone()
-    return _row_to_dict(row) if row is not None else None
+    return _current_interval_dict(row) if row is not None else None
 
 
 def _cycle_partition_rows(
@@ -204,30 +207,39 @@ def _evidence_partition_rows(
     direction = "DESC" if scope["order"] == "desc" else "ASC"
     comparator = "<" if scope["order"] == "desc" else ">"
     for is_archived in _archive_partitions(bool(scope["include_archived"])):
-        where = ["is_archived = ?", "source_revision = ?", "end_observed_at IS NOT NULL"]
+        where = [
+            "intervals.is_archived = ?",
+            "cycles.source_revision = ?",
+            "intervals.end_observed_at IS NOT NULL",
+        ]
         params: list[Any] = [is_archived, revision]
         for column, scope_key in (("window_kind", "window_kind"), ("cohort_key", "cohort_id")):
             if scope[scope_key] is not None:
-                where.append(f"{column} = ?")
+                where.append(f"intervals.{column} = ?")
                 params.append(scope[scope_key])
         if scope["start_at"] is not None:
-            where.append("end_observed_at >= ?")
+            where.append("intervals.end_observed_at >= ?")
             params.append(scope["start_at"])
         if scope["end_at"] is not None:
-            where.append("end_observed_at <= ?")
+            where.append("intervals.end_observed_at <= ?")
             params.append(scope["end_at"])
         if position is not None:
             where.append(
-                f"(end_observed_at {comparator} ? OR "
-                f"(end_observed_at = ? AND interval_id {comparator} ?))"
+                f"(intervals.end_observed_at {comparator} ? OR "
+                f"(intervals.end_observed_at = ? "
+                f"AND intervals.interval_id {comparator} ?))"
             )
             params.extend((position["observed_at"], position["observed_at"], position["row_id"]))
         partition = connection.execute(
-            f"SELECT * FROM allowance_intervals WHERE {' AND '.join(where)} "  # nosec B608 - fixed predicates and bound values
-            f"ORDER BY end_observed_at {direction}, interval_id {direction} LIMIT ?",
+            "SELECT intervals.*, cycles.source_revision AS current_source_revision "
+            "FROM allowance_intervals AS intervals "
+            "JOIN allowance_cycles AS cycles ON cycles.cycle_id = intervals.cycle_id "
+            f"WHERE {' AND '.join(where)} "  # nosec B608 - fixed predicates and bound values
+            f"ORDER BY intervals.end_observed_at {direction}, "
+            f"intervals.interval_id {direction} LIMIT ?",
             [*params, limit],
         ).fetchall()
-        rows.append([_row_to_dict(row) for row in partition])
+        rows.append([_current_interval_dict(row) for row in partition])
     return _merge_partition_rows(
         rows,
         key=lambda row: (str(row["end_observed_at"]), str(row["interval_id"])),
@@ -238,6 +250,12 @@ def _evidence_partition_rows(
 
 def _archive_partitions(include_archived: bool) -> tuple[int, ...]:
     return (0, 1) if include_archived else (0,)
+
+
+def _current_interval_dict(row: sqlite3.Row) -> dict[str, Any]:
+    result = _row_to_dict(row)
+    result["source_revision"] = result.pop("current_source_revision")
+    return result
 
 
 def _merge_partition_rows(

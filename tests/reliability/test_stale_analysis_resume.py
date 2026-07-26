@@ -53,11 +53,10 @@ def test_stale_analysis_names_durable_refresh_and_exact_resume(
     )
 
     assert len(observed_requests) == 1
+    assert observed_requests[0].aggregate_only is True
     dependency = payload["result"]
     assert isinstance(dependency, dict)
-    assert dependency["schema"] == (
-        "codex-usage-tracker.analysis-refresh-dependency.v1"
-    )
+    assert dependency["schema"] == ("codex-usage-tracker.analysis-refresh-dependency.v1")
     assert dependency["refresh_job"]["job_id"] == refresh_job.job_id
     resume = dependency["resume"]
     assert resume == {
@@ -81,9 +80,7 @@ def test_exact_resume_runs_analysis_after_fresh_generation(tmp_path: Path) -> No
 
     def completed_analysis(request, request_context):
         seen.append(request)
-        return AnalyzeResult(
-            completed=synthetic_analysis_report("token_waste", request_context)
-        )
+        return AnalyzeResult(completed=synthetic_analysis_report("token_waste", request_context))
 
     payload = build_usage_analyze(
         goal="token_waste",

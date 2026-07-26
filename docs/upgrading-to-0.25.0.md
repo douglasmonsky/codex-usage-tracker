@@ -19,6 +19,13 @@ thread-call, Home, and Limits query plans are unchanged, as are canonical
 accounting, privacy and raw-context controls, incremental refresh behavior, and
 schema migration integrity.
 
+The 0.25 maintenance line also removes the experimental local telemetry
+sidecar. Refresh, rebuild, status, and support bundles no longer scan
+`codex-completions*.jsonl`, and fresh databases never create its staging
+tables. Schema 38 performs only a one-way drop of those tables on an existing
+index; it preserves canonical usage rows and shared service-tier fields, so an
+upgrade does not require rebuilding a large database.
+
 When upgrading an installed plugin bundle, refresh it after the package
 upgrade:
 
@@ -36,9 +43,10 @@ sidecar instead of competing for the usage-index writer lock.
 
 After a compatible initial build, refresh is incremental:
 
-- no source, configuration, or OTel change completes without a usage-index
-  write, even when another connection holds the writer lock; canonical refresh
-  metadata continues to describe the last material index update;
+- when there is no source or configuration change, the request completes
+  without a usage-index write, even when another connection holds the writer
+  lock; canonical refresh metadata continues to describe the last material
+  index update;
 - appended complete JSONL rows hydrate from the stored byte checkpoint;
 - a partial last line remains pending;
 - rows appended after a refresh captures its fixed boundary are reported as

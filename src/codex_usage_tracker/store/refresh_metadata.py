@@ -10,7 +10,6 @@ from typing import Any
 
 from codex_usage_tracker.core.paths import DEFAULT_DB_PATH
 from codex_usage_tracker.core.schema import USAGE_EVENT_SCHEMA_CHECKSUM
-from codex_usage_tracker.parser.otel import OTEL_DIAGNOSTIC_KEYS
 from codex_usage_tracker.parser.state import (
     PARSER_ADAPTER_VERSION,
     PARSER_DIAGNOSTIC_KEYS,
@@ -21,17 +20,6 @@ from codex_usage_tracker.store.schema import SCHEMA_VERSION, init_db
 
 REFRESH_WORKFLOW_KEY = "refresh_workflow_v1"
 
-OTEL_REFRESH_COUNTER_KEYS = (
-    "otel_files_scanned",
-    "otel_imported",
-    "otel_duplicates",
-    "otel_matched",
-    "otel_pending",
-    "otel_ambiguous",
-    "otel_conflicts",
-    *OTEL_DIAGNOSTIC_KEYS,
-)
-
 
 def record_refresh_metadata(
     db_path: Path = DEFAULT_DB_PATH,
@@ -41,7 +29,6 @@ def record_refresh_metadata(
     skipped_events: int,
     inserted_or_updated_events: int,
     parser_diagnostics: dict[str, int] | None = None,
-    otel_diagnostics: dict[str, int] | None = None,
     parsed_source_files: int | None = None,
     skipped_source_files: int | None = None,
     workflow_kind: str = "refresh",
@@ -65,9 +52,6 @@ def record_refresh_metadata(
     diagnostics = parser_diagnostics or {}
     for key in PARSER_DIAGNOSTIC_KEYS:
         values[f"parser_{key}"] = str(int(diagnostics.get(key, 0)))
-    otel_counters = otel_diagnostics or {}
-    for key in OTEL_REFRESH_COUNTER_KEYS:
-        values[key] = str(int(otel_counters.get(key, 0)))
     with connect(db_path) as conn:
         init_db(conn)
         cache = SQLiteCacheRepository(conn)

@@ -39,13 +39,13 @@ describe('call CSV columns', () => {
       initiatorConfidence: 'high',
       fast: false,
       serviceTier: 'standard',
-      serviceTierSource: 'otel_response_completed',
+      serviceTierSource: 'usage_event',
       serviceTierConfidence: 'protocol',
       fastProxyCandidate: true,
       standardUsageCredits: 4.5,
       fastUsageCredits: 9,
       usageCreditMultiplier: 1,
-      usageCreditMultiplierSource: 'otel_response_completed',
+      usageCreditMultiplierSource: 'usage_event',
       usageCreditMultiplierSourceUrl: 'https://example.invalid/fast',
       usageCreditMultiplierFetchedAt: '2026-07-16',
       usageCreditMultiplierConfidence: 'exact',
@@ -126,7 +126,7 @@ expect(header).toContain('model_context_window');
     expect(values).toContain('2026-07-01T11:54:30Z');
     expect(values).toContain('codex-1-pricing');
     expect(values).toContain('credit-estimated');
-    expect(values).toContain('otel_response_completed');
+    expect(values).toContain('usage_event');
     expect(values).toContain('spawned child');
     expect(values).toContain('cache-drop|context-heavy');
   });

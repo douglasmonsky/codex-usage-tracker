@@ -55,7 +55,6 @@ def refresh_usage_index(
     db_path: Path,
     include_archived: bool = False,
     aggregate_only: bool = False,
-    otel_dir: Path | None = None,
     progress_callback: RefreshProgressCallback | None = None,
 ) -> RefreshResult:
     """Refresh store state and materialize application-owned allowance facts."""
@@ -64,7 +63,6 @@ def refresh_usage_index(
         db_path=db_path,
         include_archived=include_archived,
         aggregate_only=aggregate_only,
-        otel_dir=otel_dir if otel_dir is not None else db_path.parent / "otel",
         progress_callback=progress_callback,
         derived_fact_sync=sync_refresh_allowance_intelligence,
     )
@@ -158,6 +156,7 @@ class RefreshCoordinator:
                     "aggregate_only": request.aggregate_only,
                     "execution": request.execution,
                 },
+                reuse_active_across_revisions=True,
             )
             if not registration.should_start:
                 self._records.pop(job_id, None)
@@ -166,7 +165,7 @@ class RefreshCoordinator:
                 self._records.pop(job_id, None)
                 self.job_service.discard_semantic_job(job_id)
                 detached_launcher(job_id)
-                return registration.status
+                return self.job_service.status(job_id)
             self._active[request_key] = job_id
         threading.Thread(
             target=self._run,
@@ -533,9 +532,6 @@ def _refresh_request_identity(
 
 def _normalized_path(path: Path) -> str:
     return os.path.normcase(str(path.expanduser().resolve(strict=False)))
-
-
-
 
 
 def _coordinator_for_service(job_service: JobService) -> RefreshCoordinator:

@@ -13,6 +13,7 @@ import sqlite3
 import sys
 import tempfile
 from collections.abc import Mapping
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -101,11 +102,13 @@ def run_benchmark(
 
     cold = _timed_refresh(codex_home, db_path)
     cold_count = query_dashboard_event_count(db_path=db_path, include_archived=True)
+    cold_allowance_count = _allowance_observation_count(db_path)
     no_change = _timed_refresh(codex_home, db_path)
 
     _append_events(source_path, start=rows, count=append_rows)
     append = _timed_refresh(codex_home, db_path)
     append_count = query_dashboard_event_count(db_path=db_path, include_archived=True)
+    append_allowance_count = _allowance_observation_count(db_path)
 
     pending_row = _token_row(rows + append_rows)
     with source_path.open("a", encoding="utf-8") as handle:
@@ -115,6 +118,7 @@ def run_benchmark(
         handle.write("\n")
     tail_followup = _timed_refresh(codex_home, db_path)
     final_count = query_dashboard_event_count(db_path=db_path, include_archived=True)
+    final_allowance_count = _allowance_observation_count(db_path)
 
     read_during_writer = _measure_last_committed_read(db_path)
     timings = {
@@ -143,6 +147,11 @@ def run_benchmark(
             "writer_lock",
             0.0,
         ),
+        "cold_allowance_observations": cold_allowance_count,
+        "append_allowance_observations_added": append_allowance_count
+        - cold_allowance_count,
+        "tail_allowance_observations_added": final_allowance_count
+        - append_allowance_count,
     }
     expected = {
         "cold_rows": rows,
@@ -151,6 +160,9 @@ def run_benchmark(
         "tail_followup_rows_added": 1,
         "no_change_parsed_events": 0,
         "no_change_writer_lock_seconds": 0.0,
+        "cold_allowance_observations": rows,
+        "append_allowance_observations_added": append_rows,
+        "tail_allowance_observations_added": 1,
     }
     for name, expected_value in expected.items():
         if invariants[name] != expected_value:
@@ -221,6 +233,12 @@ def _measure_last_committed_read(db_path: Path) -> float:
         writer.close()
 
 
+def _allowance_observation_count(db_path: Path) -> int:
+    with sqlite3.connect(db_path) as connection:
+        row = connection.execute("SELECT COUNT(*) FROM allowance_observations").fetchone()
+    return int(row[0]) if row is not None else 0
+
+
 def _write_fixture(codex_home: Path, source_path: Path, rows: int) -> None:
     source_path.parent.mkdir(parents=True, exist_ok=True)
     session_index = codex_home / "session_index.jsonl"
@@ -263,6 +281,9 @@ def _append_events(source_path: Path, *, start: int, count: int) -> None:
 
 def _token_row(index: int) -> dict[str, object]:
     cumulative = (index + 1) * 100
+    observed_at = datetime(2026, 7, 25, 9, tzinfo=timezone.utc) + timedelta(
+        seconds=index
+    )
     return _entry(
         "event_msg",
         {
@@ -284,8 +305,17 @@ def _token_row(index: int) -> dict[str, object]:
                 },
                 "model_context_window": 258_400,
             },
+            "rate_limits": {
+                "plan_type": "pro",
+                "limit_id": "codex",
+                "primary": {
+                    "used_percent": float(index % 100),
+                    "window_minutes": 10_080,
+                    "resets_at": 2_000_000_000,
+                },
+            },
         },
-        timestamp=f"2026-07-25T09:{index // 60 % 60:02d}:{index % 60:02d}Z",
+        timestamp=observed_at.isoformat().replace("+00:00", "Z"),
     )
 
 

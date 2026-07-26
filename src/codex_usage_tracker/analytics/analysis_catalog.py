@@ -64,11 +64,13 @@ class _CompatibilityStrategy:
         )
         work_units = (
             1
-            + min(context.canonical_rows, entry.max_evidence_records)
+            + context.canonical_rows
             + filter_count
             + (2 if request.comparison is not None else 0)
         )
-        recommended = "sync" if work_units <= entry.sync_work_ceiling else "async"
+        recommended: Literal["sync", "async"] = (
+            "sync" if work_units <= entry.sync_work_ceiling else "async"
+        )
         return WorkEstimate(
             strategy_id=self.strategy_id,
             strategy_version=self.strategy_version,

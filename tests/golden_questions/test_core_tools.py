@@ -16,7 +16,6 @@ from codex_usage_tracker.application.analyze import ANALYSIS_RESULT_SCHEMA
 from codex_usage_tracker.application.query_models import QueryResult
 from codex_usage_tracker.evidence.models import EVIDENCE_RESULT_SCHEMA
 from codex_usage_tracker.interfaces.mcp.profiles import tools_for_profile
-from codex_usage_tracker.store.schema import SCHEMA_VERSION
 
 CASES_DIR = Path(__file__).with_name("cases")
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -91,7 +90,7 @@ def test_024_release_docs_preserve_core_routes_and_the_compatibility_window() ->
     upgrade = (REPO_ROOT / "docs/upgrading-to-0.24.0.md").read_text(encoding="utf-8")
 
     assert "Release 0.24.0" in release
-    assert f"schema version {SCHEMA_VERSION}" in release
+    assert "schema version 37" in release
     historical_profile_counts = {"core": 7, "full": 59, "developer": 64}
     for profile, count in historical_profile_counts.items():
         assert f"{count} {profile}" in release

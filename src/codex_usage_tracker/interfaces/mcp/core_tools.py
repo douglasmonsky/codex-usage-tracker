@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -51,7 +52,6 @@ from codex_usage_tracker.interfaces.mcp.query_analysis_tools import (
     usage_query as usage_query,
 )
 from codex_usage_tracker.jobs.service import JobService
-from codex_usage_tracker.store.analysis_job_repository import AnalysisJobRepository
 
 MAX_STATUS_PAYLOAD_BYTES = 16 * 1024
 MAX_REFRESH_PAYLOAD_BYTES = 64 * 1024
@@ -413,7 +413,14 @@ def build_usage_job_status(
         pricing_path = container.paths.pricing_path
         job_service = job_service or container.jobs
     request = JobStatusRequest(job_id=job_id, include_result=include_result)
-    status = get_job_status(request, job_service=job_service)
+    durable_row: Mapping[str, object] | None = None
+    if isinstance(job_service, JobService):
+        status, durable_row = job_service.status_snapshot(
+            request.job_id,
+            include_result=request.include_result,
+        )
+    else:
+        status = get_job_status(request, job_service=job_service)
     context = (
         container.request_context(RequestScope())
         if container is not None
@@ -424,7 +431,7 @@ def build_usage_job_status(
         )
     )
     result_payload = status.to_payload()
-    progress = _durable_progress(job_service, status.job_id)
+    progress = _bounded_progress(durable_row)
     if progress is not None:
         result_payload["progress"] = progress
     result_payload["poll_after_ms"] = (
@@ -459,16 +466,9 @@ def build_usage_job_status(
     return payload
 
 
-def _durable_progress(
-    job_service: JobStatusService | None,
-    job_id: str,
+def _bounded_progress(
+    row: Mapping[str, object] | None,
 ) -> dict[str, object] | None:
-    if not isinstance(job_service, JobService):
-        return None
-    repository = job_service.persistence
-    if not isinstance(repository, AnalysisJobRepository):
-        return None
-    row = repository.get(job_id, touch=False)
     if row is None:
         return None
     raw_progress = row.get("progress")

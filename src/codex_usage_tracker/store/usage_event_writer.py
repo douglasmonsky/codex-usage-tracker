@@ -25,10 +25,10 @@ from codex_usage_tracker.store.deduplication import (
 )
 from codex_usage_tracker.store.source_records import sync_source_records
 from codex_usage_tracker.store.source_replacement import (
-    OTEL_ENRICHMENT_COLUMNS,
-    capture_otel_enrichment_for_source_files,
+    PRESERVED_SERVICE_TIER_COLUMNS,
+    capture_service_tier_enrichment_for_source_files,
     delete_usage_events_for_source_files,
-    restore_otel_enrichment,
+    restore_service_tier_enrichment,
     source_file_strings,
     thread_keys_for_source_files,
     thread_keys_for_usage_rows,
@@ -38,6 +38,7 @@ from codex_usage_tracker.store.thread_summaries import rebuild_thread_summaries
 EVENT_COLUMNS = list(USAGE_EVENT_COLUMN_NAMES)
 DIAGNOSTIC_FACT_COLUMNS = list(DIAGNOSTIC_FACT_COLUMN_NAMES)
 SQLITE_VARIABLE_BATCH_SIZE = 500
+_THREAD_LINK_APPEND_LIMIT = 1_000
 
 
 @dataclass(frozen=True)
@@ -66,7 +67,7 @@ def upsert_usage_events_in_connection(
     source_files_to_replace = source_file_strings(replace_source_files)
     affected_thread_keys = thread_keys_for_source_files(conn, source_files_to_replace)
     replaced_fingerprints = fingerprints_for_source_files(conn, source_files_to_replace)
-    preserved_otel_enrichment = capture_otel_enrichment_for_source_files(
+    preserved_service_tier_enrichment = capture_service_tier_enrichment_for_source_files(
         conn, source_files_to_replace
     )
     delete_usage_events_for_source_files(
@@ -101,7 +102,7 @@ def upsert_usage_events_in_connection(
     _delete_diagnostic_facts_for_record_ids(conn, inserted_record_ids)
     with deferred_usage_event_indexes(conn, enabled=defer_usage_indexes):
         _insert_usage_event_rows(conn, rows)
-    restore_otel_enrichment(conn, preserved_otel_enrichment)
+    restore_service_tier_enrichment(conn, preserved_service_tier_enrichment)
     if maintain_allowance_observations:
         sync_allowance_observations_for_record_ids(conn, record_ids)
     if maintain_source_records:
@@ -110,6 +111,7 @@ def upsert_usage_events_in_connection(
     _refresh_after_usage_event_upsert(
         conn,
         refresh_links=refresh_links,
+        record_ids=record_ids,
         affected_thread_keys=affected_thread_keys,
     )
     if touch_revisions:
@@ -148,6 +150,7 @@ def finalize_streamed_usage_event_upserts(
     _refresh_after_usage_event_upsert(
         conn,
         refresh_links=True,
+        record_ids=unique_record_ids,
         affected_thread_keys=set(unique_thread_keys),
     )
     if stage_callback is not None:
@@ -232,7 +235,7 @@ def _usage_event_upsert_sql() -> str:
     placeholders = ", ".join("?" for _column in EVENT_COLUMNS)
     update_clause = ", ".join(
         f"{column}=COALESCE(usage_events.{column}, excluded.{column})"
-        if column in OTEL_ENRICHMENT_COLUMNS
+        if column in PRESERVED_SERVICE_TIER_COLUMNS
         else f"{column}=excluded.{column}"
         for column in EVENT_COLUMNS
         if column != "record_id"
@@ -259,11 +262,160 @@ def _refresh_after_usage_event_upsert(
     conn: sqlite3.Connection,
     *,
     refresh_links: bool,
+    record_ids: Iterable[str],
     affected_thread_keys: set[str],
 ) -> None:
     if refresh_links and affected_thread_keys:
-        _refresh_usage_event_links_for_threads(conn, affected_thread_keys)
+        if not _try_append_usage_event_links(
+            conn,
+            record_ids=record_ids,
+            affected_thread_keys=affected_thread_keys,
+        ):
+            _refresh_usage_event_links_for_threads(conn, affected_thread_keys)
         rebuild_thread_summaries(conn, thread_keys=affected_thread_keys)
+
+
+def _try_append_usage_event_links(
+    conn: sqlite3.Connection,
+    *,
+    record_ids: Iterable[str],
+    affected_thread_keys: set[str],
+) -> bool:
+    targets = tuple(dict.fromkeys(record_ids))
+    normalized_keys = {key for key in affected_thread_keys if key}
+    if not targets or len(targets) > _THREAD_LINK_APPEND_LIMIT or not normalized_keys:
+        return False
+    conn.execute(
+        """
+        CREATE TEMP TABLE IF NOT EXISTS usage_event_link_targets (
+            record_id TEXT PRIMARY KEY
+        ) WITHOUT ROWID
+        """
+    )
+    conn.execute("DELETE FROM usage_event_link_targets")
+    conn.executemany(
+        "INSERT OR IGNORE INTO usage_event_link_targets(record_id) VALUES (?)",
+        ((record_id,) for record_id in targets),
+    )
+    rows = [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT
+                record_id,
+                coalesce(nullif(thread_key, ''), 'session:' || session_id)
+                    AS effective_thread_key,
+                thread_key,
+                session_id,
+                event_timestamp,
+                cumulative_total_tokens,
+                line_number,
+                thread_call_index,
+                next_record_id
+            FROM usage_events
+            WHERE record_id IN (SELECT record_id FROM usage_event_link_targets)
+            """
+        )
+    ]
+    if len(rows) != len(targets) or any(
+        row["thread_call_index"] is not None for row in rows
+    ):
+        return False
+    rows_by_thread: dict[str, list[dict[str, object]]] = {}
+    for row in rows:
+        rows_by_thread.setdefault(str(row["effective_thread_key"]), []).append(row)
+    if set(rows_by_thread) != normalized_keys:
+        return False
+
+    plans: list[
+        tuple[dict[str, object] | None, list[dict[str, object]]]
+    ] = []
+    for thread_key, thread_rows in sorted(rows_by_thread.items()):
+        thread_rows.sort(key=_usage_link_order_key)
+        predicate, predicate_params = _thread_link_predicate(thread_key, thread_rows)
+        if predicate is None:
+            return False
+        predecessor_row = conn.execute(
+            "SELECT record_id, thread_call_index, next_record_id, "
+            "event_timestamp, cumulative_total_tokens, line_number "
+            f"FROM usage_events WHERE {predicate} "
+            "AND record_id NOT IN (SELECT record_id FROM usage_event_link_targets) "
+            "ORDER BY event_timestamp DESC, cumulative_total_tokens DESC, "
+            "line_number DESC, record_id DESC LIMIT 1",
+            predicate_params,
+        ).fetchone()
+        predecessor = dict(predecessor_row) if predecessor_row is not None else None
+        if predecessor is not None and (
+            predecessor["thread_call_index"] is None
+            or predecessor["next_record_id"] is not None
+            or _usage_link_order_key(predecessor)
+            >= _usage_link_order_key(thread_rows[0])
+        ):
+            return False
+        plans.append((predecessor, thread_rows))
+
+    for predecessor, thread_rows in plans:
+        previous_id = str(predecessor["record_id"]) if predecessor is not None else None
+        start_index = (
+            _stored_int(predecessor["thread_call_index"]) + 1
+            if predecessor is not None
+            else 1
+        )
+        if predecessor is not None:
+            conn.execute(
+                "UPDATE usage_events SET next_record_id = ? WHERE record_id = ?",
+                (thread_rows[0]["record_id"], predecessor["record_id"]),
+            )
+        updates = []
+        for offset, row in enumerate(thread_rows):
+            next_id = (
+                thread_rows[offset + 1]["record_id"]
+                if offset + 1 < len(thread_rows)
+                else None
+            )
+            updates.append(
+                (
+                    start_index + offset,
+                    previous_id,
+                    next_id,
+                    row["record_id"],
+                )
+            )
+            previous_id = str(row["record_id"])
+        conn.executemany(
+            "UPDATE usage_events SET thread_call_index = ?, previous_record_id = ?, "
+            "next_record_id = ? WHERE record_id = ?",
+            updates,
+        )
+    return True
+
+
+def _thread_link_predicate(
+    effective_thread_key: str,
+    rows: list[dict[str, object]],
+) -> tuple[str | None, list[object]]:
+    explicit_keys = {str(row["thread_key"] or "") for row in rows}
+    if explicit_keys == {effective_thread_key}:
+        return "thread_key = ?", [effective_thread_key]
+    session_ids = {str(row["session_id"]) for row in rows}
+    if explicit_keys == {""} and len(session_ids) == 1:
+        session_id = session_ids.pop()
+        if effective_thread_key == f"session:{session_id}":
+            return "(thread_key IS NULL OR thread_key = '') AND session_id = ?", [session_id]
+    return None, []
+
+
+def _usage_link_order_key(row: dict[str, object]) -> tuple[str, int, int, str]:
+    return (
+        str(row["event_timestamp"] or ""),
+        _stored_int(row["cumulative_total_tokens"]),
+        _stored_int(row["line_number"]),
+        str(row["record_id"]),
+    )
+
+
+def _stored_int(value: object) -> int:
+    return int(value) if isinstance(value, int | float) else 0
 
 
 def _delete_diagnostic_facts_for_record_ids(

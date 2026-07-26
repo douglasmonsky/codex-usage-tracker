@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.25.1 - 2026-07-25
+
+- Remove the experimental local telemetry parser, cursor, staging,
+  reconciliation, refresh phase, diagnostics, and support-bundle surface;
+  schema 38 drops the retired tables without rebuilding canonical usage rows.
+- Reuse the active compatible refresh when stale analysis needs current data,
+  including across moving-tail source revisions, instead of spawning
+  conflicting refresh jobs.
+- Build job status and detailed progress from one durable row snapshot so a
+  poll cannot report an outer running state with nested failed progress.
+- Route large-history `execution="auto"` analysis through a durable async job,
+  and preserve completed refresh and analysis results across MCP restarts.
+- Keep no-change and append-safe refresh work proportional to the moving tail:
+  allowance observations, reset-aware materialization, thread links, and
+  interval revisions no longer rebuild total-history derived state. Schema 38
+  replaces low-selectivity interval revision indexes.
+
 ## 0.25.0 - 2026-07-25
 
 - Prioritize central-product reliability before compatibility removal, moving

@@ -60,9 +60,7 @@ MAX_QUERY_PAYLOAD_BYTES = 256 * 1024
 MAX_ANALYSIS_PAYLOAD_BYTES = 64 * 1024
 MAX_ANALYSIS_JOB_PAYLOAD_BYTES = 16 * 1024
 ANALYSIS_JOB_SCHEMA = "codex-usage-tracker.analysis-job.v1"
-ANALYSIS_REFRESH_DEPENDENCY_SCHEMA = (
-    "codex-usage-tracker.analysis-refresh-dependency.v1"
-)
+ANALYSIS_REFRESH_DEPENDENCY_SCHEMA = "codex-usage-tracker.analysis-refresh-dependency.v1"
 QueryService = Callable[..., QueryResult]
 AnalysisService = Callable[[AnalysisRequest, RequestContext], AnalyzeResult]
 ContextBuilder = Callable[..., RequestContext]
@@ -241,8 +239,8 @@ def build_usage_analyze(
     runtime = runtime or _analysis_runtime(
         pricing_path, rate_card_path, thresholds_path, catalog, job_service
     )
-    chain_refresh = container is not None if enable_refresh_dependency is None else (
-        enable_refresh_dependency
+    chain_refresh = (
+        container is not None if enable_refresh_dependency is None else (enable_refresh_dependency)
     )
     if chain_refresh and context.freshness.state in {"stale", "empty", "unknown"}:
         payload = _stale_analysis_dependency_envelope(
@@ -275,7 +273,7 @@ def _stale_analysis_dependency_envelope(
     dependency = refresh_usage(
         RefreshRequest(
             history=request.history,
-            aggregate_only=False,
+            aggregate_only=True,
             execution="async",
         ),
         codex_home=paths.codex_home,

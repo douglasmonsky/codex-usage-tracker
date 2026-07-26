@@ -25,6 +25,38 @@ def add_allowance_all_history_query_index(conn: sqlite3.Connection) -> None:
     )
 
 
+def optimize_allowance_interval_revision_indexes(conn: sqlite3.Connection) -> None:
+    """Keep interval queries indexed without rewriting indexes on every append."""
+
+    if (
+        conn.execute(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type = 'table' AND name = 'allowance_intervals'"
+        ).fetchone()
+        is None
+    ):
+        return
+    execute_script(
+        conn,
+        """
+        DROP INDEX IF EXISTS idx_allowance_intervals_evidence_cohort_window;
+        DROP INDEX IF EXISTS idx_allowance_intervals_evidence_window;
+        DROP INDEX IF EXISTS idx_allowance_intervals_source_revision;
+
+        CREATE INDEX idx_allowance_intervals_evidence_cohort_window
+        ON allowance_intervals(
+            is_archived, window_kind, cohort_key,
+            end_observed_at DESC, interval_id DESC
+        );
+
+        CREATE INDEX idx_allowance_intervals_evidence_window
+        ON allowance_intervals(
+            is_archived, window_kind, end_observed_at DESC, interval_id DESC
+        );
+        """,
+    )
+
+
 def migrate_allowance_intelligence_v2(conn: sqlite3.Connection) -> None:
     """Create structural storage for reset-cycle allowance analysis.
 

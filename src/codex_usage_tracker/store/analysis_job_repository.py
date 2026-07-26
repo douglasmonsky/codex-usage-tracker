@@ -84,6 +84,7 @@ class AnalysisJobRepository:
         request_schema: str,
         request: Mapping[str, object],
         result_schema: str,
+        reuse_active_across_revisions: bool = False,
         now: datetime | None = None,
     ) -> tuple[dict[str, object], bool]:
         request_json = _bounded_json(
@@ -103,13 +104,19 @@ class AnalysisJobRepository:
             if active is not None and lease_expired(active, current):
                 _interrupt_row(conn, str(active["job_id"]), timestamp)
                 active = None
-            if active is not None and _compatible(
-                active,
-                source_revision=source_revision,
-                request_schema=request_schema,
-                result_schema=result_schema,
-            ):
-                return _decode(active), False
+            if active is not None:
+                compatible = _compatible(
+                    active,
+                    source_revision=source_revision,
+                    request_schema=request_schema,
+                    result_schema=result_schema,
+                )
+                request_compatible = (
+                    str(active["request_schema"]) == request_schema
+                    and str(active["result_schema"]) == result_schema
+                )
+                if compatible or (reuse_active_across_revisions and request_compatible):
+                    return _decode(active), False
             if active is not None:
                 if str(active["owner_id"]) != self.owner_id:
                     return _decode(active), False

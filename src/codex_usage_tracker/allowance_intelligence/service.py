@@ -70,7 +70,17 @@ def _weekly_estimation(connection: sqlite3.Connection, revision: str | None, inc
         return build_weekly_estimation([], [], now=now)
     params = (revision, include_archived)
     cycles = [dict(row) for row in connection.execute("SELECT * FROM allowance_cycles WHERE source_revision = ? AND (? OR is_archived = 0)", params)]
-    intervals = [dict(row) for row in connection.execute("SELECT * FROM allowance_intervals WHERE source_revision = ? AND (? OR is_archived = 0)", params)]
+    intervals = []
+    for row in connection.execute(
+        "SELECT intervals.*, cycles.source_revision AS current_source_revision "
+        "FROM allowance_intervals AS intervals "
+        "JOIN allowance_cycles AS cycles ON cycles.cycle_id = intervals.cycle_id "
+        "WHERE cycles.source_revision = ? AND (? OR intervals.is_archived = 0)",
+        params,
+    ):
+        interval = dict(row)
+        interval["source_revision"] = interval.pop("current_source_revision")
+        intervals.append(interval)
     return build_weekly_estimation(cycles, intervals, now=now)
 
 

@@ -297,10 +297,10 @@ def test_committed_budget_preserves_reviewed_baselines_and_exact_headroom() -> N
     assert metrics["contextual_dashboard_routes"]["maximum"] == 1
     assert metrics["unbudgeted_python_files_over_600"]["maximum"] == 0
     assert metrics["unbudgeted_frontend_source_files_over_500"]["maximum"] == 0
-    assert metrics["wheel_bytes"]["baseline"] == 5_156_651
-    assert metrics["wheel_bytes"]["maximum"] == math.ceil(5_156_651 * 1.03)
-    assert metrics["sdist_bytes"]["baseline"] == 28_485_858
-    assert metrics["sdist_bytes"]["maximum"] == math.ceil(28_485_858 * 1.03)
+    assert metrics["wheel_bytes"]["baseline"] == 5_152_350
+    assert metrics["wheel_bytes"]["maximum"] == math.ceil(5_152_350 * 1.03)
+    assert metrics["sdist_bytes"]["baseline"] == 28_460_311
+    assert metrics["sdist_bytes"]["maximum"] == math.ceil(28_460_311 * 1.03)
     assert metrics["main_initial_react_js_gzip_bytes"]["baseline"] == 61_457
     assert metrics["main_initial_react_js_gzip_bytes"]["maximum"] == math.ceil(61_457 * 1.03)
     assert metrics["stable_json_schemas"]["maximum"] == 116

@@ -48,6 +48,10 @@ def test_latest_and_series_are_archive_aware_and_scoped() -> None:
 
 def test_evidence_filters_orders_clamps_and_continues_without_overlap() -> None:
     conn = seeded_connection()
+    conn.execute(
+        "UPDATE allowance_intervals SET source_revision = 'revision-before-append' "
+        "WHERE interval_id = 'active-evidence-1'"
+    )
 
     newest = query_allowance_evidence(
         conn,
@@ -75,6 +79,7 @@ def test_evidence_filters_orders_clamps_and_continues_without_overlap() -> None:
     assert [row["interval_id"] for row in oldest.rows] == [
         "active-evidence-1", "active-evidence-2", "active-evidence-3"
     ]
+    assert oldest.rows[0]["source_revision"] == "revision-1"
     assert "untimed-evidence" not in {
         row["interval_id"]
         for row in query_allowance_evidence(

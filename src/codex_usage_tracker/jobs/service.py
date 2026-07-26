@@ -89,6 +89,7 @@ class JobService:
         source_revision: str | None = None,
         request_schema: str = "job.request.v1",
         request: Mapping[str, object] | None = None,
+        reuse_active_across_revisions: bool = False,
     ) -> JobRegistration:
         if not _REQUEST_HASH.fullmatch(semantic_key):
             raise ValueError("semantic_key must be a sha256 fingerprint")
@@ -105,6 +106,7 @@ class JobService:
                 request_schema=request_schema,
                 request=request or {},
                 result_schema=result_schema,
+                reuse_active_across_revisions=reuse_active_across_revisions,
             )
             persisted = persisted_status(row, include_result=True)
             if not created:
@@ -294,6 +296,33 @@ class JobService:
             if durable is not None:
                 return durable
         return self._memory_status(job_id, include_result=include_result)
+
+    def status_snapshot(
+        self,
+        job_id: str,
+        *,
+        include_result: bool = False,
+    ) -> tuple[JobStatusV1, Mapping[str, object] | None]:
+        """Return status and durable progress from one persisted row snapshot."""
+
+        repository = self._repository
+        with self._lock:
+            has_handle = job_id in self._handles
+            is_persisted = job_id in self._persisted_ids
+        if repository is None or (has_handle and not is_persisted):
+            return self.status(job_id, include_result=include_result), None
+        if has_handle:
+            self.checkpoint(job_id)
+        row = repository.get(job_id, touch=True)
+        if row is None:
+            return _not_found(job_id), None
+        status = persisted_status(row, include_result=include_result)
+        with self._lock:
+            handle = self._handles.get(job_id)
+        return (
+            enforce_status_boundaries(status, handle, include_result=include_result),
+            row,
+        )
 
     def _durable_status(
         self,

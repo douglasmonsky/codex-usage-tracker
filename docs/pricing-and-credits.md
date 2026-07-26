@@ -41,7 +41,10 @@ Edit `~/.codex-usage-tracker/pricing.json` with USD-per-million-token rates for 
 
 ### Billing Basis And Tier Scenarios
 
-OTel `service_tier=priority` proves the response tier, but it does not prove whether the call used ChatGPT/Codex credits or an API key. Set the top-level local `billing_basis` only when you know the billing path:
+An exact normalized `service_tier=priority` usage row identifies the response
+tier, but it does not prove whether the call used ChatGPT/Codex credits or an
+API key. Set the top-level local `billing_basis` only when you know the billing
+path:
 
 ```json
 {
@@ -78,7 +81,7 @@ The local snapshot is written to `~/.codex-usage-tracker/rate-card.json`. Each b
 
 ### Confirmed Fast Usage
 
-When a call has exact OTel evidence that `fast=1`, the tracker first computes
+When a call has exact normalized evidence that `fast=1`, the tracker first computes
 `standard_usage_credits`, then applies the documented model-family Fast
 multiplier to produce `usage_credits`:
 
@@ -88,7 +91,7 @@ multiplier to produce `usage_credits`:
 
 The row also exposes `fast_usage_credits`, `usage_credit_multiplier`, and
 source URL/date/confidence fields so the adjustment is auditable independently
-from OTel tier evidence. A confirmed
+from the tier evidence. A confirmed
 Fast call whose model has no documented multiplier stays at `1.0x` and is
 marked `no_documented_fast_multiplier`; the tracker does not guess. Standard
 and Unknown-tier calls also stay at `1.0x`.

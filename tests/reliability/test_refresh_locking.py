@@ -88,11 +88,9 @@ def test_no_change_refresh_is_read_only_during_usage_writer_lock(tmp_path: Path)
 
 def test_independent_services_join_and_poll_one_durable_refresh(tmp_path: Path) -> None:
     job_db = tmp_path / "usage.jobs.sqlite3"
-    first_service = JobService(
-        repository=AnalysisJobRepository(job_db, owner_id="refresh-owner-a")
-    )
+    first_service = JobService(repository=AnalysisJobRepository(job_db, owner_id="refresh-owner-a"))
     second_service = JobService(
-        repository=AnalysisJobRepository(job_db, owner_id="refresh-owner-b")
+        repository=AnalysisJobRepository(job_db, owner_id="refresh-owner-a")
     )
     first = RefreshCoordinator(first_service)
     second = RefreshCoordinator(second_service)
@@ -126,7 +124,7 @@ def test_independent_services_join_and_poll_one_durable_refresh(tmp_path: Path) 
     joined = second.start(
         "refresh-v1:synthetic",
         worker,
-        source_revision="sha256:" + "a" * 64,
+        source_revision="sha256:" + "b" * 64,
         request=request,
     )
     observed = second_service.status(first_status.job_id)
@@ -216,6 +214,40 @@ print(outcome.job.job_id)
         ).fetchone()
     assert refresh_jobs is not None
     assert refresh_jobs[0] == 1
+
+
+def test_detached_start_returns_post_handshake_failure(tmp_path: Path) -> None:
+    repository = AnalysisJobRepository(
+        tmp_path / "usage.jobs.sqlite3",
+        owner_id="detached-start-owner",
+    )
+    coordinator = RefreshCoordinator(JobService(repository=repository))
+
+    def failed_launcher(job_id: str) -> None:
+        repository.update_status(
+            job_id,
+            state="failed",
+            progress={"percent": 0, "stage": "failed"},
+            error={
+                "code": "refresh.failed",
+                "severity": "recoverable",
+                "message": "worker exited before startup",
+                "remediation": "retry the refresh",
+            },
+        )
+
+    status = coordinator.start(
+        "refresh-v1:detached-start-failure",
+        lambda _progress: pytest.fail("detached refresh worker ran in-process"),
+        source_revision="source:none",
+        request=RefreshRequest(execution="async"),
+        detached_launcher=failed_launcher,
+    )
+
+    assert status.state == "failed"
+    assert status.stage == "failed"
+    assert status.error is not None
+    assert status.error.code == "refresh.failed"
 
 
 def test_detached_worker_retries_a_transient_startup_lock(

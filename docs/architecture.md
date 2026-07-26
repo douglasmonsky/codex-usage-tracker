@@ -152,22 +152,20 @@ ceiling downward without a new decision.
 ## Boundaries
 
 - `parser.py` converts local JSONL events into aggregate `UsageEvent` records. It also attaches metadata-only call-origin categories, diagnostic facts from `diagnostic_facts.py`, archived-session flags, conservative thread keys, source cursors, and parser diagnostics.
-- `parser/otel.py`, `store/otel_ingest.py`, and `store/otel_reconciliation.py`
-  provide aggregate-only completion enrichment from local
-  `~/.codex-usage-tracker/otel/codex-completions*.jsonl` files. The importer
-  retains only approved completion identifiers, token counters, model/effort,
-  application version, and service-tier metadata; response bodies and arbitrary
-  OTLP attributes are never persisted. Reconciliation requires one canonical
-  call group with the same conversation id and all four token counters. Model
-  and effort narrow a match when both sides provide them, but timestamps are not
-  identity evidence.
 - `store/content_index.py` owns normalized local content-index population and cleanup. It may persist bounded local snippets, tool-call metadata, command roots/labels, file path hashes/basenames, parser adapter metadata, source provenance, parse warnings, and FTS5 search rows. Investigation/report builders may persist bounded run summaries in `investigation_runs`. These surfaces must not feed raw/indexed content into default CSV, dashboard HTML, support bundle, or aggregate report payloads.
 - `call_origin.py` owns the pure call-origin classifier and migrated-row fallback. It must not open source JSONL files; source-log reads belong in refresh/indexing or explicit context loading.
 - `schema.py` owns persisted SQLite columns and atomic migrations. Add columns or tables there before changing refresh, export, or MCP behavior.
 - `store/connection.py` owns the verified connection policy, including foreign-key enforcement, read-only/query-only connections, busy-timeout configuration, and transaction cleanup. `store/integrity.py` owns bounded read-only `integrity_check` and `foreign_key_check` reporting; it never performs repair.
 - `application/protocols.CacheRepository` defines cache ownership and `store/cache_repository.py` is the only runtime writer of `refresh_meta`. Callers retain their existing transaction boundaries: refresh metadata, Home metrics, and recommendation invalidation never commit each other's work.
-- `store/refresh.py` owns the primary, OTel, and finalization phases. It persists a bounded `refresh_workflow_v1` phase marker so interrupted refreshes and post-clear rebuilds are visible and safely retried; successful retry replaces the marker with `completed`.
+- `store/refresh.py` owns primary JSONL hydration, deterministic derived state,
+  and finalization. It persists a bounded `refresh_workflow_v1` phase marker so
+  interrupted refreshes and post-clear rebuilds are visible and safely retried;
+  successful retry replaces the marker with `completed`. Schema 38 removes the
+  retired telemetry sidecar tables and refresh phase.
 - `store/analysis_job_repository.py` owns compact generic analysis-job requests, lifecycle state, compatible bounded results, and transactional retention. `JobService` keeps only active worker handles in memory. Active jobs carry a process owner and renewable lease; startup and semantic reuse mark only expired foreign work `interrupted`, never resume unknown worker code, and leave live work in another process untouched. Completed results remain reusable only for the same semantic key, source revision, and result schema. Generic job storage applies bounded schema allowlists and deep raw-context rejection to every JSON column, enforces owner-scoped monotonic transitions, prunes on terminal checkpoints, and records cumulative prune counts for the read-only doctor diagnostic. Refresh jobs remain transient.
+  Here, "transient" applies only to process-local refresh worker handles. The
+  bounded job state and completed refresh result are durable across process
+  restarts.
 - `store.py` and `store/api.py` own SQLite setup, refresh, rebuild, query access, previous/next call links, materialized thread summaries, source-file refresh cursors, SQL-backed live dashboard API slices, and cleanup ordering.
 - `source_records.py` owns source-file provenance, parser coverage, incremental cursors, and replacement on source-file changes.
 - `dedupe.py` and store migrations own conservative logical identity. Indexed

@@ -9,7 +9,7 @@ import pytest
 
 from codex_usage_tracker.server import call_detail as server_call_detail
 from codex_usage_tracker.store.api import upsert_usage_events
-from tests.otel_helpers import synthetic_usage_event
+from tests.usage_helpers import synthetic_usage_event
 
 
 class _RouteSenders:
@@ -158,11 +158,7 @@ def test_call_detail_payload_requires_record_id(tmp_path: Path) -> None:
 def test_call_detail_exposes_tier_without_sidecar_identity(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     upsert_usage_events(
-        [
-            synthetic_usage_event(
-                "record-a", "conversation-a", (100, 40, 30, 10), fast=1
-            )
-        ],
+        [synthetic_usage_event("record-a", "conversation-a", (100, 40, 30, 10), fast=1)],
         db_path=db_path,
     )
 

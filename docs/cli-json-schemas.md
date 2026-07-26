@@ -481,7 +481,7 @@ disclosed in every applicable payload.
   "schema": "codex-usage-tracker-allowance-status-v2",
   "revision": "r-synthetic-42",
   "changed": true,
-  "model_version": "reset-aware-v4",
+  "model_version": "reset-aware-v5",
   "generated_at": "2026-07-15T12:00:00+00:00",
   "data_as_of": "2026-07-15T11:58:00+00:00",
   "data_state": "fresh",
@@ -534,7 +534,7 @@ official conversion.
 ```json
 {
   "schema": "codex-usage-tracker-allowance-series-v2",
-  "model_version": "reset-aware-v4",
+  "model_version": "reset-aware-v5",
   "generated_at": "2026-07-15T12:00:00+00:00",
   "revision": "r-synthetic-42",
   "requested_range": {"preset": "8w", "start_at": "2026-05-20T12:00:00+00:00", "end_at": "2026-07-15T12:00:00+00:00"},
@@ -584,7 +584,7 @@ clients must not infer a subscription plan from capacity values.
 ```json
 {
   "schema": "codex-usage-tracker-allowance-evidence-v2",
-  "model_version": "reset-aware-v4",
+  "model_version": "reset-aware-v5",
   "generated_at": "2026-07-15T12:00:00+00:00",
   "revision": "r-synthetic-42",
   "privacy_mode": "normal",
@@ -1651,13 +1651,9 @@ Most setup and file-writing commands accept `--json` and return a schema-specifi
 - `init-thresholds --json`, `init-projects --json`
 - `support-bundle --json`
 
-Refresh and rebuild payloads add bounded OTel counters under
-`parser_diagnostics`: `otel_files_scanned`, `otel_imported`,
-`otel_duplicates`, `otel_matched`, `otel_pending`, `otel_ambiguous`, and
-`otel_conflicts` (zero-valued counters may be omitted from the immediate JSON
-payload). Stored refresh metadata keeps the same keys with zero defaults so
-localhost status is stable. These surfaces never expose OTel source paths,
-semantic fingerprints, response bodies, arbitrary attributes, or staging ids.
+Refresh and rebuild payloads include bounded primary-parser counters under
+`parser_diagnostics`. They never expose source paths, record identifiers, raw
+event bodies, prompts, or tool output.
 
 Aggregate call rows may add nullable `service_tier`, `fast`,
 `service_tier_source`, and `service_tier_confidence` fields. `service_tier`
@@ -1680,9 +1676,5 @@ scenarios and are never used as generic multipliers for API USD. `fast: null`
 means Unknown; clients must not replace it with the separate throughput proxy.
 CSV export includes the exact tier, both scenario families, multiplier
 provenance, and the separately named proxy candidate.
-
-`rebuild-index` retains aggregate OTel staging for reconciliation. Confirmed
-`reset-db --yes` clears both `otel_completion_events` and
-`otel_completion_sources` along with the other tracker-owned rows.
 
 `context` already returns JSON because it is an explicit on-demand context request. Treat `codex-usage-tracker-context-v1` output as sensitive local context even though it is redacted and size-limited by default. `max_entries=0` requests all matching entries and `max_chars=0` removes the character cap for that explicit request. Tool output and compacted replacement history are omitted unless explicitly requested. Compaction entries may include metadata such as `replacement_history_available`, `replacement_entry_count`, and `replacement_history_included`; replacement text appears only when `include_compaction_history` is true for that local request. Evidence responses include `action_timing`, derived from timestamps in the same selected-turn source scan, plus per-entry `action_timing` fields such as `since_turn_start_ms`, `since_previous_entry_ms`, and `reported_duration_ms` when available. MCP returns `codex-usage-tracker-context-disabled-v1` when raw context loading has not been explicitly enabled with `CODEX_USAGE_TRACKER_ALLOW_RAW_CONTEXT=1`.

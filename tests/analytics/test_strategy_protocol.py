@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -74,6 +74,17 @@ def test_strategies_satisfy_protocol_and_estimate_deterministically() -> None:
         assert first.evidence_records <= entry.max_evidence_records
         with pytest.raises(FrozenInstanceError):
             first.estimated_work_units = 0  # type: ignore[misc]
+
+
+def test_large_history_routes_auto_analysis_to_async() -> None:
+    entry = ANALYSIS_CATALOG["token_waste"]
+    estimate = entry.strategy.estimate(
+        AnalysisRequest(goal="token_waste", filters=QueryFilters(), evidence_limit=8),
+        replace(_context(), physical_rows=216_000, canonical_rows=216_000),
+    )
+
+    assert estimate.estimated_work_units > entry.sync_work_ceiling
+    assert estimate.recommended_execution == "async"
 
 
 def test_estimate_never_calls_builders_refresh_or_analysis(monkeypatch: pytest.MonkeyPatch) -> None:

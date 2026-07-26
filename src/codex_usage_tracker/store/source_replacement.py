@@ -16,10 +16,10 @@ from codex_usage_tracker.store.content_index import (
 )
 
 _SOURCE_FILE_SQL_BATCH_SIZE = 400
-OTEL_ENRICHMENT_COLUMNS = frozenset(
+PRESERVED_SERVICE_TIER_COLUMNS = frozenset(
     {"service_tier", "fast", "service_tier_source", "service_tier_confidence"}
 )
-OtelEnrichment = tuple[object | None, object | None, object | None, object | None]
+ServiceTierEnrichment = tuple[object | None, object | None, object | None, object | None]
 
 
 def source_file_strings(replace_source_files: Iterable[Path] | None) -> list[str]:
@@ -42,10 +42,10 @@ def delete_usage_events_for_source_files(
         _rebuild_content_fts(conn)
 
 
-def capture_otel_enrichment_for_source_files(
+def capture_service_tier_enrichment_for_source_files(
     conn: sqlite3.Connection,
     source_files_to_replace: list[str],
-) -> dict[str, OtelEnrichment]:
+) -> dict[str, ServiceTierEnrichment]:
     """Capture one internally consistent non-null tier tuple per affected group."""
 
     group_ids: set[str] = set()
@@ -61,7 +61,7 @@ def capture_otel_enrichment_for_source_files(
         ).fetchall()
         group_ids.update(str(row["group_id"]) for row in rows)
 
-    tuples_by_group: dict[str, set[OtelEnrichment]] = {}
+    tuples_by_group: dict[str, set[ServiceTierEnrichment]] = {}
     for group_batch in _value_batches(sorted(group_ids)):
         placeholders = ", ".join("?" for _group in group_batch)
         rows = conn.execute(
@@ -74,7 +74,7 @@ def capture_otel_enrichment_for_source_files(
             group_batch,
         ).fetchall()
         for row in rows:
-            enrichment: OtelEnrichment = (
+            enrichment: ServiceTierEnrichment = (
                 row["service_tier"],
                 row["fast"],
                 row["service_tier_source"],
@@ -82,7 +82,7 @@ def capture_otel_enrichment_for_source_files(
             )
             tuples_by_group.setdefault(str(row["group_id"]), set()).add(enrichment)
 
-    captured: dict[str, OtelEnrichment] = {}
+    captured: dict[str, ServiceTierEnrichment] = {}
     for group_id, enrichments in tuples_by_group.items():
         if len(enrichments) != 1:
             continue
@@ -92,9 +92,9 @@ def capture_otel_enrichment_for_source_files(
     return captured
 
 
-def restore_otel_enrichment(
+def restore_service_tier_enrichment(
     conn: sqlite3.Connection,
-    captured: Mapping[str, OtelEnrichment],
+    captured: Mapping[str, ServiceTierEnrichment],
 ) -> None:
     """Restore captured tiers to reparsed clones without overwriting fresh values."""
 
@@ -170,19 +170,6 @@ def _delete_source_batch(conn: sqlite3.Connection, source_batch: list[str]) -> N
             """,  # nosec B608 - fixed table names and generated placeholders
             source_batch,
         )
-    conn.execute(
-        f"""
-        UPDATE otel_completion_events
-        SET match_status = 'pending',
-            matched_record_id = NULL
-        WHERE matched_record_id IN (
-            SELECT record_id
-            FROM usage_events
-            WHERE source_file IN ({placeholders})
-        )
-        """,  # nosec B608 - generated placeholders
-        source_batch,
-    )
     conn.execute(
         f"DELETE FROM usage_events WHERE source_file IN ({placeholders})",  # nosec B608
         source_batch,

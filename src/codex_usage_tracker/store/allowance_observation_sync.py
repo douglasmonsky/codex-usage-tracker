@@ -80,6 +80,8 @@ def sync_allowance_observations_for_record_ids(
         ).fetchone()
         if has_existing_observation is None:
             return 0
+    if len(unique_record_ids) > ALLOWANCE_SYNC_BATCH_SIZE:
+        return _sync_large_allowance_observation_target(conn, unique_record_ids)
     inserted = 0
     for start in range(0, len(unique_record_ids), ALLOWANCE_SYNC_BATCH_SIZE):
         chunk = unique_record_ids[start : start + ALLOWANCE_SYNC_BATCH_SIZE]
@@ -95,6 +97,39 @@ def sync_allowance_observations_for_record_ids(
                 chunk,
             ).rowcount
     return inserted
+
+
+def _sync_large_allowance_observation_target(
+    conn: sqlite3.Connection,
+    record_ids: list[str],
+) -> int:
+    conn.execute(
+        """
+        CREATE TEMP TABLE IF NOT EXISTS allowance_observation_targets (
+            record_id TEXT PRIMARY KEY
+        ) WITHOUT ROWID
+        """
+    )
+    conn.execute("DELETE FROM allowance_observation_targets")
+    conn.executemany(
+        "INSERT INTO allowance_observation_targets(record_id) VALUES (?)",
+        ((record_id,) for record_id in record_ids),
+    )
+    conn.execute(
+        """
+        DELETE FROM allowance_observations
+        WHERE record_id IN (SELECT record_id FROM allowance_observation_targets)
+        """
+    )
+    record_filter = (
+        "AND record_id IN (SELECT record_id FROM allowance_observation_targets)"
+    )
+    return sum(
+        conn.execute(
+            _insert_observation_sql(window_key, record_filter=record_filter)
+        ).rowcount
+        for window_key in ("primary", "secondary")
+    )
 
 
 def _insert_observation_sql(window_key: str, *, record_filter: str = "") -> str:

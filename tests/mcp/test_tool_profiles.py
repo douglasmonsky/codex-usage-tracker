@@ -41,9 +41,7 @@ def test_core_profile_has_exact_names_and_order() -> None:
 
 def test_core_timing_metadata_cannot_exceed_payload_budget() -> None:
     payload = {"padding": ""}
-    payload["padding"] = "x" * (
-        MAX_STATUS_PAYLOAD_BYTES - serialized_size(payload)
-    )
+    payload["padding"] = "x" * (MAX_STATUS_PAYLOAD_BYTES - serialized_size(payload))
     assert serialized_size(payload) == MAX_STATUS_PAYLOAD_BYTES
     handler = registry._timed_core_handler("usage_status", lambda: payload)
 
@@ -375,7 +373,10 @@ def test_core_job_status_returns_bounded_administrative_envelope(tmp_path: Path)
     assert serialized_size(payload) <= 16 * 1024
 
 
-def test_core_job_status_exposes_bounded_durable_refresh_progress(tmp_path: Path) -> None:
+def test_core_job_status_exposes_bounded_durable_refresh_progress(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from codex_usage_tracker.interfaces.mcp.core_tools import build_usage_job_status
     from codex_usage_tracker.jobs.adapters import request_hash
     from codex_usage_tracker.jobs.service import JobService
@@ -420,6 +421,15 @@ def test_core_job_status_exposes_bounded_durable_refresh_progress(tmp_path: Path
         },
     )
 
+    original_get = repository.get
+    reads = 0
+
+    def counting_get(*args: object, **kwargs: object) -> dict[str, object] | None:
+        nonlocal reads
+        reads += 1
+        return original_get(*args, **kwargs)
+
+    monkeypatch.setattr(repository, "get", counting_get)
     payload = build_usage_job_status(
         job_id="refresh-progress",
         db_path=tmp_path / "missing-usage.sqlite3",
@@ -452,6 +462,7 @@ def test_core_job_status_exposes_bounded_durable_refresh_progress(tmp_path: Path
         "total": 6,
     }
     assert "synthetic-refresh" not in json.dumps(payload)
+    assert reads == 1
 
 
 def test_core_job_result_budget_includes_envelope_overhead(tmp_path: Path) -> None:

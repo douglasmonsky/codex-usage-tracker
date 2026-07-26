@@ -467,11 +467,14 @@ class _RefreshStreamWriter:
         self.timings.add("compression_facts", started)
         if self.derived_fact_sync is not None:
             recommendation_started = perf_counter()
+            derived_facts_require_rebuild = full_rebuild or any(
+                plan.replace_existing for plan in self.parse_plans
+            )
             self.derived_fact_sync(
                 conn,
                 finalized.record_ids,
                 finalized.affected_thread_keys,
-                full_rebuild,
+                derived_facts_require_rebuild,
             )
             self.timings.add("recommendation_facts", recommendation_started)
         emit_refresh_progress(

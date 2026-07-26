@@ -59,7 +59,7 @@ def test_current_schema_declares_the_reviewed_foreign_key_inventory(tmp_path: Pa
     assert actual == EXPECTED_FOREIGN_KEYS
 
 
-def test_usage_cleanup_cascades_derived_rows_and_resets_otel_mapping(tmp_path: Path) -> None:
+def test_usage_cleanup_cascades_derived_rows(tmp_path: Path) -> None:
     db_path = tmp_path / "usage.sqlite3"
     with connect(db_path) as connection:
         init_db(connection)
@@ -104,14 +104,6 @@ def test_usage_cleanup_cascades_derived_rows_and_resets_otel_mapping(tmp_path: P
             )
             """
         )
-        connection.execute(
-            """
-            INSERT INTO otel_completion_events (
-                fingerprint, source_path, source_line, match_status, matched_record_id
-            ) VALUES ('otel-1', '/synthetic/otel.jsonl', 1, 'matched', 'record-1')
-            """
-        )
-
         delete_usage_events_for_source_files(connection, ["/synthetic/one.jsonl"])
 
         for table in (
@@ -122,10 +114,6 @@ def test_usage_cleanup_cascades_derived_rows_and_resets_otel_mapping(tmp_path: P
             "allowance_observations",
         ):
             assert connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
-        otel = connection.execute(
-            "SELECT match_status, matched_record_id FROM otel_completion_events"
-        ).fetchone()
-        assert tuple(otel) == ("pending", None)
 
 
 def test_analysis_run_deletion_cascades_candidates_and_evidence(tmp_path: Path) -> None:
