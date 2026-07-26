@@ -112,7 +112,7 @@ def test_code_disposition_rejects_immutable_k1_decision_drift() -> None:
 
 def test_progressive_tasks_advance_non_keep_paths_without_restoring_source() -> None:
     for entry in _manifest()["entries"]:
-        if entry["owner_task"] == "K2":
+        if entry["owner_task"] in {"K2", "K3"}:
             assert entry["status"] == "verified"
         elif entry["disposition"] != "keep":
             assert entry["status"] == "removed"
@@ -154,7 +154,44 @@ def test_k2_generic_assignments_resolve_to_clean_schema_contract() -> None:
         "tests/store/test_usage_deduplication.py",
     ):
         assert all_entries[path]["owner_task"] == "K3"
-        assert all_entries[path]["status"] == "removed"
+        assert all_entries[path]["status"] == "verified"
+
+
+def test_k3_assignments_resolve_to_bounded_ingestion_or_retirement() -> None:
+    entries = [
+        entry
+        for entry in _manifest()["entries"]
+        if entry["owner_task"] == "K3"
+    ]
+    transplanted = [
+        entry for entry in entries if entry["disposition"] == "transplant"
+    ]
+    retired = [entry for entry in entries if entry["disposition"] == "retire"]
+
+    assert len(entries) == 48
+    assert len(transplanted) == 33
+    assert len(retired) == 15
+    assert all(entry["status"] == "verified" for entry in entries)
+    assert {
+        entry["target_path"] for entry in transplanted
+    } <= {
+        "src/codex_usage_tracker/kernel/discovery.py",
+        "src/codex_usage_tracker/kernel/ingest.py",
+        "src/codex_usage_tracker/kernel/lease.py",
+        "src/codex_usage_tracker/kernel/normalize.py",
+        "src/codex_usage_tracker/kernel/operational.py",
+        "src/codex_usage_tracker/kernel/parser.py",
+        "src/codex_usage_tracker/kernel/schema.py",
+        "src/codex_usage_tracker/kernel/watcher.py",
+        "src/codex_usage_tracker/kernel/writer.py",
+        "tests/kernel/test_ingest_concurrency.py",
+        "tests/kernel/test_ingest_jobs.py",
+        "tests/kernel/test_ingest_oracle.py",
+        "tests/kernel/test_ingest_pipeline.py",
+        "tests/kernel/test_ingest_privacy.py",
+        "tests/kernel/test_ingest_reconciliation.py",
+        "tests/kernel/test_watcher.py",
+    }
 
 
 def test_code_disposition_preserves_and_retires_semantic_boundaries() -> None:

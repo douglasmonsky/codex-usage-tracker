@@ -63,7 +63,7 @@ progress.
 | K1 | 0.25.x bridge | Complete | K0 | Freeze accounting oracle |
 | K1A | 0.26 integration | Complete | K1 | Quarantine legacy code and freeze agent scope |
 | K2 | 0.26.0 | Complete | K1A | Kernel schema v1 and stable identity |
-| K3 | 0.26.0 | Not started | K2 | Incremental/live ingestion |
+| K3 | 0.26.0 | Implementation qualified | K2 | Incremental/live ingestion |
 | K4 | 0.26.0 | Not started | K3 | Bounded query engine |
 | K5 | 0.26.0 | Not started | K3 | Evidence timeline and live stream |
 | K6 | 0.26.0 | Not started | K4, K5 | Six-tool integration interfaces |
@@ -622,6 +622,123 @@ so token metrics remain pending without retry.
   implementation assertions.
 - K2 is complete after integration-targeting CI and merge. K3 is unblocked
   from merge `a32fbab8306f827c5d7e7161e1d6913f73e67452`.
+
+## K3 — Incremental And Live Ingestion
+
+**State:** Implementation qualified
+
+**Branch:** `kernel/k3-ingest-tail`
+
+**Base:** `6145437bcc3c8943f5b8318bd5350617f111b441`
+
+**Implementation commit:** `6d804be` (`feat: add incremental kernel ingestion`)
+
+### Contract added first
+
+- Contract-red run failed on the six absent K3 owners before implementation.
+- Frozen source lifecycle, accounting, canonical-deduplication, parentage,
+  allowance, parser-diagnostic, and privacy oracles now execute through the
+  replacement kernel rather than quarantined runtime adapters.
+- Added explicit no-change, append, partial-tail, moving-tail, replacement,
+  truncation, archive move, process-crash, failed-promotion, stable-ID,
+  two-process ownership, heartbeat, concurrent-generation, and 100,000-call
+  writer-budget contracts.
+
+### Implementation
+
+- One discovery/parser/normalizer pipeline handles explicit hydration, refresh,
+  watcher catch-up, and complete-line moving tails. Initial hydration streams
+  at most 1,000 JSONL lines at a time into bounded writes and catches up new
+  complete lines before promotion; it never retains the whole history.
+- No-change performs no analytical write or generation bump. Ordinary appends
+  and unique new sources reuse the active database. Replacement, truncation, or
+  a proven active-versus-archive canonical conflict alone uses a validated
+  side artifact, so normal refreshes do not copy or rebuild total history.
+- Facts publish in 350-row bounded transactions behind a pending generation.
+  The operational active generation keeps readers on the prior complete view
+  until promotion. Partial-batch retries are idempotent.
+- A distinct lease owner joins compatible work, rejects foreign live work,
+  recovers stale ownership, renews long parsing from a host-side heartbeat,
+  and fences every writer transaction and promotion.
+- Source-local thread and allowance identities make replacement/truncation
+  cascades exact even when active and archived files share a logical session.
+  Pending generations never mutate already-visible thread or turn rows.
+- Append promotion uses one bounded generation digest and one atomic sidecar
+  cutover, avoiding repeated full-database hashing and integrity scans.
+- The parser stores structural accounting only: four token classes, model and
+  effort, thread/turn identity, tool/activity structure, and allowance
+  observations. It never stores prompt text, reasoning, raw arguments, raw
+  output, shell bodies, or full source paths.
+- K3 resolved all 48 assigned legacy paths: 33 verified behavioral transplants
+  and 15 verified retirements. Content-index refresh, worker-launch,
+  observability, callbacks, server routes, and raw-log inspection were retired.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | Reviewer-remediation lifecycle, concurrency, reconciliation, privacy, oracle, and pipeline suites pass; final focused slice 23/23 |
+| CI-equivalent | Pass | `just v`: 99 phase-owned tests in 20.08 s, Ruff, MyPy, Pyright 0 errors, complexity, manifests, scope, release safety, and diff checks pass |
+| Performance | Pass | Final local 100,000-call run: 15.828 s, 804 bounded writer transactions, p95 36.609 ms against 50 ms budget; CI 3.10 exposed and drove removal of per-fingerprint SELECT amplification |
+| Package | Pass | isolated 0.26.0.dev0 wheel and sdist pass exact release checks; isolated installed-wheel first-build plus no-change kernel smoke passed |
+| Privacy | Pass | synthetic fixtures only; raw private sentinels and full source paths absent from analytical facts and oracle output |
+
+Agent-perf run `20260726T225506Z-ec362ecb` was incomplete because pinned
+Scalene 2.3.0 on Python 3.14 exited without producing JSON. The identical
+unprofiled workload is therefore the performance authority; no additional
+profiler retries were started.
+
+### Development-efficiency and churn
+
+| Metric | K2 | K3 | Change |
+| --- | ---: | ---: | ---: |
+| Contract-red runs | 2 | 1 | 50.0% lower |
+| Focused runs | 18 | 62 | 244.4% higher |
+| Broad runs | 11 | 6 | 45.5% lower |
+| Duplicate broad runs | 0 | 0 | unchanged |
+| Blocking findings | 18 | 35 | 94.4% higher |
+| Non-behavioral findings | 10 | 16 | 60.0% higher |
+| Gate-remediation lines | 230 | 53 | 77.0% lower |
+| Verification wall time | 49.5 s | 155.0 s | 213.1% higher |
+| Style-only commits | 0 | 0 | unchanged |
+
+K3 achieved the targeted reduction in meaningless edit volume and broad-gate
+repetition, not a blanket reduction in every metric. Focused runs, findings,
+and wall time rose because the single final review found ten substantive
+correctness/performance issues and remediation added streaming, fencing,
+catch-up, and recovery coverage. Despite that expansion, gate-only remediation
+was 77.0% lower than K2, duplicate broad runs remained zero, and style-only
+commits remained zero.
+
+The Xenon absolute block ceiling remains C while module and average ceilings
+remain B. The arbitrary 600-line file bound was retired after it demanded a
+non-behavioral split of cohesive cutover and ingestion ownership. Repository
+guidance now requires boundaries based on responsibility, dependency direction,
+complexity, and testability instead of line count.
+
+The change-plan file estimate was amended from 32 to 37. The final scope adds
+the bounded digest owner and explicit repository guidance/policy coverage; the
+4,899 changed lines remain below the 6,000-line budget.
+
+### Review metrics
+
+- Total findings: 10
+- Accepted findings: 10
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Residual risk and next task
+
+- Replacement/truncation intentionally pays for a side-artifact copy; ordinary
+  no-change, append, and unique-source refreshes do not. K15 owns later
+  fault/scale expansion beyond this K3 contract.
+- The legacy installed-package smoke imports quarantined dashboard modules and
+  is not applicable on integration. K3 instead qualified the built wheel in an
+  isolated environment with synthetic first-build and no-change refreshes.
+- K4 must resolve the active generation from the operational sidecar and bind
+  every batch to that one generation; reads never infer readiness from
+  `MAX(generation)`.
+- K3 remains non-publishable and targets `kernel/0.26-integration`.
 
 ## Task Entry Template
 

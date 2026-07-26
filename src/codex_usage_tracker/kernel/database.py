@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import sqlite3
 import uuid
@@ -155,6 +156,30 @@ def analytical_digest(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return f"sha256:{digest.hexdigest()}"
+
+
+def analytical_generation_digest(path: Path, generation: int) -> str:
+    """Bind a published generation using bounded schema and generation metadata."""
+
+    with open_read_snapshot(path) as connection:
+        row = connection.execute(
+            "SELECT * FROM generations WHERE generation = ? "
+            "AND integrity_status = 'valid'",
+            (generation,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("analytical artifact does not contain valid generation")
+        payload = {
+            "application_id": APPLICATION_ID,
+            "schema_version": SCHEMA_VERSION,
+            "generation": dict(row),
+        }
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return "generation-sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 def analytical_generation_exists(path: Path, generation: int) -> bool:

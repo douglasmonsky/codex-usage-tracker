@@ -35,9 +35,10 @@ def test_maintainability_policy_has_one_non_stylistic_guardrail_per_concern() ->
     maintainability = (
         _REPO_ROOT / "scripts" / "check_kernel_maintainability.py"
     ).read_text(encoding="utf-8")
-    assert "max_physical: int = 600" in maintainability
-    assert "max_source: int = 600" in maintainability
-    assert maintainability.count('"B"') == 3
+    assert "max_physical" not in maintainability
+    assert "max_source" not in maintainability
+    assert maintainability.count('"C"') == 1
+    assert maintainability.count('"B"') == 2
     for name in (
         "git-agent-ratchet-duplicate-helpers.json",
         "git-agent-ratchet-max-file-lines.json",
