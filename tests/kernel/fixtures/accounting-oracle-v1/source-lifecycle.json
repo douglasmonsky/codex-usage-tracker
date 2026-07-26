@@ -1,0 +1,76 @@
+{
+  "schema": "codex-usage-tracker.kernel-source-lifecycle.v1",
+  "fixture_version": 1,
+  "source_ref": "v0.25.1",
+  "cases": [
+    {"name": "new"},
+    {"name": "appended"},
+    {"name": "partially_appended"},
+    {"name": "replaced"},
+    {"name": "truncated"},
+    {"name": "archived"},
+    {"name": "restored"}
+  ],
+  "expected": {
+    "cases": [
+      {
+        "name": "new",
+        "planned": true,
+        "start_byte": 0,
+        "end_byte": 21,
+        "start_line": 0,
+        "replace_existing": true,
+        "is_archived": false
+      },
+      {
+        "name": "appended",
+        "planned": true,
+        "start_byte": 17,
+        "end_byte": 35,
+        "start_line": 1,
+        "replace_existing": false,
+        "is_archived": false
+      },
+      {
+        "name": "partially_appended",
+        "planned": false
+      },
+      {
+        "name": "replaced",
+        "planned": true,
+        "start_byte": 0,
+        "end_byte": 23,
+        "start_line": 0,
+        "replace_existing": true,
+        "is_archived": false
+      },
+      {
+        "name": "truncated",
+        "planned": true,
+        "start_byte": 0,
+        "end_byte": 3,
+        "start_line": 0,
+        "replace_existing": true,
+        "is_archived": false
+      },
+      {
+        "name": "archived",
+        "planned": true,
+        "start_byte": 0,
+        "end_byte": 20,
+        "start_line": 0,
+        "replace_existing": true,
+        "is_archived": true
+      },
+      {
+        "name": "restored",
+        "planned": true,
+        "start_byte": 0,
+        "end_byte": 20,
+        "start_line": 0,
+        "replace_existing": true,
+        "is_archived": false
+      }
+    ]
+  }
+}

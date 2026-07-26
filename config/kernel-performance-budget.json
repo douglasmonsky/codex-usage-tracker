@@ -1,0 +1,53 @@
+{
+  "acceptance_role": "comparison_evidence_only",
+  "profile_evidence": {
+    "run_id": "20260726T194642Z-9b3625c3",
+    "workload": "10000 fixed-seed synthetic calls",
+    "profiler": "scalene 2.3.0",
+    "interpretation": "Attribution only. Leading owned work includes event insertion, source-record synchronization, link refresh, and legacy compression-fact maintenance."
+  },
+  "schema": "codex-usage-tracker.kernel-performance-baseline.v1",
+  "seed": 20260726,
+  "workloads": [
+    {
+      "calls": 10000,
+      "database_bytes": 28872704,
+      "environment": {
+        "commit": "62726189c05d423f08abdec6ad1454434188d734",
+        "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+        "python": "3.14.6",
+        "runtime": "v0.25.1 persistence including derived-state maintenance",
+        "sqlite": "3.53.3"
+      },
+      "package_bytes": 9199625,
+      "rows": {
+        "canonical": 9501,
+        "physical": 10000
+      },
+      "seed": 20260726,
+      "tables": 38,
+      "wall_seconds": 1.536323,
+      "writer_lock_seconds": 1.063203
+    },
+    {
+      "calls": 100000,
+      "database_bytes": 286937088,
+      "environment": {
+        "commit": "62726189c05d423f08abdec6ad1454434188d734",
+        "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+        "python": "3.14.6",
+        "runtime": "v0.25.1 persistence including derived-state maintenance",
+        "sqlite": "3.53.3"
+      },
+      "package_bytes": 9199625,
+      "rows": {
+        "canonical": 95001,
+        "physical": 100000
+      },
+      "seed": 20260726,
+      "tables": 38,
+      "wall_seconds": 20.632941,
+      "writer_lock_seconds": 16.170328
+    }
+  ]
+}

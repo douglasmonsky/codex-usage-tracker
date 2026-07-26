@@ -65,11 +65,9 @@ PYTHONPATH=src .venv/bin/python -m pytest -q
 .venv/bin/tach check
 .venv/bin/python scripts/check_release.py
 git diff --check
-.venv/bin/python scripts/check_wemake_baseline.py
-.venv/bin/python -m agent_maintainer verify --profile fast
-.venv/bin/git-agent-ratchet max-file-lines --baseline .agent-maintainer/git-agent-ratchet-max-file-lines.json --dir src --max 600 --exclude __pycache__
-.venv/bin/git-agent-ratchet no-cross-module-private-import --baseline .agent-maintainer/git-agent-ratchet-private-imports.json --dir src --exclude __pycache__
-.venv/bin/git-agent-ratchet no-duplicate-helpers --baseline .agent-maintainer/git-agent-ratchet-duplicate-helpers.json --dir src --exclude __pycache__ --lang python
+just vp
+just v
+just vc
 ```
 
 Current passing evidence:
@@ -79,11 +77,8 @@ Current passing evidence:
 - `.venv/bin/python -m mypy`: passed for the configured 8 source files.
 - `.venv/bin/python -m compileall src`: passed.
 - `.venv/bin/tach check`: passed.
-- `.venv/bin/python scripts/check_wemake_baseline.py`: passed.
-- `.venv/bin/python -m agent_maintainer verify --profile fast`: passed with the documented structure-cohesion warning.
 - `.venv/bin/python scripts/check_release.py`: passed.
 - `git diff --check`: passed.
-- Git-agent-ratchet file length, private import, and duplicate helper checks passed.
 - Temporary detached-worktree package gates passed:
   - `.venv/bin/python -m build <worktree> --outdir <worktree>/dist`
   - `.venv/bin/python -m twine check <worktree>/dist/*`
@@ -101,22 +96,33 @@ Deferred architecture strictness:
 
 ## Wemake Status
 
-Wemake is installed as a Python 3.11+ dev dependency and is intentionally scoped
-through `scripts/check_wemake_baseline.py`.
+Wemake is retired from repository governance. Agent Maintainer keeps its wemake
+provider disabled, the standalone narrow baseline has been removed, and wemake
+is no longer installed by the development extra. Do not reintroduce or expand a
+wemake gate without a new explicit product decision.
 
-Current wemake baseline modules:
+## Low-Churn Gate Policy
 
-- `src/codex_usage_tracker/__main__.py`
-- `src/codex_usage_tracker/diagnostic_snapshot_constants.py`
-- `src/codex_usage_tracker/diagnostics_types.py`
-- `src/codex_usage_tracker/paths.py`
-- `src/codex_usage_tracker/server_routes.py`
-- `src/codex_usage_tracker/store_usage_timing.py`
-- `src/codex_usage_tracker/usage_drain_boundary_scopes.py`
+The standalone `git-agent-ratchet` file-length, private-import, and
+duplicate-helper gates are retired. Their useful responsibilities are covered
+by the repository's single physical file bound, Tach dependency contracts,
+Ruff, tests, and review. Agent Maintainer uses the same 600-line physical and
+source ceilings in its advisory configuration, while the repository-owned
+kernel gate enforces those two 600-line ceilings and a B ceiling for
+absolute/module/average Xenon complexity on the clean replacement kernel.
+The legacy runtime remains protected by the product-complexity non-regression
+budget until K1A removes it. Roadmap-compatible change budgets are 5,000 Python
+lines or 100 Python files. Approved larger changes still require an explicit
+change plan.
 
-Global wemake remains disabled in `agent-maintainer` until coverage expands
-enough to be a useful signal. The current policy is to add modules only after
-they pass without broad ignores.
+Agent Maintainer's generic verification profiles are no longer repository
+acceptance gates. The repository-owned `just vp`, `just v`, and `just vc`
+recipes run the maintained Python, architecture, test, security, release, and
+frontend checks without generic Markdown code-fence formatting, expanded test
+typechecking, historical file-length baselines, or stale change-plan scanning.
+`just vc` also runs `scripts/check_kernel_maintainability.py`; focused tests
+prove oversized or Xenon-C replacement modules fail.
+GitHub CI remains the final shared acceptance authority.
 
 ## Accepted Exceptions
 
@@ -137,6 +143,5 @@ they pass without broad ignores.
 1. Split `src/codex_usage_tracker` into responsibility packages so structure-cohesion warnings become actionable.
 2. Reduce the five B-ranked xenon modules until strict `--max-modules A` can pass.
 3. Decide whether to adopt repo-wide Ruff formatting or keep formatter drift as a documented non-blocking item.
-4. Expand `scripts/check_wemake_baseline.py` in small module groups.
-5. Revisit `forbid_circular_dependencies = true` after package boundaries are less coarse.
-6. Only after explicit approval, decide whether any local gates should become remote CI.
+4. Revisit `forbid_circular_dependencies = true` after package boundaries are less coarse.
+5. Only after explicit approval, decide whether any local gates should become remote CI.

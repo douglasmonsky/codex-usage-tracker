@@ -1,0 +1,72 @@
+{
+  "schema": "codex-usage-tracker.kernel-development-efficiency.v1",
+  "baseline_task": "K1",
+  "policy_started_at": "2026-07-26",
+  "purpose": "Measure reduction in non-behavioral gate churn without weakening correctness gates.",
+  "retired_or_adjusted_gates": [
+    {
+      "gate": "wemake",
+      "action": "retired",
+      "replacement": "Ruff, Pyright, tests, and review"
+    },
+    {
+      "gate": "git-agent-ratchet no-duplicate-helpers",
+      "action": "retired",
+      "replacement": "responsibility-based review and tests"
+    },
+    {
+      "gate": "git-agent-ratchet no-cross-module-private-import",
+      "action": "retired",
+      "replacement": "Tach dependency contracts"
+    },
+    {
+      "gate": "git-agent-ratchet max-file-lines",
+      "action": "retired",
+      "replacement": "single 600-line physical/source bound"
+    },
+    {
+      "gate": "Agent Maintainer change budget",
+      "action": "adjusted",
+      "replacement": "5000 Python lines or 100 Python files plus explicit change plans"
+    },
+    {
+      "gate": "Xenon module and average grade",
+      "action": "adjusted",
+      "replacement": "B absolute, module, and average ceiling"
+    }
+  ],
+  "metric_definitions": {
+    "contract_red_test_runs": "Intentional failing test runs that establish a task contract.",
+    "focused_test_runs": "Focused verifier or test invocations during implementation.",
+    "broad_verification_runs": "Full, CI-equivalent, release, or similarly broad profiles.",
+    "duplicate_broad_runs": "Broad profiles repeated on the same source and configuration state.",
+    "blocking_gate_findings": "Unexpected blocking findings from verification.",
+    "non_behavioral_gate_findings": "Blocking findings whose remediation changed no behavior or contract.",
+    "gate_remediation_lines": "Added plus deleted lines used only to remediate non-behavioral findings.",
+    "verification_wall_seconds": "Measured wall time across recorded verifier invocations.",
+    "style_only_commits": "Commits with no behavior, contract, test, schema, documentation-meaning, or generator-input change."
+  },
+  "target_direction": {
+    "duplicate_broad_runs": "down_to_zero",
+    "non_behavioral_gate_findings": "down",
+    "gate_remediation_lines": "down",
+    "style_only_commits": "down_to_zero",
+    "blocking_gate_findings": "down_without_weakening_correctness"
+  },
+  "tasks": [
+    {
+      "task_id": "K1",
+      "state": "complete",
+      "contract_red_test_runs": 1,
+      "focused_test_runs": 33,
+      "broad_verification_runs": 5,
+      "duplicate_broad_runs": 0,
+      "blocking_gate_findings": 8,
+      "non_behavioral_gate_findings": 6,
+      "gate_remediation_lines": 74,
+      "verification_wall_seconds": 966.0,
+      "style_only_commits": 0,
+      "notes": "First post-policy baseline. Six blocking check groups changed no product behavior: two focused import/style checks plus four generic Agent Maintainer CI-profile groups. GitHub CI found two behavioral Python 3.10 compatibility defects: new tomllib imports lacked the existing tomli fallback, and Xenon was not an explicit cross-version development dependency. Broad runs followed implementation, review fixes, or CI compatibility fixes; none repeated an unchanged source/configuration state."
+    }
+  ]
+}
