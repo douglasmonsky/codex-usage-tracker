@@ -64,8 +64,8 @@ progress.
 | K1A | 0.26 integration | Complete | K1 | Quarantine legacy code and freeze agent scope |
 | K2 | 0.26.0 | Complete | K1A | Kernel schema v1 and stable identity |
 | K3 | 0.26.0 | Complete | K2 | Incremental/live ingestion |
-| K4 | 0.26.0 | Local complete; CI pending | K3 | Bounded query engine |
-| K5 | 0.26.0 | Not started | K3 | Evidence timeline and live stream |
+| K4 | 0.26.0 | Complete | K3 | Bounded query engine |
+| K5 | 0.26.0 | CI fix pending | K3 | Evidence timeline and live stream |
 | K6 | 0.26.0 | Not started | K4, K5 | Six-tool integration interfaces |
 | K7 | 0.26.0 | Not started | K6 | Focused Evidence Console |
 | K8 | 0.26.0 | Not started | K7 | Allowance efficiency |
@@ -752,13 +752,14 @@ the bounded digest owner and explicit repository guidance/policy coverage; the
 
 ## K4 — Bounded generation-consistent query engine
 
-**State:** Integration CI passed; merge pending
+**State:** Complete
 **Branch:** `kernel/k4-query-engine`
 **Base:** `f7948ee824480e720e27111d2a8cf68dd1351cef`
 **Commits:** `e4e0dba feat: add bounded kernel query engine`;
 `b4e73e5 docs: close K4 local verification ledger`;
 `ddfbd64 ci: isolate host-sensitive ingest benchmark`;
-closeout metadata in this changeset
+merged through PR #322 as
+`a38bf4440ae04b34d9197628378f09c05fd2c060`
 
 ### Contract added first
 
@@ -869,10 +870,119 @@ also removed two redundant full scans from every non-empty SQL result.
 
 ### Residual risk and next task
 
-- PR #322 is green and remains to be squash-merged into integration; the single
-  final review is complete.
-- K5 may now build evidence timelines and the live event stream on the stable
-  logical selectors and generation-consistent query service.
+- K4 is merged into the non-publishable integration branch. K5 builds evidence
+  timelines and the live event stream on its stable logical selectors and
+  generation-consistent query service.
+
+## K5 — Exact evidence timeline and live generation stream
+
+**State:** Integration CI fix pending
+**Branch:** `kernel/k5-evidence-live`
+**Base:** `a38bf4440ae04b34d9197628378f09c05fd2c060`
+**Commits:** `c45fa2c feat: add live kernel evidence timelines`; closeout
+metadata in this changeset
+
+### Contract added first
+
+- The contract-red run failed collection because the kernel evidence and live
+  packages did not exist. The completed contract covers thread, turn, call,
+  tool, and allowance selectors; all six bounded evidence views; cursor and
+  rebuild stability; read-only behavior; privacy; journal replay, retention,
+  restart, concurrency, burst, disconnect, generation-gap, rollback, and
+  snapshot fallback.
+- Every evidence read resolves one active generation and opens one read
+  snapshot. Logical IDs, rather than SQLite row IDs, drive selectors and stable
+  relative destinations.
+- The live contract publishes a fixed `generation_committed` event only after
+  analytical promotion. Event IDs and publication identities are persistent;
+  journal failure never invalidates a promoted analytical generation.
+
+### Implementation
+
+- `kernel.evidence` owns typed selectors, normalized bounded requests, opaque
+  request- and generation-bound cursors, deterministic ordering, exact
+  matched/scanned/returned counts, and privacy-safe summary, timeline, calls,
+  tools, activities, and allowance pages.
+- `kernel.live` owns the operational `live_events` journal, monotonic event
+  allocation, bounded retention and replay, strict loopback-origin and
+  `Last-Event-ID` validation, heartbeat and snapshot-required decisions, and
+  deterministic server-sent-event frames.
+- Ingestion accepts an optional journal seam and publishes numeric-only
+  changed-source, inserted-call, inserted-tool, and deleted-row counters after
+  promotion. Publication identity, not generation number alone, detects
+  rollback or reused-generation divergence.
+- K5 resolved its one frozen legacy disposition entry by transplanting the
+  stable evidence responsibility into `kernel.evidence.service`; no legacy
+  narrative analysis or content indexing returned.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | final evidence/live contracts: 42 tests; focused Ruff, Mypy, and maintainability checks clean |
+| Broader | Pass | final pre-ledger `just v`: 141 passed; Ruff, Mypy, Pyright, Xenon, scope, manifests, and release checks clean in 37.63 s |
+| Performance | Pass | 100,000 synthetic calls: 67.032 ms median and 68.387 ms p95 first-page latency, below the 500 ms budget |
+| Profiling | Incomplete | `agent-perf` run `20260727T015044Z-fc265f11`, Scalene 2.3.0, exited zero but emitted no JSON profile; no hotspot claim |
+| Package | Pass | wheel and sdist built; release-safety distribution check passed; isolated no-dependency wheel imports for `EvidenceService`, `GenerationJournal`, and `LiveStream` passed |
+| Privacy | Pass | synthetic fixtures only; no live database, Codex log, prompt, reasoning, raw tool argument/output, shell body, secret, or full source path inspected or stored |
+| Integration CI | Fix pending | PR #323: the first defect was corrected and passed in 75 s and 90 s; a docs-only rerun exposed inherited wildcard wiring that re-added the excluded ingest benchmark to the broad matrix; a policy test now protects the dedicated-step boundary and the exact local functional command passed 141 tests in 20.14 s |
+
+The performance assertion uses the identical unprofiled synthetic workload.
+Profiling is attribution-only and cannot replace that timing evidence.
+
+### Review metrics
+
+- Total findings: 5
+- Accepted findings: 5 (`R1`–`R5`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+| Metric | K4 | K5 local | Change |
+| --- | ---: | ---: | ---: |
+| Contract-red runs | 2 | 2 | unchanged |
+| Focused runs | 25 | 19 | 24.0% lower |
+| Broad runs | 8 | 14 | 75.0% higher |
+| Duplicate broad runs | 0 | 0 | unchanged |
+| Blocking findings | 21 | 13 | 38.1% lower |
+| Non-behavioral findings | 11 | 5 | 54.5% lower |
+| Gate-remediation lines | 264 | 58 | 78.0% lower |
+| Verification wall time | 386.2 s | 712.0 s | 84.4% higher |
+| Style-only commits | 0 | 0 | unchanged |
+
+K5 reduced focused runs, findings, and remediation lines against K4 while
+preserving all behavioral, typing, privacy, scope, complexity, package,
+release, and performance gates. Broad runs and total verification time
+increased because initial CI, compatibility qualification, and corrected CI
+are recorded separately. No duplicate broad run or style-only commit occurred.
+The five non-behavioral findings were one future-schema test constant, two
+focused Ruff forms, the Python 3.10 fixture selection, and inherited CI
+performance-step wiring.
+
+### Deviations and decisions
+
+- Evidence destinations are stable relative `/evidence/...` paths. K6 owns the
+  final adapter and HTTP prefix; K5 does not invent an integration surface.
+- Call and tool selectors omit turn-wide activity unions because schema-v1
+  cannot attribute every activity exactly to a call or tool. Broader
+  attribution would be false precision.
+- The journal deliberately exposes only `generation_committed` with
+  numeric-only counters. Content events, prompts, reasoning, raw arguments,
+  outputs, full paths, and server-authored narrative are outside K5.
+- The change-plan file cap increased from 25 to 28 for the mandatory
+  development-efficiency ledger and its policy test plus one CI regression
+  test. The implementation inventory itself remained at 25 files and below the
+  line budget.
+
+### Residual risk and next task
+
+- The Scalene capture did not emit a usable profile. The repeatable unprofiled
+  100,000-call benchmark remains authoritative and passes with substantial
+  headroom.
+- The final corrected CI rerun and squash merge remain pending. After merge,
+  K6 may bind K4 queries and K5 evidence/live behavior to exactly the six
+  approved integration interfaces without reintroducing narrative analysis.
 
 ## Task Entry Template
 

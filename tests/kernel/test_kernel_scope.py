@@ -9,6 +9,7 @@ from scripts.check_kernel_scope import (
     K2_ADDITIONS,
     K3_ADDITIONS,
     K4_ADDITIONS,
+    K5_ADDITIONS,
     load_disposition_manifest,
     publication_ref_failure,
     scope_failures,
@@ -109,8 +110,22 @@ def test_k4_additions_are_explicit_and_bounded() -> None:
         "src/codex_usage_tracker/kernel/query/service.py",
         "tests/kernel/query/test_performance.py",
     } <= K4_ADDITIONS
+
+
+def test_k5_additions_are_explicit_and_bounded() -> None:
+    assert {
+        ".agent-maintainer/change-plans/k5-evidence-live.md",
+        "src/codex_usage_tracker/kernel/evidence/service.py",
+        "src/codex_usage_tracker/kernel/live/journal.py",
+        "tests/kernel/evidence/test_performance.py",
+        "tests/kernel/live/test_contracts.py",
+    } <= K5_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
-        K1A_ADDITIONS | K2_ADDITIONS | K3_ADDITIONS | K4_ADDITIONS
+        K1A_ADDITIONS
+        | K2_ADDITIONS
+        | K3_ADDITIONS
+        | K4_ADDITIONS
+        | K5_ADDITIONS
     )
 
 

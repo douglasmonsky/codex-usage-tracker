@@ -73,8 +73,28 @@ K4_ADDITIONS = frozenset(
         "tests/kernel/query/test_service.py",
     }
 )
+K5_ADDITIONS = frozenset(
+    {
+        ".agent-maintainer/change-plans/k5-evidence-live.md",
+        "src/codex_usage_tracker/kernel/evidence/__init__.py",
+        "src/codex_usage_tracker/kernel/evidence/contracts.py",
+        "src/codex_usage_tracker/kernel/evidence/service.py",
+        "src/codex_usage_tracker/kernel/live/__init__.py",
+        "src/codex_usage_tracker/kernel/live/journal.py",
+        "src/codex_usage_tracker/kernel/live/stream.py",
+        "tests/kernel/evidence/__init__.py",
+        "tests/kernel/evidence/test_contracts.py",
+        "tests/kernel/evidence/test_performance.py",
+        "tests/kernel/evidence/test_service.py",
+        "tests/kernel/live/__init__.py",
+        "tests/kernel/live/test_contracts.py",
+        "tests/kernel/live/test_ingest_integration.py",
+    }
+)
 
-INTEGRATION_ADDITIONS = K1A_ADDITIONS | K2_ADDITIONS | K3_ADDITIONS | K4_ADDITIONS
+INTEGRATION_ADDITIONS = (
+    K1A_ADDITIONS | K2_ADDITIONS | K3_ADDITIONS | K4_ADDITIONS | K5_ADDITIONS
+)
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"
 )

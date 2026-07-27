@@ -23,6 +23,7 @@ from .discovery import (
     plan_source,
 )
 from .lease import RefreshLeaseRepository
+from .live.journal import GenerationJournal
 from .models import CutoverState
 from .normalize import NormalizedBatch, normalize_batch, parser_state_from_json
 from .operational import (
@@ -58,14 +59,23 @@ class RefreshResult:
     deleted_rows: int
     writer_transaction_ms: tuple[float, ...]
     joined: bool = False
+    live_event_id: int | None = None
+    live_journal_status: str = "not_configured"
 
 
 class KernelIngestor:
     """Coordinate discovery, parsing, normalization, writing, and cutover."""
 
-    def __init__(self, analytical_path: Path, operational_path: Path) -> None:
+    def __init__(
+        self,
+        analytical_path: Path,
+        operational_path: Path,
+        *,
+        journal: GenerationJournal | None = None,
+    ) -> None:
         self.analytical_path = analytical_path.resolve()
         self.operational_path = operational_path.resolve()
+        self._journal = journal
 
     def refresh(
         self,
@@ -220,6 +230,7 @@ class KernelIngestor:
                 generation,
                 written,
             )
+            result = self._publish_generation(result)
             leases.complete(
                 lease.refresh_run_id,
                 generation=generation,
@@ -234,6 +245,29 @@ class KernelIngestor:
     def _initialize_for_explicit_refresh(self) -> None:
         initialize_analytical_database(self.analytical_path)
         initialize_operational_database(self.operational_path)
+
+    def _publish_generation(self, result: RefreshResult) -> RefreshResult:
+        if self._journal is None:
+            return result
+        try:
+            event = self._journal.publish_generation(
+                result.generation,
+                publication_id=(
+                    load_cutover_control(self.operational_path).integrity_digest
+                    or result.refresh_run_id
+                ),
+                changed_sources=result.changed_sources,
+                inserted_calls=result.inserted_calls,
+                inserted_tools=result.inserted_tools,
+                deleted_rows=result.deleted_rows,
+            )
+        except (OSError, sqlite3.Error, ValueError):
+            return replace(result, live_journal_status="snapshot_required")
+        return replace(
+            result,
+            live_event_id=event.event_id,
+            live_journal_status="published",
+        )
 
     def _plans(
         self,
@@ -686,4 +720,6 @@ def _result_payload(result: RefreshResult) -> dict[str, object]:
         "inserted_tools": result.inserted_tools,
         "deleted_rows": result.deleted_rows,
         "writer_transaction_ms": list(result.writer_transaction_ms),
+        "live_event_id": result.live_event_id,
+        "live_journal_status": result.live_journal_status,
     }
