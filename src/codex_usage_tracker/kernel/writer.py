@@ -38,6 +38,7 @@ def commit_refresh(
     reselect_canonical: bool = False,
     assert_fence: Callable[[], None] | None = None,
     generation_plans: tuple[SourcePlan, ...] | None = None,
+    canonicalize_touched: bool = True,
 ) -> WriteResult:
     """Stage a generation in bounded transactions, then publish it atomically."""
 
@@ -88,16 +89,17 @@ def commit_refresh(
         for chunk in _chunks(rows):
             with _timed_writer(path, transaction_ms, assert_fence) as connection:
                 _insert_rows(connection, table, chunk)
-    touched_fingerprints.update(
-        str(row["canonical_call_id"]) for row in table_rows[0][1]
-    )
-    for fingerprint_chunk in _chunks(tuple(sorted(touched_fingerprints))):
-        with _timed_writer(path, transaction_ms, assert_fence) as connection:
-            _canonicalize(
-                connection,
-                fingerprint_chunk,
-                reselect=reselect_canonical,
-            )
+    if canonicalize_touched:
+        touched_fingerprints.update(
+            str(row["canonical_call_id"]) for row in table_rows[0][1]
+        )
+        for fingerprint_chunk in _chunks(tuple(sorted(touched_fingerprints))):
+            with _timed_writer(path, transaction_ms, assert_fence) as connection:
+                _canonicalize(
+                    connection,
+                    fingerprint_chunk,
+                    reselect=reselect_canonical,
+                )
 
     with _read_counts(path, generation) as counts:
         inserted_calls, inserted_tools, canonical, excluded = counts
@@ -134,6 +136,32 @@ def commit_refresh(
         excluded_calls=excluded,
         transaction_ms=tuple(transaction_ms),
     )
+
+
+def canonicalize_initial_duplicates(
+    path: Path,
+    transaction_ms: list[float],
+    *,
+    assert_fence: Callable[[], None] | None = None,
+) -> None:
+    """Resolve only actual initial-hydration collisions."""
+
+    with sqlite3.connect(path) as connection:
+        fingerprints = tuple(
+            str(row[0])
+            for row in connection.execute(
+                """
+                SELECT canonical_call_id
+                FROM model_calls
+                GROUP BY canonical_call_id
+                HAVING COUNT(*) > 1
+                ORDER BY canonical_call_id
+                """
+            )
+        )
+    for chunk in _chunks(fingerprints):
+        with _timed_writer(path, transaction_ms, assert_fence) as connection:
+            _canonicalize(connection, chunk, reselect=True)
 
 
 _WRITE_BATCH_ROWS = 350

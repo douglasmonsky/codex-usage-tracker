@@ -33,7 +33,11 @@ from .operational import (
     transition_cutover,
 )
 from .parser import ParsedBatch, iter_jsonl_batches, parse_jsonl
-from .writer import WriteResult, commit_refresh
+from .writer import (
+    WriteResult,
+    canonicalize_initial_duplicates,
+    commit_refresh,
+)
 
 
 class RefreshTrigger(str, Enum):
@@ -327,6 +331,8 @@ class KernelIngestor:
                     parsed,
                     generation=generation,
                 )
+                for row in normalized.model_calls:
+                    row["duplicate_state"] = "canonical"
                 latest = commit_refresh(
                     path,
                     (chunk_plan,),
@@ -336,6 +342,7 @@ class KernelIngestor:
                     reselect_canonical=True,
                     assert_fence=assert_fence,
                     generation_plans=plans,
+                    canonicalize_touched=False,
                 )
                 transaction_ms.extend(latest.transaction_ms)
                 prior_state = parsed.final_state
@@ -343,6 +350,11 @@ class KernelIngestor:
                 start_line = parsed.end_line
         if latest is None:
             raise RuntimeError("initial stream produced no source state")
+        canonicalize_initial_duplicates(
+            path,
+            transaction_ms,
+            assert_fence=assert_fence,
+        )
         return WriteResult(
             inserted_calls=latest.inserted_calls,
             inserted_tools=latest.inserted_tools,

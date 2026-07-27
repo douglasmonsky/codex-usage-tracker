@@ -28,6 +28,7 @@ dist/
 !src/codex_usage_tracker/plugin_data/dashboard/dashboard_template.html
 
 .DS_Store
+.idea/
 tmp/
 .cache/
 /.gitnexus/
