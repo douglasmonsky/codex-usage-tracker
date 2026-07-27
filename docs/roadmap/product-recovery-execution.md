@@ -12,7 +12,7 @@ benchmark, a source-only tag, or an unpublished package.
 | Task | State | Depends on | Branch | Outcome |
 | --- | --- | --- | --- | --- |
 | R0 | Complete | — | `docs/product-recovery-roadmap` | Recovery authority merged as `117fff8` |
-| R1 | Pending | R0 | — | Agent outcome and performance baseline |
+| R1 | In progress | R0 | `feature/r1-agent-outcome-baseline` | Frozen benchmark and measured failures; validation/review pending |
 | R2 | Pending | R1 | — | Schema v3 and compact storage contract |
 | R3 | Pending | R2 | — | Cold build and incremental refresh acceleration |
 | R4 | Pending | R2 | — | Persisted rollups and fast API/MCP |
@@ -80,7 +80,7 @@ disjoint file sets.
 
 | Wave | Lane | Owner | Base | Files | State |
 | --- | --- | --- | --- | --- | --- |
-| 1 | R1 baseline | primary | R0 merge | task packet allowlist | Pending |
+| 1 | R1 baseline | primary | `96c6335` | task packet allowlist | In progress |
 | 2 | R3 ingestion | unassigned | R2 contract | ingest-owned files | Blocked |
 | 2 | R4 query | unassigned | R2 contract | query-owned files | Blocked |
 | 2 | R7 harness | unassigned | R1 harness | test/runner-owned files | Blocked |
@@ -228,5 +228,117 @@ supports the metrics helper's `strict` command. It was not retried.
 ### Residual risk and next task
 
 - R0 has no remaining implementation, review, validation, or merge work.
-- R1 is unblocked from exact merged-main SHA
-  `117fff8d38390cb64c6ebef21545908c333a767f`.
+- R1 is unblocked from exact R0 closure SHA
+  `96c63359b3e79c8147d64dc6250a0de0968eb061`.
+
+## R1 — Agent Outcome And Performance Baseline
+
+**State:** In progress
+**Branch:** `feature/r1-agent-outcome-baseline`
+**Base:** `96c63359b3e79c8147d64dc6250a0de0968eb061`
+**Commits:** pending
+**Owned files:** Product Recovery benchmark contracts and results under
+`config/`; `scripts/benchmark_agent_outcome.py`; focused R1 and scope tests;
+this ledger
+**Parallel lane:** none
+
+### Contract added first
+
+- `tests/kernel/test_agent_outcome_baseline.py` initially failed at collection
+  because the benchmark runner did not exist.
+- The implemented contract freezes ten prompt IDs, eleven lifecycle scenarios,
+  CLI and Desktop host identities, timing boundaries, fixed gates, two
+  deterministic history profiles, a bounded answer schema, candidate
+  coherence, privacy rejection, and scorecard validation.
+
+### Implementation
+
+- Added a streaming structural-only generator for an eight-thread CI workload
+  and a 643-thread, 2.35-million-fact production-shaped workload.
+- Added cold-build, byte-preserving no-change, and one-call append-safe
+  measurements without editing kernel behavior.
+- Added exact candidate binding across verified wheel `RECORD` bytes,
+  wheel-executed package version and six-tool MCP catalog, source revision,
+  plugin bundle digest, skill identity, and cached bundle digest.
+- Added an ephemeral `codex exec` runner that discards raw task output and
+  retains only bounded timings, counts, grades, versions, and error codes.
+- Added executable deterministic oracles for all ten prompt intents and a
+  lifecycle runner covering all eleven scenarios with measured or explicitly
+  unsupported outcomes.
+- Added a closed-world machine-readable scorecard schema with bounded typed
+  strings and no prompts, responses, reasoning, tool arguments, raw results,
+  paths, URIs, or extension fields.
+- Fresh-host qualification now requires observed candidate registration,
+  handshake, exact six-tool catalog, task exposure, supported launch method,
+  candidate version, and bundle digest. It is never inferred from task success.
+- Installed the exact candidate wheel locally, redirected the 0.28.0
+  marketplace to this checkout, and removed the stale enabled 0.25.1 local
+  plugin registration. The temporary synthetic Desktop MCP registration was
+  removed immediately after the run.
+
+### Agent outcome
+
+| Host | Prompts | End-to-end range | Tool-time range | Calls | Exact accuracy | Usefulness |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Codex CLI | 10/10 | 66.002–120.107 s | 12.331 ms–44.723 s | 1–3 | 0/10 | 0–3/4 |
+| Codex Desktop | 10/10 | 50.428–137.955 s | 14.717–67.946 ms | 3–10 | 0/10 | 0–3/4 |
+
+Every frozen prompt was executed in both advertised hosts against the same
+synthetic committed generation. CLI had three 120-second terminal failures and
+no exact oracle match. Desktop completed every task, but every answer violated
+the requested closed answer schema; several returned object-valued facts,
+list- or object-valued tool counts, or dictionary claim grades. Desktop spent
+15.4–37.7 seconds before its first tracker call for eight tasks; the other two
+started their first MCP call at 16.9 and 31.3 seconds. This separates
+agent-orchestration latency from the mostly sub-68-millisecond Desktop tracker
+work. The CLI allowance task independently exposed a 44.7-second tracker path.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Contract and scope | Pass | closed schemas, ten prompt oracles, eleven scenario outcomes, fail-closed scope checker |
+| Reproducibility | Pass | two small-CI runs had stable SHA-256 `73508117…f1b4cd` after removing timing values |
+| Small CI | Pass | 96 calls; 180.330 ms cold, 9.550 ms no-change, 23.495 ms tail; 286,720-byte database |
+| Production-shaped | Measured failure | 1,316,864 initial calls and about 2.35 million facts; 792.320 s cold, 743.941 ms no-change, 1.886 s tail; 1,370,804,224-byte database |
+| Candidate coherence | Pass | 129,519-byte wheel SHA-256 `551e171f…72a295`; source/cache plugin digest `84a60123…b62ec` |
+| Fresh CLI task | Measured failure | all ten prompts observed; 0% exact accuracy; 66.002–120.107 s end to end |
+| Fresh Desktop task | Measured failure | all ten prompts observed; 0% exact accuracy; every answer violated the bounded answer schema |
+| Performance attribution | Pass | `agent-perf` Scalene run `20260727T172707Z-448eeb97`; attribution only |
+| Privacy | Pass | synthetic fixtures only; persisted scorecard contains no prompt, response, reasoning, tool arguments, raw result, or local path |
+| Installed | Pass | isolated candidate wheel smoke; two fresh raw MCP processes; warm Console p95 0.760 ms |
+| Broad | Pass | `just vc`: 360 Python tests, 7 frontend tests, Ruff, MyPy, Pyright, maintainability, manifests, deterministic Console assets, scope, release checks, and rebuilt distributions |
+| Distribution | Pass | 129,519-byte wheel; 409,824-byte source-complete sdist; both inside frozen budgets |
+
+### Review metrics
+
+- Total findings: 7
+- Accepted findings: 7
+- Accepted IDs: R1, R2, R3, R4, R5, R6, R7
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Deviations and decisions
+
+- The initial one-prompt probes were superseded by a full 20-task matrix after
+  review found that nine prompt intents and most lifecycle paths were labels
+  rather than executable baselines.
+- Codex Desktop cannot inherit a shell-only cache override from an already
+  running app. The qualifying task therefore used a temporary standalone MCP
+  registration bound to the same exact installed wheel and synthetic cache,
+  while the installed 0.28.0 plugin supplied the skill. That registration was
+  removed after the task.
+- Current failures remain recorded. Gates were not weakened.
+- Non-selector prompts record `not_applicable`; selector validity is awarded
+  only when the exact synthetic selector resolves. Claim grading is aligned to
+  fact, estimate, inference, and unsupported.
+
+### Residual risk and next task
+
+- The benchmark shows correct incremental planner choices but severe
+  production-scale storage and cold-build amplification.
+- The installed skill/query contract does not reliably lead agents to exact
+  bounded answers; R4/R7 must make natural prompts succeed without teaching
+  users the wire schema.
+- R2 receives the frozen 2.35-million-fact storage/correctness oracle and the
+  20-task agent-outcome matrix.

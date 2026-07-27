@@ -10,6 +10,7 @@ vp:
     just scope
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m ruff check \
         scripts/check_kernel_maintainability.py \
+        scripts/benchmark_agent_outcome.py \
         scripts/benchmark_kernel.py \
         scripts/check_kernel_scope.py \
         scripts/check_release.py \
@@ -39,6 +40,7 @@ vp:
         tests/kernel/test_ingest_*.py \
         tests/kernel/test_kernel_maintainability.py \
         tests/kernel/test_kernel_benchmark.py \
+        tests/kernel/test_agent_outcome_baseline.py \
         tests/kernel/test_kernel_scope.py \
         tests/kernel/test_repository_quality_policy.py \
         tests/kernel/test_release_candidate.py \
@@ -65,6 +67,7 @@ verify-precommit:
 v:
     just vp
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pytest -p no:tach \
+        tests/kernel/test_agent_outcome_baseline.py \
         tests/kernel/test_kernel_scope.py \
         tests/kernel/test_code_disposition_manifest.py \
         tests/kernel/test_retired_surface_manifest.py \

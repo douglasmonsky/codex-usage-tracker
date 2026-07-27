@@ -235,6 +235,16 @@ RECOVERY_ROADMAP_ADDITIONS = frozenset(
         "docs/roadmap/product-recovery-tasks/r9-release-0.29.0.md",
     }
 )
+R1_ADDITIONS = frozenset(
+    {
+        "config/product-recovery-agent-answer-v1.schema.json",
+        "config/product-recovery-agent-baseline-v1.json",
+        "config/product-recovery-agent-baseline-results-v1.json",
+        "config/product-recovery-agent-scorecard-v1.schema.json",
+        "scripts/benchmark_agent_outcome.py",
+        "tests/kernel/test_agent_outcome_baseline.py",
+    }
+)
 
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
@@ -253,6 +263,7 @@ INTEGRATION_ADDITIONS = (
     | K15_ADDITIONS
     | K16_ADDITIONS
     | RECOVERY_ROADMAP_ADDITIONS
+    | R1_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"

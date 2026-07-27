@@ -1,0 +1,164 @@
+{
+  "gates": {
+    "cold_build_ms": 240000,
+    "console_render_ms": 500,
+    "database_bytes": 734003200,
+    "deterministic_accuracy": 1.0,
+    "selector_validity": 1.0,
+    "tail_refresh_ms": 500,
+    "top_threads_final_answer_ms": 15000,
+    "top_threads_tracker_ms": 1000,
+    "warm_status_ms": 100
+  },
+  "history_profiles": [
+    {
+      "activity_events_per_turn": 1,
+      "allowance_every_calls": 8,
+      "id": "small_ci",
+      "model_calls_per_turn": 3,
+      "threads": 8,
+      "tool_calls_per_turn": 2,
+      "turns_per_thread": 4
+    },
+    {
+      "activity_events_per_turn": 1,
+      "allowance_every_calls": 32,
+      "id": "production_shaped",
+      "model_calls_per_turn": 8,
+      "threads": 643,
+      "tool_calls_per_turn": 4,
+      "turns_per_thread": 256
+    }
+  ],
+  "privacy": {
+    "forbidden_keys": [
+      "chain_of_thought",
+      "command",
+      "content",
+      "cwd",
+      "local_path",
+      "prompt",
+      "raw_result",
+      "raw_tool_arguments",
+      "reasoning",
+      "response",
+      "tool_arguments",
+      "transcript"
+    ],
+    "max_scorecard_bytes": 65536,
+    "scorecard_schema_path": "config/product-recovery-agent-scorecard-v1.schema.json",
+    "persisted_values": [
+      "bounded counts",
+      "candidate digests",
+      "error codes",
+      "fact estimate inference grades",
+      "host versions",
+      "oracle grades",
+      "prompt IDs",
+      "synthetic fixture hashes",
+      "timings"
+    ]
+  },
+  "prompt_suite": [
+    {
+      "id": "top_threads",
+      "intent": "Rank threads by exact total token usage.",
+      "selector_required": false
+    },
+    {
+      "id": "weekly_drivers",
+      "intent": "Identify exact usage drivers in the current week.",
+      "selector_required": false
+    },
+    {
+      "id": "week_over_week",
+      "intent": "Compare current and previous non-overlapping weeks.",
+      "selector_required": false
+    },
+    {
+      "id": "model_effort_cost",
+      "intent": "Rank model and reasoning-effort combinations by exact tokens and supported cost facts.",
+      "selector_required": false
+    },
+    {
+      "id": "four_token_classes",
+      "intent": "Report uncached input, cached input, reasoning, and output tokens.",
+      "selector_required": false
+    },
+    {
+      "id": "allowance_drain",
+      "intent": "Report observed allowance drain with provenance and limitations.",
+      "selector_required": false
+    },
+    {
+      "id": "tool_context",
+      "intent": "Rank structural tool and context-composition facts without treating estimates as billed tokens.",
+      "selector_required": false
+    },
+    {
+      "id": "evidence_timeline",
+      "intent": "Resolve an exact thread selector into a bounded evidence timeline.",
+      "selector_required": true
+    },
+    {
+      "id": "expensive_thread_calls",
+      "intent": "Rank exact model calls inside one selected thread.",
+      "selector_required": true
+    },
+    {
+      "id": "latest_incremental_change",
+      "intent": "Report generation and fact changes from the latest incremental refresh.",
+      "selector_required": false
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "no_index"
+    },
+    {
+      "id": "warm_generation"
+    },
+    {
+      "id": "no_change_refresh"
+    },
+    {
+      "id": "append_safe_tail"
+    },
+    {
+      "id": "bounded_tail"
+    },
+    {
+      "id": "moving_tail"
+    },
+    {
+      "id": "refresh_in_progress"
+    },
+    {
+      "id": "browser_reopen"
+    },
+    {
+      "id": "plugin_upgrade"
+    },
+    {
+      "id": "fresh_host_task"
+    },
+    {
+      "id": "stale_task_catalog"
+    }
+  ],
+  "schema": "codex-usage-tracker.agent-outcome-baseline.v1",
+  "scorecard_schema": "codex-usage-tracker.agent-outcome-scorecard.v1",
+  "seed": 20260727,
+  "supported_hosts": [
+    {
+      "fresh_task_proof": "codex exec --ephemeral with candidate registration",
+      "id": "codex_cli",
+      "launch_method": "codex_exec_ephemeral"
+    },
+    {
+      "fresh_task_proof": "new local Codex Desktop thread with candidate registration",
+      "id": "codex_desktop",
+      "launch_method": "codex_desktop_new_thread"
+    }
+  ]
+}
