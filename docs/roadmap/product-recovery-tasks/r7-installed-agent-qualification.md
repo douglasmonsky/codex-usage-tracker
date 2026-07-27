@@ -55,6 +55,8 @@ they do not count as release qualification.
 - browser close and reopen;
 - upgrade from public `0.27.0`;
 - failed build and recovery;
+- new-install `recent_30d`, `recent_90d`, and `complete` first-build choices;
+- explicit partial-to-complete coverage expansion with no duplicate rows;
 - two consecutive identical prompts for cache reuse.
 
 ### Maintainer dogfood
@@ -99,6 +101,12 @@ installs over another lane's environment. The R7 coordinator owns candidate
 installation, scorecard schema, result aggregation, and termination.
 
 Use host-side waits for long refreshes. Models never run status-poll loops.
+
+The production-shaped `recent_30d` candidate must publish a useful generation
+within 20 seconds. Qualification records selected preset, cutoff, coverage
+revision, hydrated/deferred source and byte counts, and verifies that an
+all-history question fails closed until the caller explicitly accepts partial
+coverage or expands to `complete`.
 
 ## Release Gates
 

@@ -436,6 +436,13 @@ refresh progress/recovery, focused performance contracts, and this ledger
   transactions for 100,000 calls, preserve 50 ms live-writer p95, prove exact
   turn counts across parser batches, defer and restore secondary indexes, and
   expose advancing writing/indexing/validating progress.
+- A coverage-aware first-build amendment freezes three whole-source presets:
+  `recent_30d`, `recent_90d`, and `complete`. The cutoff is captured once in
+  UTC; uncertain timestamps are hydrated; every source is cataloged; expansion
+  is explicit and monotonic; and partial history can never be labeled complete.
+  This amendment intentionally coordinates R2 operational coverage state, R3
+  discovery/ingestion, R4 interface/query truth, and R7 installed qualification
+  before those tasks are separately closed.
 
 ### Implementation checkpoint
 
@@ -466,6 +473,9 @@ refresh progress/recovery, focused performance contracts, and this ledger
 | 160-source production slice | 49.825 s | 18.643 s | 62.6% faster with identical counts/bytes |
 | Full 643-source production corpus | 792.320 s | 111.402 s | 7.11x faster; passes 240 s gate |
 | Full database | 1,370,804,224 bytes schema v2 | 634,011,648 bytes schema v3 | 53.7% smaller; passes 700 MiB gate |
+| Three-year `recent_30d` first use | no selective baseline | 2.562 s; 17/643 sources; 34,816 calls | 98.3% below 20 s gate; coverage remains explicitly partial |
+| Explicit 30-day → 90-day expansion | 37.043 s on live incremental writer | 3.929 s on unpublished bulk clone | 89.4% faster; adds exactly 35 sources and 71,680 calls |
+| Explicit 90-day → complete expansion | exceeded 240 s on live incremental writer; aborted | 110.193 s on unpublished bulk clone | passes 240 s; adds exactly 591 sources and 1,210,368 calls |
 | One-call append-safe tail | 1.886 s R1 | 420.444 ms on owned 160-source production slice | passes 500 ms gate |
 | 32-call bounded tail | not frozen in R1 storage row | 501.004 ms on owned 160-source production slice | passes 2 s gate |
 
@@ -476,15 +486,32 @@ one filesystem-cold sample was 2.463 seconds and four warm samples were
 1.178–1.199 seconds. That remaining source-discovery cost is not hidden as a
 query or status latency result.
 
+The selective run used a deterministic 1,095-day version of the same
+643-source, 526,480,341-byte production fixture. It cataloged all sources,
+hydrated 13,855,383 recent bytes, deferred 512,624,958 bytes without parsing
+them, and published a partial-coverage revision with zero uncertain sources.
+Generating the fixture took 10.487 seconds and is excluded from refresh time.
+Large monotonic expansions now clone the committed generation, bulk-stream only
+newly selected sources without secondary indexes on the unpublished clone, and
+atomically promote after validation. Small tails remain on the WAL incremental
+path. The complete expansion produced the exact 1,316,864-call corpus without
+reparsing the first 52 sources.
+
 ### Profiling evidence
 
 - Unprofiled timings above are the only speedup evidence.
 - `agent-perf` runs `20260727T203428Z-800177dc` and
   `20260727T203508Z-8d02e30b` both failed before workload execution because
   Scalene 2.3.0 exited 251 without a JSON profile.
+- `agent-perf` run `20260727T220332Z-66e4ce6d` also failed before workload
+  execution because its runtime could not locate pinned Scalene 2.3.0.
 - A bounded cProfile fallback attributed the pre-index-deferral 100,000-call
   path primarily to normalization/stable identity work and per-row SQLite
   execution. It was used only to choose the next experiment.
+- A second attribution-only cProfile run of the exact three-year
+  `recent_30d` path completed in 4.166 seconds under instrumentation. Bounded
+  cataloging accounted for 0.949 seconds and the selected-source initial
+  stream for 3.106 seconds; the deferred 512 MB was not parsed.
 
 ### Verification checkpoint
 
@@ -496,7 +523,8 @@ query or status latency result.
 | Ruff | Pass | all changed Python paths |
 | MyPy | Pass | 59 source files |
 | Performance contracts | Pass | current 100,000-call, live-tail lock, index restoration, and progress tests |
-| Final review | Pending | one read-only reviewer after the selective-hydration contract and current full run are stable |
+| Selective hydration focus | Pass | 34 hydration, ingest, reconciliation, source-registry, Ruff, and MyPy checks |
+| Final review | Pass after remediation | one read-only reviewer reported six findings; R1–R5 accepted and fixed, R6 retained as release-hardening risk |
 
 ### Residual risk and next action
 
@@ -505,8 +533,18 @@ query or status latency result.
   selective-hydration contract is frozen.
 - Full no-change refresh still catalogs 643 sources in about 1.18 seconds warm
   and up to about 3 seconds with cold filesystem metadata. Coverage-aware
-  selective initial hydration and a bounded source catalog are the next R3/R4
-  design checkpoint.
-- R2 and R3 remain stacked and unreviewed. They must receive one stable-diff
-  review, broad repository/distribution validation, and separate intentional
-  commits/merge evidence before either task is marked complete.
+  selective initial hydration and a bounded source catalog are now the active
+  R3 implementation checkpoint.
+- R2 and R3 remain stacked and unmerged. Broad repository/distribution
+  validation and separate intentional commit/merge evidence remain before
+  either task is marked complete.
+- The final read-only review accepted fixes for incomplete bulk-artifact
+  recovery, upgrade availability, mixed expansion/tail isolation,
+  cross-preset recovery coverage, and terminal hydration-state cleanup. Review
+  token attribution is `pending` because the local metrics helper invoked a
+  retired `strict` CLI command; five of six findings were accepted.
+- The rejected R6 observation concerns the pre-existing bounded generation
+  digest, which binds validated generation metadata rather than every fact
+  byte. R8/R9 must either freeze a broader deterministic artifact-integrity
+  contract or explicitly document why SQLite integrity, foreign-key checks,
+  accounting oracles, and exact release hashes remain the chosen layers.

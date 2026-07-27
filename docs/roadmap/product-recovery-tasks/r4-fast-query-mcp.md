@@ -35,6 +35,8 @@ Add failing contracts for:
 - allowance interval reads;
 - one-thread evidence first page;
 - stable generation/request cache reuse.
+- coverage envelopes and fail-closed all-history behavior on partial
+  generations.
 
 Each contract asserts a scanned-row or query-plan budget in addition to wall
 time and result correctness.
@@ -47,9 +49,18 @@ time and result correctness.
 - Preserve typed extension points for the human labels, costs, and credits that
   R5 will populate; R4 does not claim those values as an acceptance gate.
 - Cache normalized responses by active generation and request hash.
+- Include the coverage revision in cache keys and return the active preset,
+  cutoff, completeness, and hydrated/deferred counts in status/query
+  envelopes.
+- Extend `usage_refresh` within the existing six-tool surface to accept
+  `recent_30d`, `recent_90d`, or `complete`. Do not add a hydration tool.
+- Reject all-history queries on partial generations unless the request
+  explicitly sets `allow_partial=true`; label accepted results as partial.
 - Invalidate only when a new generation publishes or relevant configuration
   changes.
 - Never start refresh from query execution.
+- Never start deferred-history hydration from query, evidence, or Console
+  navigation.
 - Batch compatible questions against one committed generation.
 - Return one structured representation; do not duplicate the payload in a
   second textual form.

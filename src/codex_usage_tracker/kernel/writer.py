@@ -243,6 +243,36 @@ def finalize_initial_refresh(
     )
 
 
+def commit_empty_initial_refresh(
+    path: Path,
+    *,
+    generation: int,
+    assert_fence: Callable[[], None] | None = None,
+) -> WriteResult:
+    """Publish a valid zero-fact generation for truthful partial coverage."""
+
+    transaction_ms: list[float] = []
+    prepare_initial_refresh(
+        path,
+        transaction_ms,
+        assert_fence=assert_fence,
+    )
+    with _timed_writer(
+        path,
+        transaction_ms,
+        assert_fence,
+        require_capabilities=False,
+        staging_bulk=True,
+    ) as connection:
+        _insert_generation(connection, generation, ())
+    return finalize_initial_refresh(
+        path,
+        generation=generation,
+        transaction_ms=transaction_ms,
+        assert_fence=assert_fence,
+    )
+
+
 def canonicalize_initial_duplicates(
     path: Path,
     transaction_ms: list[float],

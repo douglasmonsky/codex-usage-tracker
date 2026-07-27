@@ -8,6 +8,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
@@ -24,23 +25,40 @@ from .discovery import (
     observe_source,
     plan_source,
 )
+from .hydration import (
+    HydrationPreset,
+    HydrationSelection,
+    catalog_checkpoints,
+    catalog_sources,
+    select_hydration_sources,
+)
 from .lease import RefreshLeaseRepository
 from .live.journal import GenerationJournal
 from .models import CutoverState
 from .normalize import NormalizedBatch, normalize_batch, parser_state_from_json
 from .operational import (
+    discard_staged_hydration,
+    hydrated_source_ids,
+    hydrated_source_locations,
+    hydration_catalog_checkpoints,
+    hydration_selection_revision,
     initialize_operational_database,
     load_cutover_control,
+    load_staged_hydration,
     promote_cutover,
+    record_hydration_catalog,
     record_legacy_cache_metadata,
     register_source,
     reset_cutover_for_schema_upgrade,
+    restore_hydration_states,
+    stage_hydration_catalog,
     transition_cutover,
 )
 from .parser import ParsedBatch, iter_jsonl_batches, parse_jsonl
 from .schema import SCHEMA_VERSION
 from .writer import (
     WriteResult,
+    commit_empty_initial_refresh,
     commit_initial_batches,
     commit_refresh,
     finalize_initial_refresh,
@@ -49,6 +67,8 @@ from .writer import (
 
 _INITIAL_STREAM_BATCH_LINES = 1_000
 _INITIAL_WRITE_BATCHES = 25
+_BULK_EXPANSION_MIN_SOURCES = 8
+_BULK_EXPANSION_MIN_BYTES = 8 * 1024 * 1024
 
 
 class RefreshTrigger(str, Enum):
@@ -86,6 +106,7 @@ class KernelIngestor:
         self.analytical_path = analytical_path.resolve()
         self.operational_path = operational_path.resolve()
         self._journal = journal
+        self._build_path_override: Path | None = None
 
     def refresh(
         self,
@@ -93,14 +114,35 @@ class KernelIngestor:
         *,
         trigger: RefreshTrigger,
         owner_id: str,
+        hydration_preset: HydrationPreset = HydrationPreset.COMPLETE,
+        captured_at: datetime | None = None,
     ) -> RefreshResult:
         if not isinstance(trigger, RefreshTrigger):
             raise ValueError("first build requires an explicit refresh trigger")
         if trigger is RefreshTrigger.WATCHER and not self._has_active_kernel():
             raise ValueError("watcher requires an existing active kernel")
         self._initialize_for_explicit_refresh()
-        observations = tuple(observe_source(path) for path in sources)
-        request_hash = _request_hash(observations)
+        captured = captured_at or datetime.now(timezone.utc)
+        catalog = catalog_sources(
+            tuple(sources),
+            checkpoints=hydration_catalog_checkpoints(
+                self.operational_path,
+            ),
+        )
+        selection = select_hydration_sources(
+            catalog,
+            preset=hydration_preset,
+            captured_at=captured,
+            hydrated_source_ids=hydrated_source_ids(self.operational_path),
+            hydrated_paths=hydrated_source_locations(self.operational_path),
+        )
+        observations = tuple(
+            item.observation for item in selection.hydrate
+        )
+        request_hash = _request_hash(
+            tuple(item.observation for item in catalog),
+            scope=hydration_preset.value,
+        )
         leases = RefreshLeaseRepository(self.operational_path)
         lease = leases.acquire(request_hash, owner_id)
         if not lease.created:
@@ -120,7 +162,9 @@ class KernelIngestor:
                 load_cutover_control(self.operational_path).state
                 is CutoverState.FAILED
             )
-            recovered_generation = self._recover_or_active_generation()
+            recovered_generation = self._recover_or_active_generation(
+                selection,
+            )
             if (
                 was_failed
                 and load_cutover_control(self.operational_path).state
@@ -134,11 +178,62 @@ class KernelIngestor:
                     )
             active_path = self._active_path()
             plans = self._plans(observations, active_path)
+            stage_hydration_catalog(
+                self.operational_path,
+                selection,
+            )
             if not plans:
+                if recovered_generation == 0:
+                    generation = 1
+                    with leases.maintain(
+                        lease.refresh_run_id,
+                        owner_id,
+                    ) as guard:
+                        self._begin_cutover(
+                            lease.refresh_run_id,
+                            active_path,
+                        )
+                        written = commit_empty_initial_refresh(
+                            active_path,
+                            generation=generation,
+                            assert_fence=guard.check,
+                        )
+                        written, selection, catch_up_source_ids = self._catch_up(
+                            sources,
+                            active_path,
+                            generation,
+                            False,
+                            written,
+                            guard.check,
+                            selection,
+                        )
+                        self._promote(
+                            active_path,
+                            generation,
+                            hydration_selection=selection,
+                        )
+                    result = _write_result(
+                        lease.refresh_run_id,
+                        (),
+                        generation,
+                        written,
+                        changed_sources=len(catch_up_source_ids),
+                    )
+                    leases.complete(
+                        lease.refresh_run_id,
+                        generation=generation,
+                        result=_result_payload(result),
+                    )
+                    return result
                 result = _empty_result(
                     lease.refresh_run_id,
                     recovered_generation,
                     "no_changes",
+                )
+                record_hydration_catalog(
+                    self.operational_path,
+                    selection,
+                    hydrated_generation=recovered_generation,
                 )
                 leases.complete(
                     lease.refresh_run_id,
@@ -150,10 +245,30 @@ class KernelIngestor:
             timings: dict[str, float] = {}
             with leases.maintain(lease.refresh_run_id, owner_id) as guard:
                 stage_started = time.perf_counter()
-                initial_stream = self._active_generation() == 0 and all(
-                    plan.prior_source_id is None for plan in plans
+                new_plans = tuple(
+                    plan for plan in plans if plan.prior_source_id is None
                 )
-                if initial_stream:
+                all_new_sources = len(new_plans) == len(plans)
+                large_new_source_set = (
+                    len(new_plans) >= _BULK_EXPANSION_MIN_SOURCES
+                    or sum(
+                        plan.end_byte - plan.start_byte
+                        for plan in new_plans
+                    )
+                    >= _BULK_EXPANSION_MIN_BYTES
+                )
+                streamed_bulk = (
+                    self._active_generation() == 0 and all_new_sources
+                ) or (
+                    self._active_generation() > 0
+                    and large_new_source_set
+                    and all(
+                        not plan.replace_existing
+                        for plan in plans
+                        if plan.prior_source_id is not None
+                    )
+                )
+                if streamed_bulk:
                     parsed: tuple[ParsedBatch, ...] = ()
                     normalized: tuple[NormalizedBatch, ...] = ()
                 else:
@@ -194,18 +309,18 @@ class KernelIngestor:
                         timings=timings,
                     )
 
-                if initial_stream:
-                    write_path, isolated = active_path, False
-                else:
-                    write_path, isolated = self._write_path(
-                        active_path,
-                        plans,
-                        normalized,
-                        generation,
-                        lease.refresh_run_id,
-                    )
+                write_path, isolated = self._write_path(
+                    active_path,
+                    plans,
+                    normalized,
+                    generation,
+                    lease.refresh_run_id,
+                    force_isolation=(
+                        streamed_bulk and self._active_generation() > 0
+                    ),
+                )
                 self._begin_cutover(lease.refresh_run_id, write_path)
-                if initial_stream:
+                if streamed_bulk:
                     written = self._commit_initial_stream(
                         write_path,
                         plans,
@@ -224,13 +339,14 @@ class KernelIngestor:
                         assert_fence=guard.check,
                     )
                 timings["writing"] = time.perf_counter() - stage_started
-                written = self._catch_up(
+                written, selection, catch_up_source_ids = self._catch_up(
                     sources,
                     write_path,
                     generation,
                     isolated,
                     written,
                     guard.check,
+                    selection,
                 )
                 guard.check()
                 leases.progress(
@@ -244,7 +360,11 @@ class KernelIngestor:
                     timings=timings,
                 )
                 stage_started = time.perf_counter()
-                self._promote(write_path, generation)
+                self._promote(
+                    write_path,
+                    generation,
+                    hydration_selection=selection,
+                )
                 timings["promoting"] = time.perf_counter() - stage_started
             for plan in plans:
                 register_source(
@@ -257,6 +377,12 @@ class KernelIngestor:
                 plans,
                 generation,
                 written,
+                changed_sources=len(
+                    {
+                        plan.observation.source_id for plan in plans
+                    }
+                    | catch_up_source_ids
+                ),
             )
             result = self._publish_generation(result)
             leases.complete(
@@ -268,6 +394,7 @@ class KernelIngestor:
         except BaseException:
             leases.fail(lease.refresh_run_id, "refresh.failed")
             self._mark_cutover_failed()
+            restore_hydration_states(self.operational_path)
             raise
     def _initialize_for_explicit_refresh(self) -> None:
         initialize_operational_database(self.operational_path)
@@ -278,6 +405,7 @@ class KernelIngestor:
         )
         base_version = analytical_schema_version(self.analytical_path)
         if active is not None and active_version == SCHEMA_VERSION:
+            self._build_path_override = None
             return
         if active_version is not None or (
             active is None
@@ -293,14 +421,21 @@ class KernelIngestor:
             )
             initialize_analytical_database(upgrade_path, replace=True)
             self.analytical_path = upgrade_path
-            reset_cutover_for_schema_upgrade(self.operational_path)
+            self._build_path_override = upgrade_path
+            if active is None:
+                reset_cutover_for_schema_upgrade(self.operational_path)
             return
         initialize_analytical_database(
             self.analytical_path,
             replace=(
                 active is None
                 and base_version == SCHEMA_VERSION
-                and control.state is CutoverState.FAILED
+                and control.state
+                in {
+                    CutoverState.BUILDING,
+                    CutoverState.READY,
+                    CutoverState.FAILED,
+                }
             ),
         )
 
@@ -406,6 +541,10 @@ class KernelIngestor:
         report_progress: Callable[[str, float, dict[str, int]], None],
     ) -> WriteResult:
         transaction_ms: list[float] = []
+        parser_states = {
+            plan.observation.source_id: self._parser_state(plan, path)
+            for plan in plans
+        }
         prepare_initial_refresh(
             path,
             transaction_ms,
@@ -430,7 +569,7 @@ class KernelIngestor:
             )
 
         for plan in plans:
-            prior_state = None
+            prior_state = parser_states[plan.observation.source_id]
             start_byte = plan.start_byte
             start_line = plan.start_line
             for parsed in iter_jsonl_batches(
@@ -516,23 +655,50 @@ class KernelIngestor:
         isolated: bool,
         written: WriteResult,
         assert_fence,
-    ) -> WriteResult:
+        selection: HydrationSelection,
+    ) -> tuple[WriteResult, HydrationSelection, frozenset[str]]:
         """Reach a stable complete-line high water before first promotion."""
 
         transaction_ms = list(written.transaction_ms)
         deleted_rows = written.deleted_rows
         latest = written
+        catch_up_source_ids: set[str] = set()
+        selected_source_ids = frozenset(
+            item.observation.source_id for item in selection.hydrate
+        )
+        selected_paths = frozenset(item.path for item in selection.hydrate)
+        checkpoints = catalog_checkpoints(
+            selection.hydrate + selection.deferred
+        )
         for _attempt in range(3):
-            observations = tuple(observe_source(path) for path in sources)
+            catalog = catalog_sources(
+                tuple(sources),
+                checkpoints=checkpoints,
+            )
+            checkpoints = catalog_checkpoints(catalog)
+            selection = select_hydration_sources(
+                catalog,
+                preset=selection.preset,
+                captured_at=selection.captured_at,
+                hydrated_source_ids=selected_source_ids,
+                hydrated_paths=selected_paths,
+            )
+            observations = tuple(
+                item.observation for item in selection.hydrate
+            )
             plans = self._plans_from_artifact(observations, write_path)
             if not plans:
-                return WriteResult(
+                return (
+                    WriteResult(
                     inserted_calls=latest.inserted_calls,
                     inserted_tools=latest.inserted_tools,
                     deleted_rows=deleted_rows,
                     canonical_calls=latest.canonical_calls,
                     excluded_calls=latest.excluded_calls,
                     transaction_ms=tuple(transaction_ms),
+                    ),
+                    selection,
+                    frozenset(catch_up_source_ids),
                 )
             parsed, normalized = self._prepare(plans, generation, write_path)
             latest = commit_refresh(
@@ -546,6 +712,15 @@ class KernelIngestor:
             )
             deleted_rows += latest.deleted_rows
             transaction_ms.extend(latest.transaction_ms)
+            catch_up_source_ids.update(
+                plan.observation.source_id for plan in plans
+            )
+            selected_source_ids = frozenset(
+                item.observation.source_id for item in selection.hydrate
+            )
+            selected_paths = frozenset(
+                item.path for item in selection.hydrate
+            )
         raise RuntimeError("source high water did not stabilize")
 
     def _plans_from_artifact(
@@ -595,13 +770,20 @@ class KernelIngestor:
                 refresh_run_id=refresh_run_id,
             )
 
-    def _promote(self, staging_path: Path, generation: int) -> None:
+    def _promote(
+        self,
+        staging_path: Path,
+        generation: int,
+        *,
+        hydration_selection: HydrationSelection | None = None,
+    ) -> None:
         digest = analytical_generation_digest(staging_path, generation)
         promote_cutover(
             self.operational_path,
             active_kernel_path=staging_path,
             generation=generation,
             integrity_digest=digest,
+            hydration_selection=hydration_selection,
         )
 
     def _mark_cutover_failed(self) -> None:
@@ -619,10 +801,15 @@ class KernelIngestor:
         return load_cutover_control(self.operational_path).active_kernel_path is not None
 
     def _active_path(self) -> Path:
+        if self._build_path_override is not None:
+            return self._build_path_override
         if self.operational_path.is_file():
-            active = load_cutover_control(self.operational_path).active_kernel_path
+            control = load_cutover_control(self.operational_path)
+            active = control.active_kernel_path
             if active is not None:
-                return active
+                if control.active_schema == SCHEMA_VERSION:
+                    return active
+                return self.analytical_path
         return self.analytical_path
 
     def _active_generation(self) -> int:
@@ -633,31 +820,52 @@ class KernelIngestor:
     def _next_generation(self) -> int:
         return self._active_generation() + 1
 
-    def _recover_or_active_generation(self) -> int:
+    def _recover_or_active_generation(
+        self,
+        hydration_selection: HydrationSelection,
+    ) -> int:
         control = load_cutover_control(self.operational_path)
-        candidate = control.staging_kernel_path or self._active_path()
-        with open_read_snapshot(candidate) as connection:
-            latest = int(
-                connection.execute(
-                    """
-                    SELECT COALESCE(MAX(generation), 0)
-                    FROM generations
-                    WHERE integrity_status = 'valid'
-                    """
-                ).fetchone()[0]
-            )
         active = control.active_generation or 0
-        if latest > active and control.state in {
-            CutoverState.FAILED,
-            CutoverState.BUILDING,
-            CutoverState.READY,
-        }:
+        candidate = control.staging_kernel_path
+        staged = load_staged_hydration(self.operational_path)
+        latest = 0
+        if candidate is not None:
+            try:
+                with open_read_snapshot(candidate) as connection:
+                    latest = int(
+                        connection.execute(
+                            """
+                            SELECT COALESCE(MAX(generation), 0)
+                            FROM generations
+                            WHERE integrity_status = 'valid'
+                            """
+                        ).fetchone()[0]
+                    )
+            except (ValueError, sqlite3.DatabaseError):
+                latest = 0
+        compatible = (
+            staged is not None
+            and staged["preset"] == hydration_selection.preset.value
+            and staged["coverage_revision"]
+            == hydration_selection_revision(hydration_selection)
+        )
+        if latest > active and compatible and candidate is not None:
+            assert staged is not None
+            recovered_selection = replace(
+                hydration_selection,
+                captured_at=_required_timestamp(staged["captured_at"]),
+                cutoff_at=_optional_timestamp(staged["cutoff_at"]),
+            )
             if control.state is CutoverState.FAILED:
                 self._begin_cutover(
                     control.refresh_run_id or "recovery",
                     candidate,
                 )
-            self._promote(candidate, latest)
+            self._promote(
+                candidate,
+                latest,
+                hydration_selection=recovered_selection,
+            )
             return latest
         if control.state in {CutoverState.BUILDING, CutoverState.READY}:
             transition_cutover(
@@ -665,6 +873,9 @@ class KernelIngestor:
                 CutoverState.FAILED,
                 failure_code="refresh.interrupted",
             )
+            restore_hydration_states(self.operational_path)
+        if candidate is not None:
+            discard_staged_hydration(self.operational_path)
         return active
 
     def _write_path(
@@ -674,8 +885,10 @@ class KernelIngestor:
         normalized: tuple[NormalizedBatch, ...],
         generation: int,
         refresh_run_id: str,
+        *,
+        force_isolation: bool = False,
     ) -> tuple[Path, bool]:
-        requires_isolation = any(
+        requires_isolation = force_isolation or any(
             plan.replace_existing and plan.prior_source_id is not None
             for plan in plans
         ) or self._active_collision_requires_isolation(
@@ -736,10 +949,17 @@ class KernelIngestor:
         return False
 
 
-def refresh_request_hash(sources: list[Path]) -> str:
+def refresh_request_hash(
+    sources: list[Path],
+    *,
+    hydration_preset: HydrationPreset = HydrationPreset.COMPLETE,
+) -> str:
     """Return the same bounded source-set identity used by refresh leases."""
 
-    return _request_hash(tuple(observe_source(path) for path in sources))
+    return _request_hash(
+        tuple(observe_source(path) for path in sources),
+        scope=hydration_preset.value,
+    )
 
 
 def _registered_source_id(
@@ -783,12 +1003,35 @@ def _clone_database(source: Path, destination: Path) -> None:
     destination.chmod(0o600)
 
 
-def _request_hash(observations: tuple[SourceObservation, ...]) -> str:
-    payload = "|".join(
+def _request_hash(
+    observations: tuple[SourceObservation, ...],
+    *,
+    scope: str = HydrationPreset.COMPLETE.value,
+) -> str:
+    payload = scope + "|" + "|".join(
         f"{item.source_id}:{item.complete_size}:{item.modified_ns}"
         for item in observations
     )
     return "sha256:" + hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _required_timestamp(value: object) -> datetime:
+    parsed = _optional_timestamp(value)
+    if parsed is None:
+        raise ValueError("staged coverage timestamp is invalid")
+    return parsed
+
+
+def _optional_timestamp(value: object) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
 
 
 def _write_result(
@@ -796,13 +1039,15 @@ def _write_result(
     plans: tuple[SourcePlan, ...],
     generation: int,
     written: WriteResult,
+    *,
+    changed_sources: int | None = None,
 ) -> RefreshResult:
     reasons = sorted({plan.kind.value for plan in plans})
     return RefreshResult(
         refresh_run_id=refresh_run_id,
         planner_reason="+".join(reasons),
         generation=generation,
-        changed_sources=len(plans),
+        changed_sources=len(plans) if changed_sources is None else changed_sources,
         inserted_calls=written.inserted_calls,
         inserted_tools=written.inserted_tools,
         deleted_rows=written.deleted_rows,

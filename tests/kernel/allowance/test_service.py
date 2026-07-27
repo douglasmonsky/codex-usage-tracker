@@ -195,6 +195,7 @@ def test_allowance_cursor_is_bound_to_publication_identity(tmp_path: Path) -> No
 
 def test_explicit_refresh_rebuilds_pre_k8_schema_before_allowance_read(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runtime = active_runtime(tmp_path)
     control = load_cutover_control(runtime.kernel.operational)
@@ -213,10 +214,32 @@ def test_explicit_refresh_rebuilds_pre_k8_schema_before_allowance_read(
     with pytest.raises(ValueError, match="schema identity"):
         app.allowance({"limit": 1})
 
-    result = KernelIngestor(
+    ingestor = KernelIngestor(
         runtime.kernel.analytical,
         runtime.kernel.operational,
-    ).refresh(
+    )
+    real_promote = ingestor._promote
+
+    def fail_upgrade_promotion(*_args, **_kwargs):
+        raise RuntimeError("synthetic upgrade promotion failure")
+
+    monkeypatch.setattr(ingestor, "_promote", fail_upgrade_promotion)
+    with pytest.raises(
+        RuntimeError,
+        match="synthetic upgrade promotion failure",
+    ):
+        ingestor.refresh(
+            list(synthetic_sources()),
+            trigger=RefreshTrigger.CLI_REFRESH,
+            owner_id="schema-upgrade-failed",
+        )
+    failed = load_cutover_control(runtime.kernel.operational)
+    assert failed.active_kernel_path == legacy_path
+    assert failed.active_generation == control.active_generation
+    assert legacy_path.read_bytes() == legacy_bytes
+
+    monkeypatch.setattr(ingestor, "_promote", real_promote)
+    result = ingestor.refresh(
         list(synthetic_sources()),
         trigger=RefreshTrigger.CLI_REFRESH,
         owner_id="schema-upgrade",
@@ -224,11 +247,11 @@ def test_explicit_refresh_rebuilds_pre_k8_schema_before_allowance_read(
     rebuilt = load_cutover_control(runtime.kernel.operational)
 
     assert result.planner_reason == "new_source"
-    assert result.generation == 1
+    assert result.generation > (control.active_generation or 0)
     assert rebuilt.active_schema == SCHEMA_VERSION
     assert rebuilt.legacy_cache_path == legacy_path
     assert legacy_path.read_bytes() == legacy_bytes
-    assert app.allowance({"limit": 1})["generation"] == 1
+    assert app.allowance({"limit": 1})["generation"] == result.generation
 
 
 def test_appended_allowance_observation_uses_incremental_refresh(

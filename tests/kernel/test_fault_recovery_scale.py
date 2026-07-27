@@ -629,8 +629,8 @@ def _abrupt_refresh(root: Path, kind: str, boundary: int) -> None:
     elif kind == "after_promotion":
         original_promote = KernelIngestor._promote
 
-        def killed_promote(self, path, generation):
-            original_promote(self, path, generation)
+        def killed_promote(self, path, generation, **kwargs):
+            original_promote(self, path, generation, **kwargs)
             os._exit(91)
 
         setattr(KernelIngestor, "_promote", killed_promote)  # noqa: B010

@@ -200,10 +200,25 @@ def _activity_line(timestamp: str) -> bytes:
     )
 
 
-def _timestamp(thread: int, turn: int) -> str:
-    point = datetime(2026, 7, 1, tzinfo=timezone.utc) + timedelta(
-        days=(thread + turn) % 28,
-        seconds=thread * 7 + turn,
+def _timestamp(
+    thread: int,
+    turn: int,
+    *,
+    profile: Mapping[str, Any],
+    source_ordinal: int,
+) -> str:
+    history_days = profile.get("history_days")
+    if history_days is None:
+        point = datetime(2026, 7, 1, tzinfo=timezone.utc) + timedelta(
+            days=(thread + turn) % 28,
+            seconds=thread * 7 + turn,
+        )
+        return point.isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    source_count = int(profile["threads"])
+    day_offset = source_ordinal * int(history_days) // max(1, source_count)
+    point = datetime(2023, 7, 29, tzinfo=timezone.utc) + timedelta(
+        days=day_offset,
+        seconds=turn,
     )
     return point.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
@@ -219,7 +234,12 @@ def _source_bytes(
     yield _session_line(synthetic_thread)
     call_ordinal = 0
     for turn in range(int(profile["turns_per_thread"])):
-        timestamp = _timestamp(synthetic_thread, turn)
+        timestamp = _timestamp(
+            synthetic_thread,
+            turn,
+            profile=profile,
+            source_ordinal=thread,
+        )
         yield _turn_line(synthetic_thread, turn, timestamp)
         for call in range(int(profile["model_calls_per_turn"])):
             call_ordinal += 1

@@ -160,6 +160,29 @@ The schema must distinguish:
 - One durable worker owns refresh; compatible callers join it.
 - Readers stay on the prior committed generation until atomic promotion.
 
+### Coverage-aware first build
+
+Large first-time indexes may start from an explicit recent-history preset:
+
+- `recent_30d` is the non-interactive default for a new large install;
+- `recent_90d` is the broader bounded preset;
+- `complete` hydrates every discovered source.
+
+The cutoff is captured once in UTC for the refresh request. Selection operates
+on whole source files, never row prefixes. A bounded tail observation supplies
+the latest complete structural timestamp; sources with an uncertain timestamp
+are included rather than silently deferred. Every source is recorded in the
+owner-only catalog as deferred, hydrating, or hydrated. If a deferred source
+receives a recent append, its whole file becomes eligible.
+
+Coverage expansion is explicit and monotonic. It publishes a new generation
+while readers stay on the active generation. Status and query results expose
+the selected preset, cutoff, hydrated/deferred source and byte counts, and a
+coverage revision. An all-history request against partial coverage fails
+closed unless the caller explicitly accepts partial results. Browser
+navigation, query execution, and evidence resolution never hydrate deferred
+history.
+
 ## Performance Gates
 
 All timings use identical unprofiled synthetic workloads. CPU profiles
@@ -174,6 +197,7 @@ attribute work but do not prove speedup.
 | Warm status | ≤100 ms | ≤50 ms |
 | Ordinary moving-tail refresh | ≤500 ms | ≤250 ms |
 | Larger bounded tail | ≤2 s | ≤1 s |
+| Production-shaped `recent_30d` first useful generation | ≤20 s | ≤10 s |
 | Complete production-shaped cold build | ≤240 s | ≤180 s |
 | Production-shaped database | <700 MiB | <500 MiB |
 

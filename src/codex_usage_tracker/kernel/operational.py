@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 import sqlite3
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .database import (
@@ -15,6 +18,7 @@ from .database import (
     analytical_generation_digest,
     analytical_generation_exists,
 )
+from .hydration import CatalogCheckpoint, HydrationSelection
 from .models import (
     CutoverControl,
     CutoverState,
@@ -22,9 +26,16 @@ from .models import (
 )
 from .schema import SCHEMA_VERSION
 
-OPERATIONAL_SCHEMA_VERSION = 2
+OPERATIONAL_SCHEMA_VERSION = 3
 OPERATIONAL_TABLES = frozenset(
-    {"refresh_runs", "source_registry", "cutover_control", "live_events"}
+    {
+        "refresh_runs",
+        "source_registry",
+        "coverage_control",
+        "staged_coverage_control",
+        "cutover_control",
+        "live_events",
+    }
 )
 
 _TRANSITIONS = {
@@ -68,7 +79,59 @@ CREATE TABLE source_registry (
     source_location TEXT NOT NULL UNIQUE,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
-    state TEXT NOT NULL CHECK (state IN ('tracked', 'missing', 'retired'))
+    state TEXT NOT NULL CHECK (state IN ('tracked', 'missing', 'retired')),
+    hydration_state TEXT NOT NULL DEFAULT 'hydrated' CHECK (
+        hydration_state IN ('deferred', 'hydrating', 'hydrated')
+    ),
+    observed_size_bytes INTEGER NOT NULL DEFAULT 0 CHECK (
+        observed_size_bytes >= 0
+    ),
+    observed_modified_ns INTEGER NOT NULL DEFAULT 0 CHECK (
+        observed_modified_ns >= 0
+    ),
+    latest_event_at TEXT,
+    timestamp_status TEXT NOT NULL DEFAULT 'uncertain' CHECK (
+        timestamp_status IN ('certain', 'uncertain')
+    ),
+    hydrated_generation INTEGER CHECK (hydrated_generation > 0)
+) STRICT;
+
+CREATE TABLE coverage_control (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    preset TEXT NOT NULL CHECK (
+        preset IN ('recent_30d', 'recent_90d', 'complete')
+    ),
+    captured_at TEXT NOT NULL,
+    cutoff_at TEXT,
+    complete_history INTEGER NOT NULL CHECK (complete_history IN (0, 1)),
+    coverage_revision TEXT NOT NULL,
+    cataloged_source_count INTEGER NOT NULL CHECK (
+        cataloged_source_count >= 0
+    ),
+    hydrated_source_count INTEGER NOT NULL CHECK (
+        hydrated_source_count >= 0
+    ),
+    deferred_source_count INTEGER NOT NULL CHECK (
+        deferred_source_count >= 0
+    ),
+    cataloged_bytes INTEGER NOT NULL CHECK (cataloged_bytes >= 0),
+    hydrated_bytes INTEGER NOT NULL CHECK (hydrated_bytes >= 0),
+    deferred_bytes INTEGER NOT NULL CHECK (deferred_bytes >= 0),
+    uncertain_source_count INTEGER NOT NULL CHECK (
+        uncertain_source_count >= 0
+    ),
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+) STRICT;
+
+CREATE TABLE staged_coverage_control (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    preset TEXT NOT NULL CHECK (
+        preset IN ('recent_30d', 'recent_90d', 'complete')
+    ),
+    captured_at TEXT NOT NULL,
+    cutoff_at TEXT,
+    coverage_revision TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) STRICT;
 
 CREATE TABLE cutover_control (
@@ -123,6 +186,7 @@ def initialize_operational_database(path: Path) -> Path:
     if target.exists():
         _require_database_file(target)
         target.chmod(0o600)
+        _migrate_operational(target)
         _validate_operational(target)
         return target
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -161,6 +225,416 @@ def register_source(path: Path, identifier: str, source: Path) -> None:
             """,
             (identifier, str(source.resolve())),
         )
+
+
+def record_hydration_catalog(
+    path: Path,
+    selection: HydrationSelection,
+    *,
+    hydrated_generation: int,
+) -> dict[str, object]:
+    """Publish privacy-safe source coverage in the owner-only sidecar."""
+
+    with _connect(path) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        _record_hydration_catalog_in_connection(
+            connection,
+            selection,
+            hydrated_generation=hydrated_generation,
+        )
+        connection.execute(
+            "DELETE FROM staged_coverage_control WHERE singleton = 1"
+        )
+    return load_hydration_coverage(path)
+
+
+def stage_hydration_catalog(
+    path: Path,
+    selection: HydrationSelection,
+) -> None:
+    """Record build-time source states without changing active coverage."""
+
+    selected_ids = {
+        item.observation.source_id for item in selection.hydrate
+    }
+    with _connect(path) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            """
+            INSERT INTO staged_coverage_control(
+                singleton, preset, captured_at, cutoff_at, coverage_revision
+            )
+            VALUES (1, ?, ?, ?, ?)
+            ON CONFLICT(singleton) DO UPDATE SET
+                preset = excluded.preset,
+                captured_at = excluded.captured_at,
+                cutoff_at = excluded.cutoff_at,
+                coverage_revision = excluded.coverage_revision,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                selection.preset.value,
+                _timestamp(selection.captured_at),
+                _timestamp(selection.cutoff_at),
+                hydration_selection_revision(selection),
+            ),
+        )
+        for item in selection.hydrate + selection.deferred:
+            observation = item.observation
+            prior = connection.execute(
+                """
+                SELECT source_id, hydrated_generation
+                FROM source_registry
+                WHERE source_id = ? OR source_location = ?
+                ORDER BY source_location = ? DESC
+                LIMIT 1
+                """,
+                (
+                    observation.source_id,
+                    str(observation.path),
+                    str(observation.path),
+                ),
+            ).fetchone()
+            hydrated_generation = (
+                int(prior["hydrated_generation"])
+                if prior is not None
+                and prior["hydrated_generation"] is not None
+                else None
+            )
+            if (
+                prior is not None
+                and str(prior["source_id"]) != observation.source_id
+            ):
+                connection.execute(
+                    """
+                    UPDATE source_registry
+                    SET last_seen_at = CURRENT_TIMESTAMP,
+                        hydration_state = ?
+                    WHERE source_id = ?
+                    """,
+                    (
+                        (
+                            "hydrating"
+                            if observation.source_id in selected_ids
+                            else "deferred"
+                        ),
+                        str(prior["source_id"]),
+                    ),
+                )
+                continue
+            connection.execute(
+                """
+                DELETE FROM source_registry
+                WHERE source_location = ? AND source_id != ?
+                """,
+                (str(observation.path), observation.source_id),
+            )
+            connection.execute(
+                """
+                INSERT INTO source_registry(
+                    source_id, source_location, first_seen_at, last_seen_at,
+                    state, hydration_state, observed_size_bytes,
+                    observed_modified_ns, latest_event_at, timestamp_status,
+                    hydrated_generation
+                )
+                VALUES (
+                    ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'tracked',
+                    ?, ?, ?, ?, ?, ?
+                )
+                ON CONFLICT(source_id) DO UPDATE SET
+                    source_location = excluded.source_location,
+                    last_seen_at = CURRENT_TIMESTAMP,
+                    state = 'tracked',
+                    hydration_state = excluded.hydration_state,
+                    observed_size_bytes = excluded.observed_size_bytes,
+                    observed_modified_ns = excluded.observed_modified_ns,
+                    latest_event_at = excluded.latest_event_at,
+                    timestamp_status = excluded.timestamp_status,
+                    hydrated_generation = COALESCE(
+                        excluded.hydrated_generation,
+                        source_registry.hydrated_generation
+                    )
+                """,
+                (
+                    observation.source_id,
+                    str(observation.path),
+                    (
+                        "hydrating"
+                        if observation.source_id in selected_ids
+                        else "deferred"
+                    ),
+                    observation.size_bytes,
+                    observation.modified_ns,
+                    _timestamp(item.latest_event_at),
+                    "certain" if item.timestamp_is_certain else "uncertain",
+                    hydrated_generation,
+                ),
+            )
+
+
+def restore_hydration_states(path: Path) -> None:
+    """Reconcile transient source states after terminal refresh failure."""
+
+    with _connect(path) as connection:
+        connection.execute(
+            """
+            UPDATE source_registry
+            SET hydration_state = CASE
+                WHEN hydrated_generation IS NOT NULL THEN 'hydrated'
+                ELSE 'deferred'
+            END,
+            last_seen_at = CURRENT_TIMESTAMP
+            WHERE hydration_state = 'hydrating'
+            """
+        )
+
+
+def load_staged_hydration(path: Path) -> dict[str, object] | None:
+    """Return the staged selection identity used for crash recovery."""
+
+    with _connect(path) as connection:
+        row = connection.execute(
+            "SELECT * FROM staged_coverage_control WHERE singleton = 1"
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "preset": str(row["preset"]),
+        "captured_at": str(row["captured_at"]),
+        "cutoff_at": row["cutoff_at"],
+        "coverage_revision": str(row["coverage_revision"]),
+    }
+
+
+def discard_staged_hydration(path: Path) -> None:
+    """Forget an unusable staged selection without changing active coverage."""
+
+    with _connect(path) as connection:
+        connection.execute(
+            "DELETE FROM staged_coverage_control WHERE singleton = 1"
+        )
+
+
+def _record_hydration_catalog_in_connection(
+    connection: sqlite3.Connection,
+    selection: HydrationSelection,
+    *,
+    hydrated_generation: int,
+) -> None:
+    hydrated_ids = {
+        item.observation.source_id for item in selection.hydrate
+    }
+    catalog = selection.hydrate + selection.deferred
+    revision = hydration_selection_revision(selection)
+    for item in catalog:
+        observation = item.observation
+        is_hydrated = observation.source_id in hydrated_ids
+        connection.execute(
+            """
+            DELETE FROM source_registry
+            WHERE source_location = ? AND source_id != ?
+            """,
+            (str(observation.path), observation.source_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO source_registry(
+                source_id, source_location, first_seen_at, last_seen_at,
+                state, hydration_state, observed_size_bytes,
+                observed_modified_ns, latest_event_at, timestamp_status,
+                hydrated_generation
+            )
+            VALUES (
+                ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'tracked',
+                ?, ?, ?, ?, ?, ?
+            )
+            ON CONFLICT(source_id) DO UPDATE SET
+                source_location = excluded.source_location,
+                last_seen_at = CURRENT_TIMESTAMP,
+                state = 'tracked',
+                hydration_state = excluded.hydration_state,
+                observed_size_bytes = excluded.observed_size_bytes,
+                observed_modified_ns = excluded.observed_modified_ns,
+                latest_event_at = excluded.latest_event_at,
+                timestamp_status = excluded.timestamp_status,
+                hydrated_generation = CASE
+                    WHEN excluded.hydration_state = 'hydrated'
+                    THEN excluded.hydrated_generation
+                    ELSE source_registry.hydrated_generation
+                END
+            """,
+            (
+                observation.source_id,
+                str(observation.path),
+                "hydrated" if is_hydrated else "deferred",
+                observation.size_bytes,
+                observation.modified_ns,
+                _timestamp(item.latest_event_at),
+                "certain" if item.timestamp_is_certain else "uncertain",
+                hydrated_generation if is_hydrated else None,
+            ),
+        )
+    hydrated_bytes = selection.hydrated_bytes
+    deferred_bytes = selection.deferred_bytes
+    connection.execute(
+        """
+        INSERT INTO coverage_control(
+            singleton, preset, captured_at, cutoff_at, complete_history,
+            coverage_revision, cataloged_source_count,
+            hydrated_source_count, deferred_source_count, cataloged_bytes,
+            hydrated_bytes, deferred_bytes, uncertain_source_count
+        )
+        VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+            preset = excluded.preset,
+            captured_at = excluded.captured_at,
+            cutoff_at = excluded.cutoff_at,
+            complete_history = excluded.complete_history,
+            coverage_revision = excluded.coverage_revision,
+            cataloged_source_count = excluded.cataloged_source_count,
+            hydrated_source_count = excluded.hydrated_source_count,
+            deferred_source_count = excluded.deferred_source_count,
+            cataloged_bytes = excluded.cataloged_bytes,
+            hydrated_bytes = excluded.hydrated_bytes,
+            deferred_bytes = excluded.deferred_bytes,
+            uncertain_source_count = excluded.uncertain_source_count,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            selection.preset.value,
+            _timestamp(selection.captured_at),
+            _timestamp(selection.cutoff_at),
+            int(selection.complete_history),
+            revision,
+            len(catalog),
+            len(selection.hydrate),
+            len(selection.deferred),
+            hydrated_bytes + deferred_bytes,
+            hydrated_bytes,
+            deferred_bytes,
+            selection.uncertain_source_count,
+        ),
+    )
+
+
+def hydration_selection_revision(selection: HydrationSelection) -> str:
+    """Return the effective source/preset identity for one coverage selection."""
+
+    hydrated_ids = {
+        item.observation.source_id for item in selection.hydrate
+    }
+    catalog = selection.hydrate + selection.deferred
+    payload = {
+        "preset": selection.preset.value,
+        "sources": [
+            {
+                "source_id": item.observation.source_id,
+                "size_bytes": item.observation.size_bytes,
+                "modified_ns": item.observation.modified_ns,
+                "latest_event_at": _timestamp(item.latest_event_at),
+                "hydration_state": (
+                    "hydrated"
+                    if item.observation.source_id in hydrated_ids
+                    else "deferred"
+                ),
+            }
+            for item in sorted(
+                catalog,
+                key=lambda item: item.observation.source_id,
+            )
+        ],
+    }
+    return "sha256:" + hashlib.sha256(
+        json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    ).hexdigest()
+
+
+def load_hydration_coverage(path: Path) -> dict[str, object]:
+    """Return the active source-coverage truth without touching facts."""
+
+    with _connect(path) as connection:
+        row = connection.execute(
+            "SELECT * FROM coverage_control WHERE singleton = 1"
+        ).fetchone()
+    if row is None:
+        return {
+            "preset": None,
+            "captured_at": None,
+            "cutoff_at": None,
+            "complete_history": False,
+            "coverage_revision": None,
+            "cataloged_source_count": 0,
+            "hydrated_source_count": 0,
+            "deferred_source_count": 0,
+            "cataloged_bytes": 0,
+            "hydrated_bytes": 0,
+            "deferred_bytes": 0,
+            "uncertain_source_count": 0,
+        }
+    return {
+        "preset": str(row["preset"]),
+        "captured_at": str(row["captured_at"]),
+        "cutoff_at": row["cutoff_at"],
+        "complete_history": bool(row["complete_history"]),
+        "coverage_revision": str(row["coverage_revision"]),
+        "cataloged_source_count": int(row["cataloged_source_count"]),
+        "hydrated_source_count": int(row["hydrated_source_count"]),
+        "deferred_source_count": int(row["deferred_source_count"]),
+        "cataloged_bytes": int(row["cataloged_bytes"]),
+        "hydrated_bytes": int(row["hydrated_bytes"]),
+        "deferred_bytes": int(row["deferred_bytes"]),
+        "uncertain_source_count": int(row["uncertain_source_count"]),
+    }
+
+
+def hydrated_source_ids(path: Path) -> frozenset[str]:
+    """Return sources already represented in a committed generation."""
+
+    with _connect(path) as connection:
+        rows = connection.execute(
+            """
+            SELECT source_id FROM source_registry
+            WHERE hydrated_generation IS NOT NULL
+            """
+        ).fetchall()
+    return frozenset(str(row["source_id"]) for row in rows)
+
+
+def hydrated_source_locations(path: Path) -> frozenset[Path]:
+    """Return paths whose committed facts must survive file replacement."""
+
+    with _connect(path) as connection:
+        rows = connection.execute(
+            """
+            SELECT source_location FROM source_registry
+            WHERE hydrated_generation IS NOT NULL
+            """
+        ).fetchall()
+    return frozenset(Path(str(row["source_location"])) for row in rows)
+
+
+def hydration_catalog_checkpoints(
+    path: Path,
+) -> dict[str, CatalogCheckpoint]:
+    """Load reusable structural timestamps for unchanged sources."""
+
+    with _connect(path) as connection:
+        rows = connection.execute(
+            """
+            SELECT source_id, observed_size_bytes, observed_modified_ns,
+                   latest_event_at
+            FROM source_registry
+            WHERE state = 'tracked'
+            """
+        ).fetchall()
+    return {
+        str(row["source_id"]): CatalogCheckpoint(
+            size_bytes=int(row["observed_size_bytes"]),
+            modified_ns=int(row["observed_modified_ns"]),
+            latest_event_at=_read_timestamp(row["latest_event_at"]),
+        )
+        for row in rows
+    }
 
 
 def record_legacy_cache_metadata(path: Path, legacy_cache: Path) -> None:
@@ -299,6 +773,7 @@ def promote_cutover(
     active_kernel_path: Path,
     generation: int,
     integrity_digest: str,
+    hydration_selection: HydrationSelection | None = None,
 ) -> CutoverControl:
     """Validate one generation once and atomically publish its control record."""
 
@@ -336,6 +811,15 @@ def promote_cutover(
             None,
             None,
             None,
+        )
+        if hydration_selection is not None:
+            _record_hydration_catalog_in_connection(
+                connection,
+                hydration_selection,
+                hydrated_generation=generation,
+            )
+        connection.execute(
+            "DELETE FROM staged_coverage_control WHERE singleton = 1"
         )
         _write_control(connection, active)
     return load_cutover_control(path)
@@ -642,6 +1126,88 @@ def _validate_operational(path: Path) -> None:
             raise ValueError("operational quick_check failed")
 
 
+def _migrate_operational(path: Path) -> None:
+    """Upgrade only the immediately preceding public sidecar schema."""
+
+    with sqlite3.connect(path) as connection:
+        version = int(connection.execute("PRAGMA user_version").fetchone()[0])
+        if version == OPERATIONAL_SCHEMA_VERSION:
+            return
+        if version != 2:
+            raise ValueError("operational schema version is invalid")
+        connection.executescript(
+            f"""
+            BEGIN IMMEDIATE;
+            ALTER TABLE source_registry
+            ADD COLUMN hydration_state TEXT NOT NULL DEFAULT 'hydrated'
+            CHECK (hydration_state IN ('deferred', 'hydrating', 'hydrated'));
+            ALTER TABLE source_registry
+            ADD COLUMN observed_size_bytes INTEGER NOT NULL DEFAULT 0
+            CHECK (observed_size_bytes >= 0);
+            ALTER TABLE source_registry
+            ADD COLUMN observed_modified_ns INTEGER NOT NULL DEFAULT 0
+            CHECK (observed_modified_ns >= 0);
+            ALTER TABLE source_registry ADD COLUMN latest_event_at TEXT;
+            ALTER TABLE source_registry
+            ADD COLUMN timestamp_status TEXT NOT NULL DEFAULT 'uncertain'
+            CHECK (timestamp_status IN ('certain', 'uncertain'));
+            ALTER TABLE source_registry
+            ADD COLUMN hydrated_generation INTEGER
+            CHECK (hydrated_generation > 0);
+            CREATE TABLE coverage_control (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                preset TEXT NOT NULL CHECK (
+                    preset IN ('recent_30d', 'recent_90d', 'complete')
+                ),
+                captured_at TEXT NOT NULL,
+                cutoff_at TEXT,
+                complete_history INTEGER NOT NULL
+                    CHECK (complete_history IN (0, 1)),
+                coverage_revision TEXT NOT NULL,
+                cataloged_source_count INTEGER NOT NULL
+                    CHECK (cataloged_source_count >= 0),
+                hydrated_source_count INTEGER NOT NULL
+                    CHECK (hydrated_source_count >= 0),
+                deferred_source_count INTEGER NOT NULL
+                    CHECK (deferred_source_count >= 0),
+                cataloged_bytes INTEGER NOT NULL
+                    CHECK (cataloged_bytes >= 0),
+                hydrated_bytes INTEGER NOT NULL
+                    CHECK (hydrated_bytes >= 0),
+                deferred_bytes INTEGER NOT NULL
+                    CHECK (deferred_bytes >= 0),
+                uncertain_source_count INTEGER NOT NULL
+                    CHECK (uncertain_source_count >= 0),
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ) STRICT;
+            CREATE TABLE staged_coverage_control (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                preset TEXT NOT NULL CHECK (
+                    preset IN ('recent_30d', 'recent_90d', 'complete')
+                ),
+                captured_at TEXT NOT NULL,
+                cutoff_at TEXT,
+                coverage_revision TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ) STRICT;
+            UPDATE source_registry
+            SET hydrated_generation = (
+                SELECT active_generation
+                FROM cutover_control
+                WHERE singleton = 1
+            )
+            WHERE hydration_state = 'hydrated'
+                AND (
+                    SELECT active_generation
+                    FROM cutover_control
+                    WHERE singleton = 1
+                ) IS NOT NULL;
+            PRAGMA user_version = {OPERATIONAL_SCHEMA_VERSION};
+            COMMIT;
+            """
+        )
+
+
 def _control_from_row(row: sqlite3.Row) -> CutoverControl:
     return CutoverControl(
         state=CutoverState(row["state"]),
@@ -667,6 +1233,24 @@ def _path(value: str | None) -> Path | None:
 
 def _string_path(value: Path | None) -> str | None:
     return str(value.resolve()) if value else None
+
+
+def _timestamp(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _read_timestamp(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
 
 
 def _validate_artifact(
