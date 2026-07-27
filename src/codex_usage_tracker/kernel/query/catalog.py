@@ -47,6 +47,13 @@ _CALL_OPERATIONS = _COMMON_OPERATIONS | {
     Operation.COMPARISON,
     Operation.TIME_SERIES,
 }
+_CONTEXT_OPERATIONS = frozenset(
+    {
+        Operation.AGGREGATE,
+        Operation.DISTRIBUTION,
+        Operation.SHARE,
+    }
+)
 
 _CALL_DIMENSIONS = {
     "call": "model_calls.canonical_call_id",
@@ -169,6 +176,40 @@ DATASETS: dict[str, DatasetSpec] = {
         coverage_fields={
             "duration_ms": "tool_calls.duration_ms",
             "output_bytes": "tool_calls.output_bytes",
+        },
+    ),
+    "context": DatasetSpec(
+        base_sql="composition_events",
+        generation_sql="composition_events.generation <= ?",
+        time_sql="composition_events.event_at",
+        stable_id_sql="composition_events.event_id",
+        dimensions={
+            "context_event": "composition_events.event_id",
+            "category": "composition_events.category",
+            "thread": "composition_events.logical_thread_id",
+            "turn": "composition_events.turn_id",
+            "event_at": "composition_events.event_at",
+            "time_day": "substr(composition_events.event_at, 1, 10)",
+        },
+        row_measures={
+            "events": "1",
+            "observed_bytes": "composition_events.observed_bytes",
+            "estimated_tokens": "composition_events.estimated_tokens",
+        },
+        aggregate_measures={
+            "events": "COUNT(*)",
+            "observed_bytes": "SUM(composition_events.observed_bytes)",
+            "estimated_tokens": "SUM(composition_events.estimated_tokens)",
+        },
+        filter_fields={
+            "category": "composition_events.category",
+            "thread": "composition_events.logical_thread_id",
+            "turn": "composition_events.turn_id",
+            "event_at": "composition_events.event_at",
+        },
+        operations=_CONTEXT_OPERATIONS,
+        coverage_fields={
+            "estimated_tokens": "composition_events.estimated_tokens",
         },
     ),
     "activities": DatasetSpec(
@@ -415,6 +456,22 @@ _GUIDED_TEMPLATES: dict[str, dict[str, Any]] = {
             }
         ],
     },
+    "context_composition": {
+        "kind": "query_template",
+        "label": "Observed context composition by category",
+        "evidence_policy": "aggregate_only",
+        "requests": [
+            {
+                "dataset": "context",
+                "operation": "share",
+                "dimensions": ["category"],
+                "measures": ["events", "observed_bytes", "estimated_tokens"],
+                "order_by": "observed_bytes",
+                "descending": True,
+                "limit": 25,
+            }
+        ],
+    },
     "model_effort": {
         "kind": "query_template",
         "label": "Model and reasoning-effort mix",
@@ -528,6 +585,7 @@ _DATASET_DEFAULT_REQUESTS = {
     },
     "allowance": _GUIDED_TEMPLATES["allowance"]["requests"][0],
     "calls": _GUIDED_TEMPLATES["concentration"]["requests"][0],
+    "context": _GUIDED_TEMPLATES["context_composition"]["requests"][0],
     "threads": {
         "dataset": "threads",
         "operation": "aggregate",

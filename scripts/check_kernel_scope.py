@@ -177,6 +177,16 @@ K10_ADDITIONS = frozenset(
     }
 )
 
+K12_ADDITIONS = frozenset(
+    {
+        "docs/kernel-context-composition.md",
+        "src/codex_usage_tracker/kernel/content.py",
+        "tests/kernel/content/__init__.py",
+        "tests/kernel/content/test_cli.py",
+        "tests/kernel/content/test_service.py",
+    }
+)
+
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
     | K2_ADDITIONS
@@ -188,6 +198,7 @@ INTEGRATION_ADDITIONS = (
     | K8_ADDITIONS
     | K9_ADDITIONS
     | K10_ADDITIONS
+    | K12_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"

@@ -72,7 +72,7 @@ progress.
 | K9 | 0.26.0 | Complete | K8 | Release candidate and final absence audit |
 | K10 | 0.26.0 | Complete | K9 | Published lean kernel and verified exact public artifacts |
 | K11 | 0.27.0 | Complete | K10 | Guided exploration |
-| K12 | 0.27.0 | Not started | K11 | Optional context composition |
+| K12 | 0.27.0 | Complete | K11 | Optional context composition |
 | K13 | 0.27.0 | Not started | K11 | Read-only overlay boundary |
 | K14 | 0.27.0 | Not started | K12, K13 | Release qualification |
 | K15 | 0.28.0 | Not started | K14 | Fault, recovery, and scale |
@@ -1427,12 +1427,16 @@ routes, six JSON schemas, and the exact deterministic Console bundle inventory.
 
 ## K11 — Add Guided Model-Driven Exploration
 
-**State:** Complete — locally qualified for merge
+**State:** Complete — merged through
+[PR #330](https://github.com/douglasmonsky/codex-usage-tracker/pull/330)
 **Branch:** `kernel/k11-guided-exploration`
 **Base:** `origin/main` at
 `2a48fc7215ed0f32f441cc71a2a7197d43d04881`
 **Commits:** `c18b957ec20b7599112d529e598448d056979c33`
-(`feat: add guided kernel exploration`)
+(`feat: add guided kernel exploration`),
+`ece86d87e1d2a7f00f6f7f1b7986b032fc65dcb1`
+(`docs: record K11 qualification`); squash merge
+`2efd075b3a3aee7a312f5bd6ea5210b3b72960f0`
 
 ### Contract added first
 
@@ -1525,6 +1529,117 @@ denial handling. No second reviewer was used.
   indexing, or new MCP tool.
 - K12 is unblocked after K11 merges; optional context-composition estimates
   remain out of this branch.
+
+## K12 — Add Optional Context-Composition Estimates
+
+**State:** Complete — implementation, final review, and package qualification
+pass; pull request pending
+**Branch:** `kernel/k12-context-composition`
+**Base:** `origin/main` at
+`2efd075b3a3aee7a312f5bd6ea5210b3b72960f0`
+**Commits:** feature `486500b`
+
+### Contract added first
+
+- One intentional red collection proved the optional content owner did not
+  exist. The contract requires disabled-by-default behavior, explicit privacy
+  confirmation, a separate owner-only database, exact observed bytes distinct
+  from optional tokenizer estimates, deletion independence, redaction,
+  incremental cursors, and failure isolation.
+- A bounded-read contract prevents a no-change content pass from reading more
+  than three 4,096-byte source samples. An append contract proves only the new
+  committed event is hydrated and the next no-change pass inserts zero rows.
+- Query contracts require explicit estimator coverage, source generation,
+  generation lag, observed-through time, and unavailable unattributed input
+  tokens rather than fabricated exact token shares.
+
+### Implementation
+
+- `kernel/content.py` owns the isolated
+  `codex-usage-content-v1.sqlite3` lifecycle. Enabling requires
+  `--confirm-private-content`; fragment retention is a second explicit option.
+  Disabling preserves the optional database, while deletion removes only that
+  database and leaves accounting byte-identical.
+- Content indexing reads only source ranges already committed by the active
+  kernel generation. Per-source cursors append new rows, bounded
+  first/middle/last fingerprints detect replacement without rereading full
+  histories, inode-changing replacement retires prior rows and fragments, and
+  one content transaction rolls back on failure.
+- The database persists bounded category metadata for host, message, tool, MCP,
+  and unattributed material. Optional fragments redact secret-shaped values,
+  credential fields, and host paths before persistence; no raw digest or
+  fragment is available through `usage_query` or shareable export.
+- The existing `usage_query` tool gained the aggregate-only `context` dataset
+  and guided template. Exact UTF-8 bytes and event counts remain exact;
+  tokenizer estimates remain nullable until an explicit estimator supplies
+  them; changing or removing an estimator rebuilds all estimates and provenance
+  transactionally. A batched query holds one WAL read snapshot. Event-level
+  rows and timelines are rejected. No MCP tool, hidden refresh, narrative
+  analysis, or normal-refresh content work was added.
+- Console Explore shows the exact-versus-estimated distinction using the same
+  static guidance contract. CLI status, enable, index, disable, and delete
+  commands expose the explicit lifecycle.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused contracts | Pass | 42 focused content/query/interface tests; opt-in/out/delete, compound-key redaction, missing/corrupt content, estimator transitions, append/no-change/replacement cursors, stable batch snapshots, aggregate-only operations, bounded reads, and failure rollback pass |
+| Broad local profile | Pass | `just vc`: 315 Python tests, Ruff, MyPy across 58 files, Pyright, maintainability, frontend, scope, manifest, privacy, release, build, and exact-distribution checks pass |
+| Browser | Pass | 24 Chromium desktop/mobile flows pass; two intentional mobile skips remain covered on desktop |
+| Normal refresh performance | Pass | Five-run Python 3.14 medians at 10,000 synthetic calls: initial 659.288→661.255 ms (+0.3%), append 18.040→18.360 ms (+1.8%), no-change 4.273→4.609 ms (+0.336 ms absolute) |
+| Incremental content behavior | Pass | no-change source reads are mechanically bounded to at most 12,288 bytes; append indexes one new event and the next pass indexes zero |
+| Distribution | Pass | final wheel and sdist remain below the 130,000-byte and 350,000-byte ceilings; artifact hashes are intentionally recorded only by release manifests because this ledger is packaged into the sdist |
+| Installed package | Pass | exact wheel exercises content disabled-by-default, enable/index/query/delete, two fresh MCP tasks, and warm Console p95 0.908 ms |
+| Privacy | Pass | synthetic fixtures only; no live Usage Tracker database or real Codex content inspected |
+
+### Review metrics
+
+- Total findings: 5
+- Accepted findings: 5 (`R1`–`R5`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+- Token attribution: unavailable after the single bounded metrics call timed
+  out; no retry or Usage Tracker refresh was started for metrics.
+
+### Churn measurement
+
+- The maintained verification recipe initially omitted the new content test
+  package; it now includes that package in both Ruff and pytest profiles.
+- Release checks correctly rejected the added CLI command and measured package
+  bytes until the exact catalogs and at-most-three-percent ceilings were
+  updated. No behavior was reshaped to satisfy a style-only preference.
+- No unchanged-state duplicate broad run or style-only commit has occurred.
+  Final counts will be synchronized after package qualification.
+- The single final reviewer found five behavioral contract defects and all five
+  were accepted: compound sensitive-key redaction, source-retirement on inode
+  replacement, estimator-provenance rebuilds, stable WAL read snapshots, and
+  mechanical aggregate-only query enforcement.
+
+### Deviations and decisions
+
+- The first replacement check hashed the complete previously indexed prefix.
+  This contradicted the incremental product goal and was replaced before
+  review with the bounded kernel-style three-sample fingerprint plus a
+  mechanical read ceiling.
+- Serena project bootstrap and the Usage Tracker IntelliJ model are healthy,
+  but the task-host Serena adapter still resolves every explicit activation to
+  `/Users/Monsky/Documents/Agent Maintainer`. No file in that unrelated
+  project was read or changed. GitNexus impact analysis, including the critical
+  `content_status` and high-risk Console paths, plus direct source and tests,
+  remained authoritative.
+- Agent-perf run `20260727T082458Z-69c0538e` could not start because pinned
+  Scalene 2.3.0 is absent. Identical unprofiled measurements are retained and
+  no CPU-attribution claim is made.
+
+### Residual risk and next task
+
+- No tokenizer is bundled or selected. Exact observed-byte answers work now;
+  category token estimates remain unavailable unless a future explicit
+  estimator owner supplies them, matching the scheduled open decision.
+- The one final read-only review and final package rebuild remain before K12
+  can merge and unblock K14. K13 remains independent and must not be pulled
+  into this branch.
 
 ## Task Entry Template
 

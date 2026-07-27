@@ -8,6 +8,7 @@ six-tool MCP surface, and a focused Evidence Console.
 - Product roadmap: `docs/roadmap/product-kernel-reset.md`
 - Execution ledger: `docs/roadmap/product-kernel-reset-execution.md`
 - Active search policy: `docs/kernel-development-scope.md`
+- Optional context composition: `docs/kernel-context-composition.md`
 - Frozen code disposition: `config/kernel-code-disposition-v1.json`
 - Frozen retired surfaces: `config/kernel-retired-surfaces-v1.json`
 

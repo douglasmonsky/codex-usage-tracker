@@ -12,9 +12,10 @@ from typing import Any
 from urllib.parse import quote
 
 from ... import __version__
-from ...application import build_application, default_runtime_paths
+from ...application import RuntimePaths, build_application, default_runtime_paths
 from ...application.codec import json_value
 from ...application.service import run_refresh_worker
+from ...content import ContextComposition
 from ...database import initialize_analytical_database
 from ...operational import (
     initialize_operational_database,
@@ -33,6 +34,7 @@ COMMANDS = (
     "open",
     "service",
     "config",
+    "content",
     "repair",
     "package",
 )
@@ -67,6 +69,38 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)
     subparsers.add_parser("config", help="show resolved local paths")
+    content = subparsers.add_parser(
+        "content",
+        help="manage optional context-composition metadata",
+    )
+    content_subparsers = content.add_subparsers(
+        dest="content_command",
+        required=True,
+    )
+    content_subparsers.add_parser("status", help="show content capability status")
+    enable_content = content_subparsers.add_parser(
+        "enable",
+        help="enable private local content indexing",
+    )
+    enable_content.add_argument(
+        "--confirm-private-content",
+        action="store_true",
+        help="confirm that bounded private content may be processed locally",
+    )
+    enable_content.add_argument(
+        "--store-redacted-fragments",
+        action="store_true",
+        help="retain bounded redacted fragments in the isolated content database",
+    )
+    content_subparsers.add_parser(
+        "index",
+        help="consume the latest committed kernel generation",
+    )
+    content_subparsers.add_parser("disable", help="disable content indexing")
+    content_subparsers.add_parser(
+        "delete",
+        help="delete the isolated content database",
+    )
     repair = subparsers.add_parser("repair", help="validate or roll back cache")
     repair.add_argument("--rollback", action="store_true")
     subparsers.add_parser("package", help="show package identity")
@@ -140,8 +174,11 @@ def _run(arguments: argparse.Namespace) -> dict[str, Any] | None:
         return {
             "codex_home": str(runtime.codex_home),
             "cache_root": str(runtime.cache_root),
+            "content_database": str(runtime.content),
             "http_prefix": API_PREFIX,
         }
+    if arguments.command == "content":
+        return _run_content(arguments, runtime)
     if arguments.command == "repair":
         if not runtime.kernel.operational.is_file():
             raise ValueError("kernel cache is absent")
@@ -156,6 +193,31 @@ def _run(arguments: argparse.Namespace) -> dict[str, Any] | None:
     if arguments.command == "_refresh-worker":
         return run_refresh_worker(runtime)
     raise ValueError("unknown command")
+
+
+def _run_content(
+    arguments: argparse.Namespace,
+    runtime: RuntimePaths,
+) -> dict[str, Any]:
+    content = ContextComposition(
+        runtime.content,
+        runtime.kernel.operational,
+    )
+    handlers = {
+        "status": content.status,
+        "enable": lambda: content.enable(
+            privacy_confirmed=arguments.confirm_private_content,
+            store_redacted_fragments=arguments.store_redacted_fragments,
+        ),
+        "index": content.index,
+        "disable": content.disable,
+        "delete": content.delete,
+    }
+    try:
+        handler = handlers[arguments.content_command]
+    except KeyError as exc:
+        raise ValueError("unknown content command") from exc
+    return handler()
 
 
 def _request_payload(value: str) -> dict[str, Any]:

@@ -45,6 +45,7 @@ def test_catalog_routes_and_cli_are_exact_and_legacy_free() -> None:
         "open",
         "service",
         "config",
+        "content",
         "repair",
         "package",
     )
