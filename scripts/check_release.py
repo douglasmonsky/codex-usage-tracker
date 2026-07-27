@@ -194,6 +194,7 @@ def _distribution_failures(dist_dir: Path) -> list[str]:
 
 def _expected_sdist_names() -> set[str]:
     names = {
+        ".agents/plugins/marketplace.json",
         "AGENTS.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
