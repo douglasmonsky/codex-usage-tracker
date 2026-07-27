@@ -879,8 +879,8 @@ also removed two redundant full scans from every non-empty SQL result.
 **State:** Local complete; CI pending
 **Branch:** `kernel/k5-evidence-live`
 **Base:** `a38bf4440ae04b34d9197628378f09c05fd2c060`
-**Commits:** pending local commit; closeout metadata will follow in this
-changeset
+**Commits:** `c45fa2c feat: add live kernel evidence timelines`; closeout
+metadata in this changeset
 
 ### Contract added first
 
