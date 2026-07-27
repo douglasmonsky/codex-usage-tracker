@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.28.0 - 2026-07-27
+
+- Freeze the six-tool MCP, versioned HTTP/SSE, primary CLI, logical evidence,
+  cache lifecycle, calculation-grade, four-token-class, JSON export, privacy,
+  installation, and upgrade contracts.
+- Qualify abrupt writer and content-worker death, storage failures, stale
+  leases, promotion recovery, malformed requests, slow SSE clients, concurrent
+  reads, large histories, public-version upgrades, and rollback with synthetic
+  fixtures.
+- Keep `exact`, `deterministic`, and `estimated` as the only calculation grades;
+  report incomplete observations through explicit coverage rather than a
+  fourth `partial` grade.
+- Defer 1.0 until post-freeze dogfood while keeping optional context composition
+  and the read-only overlay adapter outside the stable surface.
+
 ## 0.27.0 - 2026-07-27
 
 - Add compact guided-exploration templates and filter grammar so models can

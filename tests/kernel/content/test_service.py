@@ -220,7 +220,7 @@ def test_fragments_are_redacted_and_never_exposed_by_query_results(
     encoded = json.dumps(result.rows)
     assert "secret-value" not in encoded
     assert "synthetic-secret" not in encoded
-    assert result.grade == "partial"
+    assert result.grade == "estimated"
     assert result.coverage["unattributed_input_tokens"] is None
     assert result.coverage["source_generation"] == 1
     assert result.coverage["generation_lag"] == 0

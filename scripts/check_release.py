@@ -34,8 +34,8 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from generate_kernel_manifests import manifest_failures
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_VERSION = "0.27.0"
-_PLUGIN_VERSION = "0.27.0"
+_VERSION = "0.28.0"
+_PLUGIN_VERSION = "0.28.0"
 _K1_MERGE = "d8da9bccdb6674e7dca4c0872c36a1346949dc13"
 _FROZEN_RELEASE_PATHS = (
     "scripts/release_quality.py",

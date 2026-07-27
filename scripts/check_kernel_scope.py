@@ -199,7 +199,6 @@ K13_ADDITIONS = frozenset(
 K14_ADDITIONS = frozenset(
     {
         "config/kernel-release-qualification-v1.json",
-        "tests/kernel/test_release_027_qualification.py",
     }
 )
 
@@ -207,6 +206,15 @@ K15_ADDITIONS = frozenset(
     {
         "config/kernel-fault-recovery-scale-v1.json",
         "tests/kernel/test_fault_recovery_scale.py",
+    }
+)
+
+K16_ADDITIONS = frozenset(
+    {
+        "config/kernel-stable-contract-v1.json",
+        "docs/kernel-stable-contract-0.28.md",
+        "tests/kernel/test_release_028_qualification.py",
+        "tests/kernel/test_stable_contract_028.py",
     }
 )
 
@@ -225,6 +233,7 @@ INTEGRATION_ADDITIONS = (
     | K13_ADDITIONS
     | K14_ADDITIONS
     | K15_ADDITIONS
+    | K16_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"

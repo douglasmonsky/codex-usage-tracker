@@ -296,7 +296,7 @@ def test_query_catalog_supports_every_kernel_dataset(
     assert all(result.scanned_count is not None for result in results)
     assert results[5].plan_id == "phases.timeline.v1"
     assert results[5].grade == "deterministic"
-    assert results[6].grade == "partial"
+    assert results[6].grade == "exact"
     assert any(
         row["local_tokens_per_percentage_point"] == 11.5
         for row in results[6].rows
@@ -361,7 +361,7 @@ def test_missing_tool_observations_are_partial_not_zero(tmp_path: Path) -> None:
     assert result.rows == (
         {"duration_ms": None, "output_bytes": None, "tools": 1},
     )
-    assert result.grade == "partial"
+    assert result.grade == "exact"
     assert result.coverage["measures"]["duration_ms"] == {
         "basis": "upstream_observed",
         "observed_count": 0,

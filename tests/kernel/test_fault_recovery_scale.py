@@ -91,6 +91,7 @@ def test_ci_executes_public_026_to_candidate_upgrade_smoke() -> None:
     ).read_text(encoding="utf-8")
 
     assert workflow.count("--upgrade-from 0.26.0") == 1
+    assert workflow.count("--upgrade-from 0.27.0") == 1
 
 
 def test_corrupt_lines_are_counted_while_valid_rows_still_commit(
