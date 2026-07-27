@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "strict": false,
+    "target": "ES2022"
+  },
+  "include": ["app.js", "model.js"]
+}

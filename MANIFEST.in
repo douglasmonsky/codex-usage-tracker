@@ -1,4 +1,5 @@
 include README.md LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md AGENTS.md
+include package.json package-lock.json playwright.config.mjs
 exclude .mcp.json
 prune .codex-plugin
 prune assets
@@ -14,6 +15,12 @@ include scripts/check_kernel_scope.py
 include scripts/check_release.py
 include scripts/generate_kernel_interfaces.py
 include scripts/generate_kernel_manifests.py
+include scripts/build_kernel_console.mjs
+include scripts/check_kernel_console.mjs
+include scripts/smoke_installed_console.py
+recursive-include frontend/kernel-console *.css *.html *.js *.json
 recursive-include tests/kernel *.json *.jsonl *.py
+recursive-include tests/frontend *.mjs
+recursive-include tests/e2e *.mjs
 prune tests/release
 global-exclude __pycache__ *.py[cod]

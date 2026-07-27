@@ -46,9 +46,11 @@ jobs:
             scripts/check_kernel_maintainability.py \
             scripts/check_kernel_scope.py \
             scripts/check_release.py \
+            scripts/smoke_installed_console.py \
             scripts/generate_kernel_interfaces.py \
             scripts/generate_kernel_manifests.py \
             src/codex_usage_tracker/kernel \
+            tests/kernel/console \
             tests/kernel/evidence \
             tests/kernel/interfaces \
             tests/kernel/live \
@@ -101,6 +103,7 @@ jobs:
             tests/kernel/test_privacy_oracle.py \
             tests/kernel/test_source_lifecycle_oracle.py \
             tests/kernel/test_watcher.py \
+            tests/kernel/console \
             tests/kernel/evidence \
             tests/kernel/interfaces \
             tests/kernel/live \
@@ -117,3 +120,32 @@ jobs:
           python scripts/check_release.py --dist
       - name: Whitespace
         run: git diff --check
+
+  console:
+    name: Focused Evidence Console
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install Console tooling
+        run: |
+          python -m pip install ".[dev]"
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+      - name: Verify deterministic Console
+        run: |
+          npm run console:verify
+          npm run console:e2e
+          python -m build
+          python scripts/check_release.py --dist
+          python scripts/smoke_installed_console.py --wheel dist/*.whl
+          python scripts/smoke_installed_console.py --reference-0251

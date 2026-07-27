@@ -166,7 +166,7 @@ def _console_url(host: str, port: int, selector: str | None) -> str:
         raise ValueError("open port is invalid")
     base = f"http://{host}:{port}/"
     return (
-        base
+        f"{base}live"
         if selector is None
         else f"{base}evidence/{quote(selector, safe='')}?view=summary"
     )

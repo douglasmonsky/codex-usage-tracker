@@ -4,6 +4,7 @@ scope:
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_kernel_scope.py
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/generate_kernel_manifests.py --check
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; PYTHONPATH=src "$PY" scripts/generate_kernel_interfaces.py --check
+    npm run console:build:check
 
 vp:
     just scope
@@ -11,9 +12,11 @@ vp:
         scripts/check_kernel_maintainability.py \
         scripts/check_kernel_scope.py \
         scripts/check_release.py \
+        scripts/smoke_installed_console.py \
         scripts/generate_kernel_interfaces.py \
         scripts/generate_kernel_manifests.py \
         src/codex_usage_tracker/kernel \
+        tests/kernel/console \
         tests/kernel/evidence \
         tests/kernel/interfaces \
         tests/kernel/live \
@@ -36,6 +39,9 @@ vp:
         tests/kernel/test_watcher.py
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m mypy
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_kernel_maintainability.py
+    npm run console:lint
+    npm run console:typecheck
+    npm run console:test
     git diff --check
 
 verify-precommit:
@@ -60,6 +66,7 @@ v:
         tests/kernel/test_privacy_oracle.py \
         tests/kernel/test_source_lifecycle_oracle.py \
         tests/kernel/test_watcher.py \
+        tests/kernel/console \
         tests/kernel/evidence \
         tests/kernel/interfaces \
         tests/kernel/live \
@@ -80,3 +87,6 @@ verify-ci:
 
 verify-manual:
     just vc
+
+console-e2e:
+    npm run console:e2e

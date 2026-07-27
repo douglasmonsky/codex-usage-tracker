@@ -154,6 +154,7 @@ def test_sse_event_is_compact_and_contains_generation_identity(tmp_path) -> None
     payload = event.to_sse()
     assert payload.startswith("id: 1\nevent: generation_committed\n")
     assert '"generation":1' in payload
+    assert '"publication_id":"publication-1"' in payload
     assert "PRIVATE_" not in payload
 
 

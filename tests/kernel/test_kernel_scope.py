@@ -11,6 +11,7 @@ from scripts.check_kernel_scope import (
     K4_ADDITIONS,
     K5_ADDITIONS,
     K6_ADDITIONS,
+    K7_ADDITIONS,
     load_disposition_manifest,
     publication_ref_failure,
     scope_failures,
@@ -142,6 +143,17 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/interfaces/test_performance.py",
         "tests/kernel/interfaces/test_plugin.py",
     } <= K6_ADDITIONS
+    assert {
+        ".agent-maintainer/change-plans/k7-evidence-console.md",
+        "frontend/kernel-console/app.js",
+        "scripts/build_kernel_console.mjs",
+        "scripts/check_kernel_console.mjs",
+        "scripts/smoke_installed_console.py",
+        "src/codex_usage_tracker/kernel/interfaces/http/console.py",
+        "src/codex_usage_tracker/kernel/interfaces/http/console_assets/index.html",
+        "tests/frontend/kernel_console.test.mjs",
+        "tests/kernel/console/test_contracts.py",
+    } <= K7_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -149,6 +161,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K4_ADDITIONS
         | K5_ADDITIONS
         | K6_ADDITIONS
+        | K7_ADDITIONS
     )
 
 
