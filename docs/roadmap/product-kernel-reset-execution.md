@@ -75,7 +75,7 @@ progress.
 | K12 | 0.27.0 | Complete | K11 | Optional context composition |
 | K13 | 0.27.0 | Complete | K11 | Read-only overlay boundary |
 | K14 | 0.27.0 | Complete | K12, K13 | Release qualification |
-| K15 | 0.28.0 | Not started | K14 | Fault, recovery, and scale |
+| K15 | 0.28.0 | In progress | K14 | Fault, recovery, and scale |
 | K16 | 0.28.0 | Not started | K15 | Contract freeze and release |
 
 ## Baseline Evidence
@@ -1860,6 +1860,99 @@ Python 3.10 test compatibility `889ad92`; squash merge
   conditional that caused this duplicate, contention-sensitive execution.
 - Local verification passed 324 functional tests in 34.53 seconds and the
   separately isolated 100,000-call benchmark in 11.90 seconds.
+
+## K15 — Fault, Recovery, And Scale Qualification
+
+**State:** In progress — local qualification complete; final review and CI pending
+**Branch:** `kernel/k15-fault-recovery`
+**Base:** `3f5aea32af0de08df35661bdbec3a00f8ffe346a`
+**Commits:** pending
+
+### Contract added first
+
+- The intentional red run failed because
+  `config/kernel-fault-recovery-scale-v1.json` did not exist.
+- The completed machine contract maps all 12 required fault scenarios and all
+  6 required scale scenarios to collected executable test IDs. It is
+  feature-free and permits synthetic fixtures only.
+
+### Qualification
+
+- Abrupt subprocess exits now cover every analytical writer transaction
+  discovered by the real append workload plus post-lease, post-cutover,
+  post-promotion, and pre-terminal-job boundaries. Recovery expires the orphan
+  lease, records the interrupted job, and reaches generation 2 with exactly 401
+  calls and no queued/running job.
+- Analytical and operational disk-full plus operational read-only failures
+  raise without false success or active-cache replacement. Corrupt complete
+  lines are counted, partial tails remain pending, and valid later rows commit
+  exactly once.
+- Mixed-source qualification covers 40 small files plus one large file.
+  Thread/tool scale covers 1,000 active threads, 1,000 model calls, and 4,000
+  tool calls. Real HTTP Console-data, MCP, and CLI-export interfaces execute in
+  parallel while refresh is paused mid-write and all read the published
+  generation.
+- The retained proofs also cover append-during-scan, replacement/truncation,
+  stale/live foreign leases, staging recovery, watcher/replay expiry, slow SSE
+  clients, malformed requests/cursors/selectors, optional content failure, old
+  cache rollback, and the isolated 100,000-call ingest/query/evidence gates.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Contract red | Pass | one expected failure: K15 matrix absent |
+| Complete matrix | Pass | 32 unique abrupt-process, storage, content, network, interface, upgrade, and scale proof nodes in 35.14 seconds |
+| Clean full pass 1 | Pass | 337 tests plus Ruff, MyPy, Pyright, maintainability, Console, scope, manifests, privacy, and release safety |
+| Clean full pass 2 | Pass | the same 337 tests and complete gate set on unchanged final code |
+| Browser | Pass | 25 applicable Chromium desktop/mobile flows; 3 intentional mobile stream skips |
+| Distribution | Pass | wheel 129,485 bytes; post-review sdist measured 372,730–372,839 bytes during ledger closure; exact release checks pass and the 379,000-byte ceiling retains under 1.7 percent headroom |
+| 0.26 upgrade | Pass | public 0.26.0 created generation 1; in-place final-candidate upgrade preserved cache bytes and generation before refresh; full two-task MCP/content/Console smoke passed at 0.707 ms warm Console p95 |
+| Privacy | Pass | synthetic fixtures only; no live Usage Tracker database or raw Codex content inspected |
+
+The installed upgrade is also a blocking Python 3.14 CI package step; its
+focused repository contract rejects removal of `--upgrade-from 0.26.0`.
+
+### Performance attribution
+
+- The 100,000-call ingest, query, and evidence proofs remain independently
+  bounded and passed in the complete matrix.
+- Agent Perf run `20260727T110931Z-5249ad85` could not start because pinned
+  Scalene 2.3.0 is absent. No dependency was added and no CPU-hotspot claim is
+  made; the identical unprofiled synthetic timings are authoritative.
+
+### Final review
+
+- One read-only reviewer reported 7 findings and all 7 were accepted: abrupt
+  process death, operational storage failure, real parallel data interfaces,
+  abrupt content-worker death, real SSE clients, final-state double
+  qualification, and executable upgrade gating.
+- Reviewer tokens: pending. Tokens per accepted finding: pending.
+
+### Churn measurement
+
+- Six non-behavioral findings were three test-expectation corrections, one
+  focused typing correction, explicit inclusion of the new K15 test in the
+  maintained local wrapper, and the measured sdist ratchet. No generic style
+  gate or style-only commit occurred.
+- The required second unchanged full pass and one repeated upgrade smoke used
+  only to recover concise output after build-log truncation are both recorded
+  as duplicate broad runs under the strict metric definition.
+
+### Deviations and decisions
+
+- Serena activation of the exact Usage Tracker worktree still redirects to the
+  stale nonexistent `/Users/Monsky/Documents/Agent Maintainer` path. No Agent
+  Maintainer repository was read or changed; exact Usage Tracker searches and
+  the indexed Usage Tracker architecture graph were used.
+- A read-only failure before cutover correctly leaves the prior state
+  `ACTIVE`; a disk-full failure after cutover begins records `FAILED`. Both
+  preserve the published generation and recover on retry.
+
+### Residual risk and next task
+
+- GitHub CI remains before K15 merge.
+- K16 contract freeze and 0.28.0 release remain blocked until K15 merges.
 
 ## Task Entry Template
 

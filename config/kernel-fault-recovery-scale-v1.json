@@ -1,0 +1,133 @@
+{
+  "schema": "codex-usage-tracker.kernel-fault-recovery-scale.v1",
+  "feature_changes": false,
+  "synthetic_fixtures_only": true,
+  "upgrade_proofs": [
+    "tests/kernel/test_fault_recovery_scale.py::test_ci_executes_public_026_to_candidate_upgrade_smoke"
+  ],
+  "fault_matrix": [
+    {
+      "id": "corrupt_partial_jsonl",
+      "proofs": [
+        "tests/kernel/test_fault_recovery_scale.py::test_corrupt_lines_are_counted_while_valid_rows_still_commit",
+        "tests/kernel/test_ingest_pipeline.py::test_partial_tail_waits_then_moving_tail_catches_up"
+      ]
+    },
+    {
+      "id": "file_append_during_scan",
+      "proofs": [
+        "tests/kernel/test_ingest_pipeline.py::test_source_appended_during_hydration_is_caught_before_promotion"
+      ]
+    },
+    {
+      "id": "replacement_and_truncation",
+      "proofs": [
+        "tests/kernel/test_ingest_lifecycle.py::test_replacement_truncation_archive_and_restore_are_explicit",
+        "tests/kernel/test_ingest_reconciliation.py::test_failed_replacement_promotion_keeps_prior_active_and_recovers"
+      ]
+    },
+    {
+      "id": "process_kill_at_writer_boundaries",
+      "proofs": [
+        "tests/kernel/test_fault_recovery_scale.py::test_every_writer_boundary_failure_recovers_without_false_promotion"
+      ]
+    },
+    {
+      "id": "stale_and_live_foreign_leases",
+      "proofs": [
+        "tests/kernel/test_ingest_jobs.py::test_stale_owner_recovers_without_interrupting_live_foreign_owner",
+        "tests/kernel/test_ingest_jobs.py::test_second_process_joins_live_owner_then_recovers_stale_lease"
+      ]
+    },
+    {
+      "id": "disk_full_and_read_only_cache",
+      "proofs": [
+        "tests/kernel/test_fault_recovery_scale.py::test_disk_failures_do_not_replace_the_active_cache"
+      ]
+    },
+    {
+      "id": "interrupted_staging_atomic_promotion",
+      "proofs": [
+        "tests/kernel/test_database_lifecycle.py::test_interrupted_staging_creation_does_not_replace_active_cache",
+        "tests/kernel/test_ingest_reconciliation.py::test_interrupted_after_commit_promotes_valid_generation_on_next_refresh"
+      ]
+    },
+    {
+      "id": "watcher_restart_and_replay_expiry",
+      "proofs": [
+        "tests/kernel/live/test_contracts.py::test_replay_is_monotonic_bounded_and_restart_safe",
+        "tests/kernel/test_watcher.py::test_watcher_never_starts_first_build"
+      ]
+    },
+    {
+      "id": "slow_or_disconnected_sse_client",
+      "proofs": [
+        "tests/kernel/test_fault_recovery_scale.py::test_real_sse_slow_and_disconnected_clients_do_not_block_reads",
+        "tests/kernel/live/test_contracts.py::test_burst_slow_client_disconnect_and_generation_gap_are_bounded"
+      ]
+    },
+    {
+      "id": "malformed_query_cursor_selector",
+      "proofs": [
+        "tests/kernel/query/test_service.py::test_cursor_is_generation_and_request_bound",
+        "tests/kernel/evidence/test_service.py::test_views_return_only_foundational_rows_and_reject_invalid_scope",
+        "tests/kernel/interfaces/test_mcp.py::test_invalid_envelopes_and_inputs_are_rejected_before_side_effects"
+      ]
+    },
+    {
+      "id": "optional_content_worker_crash",
+      "proofs": [
+        "tests/kernel/test_fault_recovery_scale.py::test_abrupt_content_worker_death_recovers_without_accounting_changes",
+        "tests/kernel/content/test_service.py::test_content_failure_rolls_back_without_affecting_accounting"
+      ]
+    },
+    {
+      "id": "old_cache_rollback",
+      "proofs": [
+        "tests/kernel/test_cutover_control.py::test_cutover_control_is_explicit_atomic_and_rollback_safe",
+        "tests/kernel/live/test_contracts.py::test_rollback_and_reused_generation_require_new_publication"
+      ]
+    }
+  ],
+  "scale_matrix": [
+    {
+      "id": "one_hundred_thousand_calls",
+      "proofs": [
+        "tests/kernel/test_ingest_performance.py::test_100k_call_build_meets_bounded_writer_budget",
+        "tests/kernel/query/test_performance.py::test_100k_common_comparison_and_concentration_budgets",
+        "tests/kernel/evidence/test_performance.py::test_100k_timeline_first_page_meets_budget"
+      ]
+    },
+    {
+      "id": "many_small_files_and_one_large_file",
+      "proofs": [
+        "tests/kernel/test_fault_recovery_scale.py::test_many_small_and_one_large_source_are_ingested_exactly"
+      ]
+    },
+    {
+      "id": "one_thousand_active_threads",
+      "proofs": [
+        "tests/kernel/test_fault_recovery_scale.py::test_one_thousand_threads_with_high_tool_fan_out_are_exact"
+      ]
+    },
+    {
+      "id": "high_tool_call_fan_out",
+      "proofs": [
+        "tests/kernel/test_fault_recovery_scale.py::test_one_thousand_threads_with_high_tool_fan_out_are_exact"
+      ]
+    },
+    {
+      "id": "concurrent_console_mcp_export_refresh_reads",
+      "proofs": [
+        "tests/kernel/test_fault_recovery_scale.py::test_console_mcp_and_export_reads_stay_on_the_active_generation_during_refresh"
+      ]
+    },
+    {
+      "id": "long_running_append_active_source",
+      "proofs": [
+        "tests/kernel/test_ingest_pipeline.py::test_source_appended_during_hydration_is_caught_before_promotion",
+        "tests/kernel/test_ingest_jobs.py::test_long_parse_heartbeat_prevents_live_lease_theft"
+      ]
+    }
+  ]
+}

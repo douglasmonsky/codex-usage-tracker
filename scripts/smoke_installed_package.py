@@ -506,14 +506,32 @@ def _smoke_service(
     return warm_p95_ms
 
 
-def smoke_install(target: str, *, version: str | None = None) -> None:
+def smoke_install(
+    target: str,
+    *,
+    version: str | None = None,
+    upgrade_from: str | None = None,
+) -> None:
     with tempfile.TemporaryDirectory(prefix="kernel-installed-smoke-") as name:
         root = Path(name)
         venv_root = root / "venv"
         venv.EnvBuilder(with_pip=True, clear=True).create(venv_root)
         python = _python(venv_root)
+        initial_target = (
+            f"{DISTRIBUTION_NAME}=={upgrade_from}"
+            if upgrade_from is not None
+            else target
+        )
         subprocess.run(
-            [python, "-m", "pip", "install", "--quiet", "--no-deps", target],
+            [
+                python,
+                "-m",
+                "pip",
+                "install",
+                "--quiet",
+                "--no-deps",
+                initial_target,
+            ],
             check=True,
         )
         codex_home = root / "codex"
@@ -532,6 +550,37 @@ def smoke_install(target: str, *, version: str | None = None) -> None:
             + os.pathsep
             + environment.get("PATH", "")
         )
+        prior_cache: dict[Path, bytes] | None = None
+        if upgrade_from is not None:
+            _run_json(
+                [command, "refresh", "--wait", "30"],
+                environment=environment,
+                timeout=40,
+            )
+            prior = _run_json([command, "status"], environment=environment)
+            if prior.get("state") != "active" or prior.get("generation") != 1:
+                raise RuntimeError(
+                    f"upgrade base did not activate generation 1: {prior}"
+                )
+            prior_cache = {
+                path.relative_to(cache_root): path.read_bytes()
+                for path in cache_root.rglob("*")
+                if path.is_file()
+            }
+            subprocess.run(
+                [
+                    python,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--quiet",
+                    "--no-deps",
+                    "--upgrade",
+                    "--force-reinstall",
+                    target,
+                ],
+                check=True,
+            )
         plugin_root = root / "plugin"
         (plugin_root / ".codex-plugin").mkdir(parents=True)
         shutil.copy2(
@@ -541,10 +590,25 @@ def smoke_install(target: str, *, version: str | None = None) -> None:
         shutil.copy2(REPO_ROOT / ".mcp.json", plugin_root / ".mcp.json")
 
         initial = _run_json([command, "status"], environment=environment)
-        if initial.get("state") != "absent" or cache_root.exists():
-            raise RuntimeError(
-                "clean installed status must stay absent and read-only"
-            )
+        if upgrade_from is None:
+            if initial.get("state") != "absent" or cache_root.exists():
+                raise RuntimeError(
+                    "clean installed status must stay absent and read-only"
+                )
+        else:
+            current_cache = {
+                path.relative_to(cache_root): path.read_bytes()
+                for path in cache_root.rglob("*")
+                if path.is_file()
+            }
+            if (
+                initial.get("state") != "active"
+                or initial.get("generation") != 1
+                or current_cache != prior_cache
+            ):
+                raise RuntimeError(
+                    "installed upgrade changed the active cache before refresh"
+                )
         help_text = subprocess.run(
             [command, "--help"],
             check=True,
@@ -649,12 +713,17 @@ def main() -> int:
     parser.add_argument("--from-pypi", action="store_true")
     parser.add_argument("--version")
     parser.add_argument("--artifact-dir", type=Path)
+    parser.add_argument("--upgrade-from")
     arguments = parser.parse_args()
     if arguments.from_pypi and arguments.artifact_dir is not None:
         parser.error("--from-pypi and --artifact-dir are mutually exclusive")
     with tempfile.TemporaryDirectory(prefix="kernel-smoke-build-") as name:
         target = _resolve_install_target(arguments, Path(name))
-        smoke_install(target, version=arguments.version)
+        smoke_install(
+            target,
+            version=arguments.version,
+            upgrade_from=arguments.upgrade_from,
+        )
     return 0
 
 

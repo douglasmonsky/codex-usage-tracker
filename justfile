@@ -34,6 +34,7 @@ vp:
         tests/kernel/test_cutover_control.py \
         tests/kernel/test_database_lifecycle.py \
         tests/kernel/test_development_efficiency_policy.py \
+        tests/kernel/test_fault_recovery_scale.py \
         tests/kernel/test_identity.py \
         tests/kernel/test_ingest_*.py \
         tests/kernel/test_kernel_maintainability.py \
@@ -67,6 +68,7 @@ v:
         tests/kernel/test_code_disposition_manifest.py \
         tests/kernel/test_retired_surface_manifest.py \
         tests/kernel/test_development_efficiency_policy.py \
+        tests/kernel/test_fault_recovery_scale.py \
         tests/kernel/test_kernel_maintainability.py \
         tests/kernel/test_kernel_benchmark.py \
         tests/kernel/test_repository_quality_policy.py \

@@ -203,6 +203,13 @@ K14_ADDITIONS = frozenset(
     }
 )
 
+K15_ADDITIONS = frozenset(
+    {
+        "config/kernel-fault-recovery-scale-v1.json",
+        "tests/kernel/test_fault_recovery_scale.py",
+    }
+)
+
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
     | K2_ADDITIONS
@@ -217,6 +224,7 @@ INTEGRATION_ADDITIONS = (
     | K12_ADDITIONS
     | K13_ADDITIONS
     | K14_ADDITIONS
+    | K15_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"
