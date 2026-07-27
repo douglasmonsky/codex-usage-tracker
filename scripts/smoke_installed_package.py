@@ -33,7 +33,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     )
 
 try:
-    import tomllib  # type: ignore[import-untyped]
+    import tomllib  # type: ignore[import-not-found,import-untyped]
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
     import tomli as tomllib  # type: ignore[import-not-found,no-redef]
 
