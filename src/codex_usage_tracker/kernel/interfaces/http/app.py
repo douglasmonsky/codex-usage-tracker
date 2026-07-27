@@ -72,6 +72,11 @@ class HttpApp:
         parsed = urlsplit(target)
         path = parsed.path
         query = parse_qs(parsed.query, keep_blank_values=True)
+        from .console import console_response
+
+        console = console_response(method, target)
+        if console is not None:
+            return console
         if method == "GET" and path == f"{API_PREFIX}/status":
             return _json_response(200, self._application.status())
         if method == "POST" and path == f"{API_PREFIX}/refresh":

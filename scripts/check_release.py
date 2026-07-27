@@ -145,7 +145,8 @@ def _distribution_failures(dist_dir: Path) -> list[str]:
             _REPO_ROOT / "src" / "codex_usage_tracker" / "release",
         )
         for path in root.rglob("*")
-        if path.is_file() and path.suffix in {".py", ".json"}
+        if path.is_file()
+        and path.suffix in {".py", ".json", ".css", ".html", ".js"}
     )
     if wheel_names != expected_wheel_names:
         failures.append(
@@ -199,6 +200,9 @@ def _expected_sdist_names() -> set[str]:
         "PKG-INFO",
         "README.md",
         "SECURITY.md",
+        "package-lock.json",
+        "package.json",
+        "playwright.config.mjs",
         "pyproject.toml",
         "setup.cfg",
         "src/codex_usage_tracking.egg-info/PKG-INFO",
@@ -220,13 +224,19 @@ def _expected_sdist_names() -> set[str]:
                 "check_release.py",
                 "generate_kernel_interfaces.py",
                 "generate_kernel_manifests.py",
+                "build_kernel_console.mjs",
+                "check_kernel_console.mjs",
+                "smoke_installed_console.py",
             )),
+            (_REPO_ROOT / "frontend" / "kernel-console", ("*",)),
             (
                 _REPO_ROOT / "src" / "codex_usage_tracker" / "kernel",
-                ("**/*.py", "**/*.json"),
+                ("**/*.py", "**/*.json", "**/*.css", "**/*.html", "**/*.js"),
             ),
             (_REPO_ROOT / "src" / "codex_usage_tracker" / "release", ("*.py",)),
             (_REPO_ROOT / "tests" / "kernel", ("**/*.py", "**/*.json", "**/*.jsonl")),
+            (_REPO_ROOT / "tests" / "frontend", ("*.mjs",)),
+            (_REPO_ROOT / "tests" / "e2e", ("*.mjs",)),
         )
         for pattern in patterns
         for path in root.glob(pattern)

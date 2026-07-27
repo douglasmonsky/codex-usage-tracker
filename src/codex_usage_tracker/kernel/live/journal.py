@@ -38,6 +38,7 @@ class JournalEvent:
             {
                 "generation": self.generation,
                 "kind": self.event_kind,
+                "publication_id": self.publication_id,
                 "selector": self.selector,
                 "occurred_at": self.occurred_at,
                 "payload": self.payload,

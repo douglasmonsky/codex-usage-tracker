@@ -129,6 +129,30 @@ K6_ADDITIONS = frozenset(
         "tests/kernel/interfaces/test_plugin.py",
     }
 )
+K7_ADDITIONS = frozenset(
+    {
+        ".agent-maintainer/change-plans/k7-evidence-console.md",
+        "frontend/kernel-console/app.js",
+        "frontend/kernel-console/index.html",
+        "frontend/kernel-console/model.js",
+        "frontend/kernel-console/styles.css",
+        "frontend/kernel-console/tsconfig.json",
+        "scripts/build_kernel_console.mjs",
+        "scripts/check_kernel_console.mjs",
+        "scripts/smoke_installed_console.py",
+        "src/codex_usage_tracker/kernel/interfaces/http/console.py",
+        "src/codex_usage_tracker/kernel/interfaces/http/console_assets/app.js",
+        "src/codex_usage_tracker/kernel/interfaces/http/console_assets/asset-manifest.json",
+        "src/codex_usage_tracker/kernel/interfaces/http/console_assets/index.html",
+        "src/codex_usage_tracker/kernel/interfaces/http/console_assets/model.js",
+        "src/codex_usage_tracker/kernel/interfaces/http/console_assets/styles.css",
+        "tests/frontend/kernel_console.test.mjs",
+        "tests/e2e/kernel-console.spec.mjs",
+        "tests/kernel/console/__init__.py",
+        "tests/kernel/console/serve_fixture.py",
+        "tests/kernel/console/test_contracts.py",
+    }
+)
 
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
@@ -137,6 +161,7 @@ INTEGRATION_ADDITIONS = (
     | K4_ADDITIONS
     | K5_ADDITIONS
     | K6_ADDITIONS
+    | K7_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"

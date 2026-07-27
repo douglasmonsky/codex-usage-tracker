@@ -115,6 +115,14 @@ def test_open_returns_an_encoded_stable_evidence_destination(
     )
 
 
+def test_open_defaults_to_the_focused_live_console(capsys) -> None:
+    assert main(["open", "--no-browser"]) == 0
+
+    assert json.loads(capsys.readouterr().out)["url"] == (
+        "http://127.0.0.1:8765/live"
+    )
+
+
 def test_corrupt_cache_returns_sanitized_cli_error(
     tmp_path: Path,
     monkeypatch,

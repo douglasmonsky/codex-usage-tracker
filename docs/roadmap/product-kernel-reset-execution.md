@@ -65,9 +65,9 @@ progress.
 | K2 | 0.26.0 | Complete | K1A | Kernel schema v1 and stable identity |
 | K3 | 0.26.0 | Complete | K2 | Incremental/live ingestion |
 | K4 | 0.26.0 | Complete | K3 | Bounded query engine |
-| K5 | 0.26.0 | CI fix pending | K3 | Evidence timeline and live stream |
-| K6 | 0.26.0 | CI pending | K4, K5 | Six-tool integration interfaces |
-| K7 | 0.26.0 | Not started | K6 | Focused Evidence Console |
+| K5 | 0.26.0 | Complete | K3 | Evidence timeline and live stream |
+| K6 | 0.26.0 | Complete | K4, K5 | Six-tool integration interfaces |
+| K7 | 0.26.0 | In progress | K6 | Focused Evidence Console |
 | K8 | 0.26.0 | Not started | K7 | Allowance efficiency |
 | K9 | 0.26.0 | Not started | K8 | Release candidate and final absence audit |
 | K10 | 0.26.0 | Not started | K9 | Audited release-branch cutover and qualification |
@@ -986,10 +986,12 @@ performance-step wiring.
 
 ## K6 — Six-tool kernel interface cutover
 
-**State:** CI pending
+**State:** Complete
 **Branch:** `kernel/k6-interface-cutover`
 **Base:** `7d51a17acbd4a7648674ffa56c242a8a9b32eec3`
-**Commits:** pending
+**Commits:** `1ee81ec feat: add kernel interface cutover`; squash merge
+`0fd6dc875480bc9e6ab0cacffa9d23fc053af74f`
+**Merged:** [PR #324](https://github.com/douglasmonsky/codex-usage-tracker/pull/324)
 
 ### Contract added first
 
@@ -1020,6 +1022,7 @@ performance-step wiring.
 | Profiling | Incomplete | `agent-perf` run `20260727T023958Z-652240e6` could not start because pinned Scalene 2.3.0 is absent; no hotspot claim |
 | Package | Pass | exact wheel/sdist check; isolated no-dependency CLI and six-tool MCP handshake |
 | Reference | Pass | public PyPI 0.25.1 retained installed-package smoke passed from the detached reference worktree |
+| CI | Pass | Python 3.10 passed in 58 s; Python 3.14 passed in 82 s |
 | Privacy | Pass | synthetic fixtures only; no live database or local usage content inspected |
 
 ### Review metrics
@@ -1048,9 +1051,82 @@ remain zero. The exact final counts live in
 
 ### Residual risk and next task
 
-- Final read-only review is complete; integration CI is pending.
+- Final read-only review and integration CI are complete.
 - K7 may consume only these frozen adapters and may not restore compatibility
   profiles, narrative analysis, or retired routes.
+
+## K7 — Focused Evidence Console
+
+**State:** In progress
+**Branch:** `kernel/k7-evidence-console`
+**Base:** `0fd6dc875480bc9e6ab0cacffa9d23fc053af74f`
+**Commits:** pending
+
+### Contract added first
+
+- Contract-red collection proved the Console owner was absent, then froze
+  exactly five areas: Live, Explore, Evidence, Limits, and Settings.
+- Console navigation and asset GETs are read-only, `/` redirects to `/live`,
+  retired routes stay absent, and K5/K6 `/evidence/<selector>` links round-trip.
+- Generated asset hashes, browser reopen behavior, explicit refresh ownership,
+  and installed-package serving are deterministic contracts.
+
+### Implementation
+
+- A dependency-light browser client reads only `/api/kernel/v1`, renders the
+  committed generation before freshness work, and never starts refresh on
+  mount or reopen.
+- Live shows the four exact token classes and bounded thread leaders. Explore
+  submits explicit query specs and stores an optional local query. Evidence
+  resolves stable selectors. Limits preserves fact grades and caveats.
+  Settings exposes runtime, stream, cache, freshness, and privacy state.
+- The same deterministic HTML, JavaScript, and CSS assets are package data in
+  wheel and sdist. The server uses an allowlisted route resolver and strict
+  loopback/security headers.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | 21 initial route/interface/scope contracts; Node lint, TypeScript, localization/governance, deterministic-asset, and unit gates |
+| Broader | Pass | post-review `just v`: 178 Python tests in 36.21 s; Ruff, Mypy, Pyright, maintainability, scope, release, and frontend gates clean |
+| Browser | Pass | 20 desktop/mobile flows passed with 2 intentional cross-project skips; warm reopen, all presets, exact row evidence, one refresh/job wait, stale/live/retry states, and Limits |
+| Performance | Pass | identical unprofiled synthetic warm reopen 0.562 s in both projects, under the 1 s K7 budget |
+| Profiling | Incomplete | agent-perf run `20260727T032753Z-771bda4e` emitted no Node CPU profile; no hotspot or speedup claim |
+| Package | Pass | exact wheel/sdist membership and isolated installed-wheel Console/asset smoke |
+| Privacy | Pass | synthetic accounting oracle only; no live database, prompt, reasoning, raw tool argument/output, shell body, secret, or full source path inspected or stored |
+
+### Review metrics
+
+- Total findings: 9
+- Accepted findings: 9 (`R1`–`R9`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+The current K7 counts are recorded in
+`config/kernel-development-efficiency-v1.json`. No duplicate broad verifier or
+style-only commit has occurred. Two Playwright locator assumptions required
+test-only fixes; manual visual inspection found two user-visible defects before
+final review.
+
+### Deviations and decisions
+
+- The K5/K6 relative `/evidence/<selector>` destination remains authoritative.
+  K7 reuses that logical route as a new kernel-owned implementation while all
+  other retired console routes stay absent.
+- The Console uses browser-native modules instead of restoring the retired
+  React dashboard or adding a runtime framework. The shipped source asset set
+  is 38.5 KB and has no runtime dependency.
+- Freshness is explicit or watcher-driven. Browser reopen performs status and
+  query reads only; it never leases the writer or rebuilds the cache.
+
+### Residual risk and next task
+
+- Integration CI and merge remain.
+- K8 may add allowance efficiency facts without expanding Console navigation or
+  adding server-authored recommendations.
 
 ## Task Entry Template
 

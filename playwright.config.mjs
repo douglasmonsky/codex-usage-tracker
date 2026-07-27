@@ -1,26 +1,20 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const dashboardDevPort = process.env.DASHBOARD_DEV_PORT || '5173';
-const baseURL = process.env.DASHBOARD_BASE_URL
-  || (process.env.REACT_DASHBOARD_WEB_SERVER
-    ? `http://127.0.0.1:${dashboardDevPort}`
-    : 'http://127.0.0.1:8898');
+const kernelPython = process.env.KERNEL_PYTHON || 'python3';
 
 export default defineConfig({
-  testDir: './tests/playwright',
+  testDir: './tests/e2e',
   timeout: 30_000,
-  webServer: process.env.REACT_DASHBOARD_WEB_SERVER
-    ? {
-        command: `npm --workspace frontend/dashboard run dev -- --port ${dashboardDevPort} --strictPort`,
-        url: `http://127.0.0.1:${dashboardDevPort}`,
-        reuseExistingServer: false,
-      }
-    : undefined,
+  webServer: {
+    command: `PYTHONPATH=src ${JSON.stringify(kernelPython)} -m tests.kernel.console.serve_fixture`,
+    url: 'http://127.0.0.1:8898/live',
+    reuseExistingServer: false,
+  },
   expect: {
     timeout: 10_000,
   },
   use: {
-    baseURL,
+    baseURL: 'http://127.0.0.1:8898',
     launchOptions: {
       args: ['--disable-gpu'],
     },
