@@ -1848,6 +1848,19 @@ Python 3.10 test compatibility `889ad92`; squash merge
   installed-package smoke with two fresh MCP tasks and 0.888 ms warm Console
   p95. No rebuild or republish occurred.
 
+### Post-release gate correction
+
+- The first docs-closure CI run exposed the unchanged 100,000-call ingest
+  benchmark running inside the contended Python 3.14 functional suite. Writer
+  p95 rose to 301.640 ms while the workload took 45.814 seconds, despite the
+  same release source passing its isolated qualification.
+- The 50 ms writer budget is unchanged. Both functional matrices now exclude
+  the benchmark, while the dedicated Python 3.14 performance step remains
+  blocking. The repository policy test now rejects reintroducing the matrix
+  conditional that caused this duplicate, contention-sensitive execution.
+- Local verification passed 324 functional tests in 34.53 seconds and the
+  separately isolated 100,000-call benchmark in 11.90 seconds.
+
 ## Task Entry Template
 
 Copy this section for each task and replace every placeholder.

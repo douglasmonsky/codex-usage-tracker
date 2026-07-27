@@ -57,12 +57,8 @@ jobs:
           python -m ruff check .
           python -m mypy
           python scripts/check_kernel_maintainability.py
-          if [ "$MATRIX_PYTHON" = "3.14" ]; then
-            python -m pytest -p no:tach
-          else
-            python -m pytest -p no:tach \
-              --ignore=tests/kernel/test_ingest_performance.py
-          fi
+          python -m pytest -p no:tach \
+            --ignore=tests/kernel/test_ingest_performance.py
           python -m pyright --pythonpath "$(command -v python)"
           python scripts/check_release.py
       - name: Run synthetic performance contracts

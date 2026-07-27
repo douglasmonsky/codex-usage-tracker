@@ -79,3 +79,5 @@ def test_ci_runs_ingest_performance_only_in_the_dedicated_step() -> None:
 
     assert "tests/kernel/test_ingest_*.py" not in workflow
     assert workflow.count("tests/kernel/test_ingest_performance.py") == 2
+    assert 'if [ "$MATRIX_PYTHON" = "3.14" ]; then' not in workflow
+    assert "--ignore=tests/kernel/test_ingest_performance.py" in workflow
