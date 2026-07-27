@@ -112,7 +112,7 @@ def test_code_disposition_rejects_immutable_k1_decision_drift() -> None:
 
 def test_progressive_tasks_advance_non_keep_paths_without_restoring_source() -> None:
     for entry in _manifest()["entries"]:
-        if entry["owner_task"] in {"K2", "K3", "K4", "K5", "K6"}:
+        if entry["owner_task"] in {"K2", "K3", "K4", "K5", "K6", "K8"}:
             assert entry["status"] == "verified"
         elif entry["disposition"] != "keep":
             assert entry["status"] == "removed"
@@ -259,6 +259,37 @@ def test_k6_assignments_resolve_to_the_six_tool_interface_cutover() -> None:
         "src/codex_usage_tracker/kernel/interfaces/mcp/catalog.py",
         "src/codex_usage_tracker/kernel/interfaces/mcp/server.py",
         "src/codex_usage_tracker/kernel/plugin_manifest.py",
+    }
+
+
+def test_k8_assignments_resolve_to_exact_allowance_facts_or_retirement() -> None:
+    entries = [
+        entry
+        for entry in _manifest()["entries"]
+        if entry["owner_task"] == "K8"
+    ]
+    transplanted = [
+        entry for entry in entries if entry["disposition"] == "transplant"
+    ]
+    retired = [entry for entry in entries if entry["disposition"] == "retire"]
+
+    assert len(entries) == 46
+    assert transplanted
+    assert retired
+    assert all(entry["status"] == "verified" for entry in entries)
+    assert {
+        entry["target_path"] for entry in transplanted
+    } <= {
+        "src/codex_usage_tracker/kernel/allowance/__init__.py",
+        "src/codex_usage_tracker/kernel/allowance/efficiency.py",
+        "src/codex_usage_tracker/kernel/allowance/rates.py",
+        "src/codex_usage_tracker/kernel/allowance/service.py",
+        "src/codex_usage_tracker/kernel/schema.py",
+        "src/codex_usage_tracker/kernel/writer.py",
+        "tests/kernel/allowance/test_efficiency.py",
+        "tests/kernel/allowance/test_rates.py",
+        "tests/kernel/allowance/test_service.py",
+        "tests/kernel/test_repository_quality_policy.py",
     }
 
 

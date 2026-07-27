@@ -460,6 +460,14 @@ def _measure_basis(dataset: str, measure: str) -> str:
         return "deterministic_attribution"
     if measure in {"uncached_input_tokens", "total_tokens"}:
         return "derived_exact"
+    if measure in {
+        "allowance_delta_percent",
+        "allowance_burn_rate",
+        "local_tokens_per_percentage_point",
+        "local_calls_per_percentage_point",
+        "local_turns_per_percentage_point",
+    }:
+        return "deterministic_adjacent_observations"
     if measure in {"cache_reuse", "context_pressure"}:
         return "derived_ratio"
     if measure in {"duration_ms", "output_bytes"}:
@@ -493,6 +501,19 @@ def _measure_limitations(dataset: str, measure: str) -> list[str]:
         )
     if measure in {"duration_ms", "output_bytes", "context_pressure"}:
         limitations.append("null upstream observations are excluded")
+    if measure in {
+        "allowance_delta_percent",
+        "allowance_burn_rate",
+        "local_tokens_per_percentage_point",
+        "local_calls_per_percentage_point",
+        "local_turns_per_percentage_point",
+    }:
+        limitations.extend(
+            (
+                "ratios require adjacent observations from one reset window",
+                "locally observed usage is not causal billing attribution",
+            )
+        )
     return limitations
 
 

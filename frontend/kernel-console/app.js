@@ -1,4 +1,5 @@
 import {
+  allowancePresentation,
   boundedPercent,
   cacheReuse,
   commaSeparated,
@@ -445,12 +446,32 @@ async function renderLimits() {
   workspace.replaceChildren(heading("limits"), element("div", { className: "card empty", text: "Reading allowance observations…" }));
   try {
     const result = await request("/allowance?limit=100");
+    const rows = allowancePresentation(result.intervals || result.rows || []);
+    const caveats = [...new Set(rows.flatMap((row) => row.caveats ? row.caveats.split(", ") : []))];
     workspace.replaceChildren(
       heading("limits"),
-      element("div", { className: "callout", text: "These are observed local facts. The kernel does not invent pricing, forecast capacity, or recommend a plan." }),
+      element("div", { className: "callout", text: "Allowance percentages are exact observations. Interval ratios are deterministic local comparisons, not causal billing attribution. Cost and credit values appear only as source-stamped estimates." }),
       element("section", { className: "card" }, [
-        element("div", { className: "result-meta", text: `Generation ${result.generation} · grade ${result.grade} · ${result.returned_count} observations` }),
-        tableFor(result.rows, true),
+        element("h2", { text: "Measurement coverage" }),
+        definitionList({
+          Generation: result.generation,
+          Grade: result.grade,
+          "Observed through": result.observed_through || "none",
+          "Returned observations": result.returned_count,
+          "Rate card": result.coverage?.pricing?.configured ? "configured" : "not configured",
+          "Rated token coverage": formatPercent((result.coverage?.pricing?.coverage_percent || 0) / 100),
+        }),
+      ]),
+      element("section", { className: "card" }, [
+        element("h2", { text: "Observed windows and local intervals" }),
+        element("div", { className: "result-meta", text: "A ratio is shown only when two adjacent observations share one logical reset window and usage increased." }),
+        tableFor(rows, true),
+      ]),
+      element("section", { className: "card" }, [
+        element("h2", { text: "Caveats" }),
+        caveats.length
+          ? element("ul", {}, caveats.map((item) => element("li", { text: item.replaceAll("_", " ") })))
+          : element("p", { text: "No additional caveats in this page." }),
       ]),
     );
   } catch (error) {
@@ -470,7 +491,9 @@ function renderSettings() {
         Publication: state.status?.publication_id || "none",
         "Active refresh": state.status?.refresh ? `${state.status.refresh.stage} · ${state.status.refresh.progress_percent}%` : "none",
         Watcher: localStorage.getItem("kernel-live-enabled") === "false" ? "paused in this browser" : "watching committed generations",
-        Pricing: "not configured · no estimates shown",
+        "Rate card": state.status?.rate_card?.configured
+          ? `${state.status.rate_card.source?.name || "configured"} · effective ${state.status.rate_card.source?.effective_at || "unknown"}`
+          : `${state.status?.rate_card?.status || "absent"} · no estimates shown`,
         Rollback: "available through the operational CLI",
         "Optional content indexing": "off · foundational facts only",
       }),

@@ -1,10 +1,10 @@
-"""Schema-v1 definition for foundational analytical facts."""
+"""Schema-v2 definition for foundational analytical facts."""
 
 from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 APPLICATION_ID = 0x43555431
 MAX_INDEX_COUNT = 18
 SCHEMA_CAPABILITIES = frozenset(
@@ -14,6 +14,7 @@ SCHEMA_CAPABILITIES = frozenset(
         "token-classes",
         "tool-activity",
         "allowance-observations",
+        "allowance-efficiency-intervals",
     }
 )
 ANALYTICAL_TABLES = frozenset(
@@ -26,6 +27,15 @@ ANALYTICAL_TABLES = frozenset(
         "tool_calls",
         "activity_events",
         "allowance_observations",
+    }
+)
+REQUIRED_SCHEMA_OBJECTS = frozenset(
+    {
+        "allowance_intervals",
+        "idx_allowance_generation",
+        "idx_allowance_time",
+        "idx_allowance_window_time",
+        "idx_model_calls_time",
     }
 )
 
@@ -243,6 +253,8 @@ CREATE INDEX idx_model_calls_generation
 ON model_calls(generation);
 CREATE INDEX idx_model_calls_canonical
 ON model_calls(canonical_call_id, duplicate_state);
+CREATE INDEX idx_model_calls_time
+ON model_calls(event_at, generation, duplicate_state);
 CREATE INDEX idx_tool_calls_thread_time
 ON tool_calls(thread_id, started_at);
 CREATE INDEX idx_tool_calls_turn
@@ -257,6 +269,206 @@ CREATE INDEX idx_allowance_time
 ON allowance_observations(observed_at);
 CREATE INDEX idx_allowance_generation
 ON allowance_observations(generation);
+CREATE INDEX idx_allowance_window_time
+ON allowance_observations(
+    window_kind, limit_id, plan_type, observed_at, generation
+);
+
+CREATE VIEW allowance_intervals AS
+WITH ordered AS (
+    SELECT allowance_observations.*,
+           LAG(allowance_observation_id) OVER observation_window
+               AS previous_observation_id,
+           LAG(observed_at) OVER observation_window AS previous_observed_at,
+           LAG(used_percent) OVER observation_window AS previous_used_percent,
+           LAG(duration_minutes) OVER observation_window
+               AS previous_duration_minutes,
+           LAG(resets_at) OVER observation_window AS previous_resets_at,
+           LAG(model) OVER observation_window AS previous_model,
+           LAG(service_tier) OVER observation_window
+               AS previous_service_tier,
+           LAG(provenance) OVER observation_window AS previous_provenance,
+           LAG(validation_warnings) OVER observation_window
+               AS previous_validation_warnings
+    FROM allowance_observations
+    WHERE duplicate_state = 'canonical'
+      AND generation <= (
+          SELECT COALESCE(MAX(generation), 0)
+          FROM generations
+          WHERE integrity_status = 'valid'
+      )
+    WINDOW observation_window AS (
+        PARTITION BY
+            window_kind,
+            COALESCE(limit_id, ''),
+            COALESCE(plan_type, '')
+        ORDER BY observed_at, allowance_observation_id
+    )
+),
+deltas AS (
+    SELECT ordered.*,
+           CASE
+               WHEN previous_observation_id IS NOT NULL
+                AND previous_resets_at IS resets_at
+                AND previous_duration_minutes IS duration_minutes
+                AND julianday(observed_at) > julianday(previous_observed_at)
+                AND (
+                    duration_minutes IS NULL
+                    OR (
+                        julianday(observed_at)
+                        - julianday(previous_observed_at)
+                    ) * 1440.0 <= duration_minutes
+                )
+                AND used_percent > previous_used_percent
+               THEN used_percent - previous_used_percent
+               ELSE NULL
+           END AS delta_used_percent,
+           CASE
+               WHEN previous_observation_id IS NOT NULL
+                AND previous_resets_at IS resets_at
+                AND previous_duration_minutes IS duration_minutes
+                AND julianday(observed_at) > julianday(previous_observed_at)
+                AND (
+                    duration_minutes IS NULL
+                    OR (
+                        julianday(observed_at)
+                        - julianday(previous_observed_at)
+                    ) * 1440.0 <= duration_minutes
+                )
+                AND used_percent > previous_used_percent
+               THEN (
+                   julianday(observed_at) - julianday(previous_observed_at)
+               ) * 24.0
+               ELSE NULL
+           END AS elapsed_hours
+    FROM ordered
+),
+local_facts AS (
+    SELECT deltas.*,
+           COALESCE((
+               SELECT SUM(
+                   model_calls.input_tokens
+                   - model_calls.cached_input_tokens
+               )
+               FROM model_calls
+               WHERE model_calls.generation <= (
+                         SELECT COALESCE(MAX(generation), 0)
+                         FROM generations
+                         WHERE integrity_status = 'valid'
+                     )
+                 AND model_calls.duplicate_state = 'canonical'
+                 AND julianday(model_calls.event_at)
+                     > julianday(deltas.previous_observed_at)
+                 AND julianday(model_calls.event_at)
+                     <= julianday(deltas.observed_at)
+           ), 0) AS local_uncached_input_tokens,
+           COALESCE((
+               SELECT SUM(model_calls.cached_input_tokens)
+               FROM model_calls
+               WHERE model_calls.generation <= (
+                         SELECT COALESCE(MAX(generation), 0)
+                         FROM generations
+                         WHERE integrity_status = 'valid'
+                     )
+                 AND model_calls.duplicate_state = 'canonical'
+                 AND julianday(model_calls.event_at)
+                     > julianday(deltas.previous_observed_at)
+                 AND julianday(model_calls.event_at)
+                     <= julianday(deltas.observed_at)
+           ), 0) AS local_cached_input_tokens,
+           COALESCE((
+               SELECT SUM(model_calls.reasoning_tokens)
+               FROM model_calls
+               WHERE model_calls.generation <= (
+                         SELECT COALESCE(MAX(generation), 0)
+                         FROM generations
+                         WHERE integrity_status = 'valid'
+                     )
+                 AND model_calls.duplicate_state = 'canonical'
+                 AND julianday(model_calls.event_at)
+                     > julianday(deltas.previous_observed_at)
+                 AND julianday(model_calls.event_at)
+                     <= julianday(deltas.observed_at)
+           ), 0) AS local_reasoning_tokens,
+           COALESCE((
+               SELECT SUM(model_calls.output_tokens)
+               FROM model_calls
+               WHERE model_calls.generation <= (
+                         SELECT COALESCE(MAX(generation), 0)
+                         FROM generations
+                         WHERE integrity_status = 'valid'
+                     )
+                 AND model_calls.duplicate_state = 'canonical'
+                 AND julianday(model_calls.event_at)
+                     > julianday(deltas.previous_observed_at)
+                 AND julianday(model_calls.event_at)
+                     <= julianday(deltas.observed_at)
+           ), 0) AS local_output_tokens,
+           COALESCE((
+               SELECT SUM(
+                   model_calls.input_tokens + model_calls.output_tokens
+               )
+               FROM model_calls
+               WHERE model_calls.generation <= (
+                         SELECT COALESCE(MAX(generation), 0)
+                         FROM generations
+                         WHERE integrity_status = 'valid'
+                     )
+                 AND model_calls.duplicate_state = 'canonical'
+                 AND julianday(model_calls.event_at)
+                     > julianday(deltas.previous_observed_at)
+                 AND julianday(model_calls.event_at)
+                     <= julianday(deltas.observed_at)
+           ), 0) AS local_total_tokens,
+           COALESCE((
+               SELECT COUNT(*)
+               FROM model_calls
+               WHERE model_calls.generation <= (
+                         SELECT COALESCE(MAX(generation), 0)
+                         FROM generations
+                         WHERE integrity_status = 'valid'
+                     )
+                 AND model_calls.duplicate_state = 'canonical'
+                 AND julianday(model_calls.event_at)
+                     > julianday(deltas.previous_observed_at)
+                 AND julianday(model_calls.event_at)
+                     <= julianday(deltas.observed_at)
+           ), 0) AS local_calls,
+           COALESCE((
+               SELECT COUNT(DISTINCT model_calls.turn_id)
+               FROM model_calls
+               WHERE model_calls.generation <= (
+                         SELECT COALESCE(MAX(generation), 0)
+                         FROM generations
+                         WHERE integrity_status = 'valid'
+                     )
+                 AND model_calls.duplicate_state = 'canonical'
+                 AND julianday(model_calls.event_at)
+                     > julianday(deltas.previous_observed_at)
+                 AND julianday(model_calls.event_at)
+                     <= julianday(deltas.observed_at)
+           ), 0) AS local_turns
+    FROM deltas
+)
+SELECT local_facts.*,
+       100.0 - used_percent AS remaining_percent,
+       CASE
+           WHEN delta_used_percent IS NULL THEN NULL
+           ELSE delta_used_percent / elapsed_hours
+       END AS percentage_points_per_hour,
+       CASE
+           WHEN delta_used_percent IS NULL THEN NULL
+           ELSE 1.0 * local_total_tokens / delta_used_percent
+       END AS local_tokens_per_percentage_point,
+       CASE
+           WHEN delta_used_percent IS NULL THEN NULL
+           ELSE 1.0 * local_calls / delta_used_percent
+       END AS local_calls_per_percentage_point,
+       CASE
+           WHEN delta_used_percent IS NULL THEN NULL
+           ELSE 1.0 * local_turns / delta_used_percent
+       END AS local_turns_per_percentage_point
+FROM local_facts;
 """
 
 

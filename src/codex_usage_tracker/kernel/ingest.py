@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .database import (
     analytical_generation_digest,
+    analytical_schema_version,
     initialize_analytical_database,
     open_read_snapshot,
 )
@@ -31,9 +32,11 @@ from .operational import (
     load_cutover_control,
     promote_cutover,
     register_source,
+    reset_cutover_for_schema_upgrade,
     transition_cutover,
 )
 from .parser import ParsedBatch, iter_jsonl_batches, parse_jsonl
+from .schema import SCHEMA_VERSION
 from .writer import (
     WriteResult,
     canonicalize_initial_duplicates,
@@ -242,8 +245,28 @@ class KernelIngestor:
             self._mark_cutover_failed()
             raise
     def _initialize_for_explicit_refresh(self) -> None:
-        initialize_analytical_database(self.analytical_path)
         initialize_operational_database(self.operational_path)
+        control = load_cutover_control(self.operational_path)
+        active = control.active_kernel_path
+        active_version = (
+            analytical_schema_version(active) if active is not None else None
+        )
+        base_version = analytical_schema_version(self.analytical_path)
+        if active is not None and active_version == SCHEMA_VERSION:
+            return
+        if active_version is not None or (
+            active is None
+            and base_version is not None
+            and base_version != SCHEMA_VERSION
+        ):
+            upgrade_path = self.analytical_path.with_name(
+                f".{self.analytical_path.stem}.schema-{SCHEMA_VERSION}.sqlite3"
+            )
+            initialize_analytical_database(upgrade_path, replace=True)
+            self.analytical_path = upgrade_path
+            reset_cutover_for_schema_upgrade(self.operational_path)
+            return
+        initialize_analytical_database(self.analytical_path)
 
     def _publish_generation(self, result: RefreshResult) -> RefreshResult:
         if self._journal is None:
@@ -365,6 +388,8 @@ class KernelIngestor:
                     generation=generation,
                 )
                 for row in normalized.model_calls:
+                    row["duplicate_state"] = "canonical"
+                for row in normalized.allowances:
                     row["duplicate_state"] = "canonical"
                 latest = commit_refresh(
                     path,

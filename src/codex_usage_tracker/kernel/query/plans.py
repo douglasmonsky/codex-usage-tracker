@@ -42,7 +42,11 @@ def compile_plan(
     where_sql, filter_parameters = _filters(spec, request.filters)
     predicates = [spec.generation_sql, *where_sql]
     predicate_sql = " AND ".join(f"({item})" for item in predicates)
-    parameters = (generation, *filter_parameters)
+    base_parameters = (generation,) * spec.base_generation_parameters
+    generation_parameters = (
+        () if spec.base_generation_parameters else (generation,)
+    )
+    parameters = (*base_parameters, *generation_parameters, *filter_parameters)
     base_query = _base_query(request, spec, predicate_sql)
     order_sql = _order_sql(request, spec)
     sql = f"{base_query} ORDER BY {order_sql} LIMIT ? OFFSET ?"

@@ -67,8 +67,8 @@ progress.
 | K4 | 0.26.0 | Complete | K3 | Bounded query engine |
 | K5 | 0.26.0 | Complete | K3 | Evidence timeline and live stream |
 | K6 | 0.26.0 | Complete | K4, K5 | Six-tool integration interfaces |
-| K7 | 0.26.0 | In progress | K6 | Focused Evidence Console |
-| K8 | 0.26.0 | Not started | K7 | Allowance efficiency |
+| K7 | 0.26.0 | Complete | K6 | Focused Evidence Console |
+| K8 | 0.26.0 | In progress | K7 | Allowance efficiency |
 | K9 | 0.26.0 | Not started | K8 | Release candidate and final absence audit |
 | K10 | 0.26.0 | Not started | K9 | Audited release-branch cutover and qualification |
 | K11 | 0.27.0 | Not started | K10 | Guided exploration |
@@ -1057,10 +1057,11 @@ remain zero. The exact final counts live in
 
 ## K7 — Focused Evidence Console
 
-**State:** In progress
+**State:** Complete
 **Branch:** `kernel/k7-evidence-console`
 **Base:** `0fd6dc875480bc9e6ab0cacffa9d23fc053af74f`
-**Commits:** pending
+**Commits:** `611cca8` implementation; `3b31f98` CI pin correction;
+`7a174cffe15186bebfcd51b511ec44c883ddcd13` integration squash merge
 
 ### Contract added first
 
@@ -1094,6 +1095,7 @@ remain zero. The exact final counts live in
 | Performance | Pass | identical unprofiled synthetic warm reopen 0.562 s in both projects, under the 1 s K7 budget |
 | Profiling | Incomplete | agent-perf run `20260727T032753Z-771bda4e` emitted no Node CPU profile; no hotspot or speedup claim |
 | Package | Pass | exact wheel/sdist membership and isolated installed-wheel Console/asset smoke |
+| Integration CI | Pass | PR #325; Python 3.10 in 64 s, Python 3.14 in 78 s, focused Console in 81 s |
 | Privacy | Pass | synthetic accounting oracle only; no live database, prompt, reasoning, raw tool argument/output, shell body, secret, or full source path inspected or stored |
 
 ### Review metrics
@@ -1124,9 +1126,89 @@ final review.
 
 ### Residual risk and next task
 
-- Integration CI and merge remain.
+- PR #325 merged to integration as
+  `7a174cffe15186bebfcd51b511ec44c883ddcd13`.
 - K8 may add allowance efficiency facts without expanding Console navigation or
   adding server-authored recommendations.
+
+## K8 — Allowance Efficiency
+
+**State:** In progress
+**Branch:** `kernel/k8-allowance-efficiency`
+**Base:** `7a174cffe15186bebfcd51b511ec44c883ddcd13`
+**Commits:** pending
+
+### Contract added first
+
+- Contract-red collection froze exact observation values, adjacent compatible
+  reset windows, positive percentage-point deltas, local token/call/turn
+  ratios, outside-usage caveats, and strict source-stamped rate cards.
+- Reset, missing previous observation or interval, changed window duration,
+  unchanged percentage, non-monotonic percentage, and mixed-window cases must
+  never interpolate. A missing reset timestamp remains an explicit limitation.
+
+### Implementation
+
+- One allowance service reads a committed generation without writes, exposes
+  exact observations, deterministic ratios, exact evidence selectors, and
+  partial pricing coverage.
+- Schema-v1 owns a deterministic `allowance_intervals` view and bounded time
+  indexes. `usage_query` exposes the approved allowance measures without a
+  narrative analysis system.
+- Analytical schema capability revision 2 validates the required allowance
+  view and indexes. Reads fail closed on a pre-K8 cache; one explicit refresh
+  rebuilds into a separate current-schema artifact and preserves the old cache.
+- Public allowance reads fence observations, calls, and turn starts to one
+  active generation before interval derivation. One chronological prefix scan
+  replaces repeated per-row history scans.
+- Allowance canonical/copy state now follows its owning model call, repairing a
+  pre-K8 path where normalized observations remained `unknown` and disappeared
+  from canonical queries.
+- The Limits Console separates exact observations, deterministic local ratios,
+  source-stamped estimates, and caveats. Opening it never refreshes.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Contract red | Pass | missing kernel allowance package and missing interval response both failed before implementation |
+| Focused | Pass | final 39-test allowance/schema/query/interface slice; frontend build/lint/typecheck plus 6 unit tests |
+| Incremental | Pass | appended allowance observation advanced by `append_safe`, not a rebuild |
+| Privacy | Pass | synthetic fixtures and aggregate structural facts only |
+| Broad | Pass | `just v`: 196 Python tests, Ruff, MyPy, Pyright, maintainability, scope, manifests, Console gates, and release safety |
+| Browser | Pass | 20 desktop/mobile Chromium flows passed with 2 intentional cross-project skips; warm reopen rendered in 496–498 ms without refresh |
+| Performance | Pass | 100,000 canonical calls and the maximum 500-observation page measured 397.679 ms p95; an initial range join was stopped at 52.28 s and replaced by one chronological prefix scan; Scalene attribution remains unavailable, so no hotspot claim |
+| Distribution | Pass | exact wheel/sdist checks and isolated installed-wheel Console plus allowance smoke |
+
+### Review metrics
+
+- Total findings: 6
+- Accepted findings: 6 (`R1`–`R6`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+K8 has two intentional contract-red collections, two duplicate broad profiles
+when `just v` repeated an already-green `just vp`, and no style-only commit.
+The metrics helper was run once, then stopped after 30 seconds when its legacy
+tracker refresh did not return; token attribution remains pending without a
+retry. Final CI times will be added after merge.
+
+### Deviations and decisions
+
+- K8 transplants only observation selection, reset-aware ratios, and strict
+  provenance behavior. Legacy forecasting, narrative allowance intelligence,
+  updater/network parsing, and usage-drain models remain retired.
+- The local rate card is optional and owner-controlled. Missing or incomplete
+  rates produce explicit partial coverage rather than a bundled current-price
+  claim.
+
+### Residual risk and next task
+
+- Integration CI and merge remain.
+- K9 may consume only this fact contract and must not restore legacy allowance
+  analysis or compatibility routes.
 
 ## Task Entry Template
 

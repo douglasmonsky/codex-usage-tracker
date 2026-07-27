@@ -274,7 +274,11 @@ def test_query_catalog_supports_every_kernel_dataset(
             "allowance",
             Operation.ROWS,
             ("allowance",),
-            ("allowance_used_percent",),
+            (
+                "allowance_used_percent",
+                "allowance_burn_rate",
+                "local_tokens_per_percentage_point",
+            ),
         ),
     )
 
@@ -292,6 +296,14 @@ def test_query_catalog_supports_every_kernel_dataset(
     assert all(result.scanned_count is not None for result in results)
     assert results[5].plan_id == "phases.timeline.v1"
     assert results[5].grade == "deterministic"
+    assert results[6].grade == "partial"
+    assert any(
+        row["local_tokens_per_percentage_point"] == 11.5
+        for row in results[6].rows
+    )
+    assert results[6].coverage["measures"]["allowance_burn_rate"]["basis"] == (
+        "deterministic_adjacent_observations"
+    )
 
 
 def test_phase_rows_honor_projection_order_and_actual_wrapper_unknown(
@@ -548,6 +560,15 @@ def _token_row(
         "type": "event_msg",
         "payload": {
             "type": "token_count",
+            "rate_limits": {
+                "plan_type": "synthetic",
+                "limit_id": "query-limit",
+                "primary": {
+                    "used_percent": 10 if event_id.endswith("1") else 12,
+                    "window_minutes": 300,
+                    "resets_at": 1767243600,
+                },
+            },
             "info": {
                 "last_token_usage": {
                     "input_tokens": input_tokens,

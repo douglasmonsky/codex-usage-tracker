@@ -45,7 +45,7 @@ def test_normal_connections_reject_schema_drift(tmp_path: Path) -> None:
     path = tmp_path / "codex-usage-kernel-v1.sqlite3"
     initialize_analytical_database(path)
     with sqlite3.connect(path) as connection:
-        connection.execute("PRAGMA user_version = 2")
+        connection.execute("PRAGMA user_version = 999")
 
     with pytest.raises(ValueError, match="schema identity"), open_writer(path):
         pass

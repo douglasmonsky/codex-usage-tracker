@@ -49,6 +49,11 @@ def test_read_use_cases_share_one_generation_and_never_write(tmp_path: Path) -> 
     stream = app.live(last_event_id=0, limit=10, origin="http://127.0.0.1")
 
     assert status["generation"] == 1
+    assert status["rate_card"] == {
+        "configured": False,
+        "status": "absent",
+        "source": None,
+    }
     assert query["results"][0]["generation"] == 1
     assert evidence["generation"] == 1
     assert allowance["generation"] == 1

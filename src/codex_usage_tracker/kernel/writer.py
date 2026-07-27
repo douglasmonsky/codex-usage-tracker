@@ -459,5 +459,15 @@ def _canonicalize(
         """,
         updates,
     )
+    connection.executemany(
+        """
+        UPDATE allowance_observations
+        SET duplicate_state = ?
+        WHERE source_model_call_id = ?
+        """,
+        ((state, model_call_id) for state, _reason, model_call_id in updates),
+    )
+
+
 def _small_digest(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode()).hexdigest()

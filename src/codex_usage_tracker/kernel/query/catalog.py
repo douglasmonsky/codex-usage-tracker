@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from ..allowance.service import ALLOWANCE_BASE_SQL
 from .contracts import Operation, QueryRequest
 
 
@@ -19,6 +20,7 @@ class DatasetSpec:
     filter_fields: dict[str, str]
     operations: frozenset[Operation]
     coverage_fields: dict[str, str] = field(default_factory=dict)
+    base_generation_parameters: int = 0
 
 
 _COMMON_OPERATIONS = frozenset(
@@ -199,36 +201,69 @@ DATASETS: dict[str, DatasetSpec] = {
         operations=_COMMON_OPERATIONS,
     ),
     "allowance": DatasetSpec(
-        base_sql="allowance_observations",
-        generation_sql=(
-            "allowance_observations.generation <= ? "
-            "AND allowance_observations.duplicate_state = 'canonical'"
-        ),
-        time_sql="allowance_observations.observed_at",
-        stable_id_sql="allowance_observations.allowance_observation_id",
+        base_sql=ALLOWANCE_BASE_SQL,
+        generation_sql="1 = 1",
+        time_sql="allowance_intervals.observed_at",
+        stable_id_sql="allowance_intervals.allowance_observation_id",
         dimensions={
-            "allowance": "allowance_observations.allowance_observation_id",
-            "window": "allowance_observations.window_kind",
-            "plan": "allowance_observations.plan_type",
-            "model": "allowance_observations.model",
-            "service_tier": "allowance_observations.service_tier",
-            "event_at": "allowance_observations.observed_at",
-            "time_day": "substr(allowance_observations.observed_at, 1, 10)",
+            "allowance": "allowance_intervals.allowance_observation_id",
+            "window": "allowance_intervals.window_kind",
+            "plan": "allowance_intervals.plan_type",
+            "model": "allowance_intervals.model",
+            "service_tier": "allowance_intervals.service_tier",
+            "event_at": "allowance_intervals.observed_at",
+            "time_day": "substr(allowance_intervals.observed_at, 1, 10)",
         },
         row_measures={
             "allowance_observations": "1",
-            "allowance_used_percent": "allowance_observations.used_percent",
+            "allowance_used_percent": "allowance_intervals.used_percent",
+            "allowance_remaining_percent": (
+                "allowance_intervals.remaining_percent"
+            ),
+            "allowance_delta_percent": (
+                "allowance_intervals.delta_used_percent"
+            ),
+            "allowance_burn_rate": (
+                "allowance_intervals.percentage_points_per_hour"
+            ),
+            "local_total_tokens": "allowance_intervals.local_total_tokens",
+            "local_calls": "allowance_intervals.local_calls",
+            "local_turns": "allowance_intervals.local_turns",
+            "local_tokens_per_percentage_point": (
+                "allowance_intervals.local_tokens_per_percentage_point"
+            ),
+            "local_calls_per_percentage_point": (
+                "allowance_intervals.local_calls_per_percentage_point"
+            ),
+            "local_turns_per_percentage_point": (
+                "allowance_intervals.local_turns_per_percentage_point"
+            ),
         },
-        aggregate_measures={
-            "allowance_observations": "COUNT(*)",
-            "allowance_used_percent": "MAX(allowance_observations.used_percent)",
-        },
+        aggregate_measures={},
         filter_fields={
-            "window": "allowance_observations.window_kind",
-            "plan": "allowance_observations.plan_type",
-            "observed_at": "allowance_observations.observed_at",
+            "window": "allowance_intervals.window_kind",
+            "plan": "allowance_intervals.plan_type",
+            "observed_at": "allowance_intervals.observed_at",
         },
-        operations=_COMMON_OPERATIONS,
+        operations=frozenset({Operation.ROWS, Operation.TIMELINE}),
+        coverage_fields={
+            "allowance_delta_percent": (
+                "allowance_intervals.delta_used_percent"
+            ),
+            "allowance_burn_rate": (
+                "allowance_intervals.percentage_points_per_hour"
+            ),
+            "local_tokens_per_percentage_point": (
+                "allowance_intervals.local_tokens_per_percentage_point"
+            ),
+            "local_calls_per_percentage_point": (
+                "allowance_intervals.local_calls_per_percentage_point"
+            ),
+            "local_turns_per_percentage_point": (
+                "allowance_intervals.local_turns_per_percentage_point"
+            ),
+        },
+        base_generation_parameters=3,
     ),
     "threads": DatasetSpec(
         base_sql="threads",

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Smoke the installed K7 Console or retained public 0.25.1 Console assets."""
+"""Smoke the installed kernel Console or retained public 0.25.1 assets."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import socket
@@ -82,6 +83,23 @@ def smoke_current(wheel: Path) -> None:
             )
             if len(javascript) < 1_000:
                 raise RuntimeError("installed Console JavaScript is incomplete")
+            limits = _await(f"http://127.0.0.1:{port}/limits")
+            if b"data-console-shell" not in limits:
+                raise RuntimeError("installed Limits Console is missing")
+            allowance = json.loads(
+                _await(
+                    f"http://127.0.0.1:{port}/api/kernel/v1/allowance?limit=10"
+                )
+            )
+            if (
+                allowance.get("schema")
+                != "codex-usage-tracker.allowance-efficiency.v1"
+                or allowance.get("returned_count", 0) < 1
+                or not allowance.get("evidence_selectors")
+            ):
+                raise RuntimeError(
+                    "installed allowance-efficiency contract is incomplete"
+                )
         finally:
             server.terminate()
             try:
@@ -89,7 +107,7 @@ def smoke_current(wheel: Path) -> None:
             except subprocess.TimeoutExpired:
                 server.kill()
                 server.wait(timeout=5)
-    print("Installed K7 Console smoke passed.")
+    print("Installed kernel Console and allowance smoke passed.")
 
 
 def _await(url: str) -> bytes:
