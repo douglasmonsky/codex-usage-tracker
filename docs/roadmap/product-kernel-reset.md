@@ -1,6 +1,12 @@
 # Product Kernel Reset
 
-This document is the normative product and release sequence for Codex Usage
+> **Historical program:** K0–K15 are complete. K16 produced the `v0.28.0`
+> source tag and GitHub release, but public package publication and GitHub
+> assets were not completed. Remaining work is superseded by the
+> [Product Recovery Roadmap](product-recovery.md); do not late-publish stale
+> `0.28.0` package bytes.
+
+This document was the normative product and release sequence for Codex Usage
 Tracker after Release 0.25.1. The approved
 [design](../superpowers/specs/2026-07-26-product-kernel-reset-design.md) and
 [implementation plan](../superpowers/plans/2026-07-26-product-kernel-reset.md)

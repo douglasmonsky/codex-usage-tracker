@@ -21,6 +21,7 @@ from scripts.check_kernel_scope import (
     K14_ADDITIONS,
     K15_ADDITIONS,
     K16_ADDITIONS,
+    RECOVERY_ROADMAP_ADDITIONS,
     active_paths,
     load_disposition_manifest,
     publication_ref_failure,
@@ -212,6 +213,21 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/test_release_028_qualification.py",
         "tests/kernel/test_stable_contract_028.py",
     } == K16_ADDITIONS
+    assert {
+        "docs/roadmap/product-recovery.md",
+        "docs/roadmap/product-recovery-execution.md",
+        "docs/roadmap/product-recovery-tasks/README.md",
+        "docs/roadmap/product-recovery-tasks/r0-adopt-recovery-roadmap.md",
+        "docs/roadmap/product-recovery-tasks/r1-agent-outcome-baseline.md",
+        "docs/roadmap/product-recovery-tasks/r2-schema-v3-storage.md",
+        "docs/roadmap/product-recovery-tasks/r3-build-refresh-performance.md",
+        "docs/roadmap/product-recovery-tasks/r4-fast-query-mcp.md",
+        "docs/roadmap/product-recovery-tasks/r5-analytical-primitives.md",
+        "docs/roadmap/product-recovery-tasks/r6-console-usability.md",
+        "docs/roadmap/product-recovery-tasks/r7-installed-agent-qualification.md",
+        "docs/roadmap/product-recovery-tasks/r8-public-docs.md",
+        "docs/roadmap/product-recovery-tasks/r9-release-0.29.0.md",
+    } == RECOVERY_ROADMAP_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -228,6 +244,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K14_ADDITIONS
         | K15_ADDITIONS
         | K16_ADDITIONS
+        | RECOVERY_ROADMAP_ADDITIONS
     )
 
 

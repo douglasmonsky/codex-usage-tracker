@@ -1,5 +1,11 @@
 # Product Kernel Reset Execution Ledger
 
+> **Historical ledger:** K0–K15 are complete. K16 created the `v0.28.0` source
+> tag and GitHub release, but PyPI publication and GitHub package assets were
+> not completed. The [Product Recovery Roadmap](product-recovery.md)
+> supersedes the remaining release work; do not late-publish stale `0.28.0`
+> package bytes.
+
 This is the durable execution record for the
 [Product Kernel Reset](product-kernel-reset.md). The approved
 [design](../superpowers/specs/2026-07-26-product-kernel-reset-design.md) and
@@ -76,7 +82,7 @@ progress.
 | K13 | 0.27.0 | Complete | K11 | Read-only overlay boundary |
 | K14 | 0.27.0 | Complete | K12, K13 | Release qualification |
 | K15 | 0.28.0 | Complete | K14 | Fault, recovery, and scale |
-| K16 | 0.28.0 | In progress | K15 | Contract freeze and release |
+| K16 | 0.28.0 | Superseded | K15 | Source/tag complete; public package publication incomplete |
 
 ## Baseline Evidence
 
@@ -1959,8 +1965,8 @@ focused repository contract rejects removal of `--upgrade-from 0.26.0`.
 
 ## K16 — Freeze Contracts And Publish 0.28.0
 
-**State:** In progress — local qualification complete; final review, CI, and
-protected publication pending
+**State:** Superseded — local qualification and source release completed;
+public package publication did not complete
 **Branch:** `release/0.28.0`
 **Base:** `b44a767d41434ff1ee3ec3c1293b8194f10a99a4`
 **Commits:** pending
@@ -2027,15 +2033,13 @@ protected publication pending
 - The single final reviewer reported one finding and it was accepted: the
   frozen two-version upgrade promise needed both 0.26.0 and 0.27.0 to remain
   blocking CI smokes. Both now run exactly once.
-- Reviewer token attribution is pending after the single metrics finish call;
-  it was not retried.
-- Complete the bounded post-review recheck.
-- Protected publication run 30264962387 stopped in artifact verification
-  before TestPyPI upload because the normalized sdist made the first ceiling
-  too loose. No public package bytes were created.
-- Merge the release PR through maintained CI, tag the exact merged-main SHA,
-  publish only through protected Trusted Publishing, and verify TestPyPI,
-  PyPI, and GitHub artifacts byte-for-byte.
+- Reviewer token attribution remained pending after the single metrics finish
+  call; it was not retried.
+- Tag `v0.28.0` and its GitHub release now exist, but the release has no package
+  assets and public PyPI still serves `0.27.0` as latest.
+- K16 is closed as superseded rather than falsely recorded as published. R0 of
+  the Product Recovery Roadmap owns the next release decision, and the project
+  will not late-publish the stale `0.28.0` candidate.
 
 ## Task Entry Template
 
