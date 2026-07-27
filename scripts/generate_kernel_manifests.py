@@ -595,6 +595,54 @@ def apply_k8_transition() -> None:
     _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
+def apply_k9_transition() -> None:
+    """Mark every frozen decision terminal after the final absence audit."""
+
+    payload = build_code_disposition_manifest()
+    for entry in payload["entries"]:
+        entry["status"] = "verified"
+    failures = k9_disposition_proof_failures(payload)
+    if failures:
+        raise ValueError("\n".join(failures))
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
+
+
+def k9_disposition_proof_failures(
+    disposition: dict[str, Any],
+) -> list[str]:
+    """Reconcile every terminal K1 path with its physical proof and target."""
+
+    failures: list[str] = []
+    for entry in disposition["entries"]:
+        source = _REPO_ROOT / entry["path"]
+        target = _REPO_ROOT / entry["target_path"]
+        disposition_name = entry["disposition"]
+        if entry["status"] != "verified":
+            failures.append(f"{entry['path']}: K9 status is not verified")
+        if disposition_name == "keep":
+            if not source.exists() and not source.is_symlink():
+                failures.append(f"{entry['path']}: kept path is absent")
+        elif source.exists() or source.is_symlink():
+            failures.append(f"{entry['path']}: retired source path remains")
+        if disposition_name in {"keep", "transplant"} and (
+            not target.exists() and not target.is_symlink()
+        ):
+            failures.append(
+                f"{entry['path']}: verified target is absent: {entry['target_path']}"
+            )
+        proof_paths = (
+            entry["removal_or_absence_test"],
+            *entry["required_oracle_tests"],
+        )
+        for proof_path in proof_paths:
+            proof = _REPO_ROOT / proof_path
+            if not proof.is_file():
+                failures.append(
+                    f"{entry['path']}: verified proof is absent: {proof_path}"
+                )
+    return failures
+
+
 def manifest_failures(
     disposition: dict[str, Any] | None = None,
 ) -> list[str]:
@@ -952,6 +1000,7 @@ def main() -> int:
     parser.add_argument("--apply-k5", action="store_true")
     parser.add_argument("--apply-k6", action="store_true")
     parser.add_argument("--apply-k8", action="store_true")
+    parser.add_argument("--apply-k9", action="store_true")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
@@ -969,6 +1018,8 @@ def main() -> int:
         apply_k6_transition()
     if args.apply_k8:
         apply_k8_transition()
+    if args.apply_k9:
+        apply_k9_transition()
     failures = manifest_failures()
     if failures:
         print("\n".join(failures), file=sys.stderr)

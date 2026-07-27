@@ -6,11 +6,13 @@ prune assets
 include config/kernel-code-disposition-v1.json
 include config/kernel-development-efficiency-v1.json
 include config/kernel-performance-budget.json
+include config/kernel-release-candidate-budget.json
 include config/kernel-retired-surfaces-v1.json
 recursive-include docs *.md
 prune scripts
 include scripts/benchmark_kernel.py
 include scripts/check_kernel_maintainability.py
+include scripts/check_kernel_release_candidate.py
 include scripts/check_kernel_scope.py
 include scripts/check_release.py
 include scripts/generate_kernel_interfaces.py

@@ -101,3 +101,9 @@ def test_k6_public_adapters_do_not_reactivate_retired_mcp_or_http_names() -> Non
 
     assert active_tools.isdisjoint(retired_tools)
     assert active_routes.isdisjoint(retired_routes)
+
+
+def test_every_retired_surface_has_a_live_absence_or_migration_proof() -> None:
+    from scripts.check_kernel_release_candidate import retired_surface_failures
+
+    assert retired_surface_failures() == []

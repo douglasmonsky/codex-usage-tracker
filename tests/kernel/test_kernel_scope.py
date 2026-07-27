@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,8 @@ from scripts.check_kernel_scope import (
     K6_ADDITIONS,
     K7_ADDITIONS,
     K8_ADDITIONS,
+    K9_ADDITIONS,
+    active_paths,
     load_disposition_manifest,
     publication_ref_failure,
     scope_failures,
@@ -56,10 +59,21 @@ def test_scope_checks_physical_keep_and_removed_paths(
     assert "quarantined path remains active: removed.py" in failures
 
 
+def test_active_paths_excludes_indexed_files_deleted_from_worktree(
+    tmp_path: Path,
+) -> None:
+    removed = tmp_path / "phase-ledger.md"
+    removed.write_text("temporary\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "phase-ledger.md"], check=True)
+    removed.unlink()
+
+    assert "phase-ledger.md" not in active_paths(tmp_path)
+
+
 def test_k1a_additions_are_explicit_and_bounded() -> None:
     assert frozenset(
         {
-            ".agent-maintainer/change-plans/k1a-legacy-quarantine.md",
             "docs/kernel-development-scope.md",
             "scripts/check_kernel_scope.py",
             "src/codex_usage_tracker/kernel/AGENTS.md",
@@ -71,7 +85,6 @@ def test_k1a_additions_are_explicit_and_bounded() -> None:
 
 def test_k2_additions_are_explicit_and_bounded() -> None:
     assert {
-        ".agent-maintainer/change-plans/k2-schema-identity.md",
         "src/codex_usage_tracker/kernel/database.py",
         "src/codex_usage_tracker/kernel/identity.py",
         "src/codex_usage_tracker/kernel/models.py",
@@ -87,7 +100,6 @@ def test_k2_additions_are_explicit_and_bounded() -> None:
 
 def test_k3_additions_are_explicit_and_bounded() -> None:
     assert {
-        ".agent-maintainer/change-plans/k3-incremental-ingestion.md",
         "src/codex_usage_tracker/kernel/discovery.py",
         "src/codex_usage_tracker/kernel/ingest.py",
         "src/codex_usage_tracker/kernel/lease.py",
@@ -109,7 +121,6 @@ def test_k3_additions_are_explicit_and_bounded() -> None:
 
 def test_k4_additions_are_explicit_and_bounded() -> None:
     assert {
-        ".agent-maintainer/change-plans/k4-bounded-query-engine.md",
         "src/codex_usage_tracker/kernel/query/service.py",
         "tests/kernel/query/test_performance.py",
     } <= K4_ADDITIONS
@@ -117,7 +128,6 @@ def test_k4_additions_are_explicit_and_bounded() -> None:
 
 def test_k5_additions_are_explicit_and_bounded() -> None:
     assert {
-        ".agent-maintainer/change-plans/k5-evidence-live.md",
         "src/codex_usage_tracker/kernel/evidence/service.py",
         "src/codex_usage_tracker/kernel/live/journal.py",
         "tests/kernel/evidence/test_performance.py",
@@ -127,7 +137,6 @@ def test_k5_additions_are_explicit_and_bounded() -> None:
 
 def test_k6_additions_are_explicit_and_bounded() -> None:
     assert {
-        ".agent-maintainer/change-plans/k6-interface-cutover.md",
         "scripts/generate_kernel_interfaces.py",
         "skills/usage-kernel/SKILL.md",
         "src/codex_usage_tracker/kernel/application/service.py",
@@ -145,7 +154,6 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/interfaces/test_plugin.py",
     } <= K6_ADDITIONS
     assert {
-        ".agent-maintainer/change-plans/k7-evidence-console.md",
         "frontend/kernel-console/app.js",
         "scripts/build_kernel_console.mjs",
         "scripts/check_kernel_console.mjs",
@@ -156,11 +164,16 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/console/test_contracts.py",
     } <= K7_ADDITIONS
     assert {
-        ".agent-maintainer/change-plans/k8-allowance-efficiency.md",
         "docs/kernel-allowance-efficiency.md",
         "src/codex_usage_tracker/kernel/allowance/service.py",
         "tests/kernel/allowance/test_service.py",
     } <= K8_ADDITIONS
+    assert {
+        "config/kernel-release-candidate-budget.json",
+        "docs/upgrade-0.26.md",
+        "scripts/check_kernel_release_candidate.py",
+        "tests/kernel/test_release_candidate.py",
+    } == K9_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -170,6 +183,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K6_ADDITIONS
         | K7_ADDITIONS
         | K8_ADDITIONS
+        | K9_ADDITIONS
     )
 
 

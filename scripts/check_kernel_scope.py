@@ -13,7 +13,6 @@ from typing import Any
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 K1A_ADDITIONS = frozenset(
     {
-        ".agent-maintainer/change-plans/k1a-legacy-quarantine.md",
         "docs/kernel-development-scope.md",
         "scripts/check_kernel_scope.py",
         "src/codex_usage_tracker/kernel/AGENTS.md",
@@ -23,7 +22,6 @@ K1A_ADDITIONS = frozenset(
 )
 K2_ADDITIONS = frozenset(
     {
-        ".agent-maintainer/change-plans/k2-schema-identity.md",
         "src/codex_usage_tracker/kernel/database.py",
         "src/codex_usage_tracker/kernel/identity.py",
         "src/codex_usage_tracker/kernel/models.py",
@@ -38,7 +36,6 @@ K2_ADDITIONS = frozenset(
 )
 K3_ADDITIONS = frozenset(
     {
-        ".agent-maintainer/change-plans/k3-incremental-ingestion.md",
         "src/codex_usage_tracker/kernel/discovery.py",
         "src/codex_usage_tracker/kernel/ingest.py",
         "src/codex_usage_tracker/kernel/lease.py",
@@ -59,7 +56,6 @@ K3_ADDITIONS = frozenset(
 )
 K4_ADDITIONS = frozenset(
     {
-        ".agent-maintainer/change-plans/k4-bounded-query-engine.md",
         "src/codex_usage_tracker/kernel/query/__init__.py",
         "src/codex_usage_tracker/kernel/query/catalog.py",
         "src/codex_usage_tracker/kernel/query/contracts.py",
@@ -75,7 +71,6 @@ K4_ADDITIONS = frozenset(
 )
 K5_ADDITIONS = frozenset(
     {
-        ".agent-maintainer/change-plans/k5-evidence-live.md",
         "src/codex_usage_tracker/kernel/evidence/__init__.py",
         "src/codex_usage_tracker/kernel/evidence/contracts.py",
         "src/codex_usage_tracker/kernel/evidence/service.py",
@@ -93,7 +88,6 @@ K5_ADDITIONS = frozenset(
 )
 K6_ADDITIONS = frozenset(
     {
-        ".agent-maintainer/change-plans/k6-interface-cutover.md",
         "scripts/generate_kernel_interfaces.py",
         "skills/usage-kernel/SKILL.md",
         "src/codex_usage_tracker/kernel/application/__init__.py",
@@ -131,7 +125,6 @@ K6_ADDITIONS = frozenset(
 )
 K7_ADDITIONS = frozenset(
     {
-        ".agent-maintainer/change-plans/k7-evidence-console.md",
         "frontend/kernel-console/app.js",
         "frontend/kernel-console/index.html",
         "frontend/kernel-console/model.js",
@@ -155,7 +148,6 @@ K7_ADDITIONS = frozenset(
 )
 K8_ADDITIONS = frozenset(
     {
-        ".agent-maintainer/change-plans/k8-allowance-efficiency.md",
         "docs/kernel-allowance-efficiency.md",
         "src/codex_usage_tracker/kernel/allowance/__init__.py",
         "src/codex_usage_tracker/kernel/allowance/efficiency.py",
@@ -168,6 +160,14 @@ K8_ADDITIONS = frozenset(
         "tests/kernel/allowance/test_service.py",
     }
 )
+K9_ADDITIONS = frozenset(
+    {
+        "config/kernel-release-candidate-budget.json",
+        "docs/upgrade-0.26.md",
+        "scripts/check_kernel_release_candidate.py",
+        "tests/kernel/test_release_candidate.py",
+    }
+)
 
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
@@ -178,6 +178,7 @@ INTEGRATION_ADDITIONS = (
     | K6_ADDITIONS
     | K7_ADDITIONS
     | K8_ADDITIONS
+    | K9_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"
@@ -207,7 +208,12 @@ def active_paths(repo_root: Path) -> set[str]:
         capture_output=True,
         text=True,
     )
-    return {line for line in result.stdout.splitlines() if line}
+    paths = {line for line in result.stdout.splitlines() if line}
+    return {
+        path
+        for path in paths
+        if (repo_root / path).exists() or (repo_root / path).is_symlink()
+    }
 
 
 def scope_failures(repo_root: Path, manifest: dict[str, Any]) -> list[str]:

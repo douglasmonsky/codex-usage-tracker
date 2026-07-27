@@ -3,12 +3,12 @@
     "name": "Douglas Monsky"
   },
   "bundle": {
-    "digest": "sha256:77904514db162cdc1b52e6483d1968b448f54fcdeffa3ab14547ed9884462746",
+    "digest": "sha256:2dce244c037935750a757cd0f7e43f705f1d44e838a208852854bb93f3379659",
     "publishable": false,
     "runtime_version": "0.26.0.dev0",
     "schema": "codex-usage-tracker.kernel-plugin-bundle.v1"
   },
-  "description": "Non-publishable kernel integration for exact local Codex usage facts.",
+  "description": "Non-publishable 0.26 release candidate for exact local Codex usage facts.",
   "homepage": "https://github.com/douglasmonsky/codex-usage-tracker",
   "keywords": [
     "codex",

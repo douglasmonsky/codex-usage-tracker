@@ -17,6 +17,14 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _ORACLE = _REPO_ROOT / "tests" / "kernel" / "fixtures" / "accounting-oracle-v1"
+_TOOLS = (
+    "usage_status",
+    "usage_refresh",
+    "usage_query",
+    "usage_evidence",
+    "usage_allowance",
+    "usage_job_status",
+)
 
 
 def _python(venv_root: Path) -> Path:
@@ -60,6 +68,28 @@ def smoke_current(wheel: Path) -> None:
         environment["CODEX_HOME"] = str(codex_home)
         environment["CODEX_USAGE_TRACKER_CACHE_ROOT"] = str(root / "cache")
         command = _command(root / "venv")
+        help_text = subprocess.run(
+            [command, "--help"],
+            check=True,
+            capture_output=True,
+            env=environment,
+            text=True,
+        ).stdout
+        for command_name in (
+            "setup",
+            "status",
+            "refresh",
+            "query",
+            "export",
+            "open",
+            "service",
+            "config",
+            "repair",
+            "package",
+        ):
+            if command_name not in help_text:
+                raise RuntimeError(f"installed CLI is missing {command_name}")
+        _smoke_mcp_catalog(_python(root / "venv"), environment)
         subprocess.run(
             [command, "refresh", "--wait", "30"],
             check=True,
@@ -108,6 +138,33 @@ def smoke_current(wheel: Path) -> None:
                 server.kill()
                 server.wait(timeout=5)
     print("Installed kernel Console and allowance smoke passed.")
+
+
+def _smoke_mcp_catalog(python: Path, environment: dict[str, str]) -> None:
+    requests = (
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+    )
+    payload = "".join(json.dumps(item) + "\n" for item in requests)
+    result = subprocess.run(
+        [
+            python,
+            "-m",
+            "codex_usage_tracker.kernel.interfaces.mcp.server",
+        ],
+        input=payload,
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+        timeout=10,
+    )
+    responses = [json.loads(line) for line in result.stdout.splitlines()]
+    tools = tuple(
+        item["name"] for item in responses[1]["result"]["tools"]
+    )
+    if tools != _TOOLS:
+        raise RuntimeError(f"installed MCP catalog differs: {tools}")
 
 
 def _await(url: str) -> bytes:

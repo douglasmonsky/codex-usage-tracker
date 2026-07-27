@@ -180,6 +180,8 @@ def test_explicit_refresh_rebuilds_pre_k8_schema_before_allowance_read(
     with sqlite3.connect(control.active_kernel_path) as connection:
         connection.execute("DROP VIEW allowance_intervals")
         connection.execute("PRAGMA user_version = 1")
+    legacy_path = control.active_kernel_path
+    legacy_bytes = legacy_path.read_bytes()
     app = KernelApplication(
         runtime,
         worker_launcher=lambda _paths: None,
@@ -202,6 +204,8 @@ def test_explicit_refresh_rebuilds_pre_k8_schema_before_allowance_read(
     assert result.planner_reason == "new_source"
     assert result.generation == 1
     assert rebuilt.active_schema == SCHEMA_VERSION
+    assert rebuilt.legacy_cache_path == legacy_path
+    assert legacy_path.read_bytes() == legacy_bytes
     assert app.allowance({"limit": 1})["generation"] == 1
 
 
