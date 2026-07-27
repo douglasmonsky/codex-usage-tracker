@@ -218,6 +218,24 @@ K16_ADDITIONS = frozenset(
     }
 )
 
+RECOVERY_ROADMAP_ADDITIONS = frozenset(
+    {
+        "docs/roadmap/product-recovery.md",
+        "docs/roadmap/product-recovery-execution.md",
+        "docs/roadmap/product-recovery-tasks/README.md",
+        "docs/roadmap/product-recovery-tasks/r0-adopt-recovery-roadmap.md",
+        "docs/roadmap/product-recovery-tasks/r1-agent-outcome-baseline.md",
+        "docs/roadmap/product-recovery-tasks/r2-schema-v3-storage.md",
+        "docs/roadmap/product-recovery-tasks/r3-build-refresh-performance.md",
+        "docs/roadmap/product-recovery-tasks/r4-fast-query-mcp.md",
+        "docs/roadmap/product-recovery-tasks/r5-analytical-primitives.md",
+        "docs/roadmap/product-recovery-tasks/r6-console-usability.md",
+        "docs/roadmap/product-recovery-tasks/r7-installed-agent-qualification.md",
+        "docs/roadmap/product-recovery-tasks/r8-public-docs.md",
+        "docs/roadmap/product-recovery-tasks/r9-release-0.29.0.md",
+    }
+)
+
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
     | K2_ADDITIONS
@@ -234,6 +252,7 @@ INTEGRATION_ADDITIONS = (
     | K14_ADDITIONS
     | K15_ADDITIONS
     | K16_ADDITIONS
+    | RECOVERY_ROADMAP_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"

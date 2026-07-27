@@ -2,9 +2,11 @@
 
 ## Project Purpose
 
-This repository builds the lean local usage-data kernel. Version 0.28 is
-publishable only from merged `main` or its exact release tag through the
-protected build-once workflow.
+This repository builds the lean local usage-data kernel. The active
+`0.29.0` Product Recovery program makes the installed agent outcome fast,
+accurate, useful, and evidence-grounded before the next public package.
+Publication remains restricted to merged `main` or its exact release tag
+through the protected build-once workflow.
 
 ## Tech Stack
 
@@ -40,48 +42,33 @@ just v
 
 This project is now a published PyPI package with user-facing docs, JSON/MCP contracts, a release workflow, and privacy guarantees. Treat `main` as always releasable.
 
-### Product Kernel Reset Execution
+### Product Recovery Execution
 
-All post-0.25 product work must follow
-`docs/roadmap/product-kernel-reset.md`, its approved
-`docs/superpowers/specs/2026-07-26-product-kernel-reset-design.md`, and the
-code-quarantine amendment at
-`docs/superpowers/specs/2026-07-26-kernel-code-quarantine-design.md`.
-Use one focused
-`kernel/<task-id>-<slug>` branch per task, implement only the task's declared
-contract, and update `docs/roadmap/product-kernel-reset-execution.md` in the
-same changeset with branch, commits, verification, measurements, deviations,
-review metrics, and residual risk.
+All post-0.28 product work must follow
+`docs/roadmap/product-recovery.md`, its
+`docs/roadmap/product-recovery-tasks/README.md` task packets, and
+`docs/roadmap/product-recovery-execution.md`.
 
-K1 starts from current `main` and freezes both the public-surface inventory and
-the full tracked-tree code-disposition manifest. Its resolver input is exactly
-`git ls-files` at the K1 commit; workflows, root metadata, configuration, and
-agent instructions are not exempt. After K1, create a detached,
-policy-read-only v0.25.1 reference worktree and the temporary,
-non-publishable `kernel/0.26-integration` branch. K1A–K9 used short-lived task
-branches based on, and merged back into, that integration branch. K10 creates
-`release/0.26.0` from the audited current-`main` SHA, incorporates the qualified
-integration head once, and opens `release/0.26.0` to `main`. The release branch
-remains blocked from publication; only merged `main` or its exact tag may enter
-the protected flow.
+Use one focused branch per task, implement only the packet's declared contract,
+and update the Product Recovery execution ledger in the same changeset with
+branch, commits, verification, measurements, deviations, review metrics, and
+residual risk. Start each task from the exact base named in its packet and use
+the ordinary branch prefixes below. Do not reopen the historical
+`kernel/0.26-integration` flow or create new K-series work.
 
-Before each K1A–K9 task and K10, audit tracked-path deltas from the frozen K1
-main SHA. An unrepresented path fails closed. Port required blocker behavior on
-`kernel/k<owner>-mainline-port-<issue>`, based on and targeting integration,
-with manifest, oracle, ledger, and affected phase-gate updates. Never merge the
-legacy main line into integration. If `main` moves after the K10 audit, restart
-the cutover audit rather than resolving an unclassified delta.
+Task packets identify work that could be parallelized, but they never authorize
+parallel agents. Parallel writing lanes are allowed only when the user or
+maintainer explicitly authorizes subagents for the current task. A coordinating
+agent cannot self-authorize them. After authorization, record each lane's owner,
+worktree, base, and disjoint file allowlist before work begins. The coordinating
+agent alone owns shared contracts and the execution ledger. Schema files, public
+JSON, generated Console assets, and package manifests each have one writer at a
+time. Integrate parallel branches only at the checkpoint named in the packet.
 
-After K1A, activate only the integration worktree in Serena, GitNexus, and
-ordinary agent search. Read retired or transplant source from the v0.25.1 tag
-only through a bounded path named in `config/kernel-code-disposition-v1.json`;
-do not add the reference worktree to the normal project scope. Never delete an
-old worktree or branch without explicit maintainer permission.
-
-The branch/ref publication guard must reject integration and every K1A–K9 task
-ref. K9 may remove disposable skeleton metadata but not that guard. Only K10
-sets the final version on `release/0.26.0`; publication still occurs only from
-merged `main` through the protected release workflow.
+The Product Kernel Reset roadmap, design, code-quarantine amendment, and K0–K16
+execution ledger are historical evidence for the 0.26–0.28 rewrite. They do not
+authorize new implementation. Never delete an old worktree or branch without
+explicit maintainer permission.
 
 The tracker owns exact facts, deterministic calculations, freshness, and
 evidence. The consuming model owns inference, explanation, and recommendations.
@@ -148,18 +135,15 @@ remains available for doctor, guidance, change-plan, context, and host-side wait
 workflows.
 
 - Do not commit directly to `main`.
-- Start ordinary work and K1 from current `main` with a short-lived branch.
-  For the approved reset only, start K1A–K9 from
-  `kernel/0.26-integration`; K10 creates `release/0.26.0` from audited current
-  `main`, incorporates qualified integration once, and targets `main`.
-- Use branch prefixes `feature/`, `fix/`, `docs/`, `chore/`, `test/`, `release/`, `hotfix/`, or `kernel/`. Reserve `kernel/` for tasks in the approved Product Kernel Reset roadmap.
+- Start ordinary work from current `main`, unless the active Product Recovery
+  task packet names a different exact integration checkpoint.
+- Use branch prefixes `feature/`, `fix/`, `docs/`, `chore/`, `test/`,
+  `release/`, or `hotfix/`. `kernel/` is historical and reserved for the
+  completed Product Kernel Reset.
 - Keep each branch focused on one issue, one reviewable task, or one release.
-- Do not create a long-lived `develop` branch. The non-publishable
-  `kernel/0.26-integration` branch is the sole temporary exception and exists
-  only for K1A–K10.
+- Do not create a long-lived `develop` or integration branch.
 - Do not mix release prep with unrelated feature work.
-- Push task branches and open a PR for all changes headed to `main` or
-  `kernel/0.26-integration`.
+- Push task branches and open a PR for all changes headed to `main`.
 - Prefer squash merge for ordinary task PRs so `main` stays readable.
 - Use the PR as the review artifact even when there is only one maintainer.
 
@@ -173,9 +157,8 @@ chore/<issue-number>-short-description
 test/<issue-number>-short-description
 release/0.4.0
 hotfix/0.3.3
-kernel/0.26-integration
-kernel/k1a-legacy-quarantine
-kernel/k3-ingest-tail
+feature/r3-ingest-tail
+feature/r4-fast-query
 ```
 
 Before starting a task branch:
