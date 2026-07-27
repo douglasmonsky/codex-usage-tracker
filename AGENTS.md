@@ -2,49 +2,37 @@
 
 ## Project Purpose
 
-This repo builds a local Codex plugin and dashboard that track aggregate token usage from Codex session logs.
+This repository builds the lean local usage-data kernel. Version 0.26 is
+publishable only from merged `main` or its exact release tag through the
+protected build-once workflow.
 
 ## Tech Stack
 
 - Python 3.10+
 - SQLite via the Python standard library
-- MCP Python SDK for Codex tool exposure
 - Pytest for tests
 
 ## Repo Layout
 
-- `src/codex_usage_tracker/` - parser, SQLite store, reports, dashboard, CLI, and MCP server.
-- `src/codex_usage_tracker/context.py` - on-demand raw-context reader for one selected usage record.
-- `src/codex_usage_tracker/reports.py` - shared application/report services used by CLI and MCP wrappers.
-- `src/codex_usage_tracker/api_payloads.py` - shared stable JSON payload builders for CLI and MCP surfaces.
-- `src/codex_usage_tracker/schema.py` - single source of truth for persisted usage-event columns.
-- `src/codex_usage_tracker/threads.py` - thread attachment inference used by dashboard payload generation.
-- `src/codex_usage_tracker/pricing_config.py`, `pricing_openai.py`, `pricing_estimates.py`, and `costing.py` - pricing config, source parsing, estimate policy, and cost calculations behind the `pricing.py` facade.
-- `src/codex_usage_tracker/allowance.py` - Codex credit-rate and optional local allowance-window helpers.
-- `src/codex_usage_tracker/plugin_installer.py` - package-owned local Codex plugin installer.
-- `src/codex_usage_tracker/plugin_data/` - plugin assets, dashboard template/assets, local dashboard guide, screenshots, and skill files bundled into wheels.
-- `skills/codex-usage-tracker/` and `src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/` - operational Codex skill for tracker setup, summaries, dashboard generation, and MCP tools.
-- `skills/codex-usage-api/` and `src/codex_usage_tracker/plugin_data/skills/codex-usage-api/` - companion Codex skill for conversational analysis using the stable JSON API/MCP tools.
-- `src/codex_usage_tracker/server.py` - localhost dashboard server with live aggregate refresh and lazy context endpoints.
-- `~/.codex-usage-tracker/pricing.json` - optional local-only pricing config, never committed.
-- `~/.codex-usage-tracker/allowance.json` - optional local-only copied allowance state, never committed.
-- `.codex-plugin/plugin.json` - Codex plugin manifest.
-- `.mcp.json` - MCP server configuration for Codex.
-- `scripts/install_local_plugin.py` - compatibility wrapper around `codex-usage-tracker install-plugin`.
-- `scripts/check_release.py` - release-readiness checks for docs, versions, packaging, wheel contents, and tracked secret patterns.
-- `.github/workflows/ci.yml` - GitHub Actions test and package build workflow.
-- `.github/workflows/pricing-compat.yml` - scheduled/manual non-blocking live pricing parser compatibility check.
-- `docs/` - install, dashboard, CLI, pricing/credits, MCP, privacy, architecture, development, JSON-schema docs, and screenshots built from synthetic aggregate fixture data.
-- `tests/` - synthetic fixtures and unit tests.
+- `src/codex_usage_tracker/kernel/` - the only active product implementation.
+- `src/codex_usage_tracker/release/` - retained exact-byte release primitives.
+- `tests/kernel/` - synthetic oracle and current phase contracts.
+- `tests/release/` - retained release/promotion safety contracts.
+- `config/kernel-code-disposition-v1.json` - frozen K1 path decisions and
+  progressive transplant states.
+- `config/kernel-retired-surfaces-v1.json` - exact 0.25 public-surface removal
+  inventory.
+- `scripts/check_kernel_scope.py` - active-tree and publication-ref guard.
+- `docs/kernel-development-scope.md` - search, provenance, and privacy boundary.
+- `.mcp.json` - the single retained kernel MCP server.
+- `.codex-plugin/plugin.json` - release plugin identity and bundle attestation.
 
 ## Setup
 
 ```bash
 python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install ".[dev]" twine
-codex-usage-tracker install-plugin --python .venv/bin/python
+.venv/bin/python -m pip install -e ".[dev]"
+just v
 ```
 
 ## Branch And PR Workflow
@@ -69,11 +57,12 @@ the full tracked-tree code-disposition manifest. Its resolver input is exactly
 `git ls-files` at the K1 commit; workflows, root metadata, configuration, and
 agent instructions are not exempt. After K1, create a detached,
 policy-read-only v0.25.1 reference worktree and the temporary,
-non-publishable `kernel/0.26-integration` branch. K1A–K9 use short-lived task
+non-publishable `kernel/0.26-integration` branch. K1A–K9 used short-lived task
 branches based on, and merged back into, that integration branch. K10 creates
-`release/0.26.0` from an audited current-`main` SHA, incorporates the qualified
-integration head once, and opens `release/0.26.0` to `main`. `main` remains the
-releasable 0.25.1 line until that cutover.
+`release/0.26.0` from the audited current-`main` SHA, incorporates the qualified
+integration head once, and opens `release/0.26.0` to `main`. The release branch
+remains blocked from publication; only merged `main` or its exact tag may enter
+the protected flow.
 
 Before each K1A–K9 task and K10, audit tracked-path deltas from the frozen K1
 main SHA. An unrepresented path fails closed. Port required blocker behavior on
@@ -98,7 +87,8 @@ evidence. The consuming model owns inference, explanation, and recommendations.
 Do not add server-authored narrative analysis, another MCP tool, a default fact
 table, a compatibility profile, default content indexing, or an overlay unless
 the active roadmap names it or an approved design amendment authorizes it.
-Removal and upgrade behavior must also be due in `docs/deprecations.md`.
+Removal and cutover behavior must be recorded in the active roadmap and
+execution ledger.
 
 The former MCP-first roadmap is archived historical evidence. Its stable
 redirects do not authorize new `pivot/` work.
@@ -113,6 +103,8 @@ then run broader validation in proportion to risk.
   direction. Split code when ownership or testability becomes clearer, and keep
   cohesive behavior together when an extraction would only add forwarding
   layers.
+- Judge module boundaries by responsibility, dependency direction, complexity,
+  and testability. Do not split cohesive code solely to satisfy a line count.
 - Prefer direct functions, explicit data structures, and existing repository
   patterns. Add an abstraction only when it removes current duplication,
   isolates an external boundary, or gives a concrete test seam needed now.
@@ -123,6 +115,9 @@ then run broader validation in proportion to risk.
   behavioral, type, privacy, security, dependency, packaging, or release defect
   it identifies; if it identifies none, correct the check or policy rather than
   reshaping unrelated code.
+- Write comparisons in the order that best communicates the domain contract.
+  For measured budgets, prefer `measured <= ceiling`; do not reorder a clear
+  assertion solely to satisfy a stylistic Yoda-condition preference.
 - Use one focused test loop while implementing. At the stable checkpoint, run
   the smallest broad profile that covers every touched contract; reuse that
   evidence instead of rerunning overlapping profiles.
@@ -305,46 +300,18 @@ Redirect oversized machine output to an ignored temporary file and extract a bou
 These rules optimize context use, not correctness. Reopen source or rerun evidence whenever behavior, safety, privacy, or a public contract remains uncertain.
 
 ```bash
-python -m ruff check .
-python -m mypy
-python -m pytest
-python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
-python -m compileall src
-find src/codex_usage_tracker/plugin_data/dashboard \
-  -type f -name '*.js' -exec node --check '{}' ';'
-python scripts/check_release.py
-git diff --check
-rm -rf dist build src/codex_usage_tracker.egg-info src/codex_usage_tracking.egg-info
-python -m build
-python -m twine check dist/*
-python scripts/check_release.py --dist
+just v
 ```
 
-Additional smoke checks for touched CLI surfaces:
+For release, packaging, CLI, MCP, or Console changes, also build and smoke the
+exact wheel:
 
 ```bash
-python -m pytest
-python -m compileall src
-find src/codex_usage_tracker/plugin_data/dashboard \
-  -type f -name '*.js' -exec node --check '{}' ';'
 python -m build
 python scripts/check_release.py --dist
-git diff --check
-python scripts/smoke_installed_package.py
-codex-usage-tracker update-pricing --output /tmp/codex-usage-pricing.json
-codex-usage-tracker update-rate-card --output /tmp/codex-usage-rate-card.json
-codex-usage-tracker doctor
-codex-usage-tracker doctor --suggest-repair
-codex-usage-tracker dashboard --output /tmp/codex-usage-dashboard.html
-codex-usage-tracker serve-dashboard --help
-codex-usage-tracker init-allowance --output /tmp/codex-usage-allowance.json
-codex-usage-tracker parse-allowance --output /tmp/codex-usage-allowance.json "5h 79% 6:50 PM Weekly 33% Jun 7"
-codex-usage-tracker init-thresholds --output /tmp/codex-usage-thresholds.json
-codex-usage-tracker init-projects --output /tmp/codex-usage-projects.json
-codex-usage-tracker support-bundle --output /tmp/codex-usage-support.json
-codex-usage-tracker pricing-coverage
-codex-usage-tracker summary --preset by-subagent-role
-codex-usage-tracker expensive --limit 5
+python scripts/smoke_installed_package.py \
+  --artifact-dir dist \
+  --version 0.26.0
 ```
 
 For documentation-only branches, at minimum run:
@@ -433,3 +400,48 @@ git push origin v0.4.0
 - Dashboard refresh is localhost-only, generated HTML stays aggregate-first, and context loading is lazy, localhost-only, explicit, redacted, and not embedded in the static HTML payload.
 - Subagent calls preserve logged parent-session metadata, latch to parent thread labels when available, and auto-review attachment is clearly marked when inferred.
 - Tests and compile checks pass.
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **codex-usage-tracker** (2777 symbols, 5498 relationships, 236 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
+- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
+
+## Never Do
+
+- NEVER edit a function, class, or method without first running `impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
+- NEVER commit changes without running `detect_changes()` to check affected scope.
+
+## Resources
+
+| Resource | Use for |
+|----------|---------|
+| `gitnexus://repo/codex-usage-tracker/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/codex-usage-tracker/clusters` | All functional areas |
+| `gitnexus://repo/codex-usage-tracker/processes` | All execution flows |
+| `gitnexus://repo/codex-usage-tracker/process/{name}` | Step-by-step execution trace |
+
+## CLI
+
+| Task | Read this skill file |
+|------|---------------------|
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+
+<!-- gitnexus:end -->

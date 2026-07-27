@@ -252,7 +252,13 @@ def _evidence_console_bundles(
     sdist_members: dict[str, bytes],
 ) -> list[dict[str, object]]:
     package_root = _package_root(repository_root)
-    console_root = package_root / "plugin_data" / "dashboard" / "react"
+    console_root = (
+        package_root
+        / "kernel"
+        / "interfaces"
+        / "http"
+        / "console_assets"
+    )
     if not console_root.is_dir():
         raise ManifestError(f"Evidence Console asset directory does not exist: {console_root}")
     bundles: list[dict[str, object]] = []
@@ -278,19 +284,24 @@ def _evidence_console_bundles(
 
 
 def _contract_inventory(bundles: list[dict[str, object]]) -> dict[str, object]:
-    from codex_usage_tracker.core.json_contracts import known_json_schemas
-    from codex_usage_tracker.interfaces.mcp.profiles import tools_for_profile
-    from codex_usage_tracker.store.schema import SCHEMA_VERSION
+    from codex_usage_tracker.kernel.interfaces.http.app import ROUTES
+    from codex_usage_tracker.kernel.interfaces.mcp.catalog import TOOL_SPECS
+    from codex_usage_tracker.kernel.schema import (
+        ANALYTICAL_TABLES,
+        REQUIRED_SCHEMA_OBJECTS,
+        SCHEMA_VERSION,
+    )
 
-    profiles = {
-        profile: [spec.name for spec in tools_for_profile(profile)]
-        for profile in ("core", "full", "developer")
-    }
     return {
+        "analytical_tables": sorted(ANALYTICAL_TABLES),
         "database_schema_version": SCHEMA_VERSION,
         "evidence_console_bundles": bundles,
-        "json_schemas": list(known_json_schemas()),
-        "mcp_tools": profiles,
+        "http_routes": [
+            f"{method} {path}" for method, path in sorted(ROUTES)
+        ],
+        "json_schemas": sorted(spec.name for spec in TOOL_SPECS),
+        "mcp_tools": {"default": [spec.name for spec in TOOL_SPECS]},
+        "required_schema_objects": sorted(REQUIRED_SCHEMA_OBJECTS),
     }
 
 
@@ -357,10 +368,13 @@ def _validate_contract_inventory(value: object) -> None:
     if not isinstance(value, dict):
         raise ManifestError("manifest contract inventory must be an object")
     required_types = (
+        ("analytical_tables", list),
         ("database_schema_version", int),
         ("evidence_console_bundles", list),
+        ("http_routes", list),
         ("json_schemas", list),
         ("mcp_tools", dict),
+        ("required_schema_objects", list),
     )
     invalid = [key for key, expected in required_types if not isinstance(value.get(key), expected)]
     if invalid:

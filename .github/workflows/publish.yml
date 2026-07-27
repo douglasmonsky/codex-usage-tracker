@@ -28,6 +28,13 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.14"
+      - name: Enforce kernel publication source
+        run: |
+          version="$(python -c \
+            'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          python scripts/check_kernel_scope.py \
+            --publication-ref "$GITHUB_REF" \
+            --package-version "$version"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
@@ -59,21 +66,19 @@ jobs:
         run: |
           echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$GITHUB_SHA")" \
             >> "$GITHUB_ENV"
-      - name: Verify deterministic Evidence Console assets
-        run: npm run dashboard:assets:check
+      - name: Verify deterministic Evidence Console
+        run: npm run console:verify
       - name: Ruff
         run: python -m ruff check .
       - name: Type check
         run: python -m mypy
       - name: Test
         run: python -m pytest
-      - name: Coverage
-        run: python -m pytest --cov=codex_usage_tracker --cov-report=term-missing
       - name: Compile
         run: python -m compileall src
-      - name: Dashboard JavaScript syntax
+      - name: Packaged Console JavaScript syntax
         run: |
-          find src/codex_usage_tracker/plugin_data/dashboard \
+          find src/codex_usage_tracker/kernel/interfaces/http/console_assets \
             -type f -name '*.js' -exec node --check '{}' ';'
       - name: Release readiness
         run: python scripts/check_release.py

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
+from copy import deepcopy
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -21,29 +21,7 @@ def _manifest() -> dict[str, object]:
     return json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
-def _tracked_paths() -> set[str]:
-    result = subprocess.run(
-        ["git", "ls-files"],
-        cwd=_REPO_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return set(result.stdout.splitlines())
-
-
-def _non_ignored_untracked_paths() -> set[str]:
-    result = subprocess.run(
-        ["git", "ls-files", "--others", "--exclude-standard"],
-        cwd=_REPO_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return set(result.stdout.splitlines())
-
-
-def test_code_disposition_resolves_entire_tracked_tree_once() -> None:
+def test_code_disposition_preserves_the_frozen_k1_tree_once() -> None:
     manifest = _manifest()
     entries = manifest["entries"]
     paths = [entry["path"] for entry in entries]
@@ -51,13 +29,13 @@ def test_code_disposition_resolves_entire_tracked_tree_once() -> None:
     assert manifest["schema"] == "codex-usage-tracker.kernel-code-disposition.v1"
     assert manifest["resolver"] == "git ls-files"
     assert len(paths) == len(set(paths))
-    assert set(paths) == _tracked_paths()
     assert {entry["disposition"] for entry in entries} == _DISPOSITIONS
     expected_inventory_hash = __import__("hashlib").sha256(
-        ("\n".join(sorted(_tracked_paths())) + "\n").encode()
+        ("\n".join(sorted(paths)) + "\n").encode()
     ).hexdigest()
     assert manifest["resolver_input_sha256"] == expected_inventory_hash
-    assert not _non_ignored_untracked_paths()
+    assert manifest["source_ref"] == "d8da9bccdb6674e7dca4c0872c36a1346949dc13"
+    assert manifest["quarantine_base"] == manifest["source_ref"]
 
 
 def test_code_disposition_entries_are_decision_complete() -> None:
@@ -112,9 +90,205 @@ def test_verified_is_the_only_terminal_status() -> None:
 
 
 def test_code_disposition_manifest_matches_generator() -> None:
-    from scripts.generate_kernel_manifests import build_code_disposition_manifest
+    from scripts.generate_kernel_manifests import (
+        build_code_disposition_manifest,
+        manifest_failures,
+    )
 
     assert _manifest() == build_code_disposition_manifest()
+    assert manifest_failures() == []
+
+
+def test_code_disposition_rejects_immutable_k1_decision_drift() -> None:
+    from scripts.generate_kernel_manifests import manifest_failures
+
+    changed = deepcopy(_manifest())
+    changed["entries"][0]["owner_task"] = "K9"
+
+    failures = manifest_failures(changed)
+
+    assert any("immutable K1 disposition decision changed" in item for item in failures)
+
+
+def test_progressive_tasks_advance_non_keep_paths_without_restoring_source() -> None:
+    assert {
+        entry["status"] for entry in _manifest()["entries"]
+    } == {"verified"}
+
+
+def test_k2_generic_assignments_resolve_to_clean_schema_contract() -> None:
+    entries = [
+        entry for entry in _manifest()["entries"] if entry["owner_task"] == "K2"
+    ]
+    transplanted = [
+        entry for entry in entries if entry["disposition"] == "transplant"
+    ]
+    retired = [entry for entry in entries if entry["disposition"] == "retire"]
+
+    assert len(entries) == 78
+    assert len(transplanted) == 16
+    assert len(retired) == 62
+    assert all(entry["status"] == "verified" for entry in entries)
+    assert {
+        entry["target_path"] for entry in transplanted
+    } <= {
+        "src/codex_usage_tracker/kernel/database.py",
+        "src/codex_usage_tracker/kernel/identity.py",
+        "src/codex_usage_tracker/kernel/models.py",
+        "src/codex_usage_tracker/kernel/operational.py",
+        "src/codex_usage_tracker/kernel/schema.py",
+        "tests/kernel/test_database_lifecycle.py",
+        "tests/kernel/test_identity.py",
+        "tests/kernel/test_schema.py",
+    }
+    by_path = {entry["path"]: entry for entry in entries}
+    assert by_path["tests/store/test_compression_facts.py"]["disposition"] == "retire"
+    assert by_path["tests/store/test_historical_integrity_migrations.py"][
+        "disposition"
+    ] == "retire"
+    all_entries = {entry["path"]: entry for entry in _manifest()["entries"]}
+    for path in (
+        "tests/store/test_foreign_key_cascades.py",
+        "tests/store/test_usage_deduplication.py",
+    ):
+        assert all_entries[path]["owner_task"] == "K3"
+        assert all_entries[path]["status"] == "verified"
+
+
+def test_k3_assignments_resolve_to_bounded_ingestion_or_retirement() -> None:
+    entries = [
+        entry
+        for entry in _manifest()["entries"]
+        if entry["owner_task"] == "K3"
+    ]
+    transplanted = [
+        entry for entry in entries if entry["disposition"] == "transplant"
+    ]
+    retired = [entry for entry in entries if entry["disposition"] == "retire"]
+
+    assert len(entries) == 48
+    assert len(transplanted) == 33
+    assert len(retired) == 15
+    assert all(entry["status"] == "verified" for entry in entries)
+    assert {
+        entry["target_path"] for entry in transplanted
+    } <= {
+        "src/codex_usage_tracker/kernel/discovery.py",
+        "src/codex_usage_tracker/kernel/ingest.py",
+        "src/codex_usage_tracker/kernel/lease.py",
+        "src/codex_usage_tracker/kernel/normalize.py",
+        "src/codex_usage_tracker/kernel/operational.py",
+        "src/codex_usage_tracker/kernel/parser.py",
+        "src/codex_usage_tracker/kernel/schema.py",
+        "src/codex_usage_tracker/kernel/watcher.py",
+        "src/codex_usage_tracker/kernel/writer.py",
+        "tests/kernel/test_ingest_concurrency.py",
+        "tests/kernel/test_ingest_jobs.py",
+        "tests/kernel/test_ingest_oracle.py",
+        "tests/kernel/test_ingest_pipeline.py",
+        "tests/kernel/test_ingest_privacy.py",
+        "tests/kernel/test_ingest_reconciliation.py",
+        "tests/kernel/test_watcher.py",
+    }
+
+
+def test_k4_assignments_resolve_to_bounded_queries_or_retirement() -> None:
+    entries = [
+        entry
+        for entry in _manifest()["entries"]
+        if entry["owner_task"] == "K4"
+    ]
+    transplanted = [
+        entry for entry in entries if entry["disposition"] == "transplant"
+    ]
+    retired = [entry for entry in entries if entry["disposition"] == "retire"]
+
+    assert len(entries) == 18
+    assert len(transplanted) == 13
+    assert len(retired) == 5
+    assert all(entry["status"] == "verified" for entry in entries)
+    assert {
+        entry["target_path"] for entry in transplanted
+    } <= {
+        "src/codex_usage_tracker/kernel/query/catalog.py",
+        "src/codex_usage_tracker/kernel/query/contracts.py",
+        "src/codex_usage_tracker/kernel/query/plans.py",
+        "src/codex_usage_tracker/kernel/query/service.py",
+        "src/codex_usage_tracker/kernel/schema.py",
+        "tests/kernel/query/test_contracts.py",
+        "tests/kernel/query/test_performance.py",
+        "tests/kernel/query/test_service.py",
+    }
+
+
+def test_k5_assignment_resolves_to_exact_evidence() -> None:
+    entries = [
+        entry
+        for entry in _manifest()["entries"]
+        if entry["owner_task"] == "K5"
+    ]
+
+    assert len(entries) == 1
+    assert entries[0]["disposition"] == "transplant"
+    assert entries[0]["status"] == "verified"
+    assert entries[0]["target_path"] == (
+        "src/codex_usage_tracker/kernel/evidence/service.py"
+    )
+
+
+def test_k6_assignments_resolve_to_the_six_tool_interface_cutover() -> None:
+    entries = [
+        entry
+        for entry in _manifest()["entries"]
+        if entry["owner_task"] == "K6"
+    ]
+
+    assert len(entries) == 40
+    assert all(entry["disposition"] == "transplant" for entry in entries)
+    assert all(entry["status"] == "verified" for entry in entries)
+    assert {
+        entry["target_path"] for entry in entries
+    } <= {
+        "src/codex_usage_tracker/kernel/application/codec.py",
+        "src/codex_usage_tracker/kernel/application/runtime.py",
+        "src/codex_usage_tracker/kernel/application/service.py",
+        "src/codex_usage_tracker/kernel/interfaces/cli/main.py",
+        "src/codex_usage_tracker/kernel/interfaces/http/app.py",
+        "src/codex_usage_tracker/kernel/interfaces/mcp/catalog.py",
+        "src/codex_usage_tracker/kernel/interfaces/mcp/server.py",
+        "src/codex_usage_tracker/kernel/plugin_manifest.py",
+    }
+
+
+def test_k8_assignments_resolve_to_exact_allowance_facts_or_retirement() -> None:
+    entries = [
+        entry
+        for entry in _manifest()["entries"]
+        if entry["owner_task"] == "K8"
+    ]
+    transplanted = [
+        entry for entry in entries if entry["disposition"] == "transplant"
+    ]
+    retired = [entry for entry in entries if entry["disposition"] == "retire"]
+
+    assert len(entries) == 46
+    assert transplanted
+    assert retired
+    assert all(entry["status"] == "verified" for entry in entries)
+    assert {
+        entry["target_path"] for entry in transplanted
+    } <= {
+        "src/codex_usage_tracker/kernel/allowance/__init__.py",
+        "src/codex_usage_tracker/kernel/allowance/efficiency.py",
+        "src/codex_usage_tracker/kernel/allowance/rates.py",
+        "src/codex_usage_tracker/kernel/allowance/service.py",
+        "src/codex_usage_tracker/kernel/schema.py",
+        "src/codex_usage_tracker/kernel/writer.py",
+        "tests/kernel/allowance/test_efficiency.py",
+        "tests/kernel/allowance/test_rates.py",
+        "tests/kernel/allowance/test_service.py",
+        "tests/kernel/test_repository_quality_policy.py",
+    }
 
 
 def test_code_disposition_preserves_and_retires_semantic_boundaries() -> None:

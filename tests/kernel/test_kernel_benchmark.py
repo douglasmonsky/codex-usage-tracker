@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _BUDGET_PATH = _REPO_ROOT / "config" / "kernel-performance-budget.json"
 
@@ -36,14 +34,28 @@ def test_benchmark_small_workload_is_seeded_and_structured(tmp_path: Path) -> No
     first = run_benchmark(calls=100, seed=20260726, workspace=tmp_path / "first")
     second = run_benchmark(calls=100, seed=20260726, workspace=tmp_path / "second")
 
-    stable_fields = {"calls", "rows", "tables", "seed"}
+    stable_fields = {
+        "calls",
+        "seed",
+        "canonical_calls_after_replacement",
+        "no_change_preserved_bytes",
+    }
     assert {key: first[key] for key in stable_fields} == {
         key: second[key] for key in stable_fields
     }
     assert first["calls"] == 100
-    assert first["rows"]["physical"] == 100
-    assert first["rows"]["canonical"] <= 100
-    assert first["wall_seconds"] >= first["writer_lock_seconds"] >= 0
-
-    with pytest.raises(FileExistsError, match="benchmark database already exists"):
-        run_benchmark(calls=100, seed=20260726, workspace=tmp_path / "first")
+    assert first["canonical_calls_after_replacement"] == 1
+    assert first["no_change_preserved_bytes"] is True
+    phases = first["phases"]
+    assert set(phases) == {"initial", "no_change", "append", "replacement"}
+    assert phases["initial"]["inserted_calls"] == 100
+    assert phases["no_change"]["inserted_calls"] == 0
+    assert phases["no_change"]["planner_reason"] == "no_changes"
+    assert phases["append"]["inserted_calls"] == 1
+    assert phases["append"]["planner_reason"] == "append_safe"
+    assert phases["replacement"]["deleted_rows"] == 101
+    assert phases["replacement"]["inserted_calls"] == 1
+    assert phases["replacement"]["planner_reason"] == "truncate_source"
+    for phase in phases.values():
+        assert phase["elapsed_ms"] >= phase["writer_p95_ms"] >= 0
+        assert phase["writer_transactions"] >= 0

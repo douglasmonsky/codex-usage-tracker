@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.26.0 - 2026-07-27
+
+- Replace the beta analysis and compatibility product with a lean local data
+  kernel for exact incremental facts, bounded model-driven queries, evidence
+  timelines, live reconnect, and allowance efficiency.
+- Ship exactly six MCP tools, ten operational CLI commands, seven kernel API
+  routes, and a focused Evidence Console with no implicit refresh or narrative
+  analysis job.
+- Preserve the 0.25 cache beside the new kernel, build only on explicit
+  refresh, promote atomically, and retain rollback metadata without reading or
+  rewriting the legacy database.
+- Remove retired telemetry, OTel, compression, diagnostics, recommendations,
+  content indexing, compatibility profiles, and legacy dashboard assets from
+  the installed package.
+
 - Archive the completed MCP-first roadmap and establish the Product Kernel
   Reset program around exact incremental facts, model-owned inference, live
   evidence, a six-tool MCP surface, side-by-side cache cutover, and removal of

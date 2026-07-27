@@ -1,601 +1,604 @@
 #!/usr/bin/env python3
-"""Smoke-test installed Codex Usage Tracker package behavior.
-
-The default mode builds this checkout into a temporary dist directory, installs
-the wheel into a clean virtual environment, and verifies the installed CLI,
-package data, and plugin installer. Use ``--artifact-dir`` to smoke an already
-built or downloaded wheel, ``--from-pypi`` to verify the public package, or
-``--docker`` to run the same smoke in a clean Linux image.
-"""
+"""Smoke the installed lean kernel from a wheel or package index."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import os
-import re
-import shlex
+import queue
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
-import textwrap
+import threading
+import time
+import urllib.request
 import venv
 from pathlib import Path
+from typing import Any, cast
 
 try:
-    from scripts.smoke_dashboard_server import smoke_served_dashboard
-    from scripts.smoke_installed_catalog import CLI_HELP_SUBCOMMANDS, RESOURCE_PATHS
-except ModuleNotFoundError:  # Direct execution puts scripts/ on sys.path.
-    from smoke_dashboard_server import smoke_served_dashboard
-    from smoke_installed_catalog import CLI_HELP_SUBCOMMANDS, RESOURCE_PATHS
+    from scripts.smoke_installed_catalog import (
+        CLI_HELP_SUBCOMMANDS,
+        MCP_TOOLS,
+        RESOURCE_PATHS,
+    )
+except ModuleNotFoundError:  # pragma: no cover - direct script execution
+    from smoke_installed_catalog import (  # type: ignore[import-not-found,no-redef]
+        CLI_HELP_SUBCOMMANDS,
+        MCP_TOOLS,
+        RESOURCE_PATHS,
+    )
 
 try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback.
-    import tomli as tomllib
-
+    import tomllib  # type: ignore[import-not-found,import-untyped]
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
+    import tomli as tomllib  # type: ignore[import-not-found,no-redef]
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DISTRIBUTION_NAME = "codex-usage-tracking"
 WHEEL_STEM = "codex_usage_tracking"
-IMPORT_PACKAGE = "codex_usage_tracker"
-CONSOLE_SCRIPT = "codex-usage-tracker"
 DEFAULT_DOCKER_IMAGE = (
-    "python:3.14-slim@sha256:cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6"
+    "python:3.14-slim@sha256:"
+    "cea0e6040540fb2b965b6e7fb5ffa00871e632eef63719f0ea54bca189ce14a6"
 )
-REACT_ASSET_PATTERN = re.compile(
-    r"""(?:src|href)=["'](?P<path>/codex-usage-tracker-assets/react/[^"']+)["']"""
-)
-EXPECTED_CORE_MCP_TOOLS = [
-    "usage_status",
-    "usage_refresh",
-    "usage_analyze",
-    "usage_query",
-    "usage_evidence",
-    "usage_allowance",
-    "usage_job_status",
-]
-BUILD_ARTIFACT_PATHS = [
-    REPO_ROOT / "build",
-    REPO_ROOT / "codex_usage_tracking.egg-info",
-    REPO_ROOT / "src" / "codex_usage_tracking.egg-info",
-    REPO_ROOT / "src" / "codex_usage_tracker.egg-info",
-]
+_ORACLE = REPO_ROOT / "tests" / "kernel" / "fixtures" / "accounting-oracle-v1"
+
+def _python(venv_root: Path) -> Path:
+    return venv_root / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--from-pypi",
-        action="store_true",
-        help="Install codex-usage-tracking from PyPI instead of a locally built wheel.",
+def _command(venv_root: Path) -> Path:
+    directory = "Scripts" if os.name == "nt" else "bin"
+    suffix = ".exe" if os.name == "nt" else ""
+    return venv_root / directory / f"codex-usage-tracker{suffix}"
+
+
+def _run_json(
+    command: list[str | Path],
+    *,
+    environment: dict[str, str],
+    timeout: float = 30,
+) -> dict[str, object]:
+    result = subprocess.run(
+        [str(part) for part in command],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+        timeout=timeout,
     )
-    parser.add_argument(
-        "--version",
-        default=None,
-        help="Install this exact version with --from-pypi or --artifact-dir.",
-    )
-    parser.add_argument(
-        "--artifact-dir",
-        type=Path,
-        default=None,
-        help="Install the sole matching wheel from an existing artifact directory.",
-    )
-    parser.add_argument(
-        "--docker",
-        action="store_true",
-        help="Run this smoke test inside a clean Docker Python image.",
-    )
-    parser.add_argument(
-        "--docker-image",
-        default=DEFAULT_DOCKER_IMAGE,
-        help=f"Docker image for --docker mode. Default: {DEFAULT_DOCKER_IMAGE}",
-    )
-    args = parser.parse_args(argv)
-    if args.from_pypi and args.artifact_dir is not None:
-        parser.error("--from-pypi and --artifact-dir cannot be used together")
-
-    if args.docker:
-        return _run_in_docker(args)
-
-    with tempfile.TemporaryDirectory(prefix="codex-usage-installed-smoke-") as temp_name:
-        temp_dir = Path(temp_name)
-        install_target = _resolve_install_target(args, temp_dir)
-        venv_dir = temp_dir / "venv"
-        _create_venv(venv_dir)
-        python = _venv_python(venv_dir)
-        command = _venv_console_script(venv_dir)
-
-        _run([str(python), "-m", "pip", "install", "--upgrade", "pip"], capture_output=True)
-        _run(
-            [str(python), "-m", "pip", "install", "--no-cache-dir", install_target],
-            capture_output=True,
-        )
-
-        _run([str(command), "--version"])
-        _run([str(command), "--help"], capture_output=True)
-        for subcommand in CLI_HELP_SUBCOMMANDS:
-            _run([str(command), subcommand, "--help"], capture_output=True)
-        _run([str(python), "-c", _import_check_code()])
-        _run([str(python), "-c", _resource_check_code()])
-        _smoke_plugin_install(command, temp_dir)
-        _smoke_cli_lifecycle(command, temp_dir)
-
-        print("Installed package smoke passed.")
-        return 0
-
-
-def _run_in_docker(args: argparse.Namespace) -> int:
-    inner_args = ["scripts/smoke_installed_package.py"]
-    if args.from_pypi:
-        inner_args.append("--from-pypi")
-    if args.version:
-        inner_args.extend(["--version", args.version])
-    docker_mounts = ["-v", f"{REPO_ROOT}:/work"]
-    if args.artifact_dir is not None:
-        artifact_dir = args.artifact_dir.resolve()
-        inner_args.extend(["--artifact-dir", "/release-dist"])
-        docker_mounts.extend(["-v", f"{artifact_dir}:/release-dist:ro"])
-    setup_commands = ["python -m pip install --upgrade pip >/dev/null"]
-    if not args.from_pypi and args.artifact_dir is None:
-        setup_commands.append("python -m pip install build >/dev/null")
-    inner_command = " && ".join(
-        setup_commands + ["python " + " ".join(shlex.quote(part) for part in inner_args)]
-    )
-    return _run(
-        [
-            "docker",
-            "run",
-            "--rm",
-            *docker_mounts,
-            "-w",
-            "/work",
-            args.docker_image,
-            "sh",
-            "-lc",
-            inner_command,
-        ]
-    ).returncode
+    payload = json.loads(result.stdout)
+    if not isinstance(payload, dict):
+        raise RuntimeError("installed command did not return a JSON object")
+    return payload
 
 
 def _resolve_install_target(args: argparse.Namespace, temp_dir: Path) -> str:
     if args.from_pypi:
-        return f"{DISTRIBUTION_NAME}=={args.version}" if args.version else DISTRIBUTION_NAME
+        return (
+            f"{DISTRIBUTION_NAME}=={args.version}"
+            if args.version
+            else DISTRIBUTION_NAME
+        )
     if args.artifact_dir is not None:
         artifact_dir = args.artifact_dir.resolve()
         if not artifact_dir.is_dir():
-            raise FileNotFoundError(f"artifact directory does not exist: {artifact_dir}")
-        version_pattern = args.version or "*"
-        wheels = sorted(artifact_dir.glob(f"{WHEEL_STEM}-{version_pattern}-*.whl"))
+            raise FileNotFoundError(
+                f"artifact directory does not exist: {artifact_dir}"
+            )
+        pattern = args.version or "*"
+        wheels = sorted(artifact_dir.glob(f"{WHEEL_STEM}-{pattern}-*.whl"))
         if len(wheels) != 1:
             raise FileNotFoundError(
                 "expected exactly one matching wheel in artifact directory; "
                 f"found {[path.name for path in wheels]}"
             )
-        return str(wheels[0])
+        return str(wheels[0].resolve())
 
-    version = _project_version()
-    dist_dir = temp_dir / "dist"
-    _clean_build_artifacts()
-    try:
-        _run([sys.executable, "-m", "build", "--outdir", str(dist_dir)], capture_output=True)
-    finally:
-        _clean_build_artifacts()
-    wheel = dist_dir / f"{WHEEL_STEM}-{version}-py3-none-any.whl"
-    if not wheel.exists():
+    version = tomllib.loads(
+        (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]["version"]
+    dist = temp_dir / "dist"
+    subprocess.run(
+        [sys.executable, "-m", "build", "--outdir", str(dist)],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    wheel = dist / f"{WHEEL_STEM}-{version}-py3-none-any.whl"
+    if not wheel.is_file():
         raise FileNotFoundError(f"expected built wheel was not created: {wheel}")
     return str(wheel)
 
 
-def _clean_build_artifacts() -> None:
-    for path in BUILD_ARTIFACT_PATHS:
-        if path.is_dir():
-            shutil.rmtree(path)
-        elif path.exists():
-            path.unlink()
+def _free_port() -> int:
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        return int(listener.getsockname()[1])
 
 
-def _project_version() -> str:
-    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    return str(pyproject["project"]["version"])
+def _await(url: str) -> bytes:
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=1) as response:
+                if response.status == 200:
+                    return response.read()
+        except OSError:
+            time.sleep(0.05)
+    raise RuntimeError(f"installed service did not serve {url}")
 
 
-def _create_venv(venv_dir: Path) -> None:
-    builder = venv.EnvBuilder(with_pip=True, clear=True)
-    builder.create(venv_dir)
-
-
-def _venv_python(venv_dir: Path) -> Path:
-    if os.name == "nt":
-        return venv_dir / "Scripts" / "python.exe"
-    return venv_dir / "bin" / "python"
-
-
-def _venv_console_script(venv_dir: Path) -> Path:
-    if os.name == "nt":
-        return venv_dir / "Scripts" / f"{CONSOLE_SCRIPT}.exe"
-    return venv_dir / "bin" / CONSOLE_SCRIPT
-
-
-def _import_check_code() -> str:
-    return textwrap.dedent(
-        f"""
-        import asyncio
-        import {IMPORT_PACKAGE}
-        from {IMPORT_PACKAGE}.interfaces.mcp.runtime import build_mcp_server
-
-        actual = [tool.name for tool in asyncio.run(build_mcp_server("core").list_tools())]
-        expected = {EXPECTED_CORE_MCP_TOOLS!r}
-        if actual != expected:
-            raise SystemExit(f"installed core MCP profile mismatch: {{actual}}")
-        print({IMPORT_PACKAGE}.__version__)
-        print(f"validated {{len(actual)}} installed core MCP tools")
-        """
-    )
-
-
-def _resource_check_code() -> str:
-    return textwrap.dedent(
-        f"""
-        import json
-        import re
-        from importlib import resources
-
-        resource_paths = {RESOURCE_PATHS!r}
-        base = resources.files("{IMPORT_PACKAGE}.plugin_data")
-        react_index = base.joinpath("dashboard", "react", "index.html").read_text()
-        referenced_assets = {REACT_ASSET_PATTERN.pattern!r}
-        for match in re.finditer(referenced_assets, react_index):
-            resource_paths.append(match.group("path").replace("/codex-usage-tracker-assets/react/", "dashboard/react/", 1))
-        resource_paths = sorted(set(resource_paths))
-        for resource_path in resource_paths:
-            resource = base.joinpath(*resource_path.split("/"))
-            if not resource.is_file():
-                raise SystemExit(f"missing package resource: {{resource_path}}")
-            size = len(resource.read_bytes())
-            if size <= 0:
-                raise SystemExit(f"empty package resource: {{resource_path}}")
-        rate_card = json.loads(base.joinpath("rate_cards", "codex-credit-rates.json").read_text())
-        if rate_card.get("schema") != "codex-usage-tracker-codex-rate-card-v1":
-            raise SystemExit("bundled rate card schema mismatch")
-        print(f"validated {{len(resource_paths)}} package resources")
-        """
-    )
-
-
-def _smoke_plugin_install(command: Path, temp_dir: Path) -> None:
-    plugin_dir = temp_dir / "plugin"
-    marketplace = temp_dir / "marketplace.json"
-    result = _run(
-        [
-            str(command),
-            "install-plugin",
-            "--plugin-dir",
-            str(plugin_dir),
-            "--marketplace",
-            str(marketplace),
-            "--force",
-            "--json",
-        ],
-        capture_output=True,
-    )
-    payload = json.loads(result.stdout)
-    if payload.get("plugin_dir") != str(plugin_dir):
-        raise SystemExit("install-plugin JSON reported an unexpected plugin_dir")
-    required_files = [
-        plugin_dir / ".codex-plugin" / "plugin.json",
-        plugin_dir / ".mcp.json",
-        plugin_dir / "assets" / "icon.svg",
-        plugin_dir / "skills" / "codex-usage-api" / "SKILL.md",
-        plugin_dir / "skills" / "codex-usage-tracker" / "SKILL.md",
-        plugin_dir / "skills" / "codex-usage-tracker" / "scripts" / "run_mcp.py",
-        marketplace,
-    ]
-    missing = [path for path in required_files if not path.exists()]
-    if missing:
-        raise SystemExit(
-            "plugin install missing files: " + ", ".join(str(path) for path in missing)
-        )
-    manifest = json.loads((plugin_dir / ".codex-plugin" / "plugin.json").read_text())
-    if manifest.get("name") != "codex-usage-tracker":
-        raise SystemExit("plugin manifest name mismatch")
-    if manifest.get("version") != _installed_version(command):
-        raise SystemExit("plugin manifest version does not match installed CLI")
-    mcp_config = json.loads((plugin_dir / ".mcp.json").read_text())
-    server = mcp_config.get("mcpServers", {}).get("codex-usage-tracker", {})
-    actual_python = Path(str(server.get("command", ""))).resolve()
-    expected_python = _venv_python(command.parents[1]).resolve()
-    reported_python = Path(str(payload.get("python_executable", ""))).resolve()
-    if actual_python != expected_python:
-        raise SystemExit("plugin MCP config command does not point at installed wheel Python")
-    if reported_python != actual_python:
-        raise SystemExit("install-plugin JSON and MCP config report different Python executables")
-    if server.get("args") != ["-m", "codex_usage_tracker.interfaces.mcp.server"]:
-        raise SystemExit("plugin MCP config args do not launch the installed MCP server")
-    server_env = server.get("env", {})
-    if server_env.get("CODEX_USAGE_TRACKER_MCP_PROFILE") != "core":
-        raise SystemExit("installed-wheel plugin MCP config does not select the core profile")
-    if server_env.get("PYTHONPATH"):
-        raise SystemExit("installed-wheel plugin MCP config should not require PYTHONPATH")
-
-
-def _smoke_cli_lifecycle(command: Path, temp_dir: Path) -> None:
-    home_dir = temp_dir / "home"
-    codex_home = home_dir / ".codex"
-    app_dir = home_dir / ".codex-usage-tracker"
-    project_dir = temp_dir / "synthetic-project"
-    plugin_dir = home_dir / "plugins" / "codex-usage-tracker"
-    marketplace = temp_dir / "setup-marketplace.json"
-    support_path = temp_dir / "support-bundle.json"
-    db_path = app_dir / "usage.sqlite3"
-    pricing_path = app_dir / "pricing.json"
-    allowance_path = app_dir / "allowance.json"
-    rate_card_path = app_dir / "rate-card.json"
-    thresholds_path = app_dir / "thresholds.json"
-    projects_path = app_dir / "projects.json"
-    home_dir.mkdir(parents=True)
-    app_dir.mkdir(parents=True)
-    project_dir.mkdir()
-    _write_synthetic_codex_log(codex_home, project_dir)
-    env = _isolated_home_env(home_dir)
-    global_args = [
-        "--db",
-        str(db_path),
-        "--pricing",
-        str(pricing_path),
-        "--allowance",
-        str(allowance_path),
-        "--rate-card",
-        str(rate_card_path),
-        "--thresholds",
-        str(thresholds_path),
-        "--projects",
-        str(projects_path),
-    ]
-
-    setup_result = _run(
-        [
-            str(command),
-            *global_args,
-            "setup",
-            "--codex-home",
-            str(codex_home),
-            "--plugin-dir",
-            str(plugin_dir),
-            "--marketplace",
-            str(marketplace),
-            "--skip-pricing",
-            "--json",
-        ],
-        capture_output=True,
-        env=env,
-    )
-    setup_payload = json.loads(setup_result.stdout)
-    if setup_payload.get("schema") != "codex-usage-tracker-setup-v1":
-        raise SystemExit("setup JSON schema mismatch")
-    refresh = setup_payload.get("refresh", {})
-    if int(refresh.get("parsed_events", 0)) < 1:
-        raise SystemExit("setup did not parse synthetic usage event")
-    if not db_path.exists():
-        raise SystemExit("setup did not create tracker database")
-    installed_version = _installed_version(command)
-    cached_plugin_dir = _prime_plugin_cache(plugin_dir, codex_home, installed_version)
-
-    doctor_result = _run(
-        [str(command), *global_args, "doctor", "--json"],
-        capture_output=True,
-        env=env,
-    )
-    doctor_payload = json.loads(doctor_result.stdout)
-    if doctor_payload.get("schema") != "codex-usage-tracker-doctor-v1":
-        raise SystemExit("doctor JSON schema mismatch")
-    environment = doctor_payload.get("environment", {})
-    package = environment.get("package", {})
-    if package.get("version") != _installed_version(command):
-        raise SystemExit("doctor environment did not report installed package version")
-    if "dashboard_assets" not in environment:
-        raise SystemExit("doctor environment did not report dashboard asset health")
-    _smoke_installed_mcp(
-        _venv_python(command.parents[1]),
-        home_dir=home_dir,
-        plugin_dir=cached_plugin_dir,
-        expected_version=installed_version,
-    )
-
-    smoke_served_dashboard(
-        command,
-        global_args,
-        codex_home,
-        env,
-        repo_root=REPO_ROOT,
-    )
-
-    for removed_command in ("dashboard", "open-dashboard"):
-        removed_result = _run(
-            [str(command), *global_args, removed_command],
-            capture_output=True,
-            check=False,
-            env=env,
-        )
-        if removed_result.returncode != 2:
-            raise SystemExit(f"removed command {removed_command!r} did not exit 2")
-        if "codex-usage-tracker open" not in removed_result.stderr:
-            raise SystemExit(f"removed command {removed_command!r} omitted migration guidance")
-
-    support_result = _run(
-        [
-            str(command),
-            *global_args,
-            "--privacy-mode",
-            "strict",
-            "support-bundle",
-            "--codex-home",
-            str(codex_home),
-            "--output",
-            str(support_path),
-            "--json",
-        ],
-        capture_output=True,
-        env=env,
-    )
-    support_cli_payload = json.loads(support_result.stdout)
-    if support_cli_payload.get("schema") != "codex-usage-tracker-support-bundle-v1":
-        raise SystemExit("support-bundle CLI JSON schema mismatch")
-    support_bundle = json.loads(support_path.read_text(encoding="utf-8"))
-    if not support_bundle.get("issue_report", {}).get("safe_to_paste_after_review"):
-        raise SystemExit("strict support bundle did not mark issue report as paste-safe")
-    support_text = json.dumps(support_bundle)
-    if str(temp_dir) in support_text or str(home_dir) in support_text:
-        raise SystemExit("strict support bundle leaked local temp paths")
-
-
-def _prime_plugin_cache(plugin_dir: Path, codex_home: Path, version: str) -> Path:
-    cache_dir = (
-        codex_home
-        / "plugins"
-        / "cache"
-        / "local"
-        / "codex-usage-tracker"
-        / version
-    )
-    cache_dir.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(plugin_dir, cache_dir)
-    return cache_dir
-
-
-def _smoke_installed_mcp(
-    python: Path,
+def _write_mcp(
+    process: subprocess.Popen[str],
+    request: dict[str, object],
     *,
-    home_dir: Path,
-    plugin_dir: Path,
-    expected_version: str,
-) -> None:
-    probe = REPO_ROOT / "tests" / "installed" / "mcp_two_task_probe.py"
-    result = _run(
-        [
-            str(python),
-            str(probe),
-            "--python",
-            str(python),
-            "--home",
-            str(home_dir),
-            "--plugin-config",
-            str(plugin_dir / ".mcp.json"),
-            "--expected-version",
-            expected_version,
-        ],
-        capture_output=True,
-        env=_isolated_home_env(home_dir),
+    timeout: float = 10,
+) -> dict[str, object]:
+    if process.stdin is None or process.stdout is None:
+        raise RuntimeError("installed MCP pipes are unavailable")
+    stdout = process.stdout
+    process.stdin.write(json.dumps(request) + "\n")
+    process.stdin.flush()
+    lines: queue.Queue[str] = queue.Queue(maxsize=1)
+    reader = threading.Thread(
+        target=lambda: lines.put(stdout.readline()),
+        daemon=True,
     )
-    payload = json.loads(result.stdout)
-    if payload.get("schema") != "codex-usage-tracker.installed-two-task-probe.v1":
-        raise SystemExit("installed two-task MCP probe schema mismatch")
-    if payload.get("hydrated_followup_tail") != 1:
-        raise SystemExit("installed two-task MCP probe did not hydrate the moving tail")
-    if payload.get("analysis_cache_reused") is not True:
-        raise SystemExit("installed two-task MCP probe did not reuse durable analysis")
-    print(
-        "Installed two-task MCP probe passed: "
-        f"{payload.get('mcp_calls')} calls, "
-        f"{payload.get('max_server_elapsed_ms')} ms max server time, "
-        "one moving-tail row, durable analysis reused"
+    reader.start()
+    try:
+        line = lines.get(timeout=timeout)
+    except queue.Empty as exc:
+        _stop_process(process)
+        raise TimeoutError("installed MCP response deadline exceeded") from exc
+    if not line:
+        stderr = process.stderr.read() if process.stderr is not None else ""
+        raise RuntimeError(f"installed MCP process exited without response: {stderr}")
+    response = json.loads(line)
+    if not isinstance(response, dict):
+        raise RuntimeError("installed MCP response is invalid")
+    return response
+
+
+def _stop_process(process: subprocess.Popen[str]) -> None:
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+
+
+def _call_mcp(
+    process: subprocess.Popen[str],
+    request_id: int,
+    name: str,
+    arguments: dict[str, object],
+) -> dict[str, object]:
+    response = _write_mcp(
+        process,
+        {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "method": "tools/call",
+            "params": {"name": name, "arguments": arguments},
+        },
     )
+    result = response.get("result")
+    if not isinstance(result, dict) or result.get("isError"):
+        raise RuntimeError(f"installed MCP call failed: {name}: {response}")
+    structured = result.get("structuredContent")
+    if not isinstance(structured, dict):
+        raise RuntimeError(f"installed MCP call is unstructured: {name}")
+    return structured
 
 
-def _isolated_home_env(home_dir: Path) -> dict[str, str]:
-    env = dict(os.environ)
-    env["HOME"] = str(home_dir)
-    env["USERPROFILE"] = str(home_dir)
-    return env
-
-
-def _write_synthetic_codex_log(codex_home: Path, project_dir: Path) -> None:
-    session_id = "019f0000-0000-7000-8000-000000000001"
-    session_path = codex_home / "sessions" / "2026" / "06" / "30" / f"{session_id}.jsonl"
-    session_path.parent.mkdir(parents=True, exist_ok=True)
-    rows = [
-        {
-            "timestamp": "2026-06-30T12:00:00.000Z",
-            "type": "session_meta",
-            "payload": {
-                "id": session_id,
-                "timestamp": "2026-06-30T12:00:00.000Z",
-                "cwd": str(project_dir),
+def _dogfood_query() -> dict[str, object]:
+    return {
+        "requests": [
+            {
+                "dataset": "calls",
+                "operation": "aggregate",
+                "dimensions": ["thread"],
+                "measures": ["calls", "total_tokens"],
+                "limit": 25,
             },
-        },
-        {
-            "timestamp": "2026-06-30T12:00:01.000Z",
-            "type": "turn_context",
-            "payload": {
-                "cwd": str(project_dir),
-                "model": "gpt-5.5-codex",
-                "effort": "medium",
-                "approval_policy": "never",
-                "sandbox_policy": "danger-full-access",
+            {
+                "dataset": "calls",
+                "operation": "share",
+                "dimensions": ["thread"],
+                "measures": ["total_tokens"],
+                "limit": 25,
             },
-        },
-        {
-            "timestamp": "2026-06-30T12:00:02.000Z",
-            "type": "event_msg",
-            "payload": {
-                "type": "token_count",
-                "info": {
-                    "total_token_usage": {
-                        "input_tokens": 200,
-                        "cached_input_tokens": 50,
-                        "output_tokens": 40,
-                        "reasoning_output_tokens": 10,
-                        "total_tokens": 300,
-                    },
-                    "last_token_usage": {
-                        "input_tokens": 120,
-                        "cached_input_tokens": 20,
-                        "output_tokens": 35,
-                        "reasoning_output_tokens": 5,
-                        "total_tokens": 180,
-                    },
-                    "model_context_window": 258400,
+            {
+                "dataset": "calls",
+                "operation": "aggregate",
+                "dimensions": ["model", "effort"],
+                "measures": ["calls", "total_tokens"],
+                "limit": 25,
+            },
+            {
+                "dataset": "calls",
+                "operation": "comparison",
+                "dimensions": ["model"],
+                "measures": ["calls", "total_tokens"],
+                "comparison": {
+                    "current_start": "2026-01-02T00:00:00Z",
+                    "current_end": "2026-01-03T00:00:00Z",
+                    "previous_start": "2026-01-01T00:00:00Z",
+                    "previous_end": "2026-01-02T00:00:00Z",
                 },
+                "limit": 25,
             },
-        },
-    ]
-    session_path.write_text(
-        "".join(json.dumps(row, separators=(",", ":")) + "\n" for row in rows),
-        encoding="utf-8",
+            {
+                "dataset": "tools",
+                "operation": "aggregate",
+                "dimensions": ["tool"],
+                "measures": ["tools", "duration_ms", "output_bytes"],
+                "limit": 25,
+            },
+            {
+                "dataset": "turns",
+                "operation": "aggregate",
+                "dimensions": ["thread"],
+                "measures": ["turns", "duration_ms"],
+                "limit": 25,
+            },
+        ]
+    }
+
+
+def _assert_dogfood_results(results: list[object]) -> None:
+    call_rows = _result_rows(results, 0)
+    share_rows = _result_rows(results, 1)
+    model_rows = _result_rows(results, 2)
+    comparison_rows = _result_rows(results, 3)
+    tool_rows = _result_rows(results, 4)
+    turn_rows = _result_rows(results, 5)
+    if (
+        sum(int(row["calls"]) for row in call_rows) != 4
+        or sum(int(row["total_tokens"]) for row in call_rows) != 515
+    ):
+        raise RuntimeError("installed MCP call totals differ from the oracle")
+    if (
+        sum(int(row["total_tokens"]) for row in share_rows) != 515
+        or abs(sum(float(row["share_total_tokens"]) for row in share_rows) - 1)
+        > 1e-12
+    ):
+        raise RuntimeError("installed MCP concentration differs from the oracle")
+    actual_models = {
+        (
+            str(row["model"]),
+            str(row["effort"]),
+            int(row["calls"]),
+            int(row["total_tokens"]),
+        )
+        for row in model_rows
+    }
+    if actual_models != {
+        ("gpt-5.3-codex", "medium", 2, 155),
+        ("gpt-5.4", "high", 2, 360),
+    }:
+        raise RuntimeError("installed MCP model matrix differs from the oracle")
+    if (
+        sum(int(row["current_calls"]) for row in comparison_rows) != 2
+        or sum(int(row["current_total_tokens"]) for row in comparison_rows)
+        != 155
+        or sum(int(row["previous_calls"]) for row in comparison_rows) != 2
+        or sum(int(row["previous_total_tokens"]) for row in comparison_rows)
+        != 360
+    ):
+        raise RuntimeError("installed MCP comparison differs from the oracle")
+    if (
+        sum(int(row["tools"]) for row in tool_rows) != 2
+        or sum(int(row["turns"]) for row in turn_rows) != 5
+    ):
+        raise RuntimeError("installed MCP structural totals differ from the oracle")
+
+
+def _result_rows(
+    results: list[object],
+    index: int,
+) -> list[dict[str, Any]]:
+    if index >= len(results):
+        raise RuntimeError("installed MCP dogfood result is missing")
+    result = results[index]
+    if not isinstance(result, dict):
+        raise RuntimeError("installed MCP dogfood result is invalid")
+    rows = result.get("rows")
+    if not isinstance(rows, list) or not rows:
+        raise RuntimeError("installed MCP dogfood rows are empty")
+    if not all(isinstance(row, dict) for row in rows):
+        raise RuntimeError("installed MCP dogfood row is invalid")
+    return cast(list[dict[str, Any]], rows)
+
+
+def _installed_mcp_command(
+    config_path: Path,
+    environment: dict[str, str],
+) -> list[str]:
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    server = config["mcpServers"]["codex-usage-tracker"]
+    if not isinstance(server, dict):
+        raise RuntimeError("installed plugin MCP configuration is invalid")
+    executable = shutil.which(server["command"], path=environment.get("PATH"))
+    if executable is None:
+        raise RuntimeError("installed plugin MCP executable is unavailable")
+    return [executable, *server["args"]]
+
+
+def _smoke_mcp(
+    config_path: Path,
+    environment: dict[str, str],
+) -> None:
+    command = _installed_mcp_command(config_path, environment)
+    for task_number in range(2):
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=environment,
+            text=True,
+        )
+        try:
+            _write_mcp(
+                process,
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {},
+                },
+            )
+            listed = _write_mcp(
+                process,
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/list",
+                    "params": {},
+                },
+            )
+            result = listed.get("result")
+            tools = (
+                tuple(item["name"] for item in result["tools"])
+                if isinstance(result, dict)
+                else ()
+            )
+            if tools != MCP_TOOLS:
+                raise RuntimeError(f"installed MCP catalog differs: {tools}")
+            status = _call_mcp(process, 3, "usage_status", {})
+            refresh = _call_mcp(
+                process,
+                4,
+                "usage_refresh",
+                {"wait_seconds": 30},
+            )
+            job = refresh.get("job")
+            if not isinstance(job, dict):
+                raise RuntimeError("installed MCP refresh returned no job")
+            result = job.get("result")
+            if (
+                job.get("terminal") is not True
+                or job.get("state") != "completed"
+                or not isinstance(result, dict)
+                or result.get("planner_reason") != "no_changes"
+                or result.get("generation") != 1
+                or result.get("inserted_calls") != 0
+            ):
+                raise RuntimeError(
+                    f"installed MCP no-change refresh is invalid: {refresh}"
+                )
+            job_status = _call_mcp(
+                process,
+                5,
+                "usage_job_status",
+                {
+                    "job_id": job["job_id"],
+                    "include_result": True,
+                },
+            )
+            if (
+                job_status.get("job_id") != job["job_id"]
+                or job_status.get("terminal") is not True
+                or job_status.get("result") != result
+            ):
+                raise RuntimeError("installed MCP terminal job state differs")
+            query = _call_mcp(
+                process,
+                6,
+                "usage_query",
+                _dogfood_query(),
+            )
+            results = query.get("results")
+            if not isinstance(results, list) or len(results) != 6:
+                raise RuntimeError("installed MCP dogfood query is incomplete")
+            _assert_dogfood_results(results)
+            selectors = [
+                selector
+                for item in results
+                if isinstance(item, dict)
+                for selector in item.get("evidence_selectors", [])
+                if isinstance(selector, str)
+            ]
+            if not selectors:
+                raise RuntimeError("installed MCP dogfood returned no evidence")
+            evidence = _call_mcp(
+                process,
+                7,
+                "usage_evidence",
+                {"selector": selectors[0], "view": "timeline", "limit": 10},
+            )
+            allowance = _call_mcp(
+                process,
+                8,
+                "usage_allowance",
+                {"limit": 10},
+            )
+            generations = {
+                payload.get("generation")
+                for payload in (status, evidence)
+            }
+            generations.update(
+                item.get("generation")
+                for item in results
+                if isinstance(item, dict)
+            )
+            if generations != {1}:
+                raise RuntimeError(
+                    f"fresh MCP task {task_number + 1} mixed generations: "
+                    f"{generations}"
+                )
+            if allowance.get("generation") not in {None, 1}:
+                raise RuntimeError(
+                    f"fresh MCP task {task_number + 1} allowance generation "
+                    f"is invalid: {allowance.get('generation')}"
+                )
+        finally:
+            _stop_process(process)
+
+
+def _smoke_service(
+    command: Path,
+    environment: dict[str, str],
+) -> float:
+    port = _free_port()
+    server = subprocess.Popen(
+        [command, "service", "serve", "--port", str(port)],
+        env=environment,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        live_url = f"http://127.0.0.1:{port}/live"
+        if b"data-console-shell" not in _await(live_url):
+            raise RuntimeError("installed Evidence Console shell is missing")
+        warm_samples: list[float] = []
+        for _index in range(5):
+            started = time.perf_counter()
+            _await(live_url)
+            warm_samples.append((time.perf_counter() - started) * 1_000)
+        warm_p95_ms = max(warm_samples)
+        if warm_p95_ms > 500:
+            raise RuntimeError(
+                f"installed warm Console p95 is too slow: {warm_p95_ms:.3f} ms"
+            )
+        status = json.loads(
+            _await(f"http://127.0.0.1:{port}/api/kernel/v1/status")
+        )
+        if status.get("state") != "active" or status.get("generation") != 1:
+            raise RuntimeError(f"installed service status is invalid: {status}")
+    finally:
+        server.terminate()
+        try:
+            server.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            server.kill()
+            server.wait(timeout=5)
+    return warm_p95_ms
+
+
+def smoke_install(target: str, *, version: str | None = None) -> None:
+    with tempfile.TemporaryDirectory(prefix="kernel-installed-smoke-") as name:
+        root = Path(name)
+        venv_root = root / "venv"
+        venv.EnvBuilder(with_pip=True, clear=True).create(venv_root)
+        python = _python(venv_root)
+        subprocess.run(
+            [python, "-m", "pip", "install", "--quiet", "--no-deps", target],
+            check=True,
+        )
+        codex_home = root / "codex"
+        shutil.copytree(_ORACLE / "logs" / "sessions", codex_home / "sessions")
+        shutil.copytree(
+            _ORACLE / "logs" / "archived_sessions",
+            codex_home / "archived_sessions",
+        )
+        cache_root = root / "cache"
+        environment = os.environ.copy()
+        environment["CODEX_HOME"] = str(codex_home)
+        environment["CODEX_USAGE_TRACKER_CACHE_ROOT"] = str(cache_root)
+        command = _command(venv_root)
+        environment["PATH"] = (
+            str(command.parent)
+            + os.pathsep
+            + environment.get("PATH", "")
+        )
+        plugin_root = root / "plugin"
+        (plugin_root / ".codex-plugin").mkdir(parents=True)
+        shutil.copy2(
+            REPO_ROOT / ".codex-plugin" / "plugin.json",
+            plugin_root / ".codex-plugin" / "plugin.json",
+        )
+        shutil.copy2(REPO_ROOT / ".mcp.json", plugin_root / ".mcp.json")
+
+        initial = _run_json([command, "status"], environment=environment)
+        if initial.get("state") != "absent" or cache_root.exists():
+            raise RuntimeError(
+                "clean installed status must stay absent and read-only"
+            )
+        help_text = subprocess.run(
+            [command, "--help"],
+            check=True,
+            capture_output=True,
+            env=environment,
+            text=True,
+        ).stdout
+        if any(name not in help_text for name in CLI_HELP_SUBCOMMANDS):
+            raise RuntimeError("installed CLI catalog is incomplete")
+        installed_root = next(
+            python.parent.parent.glob(
+                "lib/python*/site-packages/codex_usage_tracker"
+            )
+        )
+        missing_resources = [
+            path
+            for path in RESOURCE_PATHS
+            if not (installed_root.parent / path).is_file()
+        ]
+        if missing_resources:
+            raise RuntimeError(
+                f"installed package resources are missing: {missing_resources}"
+            )
+        package = _run_json([command, "package"], environment=environment)
+        if version is not None and package.get("version") != version:
+            raise RuntimeError(f"installed version differs: {package}")
+        _run_json(
+            [command, "refresh", "--wait", "30"],
+            environment=environment,
+            timeout=40,
+        )
+        active = _run_json([command, "status"], environment=environment)
+        if active.get("state") != "active" or active.get("generation") != 1:
+            raise RuntimeError(f"installed refresh did not activate: {active}")
+        _smoke_mcp(plugin_root / ".mcp.json", environment)
+        warm_p95_ms = _smoke_service(command, environment)
+    print(
+        "Installed kernel package smoke passed "
+        f"(two fresh MCP tasks; warm Console p95 {warm_p95_ms:.3f} ms)."
     )
 
 
-def _installed_version(command: Path) -> str:
-    result = _run([str(command), "--version"], capture_output=True)
-    return result.stdout.strip().split()[-1]
-
-
-def _run(
-    command: list[str],
-    *,
-    capture_output: bool = False,
-    check: bool = True,
-    env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess[str]:
-    print("+ " + " ".join(shlex.quote(part) for part in command), flush=True)
-    isolated_env = dict(os.environ if env is None else env)
-    isolated_env.pop("PYTHONPATH", None)
-    result = subprocess.run(
-        command,
-        cwd=REPO_ROOT,
-        env=isolated_env,
-        text=True,
-        capture_output=capture_output,
-    )
-    if check and result.returncode != 0:
-        if capture_output:
-            if result.stdout:
-                print(result.stdout, file=sys.stdout)
-            if result.stderr:
-                print(result.stderr, file=sys.stderr)
-        raise subprocess.CalledProcessError(result.returncode, command)
-    return result
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--from-pypi", action="store_true")
+    parser.add_argument("--version")
+    parser.add_argument("--artifact-dir", type=Path)
+    arguments = parser.parse_args()
+    if arguments.from_pypi and arguments.artifact_dir is not None:
+        parser.error("--from-pypi and --artifact-dir are mutually exclusive")
+    with tempfile.TemporaryDirectory(prefix="kernel-smoke-build-") as name:
+        target = _resolve_install_target(arguments, Path(name))
+        smoke_install(target, version=arguments.version)
+    return 0
 
 
 if __name__ == "__main__":

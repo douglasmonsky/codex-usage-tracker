@@ -9,8 +9,8 @@ import pytest
 
 PACKAGE_STEM = "codex_usage_tracking"
 IMPORT_PACKAGE = "codex_usage_tracker"
-ASSET_PATH = "plugin_data/dashboard/react/assets/dashboard-react.js"
-INDEX_PATH = "plugin_data/dashboard/react/index.html"
+ASSET_PATH = "kernel/interfaces/http/console_assets/app.js"
+INDEX_PATH = "kernel/interfaces/http/console_assets/index.html"
 
 
 class ReleaseFixture:

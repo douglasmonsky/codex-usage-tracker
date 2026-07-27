@@ -13,10 +13,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 def test_wemake_is_not_a_repository_or_ci_gate() -> None:
     config = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     dev_dependencies = config["project"]["optional-dependencies"]["dev"]
-    agent_maintainer = config["tool"]["agent_maintainer"]
 
     assert not any("wemake" in dependency.lower() for dependency in dev_dependencies)
-    assert agent_maintainer["enable_wemake"] is False
+    assert "agent_maintainer" not in config["tool"]
     assert not (_REPO_ROOT / "scripts" / "check_wemake_baseline.py").exists()
 
     workflows = "\n".join(
@@ -30,16 +29,16 @@ def test_wemake_is_not_a_repository_or_ci_gate() -> None:
 def test_maintainability_policy_has_one_non_stylistic_guardrail_per_concern() -> None:
     config = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     dev_dependencies = config["project"]["optional-dependencies"]["dev"]
-    policy = config["tool"]["agent_maintainer"]
 
     assert not any("git-agent-ratchet" in dependency for dependency in dev_dependencies)
-    assert policy["file_length_max_physical"] == 600
-    assert policy["file_length_max_source"] == 600
-    assert policy["change_block_lines"] == 5_000
-    assert policy["change_block_files"] == 100
-    assert policy["xenon_max_absolute"] == "B"
-    assert policy["xenon_max_modules"] == "B"
-    assert policy["xenon_max_average"] == "B"
+    assert any(dependency.startswith("xenon") for dependency in dev_dependencies)
+    maintainability = (
+        _REPO_ROOT / "scripts" / "check_kernel_maintainability.py"
+    ).read_text(encoding="utf-8")
+    assert "max_physical" not in maintainability
+    assert "max_source" not in maintainability
+    assert maintainability.count('"C"') == 1
+    assert maintainability.count('"B"') == 2
     for name in (
         "git-agent-ratchet-duplicate-helpers.json",
         "git-agent-ratchet-max-file-lines.json",
@@ -53,17 +52,30 @@ def test_repository_verification_wrappers_do_not_use_generic_maintainer_profiles
 
     assert "agent_maintainer verify" not in justfile
     for command in (
-        "ruff check .",
+        "scripts/check_kernel_scope.py",
+        "scripts/generate_kernel_manifests.py --check",
+        "-m ruff check",
         "-m mypy",
         "-m pytest",
         "-m pyright",
-        "-m tach check",
         "scripts/check_release.py",
-        "scripts/check_product_complexity.py",
         "scripts/check_kernel_maintainability.py",
-        "dashboard:verify",
     ):
         assert command in justfile
 
-    assert justfile.count("dashboard:verify") == 1
-    assert "npm run dashboard:governance" not in justfile
+    for retired_command in (
+        "dashboard:",
+        "check_product_complexity.py",
+        "agent_maintainer verify",
+        "-m tach check",
+    ):
+        assert retired_command not in justfile
+
+
+def test_ci_runs_ingest_performance_only_in_the_dedicated_step() -> None:
+    workflow = (
+        _REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "tests/kernel/test_ingest_*.py" not in workflow
+    assert workflow.count("tests/kernel/test_ingest_performance.py") == 2

@@ -1,0 +1,1 @@
+{"additionalProperties":false,"properties":{"cursor":{"type":["string","null"]},"limit":{"maximum":500,"minimum":1,"type":"integer"}},"type":"object"}

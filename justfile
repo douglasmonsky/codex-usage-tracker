@@ -1,11 +1,58 @@
 set shell := ["bash", "-uc"]
 
-doctor:
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m agent_maintainer doctor
+scope:
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_kernel_scope.py
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/generate_kernel_manifests.py --check
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; PYTHONPATH=src "$PY" scripts/generate_kernel_interfaces.py --check
+    npm run console:build:check
 
 vp:
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m ruff check .
+    just scope
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m ruff check \
+        scripts/check_kernel_maintainability.py \
+        scripts/benchmark_kernel.py \
+        scripts/check_kernel_scope.py \
+        scripts/check_release.py \
+        scripts/check_kernel_release_candidate.py \
+        scripts/release_promotion_quality.py \
+        scripts/smoke_installed_console.py \
+        scripts/smoke_installed_catalog.py \
+        scripts/smoke_installed_package.py \
+        scripts/generate_kernel_interfaces.py \
+        scripts/generate_kernel_manifests.py \
+        src/codex_usage_tracker/kernel \
+        src/codex_usage_tracker/release \
+        tests/release \
+        tests/kernel/allowance \
+        tests/kernel/console \
+        tests/kernel/evidence \
+        tests/kernel/interfaces \
+        tests/kernel/live \
+        tests/kernel/query \
+        tests/kernel/test_code_disposition_manifest.py \
+        tests/kernel/test_cutover_control.py \
+        tests/kernel/test_database_lifecycle.py \
+        tests/kernel/test_development_efficiency_policy.py \
+        tests/kernel/test_identity.py \
+        tests/kernel/test_ingest_*.py \
+        tests/kernel/test_kernel_maintainability.py \
+        tests/kernel/test_kernel_benchmark.py \
+        tests/kernel/test_kernel_scope.py \
+        tests/kernel/test_repository_quality_policy.py \
+        tests/kernel/test_release_candidate.py \
+        tests/kernel/test_release_cutover.py \
+        tests/kernel/test_retired_surface_manifest.py \
+        tests/kernel/test_schema.py \
+        tests/kernel/test_source_registry_privacy.py \
+        tests/kernel/test_oracle_equivalence.py \
+        tests/kernel/test_privacy_oracle.py \
+        tests/kernel/test_source_lifecycle_oracle.py \
+        tests/kernel/test_watcher.py
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m mypy
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_kernel_maintainability.py
+    npm run console:lint
+    npm run console:typecheck
+    npm run console:test
     git diff --check
 
 verify-precommit:
@@ -13,9 +60,33 @@ verify-precommit:
 
 v:
     just vp
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pytest
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pyright --pythonpath "$PY" src
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m tach check
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pytest -p no:tach \
+        tests/kernel/test_kernel_scope.py \
+        tests/kernel/test_code_disposition_manifest.py \
+        tests/kernel/test_retired_surface_manifest.py \
+        tests/kernel/test_development_efficiency_policy.py \
+        tests/kernel/test_kernel_maintainability.py \
+        tests/kernel/test_kernel_benchmark.py \
+        tests/kernel/test_repository_quality_policy.py \
+        tests/kernel/test_release_candidate.py \
+        tests/kernel/test_release_cutover.py \
+        tests/kernel/test_schema.py \
+        tests/kernel/test_identity.py \
+        tests/kernel/test_database_lifecycle.py \
+        tests/kernel/test_cutover_control.py \
+        tests/kernel/test_source_registry_privacy.py \
+        tests/kernel/test_ingest_*.py \
+        tests/kernel/test_oracle_equivalence.py \
+        tests/kernel/test_privacy_oracle.py \
+        tests/kernel/test_source_lifecycle_oracle.py \
+        tests/kernel/test_watcher.py \
+        tests/kernel/allowance \
+        tests/kernel/console \
+        tests/kernel/evidence \
+        tests/kernel/interfaces \
+        tests/kernel/live \
+        tests/kernel/query tests/release
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pyright --pythonpath "$PY"
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_release.py
 
 verify:
@@ -23,37 +94,14 @@ verify:
 
 vc:
     just v
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m deptry .
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m vulture src tests scripts/check_product_complexity.py scripts/check_release.py config/vulture-whitelist.py
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m agent_maintainer.runners.bandit
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_product_complexity.py --config config/product-complexity-budget.json
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_kernel_maintainability.py
-    npm run dashboard:verify
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m build
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_release.py --dist
 
 verify-ci:
     just vc
 
-verify-security:
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m agent_maintainer.runners.bandit
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pip_audit -r requirements/audit.txt
-
 verify-manual:
     just vc
 
-wg run_id:
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m agent_maintainer wait github-run {{run_id}}
-
-wait-github run_id:
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m agent_maintainer wait github-run {{run_id}}
-
-wp pr_number:
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m agent_maintainer wait github-pr {{pr_number}}
-
-wait-pr pr_number:
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m agent_maintainer wait github-pr {{pr_number}}
-
-wv run_id:
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m agent_maintainer wait verifier {{run_id}}
-
-wait-verifier run_id:
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m agent_maintainer wait verifier {{run_id}}
+console-e2e:
+    npm run console:e2e

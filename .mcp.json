@@ -1,15 +1,11 @@
 {
   "mcpServers": {
     "codex-usage-tracker": {
-      "command": "python3",
-      "args": ["./skills/codex-usage-tracker/scripts/run_mcp.py"],
-      "cwd": ".",
-      "env": {
-        "CODEX_USAGE_TRACKER_MCP_PROFILE": "core",
-        "CODEX_USAGE_TRACKER_PLUGIN_VERSION": "0.25.1",
-        "CODEX_USAGE_TRACKER_PLUGIN_BUNDLE_DIGEST": "sha256:8e2f80a1c84cd39da8047f30b14fa82a1b813421341011baf81752fa338cdb4b"
-      },
-      "startup_timeout_sec": 120
+      "command": "codex-usage-tracker",
+      "args": [
+        "_mcp"
+      ],
+      "startup_timeout_sec": 30
     }
   }
 }

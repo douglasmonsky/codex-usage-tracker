@@ -61,16 +61,16 @@ progress.
 | --- | --- | --- | --- | --- |
 | K0 | documentation baseline | Complete | — | Archive former program and approve reset |
 | K1 | 0.25.x bridge | Complete | K0 | Freeze accounting oracle |
-| K1A | 0.26 integration | Not started | K1 | Quarantine legacy code and freeze agent scope |
-| K2 | 0.26.0 | Not started | K1A | Kernel schema v1 and stable identity |
-| K3 | 0.26.0 | Not started | K2 | Incremental/live ingestion |
-| K4 | 0.26.0 | Not started | K3 | Bounded query engine |
-| K5 | 0.26.0 | Not started | K3 | Evidence timeline and live stream |
-| K6 | 0.26.0 | Not started | K4, K5 | Six-tool integration interfaces |
-| K7 | 0.26.0 | Not started | K6 | Focused Evidence Console |
-| K8 | 0.26.0 | Not started | K7 | Allowance efficiency |
-| K9 | 0.26.0 | Not started | K8 | Release candidate and final absence audit |
-| K10 | 0.26.0 | Not started | K9 | Audited release-branch cutover and qualification |
+| K1A | 0.26 integration | Complete | K1 | Quarantine legacy code and freeze agent scope |
+| K2 | 0.26.0 | Complete | K1A | Kernel schema v1 and stable identity |
+| K3 | 0.26.0 | Complete | K2 | Incremental/live ingestion |
+| K4 | 0.26.0 | Complete | K3 | Bounded query engine |
+| K5 | 0.26.0 | Complete | K3 | Evidence timeline and live stream |
+| K6 | 0.26.0 | Complete | K4, K5 | Six-tool integration interfaces |
+| K7 | 0.26.0 | Complete | K6 | Focused Evidence Console |
+| K8 | 0.26.0 | Complete | K7 | Allowance efficiency |
+| K9 | 0.26.0 | Complete | K8 | Release candidate and final absence audit |
+| K10 | 0.26.0 | In progress | K9 | Audited release branch qualified locally; protected publication pending |
 | K11 | 0.27.0 | Not started | K10 | Guided exploration |
 | K12 | 0.27.0 | Not started | K11 | Optional context composition |
 | K13 | 0.27.0 | Not started | K11 | Read-only overlay boundary |
@@ -393,7 +393,1005 @@ by the primary agent. No second review pass was run.
   entry through its declared state machine, and only `verified` is terminal.
 - Performance evidence describes the synthetic v0.25.1 path on one machine and
   is comparison evidence, not a production latency claim.
-- K1A is unblocked after this task passes review, PR CI, and merge to `main`.
+- K1A started from merged K1 commit
+  `d8da9bccdb6674e7dca4c0872c36a1346949dc13`.
+
+## K1A — Quarantine Legacy Code And Freeze Agent Scope
+
+**State:** Complete
+**Branch:** `kernel/k1a-legacy-quarantine`
+**Base:** `d8da9bccdb6674e7dca4c0872c36a1346949dc13`
+**Commits:** this changeset
+
+### K1A contract added first
+
+- Added a failing active-tree contract before deletion. It required every K1
+  keep path, rejected every active retire/transplant/historical path, bounded
+  new K1A files to one exact allowlist, imported the isolated kernel skeleton,
+  and rejected publication from integration and every K1A-K9 task ref.
+- The first run failed because the scope checker did not exist. The second
+  failed with the 1,473 expected manifest-named legacy paths still active.
+
+### K1A implementation
+
+- Created detached policy-read-only reference worktree
+  `codex-usage-tracker-v025-reference` at `v0.25.1` commit `0a558dd` and
+  preserved it clean.
+- Created and pushed `kernel/0.26-integration` at merged K1 commit `d8da9bc`,
+  then created this K1A task branch from that exact head.
+- Removed exactly 1,473 K1-classified non-keep paths: 1,063 retire, 231
+  transplant, and 179 historical. All were clean tracked files before the
+  manifest-driven deletion; no glob or user-modified target was used.
+- Advanced every removed path to `removed`, preserved its source reference,
+  owner, target, oracle, and absence test, and pinned the manifest quarantine
+  base to the merged K1 SHA.
+- Added the isolated `codex_usage_tracker.kernel` skeleton and kernel-local
+  instructions. The active tree now contains 105 retained K1 paths plus six
+  explicit K1A additions.
+- Set integration identity to `0.26.0.dev0`, removed runtime dependencies,
+  console scripts, MCP servers, plugin bundle claims, skills, package data, and
+  legacy frontend tooling. Pricing and allowance scheduled workflows are
+  paused until K8.
+- Replaced legacy CI with the K1A phase gate and made the publish workflow call
+  the persistent branch/ref guard before any release tooling.
+- Replaced runtime-derived K1 manifest generation with frozen-inventory
+  canonicalization and progressive transition validation.
+
+### K1A verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Scope and inventories | Pass | 26 phase tests; exact 1,473-path removal; all non-keep states `removed`; no unclassified or physically present quarantined path |
+| Static correctness | Pass | focused Ruff, MyPy, Pyright 0 errors/warnings, 600-line and Xenon-B kernel budget |
+| Package isolation | Pass | `just vc` plus package-only rebuilds; wheel 13,512 bytes with 5 Python modules and metadata only; sdist remains below 200,000 bytes with an exact fail-closed member set; no CLI entry point, runtime dependency, MCP server, legacy runtime, frontend, skills, or plugin data |
+| Development footprint | Pass | active paths 1,578 -> 111 (93.0% reduction); code-bearing files 1,248 -> 33 (97.4% reduction); tracked/active bytes 41,670,579 -> 3,830,579 (90.8% reduction); clean Python 3.10 dev resolution 117 -> 30 packages (74.4% reduction) |
+| Privacy | Pass | synthetic K1 fixtures only; no live database, Codex log, prompt, tool output, secret, or full user path entered the repository |
+| Reference safety | Pass | detached `v0.25.1` reference remains clean and was never built, tested, indexed, or activated |
+
+### K1A development-efficiency comparison
+
+| Metric | K1 | K1A final local | Change |
+| --- | ---: | ---: | ---: |
+| Non-behavioral blocking groups | 6 | 5 | 16.7% lower |
+| Gate-remediation lines | 74 | 60 | 18.9% lower |
+| Verification wall time | 966.0 s | 57.3 s | 94.1% lower |
+| Style-only commits | 0 | 0 | unchanged |
+| Duplicate unchanged-state broad runs | 0 | 1 | one regression |
+
+The duplicate was explicit: after `just v` passed, `just vc` reran it before
+building the package. K2 must call the package-only step after an already-green
+phase check. K1A also narrowed Ruff from the retained K10 tree to phase-owned
+files after one unrelated release-smoke style finding. Correctness, privacy,
+release-ref, package-content, and maintainability gates remain blocking.
+
+### K1A review metrics
+
+- Total findings: 4
+- Accepted findings: 4 (`K1A-R1` through `K1A-R4`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+The single final reviewer found four contract defects. K1A now proves every
+retained release primitive is byte-identical to merged K1 and importable,
+compares immutable disposition decisions and paths directly with the merged
+K1 tree, checks physical keep/removal state independently of the Git index,
+and enforces exact wheel/sdist member and dependency metadata. The retained
+0.25 release tests remain byte-identical historical K10 inputs; they are
+explicitly not collected on integration because they import quarantined
+runtime and release-smoke helpers. Their applicable dependency-free primitive
+contracts now run in the K1A kernel suite. No second review pass was run.
+
+### K1A deviations and decisions
+
+- Serena activation remains unavailable because its IDE broker points to a
+  deleted local Agent Maintainer helper root. The K1A scope checker and exact
+  Git path inventory are authoritative; the detached reference was not
+  activated.
+- GitNexus had indexed only older sibling worktrees. It was used to confirm the
+  stale scope and was not refreshed from the reference. Integration indexing
+  follows after K1A merge, as required by the quarantine design.
+- Historical paths had no approved archive target, so all 179 were removed and
+  remain accessible only through their manifest source refs and Git history.
+
+### K1A residual risk and next task
+
+- Retained K10 release primitives remain active but are not public-runtime
+  entry points. Their 0.25 release suite remains intentionally excluded
+  because it imports quarantined runtime and smoke helpers; K10 must port its
+  applicable contracts and remove remaining dynamic 0.25 identity imports
+  before release qualification.
+- K2 must implement and verify only its owned transplant entries; all other
+  removed paths remain forbidden.
+- K2 is unblocked after K1A review, integration-targeting PR CI, and merge.
+
+## K2 — Schema V1 And Stable Identity
+
+**State:** Complete
+**Branch:** `kernel/k2-schema-identity`
+**Base:** `bb11bcbef30a37e5fefa483ec7f240cf4a79468a`
+**Commits:** `629b612 feat: add kernel schema v1 and stable identities`;
+integration merge `a32fbab8306f827c5d7e7161e1d6913f73e67452`
+
+### K2 contract added first
+
+- Five new contract files initially failed collection because the kernel
+  schema, identity, database-lifecycle, cutover-control, and source-registry
+  modules did not exist.
+- A second contract-red run proved three primary-review findings before their
+  fixes: reopened databases retained permissive modes, operational schema
+  version drift was accepted, and failure codes were not actually bounded.
+
+### K2 implementation
+
+- Added the exact eight-table analytical schema:
+  `sources`, `generations`, `threads`, `turns`, `model_calls`, `tool_calls`,
+  `activity_events`, and `allowance_observations`, with 16 targeted indices
+  under the 18-index budget.
+- Added the exact three-table owner-only operational sidecar:
+  `refresh_runs`, `source_registry`, and `cutover_control`. Full source paths,
+  refresh leases/results, legacy-cache location, and activation state never
+  enter analytical bytes.
+- Chose the side-by-side filenames `codex-usage-kernel-v1.sqlite3` and
+  `codex-usage-kernel-operational-v1.sqlite3`.
+- Added stable namespaced IDs, canonical semantic fingerprints, bounded safe
+  labels, atomic staging/install, read-only snapshots, short WAL writer
+  transactions, integrity/version checks, 0600 permission repair, and explicit
+  build/ready/active/failed cutover transitions.
+- The K1 manifest had assigned 80 generic legacy paths to K2 despite the
+  approved five-module design. Exact provenance review retained 16 relevant
+  assignments as verified transplants, deferred two unproved
+  cascade/deduplication lifecycle oracles to K3, and corrected 62 compression,
+  diagnostics, dashboard, migration-chain, and other spike assignments to
+  verified retirement. No legacy database is opened or migrated.
+
+### K2 verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | 31 schema, identity, real-artifact cutover/rollback, permission, version, and privacy tests; Ruff, MyPy, Pyright, and Xenon/file-size budget pass |
+| Broader | Pass | `just v`: 59 phase-owned tests, manifest/scope, static, release-safety, and privacy gates in 3.92 s |
+| Package | Pass | package-only build plus `check_release.py --dist`; exact 10-module wheel, no CLI/MCP/plugin/runtime dependencies, and bounded fail-closed sdist |
+| Privacy | Pass | synthetic fixtures only; full synthetic source path occurs only in the 0600 operational sidecar |
+| Integration CI | Pass | Python 3.10 and 3.14 jobs in workflow run `30222635517`; PR #318 merged to integration |
+
+The retained K1 oracle-adapter implementation tests are not collected in K2:
+four deliberately import quarantined 0.25 runtime modules and are assigned to
+the K3 ingestion replacement. A trial whole-directory run failed those exact
+four adapters and passed the other 54 tests. K2 neither restored legacy code
+nor converted those contracts to misleading skips.
+
+### K2 development-efficiency comparison
+
+| Metric | K1 | K1A | K2 final local | K2 vs K1 | K2 vs K1A |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Contract-red runs | 1 | 2 | 2 | 100.0% higher | unchanged |
+| Focused verifier runs | 33 | 18 | 18 | 45.5% lower | unchanged |
+| Broad verifier runs | 6 | 11 | 11 | 83.3% higher | unchanged |
+| Blocking findings | 8 | 10 | 18 | 125.0% higher | 80.0% higher |
+| Non-behavioral blocking groups | 6 | 5 | 10 | 66.7% higher | 100.0% higher |
+| Gate-remediation lines | 74 | 60 | 230 | 210.8% higher | 283.3% higher |
+| Verification wall time | 966.0 s | 57.3 s | 49.5 s | 94.9% lower | 13.6% lower |
+| Style-only commits | 0 | 0 | 0 | unchanged | unchanged |
+| Duplicate broad runs | 0 | 1 | 0 | unchanged | one lower |
+
+K2 is substantially faster and eliminated duplicate broad verification, but it
+did not reduce non-behavioral finding count or remediation volume. Two
+Xenon-B findings caused most of the structural rewrite; the remaining churn
+was invocation/configuration form, one Ruff form, one import form, one
+over-broad test assertion, and the rejected whole-directory collection
+experiment. This is a measured regression, not a claimed reduction. K3 must
+use these figures to decide whether the absolute Xenon-B function ceiling
+still has a favorable maintainability-to-churn ratio while preserving the
+600-line bound, module budget, types, tests, privacy, and review.
+
+### K2 review metrics
+
+- Total findings: 6
+- Accepted findings: 6 (`R1` through `R6`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+The sole reviewer found two high-, three medium-, and one low-severity defect.
+All were accepted. K2 now binds readiness to the digest of one fully validated
+artifact, activates only that artifact and a generation it contains, supports
+validated atomic rollback, rejects schema drift on every normal connection
+with bounded header/catalog checks, reserves full `quick_check` for lifecycle
+boundaries, repairs operational permissions on every access, defers two
+unproved lifecycle oracles to K3, and records every required churn metric. The
+review-metrics helper was called once but reported no pending K2 attribution,
+so token metrics remain pending without retry.
+
+### K2 deviations and decisions
+
+- The task design lists `refresh_runs` among cache tables while separately
+  requiring jobs, leases, source paths, and cutover metadata to remain outside
+  analytical facts. K2 resolves that tension by placing `refresh_runs` only in
+  the operational sidecar.
+- Serena activation remained unavailable after one guarded recovery because
+  the IDE broker still resolved a deleted Agent Maintainer helper root.
+  GitNexus and exact native searches were used without further broker retries.
+- The 62 corrected manifest assignments remain available through immutable
+  source refs. A later task may amend one explicitly only when its oracle
+  demonstrates a current kernel need; generic spike ownership is not carried
+  forward.
+
+### K2 residual risk and next task
+
+- K3 owns ingestion semantics, the two explicitly deferred cascade/deduplication
+  oracles, and the four quarantined runtime adapters before collecting their
+  implementation assertions.
+- K2 is complete after integration-targeting CI and merge. K3 is unblocked
+  from merge `a32fbab8306f827c5d7e7161e1d6913f73e67452`.
+
+## K3 — Incremental And Live Ingestion
+
+**State:** Complete
+
+**Branch:** `kernel/k3-ingest-tail`
+
+**Base:** `6145437bcc3c8943f5b8318bd5350617f111b441`
+
+**Implementation commit:** `6d804be` (`feat: add incremental kernel ingestion`)
+
+**Merged:** [PR #320](https://github.com/douglasmonsky/codex-usage-tracker/pull/320)
+as `f5d988621f0cf3e130cf02ddc3a3681f9822be3d`
+
+### Contract added first
+
+- Contract-red run failed on the six absent K3 owners before implementation.
+- Frozen source lifecycle, accounting, canonical-deduplication, parentage,
+  allowance, parser-diagnostic, and privacy oracles now execute through the
+  replacement kernel rather than quarantined runtime adapters.
+- Added explicit no-change, append, partial-tail, moving-tail, replacement,
+  truncation, archive move, process-crash, failed-promotion, stable-ID,
+  two-process ownership, heartbeat, concurrent-generation, and 100,000-call
+  writer-budget contracts.
+
+### Implementation
+
+- One discovery/parser/normalizer pipeline handles explicit hydration, refresh,
+  watcher catch-up, and complete-line moving tails. Initial hydration streams
+  at most 1,000 JSONL lines at a time into bounded writes and catches up new
+  complete lines before promotion; it never retains the whole history.
+- No-change performs no analytical write or generation bump. Ordinary appends
+  and unique new sources reuse the active database. Replacement, truncation, or
+  a proven active-versus-archive canonical conflict alone uses a validated
+  side artifact, so normal refreshes do not copy or rebuild total history.
+- Facts publish in 350-row bounded transactions behind a pending generation.
+  The operational active generation keeps readers on the prior complete view
+  until promotion. Partial-batch retries are idempotent.
+- A distinct lease owner joins compatible work, rejects foreign live work,
+  recovers stale ownership, renews long parsing from a host-side heartbeat,
+  and fences every writer transaction and promotion.
+- Source-local thread and allowance identities make replacement/truncation
+  cascades exact even when active and archived files share a logical session.
+  Pending generations never mutate already-visible thread or turn rows.
+- Append promotion uses one bounded generation digest and one atomic sidecar
+  cutover, avoiding repeated full-database hashing and integrity scans.
+- The parser stores structural accounting only: four token classes, model and
+  effort, thread/turn identity, tool/activity structure, and allowance
+  observations. It never stores prompt text, reasoning, raw arguments, raw
+  output, shell bodies, or full source paths.
+- K3 resolved all 48 assigned legacy paths: 33 verified behavioral transplants
+  and 15 verified retirements. Content-index refresh, worker-launch,
+  observability, callbacks, server routes, and raw-log inspection were retired.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | Reviewer-remediation lifecycle, concurrency, reconciliation, privacy, oracle, and pipeline suites pass; final focused slice 23/23 |
+| CI-equivalent | Pass | `just v`: 99 phase-owned tests in 20.08 s, Ruff, MyPy, Pyright 0 errors, complexity, manifests, scope, release safety, and diff checks pass |
+| Performance | Pass | Final local 100,000-call run: 10.853 s, 503 bounded writer transactions, p95 33.407 ms against 50 ms budget; CI 3.10 drove removal of per-fingerprint work for collision-free initial hydration |
+| Package | Pass | isolated 0.26.0.dev0 wheel and sdist pass exact release checks; isolated installed-wheel first-build plus no-change kernel smoke passed |
+| Privacy | Pass | synthetic fixtures only; raw private sentinels and full source paths absent from analytical facts and oracle output |
+| Integration CI | Pass | Python 3.10 in 51 s and Python 3.14 in 56 s on merge head `9fecb1e`; PR #320 squash-merged |
+
+Agent-perf run `20260726T225506Z-ec362ecb` was incomplete because pinned
+Scalene 2.3.0 on Python 3.14 exited without producing JSON. The identical
+unprofiled workload is therefore the performance authority; no additional
+profiler retries were started.
+
+### Development-efficiency and churn
+
+| Metric | K2 | K3 | Change |
+| --- | ---: | ---: | ---: |
+| Contract-red runs | 2 | 1 | 50.0% lower |
+| Focused runs | 18 | 64 | 255.6% higher |
+| Broad runs | 11 | 8 | 27.3% lower |
+| Duplicate broad runs | 0 | 0 | unchanged |
+| Blocking findings | 18 | 36 | 100.0% higher |
+| Non-behavioral findings | 10 | 17 | 70.0% higher |
+| Gate-remediation lines | 230 | 54 | 76.5% lower |
+| Verification wall time | 49.5 s | 180.4 s | 264.4% higher |
+| Style-only commits | 0 | 0 | unchanged |
+
+K3 achieved the targeted reduction in meaningless edit volume and broad-gate
+repetition, not a blanket reduction in every metric. Focused runs, findings,
+and wall time rose because the single final review found ten substantive
+correctness/performance issues and remediation added streaming, fencing,
+catch-up, and recovery coverage. Despite that expansion, gate-only remediation
+was 77.0% lower than K2, duplicate broad runs remained zero, and style-only
+commits remained zero.
+
+The closeout broad run initially found one further non-behavioral blocker:
+preserved JetBrains `.idea/` state was untracked but not ignored, so the scope
+gate treated it as product input. `.idea/` is now ignored without deleting or
+mutating the user files; the subsequent full gate passed.
+
+The Xenon absolute block ceiling remains C while module and average ceilings
+remain B. The arbitrary 600-line file bound was retired after it demanded a
+non-behavioral split of cohesive cutover and ingestion ownership. Repository
+guidance now requires boundaries based on responsibility, dependency direction,
+complexity, and testability instead of line count.
+
+The change-plan file estimate was amended from 32 to 37. The final scope adds
+the bounded digest owner and explicit repository guidance/policy coverage; the
+4,899 changed lines remain below the 6,000-line budget.
+
+### Review metrics
+
+- Total findings: 10
+- Accepted findings: 10
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Residual risk and next task
+
+- Replacement/truncation intentionally pays for a side-artifact copy; ordinary
+  no-change, append, and unique-source refreshes do not. K15 owns later
+  fault/scale expansion beyond this K3 contract.
+- The legacy installed-package smoke imports quarantined dashboard modules and
+  is not applicable on integration. K3 instead qualified the built wheel in an
+  isolated environment with synthetic first-build and no-change refreshes.
+- K4 must resolve the active generation from the operational sidecar and bind
+  every batch to that one generation; reads never infer readiness from
+  `MAX(generation)`.
+- K3 is merged into the non-publishable `kernel/0.26-integration` branch and
+  unblocks K4.
+
+## K4 — Bounded generation-consistent query engine
+
+**State:** Complete
+**Branch:** `kernel/k4-query-engine`
+**Base:** `f7948ee824480e720e27111d2a8cf68dd1351cef`
+**Commits:** `e4e0dba feat: add bounded kernel query engine`;
+`b4e73e5 docs: close K4 local verification ledger`;
+`ddfbd64 ci: isolate host-sensitive ingest benchmark`;
+merged through PR #322 as
+`a38bf4440ae04b34d9197628378f09c05fd2c060`
+
+### Contract added first
+
+- The first contract-red run failed collection because the kernel query package
+  did not exist. A second red expansion required real non-overlapping period
+  comparison, all seven datasets, exact scan counts, bounded phase scopes,
+  stable selectors, opaque generation-bound cursors, and deterministic
+  four-band phase token attribution.
+- Requests accept only named datasets, operations, dimensions, measures,
+  filters, ordering, limits, and comparison windows. Unsupported fields,
+  aggregate shapes, cross-products, timelines, and unscoped phase scans fail
+  before SQL execution.
+- Every batch resolves the operational control once, opens one read-only
+  analytical transaction, and binds every plan and cursor to that active
+  generation. Query execution never starts refresh work or writes either
+  database.
+
+### Implementation
+
+- `kernel.query.contracts` owns typed normalized requests, explicit half-open
+  comparison windows, bounded batches and pages, opaque cursors, and
+  adapter-independent results.
+- `kernel.query.catalog` and `kernel.query.plans` own static SQL expressions and
+  named version-1 plans for calls, turns, threads, tools, activities, phases,
+  and allowance across rows, aggregate, share, comparison, distribution,
+  time-series, and timeline operations. Filter values remain parameters.
+- `kernel.query.service` returns normalized scope, generation, plan identity,
+  exact matched/scanned/returned counts, truncation, cursor, elapsed time,
+  grade/coverage metadata, and stable evidence selectors.
+- The pure version-1 phase segmenter uses only privacy-safe turn, activity, and
+  tool facts. It emits the approved phase vocabulary, basis, confidence,
+  unknown fallback, and four token classes with explicitly deterministic
+  attribution.
+- K4 resolved all 18 frozen K4 disposition entries: 13 bounded behaviors were
+  transplanted into the query owners and five legacy export/cache/derived
+  summary paths were retired. No query cache was added because the measured
+  plans meet budget.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | `pytest -q -s tests/kernel/query`: 25 passed; focused Ruff, Mypy, and maintainability checks clean |
+| Broader | Pass | final `just v`: 126 passed; Ruff, Mypy, Pyright, Xenon, scope, manifests, and release checks clean in 26.29 s |
+| Performance | Pass | final 100,000 synthetic calls: common p95 110.724 ms, comparison p95 135.543 ms, concentration p95 66.826 ms |
+| Profiling | Pass | `agent-perf` run `20260727T005737Z-871485fd`, Scalene 2.3.0; `_execute_one` was the only ranked owned hotspot at 16.54 percent; attribution only |
+| Package | Pass | exact wheel/sdist membership check and isolated no-dependency wheel import smoke |
+| Privacy | Pass | synthetic fixtures only; query and phase facts contain no prompt, reasoning text, tool arguments/output, shell body, secret, or full source path |
+| Integration CI | Pass | PR #322: Python 3.10 in 63 s; Python 3.14 with synthetic ingest performance and package isolation in 86 s |
+
+The query timing assertion uses the identical unprofiled workload before the
+profile capture. The contract budgets are 500 ms for common bounded queries
+and 1 second for comparison/concentration.
+
+### Review metrics
+
+- Total findings: 6
+- Accepted findings: 6 (`R1`–`R6`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+| Metric | K3 | K4 local | Change |
+| --- | ---: | ---: | ---: |
+| Contract-red runs | 1 | 2 | 100.0% higher |
+| Focused runs | 64 | 25 | 60.9% lower |
+| Broad runs | 8 | 8 | unchanged |
+| Duplicate broad runs | 0 | 0 | unchanged |
+| Blocking findings | 36 | 21 | 41.7% lower |
+| Non-behavioral findings | 17 | 11 | 35.3% lower |
+| Gate-remediation lines | 54 | 264 | 388.9% higher |
+| Verification wall time | 180.4 s | 386.2 s | 114.1% higher |
+| Style-only commits | 0 | 0 | unchanged |
+
+K4 materially reduced focused-loop and finding counts while preserving all
+maintained correctness gates; broad runs were unchanged. Total measured
+verification wall time increased because final performance, package,
+post-review, failed-CI, and corrected-CI qualification were all recorded.
+Gate-remediation lines also increased because the new planner and validator
+initially exceeded the Xenon complexity budget and were split into
+responsibility-owned helpers; no arbitrary file-length or generic style gate
+was restored.
+
+Initial CI found one further non-behavioral blocker: the inherited K3 ingest
+benchmark exceeded its 50 ms writer p95 threshold only on a shared Python 3.10
+runner. The threshold remains unchanged and runs once in the Python 3.14
+performance job; both interpreters still run all functional, typing, privacy,
+scope, release, and K4 query contracts. Corrected CI passed in 63 and 86
+seconds.
+
+The one final reviewer found six substantive defects: truth grading for partial
+measures, ambiguous shell phase classification, phase projection/order,
+timezone-offset comparison, cursor/pagination determinism, and missing
+oracle/plan/snapshot qualification. All six were accepted. The bounded fixes
+also removed two redundant full scans from every non-empty SQL result.
+
+### Deviations and decisions
+
+- Estimated cost, credits, allowance burn rate, and observed usage per
+  percentage point remain owned by K8 because schema-v1 does not yet contain
+  the qualified inputs. K4 rejects those measures instead of inventing values.
+- The warm status budget remains an adapter/status qualification owned by K6.
+  K4 qualifies only the common, comparison, and concentration read plans.
+- The repository has no profiling dependency. The exact pinned Scalene 2.3.0
+  profiler ran from an isolated temporary environment, which was then moved to
+  Trash; no project dependency or private data was added.
+
+### Residual risk and next task
+
+- K4 is merged into the non-publishable integration branch. K5 builds evidence
+  timelines and the live event stream on its stable logical selectors and
+  generation-consistent query service.
+
+## K5 — Exact evidence timeline and live generation stream
+
+**State:** Integration CI fix pending
+**Branch:** `kernel/k5-evidence-live`
+**Base:** `a38bf4440ae04b34d9197628378f09c05fd2c060`
+**Commits:** `c45fa2c feat: add live kernel evidence timelines`; closeout
+metadata in this changeset
+
+### Contract added first
+
+- The contract-red run failed collection because the kernel evidence and live
+  packages did not exist. The completed contract covers thread, turn, call,
+  tool, and allowance selectors; all six bounded evidence views; cursor and
+  rebuild stability; read-only behavior; privacy; journal replay, retention,
+  restart, concurrency, burst, disconnect, generation-gap, rollback, and
+  snapshot fallback.
+- Every evidence read resolves one active generation and opens one read
+  snapshot. Logical IDs, rather than SQLite row IDs, drive selectors and stable
+  relative destinations.
+- The live contract publishes a fixed `generation_committed` event only after
+  analytical promotion. Event IDs and publication identities are persistent;
+  journal failure never invalidates a promoted analytical generation.
+
+### Implementation
+
+- `kernel.evidence` owns typed selectors, normalized bounded requests, opaque
+  request- and generation-bound cursors, deterministic ordering, exact
+  matched/scanned/returned counts, and privacy-safe summary, timeline, calls,
+  tools, activities, and allowance pages.
+- `kernel.live` owns the operational `live_events` journal, monotonic event
+  allocation, bounded retention and replay, strict loopback-origin and
+  `Last-Event-ID` validation, heartbeat and snapshot-required decisions, and
+  deterministic server-sent-event frames.
+- Ingestion accepts an optional journal seam and publishes numeric-only
+  changed-source, inserted-call, inserted-tool, and deleted-row counters after
+  promotion. Publication identity, not generation number alone, detects
+  rollback or reused-generation divergence.
+- K5 resolved its one frozen legacy disposition entry by transplanting the
+  stable evidence responsibility into `kernel.evidence.service`; no legacy
+  narrative analysis or content indexing returned.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | final evidence/live contracts: 42 tests; focused Ruff, Mypy, and maintainability checks clean |
+| Broader | Pass | final pre-ledger `just v`: 141 passed; Ruff, Mypy, Pyright, Xenon, scope, manifests, and release checks clean in 37.63 s |
+| Performance | Pass | 100,000 synthetic calls: 67.032 ms median and 68.387 ms p95 first-page latency, below the 500 ms budget |
+| Profiling | Incomplete | `agent-perf` run `20260727T015044Z-fc265f11`, Scalene 2.3.0, exited zero but emitted no JSON profile; no hotspot claim |
+| Package | Pass | wheel and sdist built; release-safety distribution check passed; isolated no-dependency wheel imports for `EvidenceService`, `GenerationJournal`, and `LiveStream` passed |
+| Privacy | Pass | synthetic fixtures only; no live database, Codex log, prompt, reasoning, raw tool argument/output, shell body, secret, or full source path inspected or stored |
+| Integration CI | Pass | PR #323 final corrected CI passed on Python 3.10 in 56 s and Python 3.14 in 79 s; squash merge `7d51a17acbd4a7648674ffa56c242a8a9b32eec3` |
+
+The performance assertion uses the identical unprofiled synthetic workload.
+Profiling is attribution-only and cannot replace that timing evidence.
+
+### Review metrics
+
+- Total findings: 5
+- Accepted findings: 5 (`R1`–`R5`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+| Metric | K4 | K5 local | Change |
+| --- | ---: | ---: | ---: |
+| Contract-red runs | 2 | 2 | unchanged |
+| Focused runs | 25 | 19 | 24.0% lower |
+| Broad runs | 8 | 14 | 75.0% higher |
+| Duplicate broad runs | 0 | 0 | unchanged |
+| Blocking findings | 21 | 13 | 38.1% lower |
+| Non-behavioral findings | 11 | 5 | 54.5% lower |
+| Gate-remediation lines | 264 | 58 | 78.0% lower |
+| Verification wall time | 386.2 s | 712.0 s | 84.4% higher |
+| Style-only commits | 0 | 0 | unchanged |
+
+K5 reduced focused runs, findings, and remediation lines against K4 while
+preserving all behavioral, typing, privacy, scope, complexity, package,
+release, and performance gates. Broad runs and total verification time
+increased because initial CI, compatibility qualification, and corrected CI
+are recorded separately. No duplicate broad run or style-only commit occurred.
+The five non-behavioral findings were one future-schema test constant, two
+focused Ruff forms, the Python 3.10 fixture selection, and inherited CI
+performance-step wiring.
+
+### Deviations and decisions
+
+- Evidence destinations are stable relative `/evidence/...` paths. K6 owns the
+  final adapter and HTTP prefix; K5 does not invent an integration surface.
+- Call and tool selectors omit turn-wide activity unions because schema-v1
+  cannot attribute every activity exactly to a call or tool. Broader
+  attribution would be false precision.
+- The journal deliberately exposes only `generation_committed` with
+  numeric-only counters. Content events, prompts, reasoning, raw arguments,
+  outputs, full paths, and server-authored narrative are outside K5.
+- The change-plan file cap increased from 25 to 28 for the mandatory
+  development-efficiency ledger and its policy test plus one CI regression
+  test. The implementation inventory itself remained at 25 files and below the
+  line budget.
+
+### Residual risk and next task
+
+- The Scalene capture did not emit a usable profile. The repeatable unprofiled
+  100,000-call benchmark remains authoritative and passes with substantial
+  headroom.
+- K5 is complete. K6 may bind K4 queries and K5 evidence/live behavior to
+  exactly the six approved integration interfaces without reintroducing
+  narrative analysis.
+
+## K6 — Six-tool kernel interface cutover
+
+**State:** Complete
+**Branch:** `kernel/k6-interface-cutover`
+**Base:** `7d51a17acbd4a7648674ffa56c242a8a9b32eec3`
+**Commits:** `1ee81ec feat: add kernel interface cutover`; squash merge
+`0fd6dc875480bc9e6ab0cacffa9d23fc053af74f`
+**Merged:** [PR #324](https://github.com/douglasmonsky/codex-usage-tracker/pull/324)
+
+### Contract added first
+
+- Exact six-tool MCP catalog, `/api/kernel/v1` route set, retained CLI command
+  set, deterministic schemas/plugin bundle, and forbidden-name absence.
+- Read paths stay generation-consistent and write-free. Refresh starts or
+  joins one durable job, serializes the launch gap, and supports bounded
+  host-side waiting.
+
+### Implementation
+
+- `kernel.application` composes status, refresh, batched query, evidence,
+  allowance, live stream, and internally consistent job snapshots once for
+  every adapter.
+- `kernel.interfaces` provides direct stdio JSON-RPC, guarded loopback HTTP,
+  and the operational CLI without compatibility profiles or narrative
+  analysis.
+- Generated schemas and plugin identity share one source of truth. K6 resolves
+  all 40 frozen interface transplants and preserves every retired source path.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | interface/query/evidence/live contracts; Ruff, Mypy, and Pyright clean |
+| Broader | Pass | final post-review `just v`: 172 passed in 35.31 s; scope, manifests, maintainability, privacy, and release checks clean |
+| Performance | Pass | identical unprofiled synthetic adapter workload: status 0.514 ms p95, batched query 0.912 ms p95 |
+| Profiling | Incomplete | `agent-perf` run `20260727T023958Z-652240e6` could not start because pinned Scalene 2.3.0 is absent; no hotspot claim |
+| Package | Pass | exact wheel/sdist check; isolated no-dependency CLI and six-tool MCP handshake |
+| Reference | Pass | public PyPI 0.25.1 retained installed-package smoke passed from the detached reference worktree |
+| CI | Pass | Python 3.10 passed in 58 s; Python 3.14 passed in 82 s |
+| Privacy | Pass | synthetic fixtures only; no live database or local usage content inspected |
+
+### Review metrics
+
+- Total findings: 5
+- Accepted findings: 5 (`R1`–`R5`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+K6 recorded one duplicate broad verifier because `just v` immediately reran an
+already-green `just vp`. Four non-behavioral findings were limited to Ruff
+import forms and namespace-package Mypy configuration; style-only commits
+remain zero. The exact final counts live in
+`config/kernel-development-efficiency-v1.json`.
+
+### Deviations and decisions
+
+- The HTTP prefix is frozen as `/api/kernel/v1`.
+- The new skill is `skills/usage-kernel/SKILL.md`; the historical 0.25 skill
+  paths remain absent under the K1 quarantine contract.
+- The change-plan file budget increased from 38 to 55 after enumerating the
+  complete generated schema, adapter, smoke, scope, and release inventory. K7
+  console work is not included.
+
+### Residual risk and next task
+
+- Final read-only review and integration CI are complete.
+- K7 may consume only these frozen adapters and may not restore compatibility
+  profiles, narrative analysis, or retired routes.
+
+## K7 — Focused Evidence Console
+
+**State:** Complete
+**Branch:** `kernel/k7-evidence-console`
+**Base:** `0fd6dc875480bc9e6ab0cacffa9d23fc053af74f`
+**Commits:** `611cca8` implementation; `3b31f98` CI pin correction;
+`7a174cffe15186bebfcd51b511ec44c883ddcd13` integration squash merge
+
+### Contract added first
+
+- Contract-red collection proved the Console owner was absent, then froze
+  exactly five areas: Live, Explore, Evidence, Limits, and Settings.
+- Console navigation and asset GETs are read-only, `/` redirects to `/live`,
+  retired routes stay absent, and K5/K6 `/evidence/<selector>` links round-trip.
+- Generated asset hashes, browser reopen behavior, explicit refresh ownership,
+  and installed-package serving are deterministic contracts.
+
+### Implementation
+
+- A dependency-light browser client reads only `/api/kernel/v1`, renders the
+  committed generation before freshness work, and never starts refresh on
+  mount or reopen.
+- Live shows the four exact token classes and bounded thread leaders. Explore
+  submits explicit query specs and stores an optional local query. Evidence
+  resolves stable selectors. Limits preserves fact grades and caveats.
+  Settings exposes runtime, stream, cache, freshness, and privacy state.
+- The same deterministic HTML, JavaScript, and CSS assets are package data in
+  wheel and sdist. The server uses an allowlisted route resolver and strict
+  loopback/security headers.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | 21 initial route/interface/scope contracts; Node lint, TypeScript, localization/governance, deterministic-asset, and unit gates |
+| Broader | Pass | post-review `just v`: 178 Python tests in 36.21 s; Ruff, Mypy, Pyright, maintainability, scope, release, and frontend gates clean |
+| Browser | Pass | 20 desktop/mobile flows passed with 2 intentional cross-project skips; warm reopen, all presets, exact row evidence, one refresh/job wait, stale/live/retry states, and Limits |
+| Performance | Pass | identical unprofiled synthetic warm reopen 0.562 s in both projects, under the 1 s K7 budget |
+| Profiling | Incomplete | agent-perf run `20260727T032753Z-771bda4e` emitted no Node CPU profile; no hotspot or speedup claim |
+| Package | Pass | exact wheel/sdist membership and isolated installed-wheel Console/asset smoke |
+| Integration CI | Pass | PR #325; Python 3.10 in 64 s, Python 3.14 in 78 s, focused Console in 81 s |
+| Privacy | Pass | synthetic accounting oracle only; no live database, prompt, reasoning, raw tool argument/output, shell body, secret, or full source path inspected or stored |
+
+### Review metrics
+
+- Total findings: 9
+- Accepted findings: 9 (`R1`–`R9`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+The current K7 counts are recorded in
+`config/kernel-development-efficiency-v1.json`. No duplicate broad verifier or
+style-only commit has occurred. Two Playwright locator assumptions required
+test-only fixes; manual visual inspection found two user-visible defects before
+final review.
+
+### Deviations and decisions
+
+- The K5/K6 relative `/evidence/<selector>` destination remains authoritative.
+  K7 reuses that logical route as a new kernel-owned implementation while all
+  other retired console routes stay absent.
+- The Console uses browser-native modules instead of restoring the retired
+  React dashboard or adding a runtime framework. The shipped source asset set
+  is 38.5 KB and has no runtime dependency.
+- Freshness is explicit or watcher-driven. Browser reopen performs status and
+  query reads only; it never leases the writer or rebuilds the cache.
+
+### Residual risk and next task
+
+- PR #325 merged to integration as
+  `7a174cffe15186bebfcd51b511ec44c883ddcd13`.
+- K8 may add allowance efficiency facts without expanding Console navigation or
+  adding server-authored recommendations.
+
+## K8 — Allowance Efficiency
+
+**State:** Complete
+**Branch:** `kernel/k8-allowance-efficiency`
+**Base:** `7a174cffe15186bebfcd51b511ec44c883ddcd13`
+**Commits:** `beb373f` (`feat: add graded allowance efficiency measures`);
+merged through PR #326 as `e6fa2f1701111a4b98fcabce606bab9046e1c680`
+
+### Contract added first
+
+- Contract-red collection froze exact observation values, adjacent compatible
+  reset windows, positive percentage-point deltas, local token/call/turn
+  ratios, outside-usage caveats, and strict source-stamped rate cards.
+- Reset, missing previous observation or interval, changed window duration,
+  unchanged percentage, non-monotonic percentage, and mixed-window cases must
+  never interpolate. A missing reset timestamp remains an explicit limitation.
+
+### Implementation
+
+- One allowance service reads a committed generation without writes, exposes
+  exact observations, deterministic ratios, exact evidence selectors, and
+  partial pricing coverage.
+- Schema-v1 owns a deterministic `allowance_intervals` view and bounded time
+  indexes. `usage_query` exposes the approved allowance measures without a
+  narrative analysis system.
+- Analytical schema capability revision 2 validates the required allowance
+  view and indexes. Reads fail closed on a pre-K8 cache; one explicit refresh
+  rebuilds into a separate current-schema artifact and preserves the old cache.
+- Public allowance reads fence observations, calls, and turn starts to one
+  active generation before interval derivation. One chronological prefix scan
+  replaces repeated per-row history scans.
+- Allowance canonical/copy state now follows its owning model call, repairing a
+  pre-K8 path where normalized observations remained `unknown` and disappeared
+  from canonical queries.
+- The Limits Console separates exact observations, deterministic local ratios,
+  source-stamped estimates, and caveats. Opening it never refreshes.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Contract red | Pass | missing kernel allowance package and missing interval response both failed before implementation |
+| Focused | Pass | final 39-test allowance/schema/query/interface slice; frontend build/lint/typecheck plus 6 unit tests |
+| Incremental | Pass | appended allowance observation advanced by `append_safe`, not a rebuild |
+| Privacy | Pass | synthetic fixtures and aggregate structural facts only |
+| Broad | Pass | `just v`: 196 Python tests, Ruff, MyPy, Pyright, maintainability, scope, manifests, Console gates, and release safety |
+| Browser | Pass | 20 desktop/mobile Chromium flows passed with 2 intentional cross-project skips; warm reopen rendered in 496–498 ms without refresh |
+| Performance | Pass | 100,000 canonical calls and the maximum 500-observation page measured 397.679 ms p95; an initial range join was stopped at 52.28 s and replaced by one chronological prefix scan; Scalene attribution remains unavailable, so no hotspot claim |
+| Distribution | Pass | exact wheel/sdist checks and isolated installed-wheel Console plus allowance smoke |
+
+### Review metrics
+
+- Total findings: 6
+- Accepted findings: 6 (`R1`–`R6`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+K8 has two intentional contract-red collections, two duplicate broad profiles
+when `just v` repeated an already-green `just vp`, and no style-only commit.
+The metrics helper was run once, then stopped after 30 seconds when its legacy
+tracker refresh did not return; token attribution remains pending without a
+retry. Final CI times will be added after merge.
+
+### Deviations and decisions
+
+- K8 transplants only observation selection, reset-aware ratios, and strict
+  provenance behavior. Legacy forecasting, narrative allowance intelligence,
+  updater/network parsing, and usage-drain models remain retired.
+- The local rate card is optional and owner-controlled. Missing or incomplete
+  rates produce explicit partial coverage rather than a bundled current-price
+  claim.
+
+### Residual risk and next task
+
+- Integration CI passed on Python 3.10 in 79 seconds, Python 3.14 in 82
+  seconds, and the focused Evidence Console job in 77 seconds.
+- K9 may consume only this fact contract and must not restore legacy allowance
+  analysis or compatibility routes.
+
+## K9 — Kernel Release Candidate And Final Absence
+
+**State:** Complete
+**Branch:** `kernel/k9-release-candidate`
+**Base:** `e6fa2f1701111a4b98fcabce606bab9046e1c680`
+**Commits:** `94240f7` (`refactor: finalize lean kernel release candidate`);
+`f7bf862` (`docs: record K9 qualification evidence`); PR #327
+
+### Contract added first
+
+- One release-candidate contract failed on unresolved disposition states,
+  integration-skeleton metadata, the absent measured budget, and the absent
+  complete upgrade map.
+- The contract fixes the exact six-tool MCP catalog, ten-command operational
+  CLI, seven-route `/api/kernel/v1` surface, non-publishable development
+  identity, retired import owners, distribution budgets, and all 1,194
+  retired-surface migration categories.
+
+### Implementation
+
+- All 1,578 frozen code-disposition entries now have terminal `verified`
+  status through the deterministic manifest generator.
+- The candidate identifies itself consistently as non-publishable 0.26
+  release-candidate metadata in Python, npm, and plugin manifests.
+- One release-candidate checker owns final runtime-import, catalog, schema,
+  route, package, Console, plugin-bundle, wheel, and sdist budgets and is
+  composed into the release verifier.
+- Every frozen disposition now resolves its physical source state, target, and
+  named proof paths. Every retired surface is reconciled against its live MCP,
+  HTTP, CLI, schema, table, Console, package-rule, or filesystem inventory.
+- Completed K1A–K8 phase change-plan files and their scope allowances are
+  removed. The frozen K1 manifests and the durable execution roadmap remain
+  the audit record.
+- The 0.26 upgrade guide maps every manifest replacement and surface type.
+  The installed-wheel smoke now verifies the retained CLI, exact six-tool MCP
+  catalog, explicit refresh, Console, and allowance contract.
+- Explicit schema upgrade records the preserved old cache in operational
+  metadata before resetting reconstructible publication pointers.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused absence | Pass | 49 release-candidate, scope, disposition, retired-surface, and rollback/cache tests |
+| Broad local profile | Pass | post-review 209 Python tests plus Ruff, MyPy, Pyright, maintainability, frontend, scope, manifest, privacy, and release checks in 49.13 seconds |
+| Browser | Pass | 20 Chromium desktop/mobile flows passed with 2 intentional cross-project skips in 8.79 seconds |
+| Distribution | Pass | exact wheel/sdist member checks under 121,775-byte wheel and 326,054-byte sdist ceilings |
+| Installed candidate | Pass | isolated wheel CLI, six-tool MCP, refresh, Console, and allowance smoke |
+| Public reference | Pass | full public-PyPI 0.25.1 installed-package smoke from the detached reference worktree; 40-call two-task MCP probe included |
+| Publication guard | Pass | `refs/heads/kernel/k9-release-candidate` rejected with development version |
+
+### Review metrics
+
+- Total findings: 3
+- Accepted findings: 3 (`R1`–`R3`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+- One non-behavioral scope-check defect counted indexed files already deleted
+  from the worktree as active; its implementation now matches the documented
+  active-path contract and has a focused regression test.
+- Ruff `SIM300` was retired after it blocked the natural
+  `measured <= ceiling` budget assertion. Behavioral lint, typing,
+  maintainability, architecture, privacy, test, and release gates remain.
+- Six non-behavioral gate findings required 30 remediation lines. CI passed on
+  Python 3.10 in 70 seconds, Python 3.14 in 92 seconds, and the focused
+  Evidence Console job in 74 seconds. No broad
+  profile repeated an unchanged source/configuration state, and no style-only
+  commit occurred.
+
+### Residual risk and next task
+
+- PR #327 passed every required check; its squash merge to integration is the
+  remaining administrative action.
+- K10 must begin from an audited current `main` SHA and may incorporate the
+  qualified integration head only once.
+
+## K10 — Qualify And Publish 0.26.0
+
+**State:** In progress — local qualification complete; review, CI, merge, and
+protected publication pending
+**Branch:** `release/0.26.0`
+**Base:** audited `origin/main` at
+`d8da9bccdb6674e7dca4c0872c36a1346949dc13`
+**Cutover commit:** `fb948d486b2c4c1205325f6a72789bdc0458d275`
+with first parent equal to the audited main SHA and second parent equal to the
+qualified integration SHA
+`e5651313f3368836797279f40be8331103723995`
+
+### Contract added first
+
+- Six release-cutover assertions failed before implementation on final Python,
+  npm, and plugin identity, publishability, and the absent immutable cutover
+  record.
+- The release contract now records both cutover parents, the classified
+  current-main delta, and the absence of a required mainline-port PR.
+- The retained synthetic benchmark was ported to the final kernel and now
+  exercises initial build, byte-preserving no-change, append, and truncating
+  replacement behavior rather than importing retired runtime.
+
+### Implementation
+
+- Final package, npm, plugin, workflow, README, changelog, package-data, and
+  release-manifest identity is `0.26.0`; only merged `main` may pass the
+  publication ref guard.
+- The protected workflow still builds once and promotes byte-identical
+  TestPyPI artifacts to PyPI and GitHub. Its validation, contract inventory,
+  and Console checks now address only the lean kernel.
+- Installed-package qualification starts with an absent read-only status,
+  performs exactly one explicit refresh, opens two independent MCP processes,
+  runs the six required analytical requests, resolves exact evidence, checks
+  allowance caveats, and measures a warm Console reopen.
+- The installed CLI, six MCP tools, and eleven packaged Console/schema assets
+  come from one lean catalog. Historical dashboard, analysis, doctor, support
+  bundle, screenshot, locale, and rate-card resource expectations are absent.
+- The repository is a supported Codex plugin marketplace. Its installed MCP
+  entry launches the pipx-owned `codex-usage-tracker _mcp` command, never an
+  ambient `python3`, and the installed smoke launches that exact configuration
+  with a host-side response deadline.
+- Package and plugin ceilings were remeasured with at most three percent
+  headroom. The final distribution hashes, sizes, manifest, and promotion
+  evidence will be recorded after the reviewed source commit is immutable.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Cutover topology | Pass | `origin/main` and release first parent remain `d8da9bcc`; release second parent and fetched integration remain `e5651313` |
+| Focused release | Pass | 92 scope, candidate, cutover, artifact, promotion, and workflow tests |
+| Broad local profile | Pass | 286 tests passed after the accepted review fixes; full-tree Ruff, MyPy across 57 files, Pyright, maintainability, frontend, scope, manifest, privacy, and release checks passed |
+| Browser | Pass | 20 desktop/mobile Chromium flows passed with two intentional mobile cross-project skips; live reconnect and no-implicit-refresh flows passed |
+| Lifecycle performance | Pass | 10,000 synthetic calls: initial 743.373 ms, byte-preserving no-change 4.403 ms, one-row append 19.074 ms, truncating replacement 162.662 ms |
+| Scale performance | Pass | 100,000-call ingest 12.531 s with 37.189 ms writer p95; common query 98.684 ms p95, comparison 177.627 ms, concentration 103.879 ms, evidence 88.164 ms, allowance 371.188 ms |
+| Installed package | Pass | two fresh MCP tasks share generation 1, call all six tools, prove exact oracle totals and terminal no-change refresh, and use the installed plugin command; warm Console p95 0.713 ms |
+| Recovery and downgrade | Pass | 36 lifecycle, reconciliation, concurrency, live, cutover, and database tests; isolated installed `0.26.0` downgrade to public `0.25.1` passed |
+| Privacy | Pass | synthetic fixtures only; no local Usage Tracker database or raw usage content inspected |
+
+### Review metrics
+
+- Total findings: 4
+- Accepted findings: 4 (`R1`–`R4`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+- One non-behavioral release-freeze finding required deleting one obsolete
+  frozen-path entry after the catalog was intentionally ported to the lean
+  product.
+- One benchmark assertion defect queried the K1 base database rather than the
+  operationally published generation; the benchmark now resolves the same
+  active-generation pointer as product reads.
+- The single final reviewer found four release blockers and all four were
+  accepted: release-PR CI coverage and audited-base fencing, exact installed
+  plugin interpreter resolution, all-six-tool oracle dogfood, and bounded MCP
+  response deadlines.
+- No style-only commit or unchanged-state duplicate broad run occurred.
+  Final K10 counts and CI times will be synchronized into
+  `config/kernel-development-efficiency-v1.json` after the protected checks.
+
+### Deviations and decisions
+
+- Desktop Serena activation is misrouted by its host to the unrelated stale
+  `/Users/Monsky/Documents/Agent Maintainer` project and fails before
+  activation. No file there was read or changed. The exact Usage Tracker
+  worktree passed Serena's project-local Python and TypeScript LSP health
+  check.
+- Agent-perf runs `20260727T055604Z-6750a8e2` on Python 3.14 and
+  `20260727T055654Z-f220293c` on isolated Python 3.13 both exited without a
+  Scalene JSON profile. The unprofiled acceptance timings are retained, and no
+  hotspot claim is made.
+
+### Residual risk and next task
+
+- The exact final build, artifact hashes, manifest, and promotion evidence
+  depend on the reviewed source commit and remain pending.
+- K11 remains blocked until K10 is merged and 0.26.0 is published through the
+  protected workflow.
 
 ## Task Entry Template
 

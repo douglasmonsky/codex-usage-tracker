@@ -24,10 +24,13 @@ dist/
 *.csv
 *.html
 !frontend/dashboard/index.html
+!frontend/kernel-console/index.html
+!src/codex_usage_tracker/kernel/interfaces/http/console_assets/index.html
 !src/codex_usage_tracker/plugin_data/docs/dashboard-guide.html
 !src/codex_usage_tracker/plugin_data/dashboard/dashboard_template.html
 
 .DS_Store
+.idea/
 tmp/
 .cache/
 /.gitnexus/

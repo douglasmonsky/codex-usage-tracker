@@ -1,0 +1,15 @@
+{
+  "schema": "codex-usage-tracker.kernel-rc-budget.v1",
+  "headroom_percent": 3,
+  "kernel_source_bytes": 380579,
+  "console_asset_bytes": 43135,
+  "analytical_tables": 8,
+  "analytical_indexes": 18,
+  "required_schema_objects": 5,
+  "mcp_tools": 6,
+  "http_routes": 7,
+  "cli_commands": 10,
+  "wheel_bytes": 121775,
+  "sdist_bytes": 326054,
+  "plugin_bundle_bytes": 2323
+}

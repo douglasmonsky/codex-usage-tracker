@@ -1,49 +1,39 @@
-"""Static command and package-resource catalogs for installed-package smoke tests."""
+"""Lean public catalogs used by installed-package smoke tests."""
 
 from __future__ import annotations
 
-CLI_HELP_SUBCOMMANDS = [
+CLI_HELP_SUBCOMMANDS = (
     "setup",
     "status",
-    "doctor",
     "refresh",
-    "analyze",
     "query",
-    "open",
     "export",
-    "config",
+    "open",
     "service",
-    "admin",
-]
+    "config",
+    "repair",
+    "package",
+)
 
-RESOURCE_PATHS = [
-    "assets/icon.svg",
-    "dashboard/react/index.html",
-    "dashboard/react/assets/dashboard-react.js",
-    "dashboard/react/assets/index.css",
-    "dashboard/react/assets/HomePage.js",
-    "dashboard/react/assets/ExplorePage.js",
-    "dashboard/react/assets/EvidencePage.js",
-    "dashboard/react/assets/UsageDrainPage.js",
-    "dashboard/locales/en.json",
-    "dashboard/locales/vi.json",
-    "dashboard/locales/es.json",
-    "dashboard/locales/fr.json",
-    "dashboard/locales/de.json",
-    "dashboard/locales/pt.json",
-    "dashboard/locales/ja.json",
-    "dashboard/locales/zh-Hans.json",
-    "dashboard/locales/ko.json",
-    "dashboard/locales/ru.json",
-    "dashboard/locales/it.json",
-    "dashboard/locales/ar.json",
-    "docs/dashboard-guide.html",
-    "docs/examples/token-waste-conversation.md",
-    "docs/examples/remediation-conversation.md",
-    "docs/assets/plugin-prompts.png",
-    "docs/assets/plugin-thread-leaderboard.png",
-    "rate_cards/codex-credit-rates.json",
-    "skills/codex-usage-api/SKILL.md",
-    "skills/codex-usage-tracker/SKILL.md",
-    "skills/codex-usage-tracker/scripts/run_mcp.py",
-]
+MCP_TOOLS = (
+    "usage_status",
+    "usage_refresh",
+    "usage_query",
+    "usage_evidence",
+    "usage_allowance",
+    "usage_job_status",
+)
+
+RESOURCE_PATHS = (
+    "codex_usage_tracker/kernel/interfaces/schemas/usage_allowance.json",
+    "codex_usage_tracker/kernel/interfaces/schemas/usage_evidence.json",
+    "codex_usage_tracker/kernel/interfaces/schemas/usage_job_status.json",
+    "codex_usage_tracker/kernel/interfaces/schemas/usage_query.json",
+    "codex_usage_tracker/kernel/interfaces/schemas/usage_refresh.json",
+    "codex_usage_tracker/kernel/interfaces/schemas/usage_status.json",
+    "codex_usage_tracker/kernel/interfaces/http/console_assets/app.js",
+    "codex_usage_tracker/kernel/interfaces/http/console_assets/asset-manifest.json",
+    "codex_usage_tracker/kernel/interfaces/http/console_assets/index.html",
+    "codex_usage_tracker/kernel/interfaces/http/console_assets/model.js",
+    "codex_usage_tracker/kernel/interfaces/http/console_assets/styles.css",
+)

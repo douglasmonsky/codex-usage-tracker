@@ -24,8 +24,20 @@ def test_development_efficiency_policy_is_decision_complete() -> None:
     assert payload["schema"] == "codex-usage-tracker.kernel-development-efficiency.v1"
     assert payload["baseline_task"] == "K1"
     assert set(payload["metric_definitions"]) == _METRICS
-    assert payload["tasks"][0]["task_id"] == "K1"
-    assert payload["tasks"][0].keys() >= _METRICS
+    assert [task["task_id"] for task in payload["tasks"]] == [
+        "K1",
+        "K1A",
+        "K2",
+        "K3",
+        "K4",
+        "K5",
+        "K6",
+        "K7",
+        "K8",
+        "K9",
+        "K10",
+    ]
+    assert all(task.keys() >= _METRICS for task in payload["tasks"])
 
 
 def test_retired_churn_gates_have_named_replacements() -> None:

@@ -123,10 +123,17 @@ def _event_policy_failures(workflow: str) -> list[str]:
 def _dashboard_syntax_failures(workflow: str) -> list[str]:
     packaged_javascript_check = "-type f -name '*.js' -exec node --check '{}' ';'"
     static_dashboard_glob = "plugin_data/dashboard/dashboard*.js"
-    if packaged_javascript_check not in workflow or static_dashboard_glob in workflow:
+    console_root = (
+        "src/codex_usage_tracker/kernel/interfaces/http/console_assets"
+    )
+    if (
+        packaged_javascript_check not in workflow
+        or console_root not in workflow
+        or static_dashboard_glob in workflow
+    ):
         return [
-            "publish workflow must syntax-check all packaged JavaScript "
-            "without relying on removed static-dashboard filenames"
+            "publish workflow must syntax-check all packaged kernel Console "
+            "JavaScript without relying on removed dashboard paths"
         ]
     return []
 

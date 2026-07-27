@@ -1,63 +1,14 @@
-name: Pricing Source Compatibility
+name: Pricing compatibility paused for kernel reset
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 13 * * 1"
 
 permissions:
   contents: read
 
-concurrency:
-  group: pricing-source-compatibility
-  cancel-in-progress: false
-
 jobs:
-  parse-live-pricing:
-    name: Parse live OpenAI pricing source
+  paused:
+    name: Paused until K8
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.13"
-      - name: Install
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[dev]"
-      - name: Parse live pricing Markdown
-        run: |
-          python - <<'PY'
-          from urllib.request import Request, urlopen
-
-          from codex_usage_tracker.pricing import (
-              OPENAI_LATEST_MODEL_MD_URL,
-              OPENAI_PRICING_MD_URL,
-              VALID_PRICING_TIERS,
-              parse_openai_latest_model_id,
-              parse_openai_pricing_markdown,
-          )
-
-          def fetch(url: str) -> str:
-              request = Request(
-                  url,
-                  headers={"User-Agent": "codex-usage-tracker-pricing-compat"},
-              )
-              with urlopen(request, timeout=20) as response:
-                  return response.read().decode("utf-8")
-
-          markdown = fetch(OPENAI_PRICING_MD_URL)
-          latest_model = parse_openai_latest_model_id(fetch(OPENAI_LATEST_MODEL_MD_URL))
-
-          for tier in VALID_PRICING_TIERS:
-              models = parse_openai_pricing_markdown(markdown, tier=tier)
-              print(f"{tier}: parsed {len(models)} models")
-              if tier == "standard" and latest_model not in models:
-                  raise RuntimeError(
-                      f"latest model {latest_model!r} missing from parsed standard pricing"
-                  )
-          print(f"latest model: {latest_model}")
-          PY
+      - run: echo "Pricing compatibility resumes with the K8 kernel owner."
