@@ -755,7 +755,8 @@ the bounded digest owner and explicit repository guidance/policy coverage; the
 **State:** Local complete; integration CI pending
 **Branch:** `kernel/k4-query-engine`
 **Base:** `f7948ee824480e720e27111d2a8cf68dd1351cef`
-**Commits:** pending
+**Commits:** `e4e0dba feat: add bounded kernel query engine`;
+closeout metadata in this changeset
 
 ### Contract added first
 
