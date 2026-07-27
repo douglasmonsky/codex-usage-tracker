@@ -1,16 +1,25 @@
 {
-  "name": "codex-usage-tracker",
-  "version": "0.26.0-dev.0",
-  "description": "Non-publishable Product Kernel Reset integration skeleton.",
   "author": {
     "name": "Douglas Monsky"
   },
+  "bundle": {
+    "digest": "sha256:77904514db162cdc1b52e6483d1968b448f54fcdeffa3ab14547ed9884462746",
+    "publishable": false,
+    "runtime_version": "0.26.0.dev0",
+    "schema": "codex-usage-tracker.kernel-plugin-bundle.v1"
+  },
+  "description": "Non-publishable kernel integration for exact local Codex usage facts.",
   "homepage": "https://github.com/douglasmonsky/codex-usage-tracker",
-  "repository": "https://github.com/douglasmonsky/codex-usage-tracker",
-  "license": "MIT",
   "keywords": [
     "codex",
     "tokens",
-    "usage"
-  ]
+    "usage",
+    "mcp"
+  ],
+  "license": "MIT",
+  "mcpServers": "./.mcp.json",
+  "name": "codex-usage-tracker",
+  "repository": "https://github.com/douglasmonsky/codex-usage-tracker",
+  "skills": "./skills/",
+  "version": "0.26.0-dev.0"
 }

@@ -10,6 +10,7 @@ from scripts.check_kernel_scope import (
     K3_ADDITIONS,
     K4_ADDITIONS,
     K5_ADDITIONS,
+    K6_ADDITIONS,
     load_disposition_manifest,
     publication_ref_failure,
     scope_failures,
@@ -120,12 +121,34 @@ def test_k5_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/evidence/test_performance.py",
         "tests/kernel/live/test_contracts.py",
     } <= K5_ADDITIONS
+
+
+def test_k6_additions_are_explicit_and_bounded() -> None:
+    assert {
+        ".agent-maintainer/change-plans/k6-interface-cutover.md",
+        "scripts/generate_kernel_interfaces.py",
+        "skills/usage-kernel/SKILL.md",
+        "src/codex_usage_tracker/kernel/application/service.py",
+        "src/codex_usage_tracker/kernel/interfaces/cli/main.py",
+        "src/codex_usage_tracker/kernel/interfaces/http/app.py",
+        "src/codex_usage_tracker/kernel/interfaces/mcp/catalog.py",
+        "src/codex_usage_tracker/kernel/interfaces/mcp/server.py",
+        "src/codex_usage_tracker/kernel/plugin_manifest.py",
+        "tests/kernel/interfaces/test_application.py",
+        "tests/kernel/interfaces/test_cli.py",
+        "tests/kernel/interfaces/test_contracts.py",
+        "tests/kernel/interfaces/test_http.py",
+        "tests/kernel/interfaces/test_mcp.py",
+        "tests/kernel/interfaces/test_performance.py",
+        "tests/kernel/interfaces/test_plugin.py",
+    } <= K6_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
         | K3_ADDITIONS
         | K4_ADDITIONS
         | K5_ADDITIONS
+        | K6_ADDITIONS
     )
 
 

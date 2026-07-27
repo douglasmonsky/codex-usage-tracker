@@ -36,7 +36,7 @@ _CALL_OPERATIONS = _COMMON_OPERATIONS | {
 }
 
 _CALL_DIMENSIONS = {
-    "call": "model_calls.model_call_id",
+    "call": "model_calls.canonical_call_id",
     "thread": "threads.logical_thread_id",
     "turn": "COALESCE(turns.source_turn_id_hash, turns.turn_id)",
     "project": "threads.project_label",
@@ -101,7 +101,7 @@ DATASETS: dict[str, DatasetSpec] = {
             "AND model_calls.duplicate_state = 'canonical'"
         ),
         time_sql="model_calls.event_at",
-        stable_id_sql="model_calls.model_call_id",
+        stable_id_sql="model_calls.canonical_call_id",
         dimensions=_CALL_DIMENSIONS,
         row_measures=_CALL_ROWS,
         aggregate_measures=_CALL_AGGREGATES,

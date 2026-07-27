@@ -241,7 +241,6 @@ class KernelIngestor:
             leases.fail(lease.refresh_run_id, "refresh.failed")
             self._mark_cutover_failed()
             raise
-
     def _initialize_for_explicit_refresh(self) -> None:
         initialize_analytical_database(self.analytical_path)
         initialize_operational_database(self.operational_path)
@@ -624,6 +623,12 @@ class KernelIngestor:
                 if row is not None:
                     return True
         return False
+
+
+def refresh_request_hash(sources: list[Path]) -> str:
+    """Return the same bounded source-set identity used by refresh leases."""
+
+    return _request_hash(tuple(observe_source(path) for path in sources))
 
 
 def _registered_source_id(

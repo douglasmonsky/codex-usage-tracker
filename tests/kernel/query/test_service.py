@@ -393,7 +393,7 @@ def test_named_plan_has_explainable_static_sql(tmp_path: Path) -> None:
         generation=1,
         offset=0,
     )
-    assert "model_calls.model_call_id ASC" in row_plan.sql
+    assert "model_calls.canonical_call_id ASC" in row_plan.sql
 
     comparison_plan = compile_plan(
         QueryRequest(

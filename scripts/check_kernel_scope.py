@@ -91,9 +91,52 @@ K5_ADDITIONS = frozenset(
         "tests/kernel/live/test_ingest_integration.py",
     }
 )
+K6_ADDITIONS = frozenset(
+    {
+        ".agent-maintainer/change-plans/k6-interface-cutover.md",
+        "scripts/generate_kernel_interfaces.py",
+        "skills/usage-kernel/SKILL.md",
+        "src/codex_usage_tracker/kernel/application/__init__.py",
+        "src/codex_usage_tracker/kernel/application/codec.py",
+        "src/codex_usage_tracker/kernel/application/jobs.py",
+        "src/codex_usage_tracker/kernel/application/runtime.py",
+        "src/codex_usage_tracker/kernel/application/service.py",
+        "src/codex_usage_tracker/kernel/interfaces/__init__.py",
+        "src/codex_usage_tracker/kernel/interfaces/cli/__init__.py",
+        "src/codex_usage_tracker/kernel/interfaces/cli/main.py",
+        "src/codex_usage_tracker/kernel/interfaces/http/__init__.py",
+        "src/codex_usage_tracker/kernel/interfaces/http/app.py",
+        "src/codex_usage_tracker/kernel/interfaces/http/server.py",
+        "src/codex_usage_tracker/kernel/interfaces/mcp/__init__.py",
+        "src/codex_usage_tracker/kernel/interfaces/mcp/catalog.py",
+        "src/codex_usage_tracker/kernel/interfaces/mcp/server.py",
+        "src/codex_usage_tracker/kernel/interfaces/schema_catalog.py",
+        "src/codex_usage_tracker/kernel/interfaces/schemas/usage_allowance.json",
+        "src/codex_usage_tracker/kernel/interfaces/schemas/usage_evidence.json",
+        "src/codex_usage_tracker/kernel/interfaces/schemas/usage_job_status.json",
+        "src/codex_usage_tracker/kernel/interfaces/schemas/usage_query.json",
+        "src/codex_usage_tracker/kernel/interfaces/schemas/usage_refresh.json",
+        "src/codex_usage_tracker/kernel/interfaces/schemas/usage_status.json",
+        "src/codex_usage_tracker/kernel/plugin_manifest.py",
+        "tests/kernel/interfaces/__init__.py",
+        "tests/kernel/interfaces/support.py",
+        "tests/kernel/interfaces/test_application.py",
+        "tests/kernel/interfaces/test_cli.py",
+        "tests/kernel/interfaces/test_contracts.py",
+        "tests/kernel/interfaces/test_http.py",
+        "tests/kernel/interfaces/test_mcp.py",
+        "tests/kernel/interfaces/test_performance.py",
+        "tests/kernel/interfaces/test_plugin.py",
+    }
+)
 
 INTEGRATION_ADDITIONS = (
-    K1A_ADDITIONS | K2_ADDITIONS | K3_ADDITIONS | K4_ADDITIONS | K5_ADDITIONS
+    K1A_ADDITIONS
+    | K2_ADDITIONS
+    | K3_ADDITIONS
+    | K4_ADDITIONS
+    | K5_ADDITIONS
+    | K6_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"

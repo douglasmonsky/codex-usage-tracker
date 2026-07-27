@@ -1,0 +1,1 @@
+"""Kernel interface contract tests."""

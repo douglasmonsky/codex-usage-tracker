@@ -1,0 +1,1 @@
+{"additionalProperties":false,"properties":{"wait_seconds":{"maximum":30,"minimum":0,"type":"number"}},"type":"object"}

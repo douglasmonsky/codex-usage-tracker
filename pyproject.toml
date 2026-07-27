@@ -25,6 +25,9 @@ classifiers = [
 ]
 dependencies = []
 
+[project.scripts]
+codex-usage-tracker = "codex_usage_tracker.kernel.interfaces.cli.main:main"
+
 [project.urls]
 Homepage = "https://github.com/douglasmonsky/codex-usage-tracker"
 Repository = "https://github.com/douglasmonsky/codex-usage-tracker"
@@ -55,6 +58,9 @@ namespaces = true
 [tool.setuptools.exclude-package-data]
 "*" = ["__pycache__/*", "*.py[cod]"]
 
+[tool.setuptools.package-data]
+"codex_usage_tracker.kernel.interfaces" = ["schemas/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests/kernel", "tests/release"]
 pythonpath = [".", "src"]
@@ -71,9 +77,12 @@ ignore = ["E501"]
 [tool.mypy]
 python_version = "3.10"
 warn_unused_configs = true
+mypy_path = "src"
+explicit_package_bases = true
 files = [
   "scripts/check_kernel_maintainability.py",
   "scripts/check_kernel_scope.py",
+  "scripts/generate_kernel_interfaces.py",
   "scripts/generate_kernel_manifests.py",
   "src/codex_usage_tracker/kernel",
 ]
@@ -82,6 +91,7 @@ files = [
 include = [
   "scripts/check_kernel_maintainability.py",
   "scripts/check_kernel_scope.py",
+  "scripts/generate_kernel_interfaces.py",
   "scripts/generate_kernel_manifests.py",
   "src/codex_usage_tracker/kernel",
 ]
