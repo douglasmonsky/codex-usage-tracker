@@ -74,7 +74,7 @@ progress.
 | K11 | 0.27.0 | Complete | K10 | Guided exploration |
 | K12 | 0.27.0 | Complete | K11 | Optional context composition |
 | K13 | 0.27.0 | Complete | K11 | Read-only overlay boundary |
-| K14 | 0.27.0 | Not started | K12, K13 | Release qualification |
+| K14 | 0.27.0 | In progress | K12, K13 | Release qualification |
 | K15 | 0.28.0 | Not started | K14 | Fault, recovery, and scale |
 | K16 | 0.28.0 | Not started | K15 | Contract freeze and release |
 
@@ -1646,7 +1646,9 @@ denial handling. No second reviewer was used.
 **Branch:** `kernel/k13-overlay-boundary`
 **Base:** `origin/main` at
 `45f7a3e20007d18ab769599160ecbf6e7c891911`
-**Implementation commit:** `10370cd`
+**Commits:** implementation `10370cd`, ledger `44cea78`, squash merge
+`b0857cb6744ffa8f82453eedb07863afb3a6b69f` through PR
+[#332](https://github.com/douglasmonsky/codex-usage-tracker/pull/332)
 
 ### Contract added first
 
@@ -1733,6 +1735,93 @@ denial handling. No second reviewer was used.
 - Overlay implementation remains a separately approved future decision. K13
   adds no overlay bundle or new authority. K14 may start after this contract
   merges alongside completed K12.
+
+## K14 — Qualify And Publish 0.27.0
+
+**State:** In progress — local release qualification and final review complete;
+release PR CI, protected publication, and public verification remain
+**Branch:** `release/0.27.0`
+**Base:** `origin/main` at
+`b0857cb6744ffa8f82453eedb07863afb3a6b69f`
+**Commits:** release preparation `20a0c47`; qualification ledger pending
+
+### Contract added first
+
+- The intentional red run failed two tests because the 0.27 qualification
+  record and current release-branch/public-install identities were absent.
+- `config/kernel-release-qualification-v1.json` preserves the immutable 0.26
+  cutover record and separately anchors 0.27 to merged K11, K12, and K13
+  commits.
+- The release contract records the optional context store as owner-only and
+  unbundled, the future overlay as absent, and both optional assets as zero
+  bundled bytes.
+- The synthetic golden prompt is capped at exactly three read-only MCP calls.
+  Recorded responses are 499, 9,677, and 906 bytes, 11,082 bytes total, with
+  mechanically enforced ceilings no more than 3 percent above measurement.
+
+### Release preparation
+
+- Package, kernel, plugin, npm, README, changelog, CI smoke, and release-safety
+  identities are `0.27.0`; generated plugin bundle digest is synchronized.
+- Release PR CI reads the exact audited-main SHA from the new qualification
+  record only for `release/0.27.0`. The historical 0.26 cutover topology is
+  unchanged.
+- Protected publication fetches `origin/main` and fails closed unless the exact
+  tag commit is already merged into main. A focused synthetic Git test proves a
+  correctly named tag on an unmerged commit is rejected.
+- The public surface remains exactly six MCP tools, eleven operational CLI
+  commands including opt-in content operations, and seven HTTP routes.
+
+### Local qualification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Contract red | Pass | two expected failures: qualification record absent and 0.27 release paths stale |
+| Focused K10/K14 | Pass | 135 release, scope, cutover, artifact, promotion, workflow, content, query, schema, MCP, and performance tests |
+| Broad profile | Pass | `just v`: 323 tests, Ruff, MyPy, Pyright, maintainability, frontend, scope, manifest, privacy, and release checks |
+| Browser | Pass | 25 applicable desktop/mobile Chromium flows; 3 intentional mobile stream skips |
+| Golden prompt | Pass | exactly 3 successful MCP calls, 11,082 recorded response bytes, active status, nonempty query/guidance, generation-consistent selector/evidence, no worker launch, analytical and operational databases byte-identical |
+| Content isolation | Pass | disabled by default; explicit opt-in owner-only index; aggregate-only query; deletion removes content database without changing accounting |
+| 10,000-call refresh | Pass | initial 735.855 ms; byte-preserving no-change 7.666 ms; one-row append 20.437 ms; replacement 164.196 ms |
+| 100,000-call scale | Pass | initial 11.654 s with 35.384 ms writer p95; byte-preserving no-change 33.923 ms; one-row append 55.841 ms; replacement 1.821 s |
+| Distribution | Pass | normalized post-commit candidate passes exact member and source-byte checks and remains below the 130,000-byte wheel and 364,000-byte sdist ceilings; exact immutable sizes and hashes are recorded outside the self-containing archive, then in post-release evidence |
+| Installed wheel | Pass | two fresh MCP tasks; warm Console p95 0.826 ms; installed Console and allowance smoke pass |
+| Privacy | Pass | synthetic fixtures only; no live Usage Tracker database or raw Codex content inspected |
+
+### Performance attribution
+
+- The unprofiled synthetic workloads above are the release evidence.
+- Agent-perf detected both runtimes but its `detect` subcommand exposed no
+  runtime selector. An explicit Python `run` then failed because pinned
+  Scalene 2.3.0 is absent. No dependency was added and no CPU-hotspot claim is
+  made.
+
+### Deviations and decisions
+
+- A direct public-0.26 run through the current installed-package harness stopped
+  at the expected missing 0.27 `content` CLI command. This is a harness-version
+  mismatch, not a 0.26 runtime regression. The 0.27 candidate first proves all
+  six base MCP workflows with content disabled, then separately proves content
+  opt-in, indexing, aggregate query, deletion, and unchanged accounting.
+- Serena/IntelliJ project health is available for the Usage Tracker worktree,
+  but Serena activation still resolves the stale nonexistent Agent Maintainer
+  path. No Agent Maintainer repository content was read or changed.
+
+### Final review
+
+- One read-only reviewer reported three findings; all three were accepted:
+  publication tags were not proven merged into main, the pre-review sdist was
+  stale relative to the ledger, and the golden prompt did not require useful
+  status/evidence semantics.
+- Focused remediation passed 58 tests plus Ruff and `git diff --check`.
+- Review metrics: 3 findings, 3 accepted; aggregate-only reviewer token
+  attribution is `pending` because the single bounded metrics lookup timed out.
+
+### Remaining release gates
+
+- Python 3.10, Python 3.14, and Focused Evidence Console release PR jobs.
+- Protected build-once TestPyPI, PyPI, GitHub Release, promotion evidence, and
+  public installed-package verification.
 
 ## Task Entry Template
 

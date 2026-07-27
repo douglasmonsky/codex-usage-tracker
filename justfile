@@ -41,6 +41,7 @@ vp:
         tests/kernel/test_kernel_scope.py \
         tests/kernel/test_repository_quality_policy.py \
         tests/kernel/test_release_candidate.py \
+        tests/kernel/test_release_027_qualification.py \
         tests/kernel/test_release_cutover.py \
         tests/kernel/test_retired_surface_manifest.py \
         tests/kernel/test_schema.py \
@@ -70,6 +71,7 @@ v:
         tests/kernel/test_kernel_benchmark.py \
         tests/kernel/test_repository_quality_policy.py \
         tests/kernel/test_release_candidate.py \
+        tests/kernel/test_release_027_qualification.py \
         tests/kernel/test_release_cutover.py \
         tests/kernel/test_schema.py \
         tests/kernel/test_identity.py \

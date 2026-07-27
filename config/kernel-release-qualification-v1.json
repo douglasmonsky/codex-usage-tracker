@@ -1,0 +1,32 @@
+{
+  "schema": "codex-usage-tracker.kernel-release-qualification.v1",
+  "version": "0.27.0",
+  "audited_main_sha": "b0857cb6744ffa8f82453eedb07863afb3a6b69f",
+  "base_release": {
+    "version": "0.26.0",
+    "tag": "v0.26.0",
+    "merge_sha": "1d6ae5286ecde0201b5c868863df30a783b6aa82"
+  },
+  "qualified_tasks": {
+    "K11": "2efd075b3a3aee7a312f5bd6ea5210b3b72960f0",
+    "K12": "45f7a3e20007d18ab769599160ecbf6e7c891911",
+    "K13": "b0857cb6744ffa8f82453eedb07863afb3a6b69f"
+  },
+  "optional_assets": {
+    "context_store": {
+      "disposition": "owner_only_unbundled",
+      "bundled_bytes": 0
+    },
+    "overlay": {
+      "disposition": "absent",
+      "bundled_bytes": 0
+    }
+  },
+  "golden_prompt": {
+    "mcp_calls": 3,
+    "measured_response_bytes": [499, 9677, 906],
+    "response_byte_ceilings": [513, 9967, 933],
+    "measured_total_bytes": 11082,
+    "total_byte_ceiling": 11414
+  }
+}

@@ -32,8 +32,11 @@ jobs:
         run: |
           version="$(python -c \
             'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          git fetch --no-tags origin main:refs/remotes/origin/main
           python scripts/check_kernel_scope.py \
             --publication-ref "$GITHUB_REF" \
+            --publication-sha "$GITHUB_SHA" \
+            --main-ref origin/main \
             --package-version "$version"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
