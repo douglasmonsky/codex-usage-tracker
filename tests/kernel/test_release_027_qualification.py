@@ -6,7 +6,10 @@ import math
 import tarfile
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised on Python 3.10.
+    import tomli as tomllib
 
 from codex_usage_tracker.kernel import __version__
 from codex_usage_tracker.kernel.application import KernelApplication
