@@ -22,6 +22,8 @@ from scripts.check_kernel_scope import (
     K15_ADDITIONS,
     K16_ADDITIONS,
     R1_ADDITIONS,
+    R2_ADDITIONS,
+    R3_ADDITIONS,
     RECOVERY_ROADMAP_ADDITIONS,
     active_paths,
     load_disposition_manifest,
@@ -126,6 +128,13 @@ def test_k3_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/test_ingest_reconciliation.py",
         "tests/kernel/test_watcher.py",
     } == K3_ADDITIONS
+
+
+def test_r3_additions_are_explicit_and_bounded() -> None:
+    assert {
+        "src/codex_usage_tracker/kernel/hydration.py",
+        "tests/kernel/test_hydration_policy.py",
+    } == R3_ADDITIONS
 
 
 def test_k4_additions_are_explicit_and_bounded() -> None:
@@ -237,6 +246,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "scripts/benchmark_agent_outcome.py",
         "tests/kernel/test_agent_outcome_baseline.py",
     } == R1_ADDITIONS
+    assert {"tests/kernel/test_schema_v3.py"} == R2_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -253,9 +263,11 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K14_ADDITIONS
         | K15_ADDITIONS
         | K16_ADDITIONS
-        | RECOVERY_ROADMAP_ADDITIONS
-        | R1_ADDITIONS
-    )
+            | RECOVERY_ROADMAP_ADDITIONS
+            | R1_ADDITIONS
+            | R2_ADDITIONS
+            | R3_ADDITIONS
+        )
 
 
 def test_kernel_skeleton_imports_without_legacy_runtime() -> None:

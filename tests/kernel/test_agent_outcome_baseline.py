@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from scripts.benchmark_agent_outcome import (
+    _timestamp,
     candidate_identity,
     generate_history,
     load_contract,
@@ -244,6 +245,10 @@ def test_small_history_is_byte_deterministic_and_manifested(tmp_path: Path) -> N
     assert first["tool_calls"] == 64
     assert first["activity_events"] == 32
     assert first["allowance_observations"] == 12
+    assert (
+        first["source_sha256"]
+        == "c49ca558ca0b768e976e6d556ac62925e66e429192718e433944167c87294546"
+    )
     assert first["source_sha256"] == second["source_sha256"]
     different = generate_history(
         tmp_path / "different",
@@ -251,6 +256,28 @@ def test_small_history_is_byte_deterministic_and_manifested(tmp_path: Path) -> N
         seed=20260728,
     )
     assert different["source_sha256"] != first["source_sha256"]
+
+
+def test_multi_year_profile_spreads_source_high_waters_across_history(
+) -> None:
+    profile = next(
+        item
+        for item in load_contract(_CONTRACT)["history_profiles"]
+        if item["id"] == "production_multi_year"
+    )
+
+    assert _timestamp(
+        20_727,
+        255,
+        profile=profile,
+        source_ordinal=0,
+    ) == "2023-07-29T00:04:15.000Z"
+    assert _timestamp(
+        21_369,
+        255,
+        profile=profile,
+        source_ordinal=642,
+    ) == "2026-07-26T00:04:15.000Z"
 
 
 def test_small_storage_baseline_covers_cold_no_change_and_tail(

@@ -39,18 +39,42 @@ def normalize_batch(
     tools: list[Row] = []
     activities: list[Row] = []
     allowances: list[Row] = []
+    thread_ids: dict[
+        tuple[str | None, str | None, str | None, str | None],
+        str,
+    ] = {}
+    turn_ids: dict[tuple[str, str | None, int], str] = {}
     latest: str | None = None
     for event in parsed.events:
-        thread_id = _thread_id(event, plan)
-        turn_id = _turn_id(event, thread_id)
-        threads.setdefault(
-            thread_id,
-            _thread_row(event, plan, thread_id, generation),
+        thread_identity = (
+            event.session_id,
+            event.parent_session_id,
+            event.agent_role,
+            event.agent_nickname,
         )
-        turns.setdefault(
-            turn_id,
-            _turn_row(event, thread_id, turn_id, generation),
-        )
+        thread_id = thread_ids.get(thread_identity)
+        if thread_id is None:
+            thread_id = _thread_id(event, plan)
+            thread_ids[thread_identity] = thread_id
+        turn_identity = (thread_id, event.turn_id, event.turn_ordinal)
+        turn_id = turn_ids.get(turn_identity)
+        if turn_id is None:
+            turn_id = _turn_id(event, thread_id)
+            turn_ids[turn_identity] = turn_id
+        if thread_id not in threads:
+            threads[thread_id] = _thread_row(
+                event,
+                plan,
+                thread_id,
+                generation,
+            )
+        if turn_id not in turns:
+            turns[turn_id] = _turn_row(
+                event,
+                thread_id,
+                turn_id,
+                generation,
+            )
         latest = max(latest or event.timestamp, event.timestamp)
         if event.kind == "model_call":
             calls.append(_call_row(event, plan, thread_id, turn_id, generation))

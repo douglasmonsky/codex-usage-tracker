@@ -140,6 +140,7 @@ def _populate_calls(path: Path) -> None:
         connection.execute(
             """
             INSERT INTO sources VALUES (
+                NULL,
                 'source-1', 'active', 'active', NULL, NULL, 'synthetic-source',
                 1, '2026-01-29T00:00:00Z', 1, 1, 0, NULL,
                 'synthetic-replacement', 'synthetic', '1', '{}',
@@ -150,7 +151,8 @@ def _populate_calls(path: Path) -> None:
         connection.executemany(
             """
             INSERT INTO threads VALUES (
-                ?, 'source-1', ?, ?, ?, 'synthetic-project',
+                NULL,
+                ?, 1, 'source-1', ?, ?, ?, 'synthetic-project',
                 '2026-01-01T00:00:00Z', '2026-01-29T00:00:00Z', NULL,
                 'active', NULL, NULL, NULL, NULL, 1, 1, 'synthetic', 'exact'
             )
@@ -168,13 +170,18 @@ def _populate_calls(path: Path) -> None:
         connection.executemany(
             """
             INSERT INTO turns VALUES (
-                ?, NULL, ?, 0, '2026-01-01T00:00:00Z',
+                NULL,
+                ?, NULL, ?, ?, 0, '2026-01-01T00:00:00Z',
                 '2026-01-29T00:00:00Z', 'completed', 'synthetic',
                 'synthetic', 'exact', 0, 1, 400, 0, 0, 0, 0, 0, 1, 1
             )
             """,
             (
-                (f"turn-{index:03d}", f"thread-row-{index:03d}")
+                (
+                    f"turn-{index:03d}",
+                    index + 1,
+                    f"thread-row-{index:03d}",
+                )
                 for index in range(250)
             ),
         )
@@ -196,8 +203,8 @@ def _call_row(index: int) -> tuple[object, ...]:
     cached_tokens = input_tokens // 2
     output_tokens = 10 + index % 90
     return (
-        f"call-{index:06d}",
-        f"canonical-{index:06d}",
+        f"call_{index:032x}",
+        f"fp_{index:064x}",
         f"thread-row-{thread:03d}",
         f"turn-{thread:03d}",
         f"2026-01-{day:02d}T{index % 24:02d}:00:00Z",

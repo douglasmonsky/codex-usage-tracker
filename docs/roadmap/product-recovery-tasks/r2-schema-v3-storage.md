@@ -35,6 +35,7 @@ Add failing schema-v3 contracts for:
 - persisted generation-scoped rollups;
 - human thread label plus opaque logical selector;
 - metadata-only privacy;
+- owner-only source catalog state and generation-bound coverage truth;
 - side-by-side build, atomic promotion, and rollback;
 - measured database-size ceiling.
 
@@ -48,6 +49,10 @@ Add failing schema-v3 contracts for:
 - Keep the optional content store separate and disabled by default.
 - Store tool operation and bounded safe target metadata, never raw arguments or
   output.
+- Keep source locations and hydration state only in the owner-only operational
+  sidecar. Persist no full source path in the analytical database.
+- Record the requested coverage preset, captured UTC cutoff, hydrated/deferred
+  source and byte counts, completeness flag, and coverage revision.
 - Store allowance state only when the exact timestamp snapshot or ordered state
   changes according to the approved interval algorithm.
 - Preserve reset boundaries, first and last observations, periodic freshness
@@ -119,6 +124,7 @@ same recorded schema-contract SHA.
 - No foundational information required by the roadmap is lost.
 - Allowance deltas belong to intervals, not final calls.
 - Stable selectors survive a clean rebuild.
+- Partial-history generations cannot be represented as complete history.
 - Common rollups are generation-consistent.
 - The measured size gate passes.
 - R3 and R4 have disjoint implementation ownership.

@@ -28,6 +28,16 @@
       "threads": 643,
       "tool_calls_per_turn": 4,
       "turns_per_thread": 256
+    },
+    {
+      "activity_events_per_turn": 1,
+      "allowance_every_calls": 32,
+      "history_days": 1095,
+      "id": "production_multi_year",
+      "model_calls_per_turn": 8,
+      "threads": 643,
+      "tool_calls_per_turn": 4,
+      "turns_per_thread": 256
     }
   ],
   "privacy": {

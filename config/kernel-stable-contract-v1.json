@@ -88,8 +88,8 @@
     "analytical_filename": "codex-usage-kernel-v1.sqlite3",
     "operational_filename": "codex-usage-kernel-operational-v1.sqlite3",
     "content_filename": "codex-usage-content-v1.sqlite3",
-    "analytical_schema_version": 2,
-    "operational_schema_version": 2,
+    "analytical_schema_version": 3,
+    "operational_schema_version": 3,
     "content_schema_version": 1,
     "upgrade_behavior": "side_by_side_atomic_promotion",
     "rollback_behavior": "preserve_prior_published_generation"

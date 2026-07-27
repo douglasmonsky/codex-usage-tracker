@@ -30,6 +30,12 @@ Add failing unprofiled benchmarks and lifecycle tests for:
 - bounded larger tail ≤2 seconds;
 - no-change refresh performs no fact or rollup writes;
 - browser or query cannot trigger refresh;
+- `recent_30d`, `recent_90d`, and `complete` first-build source selection is
+  deterministic against one captured UTC cutoff;
+- every discovered source is cataloged and uncertain timestamps fail open into
+  hydration rather than silently deferring data;
+- coverage expansion hydrates whole sources monotonically without rebuilding
+  already hydrated history;
 - one active compatible worker is joined;
 - lines appended during build are included before promotion;
 - readers stay available on the committed generation.
@@ -49,6 +55,8 @@ Add failing unprofiled benchmarks and lifecycle tests for:
 8. Add bounded process parallelism only after global repeated work is removed.
 9. Evaluate content-addressed per-source fact shards only if the required cold
    build still misses its gate.
+10. Catalog deferred sources and apply a bounded whole-source hydration policy
+    before parsing; never make row-prefix hydration part of the fact contract.
 
 Every optimization changes one suspected cause, reruns the identical
 unprofiled workload, and records before/after evidence. Profiler shares do not
@@ -65,6 +73,8 @@ count as speedup proof.
   atomically.
 - A failed refresh never invalidates the active generation.
 - No duplicate refresh is started by MCP, Console, or agent orchestration.
+- A deferred source with a recent append is hydrated in full.
+- Query, Console, and evidence reads cannot implicitly expand coverage.
 
 ## Parallel Execution
 
@@ -94,6 +104,8 @@ Read-only profiling or SQLite-plan audits may run in parallel.
 - fault and recovery suite;
 - synthetic scale matrix;
 - production-shaped unprofiled cold run;
+- production-shaped `recent_30d` first-use run and explicit expansion to
+  `recent_90d` and `complete`;
 - warm no-change and tail distributions;
 - concurrent read test;
 - database and lock-duration measurements;
@@ -107,6 +119,8 @@ Read-only profiling or SQLite-plan audits may run in parallel.
 - Refresh does not block committed reads.
 - Reopen and query never rebuild.
 - Moving-tail correctness remains exact.
+- The recent-history first useful generation is at most 20 seconds and never
+  claims complete history.
 - R1 agent scenarios no longer spend minutes in refresh orchestration.
 
 ## Handoff

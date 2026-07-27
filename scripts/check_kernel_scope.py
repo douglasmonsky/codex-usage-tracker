@@ -245,6 +245,13 @@ R1_ADDITIONS = frozenset(
         "tests/kernel/test_agent_outcome_baseline.py",
     }
 )
+R2_ADDITIONS = frozenset({"tests/kernel/test_schema_v3.py"})
+R3_ADDITIONS = frozenset(
+    {
+        "src/codex_usage_tracker/kernel/hydration.py",
+        "tests/kernel/test_hydration_policy.py",
+    }
+)
 
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
@@ -264,6 +271,8 @@ INTEGRATION_ADDITIONS = (
     | K16_ADDITIONS
     | RECOVERY_ROADMAP_ADDITIONS
     | R1_ADDITIONS
+    | R2_ADDITIONS
+    | R3_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"

@@ -1,17 +1,25 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from codex_usage_tracker.kernel.database import initialize_analytical_database
+from codex_usage_tracker.kernel.hydration import (
+    HydrationPreset,
+    catalog_sources,
+    select_hydration_sources,
+)
 from codex_usage_tracker.kernel.identity import source_id
 from codex_usage_tracker.kernel.operational import (
     OPERATIONAL_SCHEMA_VERSION,
     OPERATIONAL_TABLES,
     initialize_operational_database,
     load_cutover_control,
+    load_hydration_coverage,
+    record_hydration_catalog,
     register_source,
 )
 
@@ -50,6 +58,53 @@ def test_operational_sidecar_has_only_approved_tables(tmp_path: Path) -> None:
         }
 
     assert tables == OPERATIONAL_TABLES
+
+
+def test_owner_only_catalog_records_partial_coverage_without_raw_content(
+    tmp_path: Path,
+) -> None:
+    old = tmp_path / "sessions" / "old.jsonl"
+    recent = tmp_path / "sessions" / "recent.jsonl"
+    old.parent.mkdir()
+    old.write_text(
+        '{"timestamp":"2024-01-01T00:00:00Z","type":"synthetic"}\n',
+        encoding="utf-8",
+    )
+    recent.write_text(
+        '{"timestamp":"2026-07-20T00:00:00Z","type":"synthetic"}\n',
+        encoding="utf-8",
+    )
+    captured_at = datetime(2026, 7, 27, 12, tzinfo=timezone.utc)
+    selection = select_hydration_sources(
+        catalog_sources((old, recent)),
+        preset=HydrationPreset.RECENT_30D,
+        captured_at=captured_at,
+    )
+    operational = tmp_path / "operational.sqlite3"
+    analytical = tmp_path / "analytical.sqlite3"
+    initialize_operational_database(operational)
+    initialize_analytical_database(analytical)
+
+    coverage = record_hydration_catalog(
+        operational,
+        selection,
+        hydrated_generation=1,
+    )
+
+    assert coverage == load_hydration_coverage(operational)
+    assert coverage["preset"] == "recent_30d"
+    assert coverage["cutoff_at"] == "2026-06-27T12:00:00Z"
+    assert coverage["complete_history"] is False
+    assert coverage["cataloged_source_count"] == 2
+    assert coverage["hydrated_source_count"] == 1
+    assert coverage["deferred_source_count"] == 1
+    assert coverage["hydrated_bytes"] == recent.stat().st_size
+    assert coverage["deferred_bytes"] == old.stat().st_size
+    assert isinstance(coverage["coverage_revision"], str)
+    assert old.read_bytes() not in operational.read_bytes()
+    assert recent.read_bytes() not in operational.read_bytes()
+    assert old.read_bytes() not in analytical.read_bytes()
+    assert recent.read_bytes() not in analytical.read_bytes()
 
 
 def test_operational_reopen_validates_version_and_repairs_permissions(
