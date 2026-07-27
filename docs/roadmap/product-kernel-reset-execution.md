@@ -65,7 +65,7 @@ progress.
 | K2 | 0.26.0 | Complete | K1A | Kernel schema v1 and stable identity |
 | K3 | 0.26.0 | Complete | K2 | Incremental/live ingestion |
 | K4 | 0.26.0 | Complete | K3 | Bounded query engine |
-| K5 | 0.26.0 | Local complete; CI pending | K3 | Evidence timeline and live stream |
+| K5 | 0.26.0 | CI passed; merge pending | K3 | Evidence timeline and live stream |
 | K6 | 0.26.0 | Not started | K4, K5 | Six-tool integration interfaces |
 | K7 | 0.26.0 | Not started | K6 | Focused Evidence Console |
 | K8 | 0.26.0 | Not started | K7 | Allowance efficiency |
@@ -876,7 +876,7 @@ also removed two redundant full scans from every non-empty SQL result.
 
 ## K5 — Exact evidence timeline and live generation stream
 
-**State:** Local complete; CI pending
+**State:** Integration CI passed; merge pending
 **Branch:** `kernel/k5-evidence-live`
 **Base:** `a38bf4440ae04b34d9197628378f09c05fd2c060`
 **Commits:** `c45fa2c feat: add live kernel evidence timelines`; closeout
@@ -925,7 +925,7 @@ metadata in this changeset
 | Profiling | Incomplete | `agent-perf` run `20260727T015044Z-fc265f11`, Scalene 2.3.0, exited zero but emitted no JSON profile; no hotspot claim |
 | Package | Pass | wheel and sdist built; release-safety distribution check passed; isolated no-dependency wheel imports for `EvidenceService`, `GenerationJournal`, and `LiveStream` passed |
 | Privacy | Pass | synthetic fixtures only; no live database, Codex log, prompt, reasoning, raw tool argument/output, shell body, secret, or full source path inspected or stored |
-| Integration CI | Fix pending | PR #323: Python 3.14 passed in 93 s; Python 3.10 found one test-fixture selection defect; exact local Python 3.10.20 recheck passed all 141 tests in 29.86 s |
+| Integration CI | Pass | PR #323: initial Python 3.14 passed and Python 3.10 found one test-fixture selection defect; exact local Python 3.10.20 recheck passed all 141 tests in 29.86 s; corrected CI passed in 75 s and 90 s |
 
 The performance assertion uses the identical unprofiled synthetic workload.
 Profiling is attribution-only and cannot replace that timing evidence.
@@ -943,21 +943,21 @@ Profiling is attribution-only and cannot replace that timing evidence.
 | --- | ---: | ---: | ---: |
 | Contract-red runs | 2 | 1 | 50.0% lower |
 | Focused runs | 25 | 17 | 32.0% lower |
-| Broad runs | 8 | 9 | 12.5% higher |
+| Broad runs | 8 | 11 | 37.5% higher |
 | Duplicate broad runs | 0 | 0 | unchanged |
 | Blocking findings | 21 | 12 | 42.9% lower |
 | Non-behavioral findings | 11 | 4 | 63.6% lower |
 | Gate-remediation lines | 264 | 31 | 88.3% lower |
-| Verification wall time | 386.2 s | 378.9 s | 1.9% lower |
+| Verification wall time | 386.2 s | 543.9 s | 40.8% higher |
 | Style-only commits | 0 | 0 | unchanged |
 
-K5 reduced focused runs, findings, remediation lines, and total verification
-time against K4 while preserving all behavioral, typing, privacy, scope,
-complexity, package, release, and performance gates. Broad runs increased by
-one because initial CI and the exact Python 3.10 fix qualification are recorded
-separately. No duplicate broad run or style-only commit occurred. The four
-non-behavioral findings were one future-schema test constant, two focused Ruff
-forms, and the Python 3.10 fixture selection.
+K5 reduced focused runs, findings, and remediation lines against K4 while
+preserving all behavioral, typing, privacy, scope, complexity, package,
+release, and performance gates. Broad runs and total verification time
+increased because initial CI, the exact Python 3.10 fix qualification, and
+corrected CI are recorded separately. No duplicate broad run or style-only
+commit occurred. The four non-behavioral findings were one future-schema test
+constant, two focused Ruff forms, and the Python 3.10 fixture selection.
 
 ### Deviations and decisions
 
@@ -978,9 +978,9 @@ forms, and the Python 3.10 fixture selection.
 - The Scalene capture did not emit a usable profile. The repeatable unprofiled
   100,000-call benchmark remains authoritative and passes with substantial
   headroom.
-- Corrected integration CI and merge remain pending. Once green and merged, K6
-  may bind K4 queries and K5 evidence/live behavior to exactly the six
-  approved integration interfaces without reintroducing narrative analysis.
+- The green PR remains to be squash-merged. After merge, K6 may bind K4 queries
+  and K5 evidence/live behavior to exactly the six approved integration
+  interfaces without reintroducing narrative analysis.
 
 ## Task Entry Template
 
