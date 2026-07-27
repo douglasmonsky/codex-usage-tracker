@@ -1,12 +1,10 @@
 {
   "mcpServers": {
     "codex-usage-tracker": {
-      "command": "python3",
+      "command": "codex-usage-tracker",
       "args": [
-        "-m",
-        "codex_usage_tracker.kernel.interfaces.mcp.server"
+        "_mcp"
       ],
-      "cwd": ".",
       "startup_timeout_sec": 30
     }
   }

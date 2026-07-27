@@ -120,7 +120,7 @@ test("stale or active-refresh status never replaces committed totals with zero",
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        version: "0.26.0.dev0",
+        version: "0.26.0",
         state: "stale",
         generation: 1,
         publication_id: "sha256:synthetic",
@@ -143,7 +143,7 @@ test("stale snapshot is explicit while committed facts remain visible", async ({
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        version: "0.26.0.dev0",
+        version: "0.26.0",
         state: "stale",
         generation: 1,
         publication_id: "sha256:synthetic",

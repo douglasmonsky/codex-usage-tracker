@@ -3,12 +3,12 @@
     "name": "Douglas Monsky"
   },
   "bundle": {
-    "digest": "sha256:2dce244c037935750a757cd0f7e43f705f1d44e838a208852854bb93f3379659",
-    "publishable": false,
-    "runtime_version": "0.26.0.dev0",
+    "digest": "sha256:37808be429472752b8aa9632ec476beea8c56e32feb2f70a00c6ea36b03bdfd1",
+    "publishable": true,
+    "runtime_version": "0.26.0",
     "schema": "codex-usage-tracker.kernel-plugin-bundle.v1"
   },
-  "description": "Non-publishable 0.26 release candidate for exact local Codex usage facts.",
+  "description": "Fast, exact, local-first Codex usage facts and evidence.",
   "homepage": "https://github.com/douglasmonsky/codex-usage-tracker",
   "keywords": [
     "codex",
@@ -21,5 +21,5 @@
   "name": "codex-usage-tracker",
   "repository": "https://github.com/douglasmonsky/codex-usage-tracker",
   "skills": "./skills/",
-  "version": "0.26.0-dev.0"
+  "version": "0.26.0"
 }

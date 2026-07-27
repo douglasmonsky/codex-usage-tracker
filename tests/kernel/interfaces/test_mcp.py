@@ -4,10 +4,14 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
+
+import pytest
 
 from codex_usage_tracker.kernel.application import KernelApplication, RuntimePaths
 from codex_usage_tracker.kernel.interfaces.mcp.server import McpServer
+from scripts.smoke_installed_package import _write_mcp
 
 from .support import active_runtime, synthetic_sources
 
@@ -163,3 +167,24 @@ def test_corrupt_cache_returns_a_sanitized_tool_error(tmp_path: Path) -> None:
     assert response["result"]["content"][0]["text"] == (
         "kernel cache is unavailable"
     )
+
+
+def test_installed_smoke_terminates_a_nonresponsive_mcp_process() -> None:
+    process = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(60)"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    started = time.monotonic()
+    with pytest.raises(TimeoutError, match="deadline"):
+        _write_mcp(
+            process,
+            {"jsonrpc": "2.0", "id": 1, "method": "ping"},
+            timeout=0.05,
+        )
+
+    assert time.monotonic() - started < 2
+    assert process.poll() is not None

@@ -1,5 +1,6 @@
 include README.md LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md AGENTS.md
 include package.json package-lock.json playwright.config.mjs
+include .agents/plugins/marketplace.json
 exclude .mcp.json
 prune .codex-plugin
 prune assets
@@ -7,6 +8,7 @@ include config/kernel-code-disposition-v1.json
 include config/kernel-development-efficiency-v1.json
 include config/kernel-performance-budget.json
 include config/kernel-release-candidate-budget.json
+include config/kernel-release-cutover-v1.json
 include config/kernel-retired-surfaces-v1.json
 recursive-include docs *.md
 prune scripts

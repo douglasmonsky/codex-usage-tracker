@@ -9,12 +9,14 @@ from scripts.release_quality import check_publish_workflow
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_release_check_rejects_static_dashboard_only_javascript_glob(tmp_path: Path) -> None:
+def test_release_check_rejects_removed_dashboard_javascript_path(
+    tmp_path: Path,
+) -> None:
     workflow_dir = tmp_path / ".github" / "workflows"
     workflow_dir.mkdir(parents=True)
     workflow = (ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
     workflow = workflow.replace(
-        "find src/codex_usage_tracker/plugin_data/dashboard \\\n"
+        "find src/codex_usage_tracker/kernel/interfaces/http/console_assets \\\n"
         "            -type f -name '*.js' -exec node --check '{}' ';'",
         "for file in src/codex_usage_tracker/plugin_data/dashboard/dashboard*.js; do\n"
         '            node --check "$file"\n'
@@ -25,4 +27,16 @@ def test_release_check_rejects_static_dashboard_only_javascript_glob(tmp_path: P
 
     failures = check_publish_workflow(tmp_path)
 
-    assert any("all packaged JavaScript" in failure for failure in failures)
+    assert any("packaged kernel Console" in failure for failure in failures)
+
+
+def test_kernel_ci_qualifies_release_pull_requests_against_audited_main() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "- main" in workflow
+    assert "github.event.pull_request.base.sha" in workflow
+    assert "config/kernel-release-cutover-v1.json" in workflow
+    assert "python -m pytest -p no:tach" in workflow
+    assert "scripts/smoke_installed_package.py" in workflow

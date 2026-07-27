@@ -70,21 +70,38 @@ def test_public_tool_schemas_are_small_deterministic_and_coherent() -> None:
         assert len(path.read_bytes()) <= 8_192
 
 
-def test_integration_plugin_declares_one_server_and_stays_non_publishable() -> None:
+def test_release_plugin_declares_one_server_and_is_publishable() -> None:
     plugin = json.loads(
         (_REPO_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
     )
     mcp = json.loads((_REPO_ROOT / ".mcp.json").read_text(encoding="utf-8"))
 
-    assert plugin["version"] == "0.26.0-dev.0"
+    assert plugin["version"] == "0.26.0"
     assert plugin["mcpServers"] == "./.mcp.json"
     assert plugin["skills"] == "./skills/"
-    assert plugin["bundle"]["runtime_version"] == "0.26.0.dev0"
-    assert plugin["bundle"]["publishable"] is False
+    assert plugin["bundle"]["runtime_version"] == "0.26.0"
+    assert plugin["bundle"]["publishable"] is True
     assert list(mcp["mcpServers"]) == ["codex-usage-tracker"]
     server = mcp["mcpServers"]["codex-usage-tracker"]
-    assert server["args"] == [
-        "-m",
-        "codex_usage_tracker.kernel.interfaces.mcp.server",
-    ]
+    assert server["command"] == "codex-usage-tracker"
+    assert server["args"] == ["_mcp"]
+    assert "cwd" not in server
     assert "CODEX_USAGE_TRACKER_MCP_PROFILE" not in server.get("env", {})
+
+    marketplace = json.loads(
+        (
+            _REPO_ROOT / ".agents" / "plugins" / "marketplace.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert marketplace["name"] == "codex-usage-tracker"
+    assert marketplace["plugins"] == [
+        {
+            "category": "Productivity",
+            "name": "codex-usage-tracker",
+            "policy": {
+                "authentication": "ON_INSTALL",
+                "installation": "AVAILABLE",
+            },
+            "source": {"path": ".", "source": "local"},
+        }
+    ]

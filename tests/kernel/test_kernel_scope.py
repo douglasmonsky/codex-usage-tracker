@@ -15,6 +15,7 @@ from scripts.check_kernel_scope import (
     K7_ADDITIONS,
     K8_ADDITIONS,
     K9_ADDITIONS,
+    K10_ADDITIONS,
     active_paths,
     load_disposition_manifest,
     publication_ref_failure,
@@ -174,6 +175,11 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "scripts/check_kernel_release_candidate.py",
         "tests/kernel/test_release_candidate.py",
     } == K9_ADDITIONS
+    assert {
+        "config/kernel-release-cutover-v1.json",
+        ".agents/plugins/marketplace.json",
+        "tests/kernel/test_release_cutover.py",
+    } == K10_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -184,13 +190,14 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K7_ADDITIONS
         | K8_ADDITIONS
         | K9_ADDITIONS
+        | K10_ADDITIONS
     )
 
 
 def test_kernel_skeleton_imports_without_legacy_runtime() -> None:
     import codex_usage_tracker.kernel as kernel
 
-    assert kernel.__version__ == "0.26.0.dev0"
+    assert kernel.__version__ == "0.26.0"
 
 
 def test_retained_release_primitives_match_k1_and_import() -> None:
@@ -224,6 +231,7 @@ def test_publication_guard_rejects_every_integration_ref() -> None:
     )
 
     assert all(publication_ref_failure(ref, "0.26.0.dev0") for ref in blocked)
+    assert publication_ref_failure("refs/heads/release/0.26.0", "0.26.0")
     assert publication_ref_failure("refs/heads/main", "0.26.0") is None
 
 
@@ -232,6 +240,6 @@ def test_publish_workflow_calls_persistent_kernel_guard() -> None:
         encoding="utf-8"
     )
 
-    assert "Reject kernel integration publication" in workflow
+    assert "Enforce kernel publication source" in workflow
     assert "scripts/check_kernel_scope.py" in workflow
     assert '--publication-ref "$GITHUB_REF"' in workflow

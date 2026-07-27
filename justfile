@@ -10,13 +10,19 @@ vp:
     just scope
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m ruff check \
         scripts/check_kernel_maintainability.py \
+        scripts/benchmark_kernel.py \
         scripts/check_kernel_scope.py \
         scripts/check_release.py \
         scripts/check_kernel_release_candidate.py \
+        scripts/release_promotion_quality.py \
         scripts/smoke_installed_console.py \
+        scripts/smoke_installed_catalog.py \
+        scripts/smoke_installed_package.py \
         scripts/generate_kernel_interfaces.py \
         scripts/generate_kernel_manifests.py \
         src/codex_usage_tracker/kernel \
+        src/codex_usage_tracker/release \
+        tests/release \
         tests/kernel/allowance \
         tests/kernel/console \
         tests/kernel/evidence \
@@ -30,9 +36,11 @@ vp:
         tests/kernel/test_identity.py \
         tests/kernel/test_ingest_*.py \
         tests/kernel/test_kernel_maintainability.py \
+        tests/kernel/test_kernel_benchmark.py \
         tests/kernel/test_kernel_scope.py \
         tests/kernel/test_repository_quality_policy.py \
         tests/kernel/test_release_candidate.py \
+        tests/kernel/test_release_cutover.py \
         tests/kernel/test_retired_surface_manifest.py \
         tests/kernel/test_schema.py \
         tests/kernel/test_source_registry_privacy.py \
@@ -58,8 +66,10 @@ v:
         tests/kernel/test_retired_surface_manifest.py \
         tests/kernel/test_development_efficiency_policy.py \
         tests/kernel/test_kernel_maintainability.py \
+        tests/kernel/test_kernel_benchmark.py \
         tests/kernel/test_repository_quality_policy.py \
         tests/kernel/test_release_candidate.py \
+        tests/kernel/test_release_cutover.py \
         tests/kernel/test_schema.py \
         tests/kernel/test_identity.py \
         tests/kernel/test_database_lifecycle.py \
@@ -75,7 +85,7 @@ v:
         tests/kernel/evidence \
         tests/kernel/interfaces \
         tests/kernel/live \
-        tests/kernel/query
+        tests/kernel/query tests/release
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pyright --pythonpath "$PY"
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_release.py
 

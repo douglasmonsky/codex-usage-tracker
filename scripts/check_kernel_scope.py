@@ -169,6 +169,14 @@ K9_ADDITIONS = frozenset(
     }
 )
 
+K10_ADDITIONS = frozenset(
+    {
+        "config/kernel-release-cutover-v1.json",
+        ".agents/plugins/marketplace.json",
+        "tests/kernel/test_release_cutover.py",
+    }
+)
+
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
     | K2_ADDITIONS
@@ -179,6 +187,7 @@ INTEGRATION_ADDITIONS = (
     | K7_ADDITIONS
     | K8_ADDITIONS
     | K9_ADDITIONS
+    | K10_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"

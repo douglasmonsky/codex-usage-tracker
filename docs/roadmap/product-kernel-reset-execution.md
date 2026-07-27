@@ -70,7 +70,7 @@ progress.
 | K7 | 0.26.0 | Complete | K6 | Focused Evidence Console |
 | K8 | 0.26.0 | Complete | K7 | Allowance efficiency |
 | K9 | 0.26.0 | Complete | K8 | Release candidate and final absence audit |
-| K10 | 0.26.0 | Not started | K9 | Audited release-branch cutover and qualification |
+| K10 | 0.26.0 | In progress | K9 | Audited release branch qualified locally; protected publication pending |
 | K11 | 0.27.0 | Not started | K10 | Guided exploration |
 | K12 | 0.27.0 | Not started | K11 | Optional context composition |
 | K13 | 0.27.0 | Not started | K11 | Read-only overlay boundary |
@@ -1290,6 +1290,108 @@ retry. Final CI times will be added after merge.
   remaining administrative action.
 - K10 must begin from an audited current `main` SHA and may incorporate the
   qualified integration head only once.
+
+## K10 — Qualify And Publish 0.26.0
+
+**State:** In progress — local qualification complete; review, CI, merge, and
+protected publication pending
+**Branch:** `release/0.26.0`
+**Base:** audited `origin/main` at
+`d8da9bccdb6674e7dca4c0872c36a1346949dc13`
+**Cutover commit:** `fb948d486b2c4c1205325f6a72789bdc0458d275`
+with first parent equal to the audited main SHA and second parent equal to the
+qualified integration SHA
+`e5651313f3368836797279f40be8331103723995`
+
+### Contract added first
+
+- Six release-cutover assertions failed before implementation on final Python,
+  npm, and plugin identity, publishability, and the absent immutable cutover
+  record.
+- The release contract now records both cutover parents, the classified
+  current-main delta, and the absence of a required mainline-port PR.
+- The retained synthetic benchmark was ported to the final kernel and now
+  exercises initial build, byte-preserving no-change, append, and truncating
+  replacement behavior rather than importing retired runtime.
+
+### Implementation
+
+- Final package, npm, plugin, workflow, README, changelog, package-data, and
+  release-manifest identity is `0.26.0`; only merged `main` may pass the
+  publication ref guard.
+- The protected workflow still builds once and promotes byte-identical
+  TestPyPI artifacts to PyPI and GitHub. Its validation, contract inventory,
+  and Console checks now address only the lean kernel.
+- Installed-package qualification starts with an absent read-only status,
+  performs exactly one explicit refresh, opens two independent MCP processes,
+  runs the six required analytical requests, resolves exact evidence, checks
+  allowance caveats, and measures a warm Console reopen.
+- The installed CLI, six MCP tools, and eleven packaged Console/schema assets
+  come from one lean catalog. Historical dashboard, analysis, doctor, support
+  bundle, screenshot, locale, and rate-card resource expectations are absent.
+- The repository is a supported Codex plugin marketplace. Its installed MCP
+  entry launches the pipx-owned `codex-usage-tracker _mcp` command, never an
+  ambient `python3`, and the installed smoke launches that exact configuration
+  with a host-side response deadline.
+- Package and plugin ceilings were remeasured with at most three percent
+  headroom. The final distribution hashes, sizes, manifest, and promotion
+  evidence will be recorded after the reviewed source commit is immutable.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Cutover topology | Pass | `origin/main` and release first parent remain `d8da9bcc`; release second parent and fetched integration remain `e5651313` |
+| Focused release | Pass | 92 scope, candidate, cutover, artifact, promotion, and workflow tests |
+| Broad local profile | Pass | 286 tests passed after the accepted review fixes; full-tree Ruff, MyPy across 57 files, Pyright, maintainability, frontend, scope, manifest, privacy, and release checks passed |
+| Browser | Pass | 20 desktop/mobile Chromium flows passed with two intentional mobile cross-project skips; live reconnect and no-implicit-refresh flows passed |
+| Lifecycle performance | Pass | 10,000 synthetic calls: initial 743.373 ms, byte-preserving no-change 4.403 ms, one-row append 19.074 ms, truncating replacement 162.662 ms |
+| Scale performance | Pass | 100,000-call ingest 12.531 s with 37.189 ms writer p95; common query 98.684 ms p95, comparison 177.627 ms, concentration 103.879 ms, evidence 88.164 ms, allowance 371.188 ms |
+| Installed package | Pass | two fresh MCP tasks share generation 1, call all six tools, prove exact oracle totals and terminal no-change refresh, and use the installed plugin command; warm Console p95 0.713 ms |
+| Recovery and downgrade | Pass | 36 lifecycle, reconciliation, concurrency, live, cutover, and database tests; isolated installed `0.26.0` downgrade to public `0.25.1` passed |
+| Privacy | Pass | synthetic fixtures only; no local Usage Tracker database or raw usage content inspected |
+
+### Review metrics
+
+- Total findings: 4
+- Accepted findings: 4 (`R1`–`R4`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+- One non-behavioral release-freeze finding required deleting one obsolete
+  frozen-path entry after the catalog was intentionally ported to the lean
+  product.
+- One benchmark assertion defect queried the K1 base database rather than the
+  operationally published generation; the benchmark now resolves the same
+  active-generation pointer as product reads.
+- The single final reviewer found four release blockers and all four were
+  accepted: release-PR CI coverage and audited-base fencing, exact installed
+  plugin interpreter resolution, all-six-tool oracle dogfood, and bounded MCP
+  response deadlines.
+- No style-only commit or unchanged-state duplicate broad run occurred.
+  Final K10 counts and CI times will be synchronized into
+  `config/kernel-development-efficiency-v1.json` after the protected checks.
+
+### Deviations and decisions
+
+- Desktop Serena activation is misrouted by its host to the unrelated stale
+  `/Users/Monsky/Documents/Agent Maintainer` project and fails before
+  activation. No file there was read or changed. The exact Usage Tracker
+  worktree passed Serena's project-local Python and TypeScript LSP health
+  check.
+- Agent-perf runs `20260727T055604Z-6750a8e2` on Python 3.14 and
+  `20260727T055654Z-f220293c` on isolated Python 3.13 both exited without a
+  Scalene JSON profile. The unprofiled acceptance timings are retained, and no
+  hotspot claim is made.
+
+### Residual risk and next task
+
+- The exact final build, artifact hashes, manifest, and promotion evidence
+  depend on the reviewed source commit and remain pending.
+- K11 remains blocked until K10 is merged and 0.26.0 is published through the
+  protected workflow.
 
 ## Task Entry Template
 

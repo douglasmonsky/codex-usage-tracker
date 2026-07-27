@@ -1,12 +1,14 @@
-name: Kernel integration CI
+name: Kernel CI
 
 on:
   push:
     branches:
       - kernel/0.26-integration
+      - main
   pull_request:
     branches:
       - kernel/0.26-integration
+      - main
 
 permissions:
   contents: read
@@ -33,85 +35,34 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: pyproject.toml
+      - name: Verify audited main base
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        env:
+          ACTUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          expected="$(python -c \
+            'import json; print(json.load(open("config/kernel-release-cutover-v1.json"))["audited_main_sha"])')"
+          test "$ACTUAL_BASE_SHA" = "$expected"
       - name: Install kernel tooling
         run: |
           python -m pip install --upgrade pip
           python -m pip install ".[dev]"
       - name: Verify kernel phase
+        env:
+          MATRIX_PYTHON: ${{ matrix.python-version }}
         run: |
           python scripts/check_kernel_scope.py
           python scripts/generate_kernel_manifests.py --check
           PYTHONPATH=src python scripts/generate_kernel_interfaces.py --check
-          python -m ruff check \
-            scripts/check_kernel_maintainability.py \
-            scripts/check_kernel_scope.py \
-            scripts/check_release.py \
-            scripts/check_kernel_release_candidate.py \
-            scripts/smoke_installed_console.py \
-            scripts/generate_kernel_interfaces.py \
-            scripts/generate_kernel_manifests.py \
-            src/codex_usage_tracker/kernel \
-            tests/kernel/console \
-            tests/kernel/allowance \
-            tests/kernel/evidence \
-            tests/kernel/interfaces \
-            tests/kernel/live \
-            tests/kernel/query \
-            tests/kernel/test_code_disposition_manifest.py \
-            tests/kernel/test_cutover_control.py \
-            tests/kernel/test_database_lifecycle.py \
-            tests/kernel/test_development_efficiency_policy.py \
-            tests/kernel/test_identity.py \
-            tests/kernel/test_ingest_concurrency.py \
-            tests/kernel/test_ingest_jobs.py \
-            tests/kernel/test_ingest_lifecycle.py \
-            tests/kernel/test_ingest_oracle.py \
-            tests/kernel/test_ingest_pipeline.py \
-            tests/kernel/test_ingest_privacy.py \
-            tests/kernel/test_ingest_reconciliation.py \
-            tests/kernel/test_kernel_maintainability.py \
-            tests/kernel/test_kernel_scope.py \
-            tests/kernel/test_repository_quality_policy.py \
-            tests/kernel/test_release_candidate.py \
-            tests/kernel/test_retired_surface_manifest.py \
-            tests/kernel/test_schema.py \
-            tests/kernel/test_source_registry_privacy.py \
-            tests/kernel/test_oracle_equivalence.py \
-            tests/kernel/test_privacy_oracle.py \
-            tests/kernel/test_source_lifecycle_oracle.py \
-            tests/kernel/test_watcher.py
+          python -m ruff check .
           python -m mypy
           python scripts/check_kernel_maintainability.py
-          python -m pytest -p no:tach \
-            --ignore=tests/kernel/test_ingest_performance.py \
-            tests/kernel/test_kernel_scope.py \
-            tests/kernel/test_code_disposition_manifest.py \
-            tests/kernel/test_retired_surface_manifest.py \
-            tests/kernel/test_development_efficiency_policy.py \
-            tests/kernel/test_kernel_maintainability.py \
-            tests/kernel/test_repository_quality_policy.py \
-            tests/kernel/test_schema.py \
-            tests/kernel/test_identity.py \
-            tests/kernel/test_database_lifecycle.py \
-            tests/kernel/test_cutover_control.py \
-            tests/kernel/test_source_registry_privacy.py \
-            tests/kernel/test_ingest_concurrency.py \
-            tests/kernel/test_ingest_jobs.py \
-            tests/kernel/test_ingest_lifecycle.py \
-            tests/kernel/test_ingest_oracle.py \
-            tests/kernel/test_ingest_pipeline.py \
-            tests/kernel/test_ingest_privacy.py \
-            tests/kernel/test_ingest_reconciliation.py \
-            tests/kernel/test_oracle_equivalence.py \
-            tests/kernel/test_privacy_oracle.py \
-            tests/kernel/test_source_lifecycle_oracle.py \
-            tests/kernel/test_watcher.py \
-            tests/kernel/console \
-            tests/kernel/allowance \
-            tests/kernel/evidence \
-            tests/kernel/interfaces \
-            tests/kernel/live \
-            tests/kernel/query
+          if [ "$MATRIX_PYTHON" = "3.14" ]; then
+            python -m pytest -p no:tach
+          else
+            python -m pytest -p no:tach \
+              --ignore=tests/kernel/test_ingest_performance.py
+          fi
           python -m pyright --pythonpath "$(command -v python)"
           python scripts/check_release.py
       - name: Run synthetic performance contracts
@@ -122,6 +73,9 @@ jobs:
         run: |
           python -m build
           python scripts/check_release.py --dist
+          python scripts/smoke_installed_package.py \
+            --artifact-dir dist \
+            --version 0.26.0
       - name: Whitespace
         run: git diff --check
 

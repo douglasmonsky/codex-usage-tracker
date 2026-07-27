@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-usage-tracking"
-version = "0.26.0.dev0"
-description = "Non-publishable 0.26 release candidate for exact local Codex usage facts."
+version = "0.26.0"
+description = "Fast, exact, local-first Codex usage facts and evidence."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Douglas Monsky" }]
@@ -86,23 +86,30 @@ warn_unused_configs = true
 mypy_path = "src"
 explicit_package_bases = true
 files = [
+  "scripts/benchmark_kernel.py",
   "scripts/check_kernel_maintainability.py",
   "scripts/check_kernel_release_candidate.py",
   "scripts/check_kernel_scope.py",
   "scripts/generate_kernel_interfaces.py",
   "scripts/generate_kernel_manifests.py",
+  "scripts/release_promotion_quality.py",
   "scripts/smoke_installed_console.py",
+  "scripts/smoke_installed_catalog.py",
+  "scripts/smoke_installed_package.py",
+  "src/codex_usage_tracker/release/artifact_manifest.py",
   "src/codex_usage_tracker/kernel",
 ]
 
 [tool.pyright]
 include = [
+  "scripts/benchmark_kernel.py",
   "scripts/check_kernel_maintainability.py",
   "scripts/check_kernel_release_candidate.py",
   "scripts/check_kernel_scope.py",
   "scripts/generate_kernel_interfaces.py",
   "scripts/generate_kernel_manifests.py",
   "scripts/smoke_installed_console.py",
+  "scripts/smoke_installed_catalog.py",
   "src/codex_usage_tracker/kernel",
 ]
 pythonVersion = "3.10"

@@ -23,7 +23,7 @@ def test_bundle_digest_and_manifest_are_deterministic() -> None:
     assert first == second
     assert first.startswith("sha256:")
     assert manifest["bundle"]["digest"] == first
-    assert manifest["bundle"]["publishable"] is False
+    assert manifest["bundle"]["publishable"] is True
 
 
 def test_same_version_cache_install_replaces_exact_bundle(tmp_path: Path) -> None:

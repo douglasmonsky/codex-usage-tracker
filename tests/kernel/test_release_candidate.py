@@ -77,7 +77,7 @@ def test_terminal_disposition_rejects_a_missing_target() -> None:
     )
 
 
-def test_release_candidate_catalogs_are_exact_and_non_publishable() -> None:
+def test_release_catalogs_are_exact_and_publishable() -> None:
     plugin = json.loads(
         (_ROOT / ".codex-plugin/plugin.json").read_text(encoding="utf-8")
     )
@@ -87,11 +87,11 @@ def test_release_candidate_catalogs_are_exact_and_non_publishable() -> None:
     assert COMMANDS == _CLI
     assert API_PREFIX == "/api/kernel/v1"
     assert len(ROUTES) == 7
-    assert plugin["bundle"]["publishable"] is False
-    assert plugin["version"] == "0.26.0-dev.0"
-    assert "release candidate" in plugin["description"].lower()
-    assert 'version = "0.26.0.dev0"' in project
-    assert "release candidate" in project.lower()
+    assert plugin["bundle"]["publishable"] is True
+    assert plugin["version"] == "0.26.0"
+    assert "exact, local-first codex usage facts" in plugin["description"].lower()
+    assert 'version = "0.26.0"' in project
+    assert "non-publishable" not in project.lower()
 
 
 def test_runtime_tree_has_no_retired_module_or_import_owner() -> None:

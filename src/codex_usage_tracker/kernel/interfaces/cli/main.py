@@ -70,12 +70,18 @@ def build_parser() -> argparse.ArgumentParser:
     repair = subparsers.add_parser("repair", help="validate or roll back cache")
     repair.add_argument("--rollback", action="store_true")
     subparsers.add_parser("package", help="show package identity")
+    subparsers.add_parser("_mcp", help=argparse.SUPPRESS)
     subparsers.add_parser("_refresh-worker", help=argparse.SUPPRESS)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
+    if arguments.command == "_mcp":
+        from ..mcp.server import run_stdio
+
+        run_stdio()
+        return 0
     try:
         result = _run(arguments)
     except sqlite3.Error:

@@ -1,9 +1,9 @@
 {
   "name": "codex-usage-tracker-kernel-integration",
-  "version": "0.26.0-dev.0",
+  "version": "0.26.0",
   "private": true,
   "type": "module",
-  "description": "Non-publishable 0.26 release candidate metadata.",
+  "description": "Kernel Evidence Console build and verification tooling.",
   "scripts": {
     "console:build": "node scripts/build_kernel_console.mjs",
     "console:build:check": "node scripts/build_kernel_console.mjs --check",

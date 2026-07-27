@@ -17,7 +17,7 @@ _SKILL_PATH = Path("skills/usage-kernel/SKILL.md")
 BUNDLE_PATHS = (_MCP_PATH, _SKILL_PATH)
 _EXPECTED_MANIFEST = {
     "name": "codex-usage-tracker",
-    "version": "0.26.0-dev.0",
+    "version": "0.26.0",
     "mcpServers": "./.mcp.json",
     "skills": "./skills/",
 }
@@ -142,8 +142,8 @@ def _validated_manifest(root: Path) -> dict[str, Any]:
     if (
         not isinstance(bundle, dict)
         or bundle.get("schema") != BUNDLE_SCHEMA
-        or bundle.get("runtime_version") != "0.26.0.dev0"
-        or bundle.get("publishable") is not False
+        or bundle.get("runtime_version") != "0.26.0"
+        or bundle.get("publishable") is not True
     ):
         raise ValueError("plugin bundle manifest is invalid")
     return payload

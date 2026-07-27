@@ -1,0 +1,9 @@
+{
+  "schema": "codex-usage-tracker.kernel-release-cutover.v1",
+  "version": "0.26.0",
+  "audited_main_sha": "d8da9bccdb6674e7dca4c0872c36a1346949dc13",
+  "qualified_integration_sha": "e5651313f3368836797279f40be8331103723995",
+  "cutover_merge_sha": "fb948d486b2c4c1205325f6a72789bdc0458d275",
+  "main_delta_paths": [],
+  "mainline_port_prs": []
+}

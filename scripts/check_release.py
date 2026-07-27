@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Release-safety checks for the non-publishable kernel integration."""
+"""Release-safety checks for the qualified kernel package."""
 
 from __future__ import annotations
 
@@ -34,25 +34,19 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from generate_kernel_manifests import manifest_failures
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_VERSION = "0.26.0.dev0"
-_PLUGIN_VERSION = "0.26.0-dev.0"
+_VERSION = "0.26.0"
+_PLUGIN_VERSION = "0.26.0"
 _K1_MERGE = "d8da9bccdb6674e7dca4c0872c36a1346949dc13"
 _FROZEN_RELEASE_PATHS = (
-    "scripts/release_promotion_quality.py",
     "scripts/release_quality.py",
-    "scripts/smoke_installed_catalog.py",
-    "scripts/smoke_installed_package.py",
     "src/codex_usage_tracker/release/__init__.py",
-    "src/codex_usage_tracker/release/artifact_manifest.py",
     "src/codex_usage_tracker/release/artifact_normalization.py",
     "src/codex_usage_tracker/release/promotion_evidence.py",
     "src/codex_usage_tracker/release/tach.domain.toml",
     "tests/release/__init__.py",
-    "tests/release/conftest.py",
     "tests/release/test_artifact_manifest.py",
     "tests/release/test_promotion_evidence.py",
     "tests/release/test_promotion_evidence_fail_closed.py",
-    "tests/release/test_publish_workflow_javascript.py",
 )
 
 
@@ -70,21 +64,21 @@ def release_failures(*, dist: bool = False) -> list[str]:
     project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     metadata = project["project"]
     if metadata["version"] != _VERSION:
-        failures.append(f"integration package version must be {_VERSION}")
+        failures.append(f"release package version must be {_VERSION}")
     if metadata.get("dependencies") != []:
-        failures.append("kernel integration must have no runtime dependencies")
+        failures.append("kernel release must have no runtime dependencies")
     if metadata.get("scripts") != {
         "codex-usage-tracker": (
             "codex_usage_tracker.kernel.interfaces.cli.main:main"
         )
     }:
-        failures.append("kernel integration must expose only its retained CLI")
+        failures.append("kernel release must expose only its retained CLI")
 
     plugin = json.loads(
         (_REPO_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
     )
     if plugin.get("version") != _PLUGIN_VERSION:
-        failures.append(f"integration plugin version must be {_PLUGIN_VERSION}")
+        failures.append(f"release plugin version must be {_PLUGIN_VERSION}")
     if plugin.get("skills") != "./skills/":
         failures.append("integration plugin must declare its kernel skill")
     if plugin.get("mcpServers") != "./.mcp.json":
@@ -95,9 +89,9 @@ def release_failures(*, dist: bool = False) -> list[str]:
         or bundle.get("schema")
         != "codex-usage-tracker.kernel-plugin-bundle.v1"
         or bundle.get("runtime_version") != _VERSION
-        or bundle.get("publishable") is not False
+        or bundle.get("publishable") is not True
     ):
-        failures.append("integration plugin bundle identity is invalid")
+        failures.append("release plugin bundle identity is invalid")
 
     mcp = json.loads((_REPO_ROOT / ".mcp.json").read_text(encoding="utf-8"))
     servers = mcp.get("mcpServers") if isinstance(mcp, dict) else None
@@ -105,11 +99,14 @@ def release_failures(*, dist: bool = False) -> list[str]:
         failures.append("integration MCP catalog must contain exactly one server")
     else:
         server = servers["codex-usage-tracker"]
-        if server.get("args") != [
-            "-m",
-            "codex_usage_tracker.kernel.interfaces.mcp.server",
-        ]:
-            failures.append("integration MCP server does not use the kernel adapter")
+        if (
+            server.get("command") != "codex-usage-tracker"
+            or server.get("args") != ["_mcp"]
+            or "cwd" in server
+        ):
+            failures.append(
+                "release MCP server must use the installed CLI interpreter"
+            )
 
     workflow = (_REPO_ROOT / ".github/workflows/publish.yml").read_text(
         encoding="utf-8"
