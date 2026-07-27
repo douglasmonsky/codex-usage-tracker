@@ -771,8 +771,12 @@ function connectLive() {
     toast(`Generation ${payload.generation} is ready.`);
   });
   source.addEventListener("snapshot_required", async () => {
+    if (state.eventSource !== source) return;
+    source.close();
+    state.eventSource = null;
     await refreshStatus();
     await renderCurrentRoute();
+    if (!state.eventSource) connectLive();
   });
 }
 

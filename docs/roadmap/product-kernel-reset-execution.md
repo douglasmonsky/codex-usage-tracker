@@ -73,7 +73,7 @@ progress.
 | K10 | 0.26.0 | Complete | K9 | Published lean kernel and verified exact public artifacts |
 | K11 | 0.27.0 | Complete | K10 | Guided exploration |
 | K12 | 0.27.0 | Complete | K11 | Optional context composition |
-| K13 | 0.27.0 | Not started | K11 | Read-only overlay boundary |
+| K13 | 0.27.0 | Complete | K11 | Read-only overlay boundary |
 | K14 | 0.27.0 | Not started | K12, K13 | Release qualification |
 | K15 | 0.28.0 | Not started | K14 | Fault, recovery, and scale |
 | K16 | 0.28.0 | Not started | K15 | Contract freeze and release |
@@ -1532,12 +1532,13 @@ denial handling. No second reviewer was used.
 
 ## K12 — Add Optional Context-Composition Estimates
 
-**State:** Complete — implementation, final review, and package qualification
-pass; pull request pending
+**State:** Complete — merged through PR
+[#331](https://github.com/douglasmonsky/codex-usage-tracker/pull/331)
 **Branch:** `kernel/k12-context-composition`
 **Base:** `origin/main` at
 `2efd075b3a3aee7a312f5bd6ea5210b3b72960f0`
-**Commits:** feature `486500b`
+**Commits:** feature `486500b`, ledger `fedcb82`, squash merge
+`45f7a3e20007d18ab769599160ecbf6e7c891911`
 
 ### Contract added first
 
@@ -1609,8 +1610,7 @@ pass; pull request pending
 - Release checks correctly rejected the added CLI command and measured package
   bytes until the exact catalogs and at-most-three-percent ceilings were
   updated. No behavior was reshaped to satisfy a style-only preference.
-- No unchanged-state duplicate broad run or style-only commit has occurred.
-  Final counts will be synchronized after package qualification.
+- No unchanged-state duplicate broad run or style-only commit occurred.
 - The single final reviewer found five behavioral contract defects and all five
   were accepted: compound sensitive-key redaction, source-retirement on inode
   replacement, estimator-provenance rebuilds, stable WAL read snapshots, and
@@ -1637,9 +1637,102 @@ pass; pull request pending
 - No tokenizer is bundled or selected. Exact observed-byte answers work now;
   category token estimates remain unavailable unless a future explicit
   estimator owner supplies them, matching the scheduled open decision.
-- The one final read-only review and final package rebuild remain before K12
-  can merge and unblock K14. K13 remains independent and must not be pulled
-  into this branch.
+- K12 is merged and unblocks its half of K14. K13 remains independently owned
+  and must freeze only the read-only boundary before K14 begins.
+
+## K13 — Freeze The Read-Only Overlay Boundary
+
+**State:** Complete — implementation, qualification, and final review complete
+**Branch:** `kernel/k13-overlay-boundary`
+**Base:** `origin/main` at
+`45f7a3e20007d18ab769599160ecbf6e7c891911`
+**Implementation commit:** `10370cd`
+
+### Contract added first
+
+- One intentional red run produced four failures because the versioned
+  machine contract, synthetic protocol exchange, and human-readable boundary
+  did not exist.
+- The contract test freezes exactly three existing read-only routes: status
+  handshake, bounded evidence snapshot, and generation-event stream. It
+  mechanically rejects refresh/write authority and requires the sidecar as
+  canonical renderer and fallback.
+- Negotiation tests accept only protocol v1 and `/api/kernel/v1`, exercise the
+  existing loopback Host/Origin guard, and fail closed on unknown protocol,
+  API prefix, host, or origin.
+- Replay tests freeze selector kinds, evidence views, bounded safe event keys,
+  numeric `Last-Event-ID`, 500-event replay, heartbeat comments, fenced
+  publication identity, and terminating `snapshot_required` gap recovery.
+
+### Implementation
+
+- `config/kernel-overlay-adapter-v1.json` is the machine-readable authority,
+  route, selector, generation, event, reconnect, negotiation, and sidecar
+  contract.
+- `tests/kernel/fixtures/overlay-adapter-v1.json` is a synthetic fenced
+  status/evidence/status snapshot, absent-status and publication-race
+  rejection set, committed-generation event, snapshot fallback, heartbeat
+  comment, and cursor-free reconnect exchange. It contains no raw prompt,
+  message, tool argument or output, path, credential, or local Usage Tracker
+  data.
+- `docs/kernel-overlay-adapter-contract.md` states that K13 does not authorize
+  an overlay, DOM integration, browser extension, CORS expansion, or transport
+  change. No runtime module, route, MCP tool, database table, asset, or bundle
+  was added.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Contract red | Pass | four tests failed only because the contract, fixture, and documentation were absent |
+| Focused contracts | Pass | 20 overlay/scope/efficiency tests validate routes, capabilities, selectors, versions, loopback origin, identity fencing, replay, privacy, real-listener read-only behavior, and exact scope ownership |
+| Broad local profile | Pass | `just v`: 320 Python tests, Ruff, MyPy, Pyright, maintainability, frontend, scope, manifest, privacy, and release checks pass |
+| Browser | Pass | 25 applicable Chromium desktop/mobile tests pass and 3 intentionally inapplicable mobile stream tests skip; the gap test proves stale EventSource closure and cursor-free reopen |
+| Distribution | Pass | wheel 129,468 bytes and pre-ledger sdist 357,268 bytes remain below measured ceilings; the machine contract is included explicitly and final release qualification will rebuild from the committed tree |
+| Installed package | Pass | exact wheel passes two fresh MCP tasks at warm Console p95 0.893 ms; installed Console and allowance smoke pass |
+| Runtime authority | Pass | allowed routes are an exact subset of existing `ROUTES`; all capture, credential, raw-content, refresh, database-write, and external-transmission flags are false |
+| Overlay absence | Pass | no `kernel/overlay` runtime package exists and no overlay or DOM asset is bundled |
+| Privacy | Pass | synthetic fixture only; a real loopback listener preserved analytical and operational SQLite files byte-identically and launched no worker; no live Usage Tracker database or real Codex content inspected |
+
+### Review metrics
+
+- Total findings: 4
+- Accepted findings: 4 (`R1`, `R2`, `R3`, `R4`)
+- Reviewer tokens: pending — the single bounded aggregate lookup timed out and
+  was not retried
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+- K13 adds no overlay runtime. The accepted review correction changes only the
+  existing sidecar's gap termination behavior; Agent Perf is not applicable
+  because no latency, throughput, or CPU claim is made.
+- No generic style gate or style-only commit occurred. One duplicate broad
+  profile occurred when `just vc` repeated the already-green `just v` before
+  building distributions; it is recorded rather than hidden.
+- Package qualification found two useful non-behavioral publication issues:
+  the contract needed an explicit sdist include, and the measured sdist ceiling
+  needed a new under-three-percent ratchet. Both were corrected without
+  changing runtime behavior.
+
+### Deviations and decisions
+
+- Serena bootstrap, IntelliJ, and semantic health are ready for the exact
+  Usage Tracker worktree. The current-task activation bridge nevertheless
+  resolves explicit activation and read-only cross-project queries to the
+  stale nonexistent `/Users/Monsky/Documents/Agent Maintainer` path. The
+  guarded recovery cycle did not change that identity defect. No unrelated
+  repository was read or changed; GitNexus and bounded source inspection were
+  used for this Usage Tracker task.
+
+### Residual risk and next task
+
+- A future overlay may need an explicitly approved transport when its page
+  origin is not loopback. K13 deliberately does not weaken the current origin
+  guard or add CORS.
+- Overlay implementation remains a separately approved future decision. K13
+  adds no overlay bundle or new authority. K14 may start after this contract
+  merges alongside completed K12.
 
 ## Task Entry Template
 

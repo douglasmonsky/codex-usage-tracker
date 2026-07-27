@@ -6,6 +6,7 @@ prune .codex-plugin
 prune assets
 include config/kernel-code-disposition-v1.json
 include config/kernel-development-efficiency-v1.json
+include config/kernel-overlay-adapter-v1.json
 include config/kernel-performance-budget.json
 include config/kernel-release-candidate-budget.json
 include config/kernel-release-cutover-v1.json

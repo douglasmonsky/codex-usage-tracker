@@ -187,6 +187,15 @@ K12_ADDITIONS = frozenset(
     }
 )
 
+K13_ADDITIONS = frozenset(
+    {
+        "config/kernel-overlay-adapter-v1.json",
+        "docs/kernel-overlay-adapter-contract.md",
+        "tests/kernel/fixtures/overlay-adapter-v1.json",
+        "tests/kernel/live/test_overlay_adapter_contract.py",
+    }
+)
+
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
     | K2_ADDITIONS
@@ -199,6 +208,7 @@ INTEGRATION_ADDITIONS = (
     | K9_ADDITIONS
     | K10_ADDITIONS
     | K12_ADDITIONS
+    | K13_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"

@@ -17,6 +17,7 @@ from scripts.check_kernel_scope import (
     K9_ADDITIONS,
     K10_ADDITIONS,
     K12_ADDITIONS,
+    K13_ADDITIONS,
     active_paths,
     load_disposition_manifest,
     publication_ref_failure,
@@ -188,6 +189,12 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/content/test_cli.py",
         "tests/kernel/content/test_service.py",
     } == K12_ADDITIONS
+    assert {
+        "config/kernel-overlay-adapter-v1.json",
+        "docs/kernel-overlay-adapter-contract.md",
+        "tests/kernel/fixtures/overlay-adapter-v1.json",
+        "tests/kernel/live/test_overlay_adapter_contract.py",
+    } == K13_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -200,6 +207,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K9_ADDITIONS
         | K10_ADDITIONS
         | K12_ADDITIONS
+        | K13_ADDITIONS
     )
 
 

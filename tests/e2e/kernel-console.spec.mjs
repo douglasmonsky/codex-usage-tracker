@@ -203,6 +203,51 @@ test("live replay and reconnect do not reannounce the committed generation", asy
   await expect(page.locator("#toast-region .toast")).toHaveCount(0);
 });
 
+test("snapshot gap resnapshots before reopening without the stale event cursor", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "one browser contract check is sufficient");
+  await page.goto("/settings");
+  await page.evaluate(() => {
+    window.__syntheticEventSources = [];
+    window.EventSource = class SyntheticEventSource {
+      constructor(url) {
+        this.url = url;
+        this.closed = false;
+        this.listeners = new Map();
+        window.__syntheticEventSources.push(this);
+      }
+
+      addEventListener(kind, listener) {
+        this.listeners.set(kind, listener);
+      }
+
+      close() {
+        this.closed = true;
+      }
+    };
+  });
+  await page.getByLabel("Watch for committed generations").check();
+  await expect.poll(
+    () => page.evaluate(() => window.__syntheticEventSources.length),
+  ).toBe(1);
+
+  await page.evaluate(() => {
+    const first = window.__syntheticEventSources[0];
+    first.listeners.get("snapshot_required")();
+  });
+
+  await expect.poll(
+    () => page.evaluate(() => window.__syntheticEventSources.length),
+  ).toBe(2);
+  const state = await page.evaluate(() => ({
+    firstClosed: window.__syntheticEventSources[0].closed,
+    secondUrl: window.__syntheticEventSources[1].url,
+  }));
+  expect(state).toEqual({
+    firstClosed: true,
+    secondUrl: "/api/kernel/v1/events?limit=100",
+  });
+});
+
 test("error recovery control retries the failed view", async ({ page }) => {
   let failures = 0;
   await page.route("**/api/kernel/v1/query", async (route) => {

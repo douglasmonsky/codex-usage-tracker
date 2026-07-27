@@ -1,0 +1,114 @@
+{
+  "schema": "codex-usage-tracker.overlay-adapter-fixture.v1",
+  "contract_schema": "codex-usage-tracker.overlay-adapter-contract.v1",
+  "protocol_version": 1,
+  "kernel_api_prefix": "/api/kernel/v1",
+  "request": {
+    "host": "127.0.0.1:47821",
+    "origin": "http://localhost:47821"
+  },
+  "capabilities": ["handshake", "evidence_snapshot", "generation_stream"],
+  "snapshot": {
+    "status_before": {
+      "version": "0.27.0+synthetic",
+      "state": "active",
+      "generation": 7,
+      "publication_id": "sha256:synthetic-publication-seven"
+    },
+    "evidence_request": {
+      "selector": "thread:synthetic-thread",
+      "view": "timeline",
+      "limit": 100,
+      "live": true
+    },
+    "evidence_response": {
+      "generation": 7,
+      "selector": "thread:synthetic-thread",
+      "view": "timeline",
+      "rows": [
+        {
+          "kind": "turn",
+          "turn_id": "synthetic-turn",
+          "total_tokens": 144,
+          "tool_calls": 2
+        }
+      ],
+      "matched_count": 1,
+      "returned_count": 1,
+      "truncated": false,
+      "next_cursor": null,
+      "destination": "/evidence/thread%3Asynthetic-thread?view=timeline&live=1",
+      "live": true,
+      "grade": "exact",
+      "coverage": {"content_included": false}
+    },
+    "status_after": {
+      "version": "0.27.0+synthetic",
+      "state": "active",
+      "generation": 7,
+      "publication_id": "sha256:synthetic-publication-seven"
+    }
+  },
+  "rejections": {
+    "absent_status": {
+      "status_before": null,
+      "evidence_response": {"generation": 7},
+      "status_after": null
+    },
+    "publication_race": {
+      "status_before": {
+        "version": "0.27.0+synthetic",
+        "state": "active",
+        "generation": 7,
+        "publication_id": "sha256:synthetic-publication-seven"
+      },
+      "evidence_response": {"generation": 7},
+      "status_after": {
+        "version": "0.27.0+synthetic",
+        "state": "active",
+        "generation": 7,
+        "publication_id": "sha256:synthetic-publication-seven-replaced"
+      }
+    }
+  },
+  "stream": {
+    "connections": [
+      {
+        "last_event_id": 40,
+        "frames": [
+          {
+            "id": 41,
+            "event": "generation_committed",
+            "data": {
+              "generation": 8,
+              "kind": "generation_committed",
+              "publication_id": "sha256:synthetic-publication-eight",
+              "selector": null,
+              "occurred_at": "2026-01-01 00:00:08",
+              "payload": {
+                "changed_sources": 1,
+                "deleted_rows": 0,
+                "inserted_calls": 2,
+                "inserted_tools": 3
+              }
+            }
+          }
+        ]
+      },
+      {
+        "last_event_id": 41,
+        "frames": [{"event": "snapshot_required", "data": {"generation": 8}}]
+      },
+      {
+        "last_event_id": null,
+        "frames": [{"comment": "heartbeat"}]
+      }
+    ],
+    "reconnect": {
+      "header": "Last-Event-ID",
+      "resume_value": "41",
+      "on_gap": "snapshot_required",
+      "after_gap_header": null
+    }
+  }
+}
