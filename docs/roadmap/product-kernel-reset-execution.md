@@ -1743,7 +1743,7 @@ release PR CI, protected publication, and public verification remain
 **Branch:** `release/0.27.0`
 **Base:** `origin/main` at
 `b0857cb6744ffa8f82453eedb07863afb3a6b69f`
-**Commits:** pending
+**Commits:** release preparation `20a0c47`; qualification ledger pending
 
 ### Contract added first
 
@@ -1784,7 +1784,7 @@ release PR CI, protected publication, and public verification remain
 | Content isolation | Pass | disabled by default; explicit opt-in owner-only index; aggregate-only query; deletion removes content database without changing accounting |
 | 10,000-call refresh | Pass | initial 735.855 ms; byte-preserving no-change 7.666 ms; one-row append 20.437 ms; replacement 164.196 ms |
 | 100,000-call scale | Pass | initial 11.654 s with 35.384 ms writer p95; byte-preserving no-change 33.923 ms; one-row append 55.841 ms; replacement 1.821 s |
-| Distribution | Pass | normalized final-review wheel 129,485 bytes and sdist 355,148 bytes; exact member and source-byte checks pass; immutable public hashes remain a protected post-merge publication gate |
+| Distribution | Pass | normalized post-commit candidate passes exact member and source-byte checks and remains below the 130,000-byte wheel and 364,000-byte sdist ceilings; exact immutable sizes and hashes are recorded outside the self-containing archive, then in post-release evidence |
 | Installed wheel | Pass | two fresh MCP tasks; warm Console p95 0.826 ms; installed Console and allowance smoke pass |
 | Privacy | Pass | synthetic fixtures only; no live Usage Tracker database or raw Codex content inspected |
 
