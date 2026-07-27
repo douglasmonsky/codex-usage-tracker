@@ -2,49 +2,36 @@
 
 ## Project Purpose
 
-This repo builds a local Codex plugin and dashboard that track aggregate token usage from Codex session logs.
+This integration branch builds the lean 0.26 local usage-data kernel. It is
+deliberately incomplete and non-publishable until the K10 cutover.
 
 ## Tech Stack
 
 - Python 3.10+
 - SQLite via the Python standard library
-- MCP Python SDK for Codex tool exposure
 - Pytest for tests
 
 ## Repo Layout
 
-- `src/codex_usage_tracker/` - parser, SQLite store, reports, dashboard, CLI, and MCP server.
-- `src/codex_usage_tracker/context.py` - on-demand raw-context reader for one selected usage record.
-- `src/codex_usage_tracker/reports.py` - shared application/report services used by CLI and MCP wrappers.
-- `src/codex_usage_tracker/api_payloads.py` - shared stable JSON payload builders for CLI and MCP surfaces.
-- `src/codex_usage_tracker/schema.py` - single source of truth for persisted usage-event columns.
-- `src/codex_usage_tracker/threads.py` - thread attachment inference used by dashboard payload generation.
-- `src/codex_usage_tracker/pricing_config.py`, `pricing_openai.py`, `pricing_estimates.py`, and `costing.py` - pricing config, source parsing, estimate policy, and cost calculations behind the `pricing.py` facade.
-- `src/codex_usage_tracker/allowance.py` - Codex credit-rate and optional local allowance-window helpers.
-- `src/codex_usage_tracker/plugin_installer.py` - package-owned local Codex plugin installer.
-- `src/codex_usage_tracker/plugin_data/` - plugin assets, dashboard template/assets, local dashboard guide, screenshots, and skill files bundled into wheels.
-- `skills/codex-usage-tracker/` and `src/codex_usage_tracker/plugin_data/skills/codex-usage-tracker/` - operational Codex skill for tracker setup, summaries, dashboard generation, and MCP tools.
-- `skills/codex-usage-api/` and `src/codex_usage_tracker/plugin_data/skills/codex-usage-api/` - companion Codex skill for conversational analysis using the stable JSON API/MCP tools.
-- `src/codex_usage_tracker/server.py` - localhost dashboard server with live aggregate refresh and lazy context endpoints.
-- `~/.codex-usage-tracker/pricing.json` - optional local-only pricing config, never committed.
-- `~/.codex-usage-tracker/allowance.json` - optional local-only copied allowance state, never committed.
-- `.codex-plugin/plugin.json` - Codex plugin manifest.
-- `.mcp.json` - MCP server configuration for Codex.
-- `scripts/install_local_plugin.py` - compatibility wrapper around `codex-usage-tracker install-plugin`.
-- `scripts/check_release.py` - release-readiness checks for docs, versions, packaging, wheel contents, and tracked secret patterns.
-- `.github/workflows/ci.yml` - GitHub Actions test and package build workflow.
-- `.github/workflows/pricing-compat.yml` - scheduled/manual non-blocking live pricing parser compatibility check.
-- `docs/` - install, dashboard, CLI, pricing/credits, MCP, privacy, architecture, development, JSON-schema docs, and screenshots built from synthetic aggregate fixture data.
-- `tests/` - synthetic fixtures and unit tests.
+- `src/codex_usage_tracker/kernel/` - the only active product implementation.
+- `src/codex_usage_tracker/release/` - retained exact-byte release primitives.
+- `tests/kernel/` - synthetic oracle and current phase contracts.
+- `tests/release/` - retained release/promotion safety contracts.
+- `config/kernel-code-disposition-v1.json` - frozen K1 path decisions and
+  progressive transplant states.
+- `config/kernel-retired-surfaces-v1.json` - exact 0.25 public-surface removal
+  inventory.
+- `scripts/check_kernel_scope.py` - active-tree and publication-ref guard.
+- `docs/kernel-development-scope.md` - search, provenance, and privacy boundary.
+- `.mcp.json` - intentionally empty until K6.
+- `.codex-plugin/plugin.json` - non-publishable integration identity.
 
 ## Setup
 
 ```bash
 python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install ".[dev]" twine
-codex-usage-tracker install-plugin --python .venv/bin/python
+.venv/bin/python -m pip install -e ".[dev]"
+just v
 ```
 
 ## Branch And PR Workflow
@@ -98,7 +85,8 @@ evidence. The consuming model owns inference, explanation, and recommendations.
 Do not add server-authored narrative analysis, another MCP tool, a default fact
 table, a compatibility profile, default content indexing, or an overlay unless
 the active roadmap names it or an approved design amendment authorizes it.
-Removal and upgrade behavior must also be due in `docs/deprecations.md`.
+Removal and cutover behavior must be recorded in the active roadmap and
+execution ledger.
 
 The former MCP-first roadmap is archived historical evidence. Its stable
 redirects do not authorize new `pivot/` work.
@@ -113,6 +101,8 @@ then run broader validation in proportion to risk.
   direction. Split code when ownership or testability becomes clearer, and keep
   cohesive behavior together when an extraction would only add forwarding
   layers.
+- Judge module boundaries by responsibility, dependency direction, complexity,
+  and testability. Do not split cohesive code solely to satisfy a line count.
 - Prefer direct functions, explicit data structures, and existing repository
   patterns. Add an abstraction only when it removes current duplication,
   isolates an external boundary, or gives a concrete test seam needed now.
@@ -123,6 +113,9 @@ then run broader validation in proportion to risk.
   behavioral, type, privacy, security, dependency, packaging, or release defect
   it identifies; if it identifies none, correct the check or policy rather than
   reshaping unrelated code.
+- Write comparisons in the order that best communicates the domain contract.
+  For measured budgets, prefer `measured <= ceiling`; do not reorder a clear
+  assertion solely to satisfy a stylistic Yoda-condition preference.
 - Use one focused test loop while implementing. At the stable checkpoint, run
   the smallest broad profile that covers every touched contract; reuse that
   evidence instead of rerunning overlapping profiles.

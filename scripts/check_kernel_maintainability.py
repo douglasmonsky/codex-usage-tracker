@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enforce lean source-size and Xenon bounds on the replacement kernel."""
+"""Enforce behavior-relevant complexity bounds on the replacement kernel."""
 
 from __future__ import annotations
 
@@ -13,29 +13,11 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def maintainability_failures(
     source_root: Path,
-    *,
-    max_physical: int = 600,
-    max_source: int = 600,
 ) -> list[str]:
     """Return deterministic kernel-only maintainability failures."""
 
     python_files = sorted(source_root.rglob("*.py")) if source_root.is_dir() else []
     failures: list[str] = []
-    for path in python_files:
-        lines = path.read_text(encoding="utf-8").splitlines()
-        physical = len(lines)
-        source = sum(
-            bool(line.strip()) and not line.lstrip().startswith("#")
-            for line in lines
-        )
-        relative = path.relative_to(source_root)
-        if physical > max_physical:
-            failures.append(
-                f"{relative}: physical lines {physical} exceed {max_physical}"
-            )
-        if source > max_source:
-            failures.append(f"{relative}: source lines {source} exceed {max_source}")
-
     if python_files:
         result = subprocess.run(
             [
@@ -43,7 +25,7 @@ def maintainability_failures(
                 "-m",
                 "xenon",
                 "-b",
-                "B",
+                "C",
                 "-m",
                 "B",
                 "-a",

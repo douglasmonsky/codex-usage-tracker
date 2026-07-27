@@ -1,50 +1,25 @@
 {
-  "name": "codex-usage-tracker",
-  "version": "0.25.1",
-  "bundle": {
-    "schema": "codex-usage-tracker.plugin-bundle.v1",
-    "digest": "sha256:8e2f80a1c84cd39da8047f30b14fa82a1b813421341011baf81752fa338cdb4b",
-    "runtime_version": "0.25.1"
-  },
-  "description": "Unofficial local, evidence-backed Codex usage analyst with MCP tools and an Evidence Console.",
   "author": {
     "name": "Douglas Monsky"
   },
+  "bundle": {
+    "digest": "sha256:2dce244c037935750a757cd0f7e43f705f1d44e838a208852854bb93f3379659",
+    "publishable": false,
+    "runtime_version": "0.26.0.dev0",
+    "schema": "codex-usage-tracker.kernel-plugin-bundle.v1"
+  },
+  "description": "Non-publishable 0.26 release candidate for exact local Codex usage facts.",
   "homepage": "https://github.com/douglasmonsky/codex-usage-tracker",
-  "repository": "https://github.com/douglasmonsky/codex-usage-tracker",
-  "license": "MIT",
   "keywords": [
     "codex",
     "tokens",
     "usage",
-    "mcp",
-    "dashboard"
+    "mcp"
   ],
-  "skills": "./skills/",
+  "license": "MIT",
   "mcpServers": "./.mcp.json",
-  "interface": {
-    "displayName": "Codex Usage Tracker",
-    "shortDescription": "Local, evidence-backed Codex usage analyst with MCP tools and an Evidence Console",
-    "longDescription": "Unofficial independent project, not made by, affiliated with, endorsed by, sponsored by, or supported by OpenAI. Reads local Codex session logs to power MCP-based usage analysis, allowance diagnostics, token-waste investigations, shareable aggregate reports, and a supporting local Evidence Console without uploading logs.",
-    "developerName": "Douglas Monsky",
-    "category": "Productivity",
-    "capabilities": [
-      "Interactive",
-      "Read",
-      "Write"
-    ],
-    "websiteURL": "https://github.com/douglasmonsky/codex-usage-tracker",
-    "privacyPolicyURL": "https://github.com/douglasmonsky/codex-usage-tracker",
-    "termsOfServiceURL": "https://github.com/douglasmonsky/codex-usage-tracker",
-    "defaultPrompt": [
-      "What drove my Codex usage this week?",
-      "Look through my usage for token waste",
-      "Compare model and effort usage",
-      "Check whether my weekly allowance changed"
-    ],
-    "brandColor": "#2563EB",
-    "composerIcon": "./assets/icon.svg",
-    "logo": "./assets/icon.svg",
-    "screenshots": []
-  }
+  "name": "codex-usage-tracker",
+  "repository": "https://github.com/douglasmonsky/codex-usage-tracker",
+  "skills": "./skills/",
+  "version": "0.26.0-dev.0"
 }

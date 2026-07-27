@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="description" content="Local-first Codex usage evidence console">
+    <title>Codex Usage Tracker</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/assets/kernel-console/styles.css">
+    <script type="module" src="/assets/kernel-console/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">Skip to workspace</a>
+    <div class="app-shell" data-console-shell>
+      <aside class="sidebar" aria-label="Primary navigation">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">&gt;_</span>
+          <span><strong>Codex Usage Tracker</strong><small>Local evidence kernel</small></span>
+        </div>
+        <p class="local-badge">Local data only</p>
+        <nav aria-label="Primary navigation">
+          <a href="/live" data-route="live"><span aria-hidden="true">◉</span>Live</a>
+          <a href="/explore" data-route="explore"><span aria-hidden="true">⌕</span>Explore</a>
+          <a href="/evidence" data-route="evidence"><span aria-hidden="true">◇</span>Evidence</a>
+          <a href="/limits" data-route="limits"><span aria-hidden="true">◔</span>Limits</a>
+          <a href="/settings" data-route="settings"><span aria-hidden="true">⚙</span>Settings</a>
+        </nav>
+        <div class="sidebar-status">
+          <span id="connection-dot" class="status-dot" aria-hidden="true"></span>
+          <span id="connection-label">Connecting…</span>
+        </div>
+      </aside>
+      <div class="content">
+        <header class="topbar">
+          <button id="menu-toggle" class="icon-button" type="button" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+          <div>
+            <span class="eyebrow">Committed snapshot</span>
+            <strong id="generation-label">Loading local index…</strong>
+          </div>
+          <div class="topbar-actions">
+            <span id="freshness-chip" class="chip neutral">Checking freshness</span>
+            <button id="refresh-button" class="button secondary" type="button">Refresh data</button>
+          </div>
+        </header>
+        <main id="workspace" tabindex="-1" aria-live="polite"></main>
+      </div>
+    </div>
+    <div id="toast-region" class="toast-region" role="status" aria-live="polite"></div>
+  </body>
+</html>

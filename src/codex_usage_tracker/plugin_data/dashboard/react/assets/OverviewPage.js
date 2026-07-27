@@ -1,1 +1,0 @@
-import"./dashboard-react.js";import{d as o}from"./App.js";import"./Primitives.js";import{r as t}from"./filtering.js";import"./locale-zh-Hans.js";import"./dashboardRouter.js";import"./router.js";o("overview-summary");o("overview-recommendations");function u(e,i=""){return e.filter(r=>t([r.thread,r.model,r.effort,r.signal,r.recommendation],i))}export{u as overviewCallsForQuery};

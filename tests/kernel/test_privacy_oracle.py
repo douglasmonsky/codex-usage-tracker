@@ -29,7 +29,7 @@ def test_kernel_fixtures_are_synthetic_and_portable() -> None:
 
 
 def test_oracle_output_excludes_raw_private_sentinels(tmp_path: Path) -> None:
-    from tests.kernel.oracle_support import export_accounting_oracle
+    from tests.kernel.test_ingest_oracle import export_accounting_oracle
 
     observed = export_accounting_oracle(
         fixture_root=_FIXTURE_ROOT,

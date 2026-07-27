@@ -1,0 +1,1 @@
+{"additionalProperties":false,"properties":{"cursor":{"type":["string","null"]},"limit":{"maximum":500,"minimum":1,"type":"integer"},"live":{"type":"boolean"},"selector":{"maxLength":256,"type":"string"},"view":{"enum":["summary","timeline","calls","tools","activities","allowance"],"type":"string"}},"required":["selector"],"type":"object"}

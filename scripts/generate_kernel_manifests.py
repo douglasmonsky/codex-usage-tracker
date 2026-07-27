@@ -1,488 +1,974 @@
 #!/usr/bin/env python3
-"""Generate the K1 retirement and full-tree disposition manifests."""
+"""Validate and transition the frozen Product Kernel Reset manifests."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import re
-import sqlite3
 import subprocess
 import sys
-from argparse import _SubParsersAction
 from pathlib import Path
 from typing import Any
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
-    import tomli as tomllib
-
-from codex_usage_tracker.interfaces.cli.parser import build_parser
-from codex_usage_tracker.interfaces.mcp.registry import tool_specs
-from codex_usage_tracker.server.routes import (
-    GET_DIAGNOSTIC_FACT_ROUTES,
-    GET_DYNAMIC_ROUTE_METHODS,
-    GET_ROUTE_METHODS,
-    POST_ROUTE_METHODS,
-)
-from codex_usage_tracker.store.schema import init_db
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _RETIRED_PATH = _REPO_ROOT / "config" / "kernel-retired-surfaces-v1.json"
 _DISPOSITION_PATH = _REPO_ROOT / "config" / "kernel-code-disposition-v1.json"
-_KERNEL_MCP_TOOLS = {
-    "usage_status",
-    "usage_refresh",
-    "usage_query",
-    "usage_evidence",
-    "usage_allowance",
-    "usage_job_status",
+_K1_MERGE = "d8da9bccdb6674e7dca4c0872c36a1346949dc13"
+_K2_DEFERRED = {
+    "tests/store/test_foreign_key_cascades.py": (
+        "tests/kernel/test_ingest_reconciliation.py",
+        "tests/kernel/test_source_lifecycle_oracle.py",
+    ),
+    "tests/store/test_usage_deduplication.py": (
+        "tests/kernel/test_ingest_deduplication.py",
+        "tests/kernel/test_oracle_equivalence.py",
+    ),
 }
-_ALREADY_REMOVED_MCP_TOOLS = {"generate_usage_dashboard"}
-_RETIRED_SOURCE_PREFIXES = (
-    "src/codex_usage_tracker/analysis",
-    "src/codex_usage_tracker/compression",
-    "src/codex_usage_tracker/content",
-    "src/codex_usage_tracker/diagnostic",
-    "src/codex_usage_tracker/recommend",
-    "src/codex_usage_tracker/usage_drain",
-    "src/codex_usage_tracker/visualization",
-)
-_LEGACY_STORE_MARKERS = (
-    "analysis_",
-    "compression",
-    "content_",
-    "dashboard",
-    "diagnostic",
-    "home_",
-    "investigation",
-    "large_low_output",
-    "recommendation",
-    "repeated_files",
-    "shell_churn",
-)
-_LEGACY_INTERFACE_MARKERS = (
-    "compatibility",
-    "compression",
-    "dashboard",
-    "dogfood",
-    "investigation",
-    "subagents",
-    "visualization",
-    "work_proof",
-)
-_LEGACY_APPLICATION_NAMES = {
-    "analysis_protocols.py",
-    "analyze.py",
-    "context.py",
+_K2_TRANSPLANTS = {
+    "src/codex_usage_tracker/core/call_origin.py": (
+        "src/codex_usage_tracker/kernel/models.py",
+        ("tests/kernel/test_schema.py",),
+    ),
+    "src/codex_usage_tracker/core/models.py": (
+        "src/codex_usage_tracker/kernel/models.py",
+        ("tests/kernel/test_schema.py",),
+    ),
+    "src/codex_usage_tracker/core/paths.py": (
+        "src/codex_usage_tracker/kernel/operational.py",
+        (
+            "tests/kernel/test_cutover_control.py",
+            "tests/kernel/test_source_registry_privacy.py",
+        ),
+    ),
+    "src/codex_usage_tracker/core/projects.py": (
+        "src/codex_usage_tracker/kernel/identity.py",
+        ("tests/kernel/test_identity.py",),
+    ),
+    "src/codex_usage_tracker/core/redaction.py": (
+        "src/codex_usage_tracker/kernel/identity.py",
+        ("tests/kernel/test_identity.py",),
+    ),
+    "src/codex_usage_tracker/core/schema.py": (
+        "src/codex_usage_tracker/kernel/models.py",
+        ("tests/kernel/test_schema.py",),
+    ),
+    "src/codex_usage_tracker/core/threads.py": (
+        "src/codex_usage_tracker/kernel/identity.py",
+        ("tests/kernel/test_identity.py",),
+    ),
+    "src/codex_usage_tracker/core/usage_identity.py": (
+        "src/codex_usage_tracker/kernel/identity.py",
+        ("tests/kernel/test_identity.py",),
+    ),
+    "src/codex_usage_tracker/store/cache_repository.py": (
+        "src/codex_usage_tracker/kernel/operational.py",
+        ("tests/kernel/test_cutover_control.py",),
+    ),
+    "src/codex_usage_tracker/store/connection.py": (
+        "src/codex_usage_tracker/kernel/database.py",
+        ("tests/kernel/test_database_lifecycle.py",),
+    ),
+    "src/codex_usage_tracker/store/deduplication.py": (
+        "src/codex_usage_tracker/kernel/identity.py",
+        ("tests/kernel/test_identity.py",),
+    ),
+    "src/codex_usage_tracker/store/deduplication_schema.py": (
+        "src/codex_usage_tracker/kernel/schema.py",
+        ("tests/kernel/test_schema.py",),
+    ),
+    "src/codex_usage_tracker/store/integrity.py": (
+        "src/codex_usage_tracker/kernel/database.py",
+        ("tests/kernel/test_database_lifecycle.py",),
+    ),
+    "src/codex_usage_tracker/store/rows.py": (
+        "src/codex_usage_tracker/kernel/models.py",
+        ("tests/kernel/test_schema.py",),
+    ),
+    "src/codex_usage_tracker/store/schema.py": (
+        "src/codex_usage_tracker/kernel/schema.py",
+        ("tests/kernel/test_schema.py",),
+    ),
+    "tests/store/test_connection_integrity.py": (
+        "tests/kernel/test_database_lifecycle.py",
+        ("tests/kernel/test_database_lifecycle.py",),
+    ),
 }
-_HISTORICAL_MARKERS = (
-    "/archive/",
-    "/archive-",
-    "docs/maintainability-roadmap.md",
-    "docs/maintainability-scorecard.md",
-    "docs/screenshots/",
-    ".agent-maintainer/change-plans/archive/",
-)
-_KEEP_PREFIXES = (
-    ".github/",
-    ".agent-maintainer/change-plans/k1-oracle-baseline.md",
-    "config/kernel-",
-    "docs/roadmap/product-kernel-reset",
-    "docs/superpowers/specs/2026-07-26-",
-    "docs/superpowers/plans/2026-07-26-product-kernel-reset",
-    "scripts/benchmark_kernel.py",
-    "scripts/check_kernel_maintainability.py",
-    "scripts/generate_kernel_manifests.py",
-    "tests/kernel/",
-)
-_KEEP_EXACT = {
-    ".gitignore",
-    ".gitattributes",
-    ".mcp.json",
-    "AGENTS.md",
-    "AGENTS.agent-maintainer.md",
-    "CHANGELOG.md",
-    "LICENSE",
-    "MANIFEST.in",
-    "README.md",
-    "SECURITY.md",
-    "justfile",
-    "package.json",
-    "package-lock.json",
-    "pyproject.toml",
-    "tach.toml",
+
+_K3_TRANSPLANTS = {
+    "src/codex_usage_tracker/application/job_status.py": (
+        "src/codex_usage_tracker/kernel/lease.py",
+        ("tests/kernel/test_ingest_jobs.py",),
+    ),
+    "src/codex_usage_tracker/application/refresh.py": (
+        "src/codex_usage_tracker/kernel/ingest.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "src/codex_usage_tracker/ingest/fact_classifiers.py": (
+        "src/codex_usage_tracker/kernel/normalize.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "src/codex_usage_tracker/ingest/facts.py": (
+        "src/codex_usage_tracker/kernel/normalize.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "src/codex_usage_tracker/parser/api.py": (
+        "src/codex_usage_tracker/kernel/parser.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "src/codex_usage_tracker/parser/jsonl_v1.py": (
+        "src/codex_usage_tracker/kernel/parser.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "src/codex_usage_tracker/parser/jsonl_values.py": (
+        "src/codex_usage_tracker/kernel/parser.py",
+        ("tests/kernel/test_ingest_privacy.py",),
+    ),
+    "src/codex_usage_tracker/parser/state.py": (
+        "src/codex_usage_tracker/kernel/parser.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "src/codex_usage_tracker/store/refresh.py": (
+        "src/codex_usage_tracker/kernel/writer.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "src/codex_usage_tracker/store/refresh_metadata.py": (
+        "src/codex_usage_tracker/kernel/lease.py",
+        ("tests/kernel/test_ingest_jobs.py",),
+    ),
+    "src/codex_usage_tracker/store/refresh_parse.py": (
+        "src/codex_usage_tracker/kernel/parser.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "src/codex_usage_tracker/store/refresh_stream.py": (
+        "src/codex_usage_tracker/kernel/watcher.py",
+        ("tests/kernel/test_watcher.py",),
+    ),
+    "src/codex_usage_tracker/store/source_record_schema.py": (
+        "src/codex_usage_tracker/kernel/schema.py",
+        ("tests/kernel/test_ingest_reconciliation.py",),
+    ),
+    "src/codex_usage_tracker/store/source_record_sync.py": (
+        "src/codex_usage_tracker/kernel/writer.py",
+        ("tests/kernel/test_ingest_reconciliation.py",),
+    ),
+    "src/codex_usage_tracker/store/source_records.py": (
+        "src/codex_usage_tracker/kernel/discovery.py",
+        ("tests/kernel/test_source_lifecycle_oracle.py",),
+    ),
+    "src/codex_usage_tracker/store/source_replacement.py": (
+        "src/codex_usage_tracker/kernel/writer.py",
+        ("tests/kernel/test_ingest_reconciliation.py",),
+    ),
+    "src/codex_usage_tracker/store/sources.py": (
+        "src/codex_usage_tracker/kernel/discovery.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "tests/application/test_refresh.py": (
+        "tests/kernel/test_ingest_pipeline.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "tests/cli/test_cli_parser_diagnostics.py": (
+        "tests/kernel/test_ingest_privacy.py",
+        ("tests/kernel/test_ingest_privacy.py",),
+    ),
+    "tests/interfaces/cli/test_parser.py": (
+        "tests/kernel/test_ingest_oracle.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "tests/parser/test_parser.py": (
+        "tests/kernel/test_ingest_oracle.py",
+        ("tests/kernel/test_ingest_oracle.py",),
+    ),
+    "tests/parser/test_parser_deduplication.py": (
+        "tests/kernel/test_ingest_reconciliation.py",
+        ("tests/kernel/test_oracle_equivalence.py",),
+    ),
+    "tests/parser/test_parser_observer.py": (
+        "tests/kernel/test_watcher.py",
+        ("tests/kernel/test_watcher.py",),
+    ),
+    "tests/parser/test_parser_state.py": (
+        "tests/kernel/test_ingest_pipeline.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "tests/reliability/test_read_during_refresh.py": (
+        "tests/kernel/test_ingest_concurrency.py",
+        ("tests/kernel/test_ingest_concurrency.py",),
+    ),
+    "tests/reliability/test_refresh_locking.py": (
+        "tests/kernel/test_ingest_jobs.py",
+        ("tests/kernel/test_ingest_jobs.py",),
+    ),
+    "tests/server/test_refresh_jobs.py": (
+        "tests/kernel/test_ingest_jobs.py",
+        ("tests/kernel/test_ingest_jobs.py",),
+    ),
+    "tests/store/test_foreign_key_cascades.py": (
+        "tests/kernel/test_ingest_reconciliation.py",
+        ("tests/kernel/test_ingest_reconciliation.py",),
+    ),
+    "tests/store/test_refresh_parallel.py": (
+        "tests/kernel/test_ingest_jobs.py",
+        ("tests/kernel/test_ingest_jobs.py",),
+    ),
+    "tests/store/test_refresh_workflow.py": (
+        "tests/kernel/test_ingest_pipeline.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "tests/store/test_source_records.py": (
+        "tests/kernel/test_ingest_reconciliation.py",
+        ("tests/kernel/test_ingest_reconciliation.py",),
+    ),
+    "tests/store/test_store_sources.py": (
+        "tests/kernel/test_ingest_pipeline.py",
+        ("tests/kernel/test_ingest_pipeline.py",),
+    ),
+    "tests/store/test_usage_deduplication.py": (
+        "tests/kernel/test_ingest_reconciliation.py",
+        ("tests/kernel/test_oracle_equivalence.py",),
+    ),
+}
+_K4_TRANSPLANTS = {
+    "src/codex_usage_tracker/application/query.py": (
+        "src/codex_usage_tracker/kernel/query/service.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+    "src/codex_usage_tracker/application/query_models.py": (
+        "src/codex_usage_tracker/kernel/query/contracts.py",
+        ("tests/kernel/query/test_contracts.py",),
+    ),
+    "src/codex_usage_tracker/application/query_validation.py": (
+        "src/codex_usage_tracker/kernel/query/catalog.py",
+        ("tests/kernel/query/test_contracts.py",),
+    ),
+    "src/codex_usage_tracker/store/query_sql.py": (
+        "src/codex_usage_tracker/kernel/query/plans.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+    "src/codex_usage_tracker/store/query_values.py": (
+        "src/codex_usage_tracker/kernel/query/contracts.py",
+        ("tests/kernel/query/test_contracts.py",),
+    ),
+    "src/codex_usage_tracker/store/schema_query_indexes.py": (
+        "src/codex_usage_tracker/kernel/schema.py",
+        ("tests/kernel/query/test_performance.py",),
+    ),
+    "src/codex_usage_tracker/store/summary_queries.py": (
+        "src/codex_usage_tracker/kernel/query/service.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+    "src/codex_usage_tracker/store/usage_timing.py": (
+        "src/codex_usage_tracker/kernel/query/service.py",
+        ("tests/kernel/query/test_performance.py",),
+    ),
+    "tests/application/test_query.py": (
+        "tests/kernel/query/test_service.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+    "tests/application/test_query_validation.py": (
+        "tests/kernel/query/test_contracts.py",
+        ("tests/kernel/query/test_contracts.py",),
+    ),
+    "tests/golden_questions/cases/03_precise_model_query.json": (
+        "tests/kernel/query/test_service.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+    "tests/mcp/test_core_query_tool.py": (
+        "tests/kernel/query/test_contracts.py",
+        ("tests/kernel/query/test_contracts.py",),
+    ),
+    "tests/store/test_store_query_sql.py": (
+        "tests/kernel/query/test_service.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+}
+_K5_TRANSPLANTS = {
+    "src/codex_usage_tracker/application/evidence.py": (
+        "src/codex_usage_tracker/kernel/evidence/service.py",
+        (
+            "tests/kernel/evidence/test_contracts.py",
+            "tests/kernel/evidence/test_service.py",
+        ),
+    ),
+}
+_K6_TRANSPLANTS = {
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/application/service.py",
+            ("tests/kernel/interfaces/test_application.py",),
+        )
+        for path in (
+            "src/codex_usage_tracker/application/__init__.py",
+            "src/codex_usage_tracker/application/container.py",
+            "src/codex_usage_tracker/application/errors.py",
+            "src/codex_usage_tracker/application/protocols.py",
+            "src/codex_usage_tracker/application/services.py",
+            "src/codex_usage_tracker/application/tach.domain.toml",
+        )
+    },
+    "src/codex_usage_tracker/application/paths.py": (
+        "src/codex_usage_tracker/kernel/application/runtime.py",
+        ("tests/kernel/interfaces/test_application.py",),
+    ),
+    "src/codex_usage_tracker/application/requests.py": (
+        "src/codex_usage_tracker/kernel/application/codec.py",
+        ("tests/kernel/interfaces/test_application.py",),
+    ),
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/interfaces/cli/main.py",
+            ("tests/kernel/interfaces/test_cli.py",),
+        )
+        for path in (
+            "src/codex_usage_tracker/interfaces/cli/__init__.py",
+            "src/codex_usage_tracker/interfaces/cli/commands.py",
+            "src/codex_usage_tracker/interfaces/cli/help_i18n.py",
+            "src/codex_usage_tracker/interfaces/cli/namespaces.py",
+            "src/codex_usage_tracker/interfaces/cli/parser.py",
+            "src/codex_usage_tracker/interfaces/cli/parser_data.py",
+            "src/codex_usage_tracker/interfaces/cli/parser_diagnostics.py",
+            "src/codex_usage_tracker/interfaces/cli/parser_lifecycle.py",
+            "src/codex_usage_tracker/interfaces/cli/parser_reports.py",
+            "src/codex_usage_tracker/interfaces/cli/tach.domain.toml",
+        )
+    },
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/interfaces/http/app.py",
+            ("tests/kernel/interfaces/test_http.py",),
+        )
+        for path in (
+            "src/codex_usage_tracker/interfaces/http/__init__.py",
+            "src/codex_usage_tracker/interfaces/http/serialization.py",
+            "src/codex_usage_tracker/interfaces/http/tach.domain.toml",
+            "src/codex_usage_tracker/interfaces/http/v2.py",
+        )
+    },
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/interfaces/mcp/catalog.py",
+            (
+                "tests/kernel/interfaces/test_contracts.py",
+                "tests/kernel/interfaces/test_mcp.py",
+            ),
+        )
+        for path in (
+            "src/codex_usage_tracker/interfaces/mcp/__init__.py",
+            "src/codex_usage_tracker/interfaces/mcp/core_tools.py",
+            "src/codex_usage_tracker/interfaces/mcp/developer_tools.py",
+            "src/codex_usage_tracker/interfaces/mcp/models.py",
+            "src/codex_usage_tracker/interfaces/mcp/profiles.py",
+            "src/codex_usage_tracker/interfaces/mcp/query_analysis_tools.py",
+            "src/codex_usage_tracker/interfaces/mcp/registry.py",
+            "src/codex_usage_tracker/interfaces/mcp/tach.domain.toml",
+            "src/codex_usage_tracker/interfaces/tach.domain.toml",
+        )
+    },
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/interfaces/mcp/server.py",
+            ("tests/kernel/interfaces/test_mcp.py",),
+        )
+        for path in (
+            "src/codex_usage_tracker/interfaces/mcp/mcp_allowance.py",
+            "src/codex_usage_tracker/interfaces/mcp/mcp_discovery.py",
+            "src/codex_usage_tracker/interfaces/mcp/mcp_local_operations.py",
+            "src/codex_usage_tracker/interfaces/mcp/mcp_server_tools.py",
+            "src/codex_usage_tracker/interfaces/mcp/runtime.py",
+            "src/codex_usage_tracker/interfaces/mcp/serialization.py",
+            "src/codex_usage_tracker/interfaces/mcp/server.py",
+            "src/codex_usage_tracker/interfaces/mcp/transports.py",
+        )
+    },
+    "src/codex_usage_tracker/plugin_installer.py": (
+        "src/codex_usage_tracker/kernel/plugin_manifest.py",
+        ("tests/kernel/interfaces/test_plugin.py",),
+    ),
+}
+_K8_TRANSPLANTS = {
+    "src/codex_usage_tracker/application/allowance.py": (
+        "src/codex_usage_tracker/kernel/allowance/service.py",
+        ("tests/kernel/allowance/test_service.py",),
+    ),
+    "src/codex_usage_tracker/application/allowance_models.py": (
+        "src/codex_usage_tracker/kernel/allowance/efficiency.py",
+        ("tests/kernel/allowance/test_efficiency.py",),
+    ),
+    "src/codex_usage_tracker/pricing/__init__.py": (
+        "src/codex_usage_tracker/kernel/allowance/__init__.py",
+        ("tests/kernel/allowance/test_rates.py",),
+    ),
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/allowance/rates.py",
+            ("tests/kernel/allowance/test_rates.py",),
+        )
+        for path in (
+            "src/codex_usage_tracker/pricing/allowance.py",
+            "src/codex_usage_tracker/pricing/allowance_config.py",
+            "src/codex_usage_tracker/pricing/allowance_rate_card.py",
+            "src/codex_usage_tracker/pricing/allowance_usage.py",
+            "src/codex_usage_tracker/pricing/api.py",
+            "src/codex_usage_tracker/pricing/config.py",
+            "src/codex_usage_tracker/pricing/costing.py",
+        )
+    },
+    "src/codex_usage_tracker/pricing/tach.domain.toml": (
+        "src/codex_usage_tracker/kernel/allowance/__init__.py",
+        ("tests/kernel/test_repository_quality_policy.py",),
+    ),
+    "src/codex_usage_tracker/store/allowance_materialization.py": (
+        "src/codex_usage_tracker/kernel/allowance/service.py",
+        ("tests/kernel/allowance/test_service.py",),
+    ),
+    "src/codex_usage_tracker/store/allowance_observation_sync.py": (
+        "src/codex_usage_tracker/kernel/writer.py",
+        ("tests/kernel/allowance/test_service.py",),
+    ),
+    "src/codex_usage_tracker/store/allowance_observations.py": (
+        "src/codex_usage_tracker/kernel/allowance/service.py",
+        ("tests/kernel/allowance/test_service.py",),
+    ),
+    "src/codex_usage_tracker/store/allowance_schema.py": (
+        "src/codex_usage_tracker/kernel/schema.py",
+        ("tests/kernel/test_schema.py",),
+    ),
+    "src/codex_usage_tracker/store/service_tier_schema.py": (
+        "src/codex_usage_tracker/kernel/schema.py",
+        ("tests/kernel/test_schema.py",),
+    ),
+    **{
+        path: (
+            "tests/kernel/allowance/test_efficiency.py",
+            ("tests/kernel/allowance/test_efficiency.py",),
+        )
+        for path in (
+            "tests/application/test_allowance_models.py",
+            "tests/allowance_intelligence/test_cycles.py",
+        )
+    },
+    **{
+        path: (
+            "tests/kernel/allowance/test_service.py",
+            ("tests/kernel/allowance/test_service.py",),
+        )
+        for path in (
+            "tests/application/test_allowance.py",
+            "tests/cli/test_allowance_intelligence_cli_mcp.py",
+            "tests/cli/test_mcp_allowance.py",
+            "tests/golden_questions/cases/08_allowance_status.json",
+            "tests/golden_questions/cases/09_allowance_evidence.json",
+            "tests/mcp/test_core_allowance_tool.py",
+            "tests/server/test_server_allowance.py",
+            "tests/server/test_server_allowance_v2.py",
+            "tests/store/test_allowance_intelligence_queries.py",
+            "tests/store/test_allowance_materialization.py",
+            "tests/store/test_allowance_observations.py",
+        )
+    },
+    **{
+        path: (
+            "tests/kernel/allowance/test_rates.py",
+            ("tests/kernel/allowance/test_rates.py",),
+        )
+        for path in (
+            "tests/pricing/test_allowance.py",
+            "tests/pricing/test_pricing.py",
+            "tests/pricing/test_rate_card.py",
+        )
+    },
 }
 
 
 def build_retired_surface_manifest() -> dict[str, Any]:
-    """Return the complete public/owned surface retirement inventory."""
+    """Return the immutable K1 public-surface inventory."""
 
-    entries: list[dict[str, str]] = []
-    for name in sorted(({spec.name for spec in tool_specs()} - _KERNEL_MCP_TOOLS) | _ALREADY_REMOVED_MCP_TOOLS):
-        entries.append(_retired_entry("mcp_tool", name, "interfaces/mcp", "six-tool kernel MCP"))
-
-    routes = {
-        *(f"GET {path}" for path in GET_ROUTE_METHODS),
-        *(f"GET {path}" for path in GET_DIAGNOSTIC_FACT_ROUTES),
-        *(f"GET {path}" for path in GET_DYNAMIC_ROUTE_METHODS),
-        *(f"POST {path}" for path in POST_ROUTE_METHODS),
-    }
-    for name in sorted(routes):
-        entries.append(_retired_entry("http_route", name, "server/routes.py", "kernel HTTP API"))
-
-    for name in _cli_command_paths():
-        entries.append(_retired_entry("cli_command", name, "cli", "kernel operational CLI"))
-
-    for name in sorted(_release_schema_ids()):
-        entries.append(_retired_entry("schema_id", name, "release_catalog.py", "kernel fact schemas"))
-
-    for name in _schema_tables():
-        entries.append(_retired_entry("table", name, "store/schema.py", "kernel database schema"))
-
-    for name in _console_routes():
-        entries.append(_retired_entry("console_route", name, "frontend/dashboard", "kernel timeline"))
-
-    for name in _frontend_assets():
-        entries.append(
-            _retired_entry("frontend_asset", name, "frontend/dashboard", "kernel timeline")
-        )
-
-    for name in _package_data_rules():
-        entries.append(
-            _retired_entry("package_data_rule", name, "pyproject.toml/MANIFEST.in", "lean kernel package")
-        )
-
-    for path in _git_lines("ls-files"):
-        if (
-            path.startswith("src/codex_usage_tracker/")
-            and path.endswith(".py")
-            and _classify_path(path)[0] == "retire"
-        ):
-            entries.append(_retired_entry("source_module", path, path, "none"))
-
-    return {
-        "schema": "codex-usage-tracker.kernel-retired-surfaces.v1",
-        "source_ref": "v0.25.1",
-        "replacement_release": "0.26.0",
-        "entries": sorted(entries, key=lambda row: (row["surface_type"], row["public_name"])),
-    }
+    return _load(_RETIRED_PATH)
 
 
 def build_code_disposition_manifest() -> dict[str, Any]:
-    """Classify every tracked path exactly once for the reset."""
+    """Return the K1 path inventory with its current transition states."""
 
-    tracked = _git_lines("ls-files")
-    tag_paths = set(_git_lines("ls-tree", "-r", "--name-only", "v0.25.1"))
-    entries = [_disposition_entry(path, tag_paths=tag_paths) for path in tracked]
-    return {
-        "schema": "codex-usage-tracker.kernel-code-disposition.v1",
-        "resolver": "git ls-files",
-        "resolver_input_sha256": hashlib.sha256(
-            ("\n".join(tracked) + "\n").encode("utf-8")
-        ).hexdigest(),
-        "source_ref": "62726189c05d423f08abdec6ad1454434188d734",
-        "terminal_status": "verified",
-        "state_machines": {
-            "keep": ["classified", "verified"],
-            "transplant": ["classified", "removed", "implemented", "verified"],
-            "retire": ["classified", "removed", "verified"],
-            "historical": ["classified", ["removed", "archived"], "verified"],
-        },
-        "entries": entries,
-    }
+    return _load(_DISPOSITION_PATH)
 
 
-def write_manifests(*, check: bool = False) -> bool:
-    """Write or compare both manifests; return whether they already matched."""
+def apply_quarantine_transition() -> None:
+    """Advance every K1 non-keep path to the K1A removed state."""
 
-    payloads = (
-        (_RETIRED_PATH, build_retired_surface_manifest()),
-        (_DISPOSITION_PATH, build_code_disposition_manifest()),
-    )
-    matched = True
-    for path, payload in payloads:
-        encoded = _compact_manifest(payload)
-        if path.is_file() and path.read_text(encoding="utf-8") == encoded:
-            continue
-        matched = False
-        if not check:
-            path.write_text(encoded, encoding="utf-8")
-    return matched
+    payload = build_code_disposition_manifest()
+    payload["source_ref"] = _K1_MERGE
+    payload["quarantine_base"] = _K1_MERGE
+    for entry in payload["entries"]:
+        if entry["disposition"] != "keep":
+            entry["status"] = "removed"
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
-def _retired_entry(
-    surface_type: str,
-    public_name: str,
-    current_owner: str,
-    replacement: str,
-) -> dict[str, str]:
-    return {
-        "surface_type": surface_type,
-        "public_name": public_name,
-        "current_owner": current_owner,
-        "replacement": replacement,
-        "final_supported_release": "0.25.x",
-        "removal_release": "0.26.0",
-        "absence_or_migration_test": "tests/kernel/test_retired_surface_manifest.py",
-    }
+def apply_k2_transition() -> None:
+    """Resolve every generic K2 assignment to one clean schema-v1 decision."""
+
+    payload = build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    payload["entries"] = [
+        _expected_k2_entry(base_by_path[entry["path"]])
+        if entry["owner_task"] == "K2"
+        else entry
+        for entry in payload["entries"]
+    ]
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
-def _schema_tables() -> list[str]:
-    conn = sqlite3.connect(":memory:")
-    try:
-        conn.row_factory = sqlite3.Row
-        init_db(conn)
-        names = [
-            str(row[0])
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
-            )
-        ]
-    finally:
-        conn.close()
-    return names
+def apply_k3_transition() -> None:
+    """Resolve every K3 assignment to bounded ingestion or explicit retirement."""
+
+    payload = build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    payload["entries"] = [
+        _expected_current_entry(base_by_path[entry["path"]])
+        if entry["owner_task"] == "K3"
+        else entry
+        for entry in payload["entries"]
+    ]
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
-def _cli_command_paths() -> list[str]:
-    paths: set[str] = set()
+def apply_k4_transition() -> None:
+    """Resolve every K4 assignment to the bounded query contract or retirement."""
 
-    def walk(parser: argparse.ArgumentParser, prefix: tuple[str, ...] = ()) -> None:
-        for action in parser._actions:
-            if not isinstance(action, _SubParsersAction):
-                continue
-            for name, child in action.choices.items():
-                command = (*prefix, name)
-                paths.add(" ".join(command))
-                walk(child, command)
-
-    walk(build_parser())
-    return sorted(paths)
-
-
-def _console_routes() -> list[str]:
-    route_files = (
-        _REPO_ROOT / "frontend/dashboard/src/routes/evidenceConsoleRoutes.ts",
-        _REPO_ROOT / "frontend/dashboard/src/app/routeCatalog.ts",
-        _REPO_ROOT / "frontend/dashboard/src/routes/legacyRouteAliases.ts",
-    )
-    routes: set[str] = set()
-    for path in route_files:
-        source = path.read_text(encoding="utf-8")
-        routes.update(re.findall(r"\bid:\s*'([^']+)'", source))
-        routes.update(
-            match.group(1) or match.group(2)
-            for match in re.finditer(
-                r"^\s*(?:'([^']+)'|([a-z][a-z0-9-]*)):\s*(?:\{|null)",
-                source,
-                flags=re.MULTILINE,
-            )
-        )
-    routes.add("insights")
-    return sorted(routes)
+    payload = build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    payload["entries"] = [
+        _expected_current_entry(base_by_path[entry["path"]])
+        if entry["owner_task"] == "K4"
+        else entry
+        for entry in payload["entries"]
+    ]
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
-def _frontend_assets() -> list[str]:
-    return sorted(
-        path
-        for path in _git_lines("ls-files")
-        if path.startswith("frontend/dashboard/")
-        or path.startswith("src/codex_usage_tracker/plugin_data/dashboard/")
-    )
+def apply_k5_transition() -> None:
+    """Resolve every K5 assignment to the exact evidence contract."""
+
+    payload = build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    payload["entries"] = [
+        _expected_current_entry(base_by_path[entry["path"]])
+        if entry["owner_task"] == "K5"
+        else entry
+        for entry in payload["entries"]
+    ]
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
-def _package_data_rules() -> list[str]:
-    config = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    package_data = config["tool"]["setuptools"]["package-data"]
-    rules = {
-        f"setuptools:{package}:{pattern}"
-        for package, patterns in package_data.items()
-        for pattern in patterns
-    }
-    rules.update(
-        f"manifest:{line.strip()}"
-        for line in (_REPO_ROOT / "MANIFEST.in").read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    )
-    return sorted(rules)
+def apply_k6_transition() -> None:
+    """Resolve every K6 assignment to the six-tool interface cutover."""
+
+    payload = build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    payload["entries"] = [
+        _expected_current_entry(base_by_path[entry["path"]])
+        if entry["owner_task"] == "K6"
+        else entry
+        for entry in payload["entries"]
+    ]
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
-def _release_schema_ids() -> set[str]:
-    source = (_REPO_ROOT / "tests" / "release_catalog.py").read_text(encoding="utf-8")
-    return set(re.findall(r'"(codex-usage-tracker-[a-z0-9-]+-v[0-9]+)"', source))
+def apply_k8_transition() -> None:
+    """Resolve K8 assignments to exact ratios, estimates, or retirement."""
+
+    payload = build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    payload["entries"] = [
+        _expected_current_entry(base_by_path[entry["path"]])
+        if entry["owner_task"] == "K8"
+        else entry
+        for entry in payload["entries"]
+    ]
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
-def _disposition_entry(path: str, *, tag_paths: set[str]) -> dict[str, Any]:
-    disposition, owner_task, reason, target = _classify_path(path)
-    return {
-        "path": path,
-        "disposition": disposition,
-        "reason": reason,
-        "owner_task": owner_task,
-        "source_ref": f"v0.25.1:{path}" if path in tag_paths else f"K1:{path}",
-        "target_path": target,
-        "public_surfaces": _public_surfaces(path),
-        "required_oracle_tests": _required_tests(
-            path,
-            disposition=disposition,
-            owner_task=owner_task,
-        ),
-        "removal_or_absence_test": _removal_test(path, disposition=disposition),
-        "status": "classified",
-    }
+def apply_k9_transition() -> None:
+    """Mark every frozen decision terminal after the final absence audit."""
+
+    payload = build_code_disposition_manifest()
+    for entry in payload["entries"]:
+        entry["status"] = "verified"
+    failures = k9_disposition_proof_failures(payload)
+    if failures:
+        raise ValueError("\n".join(failures))
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
-def _classify_path(path: str) -> tuple[str, str, str, str]:
-    if any(marker in path for marker in _HISTORICAL_MARKERS):
-        return ("historical", "K1A", "Archived planning or presentation evidence.", "")
-    if path in _KEEP_EXACT or path.startswith(_KEEP_PREFIXES):
-        owner = "K10" if path.startswith(".github/") or path in {
-            "MANIFEST.in",
-            "package.json",
-            "package-lock.json",
-            "pyproject.toml",
-        } else "K1"
-        return ("keep", owner, "Reset governance, release safety, or K1 oracle evidence.", path)
-    if path.startswith(("src/codex_usage_tracker/release/", "tests/release/")):
-        return ("keep", "K10", "Exact-byte release and promotion safety remains authoritative.", path)
-    if path.startswith("scripts/") and any(
-        marker in path for marker in ("release", "publish", "smoke_installed", "install_local_plugin")
-    ):
-        return ("keep", "K10", "Release, installation, or promotion safety remains authoritative.", path)
-    if path.startswith(("src/codex_usage_tracker/pricing/", "tests/pricing/")):
-        return ("transplant", "K8", "Pricing provenance and allowance costing must survive.", _kernel_target(path, "allowance"))
-    if path == "src/codex_usage_tracker/plugin_installer.py":
-        return ("transplant", "K6", "Plugin installation behavior must survive the adapter reset.", _kernel_target(path, "interfaces"))
-    if path.startswith(_RETIRED_SOURCE_PREFIXES):
-        return ("retire", "K1A", "Legacy analysis, content, diagnostic, or visualization subsystem.", "")
-    if path.startswith(("frontend/", "src/codex_usage_tracker/plugin_data/dashboard/")):
-        return ("retire", "K1A", "Legacy Evidence Console implementation or bundled asset.", "")
-    if path.startswith("src/codex_usage_tracker/store/"):
-        name = Path(path).name
-        if any(marker in name for marker in _LEGACY_STORE_MARKERS):
-            return ("retire", "K1A", "Legacy derived analysis or diagnostic persistence.", "")
-        owner = _store_owner(name)
-        return ("transplant", owner, "Bounded kernel persistence behavior must survive.", _kernel_target(path, "store"))
-    if path.startswith(("src/codex_usage_tracker/parser/", "src/codex_usage_tracker/ingest/")):
-        return ("transplant", "K3", "Incremental parser and source-cursor behavior must survive.", _kernel_target(path, "ingest"))
-    if path.startswith("src/codex_usage_tracker/core/"):
-        return ("transplant", "K2", "Accounting identity and normalized fact behavior must survive.", _kernel_target(path, "core"))
-    if path.startswith("src/codex_usage_tracker/interfaces/"):
-        name = Path(path).name
-        if any(marker in name for marker in _LEGACY_INTERFACE_MARKERS):
-            return ("retire", "K1A", "Legacy compatibility or automated-diagnosis interface.", "")
-        return ("transplant", "K6", "Public adapter behavior must be rebuilt on the kernel.", _kernel_target(path, "interfaces"))
-    if path.startswith("src/codex_usage_tracker/application/"):
-        name = Path(path).name
-        if name in _LEGACY_APPLICATION_NAMES:
-            return ("retire", "K1A", "Legacy analysis or raw-context application orchestration.", "")
-        owner = _application_owner(name)
-        return ("transplant", owner, "Kernel use-case contract must survive without legacy orchestration.", _kernel_target(path, "application"))
-    if path.startswith("tests/") and any(
-        marker in path for marker in ("parser", "store", "query", "allowance", "dedup", "refresh")
-    ):
-        owner = _test_owner(path)
-        return ("transplant", owner, "Behavioral coverage for a kernel candidate.", _kernel_target(path, "tests"))
-    if path.startswith(("docs/", "skills/", ".agent-maintainer/")):
-        return ("historical", "K1A", "Legacy documentation, skill, or implementation-plan evidence.", "")
-    if path.startswith(("src/", "tests/", "scripts/", "config/")):
-        return ("retire", "K1A", "Not selected for the minimal kernel contract.", "")
-    return ("keep", "K10", "Repository governance or build metadata remains release-owned.", path)
-
-
-def _store_owner(name: str) -> str:
-    if "allowance" in name or "service_tier" in name:
-        return "K8"
-    if any(marker in name for marker in ("query", "summary", "export", "timing")):
-        return "K4"
-    if any(marker in name for marker in ("source", "refresh")):
-        return "K3"
-    return "K2"
-
-
-def _application_owner(name: str) -> str:
-    if "allowance" in name:
-        return "K8"
-    if name in {"evidence.py"}:
-        return "K5"
-    if name in {"query.py", "query_models.py", "query_validation.py"}:
-        return "K4"
-    if "refresh" in name or name in {"status.py", "job_status.py"}:
-        return "K3"
-    return "K6"
-
-
-def _test_owner(path: str) -> str:
-    if "allowance" in path:
-        return "K8"
-    if "query" in path:
-        return "K4"
-    if any(marker in path for marker in ("parser", "refresh", "source")):
-        return "K3"
-    return "K2"
-
-
-def _kernel_target(path: str, domain: str) -> str:
-    name = Path(path).name
-    if path.startswith("tests/"):
-        return f"tests/kernel/{domain}/{name}"
-    return f"src/codex_usage_tracker/kernel/{domain}/{name}"
-
-
-def _required_tests(
-    path: str,
-    *,
-    disposition: str,
-    owner_task: str,
+def k9_disposition_proof_failures(
+    disposition: dict[str, Any],
 ) -> list[str]:
-    if disposition == "historical":
-        return ["tests/kernel/test_code_disposition_manifest.py"]
-    if owner_task == "K10":
-        return ["tests/release/test_artifact_manifest.py"]
-    if owner_task == "K8":
-        return ["tests/kernel/test_oracle_equivalence.py"]
-    if owner_task == "K6":
-        return ["tests/kernel/test_retired_surface_manifest.py"]
-    if owner_task == "K5":
-        return ["tests/kernel/test_oracle_equivalence.py"]
-    if owner_task == "K4":
-        return ["tests/kernel/test_oracle_equivalence.py"]
-    if owner_task == "K3":
-        return ["tests/kernel/test_source_lifecycle_oracle.py"]
-    if owner_task == "K2":
-        return ["tests/kernel/test_oracle_equivalence.py"]
-    if path in {"AGENTS.md", "AGENTS.agent-maintainer.md", "justfile"}:
-        return ["tests/kernel/test_repository_quality_policy.py"]
-    return ["tests/kernel/test_code_disposition_manifest.py"]
+    """Reconcile every terminal K1 path with its physical proof and target."""
+
+    failures: list[str] = []
+    for entry in disposition["entries"]:
+        source = _REPO_ROOT / entry["path"]
+        target = _REPO_ROOT / entry["target_path"]
+        disposition_name = entry["disposition"]
+        if entry["status"] != "verified":
+            failures.append(f"{entry['path']}: K9 status is not verified")
+        if disposition_name == "keep":
+            if not source.exists() and not source.is_symlink():
+                failures.append(f"{entry['path']}: kept path is absent")
+        elif source.exists() or source.is_symlink():
+            failures.append(f"{entry['path']}: retired source path remains")
+        if disposition_name in {"keep", "transplant"} and (
+            not target.exists() and not target.is_symlink()
+        ):
+            failures.append(
+                f"{entry['path']}: verified target is absent: {entry['target_path']}"
+            )
+        proof_paths = (
+            entry["removal_or_absence_test"],
+            *entry["required_oracle_tests"],
+        )
+        for proof_path in proof_paths:
+            proof = _REPO_ROOT / proof_path
+            if not proof.is_file():
+                failures.append(
+                    f"{entry['path']}: verified proof is absent: {proof_path}"
+                )
+    return failures
 
 
-def _removal_test(path: str, *, disposition: str) -> str:
-    if disposition == "retire" and _public_surfaces(path):
-        return "tests/kernel/test_retired_surface_manifest.py"
-    return "tests/kernel/test_code_disposition_manifest.py"
+def manifest_failures(
+    disposition: dict[str, Any] | None = None,
+) -> list[str]:
+    """Return deterministic failures for both frozen inventories."""
+
+    current = disposition or build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    retired = build_retired_surface_manifest()
+    failures: list[str] = []
+
+    paths = [entry["path"] for entry in current["entries"]]
+    if len(paths) != len(set(paths)):
+        failures.append("code disposition contains duplicate paths")
+    base_paths = _git_lines("ls-tree", "-r", "--name-only", _K1_MERGE)
+    if sorted(paths) != base_paths:
+        failures.append("code disposition paths differ from the merged K1 tree")
+    digest = hashlib.sha256(
+        ("\n".join(sorted(paths)) + "\n").encode("utf-8")
+    ).hexdigest()
+    if current["resolver_input_sha256"] != digest:
+        failures.append("code disposition resolver hash does not match frozen paths")
+    if current.get("quarantine_base") != _K1_MERGE:
+        failures.append("code disposition does not name the merged K1 quarantine base")
+    if current.get("source_ref") != _K1_MERGE:
+        failures.append("code disposition source ref is not the merged K1 commit")
+
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    for entry in current["entries"]:
+        path = entry["path"]
+        base_entry = base_by_path.get(path)
+        if base_entry is None:
+            continue
+        expected_entry = _expected_current_entry(base_entry)
+        immutable = {key: value for key, value in entry.items() if key != "status"}
+        base_immutable = {
+            key: value for key, value in expected_entry.items() if key != "status"
+        }
+        if immutable != base_immutable:
+            failures.append(f"{path}: immutable K1 disposition decision changed")
+        if (
+            expected_entry["owner_task"] == "K2"
+            and entry["status"] != "verified"
+        ):
+            failures.append(f"{path}: K2 disposition is not verified")
+        if (
+            expected_entry["owner_task"] == "K3"
+            and entry["status"] != "verified"
+        ):
+            failures.append(f"{path}: K3 disposition is not verified")
+        if (
+            expected_entry["owner_task"] == "K4"
+            and entry["status"] != "verified"
+        ):
+            failures.append(f"{path}: K4 disposition is not verified")
+        if (
+            expected_entry["owner_task"] == "K5"
+            and entry["status"] != "verified"
+        ):
+            failures.append(f"{path}: K5 disposition is not verified")
+        if (
+            expected_entry["owner_task"] == "K6"
+            and entry["status"] != "verified"
+        ):
+            failures.append(f"{path}: K6 disposition is not verified")
+        if (
+            expected_entry["owner_task"] == "K8"
+            and entry["status"] != "verified"
+        ):
+            failures.append(f"{path}: K8 disposition is not verified")
+
+    surface_keys = [
+        (entry["surface_type"], entry["public_name"])
+        for entry in retired["entries"]
+    ]
+    if len(surface_keys) != len(set(surface_keys)):
+        failures.append("retired-surface inventory contains duplicate names")
+
+    for path, payload in (
+        (_DISPOSITION_PATH, current),
+        (_RETIRED_PATH, retired),
+    ):
+        if disposition is None and path.read_text(
+            encoding="utf-8"
+        ) != _compact_manifest(payload):
+            failures.append(f"{path.name} is not canonical")
+    return failures
 
 
-def _public_surfaces(path: str) -> list[str]:
-    surfaces = []
-    if "interfaces/mcp" in path:
-        surfaces.append("mcp")
-    if "server" in path:
-        surfaces.append("http")
-    if "/cli" in path:
-        surfaces.append("cli")
-    if path.startswith("frontend/") or "plugin_data/dashboard" in path:
-        surfaces.append("console")
-    if path in {"pyproject.toml", "MANIFEST.in"} or "plugin_data" in path:
-        surfaces.append("package")
-    return surfaces
+def _load(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _load_from_git(ref: str, path: str) -> dict[str, Any]:
+    payload = subprocess.run(
+        ["git", "-C", str(_REPO_ROOT), "show", f"{ref}:{path}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return json.loads(payload)
+
+
+def _expected_k2_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = dict(base_entry)
+    path = entry["path"]
+    deferred = _K2_DEFERRED.get(path)
+    if deferred is not None:
+        target, oracle = deferred
+        entry.update(
+            {
+                "owner_task": "K3",
+                "reason": "Ingestion must prove this accounting lifecycle behavior.",
+                "required_oracle_tests": [oracle],
+                "removal_or_absence_test": oracle,
+                "status": "removed",
+                "target_path": target,
+            }
+        )
+        return entry
+    transplant = _K2_TRANSPLANTS.get(path)
+    if transplant is None:
+        entry.update(
+            {
+                "disposition": "retire",
+                "reason": (
+                    "Retired K2 spike behavior is not required by the "
+                    "schema-v1 contract."
+                ),
+                "required_oracle_tests": [
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ],
+                "removal_or_absence_test": (
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ),
+                "status": "verified",
+                "target_path": "",
+            }
+        )
+        return entry
+    target, tests = transplant
+    entry.update(
+        {
+            "reason": (
+                "Schema-v1 behavior survives through one clean kernel owner."
+            ),
+            "required_oracle_tests": list(tests),
+            "removal_or_absence_test": tests[0],
+            "status": "verified",
+            "target_path": target,
+        }
+    )
+    return entry
+
+
+def _expected_k3_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = dict(base_entry)
+    transplant = _K3_TRANSPLANTS.get(entry["path"])
+    if transplant is None:
+        entry.update(
+            {
+                "disposition": "retire",
+                "reason": (
+                    "Legacy refresh, content-index, or interface orchestration "
+                    "is not required by the bounded K3 ingestion contract."
+                ),
+                "required_oracle_tests": [
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ],
+                "removal_or_absence_test": (
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ),
+                "status": "verified",
+                "target_path": "",
+            }
+        )
+        return entry
+    target, tests = transplant
+    entry.update(
+        {
+            "reason": (
+                "Incremental ingestion behavior survives through one bounded "
+                "kernel owner."
+            ),
+            "required_oracle_tests": list(tests),
+            "removal_or_absence_test": tests[0],
+            "status": "verified",
+            "target_path": target,
+        }
+    )
+    return entry
+
+
+def _expected_k4_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = dict(base_entry)
+    transplant = _K4_TRANSPLANTS.get(entry["path"])
+    if transplant is None:
+        entry.update(
+            {
+                "disposition": "retire",
+                "reason": (
+                    "Legacy export, cache, or derived-summary behavior is not "
+                    "required by the bounded K4 query contract."
+                ),
+                "required_oracle_tests": [
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ],
+                "removal_or_absence_test": (
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ),
+                "status": "verified",
+                "target_path": "",
+            }
+        )
+        return entry
+    target, tests = transplant
+    entry.update(
+        {
+            "reason": (
+                "Bounded generation-consistent query behavior survives through "
+                "one typed kernel query owner."
+            ),
+            "required_oracle_tests": list(tests),
+            "removal_or_absence_test": tests[0],
+            "status": "verified",
+            "target_path": target,
+        }
+    )
+    return entry
+
+
+def _expected_k5_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = dict(base_entry)
+    target, tests = _K5_TRANSPLANTS[entry["path"]]
+    entry.update(
+        {
+            "reason": (
+                "Stable logical-selector evidence survives through one bounded "
+                "generation-consistent kernel owner."
+            ),
+            "required_oracle_tests": list(tests),
+            "removal_or_absence_test": tests[0],
+            "status": "verified",
+            "target_path": target,
+        }
+    )
+    return entry
+
+
+def _expected_k6_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = dict(base_entry)
+    target, tests = _K6_TRANSPLANTS[entry["path"]]
+    entry.update(
+        {
+            "reason": (
+                "Operational interface behavior survives through the exact "
+                "six-tool kernel application and adapter boundary."
+            ),
+            "required_oracle_tests": list(tests),
+            "removal_or_absence_test": tests[0],
+            "status": "verified",
+            "target_path": target,
+        }
+    )
+    return entry
+
+
+def _expected_k8_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = dict(base_entry)
+    transplant = _K8_TRANSPLANTS.get(entry["path"])
+    if transplant is None:
+        entry.update(
+            {
+                "disposition": "retire",
+                "reason": (
+                    "Legacy allowance intelligence, updater, forecasting, or "
+                    "narrative behavior is outside the exact K8 fact contract."
+                ),
+                "required_oracle_tests": [
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ],
+                "removal_or_absence_test": (
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ),
+                "status": "verified",
+                "target_path": "",
+            }
+        )
+        return entry
+    target, tests = transplant
+    entry.update(
+        {
+            "reason": (
+                "Exact observations, deterministic reset-aware ratios, and "
+                "source-stamped estimates survive through one lean K8 owner."
+            ),
+            "required_oracle_tests": list(tests),
+            "removal_or_absence_test": tests[0],
+            "status": "verified",
+            "target_path": target,
+        }
+    )
+    return entry
+
+
+def _expected_current_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = (
+        _expected_k2_entry(base_entry)
+        if base_entry["owner_task"] == "K2"
+        else dict(base_entry)
+    )
+    if entry["owner_task"] == "K3":
+        return _expected_k3_entry(entry)
+    if entry["owner_task"] == "K4":
+        return _expected_k4_entry(entry)
+    if entry["owner_task"] == "K5":
+        return _expected_k5_entry(entry)
+    if entry["owner_task"] == "K6":
+        return _expected_k6_entry(entry)
+    if entry["owner_task"] == "K8":
+        return _expected_k8_entry(entry)
+    return entry
 
 
 def _git_lines(*args: str) -> list[str]:
     return subprocess.run(
-        ["git", *args],
-        cwd=_REPO_ROOT,
+        ["git", "-C", str(_REPO_ROOT), *args],
         check=True,
         capture_output=True,
         text=True,
@@ -498,19 +984,48 @@ def _compact_manifest(payload: dict[str, Any]) -> str:
     lines.append('  "entries": [')
     for index, entry in enumerate(entries):
         suffix = "," if index + 1 < len(entries) else ""
-        lines.append(f"    {json.dumps(entry, sort_keys=True, separators=(',', ':'))}{suffix}")
+        lines.append(
+            f"    {json.dumps(entry, sort_keys=True, separators=(',', ':'))}{suffix}"
+        )
     lines.extend(["  ]", "}", ""])
     return "\n".join(lines)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--apply-quarantine", action="store_true")
+    parser.add_argument("--apply-k2", action="store_true")
+    parser.add_argument("--apply-k3", action="store_true")
+    parser.add_argument("--apply-k4", action="store_true")
+    parser.add_argument("--apply-k5", action="store_true")
+    parser.add_argument("--apply-k6", action="store_true")
+    parser.add_argument("--apply-k8", action="store_true")
+    parser.add_argument("--apply-k9", action="store_true")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    matched = write_manifests(check=args.check)
-    if args.check and not matched:
-        print("kernel manifests differ from deterministic generator", file=sys.stderr)
+
+    if args.apply_quarantine:
+        apply_quarantine_transition()
+    if args.apply_k2:
+        apply_k2_transition()
+    if args.apply_k3:
+        apply_k3_transition()
+    if args.apply_k4:
+        apply_k4_transition()
+    if args.apply_k5:
+        apply_k5_transition()
+    if args.apply_k6:
+        apply_k6_transition()
+    if args.apply_k8:
+        apply_k8_transition()
+    if args.apply_k9:
+        apply_k9_transition()
+    failures = manifest_failures()
+    if failures:
+        print("\n".join(failures), file=sys.stderr)
         return 1
+    if args.check:
+        print("Kernel manifests are canonical and frozen.")
     return 0
 
 
