@@ -925,7 +925,7 @@ metadata in this changeset
 | Profiling | Incomplete | `agent-perf` run `20260727T015044Z-fc265f11`, Scalene 2.3.0, exited zero but emitted no JSON profile; no hotspot claim |
 | Package | Pass | wheel and sdist built; release-safety distribution check passed; isolated no-dependency wheel imports for `EvidenceService`, `GenerationJournal`, and `LiveStream` passed |
 | Privacy | Pass | synthetic fixtures only; no live database, Codex log, prompt, reasoning, raw tool argument/output, shell body, secret, or full source path inspected or stored |
-| Integration CI | Pending | PR not opened yet |
+| Integration CI | Fix pending | PR #323: Python 3.14 passed in 93 s; Python 3.10 found one test-fixture selection defect; exact local Python 3.10.20 recheck passed all 141 tests in 29.86 s |
 
 The performance assertion uses the identical unprofiled synthetic workload.
 Profiling is attribution-only and cannot replace that timing evidence.
@@ -942,20 +942,22 @@ Profiling is attribution-only and cannot replace that timing evidence.
 | Metric | K4 | K5 local | Change |
 | --- | ---: | ---: | ---: |
 | Contract-red runs | 2 | 1 | 50.0% lower |
-| Focused runs | 25 | 16 | 36.0% lower |
-| Broad runs | 8 | 6 | 25.0% lower |
+| Focused runs | 25 | 17 | 32.0% lower |
+| Broad runs | 8 | 9 | 12.5% higher |
 | Duplicate broad runs | 0 | 0 | unchanged |
-| Blocking findings | 21 | 11 | 47.6% lower |
-| Non-behavioral findings | 11 | 3 | 72.7% lower |
-| Gate-remediation lines | 264 | 15 | 94.3% lower |
-| Verification wall time | 386.2 s | 188.0 s | 51.3% lower |
+| Blocking findings | 21 | 12 | 42.9% lower |
+| Non-behavioral findings | 11 | 4 | 63.6% lower |
+| Gate-remediation lines | 264 | 31 | 88.3% lower |
+| Verification wall time | 386.2 s | 378.9 s | 1.9% lower |
 | Style-only commits | 0 | 0 | unchanged |
 
-K5 reduced every positive churn measure against K4 while preserving all
-behavioral, typing, privacy, scope, complexity, package, release, and
-performance gates. No duplicate broad run or style-only commit occurred. The
-three non-behavioral findings were one future-schema test constant and two
-focused Ruff forms.
+K5 reduced focused runs, findings, remediation lines, and total verification
+time against K4 while preserving all behavioral, typing, privacy, scope,
+complexity, package, release, and performance gates. Broad runs increased by
+one because initial CI and the exact Python 3.10 fix qualification are recorded
+separately. No duplicate broad run or style-only commit occurred. The four
+non-behavioral findings were one future-schema test constant, two focused Ruff
+forms, and the Python 3.10 fixture selection.
 
 ### Deviations and decisions
 
@@ -976,9 +978,9 @@ focused Ruff forms.
 - The Scalene capture did not emit a usable profile. The repeatable unprofiled
   100,000-call benchmark remains authoritative and passes with substantial
   headroom.
-- Integration CI and merge remain pending. Once green and merged, K6 may bind
-  K4 queries and K5 evidence/live behavior to exactly the six approved
-  integration interfaces without reintroducing narrative analysis.
+- Corrected integration CI and merge remain pending. Once green and merged, K6
+  may bind K4 queries and K5 evidence/live behavior to exactly the six
+  approved integration interfaces without reintroducing narrative analysis.
 
 ## Task Entry Template
 

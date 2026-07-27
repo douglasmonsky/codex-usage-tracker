@@ -149,7 +149,25 @@ def _service(
         selectors = {
             "thread": "thread:"
             + connection.execute(
-                "SELECT logical_thread_id FROM threads ORDER BY thread_id LIMIT 1"
+                """
+                SELECT logical_thread_id
+                FROM threads
+                WHERE thread_id IN (
+                    SELECT thread_id
+                    FROM (
+                        SELECT thread_id FROM model_calls
+                        WHERE duplicate_state = 'canonical'
+                        UNION ALL
+                        SELECT thread_id FROM tool_calls
+                        UNION ALL
+                        SELECT thread_id FROM activity_events
+                    )
+                    GROUP BY thread_id
+                    HAVING COUNT(*) >= 2
+                )
+                ORDER BY logical_thread_id
+                LIMIT 1
+                """
             ).fetchone()[0],
             "turn": "turn:"
             + connection.execute(
