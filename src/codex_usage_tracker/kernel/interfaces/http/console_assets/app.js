@@ -384,6 +384,10 @@ async function renderExplore() {
     className: "form-note",
     text: `${datasetNames.length} datasets · up to ${guidance.limits.max_batch_queries} requests · ${guidance.limits.max_rows_per_query} rows/request · ${formatNumber(guidance.limits.max_response_bytes)} bytes maximum`,
   }));
+  form.append(element("p", {
+    className: "form-note",
+    text: "Context composition: Observed UTF-8 bytes and event counts are exact. Category token counts are optional tokenizer estimates with explicit coverage; they are not exact billed input-token shares.",
+  }));
   const output = element("section", { className: "card", style: "margin-top:1rem" }, [element("div", { className: "empty", text: "Choose a guided template or compose a bounded typed request." })]);
   workspace.append(form, output);
 

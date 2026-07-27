@@ -579,6 +579,63 @@ def smoke_install(target: str, *, version: str | None = None) -> None:
         active = _run_json([command, "status"], environment=environment)
         if active.get("state") != "active" or active.get("generation") != 1:
             raise RuntimeError(f"installed refresh did not activate: {active}")
+        content_status = _run_json(
+            [command, "content", "status"],
+            environment=environment,
+        )
+        if content_status.get("state") != "disabled":
+            raise RuntimeError("installed content capability must default off")
+        _run_json(
+            [command, "content", "enable", "--confirm-private-content"],
+            environment=environment,
+        )
+        content_index = _run_json(
+            [command, "content", "index"],
+            environment=environment,
+        )
+        indexed_events = content_index.get("events")
+        if (
+            content_index.get("indexed_generation") != 1
+            or not isinstance(indexed_events, int)
+            or indexed_events < 1
+        ):
+            raise RuntimeError("installed content index is incomplete")
+        context_request = json.dumps(
+            {
+                "requests": [
+                    {
+                        "dataset": "context",
+                        "operation": "aggregate",
+                        "dimensions": ["category"],
+                        "measures": ["events", "observed_bytes"],
+                        "limit": 25,
+                    }
+                ]
+            },
+            separators=(",", ":"),
+        )
+        context_query = _run_json(
+            [command, "query", "--request", context_request],
+            environment=environment,
+        )
+        context_results = context_query.get("results")
+        first_context = (
+            context_results[0]
+            if isinstance(context_results, list)
+            and context_results
+            and isinstance(context_results[0], dict)
+            else {}
+        )
+        if first_context.get("grade") != "exact":
+            raise RuntimeError("installed context bytes are not labeled exact")
+        _run_json(
+            [command, "content", "delete"],
+            environment=environment,
+        )
+        if _run_json([command, "status"], environment=environment).get(
+            "generation"
+        ) != 1:
+            raise RuntimeError("content deletion affected installed accounting")
         _smoke_mcp(plugin_root / ".mcp.json", environment)
         warm_p95_ms = _smoke_service(command, environment)
     print(

@@ -18,6 +18,7 @@ from codex_usage_tracker.kernel.query.contracts import (
 _GUIDED_TEMPLATE_IDS = (
     "allowance",
     "concentration",
+    "context_composition",
     "model_effort",
     "period_comparison",
     "subagents",
@@ -37,6 +38,7 @@ def test_exploration_guidance_is_static_compact_and_decision_complete() -> None:
         "activities",
         "allowance",
         "calls",
+        "context",
         "phases",
         "threads",
         "tools",
@@ -64,10 +66,11 @@ def test_exploration_guidance_is_static_compact_and_decision_complete() -> None:
         json.dumps(first, separators=(",", ":"), sort_keys=True).encode()
     ) <= 24_000
     assert all(
-        template["kind"] == "query_template"
-        and template["evidence_policy"] == "after_ranking"
-        and template["requests"]
+        template["kind"] == "query_template" and template["requests"]
         for template in first["templates"].values()
+    )
+    assert first["templates"]["context_composition"]["evidence_policy"] == (
+        "aggregate_only"
     )
     assert first["datasets"]["phases"]["requires_scope_filter"] is True
     assert "default_request" not in first["datasets"]["phases"]
@@ -118,7 +121,15 @@ def test_every_console_dataset_default_is_a_valid_query() -> None:
         name
         for name, metadata in datasets.items()
         if "default_request" in metadata
-    } == {"activities", "allowance", "calls", "threads", "tools", "turns"}
+    } == {
+        "activities",
+        "allowance",
+        "calls",
+        "context",
+        "threads",
+        "tools",
+        "turns",
+    }
     for metadata in datasets.values():
         if default_request := metadata.get("default_request"):
             query_request(default_request).normalized()

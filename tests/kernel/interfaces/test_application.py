@@ -81,6 +81,7 @@ def test_query_guidance_is_available_without_a_database_or_refresh(
     assert tuple(response["guidance"]["templates"]) == (
         "allowance",
         "concentration",
+        "context_composition",
         "model_effort",
         "period_comparison",
         "subagents",

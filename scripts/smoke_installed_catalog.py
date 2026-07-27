@@ -11,6 +11,7 @@ CLI_HELP_SUBCOMMANDS = (
     "open",
     "service",
     "config",
+    "content",
     "repair",
     "package",
 )

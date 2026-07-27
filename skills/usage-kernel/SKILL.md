@@ -34,6 +34,15 @@ Label every claim:
 - **hypothesis** — model inference that still needs evidence;
 - **unsupported** — unavailable from the returned scope and not asserted.
 
+The optional `context` dataset is aggregate-only private local evidence. Its
+`observed_bytes` and `events` measures are exact for the structurally observed
+payload strings that were indexed. `estimated_tokens` is available only when
+an explicit tokenizer populated it; always preserve its estimator identity and
+coverage. Never describe category bytes or estimates as exact billed input
+tokens, and keep `unattributed_input_tokens` unsupported when the response
+reports it as `null`. If context composition is disabled, continue with the
+base accounting datasets instead of starting hidden work.
+
 Call `usage_refresh` only when freshness matters. Reuse the returned job; never
 start a duplicate. Use `usage_job_status` with a bounded `wait_seconds` value
 so the host waits; do not short-interval poll from the model. Use

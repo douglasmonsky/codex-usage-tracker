@@ -44,6 +44,7 @@ _CLI = (
     "open",
     "service",
     "config",
+    "content",
     "repair",
     "package",
 )

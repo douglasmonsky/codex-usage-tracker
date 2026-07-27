@@ -27,6 +27,10 @@ class RuntimePaths:
     def rate_card(self) -> Path:
         return self.cache_root / "rate-card.json"
 
+    @property
+    def content(self) -> Path:
+        return self.cache_root / "codex-usage-content-v1.sqlite3"
+
 
 def default_runtime_paths(
     environ: Mapping[str, str] | None = None,

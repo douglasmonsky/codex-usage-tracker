@@ -17,6 +17,7 @@ from typing import Any
 from .. import __version__
 from ..allowance import AllowanceService
 from ..allowance.rates import rate_card_status
+from ..content import content_status
 from ..evidence import EvidenceService
 from ..ingest import KernelIngestor, RefreshTrigger, refresh_request_hash
 from ..live import GenerationJournal, LiveStream
@@ -87,6 +88,7 @@ class KernelApplication:
                 "publication_id": None,
                 "refresh": None,
                 "rate_card": rates,
+                "content": content_status(self.paths.content),
             }
         control = load_cutover_control(operational)
         active = JobReader(operational).active()
@@ -97,6 +99,7 @@ class KernelApplication:
             "publication_id": control.integrity_digest,
             "refresh": json_value(active),
             "rate_card": rates,
+            "content": content_status(self.paths.content),
         }
 
     def query(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -114,7 +117,10 @@ class KernelApplication:
         if not requests and not include_guidance:
             raise ValueError("query requires a query request or guidance")
         results = (
-            QueryService(self.paths.kernel.operational).execute_batch(requests)
+            QueryService(
+                self.paths.kernel.operational,
+                content_path=self.paths.content,
+            ).execute_batch(requests)
             if requests
             else ()
         )

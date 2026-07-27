@@ -8,9 +8,11 @@ import hashlib
 import json
 import sqlite3
 import time
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
+from ..content import open_content_snapshot
 from ..database import open_read_snapshot
 from ..operational import load_cutover_control
 from .contracts import (
@@ -27,8 +29,14 @@ from .plans import PLAN_VERSION, compile_plan
 class QueryService:
     """Execute bounded requests without initiating refresh or writes."""
 
-    def __init__(self, operational_path: Path) -> None:
+    def __init__(
+        self,
+        operational_path: Path,
+        *,
+        content_path: Path | None = None,
+    ) -> None:
         self._operational_path = operational_path.resolve()
+        self._content_path = content_path.resolve() if content_path else None
 
     def execute(self, request: QueryRequest) -> QueryResult:
         return self.execute_batch((request,))[0]
@@ -45,12 +53,32 @@ class QueryService:
         generation = control.active_generation
         if path is None or generation is None:
             raise ValueError("no active analytical generation")
-        with open_read_snapshot(path) as connection:
-            connection.execute("PRAGMA query_only = ON")
-            return tuple(
-                self._execute_one(connection, request, generation)
-                for request in normalized
+        with ExitStack() as stack:
+            analytical = stack.enter_context(open_read_snapshot(path))
+            analytical.execute("PRAGMA query_only = ON")
+            content = (
+                stack.enter_context(open_content_snapshot(self._content_path))
+                if any(request.dataset == "context" for request in normalized)
+                and self._content_path is not None
+                else None
             )
+            if any(request.dataset == "context" for request in normalized) and (
+                content is None
+            ):
+                raise ValueError("context composition database is not configured")
+            results: list[QueryResult] = []
+            for request in normalized:
+                connection = (
+                    content if request.dataset == "context" else analytical
+                )
+                if connection is None:
+                    raise ValueError(
+                        "context composition database is not configured"
+                    )
+                results.append(
+                    self._execute_one(connection, request, generation)
+                )
+            return tuple(results)
 
     def _execute_one(
         self,
@@ -132,9 +160,15 @@ class QueryService:
         selectors = _selectors(request.dataset, returned)
         grade, coverage = _result_coverage(
             request,
+            generation=generation,
             scanned=scanned,
             matched=matched,
             counts=coverage_counts,
+            content_metadata=(
+                _content_metadata(connection)
+                if request.dataset == "context"
+                else None
+            ),
         )
         return QueryResult(
             plan_id=plan_id,
@@ -417,9 +451,11 @@ def _project_phase_row(
 def _result_coverage(
     request: QueryRequest,
     *,
+    generation: int,
     scanned: int,
     matched: int,
     counts: dict[str, int],
+    content_metadata: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     total = matched if request.dataset == "phases" else scanned
     measures: dict[str, dict[str, Any]] = {}
@@ -437,14 +473,24 @@ def _result_coverage(
             ),
             "limitations": _measure_limitations(request.dataset, measure),
         }
+        if request.dataset == "context" and measure == "estimated_tokens":
+            measures[measure]["estimator"] = (
+                content_metadata.get("estimator")
+                if content_metadata is not None
+                else None
+            )
     grade = (
         "deterministic"
         if request.dataset == "phases"
+        else "estimated"
+        if request.dataset == "context"
+        and "estimated_tokens" in request.measures
+        and not partial
         else "partial"
         if partial
         else "exact"
     )
-    return grade, {
+    coverage: dict[str, Any] = {
         "generation_bound": True,
         "canonical_calls_only": request.dataset == "calls",
         "raw_content": False,
@@ -453,11 +499,43 @@ def _result_coverage(
         ),
         "measures": measures,
     }
+    if request.dataset == "context":
+        source_generation = (
+            content_metadata.get("indexed_generation")
+            if content_metadata is not None
+            else None
+        )
+        coverage.update(
+            {
+                "observed_content_only": True,
+                "source_generation": source_generation,
+                "observed_through": (
+                    content_metadata.get("observed_through")
+                    if content_metadata is not None
+                    else None
+                ),
+                "generation_lag": (
+                    generation - source_generation
+                    if isinstance(source_generation, int)
+                    else None
+                ),
+                "unattributed_input_tokens": None,
+                "unattributed_limitation": (
+                    "billed input tokens cannot be safely attributed to "
+                    "observed categories"
+                ),
+            }
+        )
+    return grade, coverage
 
 
 def _measure_basis(dataset: str, measure: str) -> str:
     if dataset == "phases":
         return "deterministic_attribution"
+    if dataset == "context" and measure == "observed_bytes":
+        return "exact_observed_utf8_bytes"
+    if dataset == "context" and measure == "estimated_tokens":
+        return "tokenizer_estimate"
     if measure in {"uncached_input_tokens", "total_tokens"}:
         return "derived_exact"
     if measure in {
@@ -479,6 +557,7 @@ def _measure_basis(dataset: str, measure: str) -> str:
         "calls",
         "compactions",
         "completions",
+        "events",
         "threads",
         "tools",
         "turns",
@@ -489,6 +568,14 @@ def _measure_basis(dataset: str, measure: str) -> str:
 
 def _measure_limitations(dataset: str, measure: str) -> list[str]:
     limitations: list[str] = []
+    if dataset == "context" and measure == "observed_bytes":
+        limitations.append(
+            "observed payload bytes are not exact billed input tokens"
+        )
+    if dataset == "context" and measure == "estimated_tokens":
+        limitations.append(
+            "category tokens are estimates only when an explicit tokenizer is configured"
+        )
     if measure == "reasoning_tokens":
         limitations.append(
             "reasoning tokens are reported separately; overlap with output "
@@ -515,6 +602,28 @@ def _measure_limitations(dataset: str, measure: str) -> list[str]:
             )
         )
     return limitations
+
+
+def _content_metadata(connection: sqlite3.Connection) -> dict[str, Any]:
+    settings = connection.execute(
+        """
+        SELECT indexed_generation, estimator_id
+        FROM content_settings
+        WHERE singleton = 1
+        """
+    ).fetchone()
+    observed = connection.execute(
+        "SELECT MAX(event_at) FROM composition_events"
+    ).fetchone()
+    return {
+        "indexed_generation": settings[0] if settings is not None else None,
+        "estimator": (
+            str(settings[1])
+            if settings is not None and settings[1] is not None
+            else None
+        ),
+        "observed_through": observed[0] if observed is not None else None,
+    }
 
 
 def _phase_scope(

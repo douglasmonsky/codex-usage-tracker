@@ -119,3 +119,15 @@ def test_explore_uses_kernel_guidance_and_emits_typed_requests() -> None:
     assert '"guided-template"' in source
     assert 'text: "Copy typed request"' in source
     assert "materializeTemplate" in source
+
+
+def test_context_composition_language_distinguishes_exact_and_estimated() -> None:
+    source = (
+        Path(__file__).resolve().parents[3]
+        / "frontend"
+        / "kernel-console"
+        / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert "Observed UTF-8 bytes and event counts are exact" in source
+    assert "Category token counts are optional tokenizer estimates" in source

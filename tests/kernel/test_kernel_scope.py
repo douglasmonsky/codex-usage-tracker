@@ -16,6 +16,7 @@ from scripts.check_kernel_scope import (
     K8_ADDITIONS,
     K9_ADDITIONS,
     K10_ADDITIONS,
+    K12_ADDITIONS,
     active_paths,
     load_disposition_manifest,
     publication_ref_failure,
@@ -180,6 +181,13 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         ".agents/plugins/marketplace.json",
         "tests/kernel/test_release_cutover.py",
     } == K10_ADDITIONS
+    assert {
+        "docs/kernel-context-composition.md",
+        "src/codex_usage_tracker/kernel/content.py",
+        "tests/kernel/content/__init__.py",
+        "tests/kernel/content/test_cli.py",
+        "tests/kernel/content/test_service.py",
+    } == K12_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -191,6 +199,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K8_ADDITIONS
         | K9_ADDITIONS
         | K10_ADDITIONS
+        | K12_ADDITIONS
     )
 
 

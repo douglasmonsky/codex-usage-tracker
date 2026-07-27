@@ -25,6 +25,7 @@ vp:
         tests/release \
         tests/kernel/allowance \
         tests/kernel/console \
+        tests/kernel/content \
         tests/kernel/evidence \
         tests/kernel/interfaces \
         tests/kernel/live \
@@ -82,6 +83,7 @@ v:
         tests/kernel/test_watcher.py \
         tests/kernel/allowance \
         tests/kernel/console \
+        tests/kernel/content \
         tests/kernel/evidence \
         tests/kernel/interfaces \
         tests/kernel/live \
