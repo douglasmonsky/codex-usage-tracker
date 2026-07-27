@@ -36,12 +36,12 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Verify audited main base
-        if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'release/0.26.0'
+        if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'release/0.27.0'
         env:
           ACTUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           expected="$(python -c \
-            'import json; print(json.load(open("config/kernel-release-cutover-v1.json"))["audited_main_sha"])')"
+            'import json; print(json.load(open("config/kernel-release-qualification-v1.json"))["audited_main_sha"])')"
           test "$ACTUAL_BASE_SHA" = "$expected"
       - name: Install kernel tooling
         run: |
@@ -75,7 +75,7 @@ jobs:
           python scripts/check_release.py --dist
           python scripts/smoke_installed_package.py \
             --artifact-dir dist \
-            --version 0.26.0
+            --version 0.27.0
       - name: Whitespace
         run: git diff --check
 

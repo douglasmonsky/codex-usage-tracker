@@ -1,9 +1,10 @@
 # Codex Usage Tracker
 
 Codex Usage Tracker is a fast, local-first data kernel for exact Codex usage
-facts and evidence. Version 0.26 replaces the experimental analysis product
-with incremental ingestion, bounded queries, exact evidence timelines, a
-six-tool MCP surface, and a focused Evidence Console.
+facts and evidence. Version 0.27 adds compact guided exploration and optional,
+owner-only context composition to the 0.26 incremental kernel while preserving
+bounded queries, exact evidence timelines, the six-tool MCP surface, and the
+focused Evidence Console.
 
 - Product roadmap: `docs/roadmap/product-kernel-reset.md`
 - Execution ledger: `docs/roadmap/product-kernel-reset-execution.md`
@@ -31,8 +32,8 @@ Install the Python runtime into an isolated executable environment, then add
 the same tagged repository as a Codex plugin marketplace:
 
 ```bash
-pipx install "codex-usage-tracking==0.26.0"
-codex plugin marketplace add douglasmonsky/codex-usage-tracker --ref v0.26.0
+pipx install "codex-usage-tracking==0.27.0"
+codex plugin marketplace add douglasmonsky/codex-usage-tracker --ref v0.27.0
 codex plugin add codex-usage-tracker@codex-usage-tracker
 ```
 

@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-This repository builds the lean local usage-data kernel. Version 0.26 is
+This repository builds the lean local usage-data kernel. Version 0.27 is
 publishable only from merged `main` or its exact release tag through the
 protected build-once workflow.
 
@@ -311,7 +311,7 @@ python -m build
 python scripts/check_release.py --dist
 python scripts/smoke_installed_package.py \
   --artifact-dir dist \
-  --version 0.26.0
+  --version 0.27.0
 ```
 
 For documentation-only branches, at minimum run:

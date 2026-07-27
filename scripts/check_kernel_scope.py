@@ -196,6 +196,13 @@ K13_ADDITIONS = frozenset(
     }
 )
 
+K14_ADDITIONS = frozenset(
+    {
+        "config/kernel-release-qualification-v1.json",
+        "tests/kernel/test_release_027_qualification.py",
+    }
+)
+
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
     | K2_ADDITIONS
@@ -209,6 +216,7 @@ INTEGRATION_ADDITIONS = (
     | K10_ADDITIONS
     | K12_ADDITIONS
     | K13_ADDITIONS
+    | K14_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"
@@ -308,19 +316,72 @@ def publication_ref_failure(ref: str, package_version: str) -> str | None:
     return f"publication requires main or an exact tag ref, got {ref}"
 
 
+def publication_source_failure(
+    repo_root: Path,
+    *,
+    ref: str,
+    sha: str,
+    package_version: str,
+    main_ref: str = "origin/main",
+) -> str | None:
+    """Fail closed unless the exact publication commit is merged into main."""
+    ref_failure = publication_ref_failure(ref, package_version)
+    if ref_failure:
+        return ref_failure
+
+    def resolve(commitish: str) -> str | None:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", f"{commitish}^{{commit}}"],
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        return result.stdout.strip() if result.returncode == 0 else None
+
+    resolved_sha = resolve(sha)
+    resolved_ref = resolve(ref)
+    resolved_main = resolve(main_ref)
+    if resolved_sha is None:
+        return f"publication SHA is unavailable: {sha}"
+    if resolved_ref != resolved_sha:
+        return f"publication ref {ref} does not resolve exact SHA {sha}"
+    if resolved_main is None:
+        return f"publication main ref is unavailable: {main_ref}"
+    if ref == "refs/heads/main" and resolved_sha != resolved_main:
+        return f"main publication SHA {sha} differs {main_ref} at {resolved_main}"
+    ancestry = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", resolved_sha, resolved_main],
+        cwd=repo_root,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if ancestry.returncode != 0:
+        return f"publication SHA {sha} is not merged into {main_ref}"
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", type=Path, default=_REPO_ROOT)
     parser.add_argument("--publication-ref")
+    parser.add_argument("--publication-sha")
+    parser.add_argument("--main-ref", default="origin/main")
     parser.add_argument("--package-version")
     args = parser.parse_args()
 
     if args.publication_ref:
         if not args.package_version:
             parser.error("--package-version is required with --publication-ref")
-        failure = publication_ref_failure(
-            args.publication_ref,
-            args.package_version,
+        if not args.publication_sha:
+            parser.error("--publication-sha is required with --publication-ref")
+        failure = publication_source_failure(
+            args.repo_root,
+            ref=args.publication_ref,
+            sha=args.publication_sha,
+            package_version=args.package_version,
+            main_ref=args.main_ref,
         )
         if failure:
             print(failure)

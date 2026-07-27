@@ -167,7 +167,7 @@ def _environment() -> dict[str, str]:
         "sqlite": sqlite3.sqlite_version,
         "platform": platform.platform(),
         "commit": commit,
-        "runtime": "0.26 explicit kernel refresh lifecycle",
+            "runtime": "0.27 explicit kernel refresh lifecycle",
     }
 
 

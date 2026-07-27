@@ -18,9 +18,11 @@ from scripts.check_kernel_scope import (
     K10_ADDITIONS,
     K12_ADDITIONS,
     K13_ADDITIONS,
+    K14_ADDITIONS,
     active_paths,
     load_disposition_manifest,
     publication_ref_failure,
+    publication_source_failure,
     scope_failures,
 )
 
@@ -195,6 +197,10 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/fixtures/overlay-adapter-v1.json",
         "tests/kernel/live/test_overlay_adapter_contract.py",
     } == K13_ADDITIONS
+    assert {
+        "config/kernel-release-qualification-v1.json",
+        "tests/kernel/test_release_027_qualification.py",
+    } == K14_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -208,13 +214,14 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K10_ADDITIONS
         | K12_ADDITIONS
         | K13_ADDITIONS
+        | K14_ADDITIONS
     )
 
 
 def test_kernel_skeleton_imports_without_legacy_runtime() -> None:
     import codex_usage_tracker.kernel as kernel
 
-    assert kernel.__version__ == "0.26.0"
+    assert kernel.__version__ == "0.27.0"
 
 
 def test_retained_release_primitives_match_k1_and_import() -> None:
@@ -248,8 +255,52 @@ def test_publication_guard_rejects_every_integration_ref() -> None:
     )
 
     assert all(publication_ref_failure(ref, "0.26.0.dev0") for ref in blocked)
-    assert publication_ref_failure("refs/heads/release/0.26.0", "0.26.0")
-    assert publication_ref_failure("refs/heads/main", "0.26.0") is None
+    assert publication_ref_failure("refs/heads/release/0.27.0", "0.27.0")
+    assert publication_ref_failure("refs/heads/main", "0.27.0") is None
+
+
+def test_publication_guard_rejects_correct_tag_on_unmerged_commit(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*args: str) -> str:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+
+    git("init", "-b", "main")
+    git("config", "user.name", "Kernel Release Test")
+    git("config", "user.email", "kernel-release@example.invalid")
+    tracked = repo / "tracked.txt"
+    tracked.write_text("main\n", encoding="utf-8")
+    git("add", "tracked.txt")
+    git("commit", "-m", "main")
+    main_sha = git("rev-parse", "HEAD")
+    git("update-ref", "refs/remotes/origin/main", main_sha)
+
+    git("switch", "-c", "unmerged")
+    tracked.write_text("unmerged\n", encoding="utf-8")
+    git("commit", "-am", "unmerged")
+    unmerged_sha = git("rev-parse", "HEAD")
+    git("tag", "v0.27.0")
+
+    failure = publication_source_failure(
+        repo,
+        ref="refs/tags/v0.27.0",
+        sha=unmerged_sha,
+        package_version="0.27.0",
+    )
+
+    assert failure == (
+        f"publication SHA {unmerged_sha} is not merged into origin/main"
+    )
 
 
 def test_publish_workflow_calls_persistent_kernel_guard() -> None:
@@ -260,3 +311,6 @@ def test_publish_workflow_calls_persistent_kernel_guard() -> None:
     assert "Enforce kernel publication source" in workflow
     assert "scripts/check_kernel_scope.py" in workflow
     assert '--publication-ref "$GITHUB_REF"' in workflow
+    assert 'git fetch --no-tags origin main:refs/remotes/origin/main' in workflow
+    assert '--publication-sha "$GITHUB_SHA"' in workflow
+    assert "--main-ref origin/main" in workflow

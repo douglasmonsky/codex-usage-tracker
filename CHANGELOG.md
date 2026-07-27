@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.27.0 - 2026-07-27
+
+- Add compact guided-exploration templates and filter grammar so models can
+  compose bounded exact queries without a server-authored narrative layer.
+- Add disabled-by-default, owner-only context-composition evidence with
+  explicit privacy confirmation, bounded incremental reads, exact observed
+  bytes, optional estimator coverage, and deletion that leaves accounting
+  untouched.
+- Freeze a read-only future-overlay adapter boundary over existing status,
+  evidence, and generation-event routes without adding an overlay bundle,
+  capture, write, refresh, credential, raw-content, or external-transmission
+  authority.
+- Harden Evidence Console stream-gap recovery by closing the stale EventSource,
+  resnapshotting, and reopening without its retained event cursor.
+
 ## 0.26.0 - 2026-07-27
 
 - Replace the beta analysis and compatibility product with a lean local data

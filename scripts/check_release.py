@@ -34,8 +34,8 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from generate_kernel_manifests import manifest_failures
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_VERSION = "0.26.0"
-_PLUGIN_VERSION = "0.26.0"
+_VERSION = "0.27.0"
+_PLUGIN_VERSION = "0.27.0"
 _K1_MERGE = "d8da9bccdb6674e7dca4c0872c36a1346949dc13"
 _FROZEN_RELEASE_PATHS = (
     "scripts/release_quality.py",
@@ -188,7 +188,36 @@ def _distribution_failures(dist_dir: Path) -> list[str]:
             "integration sdist member set differs from the exact kernel package: "
             f"missing={missing}, unexpected={unexpected}"
         )
+    with tarfile.open(sdists[0], "r:gz") as archive:
+        failures.extend(
+            _sdist_source_byte_failures(
+                archive,
+                archive_root=root,
+                relative_paths=sdist_names,
+            )
+        )
     failures.extend(_metadata_failures(metadata_text, artifact="sdist"))
+    return failures
+
+
+def _sdist_source_byte_failures(
+    archive: tarfile.TarFile,
+    *,
+    archive_root: str,
+    relative_paths: set[str],
+    source_root: Path = _REPO_ROOT,
+) -> list[str]:
+    """Reject archives whose packaged source differs from the release checkout."""
+    failures: list[str] = []
+    for relative_path in sorted(relative_paths):
+        source_path = source_root / relative_path
+        if not source_path.is_file():
+            continue
+        archived = archive.extractfile(f"{archive_root}{relative_path}")
+        if archived is None or archived.read() != source_path.read_bytes():
+            failures.append(
+                f"integration sdist contains stale source bytes: {relative_path}"
+            )
     return failures
 
 

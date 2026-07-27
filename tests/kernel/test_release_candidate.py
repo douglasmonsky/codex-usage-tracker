@@ -89,9 +89,9 @@ def test_release_catalogs_are_exact_and_publishable() -> None:
     assert API_PREFIX == "/api/kernel/v1"
     assert len(ROUTES) == 7
     assert plugin["bundle"]["publishable"] is True
-    assert plugin["version"] == "0.26.0"
+    assert plugin["version"] == "0.27.0"
     assert "exact, local-first codex usage facts" in plugin["description"].lower()
-    assert 'version = "0.26.0"' in project
+    assert 'version = "0.27.0"' in project
     assert "non-publishable" not in project.lower()
 
 

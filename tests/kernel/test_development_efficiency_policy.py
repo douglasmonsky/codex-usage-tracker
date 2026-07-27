@@ -39,6 +39,7 @@ def test_development_efficiency_policy_is_decision_complete() -> None:
         "K11",
         "K12",
         "K13",
+        "K14",
     ]
     assert all(task.keys() >= _METRICS for task in payload["tasks"])
 

@@ -36,8 +36,8 @@ def test_kernel_ci_qualifies_release_pull_requests_against_audited_main() -> Non
     )
 
     assert "- main" in workflow
-    assert "github.head_ref == 'release/0.26.0'" in workflow
+    assert "github.head_ref == 'release/0.27.0'" in workflow
     assert "github.event.pull_request.base.sha" in workflow
-    assert "config/kernel-release-cutover-v1.json" in workflow
+    assert "config/kernel-release-qualification-v1.json" in workflow
     assert "python -m pytest -p no:tach" in workflow
     assert "scripts/smoke_installed_package.py" in workflow
