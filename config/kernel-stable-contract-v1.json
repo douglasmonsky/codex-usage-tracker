@@ -1,0 +1,131 @@
+{
+  "schema": "codex-usage-tracker.kernel-stable-contract.v1",
+  "version": "0.28.0",
+  "stability": "frozen_pre_1_0",
+  "breaking_change_policy": "approved_roadmap_amendment",
+  "mcp_tools": [
+    {
+      "name": "usage_status",
+      "input_schema_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa"
+    },
+    {
+      "name": "usage_refresh",
+      "input_schema_sha256": "01ae972862e38edb771a88e742a5f3d8b966335a206bbedb98c73d33504309da"
+    },
+    {
+      "name": "usage_query",
+      "input_schema_sha256": "45b0e5ee0f1f75ca617ca8453a801736989cc5843fc32f9a722c64df7b5bafb0"
+    },
+    {
+      "name": "usage_evidence",
+      "input_schema_sha256": "c5c6c8e96bdc597c3686065c215c1858f4f526708ce309306629088996fe2ceb"
+    },
+    {
+      "name": "usage_allowance",
+      "input_schema_sha256": "51fe5a911be99cb9a8bc0161d9c9f5246a11d3b1b884430e0ac78250b6ad3f5d"
+    },
+    {
+      "name": "usage_job_status",
+      "input_schema_sha256": "a040afd148bd9bf195838968ee503d8874fde8f1f2521324ba684e3a52703f6d"
+    }
+  ],
+  "http": {
+    "api_prefix": "/api/kernel/v1",
+    "routes": [
+      {"method": "GET", "route": "/api/kernel/v1/status"},
+      {"method": "POST", "route": "/api/kernel/v1/refresh"},
+      {"method": "POST", "route": "/api/kernel/v1/query"},
+      {"method": "POST", "route": "/api/kernel/v1/evidence"},
+      {"method": "GET", "route": "/api/kernel/v1/allowance"},
+      {"method": "GET", "route": "/api/kernel/v1/jobs/{job_id}"},
+      {"method": "GET", "route": "/api/kernel/v1/events"}
+    ],
+    "sse": {
+      "event_kinds": ["generation_committed"],
+      "generation_payload_keys": [
+        "changed_sources",
+        "deleted_rows",
+        "inserted_calls",
+        "inserted_tools"
+      ],
+      "snapshot_event": "snapshot_required",
+      "heartbeat": "comment"
+    }
+  },
+  "cli": {
+    "commands": [
+      "setup",
+      "status",
+      "refresh",
+      "query",
+      "export",
+      "open",
+      "service",
+      "config",
+      "content",
+      "repair",
+      "package"
+    ],
+    "machine_output": "json",
+    "export_formats": ["json"],
+    "unsupported_export_formats": ["csv"]
+  },
+  "evidence": {
+    "selector_kinds": ["allowance", "call", "thread", "tool", "turn"],
+    "views": [
+      "summary",
+      "timeline",
+      "calls",
+      "tools",
+      "activities",
+      "allowance"
+    ],
+    "destination": "/evidence/{url_encoded_selector}?view={view}",
+    "identity": "logical_not_row_id"
+  },
+  "storage": {
+    "default_cache_root_suffix": "codex-usage-tracker/kernel-v1",
+    "analytical_filename": "codex-usage-kernel-v1.sqlite3",
+    "operational_filename": "codex-usage-kernel-operational-v1.sqlite3",
+    "content_filename": "codex-usage-content-v1.sqlite3",
+    "analytical_schema_version": 2,
+    "operational_schema_version": 2,
+    "content_schema_version": 1,
+    "upgrade_behavior": "side_by_side_atomic_promotion",
+    "rollback_behavior": "preserve_prior_published_generation"
+  },
+  "calculations": {
+    "grades": ["exact", "deterministic", "estimated"],
+    "model_inference_location": "consumer_only",
+    "token_classes": [
+      "uncached_input_tokens",
+      "cached_input_tokens",
+      "reasoning_tokens",
+      "output_tokens"
+    ]
+  },
+  "privacy": {
+    "local_only": true,
+    "raw_content_default": "disabled",
+    "content_store": "owner_only_separable_deletable",
+    "operational_registry_exportable": false,
+    "synthetic_release_fixtures_only": true
+  },
+  "installation": {
+    "distribution": "codex-usage-tracking",
+    "cli": "codex-usage-tracker",
+    "plugin": "codex-usage-tracker",
+    "mcp_server": "codex-usage-tracker",
+    "same_version_bundle_install": "atomic_replace",
+    "supported_upgrade_from": ["0.26.0", "0.27.0"]
+  },
+  "experimental_capabilities": {
+    "context_composition": "optional_not_stable",
+    "overlay_adapter": "contract_only_not_runtime"
+  },
+  "one_point_zero_readiness": {
+    "decision": "defer_until_post_freeze_dogfood",
+    "stable_surface_ready": true,
+    "feature_work_in_0_28": false
+  }
+}

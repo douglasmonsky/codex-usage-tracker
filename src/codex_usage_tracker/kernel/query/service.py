@@ -485,9 +485,6 @@ def _result_coverage(
         else "estimated"
         if request.dataset == "context"
         and "estimated_tokens" in request.measures
-        and not partial
-        else "partial"
-        if partial
         else "exact"
     )
     coverage: dict[str, Any] = {

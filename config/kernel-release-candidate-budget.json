@@ -10,6 +10,6 @@
   "http_routes": 7,
   "cli_commands": 11,
   "wheel_bytes": 130000,
-  "sdist_bytes": 379000,
+  "sdist_bytes": 390000,
   "plugin_bundle_bytes": 3900
 }

@@ -1,16 +1,15 @@
 {
   "schema": "codex-usage-tracker.kernel-release-qualification.v1",
-  "version": "0.27.0",
-  "audited_main_sha": "b0857cb6744ffa8f82453eedb07863afb3a6b69f",
+  "version": "0.28.0",
+  "audited_main_sha": "b44a767d41434ff1ee3ec3c1293b8194f10a99a4",
   "base_release": {
-    "version": "0.26.0",
-    "tag": "v0.26.0",
-    "merge_sha": "1d6ae5286ecde0201b5c868863df30a783b6aa82"
+    "version": "0.27.0",
+    "tag": "v0.27.0",
+    "merge_sha": "07441429bc32b17a8094b5035a4aeef053896f7e"
   },
   "qualified_tasks": {
-    "K11": "2efd075b3a3aee7a312f5bd6ea5210b3b72960f0",
-    "K12": "45f7a3e20007d18ab769599160ecbf6e7c891911",
-    "K13": "b0857cb6744ffa8f82453eedb07863afb3a6b69f"
+    "K15": "32248861c45d7d88d28e354d4ac0394d86370c2b",
+    "K15_closure": "b44a767d41434ff1ee3ec3c1293b8194f10a99a4"
   },
   "optional_assets": {
     "context_store": {

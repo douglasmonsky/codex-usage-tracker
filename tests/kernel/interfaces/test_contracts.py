@@ -85,10 +85,10 @@ def test_release_plugin_declares_one_server_and_is_publishable() -> None:
     )
     mcp = json.loads((_REPO_ROOT / ".mcp.json").read_text(encoding="utf-8"))
 
-    assert plugin["version"] == "0.27.0"
+    assert plugin["version"] == "0.28.0"
     assert plugin["mcpServers"] == "./.mcp.json"
     assert plugin["skills"] == "./skills/"
-    assert plugin["bundle"]["runtime_version"] == "0.27.0"
+    assert plugin["bundle"]["runtime_version"] == "0.28.0"
     assert plugin["bundle"]["publishable"] is True
     assert list(mcp["mcpServers"]) == ["codex-usage-tracker"]
     server = mcp["mcpServers"]["codex-usage-tracker"]

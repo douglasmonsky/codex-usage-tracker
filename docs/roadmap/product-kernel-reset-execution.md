@@ -76,7 +76,7 @@ progress.
 | K13 | 0.27.0 | Complete | K11 | Read-only overlay boundary |
 | K14 | 0.27.0 | Complete | K12, K13 | Release qualification |
 | K15 | 0.28.0 | Complete | K14 | Fault, recovery, and scale |
-| K16 | 0.28.0 | Not started | K15 | Contract freeze and release |
+| K16 | 0.28.0 | In progress | K15 | Contract freeze and release |
 
 ## Baseline Evidence
 
@@ -1956,6 +1956,81 @@ focused repository contract rejects removal of `--upgrade-from 0.26.0`.
 
 - K15 has no remaining implementation or qualification blocker.
 - K16 owns the public-contract freeze and protected 0.28.0 release.
+
+## K16 — Freeze Contracts And Publish 0.28.0
+
+**State:** In progress — local qualification complete; final review, CI, and
+protected publication pending
+**Branch:** `release/0.28.0`
+**Base:** `b44a767d41434ff1ee3ec3c1293b8194f10a99a4`
+**Commits:** pending
+
+### Contract added first
+
+- One intentional red run failed three tests because the stable-contract
+  inventory and reference did not exist.
+- `config/kernel-stable-contract-v1.json` now freezes the six MCP names and
+  schema digests, seven HTTP routes, SSE events, eleven primary CLI commands,
+  logical evidence selectors, versioned cache lifecycle, calculation grades,
+  four token classes, JSON export, privacy defaults, installation, upgrades,
+  experimental capabilities, and the pre-1.0 decision.
+- `docs/kernel-stable-contract-0.28.md` publishes the matching operations,
+  recovery, privacy, query, evidence, installation, upgrade, export, and
+  stability reference.
+
+### Stabilization decision
+
+- The approved truth contract permits `exact`, `deterministic`, and
+  `estimated`. Three query tests exposed `partial` being used as a fourth
+  grade even though incompleteness already has explicit measure-level coverage.
+  The result grade now describes calculation provenance while coverage remains
+  authoritative for missing observations.
+- The shipped export command writes the bounded shared query result as JSON.
+  K16 freezes JSON as supported and explicitly leaves CSV outside the contract
+  rather than documenting an unimplemented format.
+- Optional context composition remains experimental and disabled by default.
+  The overlay remains a read-only adapter contract with no shipped runtime or
+  authority.
+
+### Current qualification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Contract red | Pass | three expected missing-inventory/reference failures |
+| Focused contract set | Pass | 70 release, scope, interface, fault, query, content, and publication-policy tests |
+| Complete local profile | Pass | 340 Python tests plus Ruff, MyPy, Pyright, maintainability, deterministic Console assets, frontend lint/typecheck/tests, scope, privacy, manifests, and release safety |
+| Browser release candidate | Pass | 25 applicable Chromium desktop/mobile flows; 3 intentional mobile stream skips |
+| Installed and upgrade | Pass | public 0.26.0 and 0.27.0 each create and preserve their committed cache across the in-place candidate upgrade; rollback, content, Console, and two fresh MCP tasks pass for both paths; the 0.27 path measured 0.699 ms warm Console p95 |
+| Candidate artifacts | Pass | wheel 129,510 bytes, SHA-256 `a00b94cb316ccaaa46e8c674dc57c39e0d49c9e5e597cdcefee08bc292f2f4f7`; sdist 379,634 bytes, SHA-256 `7b037b24689c451c77e4cb0cf9d7bd940b43012761e4ef1c180a6be76793402e`; exact member/source-byte checks pass |
+| Privacy | Pass | stable contract preserves local-only, content-disabled-by-default, separable deletion, and synthetic-only release fixtures |
+
+### Budgets and readiness
+
+- Measured kernel source is 418,926 bytes against a 420,000-byte ceiling;
+  Console assets are 48,465 against 48,811; the plugin bundle is 3,823 against
+  3,900. Catalog counts remain exact at eight analytical tables, eighteen
+  indexes, five required schema objects, six MCP tools, seven HTTP routes, and
+  eleven CLI commands.
+- The source-complete sdist exceeded the prior K15 ceiling by 406 bytes after
+  adding the frozen contract and reference. Its 390,000-byte ceiling retains
+  less than three percent measured headroom; the 130,000-byte wheel ceiling is
+  unchanged.
+- The core factual surface is frozen and ready to remain stable. The 1.0
+  version decision is deferred until ordinary post-freeze dogfood validates
+  the inventory; a future breaking change requires an approved roadmap
+  amendment.
+
+### Remaining release work
+
+- The single final reviewer reported one finding and it was accepted: the
+  frozen two-version upgrade promise needed both 0.26.0 and 0.27.0 to remain
+  blocking CI smokes. Both now run exactly once.
+- Reviewer token attribution is pending after the single metrics finish call;
+  it was not retried.
+- Complete the bounded post-review recheck.
+- Merge the release PR through maintained CI, tag the exact merged-main SHA,
+  publish only through protected Trusted Publishing, and verify TestPyPI,
+  PyPI, and GitHub artifacts byte-for-byte.
 
 ## Task Entry Template
 

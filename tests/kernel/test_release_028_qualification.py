@@ -19,11 +19,11 @@ from scripts.check_release import _sdist_source_byte_failures
 from .interfaces.support import active_runtime, synthetic_sources
 
 _ROOT = Path(__file__).resolve().parents[2]
-_VERSION = "0.27.0"
-_AUDITED_MAIN = "b0857cb6744ffa8f82453eedb07863afb3a6b69f"
+_VERSION = "0.28.0"
+_AUDITED_MAIN = "b44a767d41434ff1ee3ec3c1293b8194f10a99a4"
 
 
-def test_release_027_sdist_rejects_stale_source_bytes(tmp_path: Path) -> None:
+def test_release_028_sdist_rejects_stale_source_bytes(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     (source / "README.md").write_text("current\n", encoding="utf-8")
@@ -47,7 +47,7 @@ def test_release_027_sdist_rejects_stale_source_bytes(tmp_path: Path) -> None:
     ]
 
 
-def test_release_027_identity_is_coherent_and_anchored_to_merged_main() -> None:
+def test_release_028_identity_is_coherent_and_anchored_to_merged_main() -> None:
     project = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     package = json.loads((_ROOT / "package.json").read_text(encoding="utf-8"))
     plugin = json.loads(
@@ -69,14 +69,13 @@ def test_release_027_identity_is_coherent_and_anchored_to_merged_main() -> None:
         "version": _VERSION,
         "audited_main_sha": _AUDITED_MAIN,
         "base_release": {
-            "version": "0.26.0",
-            "tag": "v0.26.0",
-            "merge_sha": "1d6ae5286ecde0201b5c868863df30a783b6aa82",
+            "version": "0.27.0",
+            "tag": "v0.27.0",
+            "merge_sha": "07441429bc32b17a8094b5035a4aeef053896f7e",
         },
         "qualified_tasks": {
-            "K11": "2efd075b3a3aee7a312f5bd6ea5210b3b72960f0",
-            "K12": "45f7a3e20007d18ab769599160ecbf6e7c891911",
-            "K13": _AUDITED_MAIN,
+            "K15": "32248861c45d7d88d28e354d4ac0394d86370c2b",
+            "K15_closure": _AUDITED_MAIN,
         },
         "optional_assets": {
             "context_store": {
@@ -95,18 +94,18 @@ def test_release_027_identity_is_coherent_and_anchored_to_merged_main() -> None:
     }
 
 
-def test_release_027_ci_and_public_install_paths_are_current() -> None:
+def test_release_028_ci_and_public_install_paths_are_current() -> None:
     ci = (_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     readme = (_ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert "github.head_ref == 'release/0.27.0'" in ci
+    assert "github.head_ref == 'release/0.28.0'" in ci
     assert "config/kernel-release-qualification-v1.json" in ci
-    assert "--version 0.27.0" in ci
-    assert 'codex-usage-tracking==0.27.0' in readme
-    assert "--ref v0.27.0" in readme
+    assert "--version 0.28.0" in ci
+    assert 'codex-usage-tracking==0.28.0' in readme
+    assert "--ref v0.28.0" in readme
 
 
-def test_release_027_golden_prompt_uses_three_bounded_read_only_mcp_calls(
+def test_release_028_golden_prompt_uses_three_bounded_read_only_mcp_calls(
     tmp_path: Path,
 ) -> None:
     qualification = json.loads(

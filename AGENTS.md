@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-This repository builds the lean local usage-data kernel. Version 0.27 is
+This repository builds the lean local usage-data kernel. Version 0.28 is
 publishable only from merged `main` or its exact release tag through the
 protected build-once workflow.
 
@@ -22,6 +22,7 @@ protected build-once workflow.
   progressive transplant states.
 - `config/kernel-retired-surfaces-v1.json` - exact 0.25 public-surface removal
   inventory.
+- `config/kernel-stable-contract-v1.json` - frozen pre-1.0 public contract.
 - `scripts/check_kernel_scope.py` - active-tree and publication-ref guard.
 - `docs/kernel-development-scope.md` - search, provenance, and privacy boundary.
 - `.mcp.json` - the single retained kernel MCP server.
@@ -311,7 +312,7 @@ python -m build
 python scripts/check_release.py --dist
 python scripts/smoke_installed_package.py \
   --artifact-dir dist \
-  --version 0.27.0
+  --version 0.28.0
 ```
 
 For documentation-only branches, at minimum run:

@@ -13,6 +13,7 @@ include config/kernel-release-candidate-budget.json
 include config/kernel-release-cutover-v1.json
 include config/kernel-release-qualification-v1.json
 include config/kernel-retired-surfaces-v1.json
+include config/kernel-stable-contract-v1.json
 recursive-include docs *.md
 prune scripts
 include scripts/benchmark_kernel.py
