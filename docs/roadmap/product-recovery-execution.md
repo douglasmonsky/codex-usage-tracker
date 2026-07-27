@@ -12,7 +12,7 @@ benchmark, a source-only tag, or an unpublished package.
 | Task | State | Depends on | Branch | Outcome |
 | --- | --- | --- | --- | --- |
 | R0 | Complete | — | `docs/product-recovery-roadmap` | Recovery authority merged as `117fff8` |
-| R1 | In progress | R0 | `feature/r1-agent-outcome-baseline` | Frozen benchmark and measured failures; validation/review pending |
+| R1 | Complete | R0 | `feature/r1-agent-outcome-baseline` | PR #342 merged as `aefb216`; frozen benchmark and measured failures |
 | R2 | Pending | R1 | — | Schema v3 and compact storage contract |
 | R3 | Pending | R2 | — | Cold build and incremental refresh acceleration |
 | R4 | Pending | R2 | — | Persisted rollups and fast API/MCP |
@@ -233,10 +233,11 @@ supports the metrics helper's `strict` command. It was not retried.
 
 ## R1 — Agent Outcome And Performance Baseline
 
-**State:** In progress
+**State:** Complete
 **Branch:** `feature/r1-agent-outcome-baseline`
 **Base:** `96c63359b3e79c8147d64dc6250a0de0968eb061`
-**Commits:** pending
+**Commits:** source `959843c`; squash merge
+`aefb2166eb006430bc5d66265a4256c53413e053`
 **Owned files:** Product Recovery benchmark contracts and results under
 `config/`; `scripts/benchmark_agent_outcome.py`; focused R1 and scope tests;
 this ledger
@@ -309,6 +310,7 @@ work. The CLI allowance task independently exposed a 44.7-second tracker path.
 | Installed | Pass | isolated candidate wheel smoke; two fresh raw MCP processes; warm Console p95 0.760 ms |
 | Broad | Pass | `just vc`: 360 Python tests, 7 frontend tests, Ruff, MyPy, Pyright, maintainability, manifests, deterministic Console assets, scope, release checks, and rebuilt distributions |
 | Distribution | Pass | 129,519-byte wheel; 409,824-byte source-complete sdist; both inside frozen budgets |
+| Pull request | Pass | PR #342; required CI passed after one unchanged Python 3.14 performance-gate rerun |
 
 ### Review metrics
 
@@ -329,6 +331,9 @@ work. The CLI allowance task independently exposed a 44.7-second tracker path.
   while the installed 0.28.0 plugin supplied the skill. That registration was
   removed after the task.
 - Current failures remain recorded. Gates were not weakened.
+- The first Python 3.14 CI attempt measured unchanged 100k-call writer p95 at
+  64.732 ms against the 50 ms gate. The isolated rerun passed without code or
+  threshold changes; Python 3.10 and Console lanes passed both attempts.
 - Non-selector prompts record `not_applicable`; selector validity is awarded
   only when the exact synthetic selector resolves. Claim grading is aligned to
   fact, estimate, inference, and unsupported.
@@ -342,3 +347,5 @@ work. The CLI allowance task independently exposed a 44.7-second tracker path.
   users the wire schema.
 - R2 receives the frozen 2.35-million-fact storage/correctness oracle and the
   20-task agent-outcome matrix.
+- R2 starts from exact authoritative base
+  `aefb2166eb006430bc5d66265a4256c53413e053`.
