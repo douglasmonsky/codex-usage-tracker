@@ -336,6 +336,8 @@ def _installed_mcp_command(
 def _smoke_mcp(
     config_path: Path,
     environment: dict[str, str],
+    *,
+    expected_generation: int,
 ) -> None:
     command = _installed_mcp_command(config_path, environment)
     for task_number in range(2):
@@ -390,7 +392,7 @@ def _smoke_mcp(
                 or job.get("state") != "completed"
                 or not isinstance(result, dict)
                 or result.get("planner_reason") != "no_changes"
-                or result.get("generation") != 1
+                or result.get("generation") != expected_generation
                 or result.get("inserted_calls") != 0
             ):
                 raise RuntimeError(
@@ -451,12 +453,12 @@ def _smoke_mcp(
                 for item in results
                 if isinstance(item, dict)
             )
-            if generations != {1}:
+            if generations != {expected_generation}:
                 raise RuntimeError(
                     f"fresh MCP task {task_number + 1} mixed generations: "
                     f"{generations}"
                 )
-            if allowance.get("generation") not in {None, 1}:
+            if allowance.get("generation") not in {None, expected_generation}:
                 raise RuntimeError(
                     f"fresh MCP task {task_number + 1} allowance generation "
                     f"is invalid: {allowance.get('generation')}"
@@ -468,6 +470,8 @@ def _smoke_mcp(
 def _smoke_service(
     command: Path,
     environment: dict[str, str],
+    *,
+    expected_generation: int,
 ) -> float:
     port = _free_port()
     server = subprocess.Popen(
@@ -494,7 +498,10 @@ def _smoke_service(
         status = json.loads(
             _await(f"http://127.0.0.1:{port}/api/kernel/v1/status")
         )
-        if status.get("state") != "active" or status.get("generation") != 1:
+        if (
+            status.get("state") != "active"
+            or status.get("generation") != expected_generation
+        ):
             raise RuntimeError(f"installed service status is invalid: {status}")
     finally:
         server.terminate()
@@ -640,9 +647,13 @@ def smoke_install(
             environment=environment,
             timeout=40,
         )
-        active = _run_json([command, "status"], environment=environment)
-        if active.get("state") != "active" or active.get("generation") != 1:
-            raise RuntimeError(f"installed refresh did not activate: {active}")
+    active = _run_json([command, "status"], environment=environment)
+    expected_generation = 2 if upgrade_from is not None else 1
+    if (
+        active.get("state") != "active"
+        or active.get("generation") != expected_generation
+    ):
+        raise RuntimeError(f"installed refresh did not activate: {active}")
         content_status = _run_json(
             [command, "content", "status"],
             environment=environment,
@@ -659,7 +670,7 @@ def smoke_install(
         )
         indexed_events = content_index.get("events")
         if (
-            content_index.get("indexed_generation") != 1
+        content_index.get("indexed_generation") != expected_generation
             or not isinstance(indexed_events, int)
             or indexed_events < 1
         ):
@@ -696,12 +707,20 @@ def smoke_install(
             [command, "content", "delete"],
             environment=environment,
         )
-        if _run_json([command, "status"], environment=environment).get(
-            "generation"
-        ) != 1:
-            raise RuntimeError("content deletion affected installed accounting")
-        _smoke_mcp(plugin_root / ".mcp.json", environment)
-        warm_p95_ms = _smoke_service(command, environment)
+    if _run_json([command, "status"], environment=environment).get(
+        "generation"
+    ) != expected_generation:
+        raise RuntimeError("content deletion affected installed accounting")
+    _smoke_mcp(
+        plugin_root / ".mcp.json",
+        environment,
+        expected_generation=expected_generation,
+    )
+    warm_p95_ms = _smoke_service(
+        command,
+        environment,
+        expected_generation=expected_generation,
+    )
     print(
         "Installed kernel package smoke passed "
         f"(two fresh MCP tasks; warm Console p95 {warm_p95_ms:.3f} ms)."
