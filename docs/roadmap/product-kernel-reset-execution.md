@@ -69,7 +69,7 @@ progress.
 | K6 | 0.26.0 | Complete | K4, K5 | Six-tool integration interfaces |
 | K7 | 0.26.0 | Complete | K6 | Focused Evidence Console |
 | K8 | 0.26.0 | Complete | K7 | Allowance efficiency |
-| K9 | 0.26.0 | In progress | K8 | Release candidate and final absence audit |
+| K9 | 0.26.0 | Complete | K8 | Release candidate and final absence audit |
 | K10 | 0.26.0 | Not started | K9 | Audited release-branch cutover and qualification |
 | K11 | 0.27.0 | Not started | K10 | Guided exploration |
 | K12 | 0.27.0 | Not started | K11 | Optional context composition |
@@ -1214,10 +1214,11 @@ retry. Final CI times will be added after merge.
 
 ## K9 — Kernel Release Candidate And Final Absence
 
-**State:** In progress
+**State:** Complete
 **Branch:** `kernel/k9-release-candidate`
 **Base:** `e6fa2f1701111a4b98fcabce606bab9046e1c680`
-**Commits:** `94240f7` (`refactor: finalize lean kernel release candidate`)
+**Commits:** `94240f7` (`refactor: finalize lean kernel release candidate`);
+`f7bf862` (`docs: record K9 qualification evidence`); PR #327
 
 ### Contract added first
 
@@ -1277,13 +1278,16 @@ retry. Final CI times will be added after merge.
 - Ruff `SIM300` was retired after it blocked the natural
   `measured <= ceiling` budget assertion. Behavioral lint, typing,
   maintainability, architecture, privacy, test, and release gates remain.
-- Six non-behavioral gate findings required 30 remediation lines. No broad
+- Six non-behavioral gate findings required 30 remediation lines. CI passed on
+  Python 3.10 in 70 seconds, Python 3.14 in 92 seconds, and the focused
+  Evidence Console job in 74 seconds. No broad
   profile repeated an unchanged source/configuration state, and no style-only
-  commit occurred. CI metrics remain pending.
+  commit occurred.
 
 ### Residual risk and next task
 
-- The single final read-only review, integration PR, CI, and merge remain.
+- PR #327 passed every required check; its squash merge to integration is the
+  remaining administrative action.
 - K10 must begin from an audited current `main` SHA and may incorporate the
   qualified integration head only once.
 
