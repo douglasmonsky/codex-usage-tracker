@@ -75,7 +75,7 @@ progress.
 | K12 | 0.27.0 | Complete | K11 | Optional context composition |
 | K13 | 0.27.0 | Complete | K11 | Read-only overlay boundary |
 | K14 | 0.27.0 | Complete | K12, K13 | Release qualification |
-| K15 | 0.28.0 | In progress | K14 | Fault, recovery, and scale |
+| K15 | 0.28.0 | Complete | K14 | Fault, recovery, and scale |
 | K16 | 0.28.0 | Not started | K15 | Contract freeze and release |
 
 ## Baseline Evidence
@@ -1863,10 +1863,12 @@ Python 3.10 test compatibility `889ad92`; squash merge
 
 ## K15 — Fault, Recovery, And Scale Qualification
 
-**State:** In progress — local qualification complete; final review and CI pending
+**State:** Complete
 **Branch:** `kernel/k15-fault-recovery`
 **Base:** `3f5aea32af0de08df35661bdbec3a00f8ffe346a`
-**Commits:** pending
+**Commits:** `21ac0c6` (`test: harden kernel recovery and scale gates`);
+PR #335 squash-merged as
+`32248861c45d7d88d28e354d4ac0394d86370c2b`
 
 ### Contract added first
 
@@ -1908,6 +1910,7 @@ Python 3.10 test compatibility `889ad92`; squash merge
 | Browser | Pass | 25 applicable Chromium desktop/mobile flows; 3 intentional mobile stream skips |
 | Distribution | Pass | wheel 129,485 bytes; post-review sdist measured 372,730–372,839 bytes during ledger closure; exact release checks pass and the 379,000-byte ceiling retains under 1.7 percent headroom |
 | 0.26 upgrade | Pass | public 0.26.0 created generation 1; in-place final-candidate upgrade preserved cache bytes and generation before refresh; full two-task MCP/content/Console smoke passed at 0.707 ms warm Console p95 |
+| GitHub CI | Pass | run 30262716164: Python 3.10 in 1m22s, Python 3.14 with public-0.26 upgrade smoke in 1m42s, and Focused Evidence Console in 1m14s |
 | Privacy | Pass | synthetic fixtures only; no live Usage Tracker database or raw Codex content inspected |
 
 The installed upgrade is also a blocking Python 3.14 CI package step; its
@@ -1951,8 +1954,8 @@ focused repository contract rejects removal of `--upgrade-from 0.26.0`.
 
 ### Residual risk and next task
 
-- GitHub CI remains before K15 merge.
-- K16 contract freeze and 0.28.0 release remain blocked until K15 merges.
+- K15 has no remaining implementation or qualification blocker.
+- K16 owns the public-contract freeze and protected 0.28.0 release.
 
 ## Task Entry Template
 
