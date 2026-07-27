@@ -192,6 +192,8 @@ test("error recovery control retries the failed view", async ({ page }) => {
 test("limits preserve fact grade and caveat language", async ({ page }) => {
   await page.goto("/limits");
   await expect(page.getByRole("heading", { name: "Capacity and limits" })).toBeVisible();
-  await expect(page.getByText(/does not invent pricing/)).toBeVisible();
-  await expect(page.getByText(/grade/)).toBeVisible();
+  await expect(page.getByText(/not causal billing attribution/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Measurement coverage" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Observed windows and local intervals" })).toBeVisible();
+  await expect(page.getByText(/outside usage possible/).first()).toBeVisible();
 });

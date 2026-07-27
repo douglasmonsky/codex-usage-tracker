@@ -189,6 +189,33 @@ def load_cutover_control(path: Path) -> CutoverControl:
     return _control_from_row(row)
 
 
+def reset_cutover_for_schema_upgrade(path: Path) -> None:
+    """Clear reconstructible publication pointers for an explicit rebuild."""
+
+    with _connect(path) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            """
+            UPDATE cutover_control
+            SET state = 'absent',
+                active_kernel_location = NULL,
+                active_schema = NULL,
+                active_generation = NULL,
+                integrity_digest = NULL,
+                staging_integrity_digest = NULL,
+                staging_kernel_location = NULL,
+                refresh_run_id = NULL,
+                rollback_kernel_location = NULL,
+                rollback_generation = NULL,
+                rollback_integrity_digest = NULL,
+                failure_code = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE singleton = 1
+            """
+        )
+        connection.commit()
+
+
 def rollback_cutover(path: Path) -> CutoverControl:
     """Atomically restore the previously validated analytical artifact."""
 

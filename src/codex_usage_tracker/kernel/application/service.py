@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any
 
 from .. import __version__
+from ..allowance import AllowanceService
+from ..allowance.rates import rate_card_status
 from ..evidence import EvidenceService
 from ..ingest import KernelIngestor, RefreshTrigger, refresh_request_hash
 from ..live import GenerationJournal, LiveStream
@@ -21,7 +23,7 @@ from ..operational import (
     initialize_operational_database,
     load_cutover_control,
 )
-from ..query import Operation, QueryRequest, QueryService
+from ..query import QueryService
 from .codec import evidence_request, json_value, query_request
 from .jobs import JobReader
 from .runtime import (
@@ -74,6 +76,7 @@ class KernelApplication:
 
     def status(self) -> dict[str, Any]:
         operational = self.paths.kernel.operational
+        rates = rate_card_status(self.paths.rate_card)
         if not operational.is_file():
             return {
                 "version": __version__,
@@ -81,6 +84,7 @@ class KernelApplication:
                 "generation": None,
                 "publication_id": None,
                 "refresh": None,
+                "rate_card": rates,
             }
         control = load_cutover_control(operational)
         active = JobReader(operational).active()
@@ -90,6 +94,7 @@ class KernelApplication:
             "generation": control.active_generation,
             "publication_id": control.integrity_digest,
             "refresh": json_value(active),
+            "rate_card": rates,
         }
 
     def query(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -117,22 +122,12 @@ class KernelApplication:
     def allowance(self, payload: dict[str, Any]) -> dict[str, Any]:
         limit = _int(payload.get("limit", 100), "limit")
         cursor = _optional_text(payload.get("cursor"), "cursor")
-        request = QueryRequest(
-            dataset="allowance",
-            operation=Operation.ROWS,
-            dimensions=(
-                "allowance",
-                "event_at",
-                "window",
-            ),
-            measures=("allowance_used_percent",),
-            order_by="event_at",
-            descending=True,
+        return AllowanceService(
+            self.paths.kernel.operational,
+            self.paths.rate_card,
+        ).read(
             limit=limit,
             cursor=cursor,
-        )
-        return json_value(
-            QueryService(self.paths.kernel.operational).execute(request)
         )
 
     def refresh(self, *, wait_seconds: float = 0) -> dict[str, Any]:

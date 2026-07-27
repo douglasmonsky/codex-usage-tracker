@@ -12,6 +12,7 @@ from scripts.check_kernel_scope import (
     K5_ADDITIONS,
     K6_ADDITIONS,
     K7_ADDITIONS,
+    K8_ADDITIONS,
     load_disposition_manifest,
     publication_ref_failure,
     scope_failures,
@@ -154,6 +155,12 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/frontend/kernel_console.test.mjs",
         "tests/kernel/console/test_contracts.py",
     } <= K7_ADDITIONS
+    assert {
+        ".agent-maintainer/change-plans/k8-allowance-efficiency.md",
+        "docs/kernel-allowance-efficiency.md",
+        "src/codex_usage_tracker/kernel/allowance/service.py",
+        "tests/kernel/allowance/test_service.py",
+    } <= K8_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -162,6 +169,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K5_ADDITIONS
         | K6_ADDITIONS
         | K7_ADDITIONS
+        | K8_ADDITIONS
     )
 
 

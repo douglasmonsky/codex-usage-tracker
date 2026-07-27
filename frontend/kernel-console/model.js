@@ -29,6 +29,7 @@ export function boundedPercent(value, maximum) {
 /** @param {Record<string, unknown>} row */
 export function evidenceSelectorForRow(row) {
   const candidates = [
+    ["allowance", "allowance_observation_id"],
     ["allowance", "allowance"],
     ["tool", "tool_call"],
     ["call", "call"],
@@ -40,6 +41,43 @@ export function evidenceSelectorForRow(row) {
     if (typeof value === "string" && value) return `${kind}:${value}`;
   }
   return null;
+}
+
+/** @param {Array<Record<string, unknown>>} rows */
+export function allowancePresentation(rows) {
+  return rows.map((row) => {
+    const local = /** @type {Record<string, unknown>} */ ((
+      row.local_usage && typeof row.local_usage === "object"
+      ? row.local_usage
+      : {}
+    ));
+    const pricing = /** @type {Record<string, unknown>} */ ((
+      row.pricing_coverage && typeof row.pricing_coverage === "object"
+      ? row.pricing_coverage
+      : {}
+    ));
+    const limitations = Array.isArray(row.limitations) ? row.limitations : [];
+    return {
+      allowance_observation_id: row.allowance_observation_id,
+      window: row.window_kind,
+      observed_at: row.observed_at,
+      used_percent: row.used_percent,
+      remaining_percent: row.remaining_percent,
+      delta_used_percent: row.delta_used_percent,
+      percentage_points_per_hour: row.percentage_points_per_hour,
+      local_total_tokens: local.total_tokens,
+      local_calls: local.calls,
+      local_turns: local.turns,
+      local_tokens_per_percentage_point: row.local_tokens_per_percentage_point,
+      local_calls_per_percentage_point: row.local_calls_per_percentage_point,
+      local_turns_per_percentage_point: row.local_turns_per_percentage_point,
+      estimated_cost_usd: row.estimated_cost_usd,
+      estimated_credits: row.estimated_credits,
+      pricing_coverage_percent: pricing.coverage_percent,
+      grade: row.grade,
+      caveats: limitations.join(", "),
+    };
+  });
 }
 
 /** @param {unknown} cached @param {unknown} uncached */

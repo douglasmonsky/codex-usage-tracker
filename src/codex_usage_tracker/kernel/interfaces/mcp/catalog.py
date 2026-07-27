@@ -46,7 +46,8 @@ TOOL_SPECS = tuple(
         ),
         (
             "usage_allowance",
-            "Return bounded exact allowance observations.",
+            "Return exact allowance observations, deterministic reset-aware "
+            "local ratios, and source-stamped estimates.",
         ),
         (
             "usage_job_status",

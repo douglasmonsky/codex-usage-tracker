@@ -23,6 +23,10 @@ class RuntimePaths:
     def kernel(self) -> KernelPaths:
         return kernel_paths(self.cache_root)
 
+    @property
+    def rate_card(self) -> Path:
+        return self.cache_root / "rate-card.json"
+
 
 def default_runtime_paths(
     environ: Mapping[str, str] | None = None,

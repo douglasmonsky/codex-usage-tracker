@@ -16,6 +16,7 @@ vp:
         scripts/generate_kernel_interfaces.py \
         scripts/generate_kernel_manifests.py \
         src/codex_usage_tracker/kernel \
+        tests/kernel/allowance \
         tests/kernel/console \
         tests/kernel/evidence \
         tests/kernel/interfaces \
@@ -66,6 +67,7 @@ v:
         tests/kernel/test_privacy_oracle.py \
         tests/kernel/test_source_lifecycle_oracle.py \
         tests/kernel/test_watcher.py \
+        tests/kernel/allowance \
         tests/kernel/console \
         tests/kernel/evidence \
         tests/kernel/interfaces \

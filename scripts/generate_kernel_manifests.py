@@ -386,6 +386,99 @@ _K6_TRANSPLANTS = {
         ("tests/kernel/interfaces/test_plugin.py",),
     ),
 }
+_K8_TRANSPLANTS = {
+    "src/codex_usage_tracker/application/allowance.py": (
+        "src/codex_usage_tracker/kernel/allowance/service.py",
+        ("tests/kernel/allowance/test_service.py",),
+    ),
+    "src/codex_usage_tracker/application/allowance_models.py": (
+        "src/codex_usage_tracker/kernel/allowance/efficiency.py",
+        ("tests/kernel/allowance/test_efficiency.py",),
+    ),
+    "src/codex_usage_tracker/pricing/__init__.py": (
+        "src/codex_usage_tracker/kernel/allowance/__init__.py",
+        ("tests/kernel/allowance/test_rates.py",),
+    ),
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/allowance/rates.py",
+            ("tests/kernel/allowance/test_rates.py",),
+        )
+        for path in (
+            "src/codex_usage_tracker/pricing/allowance.py",
+            "src/codex_usage_tracker/pricing/allowance_config.py",
+            "src/codex_usage_tracker/pricing/allowance_rate_card.py",
+            "src/codex_usage_tracker/pricing/allowance_usage.py",
+            "src/codex_usage_tracker/pricing/api.py",
+            "src/codex_usage_tracker/pricing/config.py",
+            "src/codex_usage_tracker/pricing/costing.py",
+        )
+    },
+    "src/codex_usage_tracker/pricing/tach.domain.toml": (
+        "src/codex_usage_tracker/kernel/allowance/__init__.py",
+        ("tests/kernel/test_repository_quality_policy.py",),
+    ),
+    "src/codex_usage_tracker/store/allowance_materialization.py": (
+        "src/codex_usage_tracker/kernel/allowance/service.py",
+        ("tests/kernel/allowance/test_service.py",),
+    ),
+    "src/codex_usage_tracker/store/allowance_observation_sync.py": (
+        "src/codex_usage_tracker/kernel/writer.py",
+        ("tests/kernel/allowance/test_service.py",),
+    ),
+    "src/codex_usage_tracker/store/allowance_observations.py": (
+        "src/codex_usage_tracker/kernel/allowance/service.py",
+        ("tests/kernel/allowance/test_service.py",),
+    ),
+    "src/codex_usage_tracker/store/allowance_schema.py": (
+        "src/codex_usage_tracker/kernel/schema.py",
+        ("tests/kernel/test_schema.py",),
+    ),
+    "src/codex_usage_tracker/store/service_tier_schema.py": (
+        "src/codex_usage_tracker/kernel/schema.py",
+        ("tests/kernel/test_schema.py",),
+    ),
+    **{
+        path: (
+            "tests/kernel/allowance/test_efficiency.py",
+            ("tests/kernel/allowance/test_efficiency.py",),
+        )
+        for path in (
+            "tests/application/test_allowance_models.py",
+            "tests/allowance_intelligence/test_cycles.py",
+        )
+    },
+    **{
+        path: (
+            "tests/kernel/allowance/test_service.py",
+            ("tests/kernel/allowance/test_service.py",),
+        )
+        for path in (
+            "tests/application/test_allowance.py",
+            "tests/cli/test_allowance_intelligence_cli_mcp.py",
+            "tests/cli/test_mcp_allowance.py",
+            "tests/golden_questions/cases/08_allowance_status.json",
+            "tests/golden_questions/cases/09_allowance_evidence.json",
+            "tests/mcp/test_core_allowance_tool.py",
+            "tests/server/test_server_allowance.py",
+            "tests/server/test_server_allowance_v2.py",
+            "tests/store/test_allowance_intelligence_queries.py",
+            "tests/store/test_allowance_materialization.py",
+            "tests/store/test_allowance_observations.py",
+        )
+    },
+    **{
+        path: (
+            "tests/kernel/allowance/test_rates.py",
+            ("tests/kernel/allowance/test_rates.py",),
+        )
+        for path in (
+            "tests/pricing/test_allowance.py",
+            "tests/pricing/test_pricing.py",
+            "tests/pricing/test_rate_card.py",
+        )
+    },
+}
 
 
 def build_retired_surface_manifest() -> dict[str, Any]:
@@ -487,6 +580,21 @@ def apply_k6_transition() -> None:
     _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
+def apply_k8_transition() -> None:
+    """Resolve K8 assignments to exact ratios, estimates, or retirement."""
+
+    payload = build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    payload["entries"] = [
+        _expected_current_entry(base_by_path[entry["path"]])
+        if entry["owner_task"] == "K8"
+        else entry
+        for entry in payload["entries"]
+    ]
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
+
+
 def manifest_failures(
     disposition: dict[str, Any] | None = None,
 ) -> list[str]:
@@ -551,6 +659,11 @@ def manifest_failures(
             and entry["status"] != "verified"
         ):
             failures.append(f"{path}: K6 disposition is not verified")
+        if (
+            expected_entry["owner_task"] == "K8"
+            and entry["status"] != "verified"
+        ):
+            failures.append(f"{path}: K8 disposition is not verified")
 
     surface_keys = [
         (entry["surface_type"], entry["public_name"])
@@ -748,6 +861,44 @@ def _expected_k6_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
     return entry
 
 
+def _expected_k8_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = dict(base_entry)
+    transplant = _K8_TRANSPLANTS.get(entry["path"])
+    if transplant is None:
+        entry.update(
+            {
+                "disposition": "retire",
+                "reason": (
+                    "Legacy allowance intelligence, updater, forecasting, or "
+                    "narrative behavior is outside the exact K8 fact contract."
+                ),
+                "required_oracle_tests": [
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ],
+                "removal_or_absence_test": (
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ),
+                "status": "verified",
+                "target_path": "",
+            }
+        )
+        return entry
+    target, tests = transplant
+    entry.update(
+        {
+            "reason": (
+                "Exact observations, deterministic reset-aware ratios, and "
+                "source-stamped estimates survive through one lean K8 owner."
+            ),
+            "required_oracle_tests": list(tests),
+            "removal_or_absence_test": tests[0],
+            "status": "verified",
+            "target_path": target,
+        }
+    )
+    return entry
+
+
 def _expected_current_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
     entry = (
         _expected_k2_entry(base_entry)
@@ -762,6 +913,8 @@ def _expected_current_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
         return _expected_k5_entry(entry)
     if entry["owner_task"] == "K6":
         return _expected_k6_entry(entry)
+    if entry["owner_task"] == "K8":
+        return _expected_k8_entry(entry)
     return entry
 
 
@@ -798,6 +951,7 @@ def main() -> int:
     parser.add_argument("--apply-k4", action="store_true")
     parser.add_argument("--apply-k5", action="store_true")
     parser.add_argument("--apply-k6", action="store_true")
+    parser.add_argument("--apply-k8", action="store_true")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
@@ -813,6 +967,8 @@ def main() -> int:
         apply_k5_transition()
     if args.apply_k6:
         apply_k6_transition()
+    if args.apply_k8:
+        apply_k8_transition()
     failures = manifest_failures()
     if failures:
         print("\n".join(failures), file=sys.stderr)

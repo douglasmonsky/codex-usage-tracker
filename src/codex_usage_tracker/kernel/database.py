@@ -14,6 +14,7 @@ from pathlib import Path
 from .schema import (
     ANALYTICAL_TABLES,
     APPLICATION_ID,
+    REQUIRED_SCHEMA_OBJECTS,
     SCHEMA_VERSION,
     create_schema,
 )
@@ -24,7 +25,7 @@ def initialize_analytical_database(
     *,
     replace: bool = False,
 ) -> Path:
-    """Create and atomically install a fresh schema-v1 cache."""
+    """Create and atomically install a fresh current-schema cache."""
 
     target = path.resolve()
     if target.exists() and not replace:
@@ -120,7 +121,9 @@ def validate_analytical_database(path: Path) -> list[str]:
         with sqlite3.connect(path) as connection:
             connection.execute("PRAGMA foreign_keys = ON")
             if connection.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
-                failures.append("analytical schema version is not 1")
+                failures.append(
+                    f"analytical schema version is not {SCHEMA_VERSION}"
+                )
             if connection.execute("PRAGMA application_id").fetchone()[0] != APPLICATION_ID:
                 failures.append("analytical application ID is invalid")
             tables = {
@@ -133,6 +136,19 @@ def validate_analytical_database(path: Path) -> list[str]:
                 failures.append(
                     "analytical table set differs from schema v1: "
                     f"{sorted(tables)}"
+                )
+            objects = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_schema "
+                    "WHERE type IN ('index', 'view')"
+                )
+            }
+            missing_objects = REQUIRED_SCHEMA_OBJECTS - objects
+            if missing_objects:
+                failures.append(
+                    "analytical schema capabilities are missing: "
+                    f"{sorted(missing_objects)}"
                 )
             integrity = connection.execute("PRAGMA quick_check").fetchone()[0]
             if integrity != "ok":
@@ -206,12 +222,32 @@ def _validate_connection_schema(connection: sqlite3.Connection) -> None:
             "SELECT name FROM sqlite_schema WHERE type = 'table'"
         )
     }
+    objects = {
+        row[0]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_schema WHERE type IN ('index', 'view')"
+        )
+    }
     if (
         version != SCHEMA_VERSION
         or application_id != APPLICATION_ID
         or tables != ANALYTICAL_TABLES
+        or not objects >= REQUIRED_SCHEMA_OBJECTS
     ):
         raise ValueError("analytical database schema identity is invalid")
+
+
+def analytical_schema_version(path: Path) -> int | None:
+    """Read only the bounded SQLite schema header for upgrade routing."""
+
+    target = path.resolve()
+    if not target.is_file():
+        return None
+    try:
+        with sqlite3.connect(f"{target.as_uri()}?mode=ro", uri=True) as connection:
+            return int(connection.execute("PRAGMA user_version").fetchone()[0])
+    except sqlite3.DatabaseError as exc:
+        raise ValueError("analytical database schema header is unreadable") from exc
 
 
 def _require_database_file(path: Path) -> None:

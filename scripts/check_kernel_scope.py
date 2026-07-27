@@ -153,6 +153,21 @@ K7_ADDITIONS = frozenset(
         "tests/kernel/console/test_contracts.py",
     }
 )
+K8_ADDITIONS = frozenset(
+    {
+        ".agent-maintainer/change-plans/k8-allowance-efficiency.md",
+        "docs/kernel-allowance-efficiency.md",
+        "src/codex_usage_tracker/kernel/allowance/__init__.py",
+        "src/codex_usage_tracker/kernel/allowance/efficiency.py",
+        "src/codex_usage_tracker/kernel/allowance/rates.py",
+        "src/codex_usage_tracker/kernel/allowance/service.py",
+        "tests/kernel/allowance/__init__.py",
+        "tests/kernel/allowance/test_efficiency.py",
+        "tests/kernel/allowance/test_performance.py",
+        "tests/kernel/allowance/test_rates.py",
+        "tests/kernel/allowance/test_service.py",
+    }
+)
 
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
@@ -162,6 +177,7 @@ INTEGRATION_ADDITIONS = (
     | K5_ADDITIONS
     | K6_ADDITIONS
     | K7_ADDITIONS
+    | K8_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"
