@@ -12,6 +12,7 @@ include scripts/benchmark_kernel.py
 include scripts/check_kernel_maintainability.py
 include scripts/check_kernel_scope.py
 include scripts/check_release.py
+include scripts/generate_kernel_interfaces.py
 include scripts/generate_kernel_manifests.py
 recursive-include tests/kernel *.json *.jsonl *.py
 prune tests/release

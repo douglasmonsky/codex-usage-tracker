@@ -292,6 +292,100 @@ _K5_TRANSPLANTS = {
         ),
     ),
 }
+_K6_TRANSPLANTS = {
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/application/service.py",
+            ("tests/kernel/interfaces/test_application.py",),
+        )
+        for path in (
+            "src/codex_usage_tracker/application/__init__.py",
+            "src/codex_usage_tracker/application/container.py",
+            "src/codex_usage_tracker/application/errors.py",
+            "src/codex_usage_tracker/application/protocols.py",
+            "src/codex_usage_tracker/application/services.py",
+            "src/codex_usage_tracker/application/tach.domain.toml",
+        )
+    },
+    "src/codex_usage_tracker/application/paths.py": (
+        "src/codex_usage_tracker/kernel/application/runtime.py",
+        ("tests/kernel/interfaces/test_application.py",),
+    ),
+    "src/codex_usage_tracker/application/requests.py": (
+        "src/codex_usage_tracker/kernel/application/codec.py",
+        ("tests/kernel/interfaces/test_application.py",),
+    ),
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/interfaces/cli/main.py",
+            ("tests/kernel/interfaces/test_cli.py",),
+        )
+        for path in (
+            "src/codex_usage_tracker/interfaces/cli/__init__.py",
+            "src/codex_usage_tracker/interfaces/cli/commands.py",
+            "src/codex_usage_tracker/interfaces/cli/help_i18n.py",
+            "src/codex_usage_tracker/interfaces/cli/namespaces.py",
+            "src/codex_usage_tracker/interfaces/cli/parser.py",
+            "src/codex_usage_tracker/interfaces/cli/parser_data.py",
+            "src/codex_usage_tracker/interfaces/cli/parser_diagnostics.py",
+            "src/codex_usage_tracker/interfaces/cli/parser_lifecycle.py",
+            "src/codex_usage_tracker/interfaces/cli/parser_reports.py",
+            "src/codex_usage_tracker/interfaces/cli/tach.domain.toml",
+        )
+    },
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/interfaces/http/app.py",
+            ("tests/kernel/interfaces/test_http.py",),
+        )
+        for path in (
+            "src/codex_usage_tracker/interfaces/http/__init__.py",
+            "src/codex_usage_tracker/interfaces/http/serialization.py",
+            "src/codex_usage_tracker/interfaces/http/tach.domain.toml",
+            "src/codex_usage_tracker/interfaces/http/v2.py",
+        )
+    },
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/interfaces/mcp/catalog.py",
+            (
+                "tests/kernel/interfaces/test_contracts.py",
+                "tests/kernel/interfaces/test_mcp.py",
+            ),
+        )
+        for path in (
+            "src/codex_usage_tracker/interfaces/mcp/__init__.py",
+            "src/codex_usage_tracker/interfaces/mcp/core_tools.py",
+            "src/codex_usage_tracker/interfaces/mcp/developer_tools.py",
+            "src/codex_usage_tracker/interfaces/mcp/models.py",
+            "src/codex_usage_tracker/interfaces/mcp/profiles.py",
+            "src/codex_usage_tracker/interfaces/mcp/query_analysis_tools.py",
+            "src/codex_usage_tracker/interfaces/mcp/registry.py",
+            "src/codex_usage_tracker/interfaces/mcp/tach.domain.toml",
+            "src/codex_usage_tracker/interfaces/tach.domain.toml",
+        )
+    },
+    **{
+        path: (
+            "src/codex_usage_tracker/kernel/interfaces/mcp/server.py",
+            ("tests/kernel/interfaces/test_mcp.py",),
+        )
+        for path in (
+            "src/codex_usage_tracker/interfaces/mcp/mcp_allowance.py",
+            "src/codex_usage_tracker/interfaces/mcp/mcp_discovery.py",
+            "src/codex_usage_tracker/interfaces/mcp/mcp_local_operations.py",
+            "src/codex_usage_tracker/interfaces/mcp/mcp_server_tools.py",
+            "src/codex_usage_tracker/interfaces/mcp/runtime.py",
+            "src/codex_usage_tracker/interfaces/mcp/serialization.py",
+            "src/codex_usage_tracker/interfaces/mcp/server.py",
+            "src/codex_usage_tracker/interfaces/mcp/transports.py",
+        )
+    },
+    "src/codex_usage_tracker/plugin_installer.py": (
+        "src/codex_usage_tracker/kernel/plugin_manifest.py",
+        ("tests/kernel/interfaces/test_plugin.py",),
+    ),
+}
 
 
 def build_retired_surface_manifest() -> dict[str, Any]:
@@ -378,6 +472,21 @@ def apply_k5_transition() -> None:
     _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
+def apply_k6_transition() -> None:
+    """Resolve every K6 assignment to the six-tool interface cutover."""
+
+    payload = build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    payload["entries"] = [
+        _expected_current_entry(base_by_path[entry["path"]])
+        if entry["owner_task"] == "K6"
+        else entry
+        for entry in payload["entries"]
+    ]
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
+
+
 def manifest_failures(
     disposition: dict[str, Any] | None = None,
 ) -> list[str]:
@@ -437,6 +546,11 @@ def manifest_failures(
             and entry["status"] != "verified"
         ):
             failures.append(f"{path}: K5 disposition is not verified")
+        if (
+            expected_entry["owner_task"] == "K6"
+            and entry["status"] != "verified"
+        ):
+            failures.append(f"{path}: K6 disposition is not verified")
 
     surface_keys = [
         (entry["surface_type"], entry["public_name"])
@@ -616,6 +730,24 @@ def _expected_k5_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
     return entry
 
 
+def _expected_k6_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = dict(base_entry)
+    target, tests = _K6_TRANSPLANTS[entry["path"]]
+    entry.update(
+        {
+            "reason": (
+                "Operational interface behavior survives through the exact "
+                "six-tool kernel application and adapter boundary."
+            ),
+            "required_oracle_tests": list(tests),
+            "removal_or_absence_test": tests[0],
+            "status": "verified",
+            "target_path": target,
+        }
+    )
+    return entry
+
+
 def _expected_current_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
     entry = (
         _expected_k2_entry(base_entry)
@@ -628,6 +760,8 @@ def _expected_current_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
         return _expected_k4_entry(entry)
     if entry["owner_task"] == "K5":
         return _expected_k5_entry(entry)
+    if entry["owner_task"] == "K6":
+        return _expected_k6_entry(entry)
     return entry
 
 
@@ -663,6 +797,7 @@ def main() -> int:
     parser.add_argument("--apply-k3", action="store_true")
     parser.add_argument("--apply-k4", action="store_true")
     parser.add_argument("--apply-k5", action="store_true")
+    parser.add_argument("--apply-k6", action="store_true")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
@@ -676,6 +811,8 @@ def main() -> int:
         apply_k4_transition()
     if args.apply_k5:
         apply_k5_transition()
+    if args.apply_k6:
+        apply_k6_transition()
     failures = manifest_failures()
     if failures:
         print("\n".join(failures), file=sys.stderr)

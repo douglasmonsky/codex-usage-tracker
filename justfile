@@ -3,6 +3,7 @@ set shell := ["bash", "-uc"]
 scope:
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_kernel_scope.py
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/generate_kernel_manifests.py --check
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; PYTHONPATH=src "$PY" scripts/generate_kernel_interfaces.py --check
 
 vp:
     just scope
@@ -10,9 +11,11 @@ vp:
         scripts/check_kernel_maintainability.py \
         scripts/check_kernel_scope.py \
         scripts/check_release.py \
+        scripts/generate_kernel_interfaces.py \
         scripts/generate_kernel_manifests.py \
         src/codex_usage_tracker/kernel \
         tests/kernel/evidence \
+        tests/kernel/interfaces \
         tests/kernel/live \
         tests/kernel/query \
         tests/kernel/test_code_disposition_manifest.py \
@@ -58,6 +61,7 @@ v:
         tests/kernel/test_source_lifecycle_oracle.py \
         tests/kernel/test_watcher.py \
         tests/kernel/evidence \
+        tests/kernel/interfaces \
         tests/kernel/live \
         tests/kernel/query
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pyright --pythonpath "$PY"

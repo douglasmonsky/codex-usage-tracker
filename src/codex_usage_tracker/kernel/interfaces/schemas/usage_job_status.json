@@ -1,0 +1,1 @@
+{"additionalProperties":false,"properties":{"include_result":{"type":"boolean"},"job_id":{"maxLength":128,"minLength":1,"type":"string"},"wait_seconds":{"maximum":30,"minimum":0,"type":"number"}},"required":["job_id"],"type":"object"}

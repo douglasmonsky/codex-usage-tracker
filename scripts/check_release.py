@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""K1A release-safety checks for the non-publishable integration skeleton."""
+"""Release-safety checks for the non-publishable kernel integration."""
 
 from __future__ import annotations
 
@@ -67,21 +67,44 @@ def release_failures(*, dist: bool = False) -> list[str]:
     if metadata["version"] != _VERSION:
         failures.append(f"integration package version must be {_VERSION}")
     if metadata.get("dependencies") != []:
-        failures.append("K1A skeleton must have no runtime dependencies")
-    if "scripts" in metadata:
-        failures.append("K1A skeleton must not expose a console script")
+        failures.append("kernel integration must have no runtime dependencies")
+    if metadata.get("scripts") != {
+        "codex-usage-tracker": (
+            "codex_usage_tracker.kernel.interfaces.cli.main:main"
+        )
+    }:
+        failures.append("kernel integration must expose only its retained CLI")
 
     plugin = json.loads(
         (_REPO_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
     )
     if plugin.get("version") != _PLUGIN_VERSION:
         failures.append(f"integration plugin version must be {_PLUGIN_VERSION}")
-    if plugin.keys() & {"skills", "mcpServers", "bundle"}:
-        failures.append("integration plugin must not claim runtime bundle surfaces")
+    if plugin.get("skills") != "./skills/":
+        failures.append("integration plugin must declare its kernel skill")
+    if plugin.get("mcpServers") != "./.mcp.json":
+        failures.append("integration plugin must declare its MCP server")
+    bundle = plugin.get("bundle")
+    if (
+        not isinstance(bundle, dict)
+        or bundle.get("schema")
+        != "codex-usage-tracker.kernel-plugin-bundle.v1"
+        or bundle.get("runtime_version") != _VERSION
+        or bundle.get("publishable") is not False
+    ):
+        failures.append("integration plugin bundle identity is invalid")
 
     mcp = json.loads((_REPO_ROOT / ".mcp.json").read_text(encoding="utf-8"))
-    if mcp != {"mcpServers": {}}:
-        failures.append("integration MCP catalog must be empty until K6")
+    servers = mcp.get("mcpServers") if isinstance(mcp, dict) else None
+    if not isinstance(servers, dict) or set(servers) != {"codex-usage-tracker"}:
+        failures.append("integration MCP catalog must contain exactly one server")
+    else:
+        server = servers["codex-usage-tracker"]
+        if server.get("args") != [
+            "-m",
+            "codex_usage_tracker.kernel.interfaces.mcp.server",
+        ]:
+            failures.append("integration MCP server does not use the kernel adapter")
 
     workflow = (_REPO_ROOT / ".github/workflows/publish.yml").read_text(
         encoding="utf-8"
@@ -112,6 +135,7 @@ def _distribution_failures(dist_dir: Path) -> list[str]:
         f"{dist_info}/METADATA",
         f"{dist_info}/RECORD",
         f"{dist_info}/WHEEL",
+        f"{dist_info}/entry_points.txt",
         f"{dist_info}/top_level.txt",
     }
     expected_wheel_names.update(
@@ -120,7 +144,8 @@ def _distribution_failures(dist_dir: Path) -> list[str]:
             _REPO_ROOT / "src" / "codex_usage_tracker" / "kernel",
             _REPO_ROOT / "src" / "codex_usage_tracker" / "release",
         )
-        for path in root.rglob("*.py")
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix in {".py", ".json"}
     )
     if wheel_names != expected_wheel_names:
         failures.append(
@@ -157,7 +182,7 @@ def _distribution_failures(dist_dir: Path) -> list[str]:
         missing = sorted(expected_sdist_names - sdist_names)
         unexpected = sorted(sdist_names - expected_sdist_names)
         failures.append(
-            "integration sdist member set differs from the exact K1A package: "
+            "integration sdist member set differs from the exact kernel package: "
             f"missing={missing}, unexpected={unexpected}"
         )
     failures.extend(_metadata_failures(metadata_text, artifact="sdist"))
@@ -179,6 +204,7 @@ def _expected_sdist_names() -> set[str]:
         "src/codex_usage_tracking.egg-info/PKG-INFO",
         "src/codex_usage_tracking.egg-info/SOURCES.txt",
         "src/codex_usage_tracking.egg-info/dependency_links.txt",
+        "src/codex_usage_tracking.egg-info/entry_points.txt",
         "src/codex_usage_tracking.egg-info/requires.txt",
         "src/codex_usage_tracking.egg-info/top_level.txt",
     }
@@ -192,11 +218,12 @@ def _expected_sdist_names() -> set[str]:
                 "check_kernel_maintainability.py",
                 "check_kernel_scope.py",
                 "check_release.py",
+                "generate_kernel_interfaces.py",
                 "generate_kernel_manifests.py",
             )),
             (
                 _REPO_ROOT / "src" / "codex_usage_tracker" / "kernel",
-                ("**/*.py",),
+                ("**/*.py", "**/*.json"),
             ),
             (_REPO_ROOT / "src" / "codex_usage_tracker" / "release", ("*.py",)),
             (_REPO_ROOT / "tests" / "kernel", ("**/*.py", "**/*.json", "**/*.jsonl")),
@@ -247,7 +274,7 @@ def main() -> int:
     if failures:
         print("\n".join(failures))
         return 1
-    print("K1A integration release-safety checks passed.")
+    print("Kernel integration release-safety checks passed.")
     return 0
 
 

@@ -66,7 +66,7 @@ progress.
 | K3 | 0.26.0 | Complete | K2 | Incremental/live ingestion |
 | K4 | 0.26.0 | Complete | K3 | Bounded query engine |
 | K5 | 0.26.0 | CI fix pending | K3 | Evidence timeline and live stream |
-| K6 | 0.26.0 | Not started | K4, K5 | Six-tool integration interfaces |
+| K6 | 0.26.0 | CI pending | K4, K5 | Six-tool integration interfaces |
 | K7 | 0.26.0 | Not started | K6 | Focused Evidence Console |
 | K8 | 0.26.0 | Not started | K7 | Allowance efficiency |
 | K9 | 0.26.0 | Not started | K8 | Release candidate and final absence audit |
@@ -925,7 +925,7 @@ metadata in this changeset
 | Profiling | Incomplete | `agent-perf` run `20260727T015044Z-fc265f11`, Scalene 2.3.0, exited zero but emitted no JSON profile; no hotspot claim |
 | Package | Pass | wheel and sdist built; release-safety distribution check passed; isolated no-dependency wheel imports for `EvidenceService`, `GenerationJournal`, and `LiveStream` passed |
 | Privacy | Pass | synthetic fixtures only; no live database, Codex log, prompt, reasoning, raw tool argument/output, shell body, secret, or full source path inspected or stored |
-| Integration CI | Fix pending | PR #323: the first defect was corrected and passed in 75 s and 90 s; a docs-only rerun exposed inherited wildcard wiring that re-added the excluded ingest benchmark to the broad matrix; a policy test now protects the dedicated-step boundary and the exact local functional command passed 141 tests in 20.14 s |
+| Integration CI | Pass | PR #323 final corrected CI passed on Python 3.10 in 56 s and Python 3.14 in 79 s; squash merge `7d51a17acbd4a7648674ffa56c242a8a9b32eec3` |
 
 The performance assertion uses the identical unprofiled synthetic workload.
 Profiling is attribution-only and cannot replace that timing evidence.
@@ -980,9 +980,77 @@ performance-step wiring.
 - The Scalene capture did not emit a usable profile. The repeatable unprofiled
   100,000-call benchmark remains authoritative and passes with substantial
   headroom.
-- The final corrected CI rerun and squash merge remain pending. After merge,
-  K6 may bind K4 queries and K5 evidence/live behavior to exactly the six
-  approved integration interfaces without reintroducing narrative analysis.
+- K5 is complete. K6 may bind K4 queries and K5 evidence/live behavior to
+  exactly the six approved integration interfaces without reintroducing
+  narrative analysis.
+
+## K6 — Six-tool kernel interface cutover
+
+**State:** CI pending
+**Branch:** `kernel/k6-interface-cutover`
+**Base:** `7d51a17acbd4a7648674ffa56c242a8a9b32eec3`
+**Commits:** pending
+
+### Contract added first
+
+- Exact six-tool MCP catalog, `/api/kernel/v1` route set, retained CLI command
+  set, deterministic schemas/plugin bundle, and forbidden-name absence.
+- Read paths stay generation-consistent and write-free. Refresh starts or
+  joins one durable job, serializes the launch gap, and supports bounded
+  host-side waiting.
+
+### Implementation
+
+- `kernel.application` composes status, refresh, batched query, evidence,
+  allowance, live stream, and internally consistent job snapshots once for
+  every adapter.
+- `kernel.interfaces` provides direct stdio JSON-RPC, guarded loopback HTTP,
+  and the operational CLI without compatibility profiles or narrative
+  analysis.
+- Generated schemas and plugin identity share one source of truth. K6 resolves
+  all 40 frozen interface transplants and preserves every retired source path.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | interface/query/evidence/live contracts; Ruff, Mypy, and Pyright clean |
+| Broader | Pass | final post-review `just v`: 172 passed in 35.31 s; scope, manifests, maintainability, privacy, and release checks clean |
+| Performance | Pass | identical unprofiled synthetic adapter workload: status 0.514 ms p95, batched query 0.912 ms p95 |
+| Profiling | Incomplete | `agent-perf` run `20260727T023958Z-652240e6` could not start because pinned Scalene 2.3.0 is absent; no hotspot claim |
+| Package | Pass | exact wheel/sdist check; isolated no-dependency CLI and six-tool MCP handshake |
+| Reference | Pass | public PyPI 0.25.1 retained installed-package smoke passed from the detached reference worktree |
+| Privacy | Pass | synthetic fixtures only; no live database or local usage content inspected |
+
+### Review metrics
+
+- Total findings: 5
+- Accepted findings: 5 (`R1`–`R5`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+K6 recorded one duplicate broad verifier because `just v` immediately reran an
+already-green `just vp`. Four non-behavioral findings were limited to Ruff
+import forms and namespace-package Mypy configuration; style-only commits
+remain zero. The exact final counts live in
+`config/kernel-development-efficiency-v1.json`.
+
+### Deviations and decisions
+
+- The HTTP prefix is frozen as `/api/kernel/v1`.
+- The new skill is `skills/usage-kernel/SKILL.md`; the historical 0.25 skill
+  paths remain absent under the K1 quarantine contract.
+- The change-plan file budget increased from 38 to 55 after enumerating the
+  complete generated schema, adapter, smoke, scope, and release inventory. K7
+  console work is not included.
+
+### Residual risk and next task
+
+- Final read-only review is complete; integration CI is pending.
+- K7 may consume only these frozen adapters and may not restore compatibility
+  profiles, narrative analysis, or retired routes.
 
 ## Task Entry Template
 

@@ -112,7 +112,7 @@ def test_code_disposition_rejects_immutable_k1_decision_drift() -> None:
 
 def test_progressive_tasks_advance_non_keep_paths_without_restoring_source() -> None:
     for entry in _manifest()["entries"]:
-        if entry["owner_task"] in {"K2", "K3", "K4", "K5"}:
+        if entry["owner_task"] in {"K2", "K3", "K4", "K5", "K6"}:
             assert entry["status"] == "verified"
         elif entry["disposition"] != "keep":
             assert entry["status"] == "removed"
@@ -236,6 +236,30 @@ def test_k5_assignment_resolves_to_exact_evidence() -> None:
     assert entries[0]["target_path"] == (
         "src/codex_usage_tracker/kernel/evidence/service.py"
     )
+
+
+def test_k6_assignments_resolve_to_the_six_tool_interface_cutover() -> None:
+    entries = [
+        entry
+        for entry in _manifest()["entries"]
+        if entry["owner_task"] == "K6"
+    ]
+
+    assert len(entries) == 40
+    assert all(entry["disposition"] == "transplant" for entry in entries)
+    assert all(entry["status"] == "verified" for entry in entries)
+    assert {
+        entry["target_path"] for entry in entries
+    } <= {
+        "src/codex_usage_tracker/kernel/application/codec.py",
+        "src/codex_usage_tracker/kernel/application/runtime.py",
+        "src/codex_usage_tracker/kernel/application/service.py",
+        "src/codex_usage_tracker/kernel/interfaces/cli/main.py",
+        "src/codex_usage_tracker/kernel/interfaces/http/app.py",
+        "src/codex_usage_tracker/kernel/interfaces/mcp/catalog.py",
+        "src/codex_usage_tracker/kernel/interfaces/mcp/server.py",
+        "src/codex_usage_tracker/kernel/plugin_manifest.py",
+    }
 
 
 def test_code_disposition_preserves_and_retires_semantic_boundaries() -> None:

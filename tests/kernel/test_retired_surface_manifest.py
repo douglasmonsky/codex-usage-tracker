@@ -79,3 +79,25 @@ def test_retired_surface_manifest_matches_generator() -> None:
     from scripts.generate_kernel_manifests import build_retired_surface_manifest
 
     assert _manifest() == build_retired_surface_manifest()
+
+
+def test_k6_public_adapters_do_not_reactivate_retired_mcp_or_http_names() -> None:
+    from codex_usage_tracker.kernel.interfaces.http.app import ROUTES
+    from codex_usage_tracker.kernel.interfaces.mcp.catalog import TOOL_SPECS
+
+    entries = _manifest()["entries"]
+    retired_tools = {
+        entry["public_name"]
+        for entry in entries
+        if entry["surface_type"] == "mcp_tool"
+    }
+    retired_routes = {
+        entry["public_name"]
+        for entry in entries
+        if entry["surface_type"] == "http_route"
+    }
+    active_tools = {spec.name for spec in TOOL_SPECS}
+    active_routes = {f"{method} {path}" for method, path in ROUTES}
+
+    assert active_tools.isdisjoint(retired_tools)
+    assert active_routes.isdisjoint(retired_routes)
