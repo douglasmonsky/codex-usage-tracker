@@ -647,13 +647,13 @@ def smoke_install(
             environment=environment,
             timeout=40,
         )
-    active = _run_json([command, "status"], environment=environment)
-    expected_generation = 2 if upgrade_from is not None else 1
-    if (
-        active.get("state") != "active"
-        or active.get("generation") != expected_generation
-    ):
-        raise RuntimeError(f"installed refresh did not activate: {active}")
+        active = _run_json([command, "status"], environment=environment)
+        expected_generation = 2 if upgrade_from is not None else 1
+        if (
+            active.get("state") != "active"
+            or active.get("generation") != expected_generation
+        ):
+            raise RuntimeError(f"installed refresh did not activate: {active}")
         content_status = _run_json(
             [command, "content", "status"],
             environment=environment,
@@ -670,7 +670,7 @@ def smoke_install(
         )
         indexed_events = content_index.get("events")
         if (
-        content_index.get("indexed_generation") != expected_generation
+            content_index.get("indexed_generation") != expected_generation
             or not isinstance(indexed_events, int)
             or indexed_events < 1
         ):
@@ -707,20 +707,20 @@ def smoke_install(
             [command, "content", "delete"],
             environment=environment,
         )
-    if _run_json([command, "status"], environment=environment).get(
-        "generation"
-    ) != expected_generation:
-        raise RuntimeError("content deletion affected installed accounting")
-    _smoke_mcp(
-        plugin_root / ".mcp.json",
-        environment,
-        expected_generation=expected_generation,
-    )
-    warm_p95_ms = _smoke_service(
-        command,
-        environment,
-        expected_generation=expected_generation,
-    )
+        if _run_json([command, "status"], environment=environment).get(
+            "generation"
+        ) != expected_generation:
+            raise RuntimeError("content deletion affected installed accounting")
+        _smoke_mcp(
+            plugin_root / ".mcp.json",
+            environment,
+            expected_generation=expected_generation,
+        )
+        warm_p95_ms = _smoke_service(
+            command,
+            environment,
+            expected_generation=expected_generation,
+        )
     print(
         "Installed kernel package smoke passed "
         f"(two fresh MCP tasks; warm Console p95 {warm_p95_ms:.3f} ms)."
