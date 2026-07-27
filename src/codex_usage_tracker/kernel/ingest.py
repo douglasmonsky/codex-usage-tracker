@@ -122,39 +122,18 @@ class KernelIngestor:
         if trigger is RefreshTrigger.WATCHER and not self._has_active_kernel():
             raise ValueError("watcher requires an existing active kernel")
         self._initialize_for_explicit_refresh()
-        captured = captured_at or datetime.now(timezone.utc)
-        catalog = catalog_sources(
-            tuple(sources),
-            checkpoints=hydration_catalog_checkpoints(
-                self.operational_path,
-            ),
-        )
-        selection = select_hydration_sources(
-            catalog,
-            preset=hydration_preset,
-            captured_at=captured,
-            hydrated_source_ids=hydrated_source_ids(self.operational_path),
-            hydrated_paths=hydrated_source_locations(self.operational_path),
-        )
-        observations = tuple(
-            item.observation for item in selection.hydrate
-        )
-        request_hash = _request_hash(
-            tuple(item.observation for item in catalog),
-            scope=hydration_preset.value,
+        selection, observations, request_hash = self._select_hydration(
+            sources,
+            hydration_preset=hydration_preset,
+            captured_at=captured_at or datetime.now(timezone.utc),
         )
         leases = RefreshLeaseRepository(self.operational_path)
         lease = leases.acquire(request_hash, owner_id)
         if not lease.created:
-            return RefreshResult(
-                refresh_run_id=lease.refresh_run_id,
-                planner_reason="busy" if lease.busy else "joined",
-                generation=self._active_generation(),
-                changed_sources=0,
-                inserted_calls=0,
-                inserted_tools=0,
-                deleted_rows=0,
-                writer_transaction_ms=(),
+            return _empty_result(
+                lease.refresh_run_id,
+                self._active_generation(),
+                "busy" if lease.busy else "joined",
                 joined=not lease.busy,
             )
         try:
@@ -170,232 +149,319 @@ class KernelIngestor:
                 and load_cutover_control(self.operational_path).state
                 is CutoverState.ACTIVE
             ):
-                for observation in observations:
-                    register_source(
-                        self.operational_path,
-                        observation.source_id,
-                        observation.path,
-                    )
+                self._register_observations(observations)
             active_path = self._active_path()
             plans = self._plans(observations, active_path)
-            stage_hydration_catalog(
-                self.operational_path,
-                selection,
-            )
+            stage_hydration_catalog(self.operational_path, selection)
             if not plans:
-                if recovered_generation == 0:
-                    generation = 1
-                    with leases.maintain(
-                        lease.refresh_run_id,
-                        owner_id,
-                    ) as guard:
-                        self._begin_cutover(
-                            lease.refresh_run_id,
-                            active_path,
-                        )
-                        written = commit_empty_initial_refresh(
-                            active_path,
-                            generation=generation,
-                            assert_fence=guard.check,
-                        )
-                        written, selection, catch_up_source_ids = self._catch_up(
-                            sources,
-                            active_path,
-                            generation,
-                            False,
-                            written,
-                            guard.check,
-                            selection,
-                        )
-                        self._promote(
-                            active_path,
-                            generation,
-                            hydration_selection=selection,
-                        )
-                    result = _write_result(
-                        lease.refresh_run_id,
-                        (),
-                        generation,
-                        written,
-                        changed_sources=len(catch_up_source_ids),
-                    )
-                    leases.complete(
-                        lease.refresh_run_id,
-                        generation=generation,
-                        result=_result_payload(result),
-                    )
-                    return result
-                result = _empty_result(
-                    lease.refresh_run_id,
-                    recovered_generation,
-                    "no_changes",
-                )
-                record_hydration_catalog(
-                    self.operational_path,
-                    selection,
-                    hydrated_generation=recovered_generation,
-                )
-                leases.complete(
-                    lease.refresh_run_id,
-                    generation=recovered_generation,
-                    result=_result_payload(result),
-                )
-                return result
-            generation = self._next_generation()
-            timings: dict[str, float] = {}
-            with leases.maintain(lease.refresh_run_id, owner_id) as guard:
-                stage_started = time.perf_counter()
-                new_plans = tuple(
-                    plan for plan in plans if plan.prior_source_id is None
-                )
-                all_new_sources = len(new_plans) == len(plans)
-                large_new_source_set = (
-                    len(new_plans) >= _BULK_EXPANSION_MIN_SOURCES
-                    or sum(
-                        plan.end_byte - plan.start_byte
-                        for plan in new_plans
-                    )
-                    >= _BULK_EXPANSION_MIN_BYTES
-                )
-                streamed_bulk = (
-                    self._active_generation() == 0 and all_new_sources
-                ) or (
-                    self._active_generation() > 0
-                    and large_new_source_set
-                    and all(
-                        not plan.replace_existing
-                        for plan in plans
-                        if plan.prior_source_id is not None
-                    )
-                )
-                if streamed_bulk:
-                    parsed: tuple[ParsedBatch, ...] = ()
-                    normalized: tuple[NormalizedBatch, ...] = ()
-                else:
-                    parsed, normalized = self._prepare(
-                        plans,
-                        generation,
-                        active_path,
-                    )
-                timings["parsing"] = time.perf_counter() - stage_started
-                guard.check()
-                leases.progress(
-                    lease.refresh_run_id,
-                    owner_id,
-                    stage="writing",
-                    percent=45,
-                    high_water={
-                        plan.observation.source_id: plan.end_byte
-                        for plan in plans
-                    },
-                    changed_sources=len(plans),
-                    timings=timings,
-                )
-                stage_started = time.perf_counter()
-
-                def report_initial_progress(
-                    stage: str,
-                    percent: float,
-                    high_water: dict[str, int],
-                ) -> None:
-                    timings["writing"] = time.perf_counter() - stage_started
-                    leases.progress(
-                        lease.refresh_run_id,
-                        owner_id,
-                        stage=stage,
-                        percent=percent,
-                        high_water=high_water,
-                        changed_sources=len(plans),
-                        timings=timings,
-                    )
-
-                write_path, isolated = self._write_path(
-                    active_path,
-                    plans,
-                    normalized,
-                    generation,
-                    lease.refresh_run_id,
-                    force_isolation=(
-                        streamed_bulk and self._active_generation() > 0
-                    ),
-                )
-                self._begin_cutover(lease.refresh_run_id, write_path)
-                if streamed_bulk:
-                    written = self._commit_initial_stream(
-                        write_path,
-                        plans,
-                        generation,
-                        guard.check,
-                        report_initial_progress,
-                    )
-                else:
-                    written = commit_refresh(
-                        write_path,
-                        plans,
-                        parsed,
-                        normalized,
-                        generation=generation,
-                        reselect_canonical=isolated,
-                        assert_fence=guard.check,
-                    )
-                timings["writing"] = time.perf_counter() - stage_started
-                written, selection, catch_up_source_ids = self._catch_up(
+                return self._complete_without_plans(
                     sources,
-                    write_path,
-                    generation,
-                    isolated,
-                    written,
-                    guard.check,
                     selection,
+                    active_path=active_path,
+                    recovered_generation=recovered_generation,
+                    owner_id=owner_id,
+                    refresh_run_id=lease.refresh_run_id,
+                    leases=leases,
                 )
-                guard.check()
-                leases.progress(
-                    lease.refresh_run_id,
-                    owner_id,
-                    stage="promoting",
-                    percent=90,
-                    changed_sources=len(plans),
-                    inserted=written.inserted_calls + written.inserted_tools,
-                    deleted=written.deleted_rows,
-                    timings=timings,
-                )
-                stage_started = time.perf_counter()
-                self._promote(
-                    write_path,
-                    generation,
-                    hydration_selection=selection,
-                )
-                timings["promoting"] = time.perf_counter() - stage_started
-            for plan in plans:
-                register_source(
-                    self.operational_path,
-                    plan.observation.source_id,
-                    plan.observation.path,
-                )
-            result = _write_result(
-                lease.refresh_run_id,
+            return self._execute_planned_refresh(
+                sources,
                 plans,
-                generation,
-                written,
-                changed_sources=len(
-                    {
-                        plan.observation.source_id for plan in plans
-                    }
-                    | catch_up_source_ids
-                ),
+                selection,
+                active_path=active_path,
+                owner_id=owner_id,
+                refresh_run_id=lease.refresh_run_id,
+                leases=leases,
             )
-            result = self._publish_generation(result)
-            leases.complete(
-                lease.refresh_run_id,
-                generation=generation,
-                result=_result_payload(result),
-            )
-            return result
         except BaseException:
             leases.fail(lease.refresh_run_id, "refresh.failed")
             self._mark_cutover_failed()
             restore_hydration_states(self.operational_path)
             raise
+
+    def _select_hydration(
+        self,
+        sources: list[Path],
+        *,
+        hydration_preset: HydrationPreset,
+        captured_at: datetime,
+    ) -> tuple[
+        HydrationSelection,
+        tuple[SourceObservation, ...],
+        str,
+    ]:
+        catalog = catalog_sources(
+            tuple(sources),
+            checkpoints=hydration_catalog_checkpoints(
+                self.operational_path,
+            ),
+        )
+        selection = select_hydration_sources(
+            catalog,
+            preset=hydration_preset,
+            captured_at=captured_at,
+            hydrated_source_ids=hydrated_source_ids(self.operational_path),
+            hydrated_paths=hydrated_source_locations(self.operational_path),
+        )
+        observations = tuple(
+            item.observation for item in selection.hydrate
+        )
+        return (
+            selection,
+            observations,
+            _request_hash(
+                tuple(item.observation for item in catalog),
+                scope=hydration_preset.value,
+            ),
+        )
+
+    def _register_observations(
+        self,
+        observations: tuple[SourceObservation, ...],
+    ) -> None:
+        for observation in observations:
+            register_source(
+                self.operational_path,
+                observation.source_id,
+                observation.path,
+            )
+
+    def _complete_without_plans(
+        self,
+        sources: list[Path],
+        selection: HydrationSelection,
+        *,
+        active_path: Path,
+        recovered_generation: int,
+        owner_id: str,
+        refresh_run_id: str,
+        leases: RefreshLeaseRepository,
+    ) -> RefreshResult:
+        if recovered_generation > 0:
+            result = _empty_result(
+                refresh_run_id,
+                recovered_generation,
+                "no_changes",
+            )
+            record_hydration_catalog(
+                self.operational_path,
+                selection,
+                hydrated_generation=recovered_generation,
+            )
+        else:
+            result = self._publish_empty_generation(
+                sources,
+                selection,
+                active_path=active_path,
+                owner_id=owner_id,
+                refresh_run_id=refresh_run_id,
+                leases=leases,
+            )
+        leases.complete(
+            refresh_run_id,
+            generation=result.generation,
+            result=_result_payload(result),
+        )
+        return result
+
+    def _publish_empty_generation(
+        self,
+        sources: list[Path],
+        selection: HydrationSelection,
+        *,
+        active_path: Path,
+        owner_id: str,
+        refresh_run_id: str,
+        leases: RefreshLeaseRepository,
+    ) -> RefreshResult:
+        generation = 1
+        with leases.maintain(refresh_run_id, owner_id) as guard:
+            self._begin_cutover(refresh_run_id, active_path)
+            written = commit_empty_initial_refresh(
+                active_path,
+                generation=generation,
+                assert_fence=guard.check,
+            )
+            written, selection, catch_up_source_ids = self._catch_up(
+                sources,
+                active_path,
+                generation,
+                False,
+                written,
+                guard.check,
+                selection,
+            )
+            self._promote(
+                active_path,
+                generation,
+                hydration_selection=selection,
+            )
+        return _write_result(
+            refresh_run_id,
+            (),
+            generation,
+            written,
+            changed_sources=len(catch_up_source_ids),
+        )
+
+    def _execute_planned_refresh(
+        self,
+        sources: list[Path],
+        plans: tuple[SourcePlan, ...],
+        selection: HydrationSelection,
+        *,
+        active_path: Path,
+        owner_id: str,
+        refresh_run_id: str,
+        leases: RefreshLeaseRepository,
+    ) -> RefreshResult:
+        generation = self._next_generation()
+        timings: dict[str, float] = {}
+        streamed_bulk = self._should_stream_bulk(plans)
+        with leases.maintain(refresh_run_id, owner_id) as guard:
+            stage_started = time.perf_counter()
+            if streamed_bulk:
+                parsed: tuple[ParsedBatch, ...] = ()
+                normalized: tuple[NormalizedBatch, ...] = ()
+            else:
+                parsed, normalized = self._prepare(
+                    plans,
+                    generation,
+                    active_path,
+                )
+            timings["parsing"] = time.perf_counter() - stage_started
+            guard.check()
+            leases.progress(
+                refresh_run_id,
+                owner_id,
+                stage="writing",
+                percent=45,
+                high_water={
+                    plan.observation.source_id: plan.end_byte
+                    for plan in plans
+                },
+                changed_sources=len(plans),
+                timings=timings,
+            )
+            stage_started = time.perf_counter()
+
+            def report_progress(
+                stage: str,
+                percent: float,
+                high_water: dict[str, int],
+            ) -> None:
+                timings["writing"] = time.perf_counter() - stage_started
+                leases.progress(
+                    refresh_run_id,
+                    owner_id,
+                    stage=stage,
+                    percent=percent,
+                    high_water=high_water,
+                    changed_sources=len(plans),
+                    timings=timings,
+                )
+
+            write_path, isolated = self._write_path(
+                active_path,
+                plans,
+                normalized,
+                generation,
+                refresh_run_id,
+                force_isolation=(
+                    streamed_bulk and self._active_generation() > 0
+                ),
+            )
+            self._begin_cutover(refresh_run_id, write_path)
+            written = (
+                self._commit_initial_stream(
+                    write_path,
+                    plans,
+                    generation,
+                    guard.check,
+                    report_progress,
+                )
+                if streamed_bulk
+                else commit_refresh(
+                    write_path,
+                    plans,
+                    parsed,
+                    normalized,
+                    generation=generation,
+                    reselect_canonical=isolated,
+                    assert_fence=guard.check,
+                )
+            )
+            timings["writing"] = time.perf_counter() - stage_started
+            written, selection, catch_up_source_ids = self._catch_up(
+                sources,
+                write_path,
+                generation,
+                isolated,
+                written,
+                guard.check,
+                selection,
+            )
+            guard.check()
+            leases.progress(
+                refresh_run_id,
+                owner_id,
+                stage="promoting",
+                percent=90,
+                changed_sources=len(plans),
+                inserted=written.inserted_calls + written.inserted_tools,
+                deleted=written.deleted_rows,
+                timings=timings,
+            )
+            self._promote(
+                write_path,
+                generation,
+                hydration_selection=selection,
+            )
+        self._register_observations(
+            tuple(plan.observation for plan in plans)
+        )
+        result = _write_result(
+            refresh_run_id,
+            plans,
+            generation,
+            written,
+            changed_sources=len(
+                {
+                    plan.observation.source_id for plan in plans
+                }
+                | catch_up_source_ids
+            ),
+        )
+        result = self._publish_generation(result)
+        leases.complete(
+            refresh_run_id,
+            generation=generation,
+            result=_result_payload(result),
+        )
+        return result
+
+    def _should_stream_bulk(
+        self,
+        plans: tuple[SourcePlan, ...],
+    ) -> bool:
+        new_plans = tuple(
+            plan for plan in plans if plan.prior_source_id is None
+        )
+        if self._active_generation() == 0:
+            return len(new_plans) == len(plans)
+        large_new_source_set = (
+            len(new_plans) >= _BULK_EXPANSION_MIN_SOURCES
+            or sum(
+                plan.end_byte - plan.start_byte
+                for plan in new_plans
+            )
+            >= _BULK_EXPANSION_MIN_BYTES
+        )
+        return large_new_source_set and all(
+            not plan.replace_existing
+            for plan in plans
+            if plan.prior_source_id is not None
+        )
+
     def _initialize_for_explicit_refresh(self) -> None:
         initialize_operational_database(self.operational_path)
         control = load_cutover_control(self.operational_path)
@@ -1059,6 +1125,8 @@ def _empty_result(
     refresh_run_id: str,
     generation: int,
     reason: str,
+    *,
+    joined: bool = False,
 ) -> RefreshResult:
     return RefreshResult(
         refresh_run_id=refresh_run_id,
@@ -1069,6 +1137,7 @@ def _empty_result(
         inserted_tools=0,
         deleted_rows=0,
         writer_transaction_ms=(),
+        joined=joined,
     )
 
 
