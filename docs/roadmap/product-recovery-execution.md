@@ -11,7 +11,7 @@ benchmark, a source-only tag, or an unpublished package.
 
 | Task | State | Depends on | Branch | Outcome |
 | --- | --- | --- | --- | --- |
-| R0 | In progress | — | `docs/product-recovery-roadmap` | Adopt recovery authority |
+| R0 | Complete | — | `docs/product-recovery-roadmap` | Recovery authority merged as `117fff8` |
 | R1 | Pending | R0 | — | Agent outcome and performance baseline |
 | R2 | Pending | R1 | — | Schema v3 and compact storage contract |
 | R3 | Pending | R2 | — | Cold build and incremental refresh acceleration |
@@ -142,10 +142,12 @@ disjoint file sets.
 
 ## R0 — Roadmap Adoption
 
-**State:** In progress
+**State:** Complete
 **Branch:** `docs/product-recovery-roadmap`
 **Base:** `0f1483509a837857efaa42aa3b1be6487ea7ada4`
-**Commits:** pending
+**Commits:** `ba9e533 docs: add product recovery roadmap`;
+`e1ec47e chore: ratchet roadmap sdist budget`;
+`117fff8 docs: adopt Product Recovery roadmap (#340)` (squash merge)
 **Owned files:** `AGENTS.md`; Product Recovery roadmap, ledger, and task
 packets; historical notices in the Product Kernel Reset roadmap and ledger;
 scope checker, focused scope test, and measured source-distribution budget
@@ -194,6 +196,7 @@ creates the executable installed-agent scorecard.
 | Release safety | Pass | `python scripts/check_release.py`: release-safety checks passed |
 | Distribution | Pass | local wheel/sdist build plus `python scripts/check_release.py --dist`; 402,593-byte sdist under 414,000-byte ceiling |
 | Broad | Pass | `just v`: 340 Python tests, 7 frontend tests, Ruff, MyPy, Pyright, maintainability, manifest, deterministic asset, scope, and release checks passed |
+| Maintained CI | Pass | run `30287836844`: Focused Evidence Console, Python 3.10, and Python 3.14 passed |
 | Diff | Pass | `git diff --check` |
 | Performance | N/A | no runtime behavior changed |
 | Privacy | Pass | documentation uses aggregate measurements and synthetic-only future fixtures; no private content or paths |
@@ -224,6 +227,6 @@ supports the metrics helper's `strict` command. It was not retried.
 
 ### Residual risk and next task
 
-- The single final read-only review is resolved. R0 remains in progress only
-  until the reviewed branch merges and its merge SHA can be recorded.
-- R1 is unblocked after that merge.
+- R0 has no remaining implementation, review, validation, or merge work.
+- R1 is unblocked from exact merged-main SHA
+  `117fff8d38390cb64c6ebef21545908c333a767f`.
