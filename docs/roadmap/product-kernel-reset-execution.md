@@ -752,10 +752,12 @@ the bounded digest owner and explicit repository guidance/policy coverage; the
 
 ## K4 — Bounded generation-consistent query engine
 
-**State:** Local complete; integration CI pending
+**State:** Integration CI passed; merge pending
 **Branch:** `kernel/k4-query-engine`
 **Base:** `f7948ee824480e720e27111d2a8cf68dd1351cef`
 **Commits:** `e4e0dba feat: add bounded kernel query engine`;
+`b4e73e5 docs: close K4 local verification ledger`;
+`ddfbd64 ci: isolate host-sensitive ingest benchmark`;
 closeout metadata in this changeset
 
 ### Contract added first
@@ -805,6 +807,7 @@ closeout metadata in this changeset
 | Profiling | Pass | `agent-perf` run `20260727T005737Z-871485fd`, Scalene 2.3.0; `_execute_one` was the only ranked owned hotspot at 16.54 percent; attribution only |
 | Package | Pass | exact wheel/sdist membership check and isolated no-dependency wheel import smoke |
 | Privacy | Pass | synthetic fixtures only; query and phase facts contain no prompt, reasoning text, tool arguments/output, shell body, secret, or full source path |
+| Integration CI | Pass | PR #322: Python 3.10 in 63 s; Python 3.14 with synthetic ingest performance and package isolation in 86 s |
 
 The query timing assertion uses the identical unprofiled workload before the
 profile capture. The contract budgets are 500 ms for common bounded queries
@@ -823,22 +826,29 @@ and 1 second for comparison/concentration.
 | --- | ---: | ---: | ---: |
 | Contract-red runs | 1 | 2 | 100.0% higher |
 | Focused runs | 64 | 25 | 60.9% lower |
-| Broad runs | 8 | 6 | 25.0% lower |
+| Broad runs | 8 | 8 | unchanged |
 | Duplicate broad runs | 0 | 0 | unchanged |
-| Blocking findings | 36 | 20 | 44.4% lower |
-| Non-behavioral findings | 17 | 10 | 41.2% lower |
-| Gate-remediation lines | 54 | 260 | 381.5% higher |
-| Verification wall time | 180.4 s | 210.2 s | 16.5% higher |
+| Blocking findings | 36 | 21 | 41.7% lower |
+| Non-behavioral findings | 17 | 11 | 35.3% lower |
+| Gate-remediation lines | 54 | 264 | 388.9% higher |
+| Verification wall time | 180.4 s | 386.2 s | 114.1% higher |
 | Style-only commits | 0 | 0 | unchanged |
 
-K4 materially reduced focused-loop, broad-gate, and finding counts while
-preserving all maintained correctness gates. Total measured verification wall
-time increased by 16.5 percent because the final performance, package, and
-post-review qualification were recorded instead of omitted. Gate-remediation
-lines also increased because the new planner and validator initially exceeded
-the Xenon complexity budget and were split into responsibility-owned helpers;
-no arbitrary file-length or generic style gate was restored. These are local
-pre-CI numbers and will be reconciled with integration CI before merge.
+K4 materially reduced focused-loop and finding counts while preserving all
+maintained correctness gates; broad runs were unchanged. Total measured
+verification wall time increased because final performance, package,
+post-review, failed-CI, and corrected-CI qualification were all recorded.
+Gate-remediation lines also increased because the new planner and validator
+initially exceeded the Xenon complexity budget and were split into
+responsibility-owned helpers; no arbitrary file-length or generic style gate
+was restored.
+
+Initial CI found one further non-behavioral blocker: the inherited K3 ingest
+benchmark exceeded its 50 ms writer p95 threshold only on a shared Python 3.10
+runner. The threshold remains unchanged and runs once in the Python 3.14
+performance job; both interpreters still run all functional, typing, privacy,
+scope, release, and K4 query contracts. Corrected CI passed in 63 and 86
+seconds.
 
 The one final reviewer found six substantive defects: truth grading for partial
 measures, ambiguous shell phase classification, phase projection/order,
@@ -859,7 +869,8 @@ also removed two redundant full scans from every non-empty SQL result.
 
 ### Residual risk and next task
 
-- Integration CI remains before merge; the single final review is complete.
+- PR #322 is green and remains to be squash-merged into integration; the single
+  final review is complete.
 - K5 may now build evidence timelines and the live event stream on the stable
   logical selectors and generation-consistent query service.
 
