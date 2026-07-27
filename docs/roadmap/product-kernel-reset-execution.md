@@ -70,7 +70,7 @@ progress.
 | K7 | 0.26.0 | Complete | K6 | Focused Evidence Console |
 | K8 | 0.26.0 | Complete | K7 | Allowance efficiency |
 | K9 | 0.26.0 | Complete | K8 | Release candidate and final absence audit |
-| K10 | 0.26.0 | In progress | K9 | Audited release branch qualified locally; protected publication pending |
+| K10 | 0.26.0 | Complete | K9 | Published lean kernel and verified exact public artifacts |
 | K11 | 0.27.0 | Not started | K10 | Guided exploration |
 | K12 | 0.27.0 | Not started | K11 | Optional context composition |
 | K13 | 0.27.0 | Not started | K11 | Read-only overlay boundary |
@@ -1286,15 +1286,14 @@ retry. Final CI times will be added after merge.
 
 ### Residual risk and next task
 
-- PR #327 passed every required check; its squash merge to integration is the
-  remaining administrative action.
-- K10 must begin from an audited current `main` SHA and may incorporate the
-  qualified integration head only once.
+- PR #327 merged after every required check passed; the qualified integration
+  head was frozen at `e5651313f3368836797279f40be8331103723995`.
+- K10 incorporated that qualified head exactly once from an audited current
+  `main` SHA.
 
 ## K10 — Qualify And Publish 0.26.0
 
-**State:** In progress — local qualification complete; review, CI, merge, and
-protected publication pending
+**State:** Complete — merged, published, and independently verified
 **Branch:** `release/0.26.0`
 **Base:** audited `origin/main` at
 `d8da9bccdb6674e7dca4c0872c36a1346949dc13`
@@ -1302,6 +1301,11 @@ protected publication pending
 with first parent equal to the audited main SHA and second parent equal to the
 qualified integration SHA
 `e5651313f3368836797279f40be8331103723995`
+**Release commits:** `4b9229a7` (`chore: prepare 0.26.0 kernel release`),
+`e89e53ed` (`fix: include plugin marketplace in release audit`), and
+`7e571d55` (`fix: support cross-version smoke typing`)
+**PR and merge:** [#328](https://github.com/douglasmonsky/codex-usage-tracker/pull/328)
+merged as `1d6ae5286ecde0201b5c868863df30a783b6aa82`
 
 ### Contract added first
 
@@ -1334,8 +1338,10 @@ qualified integration SHA
   ambient `python3`, and the installed smoke launches that exact configuration
   with a host-side response deadline.
 - Package and plugin ceilings were remeasured with at most three percent
-  headroom. The final distribution hashes, sizes, manifest, and promotion
-  evidence will be recorded after the reviewed source commit is immutable.
+  headroom.
+- The protected release run built once from the exact `v0.26.0` tag, qualified
+  unchanged bytes on TestPyPI, promoted them to PyPI, attached those same
+  bytes and evidence to GitHub, and verified every public location.
 
 ### Verification
 
@@ -1350,6 +1356,23 @@ qualified integration SHA
 | Installed package | Pass | two fresh MCP tasks share generation 1, call all six tools, prove exact oracle totals and terminal no-change refresh, and use the installed plugin command; warm Console p95 0.713 ms |
 | Recovery and downgrade | Pass | 36 lifecycle, reconciliation, concurrency, live, cutover, and database tests; isolated installed `0.26.0` downgrade to public `0.25.1` passed |
 | Privacy | Pass | synthetic fixtures only; no local Usage Tracker database or raw usage content inspected |
+| Release PR CI | Pass | run [30243377350](https://github.com/douglasmonsky/codex-usage-tracker/actions/runs/30243377350): Python 3.10, Python 3.14, and focused Console jobs all green |
+| Protected publication | Pass | run [30243741857](https://github.com/douglasmonsky/codex-usage-tracker/actions/runs/30243741857) completed from tag `v0.26.0` at merge `1d6ae528` |
+| Public package | Pass | [PyPI 0.26.0](https://pypi.org/project/codex-usage-tracking/0.26.0/) and [GitHub Release](https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.26.0) expose byte-identical wheel and sdist |
+| Public installed smoke | Pass | ordinary PyPI install passed with two fresh MCP tasks and warm Console p95 0.784 ms |
+
+### Public artifact evidence
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `codex_usage_tracking-0.26.0-py3-none-any.whl` | 118,488 | `3b8f655e1ca7a06966bc0e2abed17c9d4565e24d92698b2f7defefc5c3f4b053` |
+| `codex_usage_tracking-0.26.0.tar.gz` | 316,733 | `54361963167a09908447e7ed4b84a5ed45d7b98b68557b6c455b9523843ea937` |
+| `release-manifest.json` | 2,053 | `02aa1a612dcc1901d4597254983725f8e37c9b18830ea73902aab6b7fd466a86` |
+| `promotion-evidence.json` | 2,272 | `0ee25575016038d3f7d16a108d74ca7461ccd89fad68f7ebf3d8ef61bd9b05be` |
+
+The manifest records source SHA `1d6ae5286ecde0201b5c868863df30a783b6aa82`,
+schema version 2, eight analytical tables, six default MCP tools, seven HTTP
+routes, six JSON schemas, and the exact deterministic Console bundle inventory.
 
 ### Review metrics
 
@@ -1371,8 +1394,16 @@ qualified integration SHA
   plugin interpreter resolution, all-six-tool oracle dogfood, and bounded MCP
   response deadlines.
 - No style-only commit or unchanged-state duplicate broad run occurred.
-  Final K10 counts and CI times will be synchronized into
-  `config/kernel-development-efficiency-v1.json` after the protected checks.
+- The release merge and post-release closeout exposed three stale governance
+  constraints: required linear history conflicted with the audited cutover
+  merge topology, branch protection still named five retired CI jobs, and the
+  release-only audited-base fence initially ran on every future `main` PR.
+  Linear history was restored immediately after the merge, while required
+  checks were permanently aligned to the three maintained kernel jobs. The
+  audited-base fence now applies only to `release/0.26.0`, with a focused
+  workflow contract preserving that release safety invariant.
+- Final K10 counts and CI/publication times are synchronized in
+  `config/kernel-development-efficiency-v1.json`.
 
 ### Deviations and decisions
 
@@ -1388,10 +1419,11 @@ qualified integration SHA
 
 ### Residual risk and next task
 
-- The exact final build, artifact hashes, manifest, and promotion evidence
-  depend on the reviewed source commit and remain pending.
-- K11 remains blocked until K10 is merged and 0.26.0 is published through the
-  protected workflow.
+- PyPI's Simple index lagged the already-live JSON/file endpoints during the
+  first independent install attempt. A direct public-file smoke passed
+  immediately, and the ordinary `pip install codex-usage-tracking==0.26.0`
+  smoke passed on retry.
+- K11 is unblocked and starts from published `main` at `1d6ae528`.
 
 ## Task Entry Template
 
