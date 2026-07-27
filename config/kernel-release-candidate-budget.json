@@ -1,7 +1,7 @@
 {
   "schema": "codex-usage-tracker.kernel-rc-budget.v1",
   "headroom_percent": 3,
-  "kernel_source_bytes": 444190,
+  "kernel_source_bytes": 455524,
   "console_asset_bytes": 48811,
   "analytical_tables": 17,
   "analytical_indexes": 14,

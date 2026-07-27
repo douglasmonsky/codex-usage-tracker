@@ -6,6 +6,7 @@ import hashlib
 import sqlite3
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -40,9 +41,14 @@ from .parser import ParsedBatch, iter_jsonl_batches, parse_jsonl
 from .schema import SCHEMA_VERSION
 from .writer import (
     WriteResult,
-    canonicalize_initial_duplicates,
+    commit_initial_batches,
     commit_refresh,
+    finalize_initial_refresh,
+    prepare_initial_refresh,
 )
+
+_INITIAL_STREAM_BATCH_LINES = 1_000
+_INITIAL_WRITE_BATCHES = 25
 
 
 class RefreshTrigger(str, Enum):
@@ -171,6 +177,23 @@ class KernelIngestor:
                     timings=timings,
                 )
                 stage_started = time.perf_counter()
+
+                def report_initial_progress(
+                    stage: str,
+                    percent: float,
+                    high_water: dict[str, int],
+                ) -> None:
+                    timings["writing"] = time.perf_counter() - stage_started
+                    leases.progress(
+                        lease.refresh_run_id,
+                        owner_id,
+                        stage=stage,
+                        percent=percent,
+                        high_water=high_water,
+                        changed_sources=len(plans),
+                        timings=timings,
+                    )
+
                 if initial_stream:
                     write_path, isolated = active_path, False
                 else:
@@ -188,6 +211,7 @@ class KernelIngestor:
                         plans,
                         generation,
                         guard.check,
+                        report_initial_progress,
                     )
                 else:
                     written = commit_refresh(
@@ -271,7 +295,14 @@ class KernelIngestor:
             self.analytical_path = upgrade_path
             reset_cutover_for_schema_upgrade(self.operational_path)
             return
-        initialize_analytical_database(self.analytical_path)
+        initialize_analytical_database(
+            self.analytical_path,
+            replace=(
+                active is None
+                and base_version == SCHEMA_VERSION
+                and control.state is CutoverState.FAILED
+            ),
+        )
 
     def _publish_generation(self, result: RefreshResult) -> RefreshResult:
         if self._journal is None:
@@ -372,14 +403,41 @@ class KernelIngestor:
         plans: tuple[SourcePlan, ...],
         generation: int,
         assert_fence,
+        report_progress: Callable[[str, float, dict[str, int]], None],
     ) -> WriteResult:
         transaction_ms: list[float] = []
-        latest: WriteResult | None = None
+        prepare_initial_refresh(
+            path,
+            transaction_ms,
+            assert_fence=assert_fence,
+        )
+        initialize_generation = True
+        pending: list[tuple[SourcePlan, ParsedBatch, NormalizedBatch]] = []
+        total_bytes = sum(
+            max(0, plan.end_byte - plan.start_byte)
+            for plan in plans
+        )
+        committed_bytes = 0
+        pending_bytes = 0
+        high_water: dict[str, int] = {}
+
+        def report_committed() -> None:
+            ratio = committed_bytes / max(1, total_bytes)
+            report_progress(
+                "writing",
+                min(80.0, 45.0 + 35.0 * ratio),
+                dict(high_water),
+            )
+
         for plan in plans:
             prior_state = None
             start_byte = plan.start_byte
             start_line = plan.start_line
-            for parsed in iter_jsonl_batches(plan, prior_state, max_lines=1000):
+            for parsed in iter_jsonl_batches(
+                plan,
+                prior_state,
+                max_lines=_INITIAL_STREAM_BATCH_LINES,
+            ):
                 chunk_plan = replace(
                     plan,
                     start_byte=start_byte,
@@ -396,35 +454,58 @@ class KernelIngestor:
                     row["duplicate_state"] = "canonical"
                 for row in normalized.allowances:
                     row["duplicate_state"] = "canonical"
-                latest = commit_refresh(
-                    path,
-                    (chunk_plan,),
-                    (parsed,),
-                    (normalized,),
-                    generation=generation,
-                    reselect_canonical=True,
-                    assert_fence=assert_fence,
-                    generation_plans=plans,
-                    canonicalize_touched=False,
-                )
-                transaction_ms.extend(latest.transaction_ms)
+                pending.append((chunk_plan, parsed, normalized))
+                pending_bytes += parsed.end_byte - start_byte
+                high_water[plan.observation.source_id] = parsed.end_byte
+                if len(pending) == _INITIAL_WRITE_BATCHES:
+                    commit_initial_batches(
+                        path,
+                        tuple(pending),
+                        generation=generation,
+                        generation_plans=plans,
+                        initialize_generation=initialize_generation,
+                        transaction_ms=transaction_ms,
+                        assert_fence=assert_fence,
+                    )
+                    pending.clear()
+                    committed_bytes += pending_bytes
+                    pending_bytes = 0
+                    report_committed()
+                    initialize_generation = False
                 prior_state = parsed.final_state
                 start_byte = parsed.end_byte
                 start_line = parsed.end_line
-        if latest is None:
+        if pending:
+            commit_initial_batches(
+                path,
+                tuple(pending),
+                generation=generation,
+                generation_plans=plans,
+                initialize_generation=initialize_generation,
+                transaction_ms=transaction_ms,
+                assert_fence=assert_fence,
+            )
+            initialize_generation = False
+            committed_bytes += pending_bytes
+            report_committed()
+        if initialize_generation:
             raise RuntimeError("initial stream produced no source state")
-        canonicalize_initial_duplicates(
+        report_progress("canonicalizing", 82, dict(high_water))
+        return finalize_initial_refresh(
             path,
-            transaction_ms,
+            generation=generation,
+            transaction_ms=transaction_ms,
             assert_fence=assert_fence,
-        )
-        return WriteResult(
-            inserted_calls=latest.inserted_calls,
-            inserted_tools=latest.inserted_tools,
-            deleted_rows=0,
-            canonical_calls=latest.canonical_calls,
-            excluded_calls=latest.excluded_calls,
-            transaction_ms=tuple(transaction_ms),
+            on_indexing=lambda: report_progress(
+                "indexing",
+                84,
+                dict(high_water),
+            ),
+            on_indexes_built=lambda: report_progress(
+                "validating",
+                87,
+                dict(high_water),
+            ),
         )
 
     def _catch_up(

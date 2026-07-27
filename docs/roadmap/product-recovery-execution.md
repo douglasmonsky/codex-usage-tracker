@@ -13,8 +13,8 @@ benchmark, a source-only tag, or an unpublished package.
 | --- | --- | --- | --- | --- |
 | R0 | Complete | — | `docs/product-recovery-roadmap` | Recovery authority merged as `117fff8` |
 | R1 | Complete | R0 | `feature/r1-agent-outcome-baseline` | PR #342 merged as `aefb216`; frozen benchmark and measured failures |
-| R2 | Pending | R1 | — | Schema v3 and compact storage contract |
-| R3 | Pending | R2 | — | Cold build and incremental refresh acceleration |
+| R2 | In progress | R1 | `feature/r2-schema-v3-compact-storage` | Schema v3 implementation complete; final review/merge pending |
+| R3 | In progress | R2 | `feature/r3-build-refresh-performance` | Cold and incremental gates pass; final review/merge pending |
 | R4 | Pending | R2 | — | Persisted rollups and fast API/MCP |
 | R5 | Pending | R3, R4 | — | Analytical primitives and human semantics |
 | R6 | Pending | R4, R5 | — | Console usability |
@@ -81,7 +81,7 @@ disjoint file sets.
 | Wave | Lane | Owner | Base | Files | State |
 | --- | --- | --- | --- | --- | --- |
 | 1 | R1 baseline | primary | `96c6335` | task packet allowlist | In progress |
-| 2 | R3 ingestion | unassigned | R2 contract | ingest-owned files | Blocked |
+| 2 | R3 ingestion | primary | `1f241f9` | ingest-owned files | In progress |
 | 2 | R4 query | unassigned | R2 contract | query-owned files | Blocked |
 | 2 | R7 harness | unassigned | R1 harness | test/runner-owned files | Blocked |
 | 2 | R8 copy audit | unassigned | R0 merge | docs-only files | Blocked |
@@ -392,21 +392,19 @@ allowance, query, scope, and budget contracts; this ledger
 | --- | --- | --- |
 | Small CI | Pass | 96 initial calls; 166.483 ms cold, 10.451 ms no-change, 26.491 ms tail; 237,568-byte database |
 | Production-shaped cold | Stopped after decisive time failure | 17m20s; 1,023,666/1,316,864 model calls, 511,832 tools, 127,958 activities, 31,989 compact allowance states, and 513,318,912 database bytes |
-| Production-shaped size | Pending exact optimized run | The stopped build had loaded 77.7% of model facts. Its partial bytes project below 700 MiB, but projection is not acceptance evidence. |
+| Production-shaped size | Pass | Exact optimized build produced a 634,011,648-byte database against the 734,003,200-byte ceiling with 1,316,864 model calls, 658,432 tools, 164,608 activities, 41,152 allowance states, 643 threads, and 164,608 turns. |
 
-The production run was stopped once the cold-build failure was decisive. Paying
-for the remaining serial writer work would not improve the performance
-decision, and the partial size projection is intentionally not reported as a
-pass. R3 will remove repeated indexed selector lookups and thousands of
-transactions before the next single full production-shaped run. That run will
-provide the exact R2 size result and the R3 cold-build result together.
+The first production run was stopped once cold-build failure was decisive; its
+partial size projection was intentionally not reported as a pass. The stacked
+R3 implementation then completed the identical immutable corpus in 111.402
+seconds and proved the exact R2 storage result above.
 
 ### Verification checkpoint
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Focused schema, allowance, and query | Pass | 14 tests before the final two schema contracts; final focused rerun pending checkpoint commit |
-| Kernel | Pass with corrected catalog pending rerun | 290 passed; the only failure was the expected 15-to-17 analytical-table budget update |
+| Focused schema, allowance, and query | Pass | final schema-v3, allowance, query, privacy, and exact-selector contracts pass on the stacked R3 implementation |
+| Kernel | Pass | 294 tests passed; the only broad rerun finding was the measured source-byte ceiling, ratcheted to 1% headroom and rechecked |
 | Ruff | Pass | all changed Python paths |
 | Privacy | Pass | schema forbids raw prompts, responses, reasoning, tool arguments, tool output, shell bodies, and full paths |
 | Full repository, distribution, installed | Pending | required before R2 merge |
@@ -414,9 +412,101 @@ provide the exact R2 size result and the R3 cold-build result together.
 
 ### Residual risk and next action
 
-- The cold path remains dominated by repeated source/thread/turn selector
-  lookups and thousands of bounded transactions whose cost grows with each
-  B-tree. Progress remains at the coarse `writing` 45% stage while rows advance.
-- The next checkpoint is a stacked R3 implementation from the exact R2 source
-  commit. R2 remains open until the optimized full run proves the exact size
-  ceiling and its final broad/review gates pass.
+- Exact storage acceptance is complete. R2 remains open only for its final
+  stable-diff review, broad repository/distribution checks, and merge.
+- R3 owns the remaining refresh qualification and ledger closeout from the
+  exact R2 checkpoint.
+
+## R3 — Accelerate Cold Build And Incremental Refresh
+
+**State:** In progress
+**Branch:** `feature/r3-build-refresh-performance`
+**Base:** `1f241f963019b3f45d3eb64e521471f7c6efa6f7`
+**Commits:** pending
+**Owned files:** discovery, parser/normalizer, ingestion, analytical writer,
+refresh progress/recovery, focused performance contracts, and this ledger
+**Parallel lane:** none
+
+### Contract added first
+
+- The initial 100,000-call contract failed with 503 writer transactions,
+  11.293 seconds elapsed, and 27.736 ms writer p95.
+- Focused contracts now separate unpublished staging transactions from the
+  live incremental writer-lock budget, require no more than ten cold-build
+  transactions for 100,000 calls, preserve 50 ms live-writer p95, prove exact
+  turn counts across parser batches, defer and restore secondary indexes, and
+  expose advancing writing/indexing/validating progress.
+
+### Implementation checkpoint
+
+- Initial parsing remains bounded at 1,000 complete lines. Twenty-five already
+  normalized batches share one staging transaction, eliminating cumulative
+  count rescans and reducing the 100,000-call workload from 503 transactions
+  to eight including index/finalization transactions.
+- Source, thread, turn, fact, model-profile, and tool-profile selector keys are
+  resolved in bounded maps rather than one SQLite lookup per fact.
+- Stable thread and turn identities are cached within each normalized batch;
+  row constructors no longer execute eagerly for identities already observed.
+- Every secondary query index is absent only while the never-published cold
+  artifact bulk-loads, then restored before validation and WAL publication.
+- The disposable staging artifact uses journal-off/synchronous-off bulk
+  durability. Published and incremental databases retain WAL, normal
+  durability, foreign-key checks, and the existing side-by-side cutover.
+- Prepared batch execution replaces one Python-to-SQLite call per compact
+  fact. Failed never-active bulk artifacts are discarded and rebuilt; active
+  generations and rollback artifacts are never replaced.
+- Cold-build progress advances from 45% to 80% using committed byte coverage,
+  then reports canonicalizing, indexing, validating, and promoting stages.
+
+### Unprofiled performance evidence
+
+| Workload | Before | Current | Result |
+| --- | ---: | ---: | --- |
+| 100,000 model calls | 11.293 s; 503 transactions | 2.857 s; 8 transactions | 74.7% faster |
+| 160-source production slice | 49.825 s | 18.643 s | 62.6% faster with identical counts/bytes |
+| Full 643-source production corpus | 792.320 s | 111.402 s | 7.11x faster; passes 240 s gate |
+| Full database | 1,370,804,224 bytes schema v2 | 634,011,648 bytes schema v3 | 53.7% smaller; passes 700 MiB gate |
+| One-call append-safe tail | 1.886 s R1 | 420.444 ms on owned 160-source production slice | passes 500 ms gate |
+| 32-call bounded tail | not frozen in R1 storage row | 501.004 ms on owned 160-source production slice | passes 2 s gate |
+
+The full result contains exactly 1,316,864 model calls, 658,432 tool calls,
+164,608 activity events, 41,152 allowance states, 643 threads, and 164,608
+turns. A five-run no-change distribution performed zero writer transactions:
+one filesystem-cold sample was 2.463 seconds and four warm samples were
+1.178–1.199 seconds. That remaining source-discovery cost is not hidden as a
+query or status latency result.
+
+### Profiling evidence
+
+- Unprofiled timings above are the only speedup evidence.
+- `agent-perf` runs `20260727T203428Z-800177dc` and
+  `20260727T203508Z-8d02e30b` both failed before workload execution because
+  Scalene 2.3.0 exited 251 without a JSON profile.
+- A bounded cProfile fallback attributed the pre-index-deferral 100,000-call
+  path primarily to normalization/stable identity work and per-row SQLite
+  execution. It was used only to choose the next experiment.
+
+### Verification checkpoint
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Ingest/lifecycle/accounting | Pass | 38 focused pipeline, reconciliation, concurrency, lifecycle, oracle, job, and database tests |
+| Fault recovery/privacy/schema | Pass | 29 focused scale-recovery, privacy, and schema tests before final progress contract |
+| Kernel profile | Pass with measured budget remediation | 294 tests passed; only source-byte ceiling exceeded, then ratcheted to 1% headroom and rechecked |
+| Ruff | Pass | all changed Python paths |
+| MyPy | Pass | 59 source files |
+| Performance contracts | Pass | current 100,000-call, live-tail lock, index restoration, and progress tests |
+| Final review | Pending | one read-only reviewer after the selective-hydration contract and current full run are stable |
+
+### Residual risk and next action
+
+- The final 111.402-second full run preceded the progress-only instrumentation;
+  the current code requires one final bounded production confirmation after the
+  selective-hydration contract is frozen.
+- Full no-change refresh still catalogs 643 sources in about 1.18 seconds warm
+  and up to about 3 seconds with cold filesystem metadata. Coverage-aware
+  selective initial hydration and a bounded source catalog are the next R3/R4
+  design checkpoint.
+- R2 and R3 remain stacked and unreviewed. They must receive one stable-diff
+  review, broad repository/distribution validation, and separate intentional
+  commits/merge evidence before either task is marked complete.

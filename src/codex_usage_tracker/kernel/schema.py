@@ -57,6 +57,52 @@ REQUIRED_SCHEMA_OBJECTS = frozenset(
     }
 )
 
+SECONDARY_INDEX_SQL = {
+    "idx_sources_generation": (
+        "CREATE INDEX idx_sources_generation ON sources(last_generation)"
+    ),
+    "idx_threads_logical": (
+        "CREATE INDEX idx_threads_logical "
+        "ON threads(logical_thread_id, last_generation)"
+    ),
+    "idx_turns_thread": (
+        "CREATE INDEX idx_turns_thread ON turns(thread_key, ordinal)"
+    ),
+    "idx_model_calls_thread_time": (
+        "CREATE INDEX idx_model_calls_thread_time "
+        "ON model_call_facts(thread_key, event_at)"
+    ),
+    "idx_model_calls_turn": (
+        "CREATE INDEX idx_model_calls_turn "
+        "ON model_call_facts(turn_key, turn_ordinal)"
+    ),
+    "idx_model_calls_generation": (
+        "CREATE INDEX idx_model_calls_generation ON model_call_facts(generation)"
+    ),
+    "idx_model_calls_canonical": (
+        "CREATE INDEX idx_model_calls_canonical "
+        "ON model_call_facts(canonical_call_id, duplicate_state)"
+    ),
+    "idx_model_calls_time": (
+        "CREATE INDEX idx_model_calls_time "
+        "ON model_call_facts(event_at, generation, duplicate_state)"
+    ),
+    "idx_tool_calls_thread_time": (
+        "CREATE INDEX idx_tool_calls_thread_time "
+        "ON tool_call_facts(thread_key, started_at)"
+    ),
+    "idx_activity_thread_time": (
+        "CREATE INDEX idx_activity_thread_time "
+        "ON activity_facts(thread_key, event_at)"
+    ),
+    "idx_allowance_window_time": (
+        "CREATE INDEX idx_allowance_window_time "
+        "ON allowance_states("
+        "window_kind, COALESCE(limit_id, ''), COALESCE(plan_type, ''), "
+        "last_observed_at)"
+    ),
+}
+
 _SCHEMA_SQL = """
 CREATE TABLE generations (
     generation INTEGER PRIMARY KEY,
@@ -773,3 +819,17 @@ def create_schema(connection: sqlite3.Connection) -> None:
     connection.execute(f"PRAGMA application_id = {APPLICATION_ID}")
     connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     connection.executescript(_SCHEMA_SQL)
+
+
+def drop_secondary_indexes(connection: sqlite3.Connection) -> None:
+    """Remove query indexes while an unpublished cold build is loading."""
+
+    for name in SECONDARY_INDEX_SQL:
+        connection.execute(f"DROP INDEX IF EXISTS {name}")
+
+
+def create_secondary_indexes(connection: sqlite3.Connection) -> None:
+    """Restore every query index before an analytical artifact is published."""
+
+    for statement in SECONDARY_INDEX_SQL.values():
+        connection.execute(statement)
