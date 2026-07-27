@@ -74,7 +74,7 @@ progress.
 | K11 | 0.27.0 | Complete | K10 | Guided exploration |
 | K12 | 0.27.0 | Complete | K11 | Optional context composition |
 | K13 | 0.27.0 | Complete | K11 | Read-only overlay boundary |
-| K14 | 0.27.0 | In progress | K12, K13 | Release qualification |
+| K14 | 0.27.0 | Complete | K12, K13 | Release qualification |
 | K15 | 0.28.0 | Not started | K14 | Fault, recovery, and scale |
 | K16 | 0.28.0 | Not started | K15 | Contract freeze and release |
 
@@ -1738,12 +1738,14 @@ denial handling. No second reviewer was used.
 
 ## K14 — Qualify And Publish 0.27.0
 
-**State:** In progress — local release qualification and final review complete;
-release PR CI, protected publication, and public verification remain
+**State:** Complete — merged, published, and independently verified
 **Branch:** `release/0.27.0`
 **Base:** `origin/main` at
 `b0857cb6744ffa8f82453eedb07863afb3a6b69f`
-**Commits:** release preparation `20a0c47`; qualification ledger pending
+**Commits:** release preparation `20a0c47`, qualification ledger `e723ba4`,
+Python 3.10 test compatibility `889ad92`; squash merge
+`07441429bc32b17a8094b5035a4aeef053896f7e` through
+[PR #333](https://github.com/douglasmonsky/codex-usage-tracker/pull/333)
 
 ### Contract added first
 
@@ -1817,11 +1819,34 @@ release PR CI, protected publication, and public verification remain
 - Review metrics: 3 findings, 3 accepted; aggregate-only reviewer token
   attribution is `pending` because the single bounded metrics lookup timed out.
 
-### Remaining release gates
+### Published evidence
 
-- Python 3.10, Python 3.14, and Focused Evidence Console release PR jobs.
-- Protected build-once TestPyPI, PyPI, GitHub Release, promotion evidence, and
-  public installed-package verification.
+- Release PR CI
+  [run 30258606649](https://github.com/douglasmonsky/codex-usage-tracker/actions/runs/30258606649)
+  passed Python 3.10 in 1m18s, Python 3.14 in 2m1s, and Focused Evidence
+  Console in 1m10s.
+- Protected publication
+  [run 30258796465](https://github.com/douglasmonsky/codex-usage-tracker/actions/runs/30258796465)
+  passed the merged-main tag fence, built once, qualified TestPyPI, promoted
+  unchanged bytes to PyPI, attached those bytes to GitHub Release, and
+  verified all three public locations.
+- [GitHub Release v0.27.0](https://github.com/douglasmonsky/codex-usage-tracker/releases/tag/v0.27.0),
+  [PyPI 0.27.0](https://pypi.org/project/codex-usage-tracking/0.27.0/), and
+  [TestPyPI 0.27.0](https://test.pypi.org/project/codex-usage-tracking/0.27.0/)
+  are public.
+- Wheel: 129,485 bytes, SHA-256
+  `97ce20ebffdd34ca1b4e803a2e51a0dc12f031be04867abe37f3ce281618ca0a`.
+  Sdist: 355,302 bytes, SHA-256
+  `6dcc41c9affbf461f526216eb0801a508d391c73bf84a5ee4a1a17a1021247e0`.
+  TestPyPI, PyPI, and GitHub assets are byte-identical.
+- Release manifest: 2,053 bytes, SHA-256
+  `bb55b9aedb0066510f4bbc49c5369e37da1f1f9757c167ff4c5bec56f49f8682`.
+  Promotion evidence: 2,272 bytes, SHA-256
+  `a4bd09111f791ee671e63084642b745252ecc64cea87cc304e65200f48d0315d`.
+- The first independent public install observed normal simple-index propagation
+  lag after PyPI JSON became available. One bounded retry passed the complete
+  installed-package smoke with two fresh MCP tasks and 0.888 ms warm Console
+  p95. No rebuild or republish occurred.
 
 ## Task Entry Template
 
