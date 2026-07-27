@@ -26,13 +26,14 @@ SCHEMAS: dict[str, dict[str, Any]] = {
         "properties": {
             "requests": {
                 "type": "array",
-                "minItems": 1,
+                "minItems": 0,
                 "maxItems": 8,
                 "items": {
                     "type": "object",
                     "additionalProperties": True,
                 },
-            }
+            },
+            "include_guidance": {"type": "boolean"},
         },
         "required": ["requests"],
         "additionalProperties": False,

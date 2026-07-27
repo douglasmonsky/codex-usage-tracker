@@ -105,3 +105,17 @@ def test_console_shell_contains_no_retired_product_navigation() -> None:
         assert f'href="/{route}' in html
     for retired in ("home", "insights", "reports", "diagnostics", "compression-lab"):
         assert f'href="/{retired}' not in html
+
+
+def test_explore_uses_kernel_guidance_and_emits_typed_requests() -> None:
+    source = (
+        Path(__file__).resolve().parents[3]
+        / "frontend"
+        / "kernel-console"
+        / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert "include_guidance: true" in source
+    assert '"guided-template"' in source
+    assert 'text: "Copy typed request"' in source
+    assert "materializeTemplate" in source

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -23,7 +24,8 @@ from ..operational import (
     initialize_operational_database,
     load_cutover_control,
 )
-from ..query import QueryService
+from ..query import QueryService, exploration_guidance
+from ..query.contracts import MAX_QUERY_RESPONSE_BYTES
 from .codec import evidence_request, json_value, query_request
 from .jobs import JobReader
 from .runtime import (
@@ -101,6 +103,7 @@ class KernelApplication:
         raw_requests = payload.get("requests")
         if not isinstance(raw_requests, list):
             raise ValueError("requests must be an array")
+        include_guidance = _bool(payload.get("include_guidance", False))
         requests = tuple(
             query_request(item)
             for item in raw_requests
@@ -108,10 +111,28 @@ class KernelApplication:
         )
         if len(requests) != len(raw_requests):
             raise ValueError("every query request must be an object")
-        results = QueryService(
-            self.paths.kernel.operational
-        ).execute_batch(requests)
-        return {"results": json_value(results)}
+        if not requests and not include_guidance:
+            raise ValueError("query requires a query request or guidance")
+        results = (
+            QueryService(self.paths.kernel.operational).execute_batch(requests)
+            if requests
+            else ()
+        )
+        response = {"results": json_value(results)}
+        if include_guidance:
+            response["guidance"] = exploration_guidance()
+        response_size = len(
+            json.dumps(
+                response,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode()
+        )
+        if response_size > MAX_QUERY_RESPONSE_BYTES:
+            raise ValueError(
+                "query response exceeds byte budget; lower request limits"
+            )
+        return response
 
     def evidence(self, payload: dict[str, Any]) -> dict[str, Any]:
         result = EvidenceService(

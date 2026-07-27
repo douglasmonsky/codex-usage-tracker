@@ -12,6 +12,8 @@ from .support import active_runtime, synthetic_sources
 
 _STATUS_P95_BUDGET_MS = 50.0
 _QUERY_P95_BUDGET_MS = 500.0
+_GUIDANCE_P95_BUDGET_MS = 5.0
+_GUIDANCE_RESPONSE_BUDGET_BYTES = 24_000
 
 
 def test_warm_status_and_batched_query_adapter_budgets(tmp_path: Path) -> None:
@@ -34,10 +36,21 @@ def test_warm_status_and_batched_query_adapter_budgets(tmp_path: Path) -> None:
 
     status_p95 = _p95(application.status, repeats=40)
     query_p95 = _p95(lambda: application.query(query), repeats=20)
+    guidance = {"requests": [], "include_guidance": True}
+    guidance_p95 = _p95(lambda: application.query(guidance), repeats=40)
+    guidance_bytes = len(
+        json.dumps(
+            application.query(guidance),
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+    )
 
     print(
         json.dumps(
             {
+                "guidance_bytes": guidance_bytes,
+                "guidance_p95_ms": round(guidance_p95, 3),
                 "query_p95_ms": round(query_p95, 3),
                 "status_p95_ms": round(status_p95, 3),
             },
@@ -46,6 +59,8 @@ def test_warm_status_and_batched_query_adapter_budgets(tmp_path: Path) -> None:
     )
     assert status_p95 <= _STATUS_P95_BUDGET_MS
     assert query_p95 <= _QUERY_P95_BUDGET_MS
+    assert guidance_p95 <= _GUIDANCE_P95_BUDGET_MS
+    assert guidance_bytes <= _GUIDANCE_RESPONSE_BUDGET_BYTES
 
 
 def _p95(operation: Callable[[], object], *, repeats: int) -> float:

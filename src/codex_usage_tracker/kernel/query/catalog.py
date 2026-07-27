@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
+from typing import Any
 
 from ..allowance.service import ALLOWANCE_BASE_SQL
-from .contracts import Operation, QueryRequest
+from .contracts import (
+    MAX_BATCH_QUERIES,
+    MAX_DIMENSIONS,
+    MAX_FILTERS,
+    MAX_LIMIT,
+    MAX_MEASURES,
+    MAX_QUERY_RESPONSE_BYTES,
+    Operation,
+    QueryRequest,
+)
 
 
 @dataclass(frozen=True)
@@ -326,6 +337,242 @@ DATASETS: dict[str, DatasetSpec] = {
         coverage_fields={"duration_ms": "turns.ended_at"},
     ),
 }
+
+_PHASE_GUIDANCE = {
+    "operations": ("rows", "timeline"),
+    "dimensions": ("event_at", "phase", "thread", "turn"),
+    "measures": (
+        "activities",
+        "cached_input_tokens",
+        "input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "total_tokens",
+        "uncached_input_tokens",
+    ),
+    "filters": ("event_at", "thread", "turn"),
+    "requires_scope_filter": True,
+    "scope_filter_templates": {
+        "thread": (
+            {"field": "thread", "operator": "eq", "value": "$thread"},
+        ),
+        "turn": (
+            {"field": "turn", "operator": "eq", "value": "$turn"},
+        ),
+        "time_window": (
+            {"field": "event_at", "operator": "gte", "value": "$start"},
+            {"field": "event_at", "operator": "lt", "value": "$end"},
+        ),
+    },
+}
+
+_FILTER_GRAMMAR = {
+    "required_keys": ("field", "operator", "value"),
+    "scalar_operators": ("eq", "gte", "gt", "lte", "lt"),
+    "set_operator": {
+        "name": "in",
+        "value_type": "array",
+        "min_items": 1,
+        "max_items": 25,
+    },
+}
+
+_GUIDED_TEMPLATES: dict[str, dict[str, Any]] = {
+    "allowance": {
+        "kind": "query_template",
+        "label": "Allowance movement and local efficiency",
+        "evidence_policy": "after_ranking",
+        "requests": [
+            {
+                "dataset": "allowance",
+                "operation": "rows",
+                "dimensions": ["allowance", "window", "event_at"],
+                "measures": [
+                    "allowance_used_percent",
+                    "allowance_delta_percent",
+                    "allowance_burn_rate",
+                    "local_tokens_per_percentage_point",
+                ],
+                "order_by": "event_at",
+                "descending": True,
+                "limit": 25,
+            }
+        ],
+    },
+    "concentration": {
+        "kind": "query_template",
+        "label": "Usage concentration by thread",
+        "evidence_policy": "after_ranking",
+        "requests": [
+            {
+                "dataset": "calls",
+                "operation": "share",
+                "dimensions": ["thread"],
+                "measures": ["calls", "total_tokens"],
+                "order_by": "total_tokens",
+                "descending": True,
+                "limit": 25,
+            }
+        ],
+    },
+    "model_effort": {
+        "kind": "query_template",
+        "label": "Model and reasoning-effort mix",
+        "evidence_policy": "after_ranking",
+        "requests": [
+            {
+                "dataset": "calls",
+                "operation": "aggregate",
+                "dimensions": ["model", "effort"],
+                "measures": [
+                    "calls",
+                    "uncached_input_tokens",
+                    "cached_input_tokens",
+                    "reasoning_tokens",
+                    "output_tokens",
+                    "total_tokens",
+                ],
+                "order_by": "total_tokens",
+                "descending": True,
+                "limit": 25,
+            }
+        ],
+    },
+    "period_comparison": {
+        "kind": "query_template",
+        "label": "Current period versus previous period",
+        "evidence_policy": "after_ranking",
+        "parameters": (
+            "current_start",
+            "current_end",
+            "previous_start",
+            "previous_end",
+        ),
+        "requests": [
+            {
+                "dataset": "calls",
+                "operation": "comparison",
+                "dimensions": ["model"],
+                "measures": ["calls", "total_tokens"],
+                "order_by": "total_tokens",
+                "descending": True,
+                "limit": 25,
+                "comparison": {
+                    "current_start": "$current_start",
+                    "current_end": "$current_end",
+                    "previous_start": "$previous_start",
+                    "previous_end": "$previous_end",
+                },
+            }
+        ],
+    },
+    "subagents": {
+        "kind": "query_template",
+        "label": "Parent and subagent usage",
+        "evidence_policy": "after_ranking",
+        "requests": [
+            {
+                "dataset": "calls",
+                "operation": "aggregate",
+                "dimensions": ["agent_role"],
+                "measures": ["calls", "total_tokens"],
+                "order_by": "total_tokens",
+                "descending": True,
+                "limit": 25,
+            }
+        ],
+    },
+    "tools": {
+        "kind": "query_template",
+        "label": "Tool-call volume, duration, and output",
+        "evidence_policy": "after_ranking",
+        "requests": [
+            {
+                "dataset": "tools",
+                "operation": "aggregate",
+                "dimensions": ["category", "tool"],
+                "measures": ["tools", "duration_ms", "output_bytes"],
+                "order_by": "tools",
+                "descending": True,
+                "limit": 25,
+            }
+        ],
+    },
+    "turns": {
+        "kind": "query_template",
+        "label": "Turn count and elapsed time by thread",
+        "evidence_policy": "after_ranking",
+        "requests": [
+            {
+                "dataset": "turns",
+                "operation": "aggregate",
+                "dimensions": ["thread"],
+                "measures": ["turns", "duration_ms"],
+                "order_by": "duration_ms",
+                "descending": True,
+                "limit": 25,
+            }
+        ],
+    },
+}
+
+_DATASET_DEFAULT_REQUESTS = {
+    "activities": {
+        "dataset": "activities",
+        "operation": "aggregate",
+        "dimensions": ["category"],
+        "measures": ["activities", "completions", "aborts"],
+        "order_by": "activities",
+        "descending": True,
+        "limit": 25,
+    },
+    "allowance": _GUIDED_TEMPLATES["allowance"]["requests"][0],
+    "calls": _GUIDED_TEMPLATES["concentration"]["requests"][0],
+    "threads": {
+        "dataset": "threads",
+        "operation": "aggregate",
+        "dimensions": ["project"],
+        "measures": ["threads"],
+        "order_by": "threads",
+        "descending": True,
+        "limit": 25,
+    },
+    "tools": _GUIDED_TEMPLATES["tools"]["requests"][0],
+    "turns": _GUIDED_TEMPLATES["turns"]["requests"][0],
+}
+
+
+def exploration_guidance() -> dict[str, Any]:
+    """Return compact static metadata and non-interpretive query templates."""
+
+    datasets: dict[str, dict[str, Any]] = {
+        name: {
+            "operations": sorted(operation.value for operation in spec.operations),
+            "dimensions": sorted(spec.dimensions),
+            "measures": sorted(
+                set(spec.row_measures) | set(spec.aggregate_measures)
+            ),
+            "filters": sorted(spec.filter_fields),
+        }
+        for name, spec in sorted(DATASETS.items())
+    }
+    for name, default_request in _DATASET_DEFAULT_REQUESTS.items():
+        datasets[name]["default_request"] = deepcopy(default_request)
+    datasets["phases"] = deepcopy(_PHASE_GUIDANCE)
+    return {
+        "schema": "codex-usage-tracker.query-guidance.v1",
+        "limits": {
+            "max_batch_queries": MAX_BATCH_QUERIES,
+            "max_dimensions_per_query": MAX_DIMENSIONS,
+            "max_filters_per_query": MAX_FILTERS,
+            "max_measures_per_query": MAX_MEASURES,
+            "max_rows_per_query": MAX_LIMIT,
+            "max_response_bytes": MAX_QUERY_RESPONSE_BYTES,
+        },
+        "filter_grammar": deepcopy(_FILTER_GRAMMAR),
+        "datasets": datasets,
+        "templates": deepcopy(_GUIDED_TEMPLATES),
+    }
 
 
 def validate_request(request: QueryRequest) -> None:

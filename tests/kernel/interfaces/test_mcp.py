@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import codex_usage_tracker.kernel.application.service as application_service
 from codex_usage_tracker.kernel.application import KernelApplication, RuntimePaths
 from codex_usage_tracker.kernel.interfaces.mcp.server import McpServer
 from scripts.smoke_installed_package import _write_mcp
@@ -68,6 +69,85 @@ def test_mcp_catalog_and_calls_use_structured_results_without_duplication(
     )
 
 
+def test_guided_scope_batch_and_evidence_use_three_read_only_mcp_calls(
+    tmp_path: Path,
+) -> None:
+    launches = []
+    runtime = active_runtime(tmp_path)
+    app = KernelApplication(
+        runtime,
+        worker_launcher=launches.append,
+        source_provider=lambda _home: synthetic_sources(),
+    )
+    server = McpServer(app)
+    operational_before = runtime.kernel.operational.read_bytes()
+    analytical_before = runtime.kernel.analytical.read_bytes()
+
+    status = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "usage_status", "arguments": {}},
+        }
+    )["result"]["structuredContent"]
+    batch = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "usage_query",
+                "arguments": {
+                    "include_guidance": True,
+                    "requests": [
+                        {
+                            "dataset": "calls",
+                            "operation": "share",
+                            "dimensions": ["thread"],
+                            "measures": ["calls", "total_tokens"],
+                            "limit": 10,
+                        },
+                        {
+                            "dataset": "calls",
+                            "operation": "aggregate",
+                            "dimensions": ["model", "effort"],
+                            "measures": ["calls", "total_tokens"],
+                            "limit": 10,
+                        },
+                    ],
+                },
+            },
+        }
+    )["result"]["structuredContent"]
+    selector = batch["results"][0]["evidence_selectors"][0]
+    evidence = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "usage_evidence",
+                "arguments": {
+                    "selector": selector,
+                    "view": "summary",
+                    "limit": 10,
+                },
+            },
+        }
+    )["result"]["structuredContent"]
+
+    assert status["generation"] == 1
+    assert {result["generation"] for result in batch["results"]} == {1}
+    assert evidence["generation"] == 1
+    assert batch["guidance"]["templates"]["concentration"]["kind"] == (
+        "query_template"
+    )
+    assert launches == []
+    assert runtime.kernel.operational.read_bytes() == operational_before
+    assert runtime.kernel.analytical.read_bytes() == analytical_before
+
+
 def test_direct_stdio_handshake_lists_exact_catalog(tmp_path: Path) -> None:
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(Path(__file__).parents[3] / "src")
@@ -100,6 +180,42 @@ def test_direct_stdio_handshake_lists_exact_catalog(tmp_path: Path) -> None:
     assert responses[0]["result"]["capabilities"]["tools"]["listChanged"] is False
     assert len(responses[1]["result"]["tools"]) == 6
     assert process.returncode is not None
+
+
+def test_mcp_query_response_budget_returns_a_structured_tool_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(application_service, "MAX_QUERY_RESPONSE_BYTES", 1)
+    server = McpServer(
+        KernelApplication(
+            RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
+            worker_launcher=lambda _paths: None,
+        )
+    )
+
+    response = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "usage_query",
+                "arguments": {
+                    "requests": [],
+                    "include_guidance": True,
+                },
+            },
+        }
+    )
+
+    assert response["result"]["isError"] is True
+    assert response["result"]["content"] == [
+        {
+            "type": "text",
+            "text": "query response exceeds byte budget; lower request limits",
+        }
+    ]
 
 
 def test_invalid_envelopes_and_inputs_are_rejected_before_side_effects(

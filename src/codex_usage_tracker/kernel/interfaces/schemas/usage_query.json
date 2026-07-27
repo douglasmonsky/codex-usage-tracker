@@ -1,1 +1,1 @@
-{"additionalProperties":false,"properties":{"requests":{"items":{"additionalProperties":true,"type":"object"},"maxItems":8,"minItems":1,"type":"array"}},"required":["requests"],"type":"object"}
+{"additionalProperties":false,"properties":{"include_guidance":{"type":"boolean"},"requests":{"items":{"additionalProperties":true,"type":"object"},"maxItems":8,"minItems":0,"type":"array"}},"required":["requests"],"type":"object"}

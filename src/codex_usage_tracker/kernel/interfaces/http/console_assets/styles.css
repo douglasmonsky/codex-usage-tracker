@@ -178,7 +178,9 @@ input, select {
   padding: .6rem .7rem;
   width: 100%;
 }
-.form-actions { align-items: end; display: flex; gap: .6rem; }
+.form-actions { align-items: end; display: flex; flex-wrap: wrap; gap: .6rem; grid-column: 1 / -1; }
+.form-note { color: var(--muted); font-size: .74rem; grid-column: 1 / -1; margin: 0; }
+.query-result + .query-result { border-top: 1px solid var(--line); margin-top: 1.5rem; padding-top: 1.5rem; }
 .result-meta { color: var(--muted); font-size: .78rem; margin: 1rem 0; }
 .definition-list { display: grid; gap: 0; margin: 0; }
 .definition-list div { border-bottom: 1px solid var(--line); display: grid; gap: 1rem; grid-template-columns: 180px 1fr; padding: .85rem 0; }

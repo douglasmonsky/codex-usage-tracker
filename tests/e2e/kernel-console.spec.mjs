@@ -54,14 +54,48 @@ test("explore returns bounded facts and exact evidence deep links", async ({ pag
   expect(page.url()).toContain("/evidence/thread%3A");
 });
 
-test("every guided dataset preset submits an allowlisted query", async ({ page }) => {
+test("every guided query template submits an allowlisted request", async ({ page }) => {
   await page.goto("/explore");
-  for (const dataset of ["calls", "threads", "turns", "tools"]) {
-    await page.getByLabel("Dataset").selectOption(dataset);
+  for (const template of [
+    "allowance",
+    "concentration",
+    "model_effort",
+    "period_comparison",
+    "subagents",
+    "tools",
+    "turns",
+  ]) {
+    await page.getByLabel("Guided template").selectOption(template);
     await page.getByRole("button", { name: "Run bounded query" }).click();
     await expect(page.getByText(/Generation 1 · \d+ of \d+ rows/)).toBeVisible();
     await expect(page.getByText("This view could not load")).toHaveCount(0);
   }
+});
+
+test("non-comparison templates ignore blank comparison controls", async ({ page }) => {
+  await page.goto("/explore");
+  await page.getByLabel("Previous start").fill("");
+  await page.getByLabel("Current end").fill("");
+  await page.getByLabel("Guided template").selectOption("tools");
+  await page.getByRole("button", { name: "Run bounded query" }).click();
+  await expect(page.getByText(/Generation 1 · \d+ of \d+ rows/)).toBeVisible();
+  await expect(page.getByText("This view could not load")).toHaveCount(0);
+});
+
+test("clipboard denial is reported without an unhandled action", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: () => Promise.reject(new Error("synthetic denial")),
+      },
+    });
+  });
+  await page.goto("/explore");
+  await page.getByRole("button", { name: "Copy typed request" }).click();
+  await expect(page.getByText(
+    "Unable to copy typed request: synthetic denial",
+  )).toBeVisible();
 });
 
 test("each result row links to its own most-specific evidence", async ({ page }, testInfo) => {
