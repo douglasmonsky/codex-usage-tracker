@@ -625,13 +625,16 @@ so token metrics remain pending without retry.
 
 ## K3 — Incremental And Live Ingestion
 
-**State:** Implementation qualified
+**State:** Complete
 
 **Branch:** `kernel/k3-ingest-tail`
 
 **Base:** `6145437bcc3c8943f5b8318bd5350617f111b441`
 
 **Implementation commit:** `6d804be` (`feat: add incremental kernel ingestion`)
+
+**Merged:** [PR #320](https://github.com/douglasmonsky/codex-usage-tracker/pull/320)
+as `f5d988621f0cf3e130cf02ddc3a3681f9822be3d`
 
 ### Contract added first
 
@@ -679,9 +682,10 @@ so token metrics remain pending without retry.
 | --- | --- | --- |
 | Focused | Pass | Reviewer-remediation lifecycle, concurrency, reconciliation, privacy, oracle, and pipeline suites pass; final focused slice 23/23 |
 | CI-equivalent | Pass | `just v`: 99 phase-owned tests in 20.08 s, Ruff, MyPy, Pyright 0 errors, complexity, manifests, scope, release safety, and diff checks pass |
-| Performance | Pass | Final local 100,000-call run: 15.828 s, 804 bounded writer transactions, p95 36.609 ms against 50 ms budget; CI 3.10 exposed and drove removal of per-fingerprint SELECT amplification |
+| Performance | Pass | Final local 100,000-call run: 10.853 s, 503 bounded writer transactions, p95 33.407 ms against 50 ms budget; CI 3.10 drove removal of per-fingerprint work for collision-free initial hydration |
 | Package | Pass | isolated 0.26.0.dev0 wheel and sdist pass exact release checks; isolated installed-wheel first-build plus no-change kernel smoke passed |
 | Privacy | Pass | synthetic fixtures only; raw private sentinels and full source paths absent from analytical facts and oracle output |
+| Integration CI | Pass | Python 3.10 in 51 s and Python 3.14 in 56 s on merge head `9fecb1e`; PR #320 squash-merged |
 
 Agent-perf run `20260726T225506Z-ec362ecb` was incomplete because pinned
 Scalene 2.3.0 on Python 3.14 exited without producing JSON. The identical
@@ -693,13 +697,13 @@ profiler retries were started.
 | Metric | K2 | K3 | Change |
 | --- | ---: | ---: | ---: |
 | Contract-red runs | 2 | 1 | 50.0% lower |
-| Focused runs | 18 | 62 | 244.4% higher |
-| Broad runs | 11 | 6 | 45.5% lower |
+| Focused runs | 18 | 64 | 255.6% higher |
+| Broad runs | 11 | 8 | 27.3% lower |
 | Duplicate broad runs | 0 | 0 | unchanged |
-| Blocking findings | 18 | 35 | 94.4% higher |
-| Non-behavioral findings | 10 | 16 | 60.0% higher |
-| Gate-remediation lines | 230 | 53 | 77.0% lower |
-| Verification wall time | 49.5 s | 155.0 s | 213.1% higher |
+| Blocking findings | 18 | 36 | 100.0% higher |
+| Non-behavioral findings | 10 | 17 | 70.0% higher |
+| Gate-remediation lines | 230 | 54 | 76.5% lower |
+| Verification wall time | 49.5 s | 180.4 s | 264.4% higher |
 | Style-only commits | 0 | 0 | unchanged |
 
 K3 achieved the targeted reduction in meaningless edit volume and broad-gate
@@ -709,6 +713,11 @@ correctness/performance issues and remediation added streaming, fencing,
 catch-up, and recovery coverage. Despite that expansion, gate-only remediation
 was 77.0% lower than K2, duplicate broad runs remained zero, and style-only
 commits remained zero.
+
+The closeout broad run initially found one further non-behavioral blocker:
+preserved JetBrains `.idea/` state was untracked but not ignored, so the scope
+gate treated it as product input. `.idea/` is now ignored without deleting or
+mutating the user files; the subsequent full gate passed.
 
 The Xenon absolute block ceiling remains C while module and average ceilings
 remain B. The arbitrary 600-line file bound was retired after it demanded a
@@ -738,7 +747,8 @@ the bounded digest owner and explicit repository guidance/policy coverage; the
 - K4 must resolve the active generation from the operational sidecar and bind
   every batch to that one generation; reads never infer readiness from
   `MAX(generation)`.
-- K3 remains non-publishable and targets `kernel/0.26-integration`.
+- K3 is merged into the non-publishable `kernel/0.26-integration` branch and
+  unblocks K4.
 
 ## Task Entry Template
 
