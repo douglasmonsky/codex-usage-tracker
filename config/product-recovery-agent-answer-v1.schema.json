@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "claim_grades": {
+      "items": {
+        "enum": [
+          "estimate",
+          "fact",
+          "inference",
+          "unsupported"
+        ],
+        "type": "string"
+      },
+      "maxItems": 4,
+      "type": "array"
+    },
+    "error_code": {
+      "maxLength": 64,
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "facts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "maxLength": 64,
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 128,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "selector": {
+            "maxLength": 256,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "type": [
+              "integer",
+              "number",
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "selector",
+          "value"
+        ],
+        "type": "object"
+      },
+      "maxItems": 12,
+      "type": "array"
+    },
+    "generation": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "prompt_id": {
+      "maxLength": 64,
+      "type": "string"
+    },
+    "success": {
+      "type": "boolean"
+    },
+    "tool_calls": {
+      "maximum": 12,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "prompt_id",
+    "success",
+    "generation",
+    "tool_calls",
+    "facts",
+    "claim_grades",
+    "error_code"
+  ],
+  "title": "Usage Tracker synthetic agent benchmark answer",
+  "type": "object"
+}

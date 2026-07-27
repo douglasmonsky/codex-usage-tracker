@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "bundle_digest": {"maxLength": 80, "type": "string"},
+        "source_revision": {"maxLength": 64, "type": "string"},
+        "version": {"maxLength": 32, "type": "string"},
+        "wheel_sha256": {"maxLength": 64, "type": "string"}
+      },
+      "required": ["bundle_digest", "source_revision", "version", "wheel_sha256"],
+      "type": "object"
+    },
+    "profile_evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "profiler": {"maxLength": 32, "type": "string"},
+        "run_id": {"maxLength": 64, "type": "string"},
+        "status": {"enum": ["attribution_only", "not_run"], "type": "string"}
+      },
+      "required": ["profiler", "run_id", "status"],
+      "type": "object"
+    },
+    "runs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "accuracy": {"maximum": 1, "minimum": 0, "type": "number"},
+          "candidate_digest": {"maxLength": 80, "type": "string"},
+          "candidate_registration": {"maxLength": 128, "type": "string"},
+          "candidate_version": {"maxLength": 32, "type": "string"},
+          "catalog_observed": {"type": "boolean"},
+          "catalog_tools": {
+            "items": {"maxLength": 32, "type": "string"},
+            "maxItems": 6,
+            "type": "array"
+          },
+          "claim_grades": {
+            "items": {
+              "enum": ["estimate", "fact", "inference", "unsupported"],
+              "type": "string"
+            },
+            "maxItems": 4,
+            "type": "array"
+          },
+          "error_code": {"maxLength": 64, "type": ["string", "null"]},
+          "exposure_observed": {"type": "boolean"},
+          "final_answer_ms": {"minimum": 0, "type": "number"},
+          "first_tool_ms": {"minimum": 0, "type": "number"},
+          "fresh_task": {"type": "boolean"},
+          "generation": {"minimum": 0, "type": ["integer", "null"]},
+          "handshake_observed": {"type": "boolean"},
+          "host": {"enum": ["codex_cli", "codex_desktop"], "type": "string"},
+          "host_version": {"maxLength": 128, "type": "string"},
+          "human_labels": {"type": "boolean"},
+          "launch_method": {
+            "enum": ["codex_exec_ephemeral", "codex_desktop_new_thread"],
+            "type": "string"
+          },
+          "mcp_calls": {"minimum": 0, "type": "integer"},
+          "polls": {"minimum": 0, "type": "integer"},
+          "prompt_id": {"maxLength": 64, "type": "string"},
+          "query_batches": {"minimum": 0, "type": "integer"},
+          "refresh_joins": {"minimum": 0, "type": "integer"},
+          "refresh_starts": {"minimum": 0, "type": "integer"},
+          "registration_observed": {"type": "boolean"},
+          "response_bytes": {"minimum": 0, "type": "integer"},
+          "retries": {"minimum": 0, "type": "integer"},
+          "scenario": {"maxLength": 64, "type": "string"},
+          "selector_validity": {
+            "enum": [0, 1, "not_applicable"]
+          },
+          "success": {"type": "boolean"},
+          "terminal_state": {
+            "enum": ["completed", "failed", "timed_out", "unsupported"],
+            "type": "string"
+          },
+          "tracker_ms": {"minimum": 0, "type": "number"},
+          "usefulness": {"maximum": 4, "minimum": 0, "type": "integer"}
+        },
+        "required": [
+          "accuracy", "candidate_digest", "candidate_registration",
+          "candidate_version", "catalog_observed", "catalog_tools",
+          "claim_grades", "error_code", "exposure_observed", "final_answer_ms",
+          "first_tool_ms", "fresh_task", "generation", "handshake_observed",
+          "host", "host_version", "human_labels", "launch_method", "mcp_calls",
+          "polls", "prompt_id", "query_batches", "refresh_joins",
+          "refresh_starts", "registration_observed", "response_bytes",
+          "retries", "scenario", "selector_validity", "success",
+          "terminal_state", "tracker_ms", "usefulness"
+        ],
+        "type": "object"
+      },
+      "maxItems": 20,
+      "minItems": 20,
+      "type": "array"
+    },
+    "scenario_runs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "elapsed_ms": {"minimum": 0, "type": ["number", "null"]},
+          "error_code": {"maxLength": 64, "type": ["string", "null"]},
+          "measurement_source": {
+            "enum": [
+              "fresh_host",
+              "installed_smoke",
+              "manual_observation",
+              "storage_runner"
+            ],
+            "type": "string"
+          },
+          "outcome": {
+            "enum": ["observed_fail", "observed_pass", "unsupported"],
+            "type": "string"
+          },
+          "scenario": {"maxLength": 64, "type": "string"}
+        },
+        "required": [
+          "elapsed_ms", "error_code", "measurement_source", "outcome",
+          "scenario"
+        ],
+        "type": "object"
+      },
+      "maxItems": 11,
+      "minItems": 11,
+      "type": "array"
+    },
+    "schema": {
+      "const": "codex-usage-tracker.agent-outcome-scorecard.v1",
+      "type": "string"
+    },
+    "small_ci": {
+      "additionalProperties": false,
+      "properties": {
+        "database_bytes": {"minimum": 0, "type": "integer"},
+        "source_sha256": {"maxLength": 64, "type": "string"},
+        "stable_result_sha256": {"maxLength": 64, "type": "string"}
+      },
+      "required": ["database_bytes", "source_sha256", "stable_result_sha256"],
+      "type": "object"
+    },
+    "storage": {
+      "additionalProperties": false,
+      "properties": {
+        "database_bytes": {"minimum": 0, "type": "integer"},
+        "source_sha256": {"maxLength": 64, "type": "string"},
+        "phase_ms": {
+          "additionalProperties": false,
+          "properties": {
+            "append_safe_tail": {"minimum": 0, "type": "number"},
+            "cold_build": {"minimum": 0, "type": "number"},
+            "no_change": {"minimum": 0, "type": "number"}
+          },
+          "required": ["append_safe_tail", "cold_build", "no_change"],
+          "type": "object"
+        }
+      },
+      "required": ["database_bytes", "phase_ms", "source_sha256"],
+      "type": "object"
+    }
+  },
+  "required": [
+    "candidate", "profile_evidence", "runs", "scenario_runs", "schema",
+    "small_ci", "storage"
+  ],
+  "title": "Usage Tracker privacy-safe agent outcome scorecard",
+  "type": "object"
+}

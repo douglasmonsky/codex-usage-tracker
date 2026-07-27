@@ -21,6 +21,7 @@ from scripts.check_kernel_scope import (
     K14_ADDITIONS,
     K15_ADDITIONS,
     K16_ADDITIONS,
+    R1_ADDITIONS,
     RECOVERY_ROADMAP_ADDITIONS,
     active_paths,
     load_disposition_manifest,
@@ -228,6 +229,14 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "docs/roadmap/product-recovery-tasks/r8-public-docs.md",
         "docs/roadmap/product-recovery-tasks/r9-release-0.29.0.md",
     } == RECOVERY_ROADMAP_ADDITIONS
+    assert {
+        "config/product-recovery-agent-answer-v1.schema.json",
+        "config/product-recovery-agent-baseline-v1.json",
+        "config/product-recovery-agent-baseline-results-v1.json",
+        "config/product-recovery-agent-scorecard-v1.schema.json",
+        "scripts/benchmark_agent_outcome.py",
+        "tests/kernel/test_agent_outcome_baseline.py",
+    } == R1_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -245,6 +254,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K15_ADDITIONS
         | K16_ADDITIONS
         | RECOVERY_ROADMAP_ADDITIONS
+        | R1_ADDITIONS
     )
 
 
