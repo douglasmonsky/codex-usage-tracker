@@ -1,0 +1,74 @@
+{
+  "schema": "codex-usage-tracker.overlay-adapter-contract.v1",
+  "protocol_version": 1,
+  "kernel_api_prefix": "/api/kernel/v1",
+  "routes": [
+    {"method": "GET", "path": "/api/kernel/v1/status", "capability": "handshake"},
+    {"method": "POST", "path": "/api/kernel/v1/evidence", "capability": "evidence_snapshot"},
+    {"method": "GET", "path": "/api/kernel/v1/events", "capability": "generation_stream"}
+  ],
+  "status_required_fields": ["version", "state", "generation", "publication_id"],
+  "snapshot_identity": {
+    "usable_states": ["active"],
+    "required_fields": ["generation", "publication_id"],
+    "acceptance_sequence": ["status_before", "evidence", "status_after"],
+    "accept_when": [
+      "status_before_identity_is_non_null",
+      "status_before_identity_equals_status_after_identity",
+      "evidence_generation_equals_status_before_generation"
+    ],
+    "otherwise": "reject_and_retry_bounded"
+  },
+  "selectors": ["thread", "turn", "call", "tool", "allowance"],
+  "evidence_views": ["summary", "timeline", "calls", "tools", "activities", "allowance"],
+  "origin": {
+    "schemes": ["http", "https"],
+    "hosts": ["127.0.0.1", "localhost", "::1"],
+    "credentials": false,
+    "paths": ["", "/"],
+    "query": false,
+    "fragment": false
+  },
+  "stream": {
+    "sse_event_kinds": ["generation_committed", "snapshot_required"],
+    "comment_frames": ["heartbeat"],
+    "max_replay": 500,
+    "reconnect_header": "Last-Event-ID",
+    "last_event_id": "nonnegative_signed_64_bit_integer",
+    "on_gap": {
+      "event": "snapshot_required",
+      "action": "resnapshot_then_reopen_without_cursor",
+      "close_stale_connection": true,
+      "clear_last_event_id": true
+    },
+    "snapshot_required_on": ["before_retention", "generation_gap", "future_event_id", "publication_gap"],
+    "generation_committed_required_fields": [
+      "generation",
+      "kind",
+      "publication_id",
+      "selector",
+      "occurred_at",
+      "payload"
+    ],
+    "safe_payload_keys": ["changed_sources", "deleted_rows", "inserted_calls", "inserted_tools"]
+  },
+  "version_negotiation": {
+    "unknown_protocol": "reject",
+    "unknown_kernel_api_prefix": "reject",
+    "unknown_host": "reject",
+    "unknown_origin": "reject"
+  },
+  "sidecar": {
+    "canonical_renderer": true,
+    "fallback_required": true,
+    "destination_template": "/evidence/{selector}?view=timeline&live=1"
+  },
+  "authority": {
+    "capture": false,
+    "credentials": false,
+    "database_write": false,
+    "external_transmission": false,
+    "raw_content": false,
+    "refresh": false
+  }
+}
