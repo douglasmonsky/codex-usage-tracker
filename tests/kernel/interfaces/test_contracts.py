@@ -9,6 +9,7 @@ from codex_usage_tracker.kernel.interfaces.mcp.catalog import (
     FORBIDDEN_TOOL_NAMES,
     TOOL_SPECS,
 )
+from codex_usage_tracker.kernel.interfaces.schema_catalog import validate_input
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _EXPECTED_TOOLS = (
@@ -68,6 +69,13 @@ def test_public_tool_schemas_are_small_deterministic_and_coherent() -> None:
         assert payload["type"] == "object"
         assert payload.get("additionalProperties") is False
         assert len(path.read_bytes()) <= 8_192
+
+
+def test_usage_query_schema_allows_compact_guidance_discovery() -> None:
+    validate_input(
+        "usage_query",
+        {"requests": [], "include_guidance": True},
+    )
 
 
 def test_release_plugin_declares_one_server_and_is_publishable() -> None:

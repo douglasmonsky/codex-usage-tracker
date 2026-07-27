@@ -4,6 +4,7 @@ import {
   cacheReuse,
   commaSeparated,
   evidenceSelectorForRow,
+  materializeTemplate,
   publicationKey,
   routeFromPath,
 } from "./model.js";
@@ -37,15 +38,6 @@ const COPY = Object.freeze({
     description: "Control browser behavior and inspect cache, privacy, freshness, and rollback state.",
   },
 });
-
-const EXPLORE_PRESETS = Object.freeze({
-  calls: { dimensions: ["thread"], measures: ["calls", "total_tokens"], order_by: "total_tokens" },
-  threads: { dimensions: ["project"], measures: ["threads"], order_by: "threads" },
-  turns: { dimensions: ["thread"], measures: ["turns", "duration_ms"], order_by: "duration_ms" },
-  tools: { dimensions: ["tool"], measures: ["tools", "duration_ms"], order_by: "tools" },
-});
-const COMMON_OPERATIONS = Object.freeze(["aggregate", "rows", "distribution", "timeline"]);
-const CALL_OPERATIONS = Object.freeze([...COMMON_OPERATIONS, "share", "time_series"]);
 
 const state = {
   status: null,
@@ -299,15 +291,77 @@ function tokenBars(row) {
 }
 
 async function renderExplore() {
-  const dataset = "calls";
   workspace.replaceChildren(heading("explore"));
+  let guidance;
+  try {
+    guidance = (await request("/query", {
+      method: "POST",
+      body: JSON.stringify({ requests: [], include_guidance: true }),
+    })).guidance;
+  } catch (error) {
+    workspace.append(errorPanel(error, renderExplore));
+    return;
+  }
+  const datasetNames = Object.keys(guidance.datasets).filter(
+    (name) => guidance.datasets[name].default_request,
+  );
+  const templateNames = ["custom", ...Object.keys(guidance.templates)];
   const form = element("form", { className: "card form-grid", id: "query-form" });
-  const datasetSelect = selectField("Dataset", "dataset", Object.keys(EXPLORE_PRESETS), dataset);
-  const operationSelect = selectField("Operation", "operation", CALL_OPERATIONS, "aggregate");
+  const templateSelect = selectField(
+    "Guided template",
+    "guided-template",
+    templateNames,
+    "concentration",
+  );
+  const datasetSelect = selectField("Dataset", "dataset", datasetNames, "calls");
+  const operationSelect = selectField(
+    "Operation",
+    "operation",
+    guidance.datasets.calls.operations,
+    "share",
+  );
   const dimensionInput = inputField("Group by", "dimensions", "thread");
   const measureInput = inputField("Measures", "measures", "calls,total_tokens");
   const limitInput = inputField("Row limit", "limit", "25", "number");
-  form.append(datasetSelect.wrapper, operationSelect.wrapper, dimensionInput.wrapper, measureInput.wrapper, limitInput.wrapper);
+  const now = new Date();
+  const currentStart = new Date(now.getTime() - (7 * 86_400_000));
+  const previousStart = new Date(currentStart.getTime() - (7 * 86_400_000));
+  const previousStartInput = inputField(
+    "Previous start",
+    "previous-start",
+    dateTimeValue(previousStart),
+    "datetime-local",
+  );
+  const previousEndInput = inputField(
+    "Previous end",
+    "previous-end",
+    dateTimeValue(currentStart),
+    "datetime-local",
+  );
+  const currentStartInput = inputField(
+    "Current start",
+    "current-start",
+    dateTimeValue(currentStart),
+    "datetime-local",
+  );
+  const currentEndInput = inputField(
+    "Current end",
+    "current-end",
+    dateTimeValue(now),
+    "datetime-local",
+  );
+  form.append(
+    templateSelect.wrapper,
+    datasetSelect.wrapper,
+    operationSelect.wrapper,
+    dimensionInput.wrapper,
+    measureInput.wrapper,
+    limitInput.wrapper,
+    previousStartInput.wrapper,
+    previousEndInput.wrapper,
+    currentStartInput.wrapper,
+    currentEndInput.wrapper,
+  );
   const saveButton = element("button", { className: "button ghost", type: "button", text: "Save locally" });
   const loadButton = element("button", {
     className: "button ghost",
@@ -315,29 +369,117 @@ async function renderExplore() {
     text: "Load saved",
     ...(localStorage.getItem("kernel-saved-query") ? {} : { disabled: "" }),
   });
+  const copyButton = element("button", {
+    className: "button ghost",
+    type: "button",
+    text: "Copy typed request",
+  });
   form.append(element("div", { className: "form-actions" }, [
     element("button", { className: "button primary", type: "submit", text: "Run bounded query" }),
+    copyButton,
     saveButton,
     loadButton,
   ]));
-  const output = element("section", { className: "card", style: "margin-top:1rem" }, [element("div", { className: "empty", text: "Choose the grain and measures, then run the query." })]);
+  form.append(element("p", {
+    className: "form-note",
+    text: `${datasetNames.length} datasets · up to ${guidance.limits.max_batch_queries} requests · ${guidance.limits.max_rows_per_query} rows/request · ${formatNumber(guidance.limits.max_response_bytes)} bytes maximum`,
+  }));
+  const output = element("section", { className: "card", style: "margin-top:1rem" }, [element("div", { className: "empty", text: "Choose a guided template or compose a bounded typed request." })]);
   workspace.append(form, output);
-  datasetSelect.control.addEventListener("change", () => {
-    const preset = EXPLORE_PRESETS[datasetSelect.control.value];
+
+  let applyingTemplate = false;
+  const comparisonParameters = () => {
+    const controls = {
+      previous_start: previousStartInput.control,
+      previous_end: previousEndInput.control,
+      current_start: currentStartInput.control,
+      current_end: currentEndInput.control,
+    };
+    return Object.fromEntries(
+      Object.entries(controls).map(([name, control]) => {
+        if (!control.value) {
+          throw new Error("All comparison dates are required.");
+        }
+        const parsed = new Date(control.value);
+        if (Number.isNaN(parsed.getTime())) {
+          throw new Error("Comparison dates must be valid timestamps.");
+        }
+        return [name, parsed.toISOString()];
+      }),
+    );
+  };
+  const selectedTemplateRequests = () => {
+    const template = guidance.templates[templateSelect.control.value];
+    const parameters = template.parameters?.length
+      ? comparisonParameters()
+      : {};
+    return materializeTemplate(template, parameters);
+  };
+  const applyRequest = (requestSpec) => {
+    applyingTemplate = true;
+    datasetSelect.control.value = requestSpec.dataset;
     replaceOptions(
       operationSelect.control,
-      datasetSelect.control.value === "calls" ? CALL_OPERATIONS : COMMON_OPERATIONS,
-      "aggregate",
+      guidance.datasets[requestSpec.dataset].operations,
+      requestSpec.operation,
     );
-    dimensionInput.control.value = preset.dimensions.join(",");
-    measureInput.control.value = preset.measures.join(",");
+    dimensionInput.control.value = requestSpec.dimensions.join(",");
+    measureInput.control.value = requestSpec.measures.join(",");
+    limitInput.control.value = String(requestSpec.limit);
+    applyingTemplate = false;
+  };
+  const typedRequests = () => {
+    if (templateSelect.control.value !== "custom") {
+      return selectedTemplateRequests();
+    }
+    const requestSpec = {
+      dataset: datasetSelect.control.value,
+      operation: operationSelect.control.value,
+      dimensions: commaSeparated(dimensionInput.control.value),
+      measures: commaSeparated(measureInput.control.value),
+      limit: Number(limitInput.control.value),
+      descending: true,
+      ...(operationSelect.control.value === "comparison"
+        ? { comparison: comparisonParameters() }
+        : {}),
+    };
+    return [requestSpec];
+  };
+  templateSelect.control.addEventListener("change", () => {
+    if (templateSelect.control.value === "custom") return;
+    try {
+      applyRequest(selectedTemplateRequests()[0]);
+    } catch (error) {
+      toast(error.message);
+    }
   });
+  datasetSelect.control.addEventListener("change", () => {
+    applyRequest(
+      guidance.datasets[datasetSelect.control.value].default_request,
+    );
+  });
+  for (const control of [
+    datasetSelect.control,
+    operationSelect.control,
+    dimensionInput.control,
+    measureInput.control,
+    limitInput.control,
+  ]) {
+    control.addEventListener("input", () => {
+      if (!applyingTemplate) templateSelect.control.value = "custom";
+    });
+  }
   const currentSpec = () => ({
+    template: templateSelect.control.value,
     dataset: datasetSelect.control.value,
     operation: operationSelect.control.value,
     dimensions: dimensionInput.control.value,
     measures: measureInput.control.value,
     limit: limitInput.control.value,
+    previousStart: previousStartInput.control.value,
+    previousEnd: previousEndInput.control.value,
+    currentStart: currentStartInput.control.value,
+    currentEnd: currentEndInput.control.value,
   });
   saveButton.addEventListener("click", () => {
     localStorage.setItem("kernel-saved-query", JSON.stringify(currentSpec()));
@@ -347,41 +489,76 @@ async function renderExplore() {
   loadButton.addEventListener("click", () => {
     const saved = JSON.parse(localStorage.getItem("kernel-saved-query") || "null");
     if (!saved) return;
+    templateSelect.control.value = saved.template || "custom";
     datasetSelect.control.value = saved.dataset;
     replaceOptions(
       operationSelect.control,
-      saved.dataset === "calls" ? CALL_OPERATIONS : COMMON_OPERATIONS,
+      guidance.datasets[saved.dataset].operations,
       saved.operation,
     );
     operationSelect.control.value = saved.operation;
     dimensionInput.control.value = saved.dimensions;
     measureInput.control.value = saved.measures;
     limitInput.control.value = saved.limit;
+    previousStartInput.control.value = saved.previousStart || previousStartInput.control.value;
+    previousEndInput.control.value = saved.previousEnd || previousEndInput.control.value;
+    currentStartInput.control.value = saved.currentStart || currentStartInput.control.value;
+    currentEndInput.control.value = saved.currentEnd || currentEndInput.control.value;
     toast("Saved query loaded.");
+  });
+  copyButton.addEventListener("click", async () => {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard access is unavailable.");
+      }
+      await navigator.clipboard.writeText(
+        JSON.stringify({ requests: typedRequests() }, null, 2),
+      );
+      toast("Typed query request copied.");
+    } catch (error) {
+      toast(`Unable to copy typed request: ${error.message}`);
+    }
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     output.replaceChildren(element("div", { className: "empty", text: "Reading committed facts…" }));
     try {
-      const result = (await request("/query", {
+      const response = await request("/query", {
         method: "POST",
-        body: JSON.stringify({ requests: [{
-          dataset: datasetSelect.control.value,
-          operation: operationSelect.control.value,
-          dimensions: commaSeparated(dimensionInput.control.value),
-          measures: commaSeparated(measureInput.control.value),
-          limit: Number(limitInput.control.value),
-          descending: true,
-        }] }),
-      })).results[0];
+        body: JSON.stringify({ requests: typedRequests() }),
+      });
+      const generations = new Set(
+        response.results.map((result) => result.generation),
+      );
+      if (generations.size > 1) {
+        throw new Error("Batched query results crossed committed generations.");
+      }
       output.replaceChildren(
-        element("div", { className: "result-meta", text: `Generation ${result.generation} · ${result.returned_count} of ${result.matched_count} rows · ${formatNumber(result.elapsed_ms)} ms · ${result.grade}` }),
-        tableFor(result.rows, true),
+        ...response.results.map((result) => queryResultPanel(result)),
       );
     } catch (error) {
       output.replaceChildren(errorPanel(error, () => form.requestSubmit()));
     }
   });
+  applyRequest(selectedTemplateRequests()[0]);
+}
+
+function queryResultPanel(result) {
+  return element("section", { className: "query-result" }, [
+    element("h3", { text: `${result.dataset} · ${result.operation}` }),
+    element("div", {
+      className: "result-meta",
+      text: `Generation ${result.generation} · ${result.returned_count} of ${result.matched_count} rows · ${formatNumber(result.elapsed_ms)} ms · ${result.grade}`,
+    }),
+    tableFor(result.rows, true),
+  ]);
+}
+
+function dateTimeValue(value) {
+  const local = new Date(
+    value.getTime() - (value.getTimezoneOffset() * 60_000),
+  );
+  return local.toISOString().slice(0, 16);
 }
 
 function selectField(labelText, name, options, selected) {

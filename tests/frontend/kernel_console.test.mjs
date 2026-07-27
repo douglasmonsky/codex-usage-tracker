@@ -7,6 +7,7 @@ import {
   cacheReuse,
   commaSeparated,
   evidenceSelectorForRow,
+  materializeTemplate,
   publicationKey,
   routeFromPath,
 } from "../../frontend/kernel-console/model.js";
@@ -23,6 +24,39 @@ test("only approved console routes resolve", () => {
 test("query fields are normalized without inventing defaults", () => {
   assert.deepEqual(commaSeparated(" calls, total_tokens, "), ["calls", "total_tokens"]);
   assert.deepEqual(commaSeparated(""), []);
+});
+
+test("guided templates become typed requests only after parameters resolve", () => {
+  const template = {
+    requests: [{
+      dataset: "calls",
+      operation: "comparison",
+      comparison: {
+        current_start: "$current_start",
+        current_end: "$current_end",
+      },
+    }],
+  };
+
+  assert.deepEqual(
+    materializeTemplate(template, {
+      current_start: "2026-01-08T00:00:00Z",
+      current_end: "2026-01-15T00:00:00Z",
+    }),
+    [{
+      dataset: "calls",
+      operation: "comparison",
+      comparison: {
+        current_start: "2026-01-08T00:00:00Z",
+        current_end: "2026-01-15T00:00:00Z",
+      },
+    }],
+  );
+  assert.throws(
+    () => materializeTemplate(template, {}),
+    /current_start/,
+  );
+  assert.equal(template.requests[0].comparison.current_start, "$current_start");
 });
 
 test("live publication identity is stable and percentages are bounded", () => {

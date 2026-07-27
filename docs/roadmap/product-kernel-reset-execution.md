@@ -71,7 +71,7 @@ progress.
 | K8 | 0.26.0 | Complete | K7 | Allowance efficiency |
 | K9 | 0.26.0 | Complete | K8 | Release candidate and final absence audit |
 | K10 | 0.26.0 | Complete | K9 | Published lean kernel and verified exact public artifacts |
-| K11 | 0.27.0 | Not started | K10 | Guided exploration |
+| K11 | 0.27.0 | Complete | K10 | Guided exploration |
 | K12 | 0.27.0 | Not started | K11 | Optional context composition |
 | K13 | 0.27.0 | Not started | K11 | Read-only overlay boundary |
 | K14 | 0.27.0 | Not started | K12, K13 | Release qualification |
@@ -1424,6 +1424,107 @@ routes, six JSON schemas, and the exact deterministic Console bundle inventory.
   immediately, and the ordinary `pip install codex-usage-tracking==0.26.0`
   smoke passed on retry.
 - K11 is unblocked and starts from published `main` at `1d6ae528`.
+
+## K11 — Add Guided Model-Driven Exploration
+
+**State:** Complete — locally qualified for merge
+**Branch:** `kernel/k11-guided-exploration`
+**Base:** `origin/main` at
+`2a48fc7215ed0f32f441cc71a2a7197d43d04881`
+**Commits:** `c18b957ec20b7599112d529e598448d056979c33`
+(`feat: add guided kernel exploration`)
+
+### Contract added first
+
+- Contract-red collection proved compact capability guidance was absent.
+- The frozen contract requires seven non-interpretive templates, explicit
+  batch/row/response limits, one-generation batches, evidence only after
+  ranking, and fact/estimate/hypothesis/unsupported claim grading.
+- Console contracts require the browser to materialize the same typed requests
+  published by `usage_query`; no second schema or hard-coded dataset catalog is
+  allowed.
+
+### Implementation
+
+- `usage_query` optionally returns deterministic
+  `codex-usage-tracker.query-guidance.v1` metadata with seven datasets, explicit
+  operations/dimensions/measures/filters, six safe unscoped Console defaults,
+  the phase scope-filter requirement, and the seven required templates:
+  allowance, concentration, model/effort, period comparison, subagents, tools,
+  and turns.
+- Empty-batch discovery is read-only and works without a database. A nonempty
+  batch may return the same guidance in one call; the service enforces the
+  one-megabyte response ceiling after JSON serialization.
+- The plugin skill now specifies the scope → batch → evidence loop, preserves
+  generation/grade/coverage, separates facts from estimates and model
+  hypotheses, and forbids evidence expansion before ranking.
+- The Console discovers its builder contract from `usage_query`, materializes
+  parameterized templates without mutation, copies and submits the same typed
+  request, renders every result in a batch, and rejects cross-generation
+  results. Phase metadata remains discoverable but is not offered as an
+  unscoped browser default.
+- The deterministic Console assets, interface schema, and plugin bundle digest
+  were regenerated. Measured source, Console, plugin, and sdist ceilings retain
+  no more than three percent headroom.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Contract and interfaces | Pass | 40 focused query/application/MCP/HTTP/interface tests; all seven templates, six Console defaults, filter grammar, phase scope forms, and response-ceiling errors use the production contracts |
+| Golden model loop | Pass | exactly three synthetic MCP calls (`usage_status`, one guided two-query batch, then `usage_evidence`); generation 1 throughout, no worker launch, byte-identical databases |
+| Determinism | Pass | repeated guided batch is identical after excluding only measured `elapsed_ms`; generated schemas, plugin digest, and Console assets are canonical |
+| Guidance budgets | Pass | 6,696-byte response; 0.142 ms synthetic p95 against 5 ms; batched query 1.1 ms p95 against 500 ms |
+| Broad local profile | Pass | `just vc`: 300 Python tests, Ruff, MyPy across 57 files, Pyright, maintainability, scope, manifests, privacy, frontend, release safety, and exact distribution checks |
+| Browser | Pass | 13/13 Chromium desktop and 11/11 applicable mobile flows; two intentional mobile skips covered on desktop; every guided template and both reviewer regressions passed |
+| Distribution | Pass | wheel 121,715 bytes and sdist 334,769 bytes under configured 121,775-byte and 341,195-byte ceilings |
+| Installed package | Pass | exact wheel smoke with two fresh MCP tasks and warm Console p95 0.666 ms |
+| Privacy | Pass | synthetic accounting oracle only; no local usage database, prompts, reasoning, raw tool output, or private content inspected |
+
+### Review metrics
+
+- Total findings: 4
+- Accepted findings: 4 (`R1`–`R4`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+The one final reviewer found four medium/low contract defects and all were
+accepted: discoverable filter grammar and phase scope forms, comparison-date
+isolation, fail-closed response-ceiling adapter coverage, and visible clipboard
+denial handling. No second reviewer was used.
+
+### Churn measurement
+
+- One contract-red run, 35 focused verifier invocations, and four broad
+  qualification runs were recorded. Every broad run followed a product,
+  generated-asset, type, or measured-budget change; unchanged-state duplicate
+  broad runs remained zero.
+- Eleven blocking findings included the desktop form-grid overlap and four
+  accepted substantive reviewer contracts. Six non-behavioral findings were
+  one brittle source assertion, one local metadata annotation, and four
+  measured release ceilings. The non-behavioral fixes used six remediation
+  lines; no style-only commit occurred.
+- The first installed smoke was invoked with `PYTHONPATH=src`, causing pip to
+  mistake the checkout for an already-installed same-version distribution and
+  skip the wheel. The exact repository command without that environment
+  override passed; no product change was made for the command error.
+
+### Deviations and decisions
+
+- Desktop Serena activation remains host-misrouted to the unrelated
+  `/Users/Monsky/Documents/Agent Maintainer` project. No file there was read or
+  changed; Usage Tracker GitNexus, source, tests, and local language tooling
+  remained authoritative.
+- Agent-perf could not start because pinned Scalene 2.3.0 is absent from the
+  reusable environment. The identical unprofiled latency budgets are recorded,
+  and no CPU-attribution or speedup claim is made.
+
+### Residual risk and next task
+
+- K11 adds no server-authored finding, hidden refresh, analysis job, content
+  indexing, or new MCP tool.
+- K12 is unblocked after K11 merges; optional context-composition estimates
+  remain out of this branch.
 
 ## Task Entry Template
 

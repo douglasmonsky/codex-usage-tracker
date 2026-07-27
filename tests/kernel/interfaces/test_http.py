@@ -6,6 +6,9 @@ import threading
 from pathlib import Path
 from urllib.request import Request, urlopen
 
+import pytest
+
+import codex_usage_tracker.kernel.application.service as application_service
 from codex_usage_tracker.kernel.application import KernelApplication, RuntimePaths
 from codex_usage_tracker.kernel.interfaces.http.app import API_PREFIX, HttpApp
 from codex_usage_tracker.kernel.interfaces.http.server import create_server
@@ -95,6 +98,31 @@ def test_real_listener_rejects_invalid_content_length(tmp_path: Path) -> None:
         worker.join(timeout=5)
 
     assert b" 400 " in response.splitlines()[0]
+
+
+def test_http_query_response_budget_returns_a_bounded_client_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(application_service, "MAX_QUERY_RESPONSE_BYTES", 1)
+    response = HttpApp(
+        KernelApplication(
+            RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
+            worker_launcher=lambda _paths: None,
+        )
+    ).handle(
+        "POST",
+        f"{API_PREFIX}/query",
+        body=json.dumps(
+            {"requests": [], "include_guidance": True}
+        ).encode(),
+        headers={"Host": "127.0.0.1:8765"},
+    )
+
+    assert response.status == 400
+    assert json.loads(response.body) == {
+        "error": "query response exceeds byte budget; lower request limits"
+    }
 
 
 def test_corrupt_cache_returns_sanitized_service_unavailable(

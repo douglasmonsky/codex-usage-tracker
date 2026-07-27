@@ -73,3 +73,16 @@ def test_manifest_wiring_is_covered_by_bundle_attestation(tmp_path: Path) -> Non
 
     with pytest.raises(ValueError, match="mcpServers"):
         bundle_digest(source)
+
+
+def test_skill_teaches_scope_batch_evidence_and_claim_grading() -> None:
+    skill = (
+        _REPO_ROOT / "skills" / "usage-kernel" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    assert "scope → batch → evidence" in skill
+    assert "fact" in skill
+    assert "estimate" in skill
+    assert "hypothesis" in skill
+    assert "unsupported" in skill
+    assert "after ranking" in skill

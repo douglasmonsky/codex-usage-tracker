@@ -9,20 +9,36 @@ Use the tracker as a factual local data plane. The tools return exact or
 explicitly graded facts; the model owns inference, explanation, and
 recommendations.
 
-1. Call `usage_status` once. If a committed generation exists, query it
-   immediately even when refresh is active or recommended.
-2. Call `usage_refresh` only when freshness matters. Reuse the returned job;
-   never start a duplicate.
-3. Prefer one batched `usage_query` request with only the dimensions, measures,
-   filters, and limits needed for the question.
-4. Use returned grades, coverage, counts, and selectors. Do not infer waste or
-   productivity from token totals alone.
-5. Call `usage_evidence` only with an exact logical selector. Use `live=true`
-   for the same timeline in live mode.
-6. Use `usage_job_status` with a bounded `wait_seconds` value so the host waits;
-   do not short-interval poll from the model.
-7. Use `usage_allowance` for observed allowance facts and preserve its
-   provenance and limitations.
+Use the three-step loop **scope → batch → evidence**:
+
+1. **Scope.** Call `usage_status` once. If a committed generation exists, query
+   it immediately even when refresh is active or recommended. When the needed
+   fields are unfamiliar, set `include_guidance=true` on the same
+   `usage_query` call that carries the first batch; use an empty batch only for
+   standalone capability discovery.
+2. **Batch.** Prefer one batched `usage_query` request using a curated template
+   or only the dimensions, measures, filters, and limits needed for the
+   question. Preserve the returned generation, grade, coverage, counts, and
+   explicit row/byte limits. Compose filters as
+   `{field, operator, value}` using only the dataset fields and operators in
+   `filter_grammar`; `in` takes an array of 1–25 values. Phase queries require
+   one returned scope-filter template for a thread, turn, or time window.
+3. **Evidence.** Rank candidates from the facts first. Call `usage_evidence`
+   only after ranking, and only with an exact returned logical selector. Use
+   `live=true` for the same timeline in live mode.
+
+Label every claim:
+
+- **fact** — directly returned exact or deterministic data with generation;
+- **estimate** — returned estimated data with coverage and provenance;
+- **hypothesis** — model inference that still needs evidence;
+- **unsupported** — unavailable from the returned scope and not asserted.
+
+Call `usage_refresh` only when freshness matters. Reuse the returned job; never
+start a duplicate. Use `usage_job_status` with a bounded `wait_seconds` value
+so the host waits; do not short-interval poll from the model. Use
+`usage_allowance` for observed allowance facts and preserve its provenance and
+limitations. Do not infer waste or productivity from token totals alone.
 
 Never inspect raw logs as a fallback, invent missing selectors, claim narrative
 findings the tools did not return, or expose prompts, reasoning, tool

@@ -4,6 +4,9 @@ import shutil
 import threading
 from pathlib import Path
 
+import pytest
+
+import codex_usage_tracker.kernel.application.service as application_service
 from codex_usage_tracker.kernel.application import (
     KernelApplication,
     RuntimePaths,
@@ -60,6 +63,93 @@ def test_read_use_cases_share_one_generation_and_never_write(tmp_path: Path) -> 
     assert stream[0].startswith("id: 1\nevent: generation_committed")
     assert runtime.kernel.operational.read_bytes() == operational_before
     assert runtime.kernel.analytical.read_bytes() == analytical_before
+
+
+def test_query_guidance_is_available_without_a_database_or_refresh(
+    tmp_path: Path,
+) -> None:
+    launches: list[RuntimePaths] = []
+    app = KernelApplication(
+        RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
+        worker_launcher=launches.append,
+    )
+
+    response = app.query({"requests": [], "include_guidance": True})
+
+    assert response["results"] == []
+    assert response["guidance"]["schema"].endswith(".v1")
+    assert tuple(response["guidance"]["templates"]) == (
+        "allowance",
+        "concentration",
+        "model_effort",
+        "period_comparison",
+        "subagents",
+        "tools",
+        "turns",
+    )
+    assert launches == []
+    assert not app.paths.kernel.operational.exists()
+
+
+def test_query_rejects_an_empty_batch_without_guidance(tmp_path: Path) -> None:
+    app = KernelApplication(
+        RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
+        worker_launcher=lambda _paths: None,
+    )
+
+    with pytest.raises(ValueError, match="query request or guidance"):
+        app.query({"requests": []})
+
+
+def test_query_response_budget_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(application_service, "MAX_QUERY_RESPONSE_BYTES", 1)
+    app = KernelApplication(
+        RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
+        worker_launcher=lambda _paths: None,
+    )
+
+    with pytest.raises(ValueError, match="response exceeds byte budget"):
+        app.query({"requests": [], "include_guidance": True})
+
+
+def test_repeated_guided_batch_is_deterministic_except_for_elapsed_time(
+    tmp_path: Path,
+) -> None:
+    app = KernelApplication(
+        active_runtime(tmp_path),
+        worker_launcher=lambda _paths: None,
+        source_provider=lambda _home: synthetic_sources(),
+    )
+    payload = {
+        "include_guidance": True,
+        "requests": [
+            {
+                "dataset": "calls",
+                "operation": "share",
+                "dimensions": ["thread"],
+                "measures": ["calls", "total_tokens"],
+                "limit": 10,
+            },
+            {
+                "dataset": "calls",
+                "operation": "aggregate",
+                "dimensions": ["model", "effort"],
+                "measures": ["calls", "total_tokens"],
+                "limit": 10,
+            },
+        ],
+    }
+
+    first = app.query(payload)
+    second = app.query(payload)
+    for response in (first, second):
+        for result in response["results"]:
+            result.pop("elapsed_ms")
+
+    assert first == second
 
 
 def test_refresh_joins_compatible_live_job_without_launching_worker(

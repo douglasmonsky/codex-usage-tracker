@@ -1,5 +1,28 @@
 export const CONSOLE_AREAS = Object.freeze(["live", "explore", "evidence", "limits", "settings"]);
 
+export function materializeTemplate(template, parameters = {}) {
+  if (!template || !Array.isArray(template.requests)) {
+    throw new Error("Query template has no requests.");
+  }
+  const resolve = (value) => {
+    if (typeof value === "string" && value.startsWith("$")) {
+      const name = value.slice(1);
+      if (!parameters[name]) {
+        throw new Error(`Template parameter ${name} is required.`);
+      }
+      return parameters[name];
+    }
+    if (Array.isArray(value)) return value.map(resolve);
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [key, resolve(item)]),
+      );
+    }
+    return value;
+  };
+  return resolve(template.requests);
+}
+
 /** @param {string} pathname */
 export function routeFromPath(pathname) {
   const parts = pathname.split("/").filter(Boolean);

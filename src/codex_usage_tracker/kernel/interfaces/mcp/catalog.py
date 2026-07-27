@@ -38,7 +38,8 @@ TOOL_SPECS = tuple(
         ),
         (
             "usage_query",
-            "Run one bounded generation-consistent query batch.",
+            "Discover compact query guidance and run one bounded "
+            "generation-consistent query batch.",
         ),
         (
             "usage_evidence",

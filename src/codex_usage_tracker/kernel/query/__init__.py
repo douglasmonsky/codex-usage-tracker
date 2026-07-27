@@ -1,5 +1,6 @@
 """Bounded generation-consistent kernel query engine."""
 
+from .catalog import exploration_guidance
 from .contracts import (
     ComparisonWindow,
     Filter,
@@ -16,4 +17,5 @@ __all__ = [
     "QueryRequest",
     "QueryResult",
     "QueryService",
+    "exploration_guidance",
 ]
