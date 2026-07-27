@@ -29,8 +29,16 @@ def test_allowance_service_returns_reset_aware_local_facts_and_estimates(
             "SELECT source_id FROM sources ORDER BY source_id LIMIT 1"
         ).fetchone()[0]
         for observation_id, observed_at, used_percent in (
-            ("k8_previous", "2026-01-01T00:00:00.000Z", 10.0),
-            ("k8_current", "2026-01-01T00:00:03.000Z", 12.0),
+            (
+                "allow_00000000000000000000000000000001",
+                "2026-01-01T00:00:00.000Z",
+                10.0,
+            ),
+            (
+                "allow_00000000000000000000000000000002",
+                "2026-01-01T00:00:03.000Z",
+                12.0,
+            ),
         ):
             connection.execute(
                 """
@@ -76,7 +84,10 @@ def test_allowance_service_returns_reset_aware_local_facts_and_estimates(
                 source_model_call_id, generation, duplicate_state,
                 provenance, validation_warnings
             )
-            VALUES ('future_backfill', ?, '2026-01-01T00:00:01.500Z',
+                VALUES (
+                    'allow_00000000000000000000000000000003',
+                    ?,
+                    '2026-01-01T00:00:01.500Z',
                     'primary', 'k8-limit', 'synthetic', 11,
                     300, '2026-01-01T05:00:00Z', NULL, NULL, NULL, ?,
                     'canonical', 'synthetic future fixture', '[]')
@@ -94,7 +105,11 @@ def test_allowance_service_returns_reset_aware_local_facts_and_estimates(
                 rate_limit_observation_id, duplicate_state, duplicate_reason,
                 fingerprint_version, source_offset, generation
             )
-            SELECT 'future_call', 'future_call', source_id, thread_id,
+                SELECT
+                    'call_00000000000000000000000000000003',
+                    'fp_0000000000000000000000000000000000000000000000000000000000000003',
+                    source_id,
+                    thread_id,
                    turn_id, '2026-01-01T00:00:02.500Z', turn_ordinal,
                    model, effort, service_tier, origin, context_window,
                    1000000, 0, 1000000, 0, 2000000, NULL, NULL,
@@ -120,11 +135,15 @@ def test_allowance_service_returns_reset_aware_local_facts_and_estimates(
     interval = next(
         item
         for item in result["intervals"]
-        if item["allowance_observation_id"] == "k8_current"
+        if item["allowance_observation_id"]
+        == "allow_00000000000000000000000000000002"
     )
     assert result["schema"] == "codex-usage-tracker.allowance-efficiency.v1"
     assert result["generation"] == control.active_generation
-    assert interval["previous_observation_id"] == "k8_previous"
+    assert (
+        interval["previous_observation_id"]
+        == "allow_00000000000000000000000000000001"
+    )
     assert interval["grade"] == "deterministic"
     assert interval["used_percent"] == 12
     assert interval["remaining_percent"] == 88
@@ -145,7 +164,10 @@ def test_allowance_service_returns_reset_aware_local_facts_and_estimates(
     assert interval["estimated_cost_usd"] == pytest.approx(0.00231)
     assert interval["estimated_credits"] == pytest.approx(0.001155)
     assert interval["pricing_coverage"]["coverage_percent"] == 100
-    assert interval["evidence_selector"] == "allowance:k8_current"
+    assert (
+        interval["evidence_selector"]
+        == "allowance:allow_00000000000000000000000000000002"
+    )
     assert interval["limitations"] == ["outside_usage_possible"]
     assert runtime.kernel.operational.read_bytes() == operational_before
     assert control.active_kernel_path.read_bytes() == analytical_before

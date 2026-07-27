@@ -1,12 +1,12 @@
-"""Schema-v2 definition for foundational analytical facts."""
+"""Schema-v3 definition for compact metadata-first analytical facts."""
 
 from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 APPLICATION_ID = 0x43555431
-MAX_INDEX_COUNT = 18
+MAX_INDEX_COUNT = 14
 SCHEMA_CAPABILITIES = frozenset(
     {
         "stable-identities",
@@ -15,6 +15,11 @@ SCHEMA_CAPABILITIES = frozenset(
         "tool-activity",
         "allowance-observations",
         "allowance-efficiency-intervals",
+        "compact-integer-foreign-keys",
+        "generation-rollups",
+        "allowance-state-intervals",
+        "observation-trigger-not-causation",
+        "metadata-only",
     }
 )
 ANALYTICAL_TABLES = frozenset(
@@ -23,19 +28,32 @@ ANALYTICAL_TABLES = frozenset(
         "generations",
         "threads",
         "turns",
-        "model_calls",
-        "tool_calls",
-        "activity_events",
-        "allowance_observations",
+        "model_profiles",
+        "tool_profiles",
+        "model_call_facts",
+        "tool_call_facts",
+        "activity_facts",
+        "allowance_states",
+        "rollup_global",
+        "rollup_thread",
+        "rollup_model_effort",
+        "rollup_time_band",
+        "rollup_cost_credits",
+        "rollup_allowance",
+        "rollup_tool_operation",
     }
 )
 REQUIRED_SCHEMA_OBJECTS = frozenset(
     {
+        "model_calls",
+        "tool_calls",
+        "activity_events",
+        "allowance_observations",
         "allowance_intervals",
-        "idx_allowance_generation",
-        "idx_allowance_time",
         "idx_allowance_window_time",
         "idx_model_calls_time",
+        "idx_model_calls_thread_time",
+        "idx_tool_calls_thread_time",
     }
 )
 
@@ -58,7 +76,8 @@ CREATE TABLE generations (
 ) STRICT;
 
 CREATE TABLE sources (
-    source_id TEXT PRIMARY KEY,
+    source_key INTEGER PRIMARY KEY,
+    source_id TEXT NOT NULL UNIQUE,
     source_kind TEXT NOT NULL,
     archive_state TEXT NOT NULL CHECK (
         archive_state IN ('active', 'archived', 'missing', 'replaced')
@@ -88,8 +107,10 @@ CREATE TABLE sources (
 ) STRICT;
 
 CREATE TABLE threads (
-    thread_id TEXT PRIMARY KEY,
-    source_id TEXT NOT NULL REFERENCES sources(source_id) ON DELETE CASCADE,
+    thread_key INTEGER PRIMARY KEY,
+    thread_id TEXT NOT NULL UNIQUE,
+    source_key INTEGER NOT NULL REFERENCES sources(source_key) ON DELETE CASCADE,
+    source_id TEXT NOT NULL,
     logical_thread_id TEXT NOT NULL,
     session_identity_hash TEXT NOT NULL,
     display_label TEXT NOT NULL,
@@ -113,9 +134,11 @@ CREATE TABLE threads (
 ) STRICT;
 
 CREATE TABLE turns (
-    turn_id TEXT PRIMARY KEY,
+    turn_key INTEGER PRIMARY KEY,
+    turn_id TEXT NOT NULL UNIQUE,
     source_turn_id_hash TEXT,
-    thread_id TEXT NOT NULL REFERENCES threads(thread_id) ON DELETE CASCADE,
+    thread_key INTEGER NOT NULL REFERENCES threads(thread_key) ON DELETE CASCADE,
+    thread_id TEXT NOT NULL,
     ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
     started_at TEXT,
     ended_at TEXT,
@@ -139,21 +162,46 @@ CREATE TABLE turns (
     error_count INTEGER NOT NULL CHECK (error_count >= 0),
     first_generation INTEGER NOT NULL REFERENCES generations(generation),
     last_generation INTEGER NOT NULL REFERENCES generations(generation),
-    UNIQUE (thread_id, ordinal)
+    UNIQUE (thread_key, ordinal)
 ) STRICT;
 
-CREATE TABLE model_calls (
-    model_call_id TEXT PRIMARY KEY,
-    canonical_call_id TEXT NOT NULL,
-    source_id TEXT NOT NULL REFERENCES sources(source_id) ON DELETE CASCADE,
-    thread_id TEXT NOT NULL REFERENCES threads(thread_id) ON DELETE CASCADE,
-    turn_id TEXT REFERENCES turns(turn_id) ON DELETE SET NULL,
+CREATE TABLE model_profiles (
+    model_profile_key INTEGER PRIMARY KEY,
+    model TEXT NOT NULL,
+    effort_key TEXT NOT NULL,
+    service_tier_key TEXT NOT NULL,
+    origin TEXT NOT NULL,
+    UNIQUE (model, effort_key, service_tier_key, origin)
+) STRICT;
+
+CREATE TABLE tool_profiles (
+    tool_profile_key INTEGER PRIMARY KEY,
+    tool_name TEXT NOT NULL,
+    server_name_key TEXT NOT NULL,
+    namespace_key TEXT NOT NULL,
+    tool_category TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    UNIQUE (
+        tool_name,
+        server_name_key,
+        namespace_key,
+        tool_category,
+        operation
+    )
+) STRICT;
+
+CREATE TABLE model_call_facts (
+    model_call_key INTEGER PRIMARY KEY,
+    model_call_id BLOB NOT NULL UNIQUE,
+    canonical_call_id BLOB NOT NULL,
+    source_key INTEGER NOT NULL REFERENCES sources(source_key) ON DELETE CASCADE,
+    thread_key INTEGER NOT NULL REFERENCES threads(thread_key) ON DELETE CASCADE,
+    turn_key INTEGER REFERENCES turns(turn_key) ON DELETE SET NULL,
+    model_profile_key INTEGER NOT NULL REFERENCES model_profiles(
+        model_profile_key
+    ),
     event_at TEXT NOT NULL,
     turn_ordinal INTEGER NOT NULL CHECK (turn_ordinal >= 0),
-    model TEXT NOT NULL,
-    effort TEXT,
-    service_tier TEXT,
-    origin TEXT NOT NULL,
     context_window INTEGER CHECK (context_window > 0),
     input_tokens INTEGER NOT NULL CHECK (input_tokens >= 0),
     cached_input_tokens INTEGER NOT NULL CHECK (cached_input_tokens >= 0),
@@ -171,17 +219,17 @@ CREATE TABLE model_calls (
     generation INTEGER NOT NULL REFERENCES generations(generation)
 ) STRICT;
 
-CREATE TABLE tool_calls (
-    tool_call_id TEXT PRIMARY KEY,
+CREATE TABLE tool_call_facts (
+    tool_call_key INTEGER PRIMARY KEY,
+    tool_call_id BLOB NOT NULL UNIQUE,
     upstream_call_id_hash TEXT,
-    source_id TEXT NOT NULL REFERENCES sources(source_id) ON DELETE CASCADE,
-    thread_id TEXT NOT NULL REFERENCES threads(thread_id) ON DELETE CASCADE,
-    turn_id TEXT REFERENCES turns(turn_id) ON DELETE SET NULL,
-    nearest_model_call_id TEXT REFERENCES model_calls(model_call_id) ON DELETE SET NULL,
-    tool_name TEXT NOT NULL,
-    server_name TEXT,
-    namespace TEXT,
-    tool_category TEXT NOT NULL,
+    source_key INTEGER NOT NULL REFERENCES sources(source_key) ON DELETE CASCADE,
+    thread_key INTEGER NOT NULL REFERENCES threads(thread_key) ON DELETE CASCADE,
+    turn_key INTEGER REFERENCES turns(turn_key) ON DELETE SET NULL,
+    tool_profile_key INTEGER NOT NULL REFERENCES tool_profiles(tool_profile_key),
+    nearest_model_call_key INTEGER REFERENCES model_call_facts(model_call_key)
+        ON DELETE SET NULL,
+    target_label TEXT,
     started_at TEXT,
     ended_at TEXT,
     duration_ms REAL CHECK (duration_ms >= 0),
@@ -201,11 +249,12 @@ CREATE TABLE tool_calls (
     )
 ) STRICT;
 
-CREATE TABLE activity_events (
-    activity_event_id TEXT PRIMARY KEY,
-    source_id TEXT NOT NULL REFERENCES sources(source_id) ON DELETE CASCADE,
-    thread_id TEXT NOT NULL REFERENCES threads(thread_id) ON DELETE CASCADE,
-    turn_id TEXT REFERENCES turns(turn_id) ON DELETE SET NULL,
+CREATE TABLE activity_facts (
+    activity_key INTEGER PRIMARY KEY,
+    activity_event_id BLOB NOT NULL UNIQUE,
+    source_key INTEGER NOT NULL REFERENCES sources(source_key) ON DELETE CASCADE,
+    thread_key INTEGER NOT NULL REFERENCES threads(thread_key) ON DELETE CASCADE,
+    turn_key INTEGER REFERENCES turns(turn_key) ON DELETE SET NULL,
     event_kind TEXT NOT NULL,
     event_at TEXT NOT NULL,
     safe_label TEXT,
@@ -214,10 +263,13 @@ CREATE TABLE activity_events (
     generation INTEGER NOT NULL REFERENCES generations(generation)
 ) STRICT;
 
-CREATE TABLE allowance_observations (
-    allowance_observation_id TEXT PRIMARY KEY,
-    source_id TEXT NOT NULL REFERENCES sources(source_id) ON DELETE CASCADE,
-    observed_at TEXT NOT NULL,
+CREATE TABLE allowance_states (
+    allowance_state_key INTEGER PRIMARY KEY,
+    allowance_observation_id BLOB NOT NULL UNIQUE,
+    source_key INTEGER NOT NULL REFERENCES sources(source_key) ON DELETE CASCADE,
+    first_observed_at TEXT NOT NULL,
+    last_observed_at TEXT NOT NULL,
+    observation_count INTEGER NOT NULL CHECK (observation_count > 0),
     window_kind TEXT NOT NULL,
     limit_id TEXT,
     plan_type TEXT,
@@ -226,7 +278,8 @@ CREATE TABLE allowance_observations (
     resets_at TEXT,
     model TEXT,
     service_tier TEXT,
-    source_model_call_id TEXT REFERENCES model_calls(model_call_id) ON DELETE SET NULL,
+    observation_trigger_call_key INTEGER REFERENCES model_call_facts(model_call_key)
+        ON DELETE SET NULL,
     generation INTEGER NOT NULL REFERENCES generations(generation),
     duplicate_state TEXT NOT NULL CHECK (
         duplicate_state IN ('canonical', 'copied', 'excluded', 'unknown')
@@ -235,61 +288,374 @@ CREATE TABLE allowance_observations (
     validation_warnings TEXT NOT NULL
 ) STRICT;
 
+CREATE TABLE rollup_global (
+    generation INTEGER PRIMARY KEY REFERENCES generations(generation)
+        ON DELETE CASCADE,
+    calls INTEGER NOT NULL CHECK (calls >= 0),
+    input_tokens INTEGER NOT NULL CHECK (input_tokens >= 0),
+    cached_input_tokens INTEGER NOT NULL CHECK (cached_input_tokens >= 0),
+    output_tokens INTEGER NOT NULL CHECK (output_tokens >= 0),
+    reasoning_tokens INTEGER NOT NULL CHECK (reasoning_tokens >= 0)
+) STRICT;
+
+CREATE TABLE rollup_thread (
+    generation INTEGER NOT NULL REFERENCES generations(generation)
+        ON DELETE CASCADE,
+    thread_key INTEGER NOT NULL REFERENCES threads(thread_key) ON DELETE CASCADE,
+    calls INTEGER NOT NULL CHECK (calls >= 0),
+    input_tokens INTEGER NOT NULL CHECK (input_tokens >= 0),
+    cached_input_tokens INTEGER NOT NULL CHECK (cached_input_tokens >= 0),
+    output_tokens INTEGER NOT NULL CHECK (output_tokens >= 0),
+    reasoning_tokens INTEGER NOT NULL CHECK (reasoning_tokens >= 0),
+    PRIMARY KEY (generation, thread_key)
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE rollup_model_effort (
+    generation INTEGER NOT NULL REFERENCES generations(generation)
+        ON DELETE CASCADE,
+    model TEXT NOT NULL,
+    effort TEXT NOT NULL,
+    service_tier TEXT NOT NULL,
+    calls INTEGER NOT NULL CHECK (calls >= 0),
+    input_tokens INTEGER NOT NULL CHECK (input_tokens >= 0),
+    cached_input_tokens INTEGER NOT NULL CHECK (cached_input_tokens >= 0),
+    output_tokens INTEGER NOT NULL CHECK (output_tokens >= 0),
+    reasoning_tokens INTEGER NOT NULL CHECK (reasoning_tokens >= 0),
+    PRIMARY KEY (generation, model, effort, service_tier)
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE rollup_time_band (
+    generation INTEGER NOT NULL REFERENCES generations(generation)
+        ON DELETE CASCADE,
+    band_kind TEXT NOT NULL CHECK (band_kind IN ('hour', 'day')),
+    band_start TEXT NOT NULL,
+    calls INTEGER NOT NULL CHECK (calls >= 0),
+    input_tokens INTEGER NOT NULL CHECK (input_tokens >= 0),
+    cached_input_tokens INTEGER NOT NULL CHECK (cached_input_tokens >= 0),
+    output_tokens INTEGER NOT NULL CHECK (output_tokens >= 0),
+    reasoning_tokens INTEGER NOT NULL CHECK (reasoning_tokens >= 0),
+    PRIMARY KEY (generation, band_kind, band_start)
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE rollup_cost_credits (
+    generation INTEGER NOT NULL REFERENCES generations(generation)
+        ON DELETE CASCADE,
+    scope_kind TEXT NOT NULL,
+    scope_key TEXT NOT NULL,
+    configured_cost_micros INTEGER NOT NULL CHECK (configured_cost_micros >= 0),
+    estimated_credits_micros INTEGER NOT NULL CHECK (
+        estimated_credits_micros >= 0
+    ),
+    covered_calls INTEGER NOT NULL CHECK (covered_calls >= 0),
+    uncovered_calls INTEGER NOT NULL CHECK (uncovered_calls >= 0),
+    rate_card_digest TEXT,
+    PRIMARY KEY (generation, scope_kind, scope_key)
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE rollup_allowance (
+    generation INTEGER NOT NULL REFERENCES generations(generation)
+        ON DELETE CASCADE,
+    allowance_state_key INTEGER NOT NULL REFERENCES allowance_states(
+        allowance_state_key
+    ) ON DELETE CASCADE,
+    delta_used_percent REAL,
+    elapsed_hours REAL,
+    local_calls INTEGER NOT NULL CHECK (local_calls >= 0),
+    local_turns INTEGER NOT NULL CHECK (local_turns >= 0),
+    local_total_tokens INTEGER NOT NULL CHECK (local_total_tokens >= 0),
+    PRIMARY KEY (generation, allowance_state_key)
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE rollup_tool_operation (
+    generation INTEGER NOT NULL REFERENCES generations(generation)
+        ON DELETE CASCADE,
+    operation TEXT NOT NULL,
+    target_label TEXT NOT NULL,
+    calls INTEGER NOT NULL CHECK (calls >= 0),
+    duration_ms REAL NOT NULL CHECK (duration_ms >= 0),
+    output_bytes INTEGER NOT NULL CHECK (output_bytes >= 0),
+    PRIMARY KEY (generation, operation, target_label)
+) STRICT, WITHOUT ROWID;
+
 CREATE INDEX idx_sources_generation
 ON sources(last_generation);
-CREATE INDEX idx_threads_source
-ON threads(source_id, last_generation);
-CREATE INDEX idx_threads_parent
-ON threads(parent_logical_thread_id);
+CREATE INDEX idx_threads_logical
+ON threads(logical_thread_id, last_generation);
 CREATE INDEX idx_turns_thread
-ON turns(thread_id, ordinal);
-CREATE INDEX idx_turns_generation
-ON turns(last_generation);
+ON turns(thread_key, ordinal);
 CREATE INDEX idx_model_calls_thread_time
-ON model_calls(thread_id, event_at);
+ON model_call_facts(thread_key, event_at);
 CREATE INDEX idx_model_calls_turn
-ON model_calls(turn_id, turn_ordinal);
+ON model_call_facts(turn_key, turn_ordinal);
 CREATE INDEX idx_model_calls_generation
-ON model_calls(generation);
+ON model_call_facts(generation);
 CREATE INDEX idx_model_calls_canonical
-ON model_calls(canonical_call_id, duplicate_state);
+ON model_call_facts(canonical_call_id, duplicate_state);
 CREATE INDEX idx_model_calls_time
-ON model_calls(event_at, generation, duplicate_state);
+ON model_call_facts(event_at, generation, duplicate_state);
 CREATE INDEX idx_tool_calls_thread_time
-ON tool_calls(thread_id, started_at);
-CREATE INDEX idx_tool_calls_turn
-ON tool_calls(turn_id);
-CREATE INDEX idx_tool_calls_generation
-ON tool_calls(generation);
+ON tool_call_facts(thread_key, started_at);
 CREATE INDEX idx_activity_thread_time
-ON activity_events(thread_id, event_at);
-CREATE INDEX idx_activity_turn
-ON activity_events(turn_id);
-CREATE INDEX idx_allowance_time
-ON allowance_observations(observed_at);
-CREATE INDEX idx_allowance_generation
-ON allowance_observations(generation);
+ON activity_facts(thread_key, event_at);
 CREATE INDEX idx_allowance_window_time
-ON allowance_observations(
-    window_kind, limit_id, plan_type, observed_at, generation
+ON allowance_states(
+    window_kind,
+    COALESCE(limit_id, ''),
+    COALESCE(plan_type, ''),
+    last_observed_at
 );
+
+CREATE VIEW model_calls AS
+SELECT
+    'call_' || lower(hex(facts.model_call_id)) AS model_call_id,
+    'fp_' || lower(hex(facts.canonical_call_id)) AS canonical_call_id,
+    sources.source_id,
+    threads.thread_id,
+    turns.turn_id,
+    facts.event_at,
+    facts.turn_ordinal,
+    model_profiles.model,
+    NULLIF(model_profiles.effort_key, '') AS effort,
+    NULLIF(model_profiles.service_tier_key, '') AS service_tier,
+    model_profiles.origin,
+    facts.context_window,
+    facts.input_tokens,
+    facts.cached_input_tokens,
+    facts.output_tokens,
+    facts.reasoning_tokens,
+    facts.upstream_total_tokens,
+    facts.upstream_cumulative_tokens,
+    facts.rate_limit_observation_id,
+    facts.duplicate_state,
+    facts.duplicate_reason,
+    facts.fingerprint_version,
+    facts.source_offset,
+    facts.generation
+FROM model_call_facts AS facts
+JOIN sources USING (source_key)
+JOIN threads USING (thread_key)
+LEFT JOIN turns USING (turn_key)
+JOIN model_profiles USING (model_profile_key);
+
+CREATE TRIGGER insert_model_calls
+INSTEAD OF INSERT ON model_calls
+BEGIN
+    INSERT INTO model_profiles(
+        model,
+        effort_key,
+        service_tier_key,
+        origin
+    )
+    VALUES (
+        NEW.model,
+        COALESCE(NEW.effort, ''),
+        COALESCE(NEW.service_tier, ''),
+        NEW.origin
+    )
+    ON CONFLICT(model, effort_key, service_tier_key, origin) DO NOTHING;
+
+    INSERT INTO model_call_facts(
+        model_call_id,
+        canonical_call_id,
+        source_key,
+        thread_key,
+        turn_key,
+        model_profile_key,
+        event_at,
+        turn_ordinal,
+        context_window,
+        input_tokens,
+        cached_input_tokens,
+        output_tokens,
+        reasoning_tokens,
+        upstream_total_tokens,
+        upstream_cumulative_tokens,
+        rate_limit_observation_id,
+        duplicate_state,
+        duplicate_reason,
+        fingerprint_version,
+        source_offset,
+        generation
+    )
+    SELECT
+        unhex(substr(NEW.model_call_id, 6)),
+        unhex(substr(NEW.canonical_call_id, 4)),
+        sources.source_key,
+        threads.thread_key,
+        turns.turn_key,
+        model_profiles.model_profile_key,
+        NEW.event_at,
+        NEW.turn_ordinal,
+        NEW.context_window,
+        NEW.input_tokens,
+        NEW.cached_input_tokens,
+        NEW.output_tokens,
+        NEW.reasoning_tokens,
+        NEW.upstream_total_tokens,
+        NEW.upstream_cumulative_tokens,
+        NEW.rate_limit_observation_id,
+        NEW.duplicate_state,
+        NEW.duplicate_reason,
+        NEW.fingerprint_version,
+        NEW.source_offset,
+        NEW.generation
+    FROM sources
+    JOIN threads ON threads.thread_id = NEW.thread_id
+    LEFT JOIN turns ON turns.turn_id = NEW.turn_id
+    JOIN model_profiles
+      ON model_profiles.model = NEW.model
+     AND model_profiles.effort_key = COALESCE(NEW.effort, '')
+     AND model_profiles.service_tier_key = COALESCE(NEW.service_tier, '')
+     AND model_profiles.origin = NEW.origin
+    WHERE sources.source_id = NEW.source_id;
+END;
+
+CREATE VIEW tool_calls AS
+SELECT
+    'tool_' || lower(hex(facts.tool_call_id)) AS tool_call_id,
+    facts.upstream_call_id_hash,
+    sources.source_id,
+    threads.thread_id,
+    turns.turn_id,
+    CASE
+        WHEN nearest.model_call_id IS NULL THEN NULL
+        ELSE 'call_' || lower(hex(nearest.model_call_id))
+    END AS nearest_model_call_id,
+    tool_profiles.tool_name,
+    NULLIF(tool_profiles.server_name_key, '') AS server_name,
+    NULLIF(tool_profiles.namespace_key, '') AS namespace,
+    tool_profiles.tool_category,
+    facts.started_at,
+    facts.ended_at,
+    facts.duration_ms,
+    facts.status,
+    facts.error_category,
+    facts.output_bytes,
+    facts.argument_shape,
+    facts.first_source_offset,
+    facts.last_source_offset,
+    facts.generation,
+    facts.observation_confidence,
+    tool_profiles.operation,
+    facts.target_label
+FROM tool_call_facts AS facts
+JOIN sources USING (source_key)
+JOIN threads USING (thread_key)
+LEFT JOIN turns USING (turn_key)
+JOIN tool_profiles USING (tool_profile_key)
+LEFT JOIN model_call_facts AS nearest
+    ON nearest.model_call_key = facts.nearest_model_call_key;
+
+CREATE VIEW activity_events AS
+SELECT
+    'act_' || lower(hex(facts.activity_event_id)) AS activity_event_id,
+    sources.source_id,
+    threads.thread_id,
+    turns.turn_id,
+    facts.event_kind,
+    facts.event_at,
+    facts.safe_label,
+    facts.category,
+    facts.source_offset,
+    facts.generation
+FROM activity_facts AS facts
+JOIN sources USING (source_key)
+JOIN threads USING (thread_key)
+LEFT JOIN turns USING (turn_key);
+
+CREATE VIEW allowance_observations AS
+SELECT
+    'allow_' || lower(hex(states.allowance_observation_id))
+        AS allowance_observation_id,
+    sources.source_id,
+    states.last_observed_at AS observed_at,
+    states.window_kind,
+    states.limit_id,
+    states.plan_type,
+    states.used_percent,
+    states.duration_minutes,
+    states.resets_at,
+    states.model,
+    states.service_tier,
+    CASE
+        WHEN trigger_call.model_call_id IS NULL THEN NULL
+        ELSE 'call_' || lower(hex(trigger_call.model_call_id))
+    END AS source_model_call_id,
+    states.generation,
+    states.duplicate_state,
+    states.provenance,
+    states.validation_warnings,
+    states.allowance_state_key,
+    states.first_observed_at,
+    states.last_observed_at,
+    states.observation_count,
+    states.observation_trigger_call_key
+FROM allowance_states AS states
+JOIN sources USING (source_key)
+LEFT JOIN model_call_facts AS trigger_call
+    ON trigger_call.model_call_key = states.observation_trigger_call_key;
+
+CREATE TRIGGER insert_allowance_observations
+INSTEAD OF INSERT ON allowance_observations
+BEGIN
+    INSERT INTO allowance_states(
+        allowance_observation_id,
+        source_key,
+        first_observed_at,
+        last_observed_at,
+        observation_count,
+        window_kind,
+        limit_id,
+        plan_type,
+        used_percent,
+        duration_minutes,
+        resets_at,
+        model,
+        service_tier,
+        observation_trigger_call_key,
+        generation,
+        duplicate_state,
+        provenance,
+        validation_warnings
+    )
+    SELECT
+        unhex(substr(NEW.allowance_observation_id, 7)),
+        sources.source_key,
+        NEW.observed_at,
+        NEW.observed_at,
+        1,
+        NEW.window_kind,
+        NEW.limit_id,
+        NEW.plan_type,
+        NEW.used_percent,
+        NEW.duration_minutes,
+        NEW.resets_at,
+        NEW.model,
+        NEW.service_tier,
+        model_call_facts.model_call_key,
+        NEW.generation,
+        NEW.duplicate_state,
+        NEW.provenance,
+        NEW.validation_warnings
+    FROM sources
+    LEFT JOIN model_call_facts
+        ON model_call_facts.model_call_id = unhex(
+            substr(NEW.source_model_call_id, 6)
+        )
+    WHERE sources.source_id = NEW.source_id;
+END;
 
 CREATE VIEW allowance_intervals AS
 WITH ordered AS (
-    SELECT allowance_observations.*,
-           LAG(allowance_observation_id) OVER observation_window
-               AS previous_observation_id,
-           LAG(observed_at) OVER observation_window AS previous_observed_at,
-           LAG(used_percent) OVER observation_window AS previous_used_percent,
-           LAG(duration_minutes) OVER observation_window
-               AS previous_duration_minutes,
-           LAG(resets_at) OVER observation_window AS previous_resets_at,
-           LAG(model) OVER observation_window AS previous_model,
-           LAG(service_tier) OVER observation_window
-               AS previous_service_tier,
-           LAG(provenance) OVER observation_window AS previous_provenance,
-           LAG(validation_warnings) OVER observation_window
-               AS previous_validation_warnings
+    SELECT
+        allowance_observations.*,
+        LAG(allowance_state_key) OVER observation_window
+            AS previous_state_key,
+        LAG(observed_at) OVER observation_window AS previous_observed_at,
+        LAG(used_percent) OVER observation_window AS previous_used_percent,
+        LAG(duration_minutes) OVER observation_window
+            AS previous_duration_minutes,
+        LAG(resets_at) OVER observation_window AS previous_resets_at
     FROM allowance_observations
     WHERE duplicate_state = 'canonical'
       AND generation <= (
@@ -302,172 +668,100 @@ WITH ordered AS (
             window_kind,
             COALESCE(limit_id, ''),
             COALESCE(plan_type, '')
-        ORDER BY observed_at, allowance_observation_id
+        ORDER BY observed_at, allowance_state_key
     )
 ),
 deltas AS (
-    SELECT ordered.*,
-           CASE
-               WHEN previous_observation_id IS NOT NULL
-                AND previous_resets_at IS resets_at
-                AND previous_duration_minutes IS duration_minutes
-                AND julianday(observed_at) > julianday(previous_observed_at)
-                AND (
-                    duration_minutes IS NULL
-                    OR (
-                        julianday(observed_at)
-                        - julianday(previous_observed_at)
-                    ) * 1440.0 <= duration_minutes
-                )
-                AND used_percent > previous_used_percent
-               THEN used_percent - previous_used_percent
-               ELSE NULL
-           END AS delta_used_percent,
-           CASE
-               WHEN previous_observation_id IS NOT NULL
-                AND previous_resets_at IS resets_at
-                AND previous_duration_minutes IS duration_minutes
-                AND julianday(observed_at) > julianday(previous_observed_at)
-                AND (
-                    duration_minutes IS NULL
-                    OR (
-                        julianday(observed_at)
-                        - julianday(previous_observed_at)
-                    ) * 1440.0 <= duration_minutes
-                )
-                AND used_percent > previous_used_percent
-               THEN (
-                   julianday(observed_at) - julianday(previous_observed_at)
-               ) * 24.0
-               ELSE NULL
-           END AS elapsed_hours
+    SELECT
+        ordered.*,
+        CASE
+            WHEN previous_state_key IS NOT NULL
+             AND previous_resets_at IS resets_at
+             AND previous_duration_minutes IS duration_minutes
+             AND julianday(observed_at) > julianday(previous_observed_at)
+             AND (
+                 duration_minutes IS NULL
+                 OR (
+                     julianday(observed_at) - julianday(previous_observed_at)
+                 ) * 1440.0 <= duration_minutes
+             )
+             AND used_percent > previous_used_percent
+            THEN used_percent - previous_used_percent
+            ELSE NULL
+        END AS delta_used_percent,
+        CASE
+            WHEN previous_state_key IS NOT NULL
+             AND previous_resets_at IS resets_at
+             AND previous_duration_minutes IS duration_minutes
+             AND julianday(observed_at) > julianday(previous_observed_at)
+             AND (
+                 duration_minutes IS NULL
+                 OR (
+                     julianday(observed_at) - julianday(previous_observed_at)
+                 ) * 1440.0 <= duration_minutes
+             )
+             AND used_percent > previous_used_percent
+            THEN (
+                julianday(observed_at) - julianday(previous_observed_at)
+            ) * 24.0
+            ELSE NULL
+        END AS elapsed_hours
     FROM ordered
 ),
 local_facts AS (
-    SELECT deltas.*,
-           COALESCE((
-               SELECT SUM(
-                   model_calls.input_tokens
-                   - model_calls.cached_input_tokens
-               )
-               FROM model_calls
-               WHERE model_calls.generation <= (
-                         SELECT COALESCE(MAX(generation), 0)
-                         FROM generations
-                         WHERE integrity_status = 'valid'
-                     )
-                 AND model_calls.duplicate_state = 'canonical'
-                 AND julianday(model_calls.event_at)
-                     > julianday(deltas.previous_observed_at)
-                 AND julianday(model_calls.event_at)
-                     <= julianday(deltas.observed_at)
-           ), 0) AS local_uncached_input_tokens,
-           COALESCE((
-               SELECT SUM(model_calls.cached_input_tokens)
-               FROM model_calls
-               WHERE model_calls.generation <= (
-                         SELECT COALESCE(MAX(generation), 0)
-                         FROM generations
-                         WHERE integrity_status = 'valid'
-                     )
-                 AND model_calls.duplicate_state = 'canonical'
-                 AND julianday(model_calls.event_at)
-                     > julianday(deltas.previous_observed_at)
-                 AND julianday(model_calls.event_at)
-                     <= julianday(deltas.observed_at)
-           ), 0) AS local_cached_input_tokens,
-           COALESCE((
-               SELECT SUM(model_calls.reasoning_tokens)
-               FROM model_calls
-               WHERE model_calls.generation <= (
-                         SELECT COALESCE(MAX(generation), 0)
-                         FROM generations
-                         WHERE integrity_status = 'valid'
-                     )
-                 AND model_calls.duplicate_state = 'canonical'
-                 AND julianday(model_calls.event_at)
-                     > julianday(deltas.previous_observed_at)
-                 AND julianday(model_calls.event_at)
-                     <= julianday(deltas.observed_at)
-           ), 0) AS local_reasoning_tokens,
-           COALESCE((
-               SELECT SUM(model_calls.output_tokens)
-               FROM model_calls
-               WHERE model_calls.generation <= (
-                         SELECT COALESCE(MAX(generation), 0)
-                         FROM generations
-                         WHERE integrity_status = 'valid'
-                     )
-                 AND model_calls.duplicate_state = 'canonical'
-                 AND julianday(model_calls.event_at)
-                     > julianday(deltas.previous_observed_at)
-                 AND julianday(model_calls.event_at)
-                     <= julianday(deltas.observed_at)
-           ), 0) AS local_output_tokens,
-           COALESCE((
-               SELECT SUM(
-                   model_calls.input_tokens + model_calls.output_tokens
-               )
-               FROM model_calls
-               WHERE model_calls.generation <= (
-                         SELECT COALESCE(MAX(generation), 0)
-                         FROM generations
-                         WHERE integrity_status = 'valid'
-                     )
-                 AND model_calls.duplicate_state = 'canonical'
-                 AND julianday(model_calls.event_at)
-                     > julianday(deltas.previous_observed_at)
-                 AND julianday(model_calls.event_at)
-                     <= julianday(deltas.observed_at)
-           ), 0) AS local_total_tokens,
-           COALESCE((
-               SELECT COUNT(*)
-               FROM model_calls
-               WHERE model_calls.generation <= (
-                         SELECT COALESCE(MAX(generation), 0)
-                         FROM generations
-                         WHERE integrity_status = 'valid'
-                     )
-                 AND model_calls.duplicate_state = 'canonical'
-                 AND julianday(model_calls.event_at)
-                     > julianday(deltas.previous_observed_at)
-                 AND julianday(model_calls.event_at)
-                     <= julianday(deltas.observed_at)
-           ), 0) AS local_calls,
-           COALESCE((
-               SELECT COUNT(DISTINCT model_calls.turn_id)
-               FROM model_calls
-               WHERE model_calls.generation <= (
-                         SELECT COALESCE(MAX(generation), 0)
-                         FROM generations
-                         WHERE integrity_status = 'valid'
-                     )
-                 AND model_calls.duplicate_state = 'canonical'
-                 AND julianday(model_calls.event_at)
-                     > julianday(deltas.previous_observed_at)
-                 AND julianday(model_calls.event_at)
-                     <= julianday(deltas.observed_at)
-           ), 0) AS local_turns
+    SELECT
+        deltas.*,
+        COALESCE((
+            SELECT COUNT(*)
+            FROM model_call_facts
+            WHERE model_call_facts.duplicate_state = 'canonical'
+              AND julianday(model_call_facts.event_at)
+                    > julianday(deltas.previous_observed_at)
+              AND julianday(model_call_facts.event_at)
+                    <= julianday(deltas.observed_at)
+        ), 0) AS local_calls,
+        COALESCE((
+            SELECT COUNT(DISTINCT model_call_facts.turn_key)
+            FROM model_call_facts
+            WHERE model_call_facts.duplicate_state = 'canonical'
+              AND julianday(model_call_facts.event_at)
+                    > julianday(deltas.previous_observed_at)
+              AND julianday(model_call_facts.event_at)
+                    <= julianday(deltas.observed_at)
+        ), 0) AS local_turns,
+        COALESCE((
+            SELECT SUM(
+                model_call_facts.input_tokens
+                + model_call_facts.output_tokens
+            )
+            FROM model_call_facts
+            WHERE model_call_facts.duplicate_state = 'canonical'
+              AND julianday(model_call_facts.event_at)
+                    > julianday(deltas.previous_observed_at)
+              AND julianday(model_call_facts.event_at)
+                    <= julianday(deltas.observed_at)
+        ), 0) AS local_total_tokens
     FROM deltas
 )
-SELECT local_facts.*,
-       100.0 - used_percent AS remaining_percent,
-       CASE
-           WHEN delta_used_percent IS NULL THEN NULL
-           ELSE delta_used_percent / elapsed_hours
-       END AS percentage_points_per_hour,
-       CASE
-           WHEN delta_used_percent IS NULL THEN NULL
-           ELSE 1.0 * local_total_tokens / delta_used_percent
-       END AS local_tokens_per_percentage_point,
-       CASE
-           WHEN delta_used_percent IS NULL THEN NULL
-           ELSE 1.0 * local_calls / delta_used_percent
-       END AS local_calls_per_percentage_point,
-       CASE
-           WHEN delta_used_percent IS NULL THEN NULL
-           ELSE 1.0 * local_turns / delta_used_percent
-       END AS local_turns_per_percentage_point
+SELECT
+    local_facts.*,
+    100.0 - used_percent AS remaining_percent,
+    CASE
+        WHEN delta_used_percent IS NULL THEN NULL
+        ELSE delta_used_percent / elapsed_hours
+    END AS percentage_points_per_hour,
+    CASE
+        WHEN delta_used_percent IS NULL THEN NULL
+        ELSE 1.0 * local_total_tokens / delta_used_percent
+    END AS local_tokens_per_percentage_point,
+    CASE
+        WHEN delta_used_percent IS NULL THEN NULL
+        ELSE 1.0 * local_calls / delta_used_percent
+    END AS local_calls_per_percentage_point,
+    CASE
+        WHEN delta_used_percent IS NULL THEN NULL
+        ELSE 1.0 * local_turns / delta_used_percent
+    END AS local_turns_per_percentage_point
 FROM local_facts;
 """
 

@@ -65,8 +65,8 @@ def test_bounded_allowance_read_stays_within_common_query_budget(
                 rate_limit_observation_id, duplicate_state, duplicate_reason,
                 fingerprint_version, source_offset, generation
             )
-            SELECT printf('perf-call-%06d', sequence.value),
-                   printf('perf-call-%06d', sequence.value),
+            SELECT printf('call_%032x', sequence.value),
+                   printf('fp_%064x', sequence.value),
                    seed.source_id, seed.thread_id, seed.turn_id,
                    '2026-01-01T00:00:50.500Z', seed.turn_ordinal,
                    seed.model, seed.effort, seed.service_tier, seed.origin,
@@ -90,7 +90,10 @@ def test_bounded_allowance_read_stays_within_common_query_budget(
                     source_model_call_id, generation, duplicate_state,
                     provenance, validation_warnings
                 )
-                SELECT printf('perf-copy-%d-%s', ?, allowance_observation_id),
+                SELECT printf(
+                           'allow_%032x',
+                           ? * 1000000 + allowance_state_key
+                       ),
                        source_id, observed_at, window_kind,
                        printf('performance-limit-%d', ?), plan_type,
                        used_percent, duration_minutes, resets_at, model,

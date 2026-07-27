@@ -349,3 +349,74 @@ work. The CLI allowance task independently exposed a 44.7-second tracker path.
   20-task agent-outcome matrix.
 - R2 starts from exact authoritative base
   `aefb2166eb006430bc5d66265a4256c53413e053`.
+
+## R2 — Define Schema V3 And Compact Storage
+
+**State:** In progress
+**Branch:** `feature/r2-schema-v3-compact-storage`
+**Base:** `8afcb589e54ada05256f713a72c2f9ac9ba2cf7d`
+**Commits:** pending
+**Owned files:** analytical schema and writer storage boundary; focused schema,
+allowance, query, scope, and budget contracts; this ledger
+**Parallel lane:** none
+
+### Contract added first
+
+- The first focused run failed four schema-v3 contracts because the analytical
+  store was still schema v2 and had no compact integer-key facts, allowance
+  states, generation rollups, or metadata-only schema capability.
+- The implemented contract now covers compact dimension and fact keys, exact
+  selector round trips, four token classes, observation-trigger semantics,
+  unchanged allowance-state compaction, interval deltas, generation-fenced
+  rollups, and forbidden raw-content fields.
+
+### Implementation checkpoint
+
+- Analytical schema version 3 stores stable call, fingerprint, tool, activity,
+  and allowance selectors as compact binary identities behind the existing
+  logical selector views.
+- Source, thread, turn, model, and tool dimensions provide integer foreign
+  keys. Low-cardinality model/effort/tier/origin and tool-operation metadata
+  are stored once per profile rather than once per fact.
+- Repeated unchanged allowance snapshots update first/last observation bounds
+  and count on one state. State changes create ordered intervals; the revealing
+  call remains an observation trigger and is not treated as causal attribution.
+- Seven generation-scoped rollup table contracts are frozen for the R4 updater.
+  R2 does not populate them independently of fact publication.
+- Side-by-side upgrade and rollback continue through the existing operational
+  cutover state machine; schema-v2 bytes are never mutated in place.
+
+### Measurement checkpoint
+
+| Workload | Result | Evidence |
+| --- | --- | --- |
+| Small CI | Pass | 96 initial calls; 166.483 ms cold, 10.451 ms no-change, 26.491 ms tail; 237,568-byte database |
+| Production-shaped cold | Stopped after decisive time failure | 17m20s; 1,023,666/1,316,864 model calls, 511,832 tools, 127,958 activities, 31,989 compact allowance states, and 513,318,912 database bytes |
+| Production-shaped size | Pending exact optimized run | The stopped build had loaded 77.7% of model facts. Its partial bytes project below 700 MiB, but projection is not acceptance evidence. |
+
+The production run was stopped once the cold-build failure was decisive. Paying
+for the remaining serial writer work would not improve the performance
+decision, and the partial size projection is intentionally not reported as a
+pass. R3 will remove repeated indexed selector lookups and thousands of
+transactions before the next single full production-shaped run. That run will
+provide the exact R2 size result and the R3 cold-build result together.
+
+### Verification checkpoint
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused schema, allowance, and query | Pass | 14 tests before the final two schema contracts; final focused rerun pending checkpoint commit |
+| Kernel | Pass with corrected catalog pending rerun | 290 passed; the only failure was the expected 15-to-17 analytical-table budget update |
+| Ruff | Pass | all changed Python paths |
+| Privacy | Pass | schema forbids raw prompts, responses, reasoning, tool arguments, tool output, shell bodies, and full paths |
+| Full repository, distribution, installed | Pending | required before R2 merge |
+| Review | Pending | one final read-only review after exact size evidence |
+
+### Residual risk and next action
+
+- The cold path remains dominated by repeated source/thread/turn selector
+  lookups and thousands of bounded transactions whose cost grows with each
+  B-tree. Progress remains at the coarse `writing` 45% stage while rows advance.
+- The next checkpoint is a stacked R3 implementation from the exact R2 source
+  commit. R2 remains open until the optimized full run proves the exact size
+  ceiling and its final broad/review gates pass.

@@ -151,8 +151,8 @@ def canonicalize_initial_duplicates(
             str(row[0])
             for row in connection.execute(
                 """
-                SELECT canonical_call_id
-                FROM model_calls
+            SELECT 'fp_' || lower(hex(canonical_call_id))
+            FROM model_call_facts
                 GROUP BY canonical_call_id
                 HAVING COUNT(*) > 1
                 ORDER BY canonical_call_id
@@ -335,8 +335,16 @@ def _upsert_source(
 
 def _upsert_threads(connection: sqlite3.Connection, rows: tuple[dict[str, Any], ...]) -> None:
     for row in rows:
-        columns = tuple(row)
-        values = tuple(row.values())
+        compact = dict(row)
+        compact["source_key"] = _required_key(
+            connection,
+            "sources",
+            "source_key",
+            "source_id",
+            str(row["source_id"]),
+        )
+        columns = tuple(compact)
+        values = tuple(compact.values())
         connection.execute(
             f"""
             INSERT INTO threads({", ".join(columns)})
@@ -349,14 +357,22 @@ def _upsert_threads(connection: sqlite3.Connection, rows: tuple[dict[str, Any], 
 
 def _upsert_turns(connection: sqlite3.Connection, rows: tuple[dict[str, Any], ...]) -> None:
     for row in rows:
-        columns = tuple(row)
+        compact = dict(row)
+        compact["thread_key"] = _required_key(
+            connection,
+            "threads",
+            "thread_key",
+            "thread_id",
+            str(row["thread_id"]),
+        )
+        columns = tuple(compact)
         connection.execute(
             f"""
             INSERT INTO turns({", ".join(columns)})
             VALUES ({", ".join("?" for _ in columns)})
             ON CONFLICT(turn_id) DO NOTHING
             """,
-            tuple(row.values()),
+            tuple(compact.values()),
         )
 
 
@@ -366,18 +382,350 @@ def _insert_rows(
     rows: tuple[dict[str, Any], ...],
 ) -> int:
     inserted = 0
+    profile_keys: dict[tuple[str, ...], int] = {}
     for row in rows:
-        columns = tuple(row)
+        if table == "allowance_observations":
+            inserted += _insert_allowance_state(connection, row)
+            continue
+        physical_table, compact = _compact_fact_row(
+            connection,
+            table,
+            row,
+            profile_keys,
+        )
+        columns = tuple(compact)
         cursor = connection.execute(
             f"""
-            INSERT INTO {table}({", ".join(columns)})
+            INSERT INTO {physical_table}({", ".join(columns)})
             VALUES ({", ".join("?" for _ in columns)})
             ON CONFLICT DO NOTHING
             """,
-            tuple(row.values()),
+            tuple(compact.values()),
         )
         inserted += max(0, cursor.rowcount)
     return inserted
+
+
+def _compact_fact_row(
+    connection: sqlite3.Connection,
+    table: str,
+    row: dict[str, Any],
+    profile_keys: dict[tuple[str, ...], int],
+) -> tuple[str, dict[str, Any]]:
+    table_map = {
+        "model_calls": "model_call_facts",
+        "tool_calls": "tool_call_facts",
+        "activity_events": "activity_facts",
+    }
+    physical_table = table_map.get(table)
+    if physical_table is None:
+        raise ValueError(f"unsupported analytical fact table: {table}")
+
+    compact = dict(row)
+    compact["source_key"] = _required_key(
+        connection,
+        "sources",
+        "source_key",
+        "source_id",
+        str(compact.pop("source_id")),
+    )
+    compact["thread_key"] = _required_key(
+        connection,
+        "threads",
+        "thread_key",
+        "thread_id",
+        str(compact.pop("thread_id")),
+    )
+    compact["turn_key"] = _optional_key(
+        connection,
+        "turns",
+        "turn_key",
+        "turn_id",
+        compact.pop("turn_id", None),
+    )
+    if table == "model_calls":
+        profile = (
+            str(compact.pop("model")),
+            str(compact.pop("effort") or ""),
+            str(compact.pop("service_tier") or ""),
+            str(compact.pop("origin")),
+        )
+        if profile not in profile_keys:
+            profile_keys[profile] = _model_profile_key(connection, profile)
+        compact["model_profile_key"] = profile_keys[profile]
+        compact["model_call_id"] = _selector_blob(
+            compact["model_call_id"],
+            "call_",
+        )
+        compact["canonical_call_id"] = _selector_blob(
+            compact["canonical_call_id"],
+            "fp_",
+        )
+    if table == "tool_calls":
+        tool_name = str(compact.pop("tool_name"))
+        profile = (
+            tool_name,
+            str(compact.pop("server_name") or ""),
+            str(compact.pop("namespace") or ""),
+            str(compact.pop("tool_category")),
+            str(compact.pop("operation", tool_name)),
+        )
+        if profile not in profile_keys:
+            profile_keys[profile] = _tool_profile_key(connection, profile)
+        compact["tool_profile_key"] = profile_keys[profile]
+        compact["tool_call_id"] = _selector_blob(
+            compact["tool_call_id"],
+            "tool_",
+        )
+        compact["nearest_model_call_key"] = _optional_key(
+            connection,
+            "model_call_facts",
+            "model_call_key",
+            "model_call_id",
+            compact.pop("nearest_model_call_id", None),
+        )
+    if table == "activity_events":
+        compact["activity_event_id"] = _selector_blob(
+            compact["activity_event_id"],
+            "act_",
+        )
+    return physical_table, compact
+
+
+def _model_profile_key(
+    connection: sqlite3.Connection,
+    profile: tuple[str, str, str, str],
+) -> int:
+    connection.execute(
+        """
+        INSERT INTO model_profiles(model, effort_key, service_tier_key, origin)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(model, effort_key, service_tier_key, origin) DO NOTHING
+        """,
+        profile,
+    )
+    row = connection.execute(
+        """
+        SELECT model_profile_key
+        FROM model_profiles
+        WHERE model = ?
+          AND effort_key = ?
+          AND service_tier_key = ?
+          AND origin = ?
+        """,
+        profile,
+    ).fetchone()
+    if row is None:
+        raise RuntimeError("model profile was not persisted")
+    return int(row[0])
+
+
+def _tool_profile_key(
+    connection: sqlite3.Connection,
+    profile: tuple[str, str, str, str, str],
+) -> int:
+    connection.execute(
+        """
+        INSERT INTO tool_profiles(
+            tool_name,
+            server_name_key,
+            namespace_key,
+            tool_category,
+            operation
+        )
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(
+            tool_name,
+            server_name_key,
+            namespace_key,
+            tool_category,
+            operation
+        ) DO NOTHING
+        """,
+        profile,
+    )
+    row = connection.execute(
+        """
+        SELECT tool_profile_key
+        FROM tool_profiles
+        WHERE tool_name = ?
+          AND server_name_key = ?
+          AND namespace_key = ?
+          AND tool_category = ?
+          AND operation = ?
+        """,
+        profile,
+    ).fetchone()
+    if row is None:
+        raise RuntimeError("tool profile was not persisted")
+    return int(row[0])
+
+
+def _insert_allowance_state(
+    connection: sqlite3.Connection,
+    row: dict[str, Any],
+) -> int:
+    source_key = _required_key(
+        connection,
+        "sources",
+        "source_key",
+        "source_id",
+        str(row["source_id"]),
+    )
+    trigger_key = _optional_key(
+        connection,
+        "model_call_facts",
+        "model_call_key",
+        "model_call_id",
+        row.get("source_model_call_id"),
+    )
+    prior = connection.execute(
+        """
+        SELECT
+            allowance_state_key,
+            used_percent,
+            duration_minutes,
+            resets_at,
+            model,
+            service_tier,
+            provenance,
+            validation_warnings
+        FROM allowance_states
+        WHERE source_key = ?
+          AND window_kind = ?
+          AND limit_id IS ?
+          AND plan_type IS ?
+        ORDER BY last_observed_at DESC, allowance_state_key DESC
+        LIMIT 1
+        """,
+        (
+            source_key,
+            row["window_kind"],
+            row.get("limit_id"),
+            row.get("plan_type"),
+        ),
+    ).fetchone()
+    state_values = (
+        row["used_percent"],
+        row.get("duration_minutes"),
+        row.get("resets_at"),
+        row.get("model"),
+        row.get("service_tier"),
+        row["provenance"],
+        row["validation_warnings"],
+    )
+    if prior is not None and tuple(prior[1:]) == state_values:
+        connection.execute(
+            """
+            UPDATE allowance_states
+            SET last_observed_at = ?,
+                observation_count = observation_count + 1,
+                observation_trigger_call_key = ?,
+                generation = ?
+            WHERE allowance_state_key = ?
+            """,
+            (
+                row["observed_at"],
+                trigger_key,
+                row["generation"],
+                int(prior[0]),
+            ),
+        )
+        return 0
+
+    cursor = connection.execute(
+        """
+        INSERT INTO allowance_states(
+            allowance_observation_id,
+            source_key,
+            first_observed_at,
+            last_observed_at,
+            observation_count,
+            window_kind,
+            limit_id,
+            plan_type,
+            used_percent,
+            duration_minutes,
+            resets_at,
+            model,
+            service_tier,
+            observation_trigger_call_key,
+            generation,
+            duplicate_state,
+            provenance,
+            validation_warnings
+        )
+        VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(allowance_observation_id) DO NOTHING
+        """,
+        (
+            _selector_blob(row["allowance_observation_id"], "allow_"),
+            source_key,
+            row["observed_at"],
+            row["observed_at"],
+            row["window_kind"],
+            row.get("limit_id"),
+            row.get("plan_type"),
+            row["used_percent"],
+            row.get("duration_minutes"),
+            row.get("resets_at"),
+            row.get("model"),
+            row.get("service_tier"),
+            trigger_key,
+            row["generation"],
+            row["duplicate_state"],
+            row["provenance"],
+            row["validation_warnings"],
+        ),
+    )
+    return max(0, cursor.rowcount)
+
+
+def _required_key(
+    connection: sqlite3.Connection,
+    table: str,
+    key_column: str,
+    selector_column: str,
+    selector: str,
+) -> int:
+    value = _optional_key(
+        connection,
+        table,
+        key_column,
+        selector_column,
+        selector,
+    )
+    if value is None:
+        raise ValueError(f"missing {table} selector")
+    return value
+
+
+def _optional_key(
+    connection: sqlite3.Connection,
+    table: str,
+    key_column: str,
+    selector_column: str,
+    selector: object,
+) -> int | None:
+    if selector is None:
+        return None
+    stored_selector = (
+        _selector_blob(selector, "call_")
+        if table == "model_call_facts" and selector_column == "model_call_id"
+        else str(selector)
+    )
+    row = connection.execute(
+        f"SELECT {key_column} FROM {table} WHERE {selector_column} = ?",
+        (stored_selector,),
+    ).fetchone()
+    return None if row is None else int(row[0])
+
+
+def _selector_blob(selector: object, prefix: str) -> bytes:
+    value = str(selector)
+    if not value.startswith(prefix):
+        raise ValueError(f"invalid selector prefix: {prefix}")
+    return bytes.fromhex(value[len(prefix) :])
 
 
 def _delete_source(
@@ -418,14 +766,16 @@ def _canonicalize(
     placeholders = ", ".join("?" for _ in fingerprints)
     rows = connection.execute(
         f"""
-        SELECT model_calls.model_call_id, model_calls.canonical_call_id
-        FROM model_calls
-        JOIN sources USING (source_id)
-        WHERE canonical_call_id IN ({placeholders})
-        ORDER BY model_calls.canonical_call_id,
+        SELECT
+            'call_' || lower(hex(facts.model_call_id)),
+            'fp_' || lower(hex(facts.canonical_call_id))
+        FROM model_call_facts AS facts
+        JOIN sources USING (source_key)
+        WHERE facts.canonical_call_id IN ({placeholders})
+        ORDER BY facts.canonical_call_id,
                  CASE
                      WHEN ? = 0
-                          AND model_calls.duplicate_state = 'canonical'
+                AND facts.duplicate_state = 'canonical'
                      THEN 0
                      ELSE 1
                  END,
@@ -434,9 +784,12 @@ def _canonicalize(
                      WHEN 'archived' THEN 1
                      ELSE 2
                  END,
-                 model_calls.model_call_id
+            facts.model_call_id
         """,
-        (*fingerprints, int(reselect)),
+        (
+            *(_selector_blob(item, "fp_") for item in fingerprints),
+            int(reselect),
+        ),
     ).fetchall()
     updates: list[tuple[str, str | None, str]] = []
     prior_fingerprint: str | None = None
@@ -453,17 +806,21 @@ def _canonicalize(
         prior_fingerprint = fingerprint
     connection.executemany(
         """
-        UPDATE model_calls
+        UPDATE model_call_facts
         SET duplicate_state = ?, duplicate_reason = ?
-        WHERE model_call_id = ?
+        WHERE model_call_id = unhex(substr(?, 6))
         """,
         updates,
     )
     connection.executemany(
         """
-        UPDATE allowance_observations
+        UPDATE allowance_states
         SET duplicate_state = ?
-        WHERE source_model_call_id = ?
+        WHERE observation_trigger_call_key = (
+            SELECT model_call_key
+            FROM model_call_facts
+            WHERE model_call_id = unhex(substr(?, 6))
+        )
         """,
         ((state, model_call_id) for state, _reason, model_call_id in updates),
     )
