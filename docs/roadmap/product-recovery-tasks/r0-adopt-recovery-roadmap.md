@@ -19,6 +19,7 @@ None.
 - status notices in:
   - `docs/roadmap/product-kernel-reset.md`
   - `docs/roadmap/product-kernel-reset-execution.md`
+- `config/kernel-release-candidate-budget.json`
 - `scripts/check_kernel_scope.py`
 - `tests/kernel/test_kernel_scope.py`
 
@@ -39,8 +40,11 @@ allowlist is absent, then pass after the exact inventory is added.
 5. Point `AGENTS.md` to the new authority.
 6. Preserve the reset roadmap in place to avoid breaking historical links.
 7. Preserve the paused public-doc and thread-label worktrees.
-8. Run documentation, scope, release, and diff checks.
-9. Complete one final read-only review after the diff is stable.
+8. Measure and ratchet the source-distribution budget when the new source
+   documents change the archive size; retain no more than three percent
+   headroom and do not change runtime, wheel, Console, or plugin budgets.
+9. Run documentation, scope, release, distribution, and diff checks.
+10. Complete one final read-only review after the diff is stable.
 
 ## Non-Goals
 

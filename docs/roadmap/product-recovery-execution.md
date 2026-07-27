@@ -148,7 +148,7 @@ disjoint file sets.
 **Commits:** pending
 **Owned files:** `AGENTS.md`; Product Recovery roadmap, ledger, and task
 packets; historical notices in the Product Kernel Reset roadmap and ledger;
-scope checker and focused scope test
+scope checker, focused scope test, and measured source-distribution budget
 **Parallel lane:** none; R0 is coordinator-owned
 
 ### Contract added first
@@ -175,6 +175,10 @@ scope checker and focused scope test
 - Pointed `AGENTS.md` to the new active authority.
 - Preserved Product Kernel Reset documents as historical evidence and recorded
   K16 as superseded.
+- CI and the matching local build measured source-complete sdists at
+  402,327–402,593 bytes after adding the roadmap source. The sdist ceiling was
+  ratcheted from 382,000 to 414,000 bytes, 2.83–2.90 percent headroom. Wheel,
+  runtime source, Console, plugin, and catalog ceilings are unchanged.
 
 ### Agent outcome
 
@@ -188,6 +192,7 @@ creates the executable installed-agent scorecard.
 | Focused | Pass | `pytest tests/kernel/test_kernel_scope.py -q`: 14 passed |
 | Scope | Pass | `python scripts/check_kernel_scope.py`: integration scope passed |
 | Release safety | Pass | `python scripts/check_release.py`: release-safety checks passed |
+| Distribution | Pass | local wheel/sdist build plus `python scripts/check_release.py --dist`; 402,593-byte sdist under 414,000-byte ceiling |
 | Broad | Pass | `just v`: 340 Python tests, 7 frontend tests, Ruff, MyPy, Pyright, maintainability, manifest, deterministic asset, scope, and release checks passed |
 | Diff | Pass | `git diff --check` |
 | Performance | N/A | no runtime behavior changed |
@@ -212,6 +217,10 @@ supports the metrics helper's `strict` command. It was not retried.
   plan was written directly into the repository's established roadmap format.
 - Public `0.28.0` package publication is not resumed. The next qualified target
   is `0.29.0`.
+- Initial PR CI correctly failed both distribution-building jobs because the
+  new source documents exceeded the frozen 382,000-byte sdist ceiling. The
+  measured ratchet is a source-package accounting correction, not a runtime or
+  compatibility expansion.
 
 ### Residual risk and next task
 
