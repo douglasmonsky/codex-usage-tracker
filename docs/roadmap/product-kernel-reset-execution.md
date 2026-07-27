@@ -63,8 +63,8 @@ progress.
 | K1 | 0.25.x bridge | Complete | K0 | Freeze accounting oracle |
 | K1A | 0.26 integration | Complete | K1 | Quarantine legacy code and freeze agent scope |
 | K2 | 0.26.0 | Complete | K1A | Kernel schema v1 and stable identity |
-| K3 | 0.26.0 | Implementation qualified | K2 | Incremental/live ingestion |
-| K4 | 0.26.0 | Not started | K3 | Bounded query engine |
+| K3 | 0.26.0 | Complete | K2 | Incremental/live ingestion |
+| K4 | 0.26.0 | Local complete; CI pending | K3 | Bounded query engine |
 | K5 | 0.26.0 | Not started | K3 | Evidence timeline and live stream |
 | K6 | 0.26.0 | Not started | K4, K5 | Six-tool integration interfaces |
 | K7 | 0.26.0 | Not started | K6 | Focused Evidence Console |
@@ -749,6 +749,130 @@ the bounded digest owner and explicit repository guidance/policy coverage; the
   `MAX(generation)`.
 - K3 is merged into the non-publishable `kernel/0.26-integration` branch and
   unblocks K4.
+
+## K4 — Bounded generation-consistent query engine
+
+**State:** Integration CI passed; merge pending
+**Branch:** `kernel/k4-query-engine`
+**Base:** `f7948ee824480e720e27111d2a8cf68dd1351cef`
+**Commits:** `e4e0dba feat: add bounded kernel query engine`;
+`b4e73e5 docs: close K4 local verification ledger`;
+`ddfbd64 ci: isolate host-sensitive ingest benchmark`;
+closeout metadata in this changeset
+
+### Contract added first
+
+- The first contract-red run failed collection because the kernel query package
+  did not exist. A second red expansion required real non-overlapping period
+  comparison, all seven datasets, exact scan counts, bounded phase scopes,
+  stable selectors, opaque generation-bound cursors, and deterministic
+  four-band phase token attribution.
+- Requests accept only named datasets, operations, dimensions, measures,
+  filters, ordering, limits, and comparison windows. Unsupported fields,
+  aggregate shapes, cross-products, timelines, and unscoped phase scans fail
+  before SQL execution.
+- Every batch resolves the operational control once, opens one read-only
+  analytical transaction, and binds every plan and cursor to that active
+  generation. Query execution never starts refresh work or writes either
+  database.
+
+### Implementation
+
+- `kernel.query.contracts` owns typed normalized requests, explicit half-open
+  comparison windows, bounded batches and pages, opaque cursors, and
+  adapter-independent results.
+- `kernel.query.catalog` and `kernel.query.plans` own static SQL expressions and
+  named version-1 plans for calls, turns, threads, tools, activities, phases,
+  and allowance across rows, aggregate, share, comparison, distribution,
+  time-series, and timeline operations. Filter values remain parameters.
+- `kernel.query.service` returns normalized scope, generation, plan identity,
+  exact matched/scanned/returned counts, truncation, cursor, elapsed time,
+  grade/coverage metadata, and stable evidence selectors.
+- The pure version-1 phase segmenter uses only privacy-safe turn, activity, and
+  tool facts. It emits the approved phase vocabulary, basis, confidence,
+  unknown fallback, and four token classes with explicitly deterministic
+  attribution.
+- K4 resolved all 18 frozen K4 disposition entries: 13 bounded behaviors were
+  transplanted into the query owners and five legacy export/cache/derived
+  summary paths were retired. No query cache was added because the measured
+  plans meet budget.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused | Pass | `pytest -q -s tests/kernel/query`: 25 passed; focused Ruff, Mypy, and maintainability checks clean |
+| Broader | Pass | final `just v`: 126 passed; Ruff, Mypy, Pyright, Xenon, scope, manifests, and release checks clean in 26.29 s |
+| Performance | Pass | final 100,000 synthetic calls: common p95 110.724 ms, comparison p95 135.543 ms, concentration p95 66.826 ms |
+| Profiling | Pass | `agent-perf` run `20260727T005737Z-871485fd`, Scalene 2.3.0; `_execute_one` was the only ranked owned hotspot at 16.54 percent; attribution only |
+| Package | Pass | exact wheel/sdist membership check and isolated no-dependency wheel import smoke |
+| Privacy | Pass | synthetic fixtures only; query and phase facts contain no prompt, reasoning text, tool arguments/output, shell body, secret, or full source path |
+| Integration CI | Pass | PR #322: Python 3.10 in 63 s; Python 3.14 with synthetic ingest performance and package isolation in 86 s |
+
+The query timing assertion uses the identical unprofiled workload before the
+profile capture. The contract budgets are 500 ms for common bounded queries
+and 1 second for comparison/concentration.
+
+### Review metrics
+
+- Total findings: 6
+- Accepted findings: 6 (`R1`–`R6`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+| Metric | K3 | K4 local | Change |
+| --- | ---: | ---: | ---: |
+| Contract-red runs | 1 | 2 | 100.0% higher |
+| Focused runs | 64 | 25 | 60.9% lower |
+| Broad runs | 8 | 8 | unchanged |
+| Duplicate broad runs | 0 | 0 | unchanged |
+| Blocking findings | 36 | 21 | 41.7% lower |
+| Non-behavioral findings | 17 | 11 | 35.3% lower |
+| Gate-remediation lines | 54 | 264 | 388.9% higher |
+| Verification wall time | 180.4 s | 386.2 s | 114.1% higher |
+| Style-only commits | 0 | 0 | unchanged |
+
+K4 materially reduced focused-loop and finding counts while preserving all
+maintained correctness gates; broad runs were unchanged. Total measured
+verification wall time increased because final performance, package,
+post-review, failed-CI, and corrected-CI qualification were all recorded.
+Gate-remediation lines also increased because the new planner and validator
+initially exceeded the Xenon complexity budget and were split into
+responsibility-owned helpers; no arbitrary file-length or generic style gate
+was restored.
+
+Initial CI found one further non-behavioral blocker: the inherited K3 ingest
+benchmark exceeded its 50 ms writer p95 threshold only on a shared Python 3.10
+runner. The threshold remains unchanged and runs once in the Python 3.14
+performance job; both interpreters still run all functional, typing, privacy,
+scope, release, and K4 query contracts. Corrected CI passed in 63 and 86
+seconds.
+
+The one final reviewer found six substantive defects: truth grading for partial
+measures, ambiguous shell phase classification, phase projection/order,
+timezone-offset comparison, cursor/pagination determinism, and missing
+oracle/plan/snapshot qualification. All six were accepted. The bounded fixes
+also removed two redundant full scans from every non-empty SQL result.
+
+### Deviations and decisions
+
+- Estimated cost, credits, allowance burn rate, and observed usage per
+  percentage point remain owned by K8 because schema-v1 does not yet contain
+  the qualified inputs. K4 rejects those measures instead of inventing values.
+- The warm status budget remains an adapter/status qualification owned by K6.
+  K4 qualifies only the common, comparison, and concentration read plans.
+- The repository has no profiling dependency. The exact pinned Scalene 2.3.0
+  profiler ran from an isolated temporary environment, which was then moved to
+  Trash; no project dependency or private data was added.
+
+### Residual risk and next task
+
+- PR #322 is green and remains to be squash-merged into integration; the single
+  final review is complete.
+- K5 may now build evidence timelines and the live event stream on the stable
+  logical selectors and generation-consistent query service.
 
 ## Task Entry Template
 

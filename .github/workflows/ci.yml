@@ -1,4 +1,4 @@
-name: Kernel K2 integration CI
+name: Kernel integration CI
 
 on:
   push:
@@ -16,8 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  k2-schema:
-    name: K2 schema and package isolation
+  kernel:
+    name: Kernel phase and package isolation
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -33,11 +33,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: pyproject.toml
-      - name: Install K1A tooling
+      - name: Install kernel tooling
         run: |
           python -m pip install --upgrade pip
           python -m pip install ".[dev]"
-      - name: Verify K1A phase
+      - name: Verify kernel phase
         run: |
           python scripts/check_kernel_scope.py
           python scripts/generate_kernel_manifests.py --check
@@ -47,6 +47,7 @@ jobs:
             scripts/check_release.py \
             scripts/generate_kernel_manifests.py \
             src/codex_usage_tracker/kernel \
+            tests/kernel/query \
             tests/kernel/test_code_disposition_manifest.py \
             tests/kernel/test_cutover_control.py \
             tests/kernel/test_database_lifecycle.py \
@@ -66,6 +67,7 @@ jobs:
           python -m mypy
           python scripts/check_kernel_maintainability.py
           python -m pytest -p no:tach \
+            --ignore=tests/kernel/test_ingest_performance.py \
             tests/kernel/test_kernel_scope.py \
             tests/kernel/test_code_disposition_manifest.py \
             tests/kernel/test_retired_surface_manifest.py \
@@ -81,9 +83,13 @@ jobs:
             tests/kernel/test_oracle_equivalence.py \
             tests/kernel/test_privacy_oracle.py \
             tests/kernel/test_source_lifecycle_oracle.py \
-            tests/kernel/test_watcher.py
+            tests/kernel/test_watcher.py \
+            tests/kernel/query
           python -m pyright --pythonpath "$(command -v python)"
           python scripts/check_release.py
+      - name: Run synthetic performance contracts
+        if: matrix.python-version == '3.14'
+        run: python -m pytest -p no:tach tests/kernel/test_ingest_performance.py
       - name: Build isolated development package
         if: matrix.python-version == '3.14'
         run: |

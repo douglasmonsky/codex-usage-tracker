@@ -229,6 +229,60 @@ _K3_TRANSPLANTS = {
         ("tests/kernel/test_oracle_equivalence.py",),
     ),
 }
+_K4_TRANSPLANTS = {
+    "src/codex_usage_tracker/application/query.py": (
+        "src/codex_usage_tracker/kernel/query/service.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+    "src/codex_usage_tracker/application/query_models.py": (
+        "src/codex_usage_tracker/kernel/query/contracts.py",
+        ("tests/kernel/query/test_contracts.py",),
+    ),
+    "src/codex_usage_tracker/application/query_validation.py": (
+        "src/codex_usage_tracker/kernel/query/catalog.py",
+        ("tests/kernel/query/test_contracts.py",),
+    ),
+    "src/codex_usage_tracker/store/query_sql.py": (
+        "src/codex_usage_tracker/kernel/query/plans.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+    "src/codex_usage_tracker/store/query_values.py": (
+        "src/codex_usage_tracker/kernel/query/contracts.py",
+        ("tests/kernel/query/test_contracts.py",),
+    ),
+    "src/codex_usage_tracker/store/schema_query_indexes.py": (
+        "src/codex_usage_tracker/kernel/schema.py",
+        ("tests/kernel/query/test_performance.py",),
+    ),
+    "src/codex_usage_tracker/store/summary_queries.py": (
+        "src/codex_usage_tracker/kernel/query/service.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+    "src/codex_usage_tracker/store/usage_timing.py": (
+        "src/codex_usage_tracker/kernel/query/service.py",
+        ("tests/kernel/query/test_performance.py",),
+    ),
+    "tests/application/test_query.py": (
+        "tests/kernel/query/test_service.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+    "tests/application/test_query_validation.py": (
+        "tests/kernel/query/test_contracts.py",
+        ("tests/kernel/query/test_contracts.py",),
+    ),
+    "tests/golden_questions/cases/03_precise_model_query.json": (
+        "tests/kernel/query/test_service.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+    "tests/mcp/test_core_query_tool.py": (
+        "tests/kernel/query/test_contracts.py",
+        ("tests/kernel/query/test_contracts.py",),
+    ),
+    "tests/store/test_store_query_sql.py": (
+        "tests/kernel/query/test_service.py",
+        ("tests/kernel/query/test_service.py",),
+    ),
+}
 
 
 def build_retired_surface_manifest() -> dict[str, Any]:
@@ -285,6 +339,21 @@ def apply_k3_transition() -> None:
     _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
+def apply_k4_transition() -> None:
+    """Resolve every K4 assignment to the bounded query contract or retirement."""
+
+    payload = build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    payload["entries"] = [
+        _expected_current_entry(base_by_path[entry["path"]])
+        if entry["owner_task"] == "K4"
+        else entry
+        for entry in payload["entries"]
+    ]
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
+
+
 def manifest_failures(
     disposition: dict[str, Any] | None = None,
 ) -> list[str]:
@@ -334,6 +403,11 @@ def manifest_failures(
             and entry["status"] != "verified"
         ):
             failures.append(f"{path}: K3 disposition is not verified")
+        if (
+            expected_entry["owner_task"] == "K4"
+            and entry["status"] != "verified"
+        ):
+            failures.append(f"{path}: K4 disposition is not verified")
 
     surface_keys = [
         (entry["surface_type"], entry["public_name"])
@@ -457,6 +531,44 @@ def _expected_k3_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
     return entry
 
 
+def _expected_k4_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = dict(base_entry)
+    transplant = _K4_TRANSPLANTS.get(entry["path"])
+    if transplant is None:
+        entry.update(
+            {
+                "disposition": "retire",
+                "reason": (
+                    "Legacy export, cache, or derived-summary behavior is not "
+                    "required by the bounded K4 query contract."
+                ),
+                "required_oracle_tests": [
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ],
+                "removal_or_absence_test": (
+                    "tests/kernel/test_code_disposition_manifest.py"
+                ),
+                "status": "verified",
+                "target_path": "",
+            }
+        )
+        return entry
+    target, tests = transplant
+    entry.update(
+        {
+            "reason": (
+                "Bounded generation-consistent query behavior survives through "
+                "one typed kernel query owner."
+            ),
+            "required_oracle_tests": list(tests),
+            "removal_or_absence_test": tests[0],
+            "status": "verified",
+            "target_path": target,
+        }
+    )
+    return entry
+
+
 def _expected_current_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
     entry = (
         _expected_k2_entry(base_entry)
@@ -465,6 +577,8 @@ def _expected_current_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
     )
     if entry["owner_task"] == "K3":
         return _expected_k3_entry(entry)
+    if entry["owner_task"] == "K4":
+        return _expected_k4_entry(entry)
     return entry
 
 
@@ -498,6 +612,7 @@ def main() -> int:
     parser.add_argument("--apply-quarantine", action="store_true")
     parser.add_argument("--apply-k2", action="store_true")
     parser.add_argument("--apply-k3", action="store_true")
+    parser.add_argument("--apply-k4", action="store_true")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
@@ -507,6 +622,8 @@ def main() -> int:
         apply_k2_transition()
     if args.apply_k3:
         apply_k3_transition()
+    if args.apply_k4:
+        apply_k4_transition()
     failures = manifest_failures()
     if failures:
         print("\n".join(failures), file=sys.stderr)

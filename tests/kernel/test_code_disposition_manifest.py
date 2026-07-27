@@ -112,7 +112,7 @@ def test_code_disposition_rejects_immutable_k1_decision_drift() -> None:
 
 def test_progressive_tasks_advance_non_keep_paths_without_restoring_source() -> None:
     for entry in _manifest()["entries"]:
-        if entry["owner_task"] in {"K2", "K3"}:
+        if entry["owner_task"] in {"K2", "K3", "K4"}:
             assert entry["status"] == "verified"
         elif entry["disposition"] != "keep":
             assert entry["status"] == "removed"
@@ -191,6 +191,35 @@ def test_k3_assignments_resolve_to_bounded_ingestion_or_retirement() -> None:
         "tests/kernel/test_ingest_privacy.py",
         "tests/kernel/test_ingest_reconciliation.py",
         "tests/kernel/test_watcher.py",
+    }
+
+
+def test_k4_assignments_resolve_to_bounded_queries_or_retirement() -> None:
+    entries = [
+        entry
+        for entry in _manifest()["entries"]
+        if entry["owner_task"] == "K4"
+    ]
+    transplanted = [
+        entry for entry in entries if entry["disposition"] == "transplant"
+    ]
+    retired = [entry for entry in entries if entry["disposition"] == "retire"]
+
+    assert len(entries) == 18
+    assert len(transplanted) == 13
+    assert len(retired) == 5
+    assert all(entry["status"] == "verified" for entry in entries)
+    assert {
+        entry["target_path"] for entry in transplanted
+    } <= {
+        "src/codex_usage_tracker/kernel/query/catalog.py",
+        "src/codex_usage_tracker/kernel/query/contracts.py",
+        "src/codex_usage_tracker/kernel/query/plans.py",
+        "src/codex_usage_tracker/kernel/query/service.py",
+        "src/codex_usage_tracker/kernel/schema.py",
+        "tests/kernel/query/test_contracts.py",
+        "tests/kernel/query/test_performance.py",
+        "tests/kernel/query/test_service.py",
     }
 
 
