@@ -19,6 +19,7 @@ from scripts.check_kernel_scope import (
     K12_ADDITIONS,
     K13_ADDITIONS,
     K14_ADDITIONS,
+    K15_ADDITIONS,
     active_paths,
     load_disposition_manifest,
     publication_ref_failure,
@@ -201,6 +202,10 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "config/kernel-release-qualification-v1.json",
         "tests/kernel/test_release_027_qualification.py",
     } == K14_ADDITIONS
+    assert {
+        "config/kernel-fault-recovery-scale-v1.json",
+        "tests/kernel/test_fault_recovery_scale.py",
+    } == K15_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -215,6 +220,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K12_ADDITIONS
         | K13_ADDITIONS
         | K14_ADDITIONS
+        | K15_ADDITIONS
     )
 
 
