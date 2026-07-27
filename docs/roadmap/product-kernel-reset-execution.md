@@ -2012,9 +2012,11 @@ protected publication pending
   indexes, five required schema objects, six MCP tools, seven HTTP routes, and
   eleven CLI commands.
 - The source-complete sdist exceeded the prior K15 ceiling by 406 bytes after
-  adding the frozen contract and reference. Its 390,000-byte ceiling retains
-  less than three percent measured headroom; the 130,000-byte wheel ceiling is
-  unchanged.
+  adding the frozen contract and reference. The first protected build
+  normalized the archive to 371,607 bytes and correctly rejected the local
+  390,000-byte estimate as more than three percent headroom. The corrected
+  382,000-byte ceiling passes both normalized and larger local builds; the
+  130,000-byte wheel ceiling is unchanged.
 - The core factual surface is frozen and ready to remain stable. The 1.0
   version decision is deferred until ordinary post-freeze dogfood validates
   the inventory; a future breaking change requires an approved roadmap
@@ -2028,6 +2030,9 @@ protected publication pending
 - Reviewer token attribution is pending after the single metrics finish call;
   it was not retried.
 - Complete the bounded post-review recheck.
+- Protected publication run 30264962387 stopped in artifact verification
+  before TestPyPI upload because the normalized sdist made the first ceiling
+  too loose. No public package bytes were created.
 - Merge the release PR through maintained CI, tag the exact merged-main SHA,
   publish only through protected Trusted Publishing, and verify TestPyPI,
   PyPI, and GitHub artifacts byte-for-byte.
