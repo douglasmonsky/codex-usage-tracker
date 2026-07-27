@@ -70,3 +70,12 @@ def test_repository_verification_wrappers_do_not_use_generic_maintainer_profiles
         "-m tach check",
     ):
         assert retired_command not in justfile
+
+
+def test_ci_runs_ingest_performance_only_in_the_dedicated_step() -> None:
+    workflow = (
+        _REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "tests/kernel/test_ingest_*.py" not in workflow
+    assert workflow.count("tests/kernel/test_ingest_performance.py") == 2

@@ -39,6 +39,7 @@ persistent, reconnectable, privacy-safe post-commit generation stream.
 
 ## Budget
 
-- Maximum changed files: 27 (the implementation inventory is 25; the
-  mandatory development-efficiency ledger and its policy test add two)
+- Maximum changed files: 28 (the implementation inventory is 25; the
+  mandatory development-efficiency ledger and its policy test add two, and
+  the CI performance-step regression test adds one)
 - Maximum changed lines: 4,500
