@@ -120,11 +120,11 @@ def _distribution_failures(dist_dir: Path) -> list[str]:
             _REPO_ROOT / "src" / "codex_usage_tracker" / "kernel",
             _REPO_ROOT / "src" / "codex_usage_tracker" / "release",
         )
-        for path in root.glob("*.py")
+        for path in root.rglob("*.py")
     )
     if wheel_names != expected_wheel_names:
         failures.append(
-            "integration wheel member set differs from the exact K1A package"
+            "integration wheel member set differs from the exact kernel package"
         )
     failures.extend(
         _metadata_failures(
@@ -194,7 +194,10 @@ def _expected_sdist_names() -> set[str]:
                 "check_release.py",
                 "generate_kernel_manifests.py",
             )),
-            (_REPO_ROOT / "src" / "codex_usage_tracker" / "kernel", ("*.py",)),
+            (
+                _REPO_ROOT / "src" / "codex_usage_tracker" / "kernel",
+                ("**/*.py",),
+            ),
             (_REPO_ROOT / "src" / "codex_usage_tracker" / "release", ("*.py",)),
             (_REPO_ROOT / "tests" / "kernel", ("**/*.py", "**/*.json", "**/*.jsonl")),
         )

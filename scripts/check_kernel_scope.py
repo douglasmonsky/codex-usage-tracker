@@ -57,8 +57,24 @@ K3_ADDITIONS = frozenset(
         "tests/kernel/test_watcher.py",
     }
 )
+K4_ADDITIONS = frozenset(
+    {
+        ".agent-maintainer/change-plans/k4-bounded-query-engine.md",
+        "src/codex_usage_tracker/kernel/query/__init__.py",
+        "src/codex_usage_tracker/kernel/query/catalog.py",
+        "src/codex_usage_tracker/kernel/query/contracts.py",
+        "src/codex_usage_tracker/kernel/query/phases.py",
+        "src/codex_usage_tracker/kernel/query/plans.py",
+        "src/codex_usage_tracker/kernel/query/service.py",
+        "tests/kernel/query/__init__.py",
+        "tests/kernel/query/test_contracts.py",
+        "tests/kernel/query/test_performance.py",
+        "tests/kernel/query/test_phases.py",
+        "tests/kernel/query/test_service.py",
+    }
+)
 
-INTEGRATION_ADDITIONS = K1A_ADDITIONS | K2_ADDITIONS | K3_ADDITIONS
+INTEGRATION_ADDITIONS = K1A_ADDITIONS | K2_ADDITIONS | K3_ADDITIONS | K4_ADDITIONS
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"
 )

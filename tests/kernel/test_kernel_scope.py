@@ -8,6 +8,7 @@ from scripts.check_kernel_scope import (
     K1A_ADDITIONS,
     K2_ADDITIONS,
     K3_ADDITIONS,
+    K4_ADDITIONS,
     load_disposition_manifest,
     publication_ref_failure,
     scope_failures,
@@ -100,7 +101,17 @@ def test_k3_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/test_ingest_reconciliation.py",
         "tests/kernel/test_watcher.py",
     } == K3_ADDITIONS
-    assert INTEGRATION_ADDITIONS == K1A_ADDITIONS | K2_ADDITIONS | K3_ADDITIONS
+
+
+def test_k4_additions_are_explicit_and_bounded() -> None:
+    assert {
+        ".agent-maintainer/change-plans/k4-bounded-query-engine.md",
+        "src/codex_usage_tracker/kernel/query/service.py",
+        "tests/kernel/query/test_performance.py",
+    } <= K4_ADDITIONS
+    assert INTEGRATION_ADDITIONS == (
+        K1A_ADDITIONS | K2_ADDITIONS | K3_ADDITIONS | K4_ADDITIONS
+    )
 
 
 def test_kernel_skeleton_imports_without_legacy_runtime() -> None:
