@@ -283,6 +283,15 @@ _K4_TRANSPLANTS = {
         ("tests/kernel/query/test_service.py",),
     ),
 }
+_K5_TRANSPLANTS = {
+    "src/codex_usage_tracker/application/evidence.py": (
+        "src/codex_usage_tracker/kernel/evidence/service.py",
+        (
+            "tests/kernel/evidence/test_contracts.py",
+            "tests/kernel/evidence/test_service.py",
+        ),
+    ),
+}
 
 
 def build_retired_surface_manifest() -> dict[str, Any]:
@@ -354,6 +363,21 @@ def apply_k4_transition() -> None:
     _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
 
 
+def apply_k5_transition() -> None:
+    """Resolve every K5 assignment to the exact evidence contract."""
+
+    payload = build_code_disposition_manifest()
+    base = _load_from_git(_K1_MERGE, "config/kernel-code-disposition-v1.json")
+    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    payload["entries"] = [
+        _expected_current_entry(base_by_path[entry["path"]])
+        if entry["owner_task"] == "K5"
+        else entry
+        for entry in payload["entries"]
+    ]
+    _DISPOSITION_PATH.write_text(_compact_manifest(payload), encoding="utf-8")
+
+
 def manifest_failures(
     disposition: dict[str, Any] | None = None,
 ) -> list[str]:
@@ -408,6 +432,11 @@ def manifest_failures(
             and entry["status"] != "verified"
         ):
             failures.append(f"{path}: K4 disposition is not verified")
+        if (
+            expected_entry["owner_task"] == "K5"
+            and entry["status"] != "verified"
+        ):
+            failures.append(f"{path}: K5 disposition is not verified")
 
     surface_keys = [
         (entry["surface_type"], entry["public_name"])
@@ -569,6 +598,24 @@ def _expected_k4_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
     return entry
 
 
+def _expected_k5_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
+    entry = dict(base_entry)
+    target, tests = _K5_TRANSPLANTS[entry["path"]]
+    entry.update(
+        {
+            "reason": (
+                "Stable logical-selector evidence survives through one bounded "
+                "generation-consistent kernel owner."
+            ),
+            "required_oracle_tests": list(tests),
+            "removal_or_absence_test": tests[0],
+            "status": "verified",
+            "target_path": target,
+        }
+    )
+    return entry
+
+
 def _expected_current_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
     entry = (
         _expected_k2_entry(base_entry)
@@ -579,6 +626,8 @@ def _expected_current_entry(base_entry: dict[str, Any]) -> dict[str, Any]:
         return _expected_k3_entry(entry)
     if entry["owner_task"] == "K4":
         return _expected_k4_entry(entry)
+    if entry["owner_task"] == "K5":
+        return _expected_k5_entry(entry)
     return entry
 
 
@@ -613,6 +662,7 @@ def main() -> int:
     parser.add_argument("--apply-k2", action="store_true")
     parser.add_argument("--apply-k3", action="store_true")
     parser.add_argument("--apply-k4", action="store_true")
+    parser.add_argument("--apply-k5", action="store_true")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
@@ -624,6 +674,8 @@ def main() -> int:
         apply_k3_transition()
     if args.apply_k4:
         apply_k4_transition()
+    if args.apply_k5:
+        apply_k5_transition()
     failures = manifest_failures()
     if failures:
         print("\n".join(failures), file=sys.stderr)

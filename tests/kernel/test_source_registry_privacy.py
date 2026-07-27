@@ -8,6 +8,7 @@ import pytest
 from codex_usage_tracker.kernel.database import initialize_analytical_database
 from codex_usage_tracker.kernel.identity import source_id
 from codex_usage_tracker.kernel.operational import (
+    OPERATIONAL_SCHEMA_VERSION,
     OPERATIONAL_TABLES,
     initialize_operational_database,
     load_cutover_control,
@@ -62,7 +63,9 @@ def test_operational_reopen_validates_version_and_repairs_permissions(
 
     assert oct(path.stat().st_mode & 0o777) == "0o600"
     with sqlite3.connect(path) as connection:
-        connection.execute("PRAGMA user_version = 2")
+        connection.execute(
+            f"PRAGMA user_version = {OPERATIONAL_SCHEMA_VERSION + 1}"
+        )
     with pytest.raises(ValueError, match="schema version"):
         initialize_operational_database(path)
 

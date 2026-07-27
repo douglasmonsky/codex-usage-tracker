@@ -22,9 +22,9 @@ from .models import (
 )
 from .schema import SCHEMA_VERSION
 
-OPERATIONAL_SCHEMA_VERSION = 1
+OPERATIONAL_SCHEMA_VERSION = 2
 OPERATIONAL_TABLES = frozenset(
-    {"refresh_runs", "source_registry", "cutover_control"}
+    {"refresh_runs", "source_registry", "cutover_control", "live_events"}
 )
 
 _TRANSITIONS = {
@@ -90,6 +90,20 @@ CREATE TABLE cutover_control (
     failure_code TEXT,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) STRICT;
+
+CREATE TABLE live_events (
+    event_id INTEGER PRIMARY KEY,
+    event_key TEXT NOT NULL UNIQUE,
+    publication_id TEXT NOT NULL,
+    generation INTEGER NOT NULL CHECK (generation > 0),
+    event_kind TEXT NOT NULL,
+    selector TEXT,
+    occurred_at TEXT NOT NULL,
+    payload_json TEXT NOT NULL
+) STRICT;
+
+CREATE INDEX idx_live_events_generation
+ON live_events(generation, event_id);
 """
 
 

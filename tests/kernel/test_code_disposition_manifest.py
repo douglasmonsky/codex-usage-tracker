@@ -112,7 +112,7 @@ def test_code_disposition_rejects_immutable_k1_decision_drift() -> None:
 
 def test_progressive_tasks_advance_non_keep_paths_without_restoring_source() -> None:
     for entry in _manifest()["entries"]:
-        if entry["owner_task"] in {"K2", "K3", "K4"}:
+        if entry["owner_task"] in {"K2", "K3", "K4", "K5"}:
             assert entry["status"] == "verified"
         elif entry["disposition"] != "keep":
             assert entry["status"] == "removed"
@@ -221,6 +221,21 @@ def test_k4_assignments_resolve_to_bounded_queries_or_retirement() -> None:
         "tests/kernel/query/test_performance.py",
         "tests/kernel/query/test_service.py",
     }
+
+
+def test_k5_assignment_resolves_to_exact_evidence() -> None:
+    entries = [
+        entry
+        for entry in _manifest()["entries"]
+        if entry["owner_task"] == "K5"
+    ]
+
+    assert len(entries) == 1
+    assert entries[0]["disposition"] == "transplant"
+    assert entries[0]["status"] == "verified"
+    assert entries[0]["target_path"] == (
+        "src/codex_usage_tracker/kernel/evidence/service.py"
+    )
 
 
 def test_code_disposition_preserves_and_retires_semantic_boundaries() -> None:

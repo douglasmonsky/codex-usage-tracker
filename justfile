@@ -12,6 +12,8 @@ vp:
         scripts/check_release.py \
         scripts/generate_kernel_manifests.py \
         src/codex_usage_tracker/kernel \
+        tests/kernel/evidence \
+        tests/kernel/live \
         tests/kernel/query \
         tests/kernel/test_code_disposition_manifest.py \
         tests/kernel/test_cutover_control.py \
@@ -55,6 +57,8 @@ v:
         tests/kernel/test_privacy_oracle.py \
         tests/kernel/test_source_lifecycle_oracle.py \
         tests/kernel/test_watcher.py \
+        tests/kernel/evidence \
+        tests/kernel/live \
         tests/kernel/query
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pyright --pythonpath "$PY"
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_release.py
