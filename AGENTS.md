@@ -241,7 +241,14 @@ Use patch releases for public blockers such as broken PyPI installs, missing pac
 
 Use the `agent-perf` skill and CLI when optimizing localhost API endpoints, dashboard refreshes, report generation, content indexing, parser or SQLite hot paths, or other latency- or CPU-sensitive code, and when investigating a performance regression or making a speedup claim.
 
-Install the repository's pinned profiling tools with `uv sync --group performance`. Profile the smallest repeatable workload with synthetic or anonymized inputs; never profile production, live private databases, arbitrary processes, or real Codex session content. Record the identical workload without a profiler before making a performance claim. Change one suspected cause at a time, rerun the unprofiled workload, and use `agent-perf compare` only to compare attribution evidence rather than as proof of a speedup.
+Install the repository's pinned profiling tools with
+`.venv/bin/python -m pip install -e ".[dev]"`. Profile the smallest repeatable
+workload with synthetic or anonymized inputs; never profile production, live
+private databases, arbitrary processes, or real Codex session content. Record
+the identical workload without a profiler before making a performance claim.
+Change one suspected cause at a time, rerun the unprofiled workload, and use
+`agent-perf compare` only to compare attribution evidence rather than as proof
+of a speedup.
 
 ### Code intelligence tools
 
