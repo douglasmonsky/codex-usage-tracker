@@ -36,7 +36,7 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Verify audited main base
-        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'release/0.26.0'
         env:
           ACTUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |

@@ -1394,11 +1394,14 @@ routes, six JSON schemas, and the exact deterministic Console bundle inventory.
   plugin interpreter resolution, all-six-tool oracle dogfood, and bounded MCP
   response deadlines.
 - No style-only commit or unchanged-state duplicate broad run occurred.
-- The release merge exposed two stale governance constraints without causing
-  source churn: required linear history conflicted with the audited cutover
-  merge topology, and branch protection still named five retired CI jobs.
+- The release merge and post-release closeout exposed three stale governance
+  constraints: required linear history conflicted with the audited cutover
+  merge topology, branch protection still named five retired CI jobs, and the
+  release-only audited-base fence initially ran on every future `main` PR.
   Linear history was restored immediately after the merge, while required
-  checks were permanently aligned to the three maintained kernel jobs.
+  checks were permanently aligned to the three maintained kernel jobs. The
+  audited-base fence now applies only to `release/0.26.0`, with a focused
+  workflow contract preserving that release safety invariant.
 - Final K10 counts and CI/publication times are synchronized in
   `config/kernel-development-efficiency-v1.json`.
 
