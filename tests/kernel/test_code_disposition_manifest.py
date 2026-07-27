@@ -111,11 +111,9 @@ def test_code_disposition_rejects_immutable_k1_decision_drift() -> None:
 
 
 def test_progressive_tasks_advance_non_keep_paths_without_restoring_source() -> None:
-    for entry in _manifest()["entries"]:
-        if entry["owner_task"] in {"K2", "K3", "K4", "K5", "K6", "K8"}:
-            assert entry["status"] == "verified"
-        elif entry["disposition"] != "keep":
-            assert entry["status"] == "removed"
+    assert {
+        entry["status"] for entry in _manifest()["entries"]
+    } == {"verified"}
 
 
 def test_k2_generic_assignments_resolve_to_clean_schema_contract() -> None:

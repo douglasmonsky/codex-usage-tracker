@@ -68,8 +68,8 @@ progress.
 | K5 | 0.26.0 | Complete | K3 | Evidence timeline and live stream |
 | K6 | 0.26.0 | Complete | K4, K5 | Six-tool integration interfaces |
 | K7 | 0.26.0 | Complete | K6 | Focused Evidence Console |
-| K8 | 0.26.0 | In progress | K7 | Allowance efficiency |
-| K9 | 0.26.0 | Not started | K8 | Release candidate and final absence audit |
+| K8 | 0.26.0 | Complete | K7 | Allowance efficiency |
+| K9 | 0.26.0 | Complete | K8 | Release candidate and final absence audit |
 | K10 | 0.26.0 | Not started | K9 | Audited release-branch cutover and qualification |
 | K11 | 0.27.0 | Not started | K10 | Guided exploration |
 | K12 | 0.27.0 | Not started | K11 | Optional context composition |
@@ -1133,10 +1133,11 @@ final review.
 
 ## K8 — Allowance Efficiency
 
-**State:** In progress
+**State:** Complete
 **Branch:** `kernel/k8-allowance-efficiency`
 **Base:** `7a174cffe15186bebfcd51b511ec44c883ddcd13`
-**Commits:** pending
+**Commits:** `beb373f` (`feat: add graded allowance efficiency measures`);
+merged through PR #326 as `e6fa2f1701111a4b98fcabce606bab9046e1c680`
 
 ### Contract added first
 
@@ -1206,9 +1207,89 @@ retry. Final CI times will be added after merge.
 
 ### Residual risk and next task
 
-- Integration CI and merge remain.
+- Integration CI passed on Python 3.10 in 79 seconds, Python 3.14 in 82
+  seconds, and the focused Evidence Console job in 77 seconds.
 - K9 may consume only this fact contract and must not restore legacy allowance
   analysis or compatibility routes.
+
+## K9 — Kernel Release Candidate And Final Absence
+
+**State:** Complete
+**Branch:** `kernel/k9-release-candidate`
+**Base:** `e6fa2f1701111a4b98fcabce606bab9046e1c680`
+**Commits:** `94240f7` (`refactor: finalize lean kernel release candidate`);
+`f7bf862` (`docs: record K9 qualification evidence`); PR #327
+
+### Contract added first
+
+- One release-candidate contract failed on unresolved disposition states,
+  integration-skeleton metadata, the absent measured budget, and the absent
+  complete upgrade map.
+- The contract fixes the exact six-tool MCP catalog, ten-command operational
+  CLI, seven-route `/api/kernel/v1` surface, non-publishable development
+  identity, retired import owners, distribution budgets, and all 1,194
+  retired-surface migration categories.
+
+### Implementation
+
+- All 1,578 frozen code-disposition entries now have terminal `verified`
+  status through the deterministic manifest generator.
+- The candidate identifies itself consistently as non-publishable 0.26
+  release-candidate metadata in Python, npm, and plugin manifests.
+- One release-candidate checker owns final runtime-import, catalog, schema,
+  route, package, Console, plugin-bundle, wheel, and sdist budgets and is
+  composed into the release verifier.
+- Every frozen disposition now resolves its physical source state, target, and
+  named proof paths. Every retired surface is reconciled against its live MCP,
+  HTTP, CLI, schema, table, Console, package-rule, or filesystem inventory.
+- Completed K1A–K8 phase change-plan files and their scope allowances are
+  removed. The frozen K1 manifests and the durable execution roadmap remain
+  the audit record.
+- The 0.26 upgrade guide maps every manifest replacement and surface type.
+  The installed-wheel smoke now verifies the retained CLI, exact six-tool MCP
+  catalog, explicit refresh, Console, and allowance contract.
+- Explicit schema upgrade records the preserved old cache in operational
+  metadata before resetting reconstructible publication pointers.
+
+### Verification
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Focused absence | Pass | 49 release-candidate, scope, disposition, retired-surface, and rollback/cache tests |
+| Broad local profile | Pass | post-review 209 Python tests plus Ruff, MyPy, Pyright, maintainability, frontend, scope, manifest, privacy, and release checks in 49.13 seconds |
+| Browser | Pass | 20 Chromium desktop/mobile flows passed with 2 intentional cross-project skips in 8.79 seconds |
+| Distribution | Pass | exact wheel/sdist member checks under 121,775-byte wheel and 326,054-byte sdist ceilings |
+| Installed candidate | Pass | isolated wheel CLI, six-tool MCP, refresh, Console, and allowance smoke |
+| Public reference | Pass | full public-PyPI 0.25.1 installed-package smoke from the detached reference worktree; 40-call two-task MCP probe included |
+| Publication guard | Pass | `refs/heads/kernel/k9-release-candidate` rejected with development version |
+
+### Review metrics
+
+- Total findings: 3
+- Accepted findings: 3 (`R1`–`R3`)
+- Reviewer tokens: pending
+- Tokens per accepted finding: pending
+
+### Churn measurement
+
+- One non-behavioral scope-check defect counted indexed files already deleted
+  from the worktree as active; its implementation now matches the documented
+  active-path contract and has a focused regression test.
+- Ruff `SIM300` was retired after it blocked the natural
+  `measured <= ceiling` budget assertion. Behavioral lint, typing,
+  maintainability, architecture, privacy, test, and release gates remain.
+- Six non-behavioral gate findings required 30 remediation lines. CI passed on
+  Python 3.10 in 70 seconds, Python 3.14 in 92 seconds, and the focused
+  Evidence Console job in 74 seconds. No broad
+  profile repeated an unchanged source/configuration state, and no style-only
+  commit occurred.
+
+### Residual risk and next task
+
+- PR #327 passed every required check; its squash merge to integration is the
+  remaining administrative action.
+- K10 must begin from an audited current `main` SHA and may incorporate the
+  qualified integration head only once.
 
 ## Task Entry Template
 

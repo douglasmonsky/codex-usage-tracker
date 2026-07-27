@@ -3,7 +3,7 @@
   "version": "0.26.0-dev.0",
   "private": true,
   "type": "module",
-  "description": "Non-publishable integration metadata; frontend work resumes at K7.",
+  "description": "Non-publishable 0.26 release candidate metadata.",
   "scripts": {
     "console:build": "node scripts/build_kernel_console.mjs",
     "console:build:check": "node scripts/build_kernel_console.mjs --check",

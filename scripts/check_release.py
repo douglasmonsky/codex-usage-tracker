@@ -17,12 +17,16 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
     import tomli as tomllib
 
 try:
+    from scripts.check_kernel_release_candidate import (
+        release_candidate_failures,
+    )
     from scripts.check_kernel_scope import (
         load_disposition_manifest,
         scope_failures,
     )
     from scripts.generate_kernel_manifests import manifest_failures
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
+    from check_kernel_release_candidate import release_candidate_failures
     from check_kernel_scope import (
         load_disposition_manifest,
         scope_failures,
@@ -56,6 +60,7 @@ def release_failures(*, dist: bool = False) -> list[str]:
     """Return deterministic integration metadata and package failures."""
 
     failures = manifest_failures()
+    failures.extend(release_candidate_failures(dist=dist))
     failures.extend(_frozen_release_failures())
     manifest = load_disposition_manifest(
         _REPO_ROOT / "config" / "kernel-code-disposition-v1.json"
@@ -220,6 +225,7 @@ def _expected_sdist_names() -> set[str]:
             (_REPO_ROOT / "scripts", (
                 "benchmark_kernel.py",
                 "check_kernel_maintainability.py",
+                "check_kernel_release_candidate.py",
                 "check_kernel_scope.py",
                 "check_release.py",
                 "generate_kernel_interfaces.py",

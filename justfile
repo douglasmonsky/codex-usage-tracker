@@ -12,6 +12,7 @@ vp:
         scripts/check_kernel_maintainability.py \
         scripts/check_kernel_scope.py \
         scripts/check_release.py \
+        scripts/check_kernel_release_candidate.py \
         scripts/smoke_installed_console.py \
         scripts/generate_kernel_interfaces.py \
         scripts/generate_kernel_manifests.py \
@@ -31,6 +32,7 @@ vp:
         tests/kernel/test_kernel_maintainability.py \
         tests/kernel/test_kernel_scope.py \
         tests/kernel/test_repository_quality_policy.py \
+        tests/kernel/test_release_candidate.py \
         tests/kernel/test_retired_surface_manifest.py \
         tests/kernel/test_schema.py \
         tests/kernel/test_source_registry_privacy.py \
@@ -57,6 +59,7 @@ v:
         tests/kernel/test_development_efficiency_policy.py \
         tests/kernel/test_kernel_maintainability.py \
         tests/kernel/test_repository_quality_policy.py \
+        tests/kernel/test_release_candidate.py \
         tests/kernel/test_schema.py \
         tests/kernel/test_identity.py \
         tests/kernel/test_database_lifecycle.py \

@@ -31,6 +31,7 @@ from .operational import (
     initialize_operational_database,
     load_cutover_control,
     promote_cutover,
+    record_legacy_cache_metadata,
     register_source,
     reset_cutover_for_schema_upgrade,
     transition_cutover,
@@ -259,6 +260,10 @@ class KernelIngestor:
             and base_version is not None
             and base_version != SCHEMA_VERSION
         ):
+            legacy_cache = active if active_version is not None else self.analytical_path
+            if legacy_cache is None:
+                raise ValueError("schema upgrade requires a preserved cache artifact")
+            record_legacy_cache_metadata(self.operational_path, legacy_cache)
             upgrade_path = self.analytical_path.with_name(
                 f".{self.analytical_path.stem}.schema-{SCHEMA_VERSION}.sqlite3"
             )

@@ -113,6 +113,9 @@ then run broader validation in proportion to risk.
   behavioral, type, privacy, security, dependency, packaging, or release defect
   it identifies; if it identifies none, correct the check or policy rather than
   reshaping unrelated code.
+- Write comparisons in the order that best communicates the domain contract.
+  For measured budgets, prefer `measured <= ceiling`; do not reorder a clear
+  assertion solely to satisfy a stylistic Yoda-condition preference.
 - Use one focused test loop while implementing. At the stable checkpoint, run
   the smallest broad profile that covers every touched contract; reuse that
   evidence instead of rerunning overlapping profiles.
