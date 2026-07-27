@@ -1217,7 +1217,7 @@ retry. Final CI times will be added after merge.
 **State:** In progress
 **Branch:** `kernel/k9-release-candidate`
 **Base:** `e6fa2f1701111a4b98fcabce606bab9046e1c680`
-**Commits:** pending
+**Commits:** `94240f7` (`refactor: finalize lean kernel release candidate`)
 
 ### Contract added first
 
