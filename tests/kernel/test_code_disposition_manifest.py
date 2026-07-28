@@ -38,6 +38,15 @@ def test_code_disposition_preserves_the_frozen_k1_tree_once() -> None:
     assert manifest["quarantine_base"] == manifest["source_ref"]
 
 
+def test_code_disposition_excludes_retired_authority_paths() -> None:
+    from scripts.generate_kernel_manifests import is_retired_authority_path
+
+    assert not any(
+        is_retired_authority_path(entry["path"])
+        for entry in _manifest()["entries"]
+    )
+
+
 def test_code_disposition_entries_are_decision_complete() -> None:
     for entry in _manifest()["entries"]:
         assert entry.keys() >= {

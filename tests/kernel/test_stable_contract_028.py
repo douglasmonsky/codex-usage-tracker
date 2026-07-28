@@ -25,7 +25,9 @@ from codex_usage_tracker.kernel.schema import SCHEMA_VERSION
 
 _ROOT = Path(__file__).resolve().parents[2]
 _CONTRACT_PATH = _ROOT / "config/kernel-stable-contract-v1.json"
-_REFERENCE_PATH = _ROOT / "docs/kernel-stable-contract-0.28.md"
+_REFERENCE_PATH = (
+    _ROOT / "docs/archive/spike/KERNEL_STABLE_CONTRACT_0_28.md"
+)
 _VERSION = "0.28.0"
 
 

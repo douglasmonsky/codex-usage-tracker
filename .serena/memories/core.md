@@ -1,7 +1,7 @@
 # Project map
-- Python package: `src/codex_usage_tracker/`; CLI, parser, SQLite store, reports, localhost dashboard server, MCP/plugin assets.
-- React dashboard: `frontend/dashboard/`; packaged assets are generated and should not be hand-edited.
-- Synthetic tests: `tests/`; never commit real Codex logs or raw user content.
-- Stable contracts include CLI/MCP JSON payloads, schema IDs, plugin names, and privacy behavior.
-- Compression Lab work is specified in `docs/compression-lab-roadmap.md` and linked design/implementation plans.
+- Authority starts at `docs/INDEX.md`; the only roadmap is `docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md`.
+- The replacement is built under `src/codex_usage_tracker/agent_kernel/`, one CK packet at a time.
+- `src/codex_usage_tracker/kernel/` and the frontend are frozen 0.28 oracles until CK-14; do not extend or import them.
+- Use deterministic synthetic fixtures only; never inspect or commit real Codex logs or raw user content.
+- The replacement stores structural facts, not prompt, response, reasoning, command, patch, or tool-output bodies.
 - Read `mem:tech_stack` for tooling, `mem:conventions` for code constraints, and `mem:task_completion` for gates.

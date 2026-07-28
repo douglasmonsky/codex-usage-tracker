@@ -17,8 +17,8 @@ body:
   - type: textarea
     id: inspect
     attributes:
-      label: inspect-log output
-      description: Paste safe output from `codex-usage-tracker inspect-log <path> --json` after removing private paths and identifiers.
+      label: Structural diagnostics
+      description: Describe only the event kind, field names, types, and failure counters needed to reproduce the issue. Do not paste a source-log record.
       render: json
   - type: textarea
     id: synthetic

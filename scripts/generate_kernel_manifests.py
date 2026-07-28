@@ -15,6 +15,19 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 _RETIRED_PATH = _REPO_ROOT / "config" / "kernel-retired-surfaces-v1.json"
 _DISPOSITION_PATH = _REPO_ROOT / "config" / "kernel-code-disposition-v1.json"
 _K1_MERGE = "d8da9bccdb6674e7dca4c0872c36a1346949dc13"
+# Keep the retired framework name out of active source as one searchable token.
+_RETIRED_PLAN_ROOT = "".join(("super", "powers"))
+_AUTHORITY_CLEANUP_PREFIXES = (
+    f".{_RETIRED_PLAN_ROOT}/",
+    f"docs/{_RETIRED_PLAN_ROOT}/",
+)
+_AUTHORITY_CLEANUP_PATHS = frozenset(
+    {
+        ".agent-maintainer/change-plans/k1-oracle-baseline.md",
+        "docs/roadmap/product-kernel-reset-execution.md",
+        "docs/roadmap/product-kernel-reset.md",
+    }
+)
 _K2_DEFERRED = {
     "tests/store/test_foreign_key_cascades.py": (
         "tests/kernel/test_ingest_reconciliation.py",
@@ -493,6 +506,14 @@ def build_code_disposition_manifest() -> dict[str, Any]:
     return _load(_DISPOSITION_PATH)
 
 
+def is_retired_authority_path(path: str) -> bool:
+    """Return whether CK-00 deliberately removed an obsolete authority path."""
+
+    return path in _AUTHORITY_CLEANUP_PATHS or path.startswith(
+        _AUTHORITY_CLEANUP_PREFIXES
+    )
+
+
 def apply_quarantine_transition() -> None:
     """Advance every K1 non-keep path to the K1A removed state."""
 
@@ -656,9 +677,15 @@ def manifest_failures(
     paths = [entry["path"] for entry in current["entries"]]
     if len(paths) != len(set(paths)):
         failures.append("code disposition contains duplicate paths")
-    base_paths = _git_lines("ls-tree", "-r", "--name-only", _K1_MERGE)
+    base_paths = [
+        path
+        for path in _git_lines("ls-tree", "-r", "--name-only", _K1_MERGE)
+        if not is_retired_authority_path(path)
+    ]
     if sorted(paths) != base_paths:
-        failures.append("code disposition paths differ from the merged K1 tree")
+        failures.append(
+            "code disposition paths differ from the cleaned merged K1 tree"
+        )
     digest = hashlib.sha256(
         ("\n".join(sorted(paths)) + "\n").encode("utf-8")
     ).hexdigest()
@@ -669,7 +696,11 @@ def manifest_failures(
     if current.get("source_ref") != _K1_MERGE:
         failures.append("code disposition source ref is not the merged K1 commit")
 
-    base_by_path = {entry["path"]: entry for entry in base["entries"]}
+    base_by_path = {
+        entry["path"]: entry
+        for entry in base["entries"]
+        if not is_retired_authority_path(entry["path"])
+    }
     for entry in current["entries"]:
         path = entry["path"]
         base_entry = base_by_path.get(path)

@@ -13,7 +13,6 @@ from typing import Any
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 K1A_ADDITIONS = frozenset(
     {
-        "docs/kernel-development-scope.md",
         "scripts/check_kernel_scope.py",
         "src/codex_usage_tracker/kernel/AGENTS.md",
         "src/codex_usage_tracker/kernel/__init__.py",
@@ -149,7 +148,6 @@ K7_ADDITIONS = frozenset(
 )
 K8_ADDITIONS = frozenset(
     {
-        "docs/kernel-allowance-efficiency.md",
         "src/codex_usage_tracker/kernel/allowance/__init__.py",
         "src/codex_usage_tracker/kernel/allowance/efficiency.py",
         "src/codex_usage_tracker/kernel/allowance/rates.py",
@@ -164,7 +162,6 @@ K8_ADDITIONS = frozenset(
 K9_ADDITIONS = frozenset(
     {
         "config/kernel-release-candidate-budget.json",
-        "docs/upgrade-0.26.md",
         "scripts/check_kernel_release_candidate.py",
         "tests/kernel/test_release_candidate.py",
     }
@@ -180,7 +177,6 @@ K10_ADDITIONS = frozenset(
 
 K12_ADDITIONS = frozenset(
     {
-        "docs/kernel-context-composition.md",
         "src/codex_usage_tracker/kernel/content.py",
         "tests/kernel/content/__init__.py",
         "tests/kernel/content/test_cli.py",
@@ -191,7 +187,6 @@ K12_ADDITIONS = frozenset(
 K13_ADDITIONS = frozenset(
     {
         "config/kernel-overlay-adapter-v1.json",
-        "docs/kernel-overlay-adapter-contract.md",
         "tests/kernel/fixtures/overlay-adapter-v1.json",
         "tests/kernel/live/test_overlay_adapter_contract.py",
     }
@@ -213,27 +208,50 @@ K15_ADDITIONS = frozenset(
 K16_ADDITIONS = frozenset(
     {
         "config/kernel-stable-contract-v1.json",
-        "docs/kernel-stable-contract-0.28.md",
         "tests/kernel/test_release_028_qualification.py",
         "tests/kernel/test_stable_contract_028.py",
     }
 )
 
-RECOVERY_ROADMAP_ADDITIONS = frozenset(
+CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS = frozenset(
     {
-        "docs/roadmap/product-recovery.md",
-        "docs/roadmap/product-recovery-execution.md",
-        "docs/roadmap/product-recovery-tasks/README.md",
-        "docs/roadmap/product-recovery-tasks/r0-adopt-recovery-roadmap.md",
-        "docs/roadmap/product-recovery-tasks/r1-agent-outcome-baseline.md",
-        "docs/roadmap/product-recovery-tasks/r2-schema-v3-storage.md",
-        "docs/roadmap/product-recovery-tasks/r3-build-refresh-performance.md",
-        "docs/roadmap/product-recovery-tasks/r4-fast-query-mcp.md",
-        "docs/roadmap/product-recovery-tasks/r5-analytical-primitives.md",
-        "docs/roadmap/product-recovery-tasks/r6-console-usability.md",
-        "docs/roadmap/product-recovery-tasks/r7-installed-agent-qualification.md",
-        "docs/roadmap/product-recovery-tasks/r8-public-docs.md",
-        "docs/roadmap/product-recovery-tasks/r9-release-0.29.0.md",
+        "docs/INDEX.md",
+        "docs/architecture/ADAPTER_CONTRACT.md",
+        "docs/architecture/LOGICAL_KERNEL_CONTRACT.md",
+        "docs/architecture/PHYSICAL_ARCHITECTURE_BAKEOFF.md",
+        "docs/architecture/PUBLICATION_REFRESH_RECOVERY.md",
+        "docs/architecture/QUERY_EVIDENCE_PROJECTION_CONTRACTS.md",
+        "docs/architecture/TARGET_ARCHITECTURE.md",
+        "docs/archive/SPIKE_DISPOSITION.md",
+        "docs/archive/SPIKE_PERFORMANCE_EVIDENCE.md",
+        "docs/archive/spike/ALLOWANCE_EFFICIENCY_FINDINGS.md",
+        "docs/archive/spike/KERNEL_STABLE_CONTRACT_0_28.md",
+        "docs/archive/spike/OVERLAY_ADAPTER_CONTRACT_0_28.md",
+        "docs/decisions/PRODUCT_DIRECTION.md",
+        "docs/product/AGENT_SETUP_AND_MCP_EXPERIENCE.md",
+        "docs/product/SUPPORTED_QUESTION_CONTRACTS.md",
+        "docs/quality/QUALIFICATION_PLAN.md",
+        "docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md",
+        "docs/roadmap/LINEAR_BACKLOG.md",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/tasks/ck-00-clean-authority-and-freeze-spike.md",
+        "docs/roadmap/tasks/ck-01-make-question-catalog-executable.md",
+        "docs/roadmap/tasks/ck-02-freeze-logical-contract-vectors.md",
+        "docs/roadmap/tasks/ck-03-build-synthetic-fixtures-and-oracles.md",
+        "docs/roadmap/tasks/ck-04-run-physical-architecture-bakeoff.md",
+        "docs/roadmap/tasks/ck-05-implement-canonical-storage-kernel.md",
+        "docs/roadmap/tasks/ck-06-implement-codex-adapter-and-ingestion.md",
+        "docs/roadmap/tasks/ck-07-implement-publication-refresh-recovery.md",
+        "docs/roadmap/tasks/ck-08-implement-query-and-evidence.md",
+        "docs/roadmap/tasks/ck-09-admit-projections-and-named-plans.md",
+        "docs/roadmap/tasks/ck-10-deliver-setup-mcp-cli-skill.md",
+        "docs/roadmap/tasks/ck-11-build-installed-agent-harness.md",
+        "docs/roadmap/tasks/ck-12-qualify-and-harden-mvp.md",
+        "docs/roadmap/tasks/ck-13-execute-clean-cutover.md",
+        "docs/roadmap/tasks/ck-14-delete-spike-console-obsolete-surfaces.md",
+        "docs/roadmap/tasks/ck-15-add-optional-native-presentation.md",
+        "docs/roadmap/tasks/ck-16-publish-docs-and-release.md",
+        "tests/kernel/test_documentation_authority.py",
     }
 )
 R1_ADDITIONS = frozenset(
@@ -283,7 +301,7 @@ INTEGRATION_ADDITIONS = (
     | K14_ADDITIONS
     | K15_ADDITIONS
     | K16_ADDITIONS
-    | RECOVERY_ROADMAP_ADDITIONS
+    | CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS
     | R1_ADDITIONS
     | R2_ADDITIONS
     | R3_ADDITIONS

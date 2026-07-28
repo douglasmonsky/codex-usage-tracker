@@ -30,7 +30,9 @@ _CONTRACT_PATH = _ROOT / "config" / "kernel-overlay-adapter-v1.json"
 _FIXTURE_PATH = (
     _ROOT / "tests" / "kernel" / "fixtures" / "overlay-adapter-v1.json"
 )
-_DOC_PATH = _ROOT / "docs" / "kernel-overlay-adapter-contract.md"
+_DOC_PATH = (
+    _ROOT / "docs" / "archive" / "spike" / "OVERLAY_ADAPTER_CONTRACT_0_28.md"
+)
 
 
 def _load(path: Path) -> dict:

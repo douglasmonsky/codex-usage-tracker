@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.check_kernel_scope import (
+    CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     INTEGRATION_ADDITIONS,
     K1A_ADDITIONS,
     K2_ADDITIONS,
@@ -26,7 +27,6 @@ from scripts.check_kernel_scope import (
     R3_ADDITIONS,
     R4_ADDITIONS,
     R5_ADDITIONS,
-    RECOVERY_ROADMAP_ADDITIONS,
     active_paths,
     load_disposition_manifest,
     publication_ref_failure,
@@ -86,7 +86,6 @@ def test_k1a_additions_are_explicit_and_bounded() -> None:
     assert (
         frozenset(
             {
-                "docs/kernel-development-scope.md",
                 "scripts/check_kernel_scope.py",
                 "src/codex_usage_tracker/kernel/AGENTS.md",
                 "src/codex_usage_tracker/kernel/__init__.py",
@@ -185,13 +184,11 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/console/test_contracts.py",
     } <= K7_ADDITIONS
     assert {
-        "docs/kernel-allowance-efficiency.md",
         "src/codex_usage_tracker/kernel/allowance/service.py",
         "tests/kernel/allowance/test_service.py",
     } <= K8_ADDITIONS
     assert {
         "config/kernel-release-candidate-budget.json",
-        "docs/upgrade-0.26.md",
         "scripts/check_kernel_release_candidate.py",
         "tests/kernel/test_release_candidate.py",
     } == K9_ADDITIONS
@@ -201,7 +198,6 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/test_release_cutover.py",
     } == K10_ADDITIONS
     assert {
-        "docs/kernel-context-composition.md",
         "src/codex_usage_tracker/kernel/content.py",
         "tests/kernel/content/__init__.py",
         "tests/kernel/content/test_cli.py",
@@ -209,7 +205,6 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
     } == K12_ADDITIONS
     assert {
         "config/kernel-overlay-adapter-v1.json",
-        "docs/kernel-overlay-adapter-contract.md",
         "tests/kernel/fixtures/overlay-adapter-v1.json",
         "tests/kernel/live/test_overlay_adapter_contract.py",
     } == K13_ADDITIONS
@@ -222,25 +217,27 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
     } == K15_ADDITIONS
     assert {
         "config/kernel-stable-contract-v1.json",
-        "docs/kernel-stable-contract-0.28.md",
         "tests/kernel/test_release_028_qualification.py",
         "tests/kernel/test_stable_contract_028.py",
     } == K16_ADDITIONS
+    task_packets = {
+        path
+        for path in CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS
+        if path.startswith("docs/roadmap/tasks/")
+    }
+    assert len(CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS) == 37
+    assert len(task_packets) == 17
     assert {
-        "docs/roadmap/product-recovery.md",
-        "docs/roadmap/product-recovery-execution.md",
-        "docs/roadmap/product-recovery-tasks/README.md",
-        "docs/roadmap/product-recovery-tasks/r0-adopt-recovery-roadmap.md",
-        "docs/roadmap/product-recovery-tasks/r1-agent-outcome-baseline.md",
-        "docs/roadmap/product-recovery-tasks/r2-schema-v3-storage.md",
-        "docs/roadmap/product-recovery-tasks/r3-build-refresh-performance.md",
-        "docs/roadmap/product-recovery-tasks/r4-fast-query-mcp.md",
-        "docs/roadmap/product-recovery-tasks/r5-analytical-primitives.md",
-        "docs/roadmap/product-recovery-tasks/r6-console-usability.md",
-        "docs/roadmap/product-recovery-tasks/r7-installed-agent-qualification.md",
-        "docs/roadmap/product-recovery-tasks/r8-public-docs.md",
-        "docs/roadmap/product-recovery-tasks/r9-release-0.29.0.md",
-    } == RECOVERY_ROADMAP_ADDITIONS
+        "docs/INDEX.md",
+        "docs/decisions/PRODUCT_DIRECTION.md",
+        "docs/product/SUPPORTED_QUESTION_CONTRACTS.md",
+        "docs/architecture/LOGICAL_KERNEL_CONTRACT.md",
+        "docs/quality/QUALIFICATION_PLAN.md",
+        "docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/LINEAR_BACKLOG.md",
+        "tests/kernel/test_documentation_authority.py",
+    } <= CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS
     assert {
         "config/product-recovery-agent-answer-v1.schema.json",
         "config/product-recovery-agent-baseline-v1.json",
@@ -275,7 +272,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K14_ADDITIONS
         | K15_ADDITIONS
         | K16_ADDITIONS
-        | RECOVERY_ROADMAP_ADDITIONS
+        | CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS
         | R1_ADDITIONS
         | R2_ADDITIONS
         | R3_ADDITIONS

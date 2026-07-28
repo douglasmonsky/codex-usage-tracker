@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest a new aggregate-only workflow, report, or dashboard improvement.
+description: Suggest an exact usage question, bounded fact, agent workflow, or integration improvement.
 title: "feat: "
 labels: ["enhancement"]
 body:
@@ -14,7 +14,7 @@ body:
     id: proposal
     attributes:
       label: Proposed behavior
-      description: Describe the CLI, MCP, dashboard, CSV, or docs change you want.
+      description: Describe the exact facts, calculation, evidence, or agent behavior you want.
     validations:
       required: true
   - type: dropdown
@@ -22,14 +22,15 @@ body:
     attributes:
       label: Main surface
       options:
-        - Dashboard
-        - CLI
-        - MCP or companion skill
-        - CSV/export
-        - Parser/index
+        - Agent question or preset
+        - Kernel fact or calculation
+        - MCP, plugin, or skill
+        - CLI or setup
+        - Codex source adapter
+        - Optional Data Analytics handoff
         - Documentation
   - type: textarea
-    id: privacy
+    id: data_boundary
     attributes:
-      label: Privacy considerations
-      description: Note any project metadata, source path, raw context, or sharing risk this feature might introduce.
+      label: Data and sharing boundary
+      description: Identify the structural metadata required, whether raw bodies are truly necessary, and what local values a user must review before sharing.
