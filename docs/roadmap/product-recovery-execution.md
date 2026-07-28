@@ -750,7 +750,16 @@ Review totals are one finding, one accepted finding (`R1`), reviewer-token
 status `pending`, and tokens per accepted finding `pending`; the aggregate-only
 metrics helper could not attribute tokens because the installed CLI no longer
 provides its historical `strict` command. No retry or second reviewer was run.
-PR and CI evidence remains pending on the corrected stable diff.
+
+Initial PR CI exposed a Python-version-dependent fallback-label assertion. The
+same logical thread produced `Thread aac3298f` on Python 3.10 and
+`Thread 4f5cda07` on Python 3.12 because its fallback label was derived from
+the physical source-thread identity, which includes the local file identity.
+Fallback labels now derive from the stable logical thread identity instead, so
+copied sources, rebuild locations, and supported Python hosts retain the same
+bounded human label. The exact query, ingestion oracle, equivalence, and R5
+analytical suite passes 30 focused tests. Final PR CI remains pending on this
+cross-host correction.
 
 ## R4 — Build Persisted Rollups And Fast MCP/API Paths
 

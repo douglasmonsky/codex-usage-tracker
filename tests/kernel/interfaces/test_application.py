@@ -211,7 +211,7 @@ def test_curated_period_and_latest_change_templates_use_one_snapshot(
                 {
                     "calls": 3,
                     "thread": "thr_110d88d20a0cf11ee23996ca93651d87",
-                    "thread_label": "Thread 4f5cda07",
+                    "thread_label": "Thread 93651d87",
                     "total_tokens": 420,
                 }
         ],
