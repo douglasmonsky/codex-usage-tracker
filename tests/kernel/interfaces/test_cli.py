@@ -6,6 +6,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+from codex_usage_tracker.kernel import __version__
 from codex_usage_tracker.kernel.interfaces.cli.main import build_parser, main
 
 from .support import active_runtime
@@ -29,6 +32,14 @@ def test_cli_help_contains_only_retained_public_commands() -> None:
         assert command in help_text
     for removed in ("analyze", "dashboard", "open-dashboard", "admin"):
         assert removed not in help_text
+
+
+def test_cli_reports_the_installed_package_version(capsys) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        build_parser().parse_args(["--version"])
+
+    assert exit_info.value.code == 0
+    assert capsys.readouterr().out == f"codex-usage-tracker {__version__}\n"
 
 
 def test_status_is_read_only_and_setup_is_explicit(
