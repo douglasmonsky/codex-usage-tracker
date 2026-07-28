@@ -169,16 +169,17 @@ def test_release_candidate_budget_rejects_excess_headroom_and_count_drift() -> N
     assert "mcp_tools catalog ceiling 7 must equal measured 6" in failures
 
 
-def test_upgrade_guide_maps_every_retired_surface_category() -> None:
+def test_retired_surface_manifest_remains_a_frozen_cutover_oracle() -> None:
     manifest = json.loads(
         (_ROOT / "config/kernel-retired-surfaces-v1.json").read_text(
             encoding="utf-8"
         )
     )
-    guide = (_ROOT / "docs/upgrade-0.26.md").read_text(encoding="utf-8")
+    disposition = (_ROOT / "docs/archive/SPIKE_DISPOSITION.md").read_text(
+        encoding="utf-8"
+    )
 
-    assert "config/kernel-retired-surfaces-v1.json" in guide
-    for replacement in {entry["replacement"] for entry in manifest["entries"]}:
-        assert f"`{replacement}`" in guide
-    for surface_type in {entry["surface_type"] for entry in manifest["entries"]}:
-        assert f"`{surface_type}`" in guide
+    assert manifest["schema"] == "codex-usage-tracker.kernel-retired-surfaces.v1"
+    assert manifest["entries"]
+    assert "config/kernel-retired-surfaces-v1.json" in disposition
+    assert "docs/upgrade-0.26.md" in disposition

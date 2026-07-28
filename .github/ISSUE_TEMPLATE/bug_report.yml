@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a tracker, dashboard, CLI, or MCP bug without sharing private logs.
+description: Report a kernel, setup, CLI, MCP/plugin, skill, or 0.28 Console bug without sharing private logs.
 title: "bug: "
 labels: ["bug"]
 body:
@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Do not paste real Codex logs, prompts, assistant text, tool output, secrets, private repo names, or full local paths.
-        Prefer synthetic examples and strict privacy mode outputs.
+        Reproduce with synthetic data or manually minimize every field before sharing it.
   - type: textarea
     id: summary
     attributes:
@@ -19,7 +19,7 @@ body:
     id: reproduce
     attributes:
       label: Reproduction steps
-      description: Include commands, dashboard actions, filters, or MCP calls that reproduce the issue.
+      description: Include setup steps, commands, MCP calls, or 0.28 Console actions that reproduce the issue.
       placeholder: |
         1. Run `codex-usage-tracker ...`
         2. Open ...
@@ -29,8 +29,8 @@ body:
   - type: textarea
     id: diagnostics
     attributes:
-      label: Safe diagnostics
-      description: Prefer a reviewed strict support bundle from `codex-usage-tracker --privacy-mode strict support-bundle --output ~/.codex-usage-tracker/support-bundle.json`. The bundle's `issue_report.safe_fields` list names the safest fields to paste. If pasting JSON, paste only reviewed strict-mode bundle content or `doctor --json` output.
+      label: Minimized diagnostics
+      description: Paste only the smallest manually reviewed excerpt needed to show the failure. Replace project names, ids, paths, labels, and account details with synthetic values; never assume an output is sanitized for you.
       render: json
   - type: input
     id: version
@@ -41,4 +41,4 @@ body:
     id: checks
     attributes:
       label: Checks tried
-      description: List any validation commands you ran, such as pytest, check_release, or Node syntax checks.
+      description: List any focused validation commands you ran.

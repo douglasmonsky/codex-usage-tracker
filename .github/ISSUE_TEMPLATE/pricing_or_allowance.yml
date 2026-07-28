@@ -11,14 +11,14 @@ body:
     id: issue
     attributes:
       label: What looks wrong?
-      description: Describe the model, credit estimate, pricing status, allowance window, or dashboard field that seems incorrect.
+      description: Describe the model, credit estimate, pricing status, allowance window, or named-query field that seems incorrect.
     validations:
       required: true
   - type: textarea
     id: safe_output
     attributes:
-      label: Safe aggregate output
-      description: Paste strict-mode output from `codex-usage-tracker --privacy-mode strict pricing-coverage --json` or a filtered strict `query`.
+      label: Minimized synthetic output
+      description: Reproduce with synthetic values or paste only a manually reviewed minimal excerpt. The replacement does not sanitize output for sharing.
       render: json
   - type: textarea
     id: config

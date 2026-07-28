@@ -10,7 +10,7 @@
 
 -
 
-## Privacy Impact
+## Data And Local-State Impact
 
 -
 
@@ -22,10 +22,10 @@
 
 -
 
-## Screenshots
+## Measurements And Evidence
 
 -
 
-## Follow-Up
+## Residual Risk Or Follow-Up
 
 -
