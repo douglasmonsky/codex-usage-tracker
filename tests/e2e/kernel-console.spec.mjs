@@ -261,6 +261,7 @@ test("each result row links to its own most-specific evidence", async ({ page },
   await page.getByLabel("Measures").fill("total_tokens");
   await page.getByRole("button", { name: "Run bounded query" }).click();
   const result = page.locator(".query-result").first();
+  await expect(result.getByRole("heading", { name: "calls · rows" })).toBeVisible();
   await expect(result.getByRole("columnheader", { name: "call" })).toHaveCount(0);
   const rows = result.locator("tbody tr");
   expect(await rows.count()).toBeGreaterThan(1);
@@ -525,6 +526,7 @@ test("limits graph uses elapsed time and labels reset boundaries", async ({ page
     });
   });
   await page.goto("/limits");
+  await expect(page.locator(".allowance-chart .chart-point")).toHaveCount(3);
   const positions = await page.locator(".allowance-chart .chart-point").evaluateAll(
     (nodes) => nodes.map((node) => Number(node.getAttribute("cx"))),
   );
