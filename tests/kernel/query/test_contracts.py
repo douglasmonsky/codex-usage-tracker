@@ -7,7 +7,10 @@ from typing import Any
 import pytest
 
 from codex_usage_tracker.kernel.application.codec import query_request
-from codex_usage_tracker.kernel.query.catalog import exploration_guidance
+from codex_usage_tracker.kernel.query.catalog import (
+    exploration_guidance,
+    materialize_query_requests,
+)
 from codex_usage_tracker.kernel.query.contracts import (
     ComparisonWindow,
     Filter,
@@ -22,6 +25,7 @@ _GUIDED_TEMPLATE_IDS = (
     "model_effort",
     "period_comparison",
     "subagents",
+    "top_threads",
     "tools",
     "turns",
 )
@@ -111,6 +115,34 @@ def test_every_guided_template_materializes_to_a_valid_query_batch() -> None:
         requests = _materialize(template["requests"], parameters)
         assert 1 <= len(requests) <= 8
         for request in requests:
+            query_request(request).normalized()
+
+
+def test_server_side_template_materialization_matches_every_guided_template() -> None:
+    templates = exploration_guidance()["templates"]
+    parameters = {
+        "current_end": "2026-01-15T00:00:00Z",
+        "current_start": "2026-01-08T00:00:00Z",
+        "previous_end": "2026-01-08T00:00:00Z",
+        "previous_start": "2026-01-01T00:00:00Z",
+    }
+
+    for name, template in templates.items():
+        selected = {
+            key: parameters[key]
+            for key in template.get("parameters", ())
+        }
+        named_request: dict[str, object] = {"template": name}
+        if selected:
+            named_request["parameters"] = selected
+
+        materialized = materialize_query_requests([named_request])
+
+        assert list(materialized) == _materialize(
+            template["requests"],
+            parameters,
+        )
+        for request in materialized:
             query_request(request).normalized()
 
 

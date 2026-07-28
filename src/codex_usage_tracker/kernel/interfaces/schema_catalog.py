@@ -4,6 +4,124 @@ from __future__ import annotations
 
 from typing import Any
 
+_QUERY_TEMPLATE_NAMES = [
+    "allowance",
+    "concentration",
+    "context_composition",
+    "model_effort",
+    "period_comparison",
+    "subagents",
+    "top_threads",
+    "tools",
+    "turns",
+]
+_QUERY_FILTER = {
+    "type": "object",
+    "properties": {
+        "field": {"type": "string"},
+        "operator": {"type": "string", "enum": ["eq", "in", "gte", "gt", "lte", "lt"]},
+        "value": {
+            "oneOf": [
+                {"type": ["string", "integer", "number"]},
+                {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 25,
+                    "items": {"type": ["string", "integer", "number"]},
+                },
+            ]
+        },
+    },
+    "required": ["field", "operator", "value"],
+    "additionalProperties": False,
+}
+_TYPED_QUERY_REQUEST = {
+    "type": "object",
+    "description": "One explicit bounded query.",
+    "properties": {
+        "dataset": {
+            "type": "string",
+            "enum": [
+                "activities",
+                "allowance",
+                "calls",
+                "context",
+                "phases",
+                "threads",
+                "tools",
+                "turns",
+            ],
+        },
+        "operation": {
+            "type": "string",
+            "enum": [
+                "rows",
+                "aggregate",
+                "share",
+                "comparison",
+                "distribution",
+                "time_series",
+                "timeline",
+            ],
+        },
+        "dimensions": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {"type": "string"},
+        },
+        "measures": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {"type": "string"},
+        },
+        "filters": {
+            "type": "array",
+            "maxItems": 8,
+            "items": _QUERY_FILTER,
+        },
+        "order_by": {"type": ["string", "null"]},
+        "descending": {"type": "boolean"},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+        "cursor": {"type": ["string", "null"]},
+        "comparison": {
+            "type": ["object", "null"],
+            "properties": {
+                "current_start": {"type": "string"},
+                "current_end": {"type": "string"},
+                "previous_start": {"type": "string"},
+                "previous_end": {"type": "string"},
+            },
+            "required": [
+                "current_start",
+                "current_end",
+                "previous_start",
+                "previous_end",
+            ],
+            "additionalProperties": False,
+        },
+        "allow_partial": {"type": "boolean"},
+    },
+    "required": ["dataset", "operation"],
+    "additionalProperties": False,
+}
+_NAMED_QUERY_REQUEST = {
+    "type": "object",
+    "description": "One server-side curated query template.",
+    "properties": {
+        "template": {
+            "type": "string",
+            "enum": _QUERY_TEMPLATE_NAMES,
+            "description": "Use top_threads for the common usage leaderboard.",
+        },
+        "parameters": {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+        },
+    },
+    "required": ["template"],
+    "additionalProperties": False,
+}
+
 SCHEMAS: dict[str, dict[str, Any]] = {
     "usage_status": {
         "type": "object",
@@ -33,8 +151,10 @@ SCHEMAS: dict[str, dict[str, Any]] = {
                 "minItems": 0,
                 "maxItems": 8,
                 "items": {
-                    "type": "object",
-                    "additionalProperties": True,
+                    "oneOf": [
+                        _NAMED_QUERY_REQUEST,
+                        _TYPED_QUERY_REQUEST,
+                    ],
                 },
             },
             "include_guidance": {"type": "boolean"},
@@ -102,6 +222,18 @@ def validate_input(name: str, payload: dict[str, Any]) -> None:
 
 
 def _validate(value: Any, schema: dict[str, Any], label: str) -> None:
+    alternatives = schema.get("oneOf")
+    if isinstance(alternatives, list):
+        matches = 0
+        for alternative in alternatives:
+            try:
+                _validate(value, alternative, label)
+            except ValueError:
+                continue
+            matches += 1
+        if matches != 1:
+            raise ValueError(f"{label} does not match exactly one allowed shape")
+        return
     expected = schema.get("type")
     if expected is not None and not _matches_type(value, expected):
         raise ValueError(f"{label} has invalid type")

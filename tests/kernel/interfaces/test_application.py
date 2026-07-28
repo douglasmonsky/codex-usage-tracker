@@ -86,6 +86,7 @@ def test_query_guidance_is_available_without_a_database_or_refresh(
         "model_effort",
         "period_comparison",
         "subagents",
+        "top_threads",
         "tools",
         "turns",
     )
@@ -101,6 +102,90 @@ def test_query_rejects_an_empty_batch_without_guidance(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="query request or guidance"):
         app.query({"requests": []})
+
+
+def test_named_top_threads_template_matches_the_explicit_fast_path(
+    tmp_path: Path,
+) -> None:
+    app = KernelApplication(
+        active_runtime(tmp_path),
+        worker_launcher=lambda _paths, _preset: None,
+        source_provider=lambda _home: synthetic_sources(),
+    )
+
+    named = app.query({"requests": [{"template": "top_threads"}]})
+    explicit = app.query(
+        {
+            "requests": [
+                {
+                    "dataset": "calls",
+                    "operation": "share",
+                    "dimensions": ["thread"],
+                    "measures": [
+                        "calls",
+                        "uncached_input_tokens",
+                        "cached_input_tokens",
+                        "reasoning_tokens",
+                        "output_tokens",
+                        "total_tokens",
+                    ],
+                    "order_by": "total_tokens",
+                    "descending": True,
+                    "limit": 5,
+                }
+            ]
+        }
+    )
+    repeated = app.query({"requests": [{"template": "top_threads"}]})
+
+    named_exact = dict(named["results"][0])
+    explicit_exact = dict(explicit["results"][0])
+    named_exact.pop("elapsed_ms")
+    explicit_exact.pop("elapsed_ms")
+    assert named_exact == explicit_exact
+    assert named["results"][0]["grade"] == "exact"
+    assert named["results"][1]["grade"] == "estimated"
+    assert repeated["results"] == named["results"]
+    assert repeated["cache"]["key"] == named["cache"]["key"]
+    assert named["cache"]["hit"] is False
+    assert repeated["cache"]["hit"] is True
+    assert all(row["thread_label"] for row in named["results"][0]["rows"])
+    assert named["results"][0]["evidence_selectors"]
+
+
+@pytest.mark.parametrize(
+    ("query_payload", "message"),
+    [
+        ({"template": "missing"}, "query template is not allowlisted"),
+        (
+            {"template": "top_threads", "parameters": {"unexpected": "value"}},
+            "query template parameters are invalid",
+        ),
+        (
+            {
+                "template": "top_threads",
+                "dataset": "calls",
+            },
+            "query template request has unexpected fields",
+        ),
+        (
+            {"template": "period_comparison"},
+            "query template parameters are invalid",
+        ),
+    ],
+)
+def test_named_query_templates_fail_closed(
+    tmp_path: Path,
+    query_payload: dict[str, object],
+    message: str,
+) -> None:
+    app = KernelApplication(
+        active_runtime(tmp_path),
+        worker_launcher=lambda _paths, _preset: None,
+    )
+
+    with pytest.raises(ValueError, match=message):
+        app.query({"requests": [query_payload]})
 
 
 def test_query_response_budget_fails_closed(

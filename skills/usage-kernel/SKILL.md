@@ -11,15 +11,26 @@ recommendations.
 
 Use the three-step loop **scope → batch → evidence**:
 
-1. **Scope.** Call `usage_status` once. If a committed generation exists, query
-   it immediately even when refresh is active or recommended. When the needed
-   fields are unfamiliar, set `include_guidance=true` on the same
+1. **Scope.** Start with the needed `usage_query` whenever the question maps
+   to a curated template or a known typed request. The result carries its
+   generation, grade, history coverage, and cache state. Call `usage_status`
+   only when the query reports an absent or insufficiently fresh index, or
+   when the user explicitly asks about operational state. A committed
+   generation remains queryable while refresh is active or recommended. When
+   the needed fields are unfamiliar, set `include_guidance=true` on the same
    `usage_query` call that carries the first batch; use an empty batch only for
    standalone capability discovery.
-2. **Batch.** Prefer one batched `usage_query` request using a curated template
-   or only the dimensions, measures, filters, and limits needed for the
-   question. Preserve the returned generation, grade, coverage, counts, and
-   explicit row/byte limits. Compose filters as
+2. **Batch.** Prefer one batched `usage_query` request. Execute a curated
+   server-side template directly with `{"template":"<name>"}`; for the common
+   thread leaderboard use `{"template":"top_threads"}`. That template returns
+   the exact token leaderboard first and the cost/credit context second in the
+   same batch; do not run another query or resolve every selector unless the
+   user asks for deeper evidence. Supply `parameters` only when the selected
+   template requires them. Otherwise send only the typed dataset, operation,
+   dimensions, measures, filters, and limits needed for the question. Do not
+   copy or reconstruct a returned template body.
+   Preserve the returned generation, grade, coverage, counts, and explicit
+   row/byte limits. Compose filters as
    `{field, operator, value}` using only the dataset fields and operators in
    `filter_grammar`; `in` takes an array of 1–25 values. Phase queries require
    one returned scope-filter template for a thread, turn, or time window.

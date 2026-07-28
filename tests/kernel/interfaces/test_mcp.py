@@ -10,8 +10,14 @@ from pathlib import Path
 import pytest
 
 import codex_usage_tracker.kernel.application.service as application_service
+import codex_usage_tracker.kernel.interfaces.mcp.server as mcp_server
 from codex_usage_tracker.kernel.application import KernelApplication, RuntimePaths
-from codex_usage_tracker.kernel.interfaces.mcp.server import McpServer
+from codex_usage_tracker.kernel.interfaces.mcp.server import (
+    MAX_MESSAGE_BYTES,
+    MAX_MODEL_CONTENT_BYTES,
+    McpServer,
+    _model_content,
+)
 from scripts.smoke_installed_package import _write_mcp
 
 from .support import active_runtime, synthetic_sources
@@ -146,6 +152,171 @@ def test_guided_scope_batch_and_evidence_use_three_read_only_mcp_calls(
     assert launches == []
     assert runtime.kernel.operational.read_bytes() == operational_before
     assert runtime.kernel.analytical.read_bytes() == analytical_before
+
+
+def test_mcp_executes_named_top_threads_template_in_one_query_call(
+    tmp_path: Path,
+) -> None:
+    server = McpServer(
+        KernelApplication(
+            active_runtime(tmp_path),
+            worker_launcher=lambda _paths, _preset: None,
+            source_provider=lambda _home: synthetic_sources(),
+        )
+    )
+
+    response = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "usage_query",
+                "arguments": {
+                    "include_guidance": True,
+                    "requests": [{"template": "top_threads"}],
+                },
+            },
+        }
+    )
+
+    result = response["result"]["structuredContent"]
+    model_content = json.loads(result["model_summary"])
+    query = result["results"][0]
+    cost_context = result["results"][1]
+    assert query["dataset"] == "calls"
+    assert query["operation"] == "share"
+    assert query["grade"] == "exact"
+    assert query["normalized_scope"]["dimensions"] == ["thread"]
+    assert query["rows"]
+    assert "total_tokens" in query["rows"][0]
+    assert query["evidence_selectors"]
+    assert cost_context["grade"] == "estimated"
+    assert "configured_cost_usd" in cost_context["rows"][0]
+    assert result["guidance"]["templates"]["top_threads"]["requests"]
+    assert model_content["results"][0]["rows"] == query["rows"]
+    assert model_content["results"][0]["evidence_selectors"] == (
+        query["evidence_selectors"]
+    )
+    assert "measure_coverage" in model_content["results"][1]
+    text_content = response["result"]["content"][0]["text"]
+    assert text_content == "Kernel result is available in structuredContent."
+    assert result["model_summary"].startswith('{"results":[{"rows":')
+    assert len(result["model_summary"].encode()) <= 65_536
+    assert len(json.dumps(response, separators=(",", ":")).encode()) <= (
+        MAX_MESSAGE_BYTES
+    )
+
+
+def test_query_guidance_is_visible_in_bounded_model_summary(
+    tmp_path: Path,
+) -> None:
+    server = McpServer(
+        KernelApplication(
+            RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
+            worker_launcher=lambda _paths, _preset: None,
+        )
+    )
+
+    response = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "usage_query",
+                "arguments": {
+                    "requests": [],
+                    "include_guidance": True,
+                },
+            },
+        }
+    )
+
+    result = response["result"]["structuredContent"]
+    summary = json.loads(result["model_summary"])
+    assert summary["guidance"]["templates"]["top_threads"]["label"]
+    assert "requests" not in summary["guidance"]["templates"]["top_threads"]
+    assert summary["guidance"]["datasets"]["calls"]["measures"]
+    assert summary["guidance"]["filter_grammar"]["scalar_operators"]
+    assert len(result["model_summary"].encode()) <= MAX_MODEL_CONTENT_BYTES
+
+
+def test_mcp_response_envelope_fails_closed_at_byte_budget(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    server = McpServer(
+        KernelApplication(
+            active_runtime(tmp_path),
+            worker_launcher=lambda _paths, _preset: None,
+            source_provider=lambda _home: synthetic_sources(),
+        )
+    )
+    monkeypatch.setattr(mcp_server, "MAX_MESSAGE_BYTES", 1)
+
+    response = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "usage_query",
+                "arguments": {
+                    "requests": [{"template": "top_threads"}],
+                },
+            },
+        }
+    )
+
+    assert response["result"]["isError"] is True
+    assert response["result"]["content"] == [
+        {
+            "type": "text",
+            "text": "kernel response exceeds byte budget; lower request limits",
+        }
+    ]
+
+
+def test_query_model_content_is_bounded_and_aggregate_only() -> None:
+    rows = [
+        {
+            "thread": f"thread-{index:04d}",
+            "thread_label": f"Synthetic project {index:04d}",
+            "total_tokens": index * 100,
+            "padding": "x" * 1_000,
+        }
+        for index in range(100)
+    ]
+
+    content = _model_content(
+        "usage_query",
+        {
+            "results": [
+                {
+                    "dataset": "calls",
+                    "operation": "share",
+                    "generation": 1,
+                    "grade": "exact",
+                    "matched_count": 100,
+                    "returned_count": 100,
+                    "truncated": False,
+                    "rows": rows,
+                    "evidence_selectors": [
+                        f"thread:thread-{index:04d}" for index in range(100)
+                    ],
+                    "coverage": {"measures": {}},
+                }
+            ]
+        },
+    )
+    projected = json.loads(content)
+
+    assert len(content.encode()) <= MAX_MODEL_CONTENT_BYTES
+    assert projected["results"][0]["model_rows_returned"] < 100
+    assert projected["results"][0]["model_rows_truncated"] is True
+    assert "prompt" not in content
+    assert "reasoning" not in content
 
 
 def test_mcp_refresh_transports_hydration_preset(tmp_path: Path) -> None:

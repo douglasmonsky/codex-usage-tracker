@@ -32,7 +32,7 @@ from ..operational import (
     load_hydration_coverage,
     load_publication_snapshot,
 )
-from ..query import QueryService, exploration_guidance
+from ..query import QueryService, exploration_guidance, materialize_query_requests
 from ..query.contracts import MAX_QUERY_RESPONSE_BYTES
 from ..thread_labels import load_thread_label_hashes, thread_label_revision
 from .codec import evidence_request, json_value, query_request
@@ -121,9 +121,10 @@ class KernelApplication:
         if not isinstance(raw_requests, list):
             raise ValueError("requests must be an array")
         include_guidance = _bool(payload.get("include_guidance", False))
-        requests = tuple(query_request(item) for item in raw_requests if isinstance(item, dict))
-        if len(requests) != len(raw_requests):
+        if any(not isinstance(item, dict) for item in raw_requests):
             raise ValueError("every query request must be an object")
+        materialized = materialize_query_requests(raw_requests)
+        requests = tuple(query_request(item) for item in materialized)
         if not requests and not include_guidance:
             raise ValueError("query requires a query request or guidance")
         publication = load_publication_snapshot(self.paths.kernel.operational) if requests else None
