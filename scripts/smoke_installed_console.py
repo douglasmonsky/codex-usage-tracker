@@ -91,7 +91,7 @@ def smoke_current(wheel: Path) -> None:
                 raise RuntimeError(f"installed CLI is missing {command_name}")
         _smoke_mcp_catalog(_python(root / "venv"), environment)
         subprocess.run(
-            [command, "refresh", "--wait", "30"],
+            [command, "refresh", "--preset", "complete", "--wait", "30"],
             check=True,
             capture_output=True,
             env=environment,

@@ -640,10 +640,14 @@ query, recovery, and performance contracts, scope allowlist, and this ledger
 | Ruff, MyPy, Pyright | Pass | active kernel, kernel tests, and scope script |
 | Agent Perf | Pass with one compatibility caveat | one complete Scalene run; direct pytest capture incomplete |
 | Full repository | Pass | 386 Python tests; frontend build/lint/typecheck/tests; Ruff, MyPy, Pyright, maintainability, scope, manifests, and release safety |
-| Distribution and installed | Pass | exact 148,013-byte wheel and 449,325-byte sdist; two-fresh-task installed smoke; warm Console p95 0.853 ms |
+| Distribution and installed | Pass | exact 148,013-byte wheel and 449,670-byte sdist; two-fresh-task installed smoke and installed Console/allowance smoke; warm Console p95 0.853 ms |
 | Final review | Pass after remediation | one read-only reviewer reported five findings; R1–R5 accepted and fixed; reviewer token attribution pending because the installed tracker CLI lacks the metrics helper's legacy `strict` command |
 
 ### Residual risk and next action
 
 - Commit and open the R4 pull request, require green CI, and merge before
   starting R5. No second reviewer is permitted.
+- The first PR CI attempt exposed one stale installed-Console assumption: its
+  synthetic allowance fixture relied on the former complete-history default.
+  The smoke now explicitly requests `complete`; the local installed
+  Console/allowance smoke passes without changing product behavior.
