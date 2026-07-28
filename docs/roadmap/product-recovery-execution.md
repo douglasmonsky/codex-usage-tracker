@@ -901,6 +901,10 @@ below the retained 90,000-byte ceiling.
   runner contention rather than an R6 behavior change. All five hard
   performance contracts now run together in the dedicated Python 3.14 step
   and are excluded from the broad matrix; their ceilings are unchanged. The
-  exact dedicated command passed 12 policy and performance tests locally.
+  writer metric now begins only after `BEGIN IMMEDIATE` has acquired the lock
+  and ends after commit, so connection open, capability validation, and lock
+  acquisition wait no longer masquerade as lock occupancy. A deterministic
+  ordering regression test freezes that boundary. The exact dedicated command
+  passed 12 policy and performance tests locally.
 
 PR/CI merge remains before R6 completion.

@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from codex_usage_tracker.kernel import database
 from codex_usage_tracker.kernel.database import (
     initialize_analytical_database,
     open_read_snapshot,
@@ -29,6 +32,48 @@ def test_create_reopen_and_writer_connections_enforce_integrity(
         with pytest.raises(sqlite3.OperationalError):
             reader.execute("DELETE FROM sources")
     assert validate_analytical_database(path) == []
+
+
+def test_writer_timing_measures_only_the_active_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+
+    class FakeConnection:
+        def execute(self, statement: str) -> None:
+            assert statement == "BEGIN IMMEDIATE"
+            events.append("begin")
+
+        def commit(self) -> None:
+            events.append("commit")
+
+        def rollback(self) -> None:
+            events.append("rollback")
+
+    @contextmanager
+    def fake_open_writer(*_args: Any, **_kwargs: Any) -> Any:
+        events.append("open")
+        yield FakeConnection()
+        events.append("close")
+
+    ticks = iter((10.0, 10.005))
+
+    def perf_counter() -> float:
+        events.append("timer")
+        return next(ticks)
+
+    observed: list[float] = []
+    monkeypatch.setattr(database, "open_writer", fake_open_writer)
+    monkeypatch.setattr(database.time, "perf_counter", perf_counter)
+
+    with database.short_writer_transaction(
+        Path("synthetic.sqlite3"),
+        on_transaction_ms=observed.append,
+    ):
+        events.append("work")
+
+    assert events == ["open", "begin", "timer", "work", "commit", "timer", "close"]
+    assert observed == pytest.approx([5.0])
 
 
 def test_reopen_restores_owner_only_permissions(tmp_path: Path) -> None:

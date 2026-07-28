@@ -229,7 +229,7 @@ def test_disk_failures_do_not_replace_the_active_cache(
     with monkeypatch.context() as patch:
         if failure == "analytical_disk_full":
             @contextmanager
-            def disk_full(path):
+            def disk_full(path, **_kwargs):
                 del path
                 raise sqlite3.OperationalError("database or disk is full")
                 yield
