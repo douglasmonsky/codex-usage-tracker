@@ -615,7 +615,7 @@ _TOP_THREADS_EXACT_REQUEST = {
 }
 _TOP_THREADS_COST_REQUEST = {
     "dataset": "calls",
-    "operation": "share",
+    "operation": "aggregate",
     "dimensions": ["thread"],
     "measures": [
         "total_tokens",

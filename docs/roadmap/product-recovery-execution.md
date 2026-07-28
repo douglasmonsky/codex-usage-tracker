@@ -883,8 +883,51 @@ LOW impact from final-diff MEDIUM risk. Review totals are three findings and
 three accepted findings (`R1`, `R2`, `R3`); reviewer-token status and tokens
 per accepted finding are `pending` because the metrics helper invokes the
 retired `strict` command. No retry or second review was run. Branch:
-`fix/logical-thread-rollup`. PR CI, merge identity, and repeated installed
-fresh-task confirmation remain pending.
+`fix/logical-thread-rollup`. PR #361 merged as `44ca2d1`; Python 3.10 passed
+in 1m11s, Python 3.14 in 2m30s, and the focused Console job in 1m29s.
+Repeated installed fresh-task confirmation then exposed issue #362 below.
+
+### R7 qualification correction — issue #362
+
+The first fresh local Codex Desktop task after issue #360 used exactly one
+`usage_query` batch and returned coherent five-row token and cost/credit
+results: both contained five unique logical threads, their identity sets
+matched, all human labels were non-empty, all four token classes and exact
+selectors were present, and no refresh or poll occurred. The structured tracker
+call still took 4,990.064 ms on the maintainer aggregate index, however, and
+the complete Desktop turn took 53.332 seconds. No private labels, identities,
+selectors, or usage values were persisted.
+
+The cost/credit companion still evaluated query-time pricing across the full
+canonical call table. Its existing cost-aware direct path measured 615.058 ms
+p95 on the maintained 100,000-call synthetic workload. The corrected curated
+request first ranks logical threads from `rollup_thread`, then evaluates
+configured cost and estimated credits only for canonical calls belonging to
+the bounded selected threads. Pricing coverage comes from the small
+model/effort rollup, so rate-card semantics remain query-time correct without a
+full call-table pricing scan.
+
+The dedicated five-thread companion measures 10.955 ms p95 on the unchanged
+100,000-call workload, a 98.2 percent reduction from the direct-path baseline.
+Its ordered logical identities, canonical labels, token totals, configured
+costs, estimated credits, and exact/estimated coverage match the full direct
+oracle. The broader caller-authored cost-aware share plan remains available and
+unchanged. Agent-perf runs `20260728T135034Z-311a97b6` before and
+`20260728T135106Z-8429ac5d` after provide CPU attribution only. Branch:
+`fix/top-threads-cost-fast-path`. The specialized compiler is isolated in its
+own K4-owned module; maintainability, Ruff, MyPy, 56 focused
+query/interface/performance tests, and the complete 444-test `just v` gate
+pass. After the accepted regression tests were added, the complete gate passed
+again with 451 tests. One intervening allowance timing sample exceeded its
+550 ms ceiling at 608.861 ms; the isolated prescribed retry passed at
+404.132 ms and the complete rerun passed. GitNexus reports MEDIUM final-diff
+risk across three query execution
+processes. The one final read-only review returned two findings and both were
+accepted: generation-bound canonical-label selection and focused
+fallback/pagination/partial-coverage/logical-split tests. Reviewer-token status
+and tokens per accepted finding are `pending` because the metrics helper still
+invokes the retired `strict` command; it was not retried. PR CI, merge identity,
+rebuilt installed candidate, and fresh Desktop confirmation remain pending.
 
 ## R4 — Build Persisted Rollups And Fast MCP/API Paths
 
