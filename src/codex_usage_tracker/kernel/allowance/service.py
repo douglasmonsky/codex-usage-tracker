@@ -206,12 +206,16 @@ FROM local_facts
 ) AS allowance_intervals
 """
 
-_OBSERVATION_SQL = """
+_OBSERVATION_SQL = (
+    """
 SELECT *
-FROM """ + ALLOWANCE_BASE_SQL + """
+FROM """
+    + ALLOWANCE_BASE_SQL
+    + """
 ORDER BY observed_at DESC, allowance_observation_id DESC
 LIMIT ? OFFSET ?
 """
+)
 
 _LOCAL_USAGE_SQL = """
 SELECT model,
@@ -230,6 +234,7 @@ GROUP BY model
 ORDER BY model
 """
 
+
 class AllowanceService:
     """Return exact observations plus deterministic local-efficiency facts."""
 
@@ -239,9 +244,7 @@ class AllowanceService:
 
     def read(self, *, limit: int = 100, cursor: str | None = None) -> dict[str, Any]:
         if not 1 <= limit <= MAX_ALLOWANCE_LIMIT:
-            raise ValueError(
-                f"allowance limit must be between 1 and {MAX_ALLOWANCE_LIMIT}"
-            )
+            raise ValueError(f"allowance limit must be between 1 and {MAX_ALLOWANCE_LIMIT}")
         started = time.perf_counter()
         control = load_cutover_control(self._operational_path)
         path = control.active_kernel_path
@@ -256,7 +259,12 @@ class AllowanceService:
             generation=generation,
             publication_id=publication_id,
         )
-        card = load_rate_card(self._rate_card_path)
+        rate_card_error: str | None = None
+        try:
+            card = load_rate_card(self._rate_card_path)
+        except ValueError:
+            card = None
+            rate_card_error = "invalid local rate card; unpriced usage remains visible"
         with open_read_snapshot(path) as connection:
             matched = int(
                 connection.execute(
@@ -293,9 +301,7 @@ class AllowanceService:
             else None
         )
         observed_through = (
-            max(str(row["observed_at"]) for row in returned_rows)
-            if returned_rows
-            else None
+            max(str(row["observed_at"]) for row in returned_rows) if returned_rows else None
         )
         grades = {str(item["grade"]) for item in intervals}
         grade = "deterministic" if "deterministic" in grades else "exact"
@@ -315,10 +321,12 @@ class AllowanceService:
             "next_cursor": next_cursor,
             "elapsed_ms": (time.perf_counter() - started) * 1000,
             "grade": grade,
-            "coverage": _coverage(intervals, card is not None),
-            "evidence_selectors": [
-                str(item["evidence_selector"]) for item in intervals
-            ],
+            "coverage": _coverage(
+                intervals,
+                card is not None,
+                rate_card_error=rate_card_error,
+            ),
+            "evidence_selectors": [str(item["evidence_selector"]) for item in intervals],
         }
 
 
@@ -355,15 +363,13 @@ def _interval_payload(
     if estimate.coverage_percent < 100:
         limitations.append("incomplete_rate_card_coverage")
     payload = {
-        "allowance_observation_id": current.allowance_observation_id,
-        "previous_observation_id": (
-            previous.allowance_observation_id if previous else None
-        ),
-        "evidence_selector": (
-            f"allowance:{current.allowance_observation_id}"
-        ),
-        "observed_at": _timestamp_text(current.observed_at),
+        "interval_start": (_timestamp_text(previous.observed_at) if previous else None),
+        "interval_end": _timestamp_text(current.observed_at),
         "window_kind": current.window_kind,
+        "allowance_observation_id": current.allowance_observation_id,
+        "previous_observation_id": (previous.allowance_observation_id if previous else None),
+        "evidence_selector": (f"allowance:{current.allowance_observation_id}"),
+        "observed_at": _timestamp_text(current.observed_at),
         "limit_id": current.limit_id,
         "plan_type": current.plan_type,
         "used_percent": current.used_percent,
@@ -385,23 +391,19 @@ def _interval_payload(
             else "exact_observation"
         ),
         "source_generation": generation,
+        "observed_allowance_drain": interval.delta_used_percent,
+        "allowance_attribution": ("interval_observation_not_revealing_call"),
         "delta_used_percent": interval.delta_used_percent,
         "elapsed_hours": interval.elapsed_hours,
         "percentage_points_per_hour": interval.percentage_points_per_hour,
-        "local_tokens_per_percentage_point": (
-            interval.local_tokens_per_percentage_point
-        ),
-        "local_calls_per_percentage_point": (
-            interval.local_calls_per_percentage_point
-        ),
-        "local_turns_per_percentage_point": (
-            interval.local_turns_per_percentage_point
-        ),
+        "local_tokens_per_percentage_point": (interval.local_tokens_per_percentage_point),
+        "local_calls_per_percentage_point": (interval.local_calls_per_percentage_point),
+        "local_turns_per_percentage_point": (interval.local_turns_per_percentage_point),
         "local_usage": {
             **asdict(usage),
             "total_tokens": usage.total_tokens,
         },
-        "estimated_cost_usd": estimate.estimated_cost_usd,
+        "configured_cost_usd": estimate.estimated_cost_usd,
         "estimated_credits": estimate.estimated_credits,
         "pricing_coverage": {
             "rated_tokens": estimate.rated_tokens,
@@ -409,6 +411,7 @@ def _interval_payload(
             "coverage_percent": estimate.coverage_percent,
             "unrated_models": list(estimate.unrated_models),
             "provenance": estimate.provenance,
+            "confidence": estimate.confidence,
         },
         "limitations": limitations,
     }
@@ -483,16 +486,16 @@ def _local_usage(
         )
         for row in rows
     }
+
+
 def _coverage(
     intervals: list[dict[str, Any]],
     configured: bool,
+    *,
+    rate_card_error: str | None = None,
 ) -> dict[str, Any]:
-    total_tokens = sum(
-        int(item["pricing_coverage"]["total_tokens"]) for item in intervals
-    )
-    rated_tokens = sum(
-        int(item["pricing_coverage"]["rated_tokens"]) for item in intervals
-    )
+    total_tokens = sum(int(item["pricing_coverage"]["total_tokens"]) for item in intervals)
+    rated_tokens = sum(int(item["pricing_coverage"]["rated_tokens"]) for item in intervals)
     return {
         "generation_bound": True,
         "raw_content": False,
@@ -504,14 +507,20 @@ def _coverage(
         },
         "ratios": {
             "basis": "deterministic_adjacent_observations",
-            "calculated_count": sum(
-                item["grade"] == "deterministic" for item in intervals
-            ),
+            "calculated_count": sum(item["grade"] == "deterministic" for item in intervals),
             "total_count": len(intervals),
         },
         "pricing": {
             "basis": "source_stamped_local_rate_card",
             "configured": configured,
+            "status": (
+                "invalid"
+                if rate_card_error is not None
+                else "ready"
+                if configured
+                else "absent"
+            ),
+            "limitation": rate_card_error,
             "rated_tokens": rated_tokens,
             "total_tokens": total_tokens,
             "coverage_percent": (
@@ -575,11 +584,7 @@ def _decode_cursor(
         encoded = cursor.encode()
         padding = b"=" * (-len(encoded) % 4)
         payload = json.loads(base64.urlsafe_b64decode(encoded + padding))
-        if (
-            payload["g"] != generation
-            or payload["p"] != publication_id
-            or payload["v"] != 1
-        ):
+        if payload["g"] != generation or payload["p"] != publication_id or payload["v"] != 1:
             raise ValueError
         offset = int(payload["o"])
         if offset < 0 or offset > MAX_ALLOWANCE_OFFSET:
@@ -592,6 +597,4 @@ def _decode_cursor(
         ValueError,
         json.JSONDecodeError,
     ) as exc:
-        raise ValueError(
-            "allowance cursor does not match analytical publication"
-        ) from exc
+        raise ValueError("allowance cursor does not match analytical publication") from exc

@@ -54,10 +54,100 @@ _CONTEXT_OPERATIONS = frozenset(
         Operation.SHARE,
     }
 )
+_THREAD_LABEL_SQL = "resolved_thread_label(threads.session_identity_hash, threads.display_label)"
+_CANONICAL_THREAD_SQL = """
+(
+    threads.thread_key = (
+        SELECT candidate_threads.thread_key
+        FROM threads AS candidate_threads
+        WHERE candidate_threads.logical_thread_id = threads.logical_thread_id
+          AND candidate_threads.first_generation <= ?
+        ORDER BY candidate_threads.archive_state = 'active' DESC,
+                 candidate_threads.last_generation DESC,
+                 candidate_threads.thread_key
+        LIMIT 1
+    )
+)
+"""
+_CANONICAL_TOOL_SQL = f"""
+(
+    (
+        nearest_call.model_call_id IS NOT NULL
+        AND nearest_call.duplicate_state = 'canonical'
+    )
+    OR (
+        nearest_call.model_call_id IS NULL
+        AND {_CANONICAL_THREAD_SQL}
+    )
+)
+"""
+_CANONICAL_TURN_SQL = """
+(
+    turns.turn_key = (
+        SELECT candidate_turns.turn_key
+        FROM turns AS candidate_turns
+        JOIN threads AS candidate_threads
+          ON candidate_threads.thread_key = candidate_turns.thread_key
+        WHERE COALESCE(
+                  candidate_turns.source_turn_id_hash,
+                  candidate_turns.turn_id
+              ) = COALESCE(turns.source_turn_id_hash, turns.turn_id)
+          AND candidate_turns.first_generation <= ?
+        ORDER BY candidate_threads.archive_state = 'active' DESC,
+                 candidate_turns.last_generation DESC,
+                 candidate_turns.turn_key
+        LIMIT 1
+    )
+)
+"""
+_TURN_BASE_SQL = """
+(
+    SELECT stored_turns.*,
+           COALESCE(completion.status, stored_turns.status)
+               AS effective_status,
+           COALESCE(
+               completion.completion_basis,
+               stored_turns.completion_basis
+           ) AS effective_completion_basis,
+           COALESCE(completion.ended_at, stored_turns.ended_at)
+               AS effective_ended_at
+    FROM turns AS stored_turns
+    LEFT JOIN (
+        SELECT ranked.turn_id,
+               ranked.event_at AS ended_at,
+               'observed_event' AS completion_basis,
+               CASE ranked.event_kind
+                   WHEN 'task' THEN 'completed'
+                   WHEN 'turn_aborted' THEN 'aborted'
+                   ELSE 'rolled_back'
+               END AS status
+        FROM (
+            SELECT activity_events.turn_id,
+                   activity_events.event_at,
+                   activity_events.event_kind,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY activity_events.turn_id
+                       ORDER BY activity_events.event_at DESC,
+                                activity_events.activity_event_id DESC
+                   ) AS rank
+            FROM activity_events
+            WHERE activity_events.generation <= ?
+              AND activity_events.event_kind IN (
+                  'task',
+                  'turn_aborted',
+                  'rollback'
+              )
+        ) AS ranked
+        WHERE ranked.rank = 1
+    ) AS completion ON completion.turn_id = stored_turns.turn_id
+) AS turns
+JOIN threads ON threads.thread_id = turns.thread_id
+"""
 
 _CALL_DIMENSIONS = {
     "call": "model_calls.canonical_call_id",
     "thread": "threads.logical_thread_id",
+    "thread_label": _THREAD_LABEL_SQL,
     "turn": "COALESCE(turns.source_turn_id_hash, turns.turn_id)",
     "project": "threads.project_label",
     "model": "model_calls.model",
@@ -72,13 +162,21 @@ _CALL_DIMENSIONS = {
 _CALL_ROWS = {
     "calls": "1",
     "input_tokens": "model_calls.input_tokens",
-    "uncached_input_tokens": (
-        "model_calls.input_tokens - model_calls.cached_input_tokens"
-    ),
+    "uncached_input_tokens": ("model_calls.input_tokens - model_calls.cached_input_tokens"),
     "cached_input_tokens": "model_calls.cached_input_tokens",
     "reasoning_tokens": "model_calls.reasoning_tokens",
     "output_tokens": "model_calls.output_tokens",
     "total_tokens": "model_calls.input_tokens + model_calls.output_tokens",
+    "configured_cost_usd": (
+        "configured_cost_usd("
+        "model_calls.model, model_calls.input_tokens, "
+        "model_calls.cached_input_tokens, model_calls.output_tokens)"
+    ),
+    "estimated_credits": (
+        "estimated_credits("
+        "model_calls.model, model_calls.input_tokens, "
+        "model_calls.cached_input_tokens, model_calls.output_tokens)"
+    ),
     "cache_reuse": (
         "CASE WHEN model_calls.input_tokens = 0 THEN 0.0 "
         "ELSE 1.0 * model_calls.cached_input_tokens / model_calls.input_tokens END"
@@ -91,13 +189,21 @@ _CALL_ROWS = {
 _CALL_AGGREGATES = {
     "calls": "COUNT(*)",
     "input_tokens": "SUM(model_calls.input_tokens)",
-    "uncached_input_tokens": (
-        "SUM(model_calls.input_tokens - model_calls.cached_input_tokens)"
-    ),
+    "uncached_input_tokens": ("SUM(model_calls.input_tokens - model_calls.cached_input_tokens)"),
     "cached_input_tokens": "SUM(model_calls.cached_input_tokens)",
     "reasoning_tokens": "SUM(model_calls.reasoning_tokens)",
     "output_tokens": "SUM(model_calls.output_tokens)",
     "total_tokens": "SUM(model_calls.input_tokens + model_calls.output_tokens)",
+    "configured_cost_usd": (
+        "SUM(configured_cost_usd("
+        "model_calls.model, model_calls.input_tokens, "
+        "model_calls.cached_input_tokens, model_calls.output_tokens))"
+    ),
+    "estimated_credits": (
+        "SUM(estimated_credits("
+        "model_calls.model, model_calls.input_tokens, "
+        "model_calls.cached_input_tokens, model_calls.output_tokens))"
+    ),
     "cache_reuse": (
         "CASE WHEN SUM(model_calls.input_tokens) = 0 THEN 0.0 "
         "ELSE 1.0 * SUM(model_calls.cached_input_tokens) "
@@ -118,8 +224,7 @@ DATASETS: dict[str, DatasetSpec] = {
             "LEFT JOIN turns ON turns.turn_id = model_calls.turn_id"
         ),
         generation_sql=(
-            "model_calls.generation <= ? "
-            "AND model_calls.duplicate_state = 'canonical'"
+            "model_calls.generation <= ? AND model_calls.duplicate_state = 'canonical'"
         ),
         time_sql="model_calls.event_at",
         stable_id_sql="model_calls.canonical_call_id",
@@ -131,15 +236,30 @@ DATASETS: dict[str, DatasetSpec] = {
             "event_at": "model_calls.event_at",
         },
         operations=_CALL_OPERATIONS,
-        coverage_fields={"context_pressure": "model_calls.context_window"},
+        coverage_fields={
+            "context_pressure": "model_calls.context_window",
+            "configured_cost_usd": (
+                "configured_cost_usd("
+                "model_calls.model, model_calls.input_tokens, "
+                "model_calls.cached_input_tokens, model_calls.output_tokens)"
+            ),
+            "estimated_credits": (
+                "estimated_credits("
+                "model_calls.model, model_calls.input_tokens, "
+                "model_calls.cached_input_tokens, model_calls.output_tokens)"
+            ),
+        },
     ),
     "tools": DatasetSpec(
         base_sql=(
             "tool_calls "
             "JOIN threads ON threads.thread_id = tool_calls.thread_id "
-            "LEFT JOIN turns ON turns.turn_id = tool_calls.turn_id"
+            "LEFT JOIN turns ON turns.turn_id = tool_calls.turn_id "
+            "LEFT JOIN model_calls AS nearest_call "
+            "ON nearest_call.model_call_id = tool_calls.nearest_model_call_id "
+            "AND nearest_call.generation <= tool_calls.generation"
         ),
-        generation_sql="tool_calls.generation <= ?",
+        generation_sql=("tool_calls.generation <= ? AND " + _CANONICAL_TOOL_SQL),
         time_sql="tool_calls.started_at",
         stable_id_sql="tool_calls.tool_call_id",
         dimensions={
@@ -150,24 +270,45 @@ DATASETS: dict[str, DatasetSpec] = {
             "namespace": "tool_calls.namespace",
             "category": "tool_calls.tool_category",
             "status": "tool_calls.status",
+            "impact_grade": (
+                "CASE WHEN nearest_call.model_call_id IS NULL "
+                "THEN 'structural_only' "
+                "ELSE 'deterministic_adjacent_call' END"
+            ),
             "thread": "threads.logical_thread_id",
+            "thread_label": _THREAD_LABEL_SQL,
             "turn": "COALESCE(turns.source_turn_id_hash, turns.turn_id)",
+            "turn_ordinal": "turns.ordinal",
             "tool_call": "tool_calls.tool_call_id",
             "event_at": "tool_calls.started_at",
             "time_day": "substr(tool_calls.started_at, 1, 10)",
-            "time_hour": (
-                "substr(tool_calls.started_at, 1, 13) || ':00:00Z'"
-            ),
+            "time_hour": ("substr(tool_calls.started_at, 1, 13) || ':00:00Z'"),
         },
         row_measures={
             "tools": "1",
             "duration_ms": "tool_calls.duration_ms",
             "output_bytes": "tool_calls.output_bytes",
+            "adjacent_uncached_input_tokens": (
+                "nearest_call.input_tokens - nearest_call.cached_input_tokens"
+            ),
+            "adjacent_cached_input_tokens": "nearest_call.cached_input_tokens",
+            "adjacent_reasoning_tokens": "nearest_call.reasoning_tokens",
+            "adjacent_output_tokens": "nearest_call.output_tokens",
+            "adjacent_total_tokens": ("nearest_call.input_tokens + nearest_call.output_tokens"),
         },
         aggregate_measures={
             "tools": "COUNT(*)",
             "duration_ms": "SUM(tool_calls.duration_ms)",
             "output_bytes": "SUM(tool_calls.output_bytes)",
+            "adjacent_uncached_input_tokens": (
+                "SUM(nearest_call.input_tokens - nearest_call.cached_input_tokens)"
+            ),
+            "adjacent_cached_input_tokens": "SUM(nearest_call.cached_input_tokens)",
+            "adjacent_reasoning_tokens": "SUM(nearest_call.reasoning_tokens)",
+            "adjacent_output_tokens": "SUM(nearest_call.output_tokens)",
+            "adjacent_total_tokens": (
+                "SUM(nearest_call.input_tokens + nearest_call.output_tokens)"
+            ),
         },
         filter_fields={
             "tool": "tool_calls.tool_name",
@@ -178,13 +319,20 @@ DATASETS: dict[str, DatasetSpec] = {
             "category": "tool_calls.tool_category",
             "status": "tool_calls.status",
             "thread": "threads.logical_thread_id",
+            "thread_label": _THREAD_LABEL_SQL,
             "started_at": "tool_calls.started_at",
         },
         operations=_COMMON_OPERATIONS,
         coverage_fields={
             "duration_ms": "tool_calls.duration_ms",
             "output_bytes": "tool_calls.output_bytes",
+            "adjacent_uncached_input_tokens": "nearest_call.input_tokens",
+            "adjacent_cached_input_tokens": "nearest_call.input_tokens",
+            "adjacent_reasoning_tokens": "nearest_call.input_tokens",
+            "adjacent_output_tokens": "nearest_call.input_tokens",
+            "adjacent_total_tokens": "nearest_call.input_tokens",
         },
+        base_generation_parameters=2,
     ),
     "context": DatasetSpec(
         base_sql="composition_events",
@@ -240,16 +388,13 @@ DATASETS: dict[str, DatasetSpec] = {
         row_measures={"activities": "1"},
         aggregate_measures={
             "activities": "COUNT(*)",
-            "completions": (
-                "SUM(CASE WHEN activity_events.event_kind = 'task' THEN 1 ELSE 0 END)"
-            ),
+            "completions": ("SUM(CASE WHEN activity_events.event_kind = 'task' THEN 1 ELSE 0 END)"),
             "aborts": (
                 "SUM(CASE WHEN activity_events.event_kind IN "
                 "('rollback', 'turn_aborted') THEN 1 ELSE 0 END)"
             ),
             "compactions": (
-                "SUM(CASE WHEN activity_events.event_kind = 'compaction' "
-                "THEN 1 ELSE 0 END)"
+                "SUM(CASE WHEN activity_events.event_kind = 'compaction' THEN 1 ELSE 0 END)"
             ),
         },
         filter_fields={
@@ -277,16 +422,14 @@ DATASETS: dict[str, DatasetSpec] = {
         row_measures={
             "allowance_observations": "1",
             "allowance_used_percent": "allowance_intervals.used_percent",
-            "allowance_remaining_percent": (
-                "allowance_intervals.remaining_percent"
-            ),
-            "allowance_delta_percent": (
-                "allowance_intervals.delta_used_percent"
-            ),
-            "allowance_burn_rate": (
-                "allowance_intervals.percentage_points_per_hour"
-            ),
+            "allowance_remaining_percent": ("allowance_intervals.remaining_percent"),
+            "allowance_delta_percent": ("allowance_intervals.delta_used_percent"),
+            "allowance_burn_rate": ("allowance_intervals.percentage_points_per_hour"),
             "local_total_tokens": "allowance_intervals.local_total_tokens",
+            "local_uncached_input_tokens": ("allowance_intervals.local_uncached_input_tokens"),
+            "local_cached_input_tokens": ("allowance_intervals.local_cached_input_tokens"),
+            "local_reasoning_tokens": ("allowance_intervals.local_reasoning_tokens"),
+            "local_output_tokens": ("allowance_intervals.local_output_tokens"),
             "local_calls": "allowance_intervals.local_calls",
             "local_turns": "allowance_intervals.local_turns",
             "local_tokens_per_percentage_point": (
@@ -307,12 +450,8 @@ DATASETS: dict[str, DatasetSpec] = {
         },
         operations=frozenset({Operation.ROWS, Operation.TIMELINE}),
         coverage_fields={
-            "allowance_delta_percent": (
-                "allowance_intervals.delta_used_percent"
-            ),
-            "allowance_burn_rate": (
-                "allowance_intervals.percentage_points_per_hour"
-            ),
+            "allowance_delta_percent": ("allowance_intervals.delta_used_percent"),
+            "allowance_burn_rate": ("allowance_intervals.percentage_points_per_hour"),
             "local_tokens_per_percentage_point": (
                 "allowance_intervals.local_tokens_per_percentage_point"
             ),
@@ -327,11 +466,12 @@ DATASETS: dict[str, DatasetSpec] = {
     ),
     "threads": DatasetSpec(
         base_sql="threads",
-        generation_sql="threads.first_generation <= ?",
+        generation_sql=("threads.first_generation <= ? AND " + _CANONICAL_THREAD_SQL),
         time_sql="threads.updated_at",
         stable_id_sql="threads.logical_thread_id",
         dimensions={
             "thread": "threads.logical_thread_id",
+            "thread_label": _THREAD_LABEL_SQL,
             "project": "threads.project_label",
             "agent_role": "threads.subagent_role",
             "agent_type": "threads.subagent_type",
@@ -347,42 +487,45 @@ DATASETS: dict[str, DatasetSpec] = {
             "archive_state": "threads.archive_state",
         },
         operations=_COMMON_OPERATIONS,
+        base_generation_parameters=2,
     ),
     "turns": DatasetSpec(
-        base_sql=(
-            "turns JOIN threads ON threads.thread_id = turns.thread_id"
-        ),
-        generation_sql="turns.first_generation <= ?",
+        base_sql=_TURN_BASE_SQL,
+        generation_sql=("turns.first_generation <= ? AND " + _CANONICAL_TURN_SQL),
         time_sql="turns.started_at",
         stable_id_sql="turns.turn_id",
         dimensions={
             "turn": "COALESCE(turns.source_turn_id_hash, turns.turn_id)",
             "thread": "threads.logical_thread_id",
-            "status": "turns.status",
+            "thread_label": _THREAD_LABEL_SQL,
+            "turn_ordinal": "turns.ordinal",
+            "completion_basis": "turns.effective_completion_basis",
+            "status": "turns.effective_status",
             "event_at": "turns.started_at",
             "time_day": "substr(turns.started_at, 1, 10)",
         },
         row_measures={
             "turns": "1",
             "duration_ms": (
-                "MAX(0.0, (julianday(turns.ended_at) - "
+                "MAX(0.0, (julianday(turns.effective_ended_at) - "
                 "julianday(turns.started_at)) * 86400000.0)"
             ),
         },
         aggregate_measures={
             "turns": "COUNT(*)",
             "duration_ms": (
-                "SUM(MAX(0.0, (julianday(turns.ended_at) - "
+                "SUM(MAX(0.0, (julianday(turns.effective_ended_at) - "
                 "julianday(turns.started_at)) * 86400000.0))"
             ),
         },
         filter_fields={
             "turn": "COALESCE(turns.source_turn_id_hash, turns.turn_id)",
             "thread": "threads.logical_thread_id",
-            "status": "turns.status",
+            "status": "turns.effective_status",
             "started_at": "turns.started_at",
         },
         operations=_COMMON_OPERATIONS,
+        base_generation_parameters=3,
         coverage_fields={"duration_ms": "turns.ended_at"},
     ),
 }
@@ -402,12 +545,8 @@ _PHASE_GUIDANCE = {
     "filters": ("event_at", "thread", "turn"),
     "requires_scope_filter": True,
     "scope_filter_templates": {
-        "thread": (
-            {"field": "thread", "operator": "eq", "value": "$thread"},
-        ),
-        "turn": (
-            {"field": "turn", "operator": "eq", "value": "$turn"},
-        ),
+        "thread": ({"field": "thread", "operator": "eq", "value": "$thread"},),
+        "turn": ({"field": "turn", "operator": "eq", "value": "$turn"},),
         "time_window": (
             {"field": "event_at", "operator": "gte", "value": "$start"},
             {"field": "event_at", "operator": "lt", "value": "$end"},
@@ -440,12 +579,28 @@ _GUIDED_TEMPLATES: dict[str, dict[str, Any]] = {
                     "allowance_used_percent",
                     "allowance_delta_percent",
                     "allowance_burn_rate",
-                    "local_tokens_per_percentage_point",
+                    "local_total_tokens",
+                    "local_calls",
+                    "local_turns",
                 ],
                 "order_by": "event_at",
                 "descending": True,
                 "limit": 25,
-            }
+            },
+            {
+                "dataset": "allowance",
+                "operation": "rows",
+                "dimensions": ["allowance", "window", "event_at"],
+                "measures": [
+                    "local_uncached_input_tokens",
+                    "local_cached_input_tokens",
+                    "local_reasoning_tokens",
+                    "local_output_tokens",
+                ],
+                "order_by": "event_at",
+                "descending": True,
+                "limit": 25,
+            },
         ],
     },
     "concentration": {
@@ -457,7 +612,16 @@ _GUIDED_TEMPLATES: dict[str, dict[str, Any]] = {
                 "dataset": "calls",
                 "operation": "share",
                 "dimensions": ["thread"],
-                "measures": ["calls", "total_tokens"],
+                "measures": [
+                    "calls",
+                    "uncached_input_tokens",
+                    "cached_input_tokens",
+                    "reasoning_tokens",
+                    "output_tokens",
+                    "total_tokens",
+                    "configured_cost_usd",
+                    "estimated_credits",
+                ],
                 "order_by": "total_tokens",
                 "descending": True,
                 "limit": 25,
@@ -496,6 +660,8 @@ _GUIDED_TEMPLATES: dict[str, dict[str, Any]] = {
                     "reasoning_tokens",
                     "output_tokens",
                     "total_tokens",
+                    "configured_cost_usd",
+                    "estimated_credits",
                 ],
                 "order_by": "total_tokens",
                 "descending": True,
@@ -560,7 +726,24 @@ _GUIDED_TEMPLATES: dict[str, dict[str, Any]] = {
                 "order_by": "tools",
                 "descending": True,
                 "limit": 25,
-            }
+            },
+            {
+                "dataset": "tools",
+                "operation": "rows",
+                "dimensions": ["tool_call", "operation", "target"],
+                "measures": [
+                    "duration_ms",
+                    "output_bytes",
+                    "adjacent_uncached_input_tokens",
+                    "adjacent_cached_input_tokens",
+                    "adjacent_reasoning_tokens",
+                    "adjacent_output_tokens",
+                    "adjacent_total_tokens",
+                ],
+                "order_by": "adjacent_total_tokens",
+                "descending": True,
+                "limit": 25,
+            },
         ],
     },
     "turns": {
@@ -615,9 +798,7 @@ def exploration_guidance() -> dict[str, Any]:
         name: {
             "operations": sorted(operation.value for operation in spec.operations),
             "dimensions": sorted(spec.dimensions),
-            "measures": sorted(
-                set(spec.row_measures) | set(spec.aggregate_measures)
-            ),
+            "measures": sorted(set(spec.row_measures) | set(spec.aggregate_measures)),
             "filters": sorted(spec.filter_fields),
         }
         for name, spec in sorted(DATASETS.items())
@@ -678,9 +859,7 @@ def _measure_catalog(
         Operation.TIME_SERIES,
     }
     return (
-        spec.aggregate_measures
-        if request.operation in aggregate_operations
-        else spec.row_measures
+        spec.aggregate_measures if request.operation in aggregate_operations else spec.row_measures
     )
 
 
@@ -688,13 +867,17 @@ def _validate_operation_shape(
     request: QueryRequest,
     spec: DatasetSpec,
 ) -> None:
-    if request.operation in {
-        Operation.AGGREGATE,
-        Operation.SHARE,
-        Operation.COMPARISON,
-        Operation.DISTRIBUTION,
-        Operation.TIME_SERIES,
-    } and not request.measures:
+    if (
+        request.operation
+        in {
+            Operation.AGGREGATE,
+            Operation.SHARE,
+            Operation.COMPARISON,
+            Operation.DISTRIBUTION,
+            Operation.TIME_SERIES,
+        }
+        and not request.measures
+    ):
         raise ValueError("aggregate query requires at least one measure")
     if request.operation is Operation.SHARE and (
         len(request.dimensions) != 1 or not request.measures
@@ -702,9 +885,7 @@ def _validate_operation_shape(
         raise ValueError("share requires one dimension and at least one measure")
     if request.operation is Operation.COMPARISON:
         if request.comparison is None or spec.time_sql is None or not request.measures:
-            raise ValueError(
-                "comparison requires a timed dataset, measures, and two windows"
-            )
+            raise ValueError("comparison requires a timed dataset, measures, and two windows")
         unsupported = set(request.measures) - {
             "calls",
             "input_tokens",
@@ -715,20 +896,14 @@ def _validate_operation_shape(
             "total_tokens",
         }
         if request.dataset != "calls" or unsupported:
-            raise ValueError(
-                "comparison supports exact additive call measures only"
-            )
+            raise ValueError("comparison supports exact additive call measures only")
     elif request.comparison is not None:
         raise ValueError("comparison windows require the comparison operation")
-    if (
-        request.operation is Operation.TIME_SERIES
-        and not {"time_day", "time_hour"} & set(request.dimensions)
+    if request.operation is Operation.TIME_SERIES and not {"time_day", "time_hour"} & set(
+        request.dimensions
     ):
         raise ValueError("time series requires time_day or time_hour dimension")
-    if (
-        request.operation is Operation.TIMELINE
-        and "event_at" not in request.dimensions
-    ):
+    if request.operation is Operation.TIMELINE and "event_at" not in request.dimensions:
         raise ValueError("timeline requires event_at dimension")
     if request.operation is Operation.DISTRIBUTION and not request.dimensions:
         raise ValueError("distribution requires at least one dimension")
@@ -753,10 +928,7 @@ def _validate_phases(request: QueryRequest) -> None:
         raise ValueError("query field is not allowlisted for phases")
     if not request.filters:
         raise ValueError("phase timeline requires a bounded scope filter")
-    if (
-        request.operation is Operation.TIMELINE
-        and "event_at" not in request.dimensions
-    ):
+    if request.operation is Operation.TIMELINE and "event_at" not in request.dimensions:
         raise ValueError("phase timeline requires event_at dimension")
     available_order = set(request.dimensions) | set(request.measures)
     if request.order_by and request.order_by not in available_order:

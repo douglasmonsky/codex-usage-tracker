@@ -83,6 +83,7 @@ def test_source_stamped_rate_card_estimates_cost_credits_and_coverage(
             "fetched_at": "2026-01-02",
         },
         "model_count": 1,
+        "revision": card.digest,
     }
 
 

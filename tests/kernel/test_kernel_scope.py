@@ -25,6 +25,7 @@ from scripts.check_kernel_scope import (
     R2_ADDITIONS,
     R3_ADDITIONS,
     R4_ADDITIONS,
+    R5_ADDITIONS,
     RECOVERY_ROADMAP_ADDITIONS,
     active_paths,
     load_disposition_manifest,
@@ -37,9 +38,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_integration_tree_matches_quarantine_manifest() -> None:
-    manifest = load_disposition_manifest(
-        _REPO_ROOT / "config" / "kernel-code-disposition-v1.json"
-    )
+    manifest = load_disposition_manifest(_REPO_ROOT / "config" / "kernel-code-disposition-v1.json")
 
     assert scope_failures(_REPO_ROOT, manifest) == []
 
@@ -84,15 +83,18 @@ def test_active_paths_excludes_indexed_files_deleted_from_worktree(
 
 
 def test_k1a_additions_are_explicit_and_bounded() -> None:
-    assert frozenset(
-        {
-            "docs/kernel-development-scope.md",
-            "scripts/check_kernel_scope.py",
-            "src/codex_usage_tracker/kernel/AGENTS.md",
-            "src/codex_usage_tracker/kernel/__init__.py",
-            "tests/kernel/test_kernel_scope.py",
-        }
-    ) == K1A_ADDITIONS
+    assert (
+        frozenset(
+            {
+                "docs/kernel-development-scope.md",
+                "scripts/check_kernel_scope.py",
+                "src/codex_usage_tracker/kernel/AGENTS.md",
+                "src/codex_usage_tracker/kernel/__init__.py",
+                "tests/kernel/test_kernel_scope.py",
+            }
+        )
+        == K1A_ADDITIONS
+    )
 
 
 def test_k2_additions_are_explicit_and_bounded() -> None:
@@ -253,6 +255,10 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/interfaces/test_r4_coverage_contract.py",
         "tests/kernel/query/test_r4_rollups.py",
     } == R4_ADDITIONS
+    assert {
+        "src/codex_usage_tracker/kernel/thread_labels.py",
+        "tests/kernel/test_r5_analytical_primitives.py",
+    } == R5_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -269,12 +275,13 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | K14_ADDITIONS
         | K15_ADDITIONS
         | K16_ADDITIONS
-            | RECOVERY_ROADMAP_ADDITIONS
-            | R1_ADDITIONS
-            | R2_ADDITIONS
-            | R3_ADDITIONS
-            | R4_ADDITIONS
-        )
+        | RECOVERY_ROADMAP_ADDITIONS
+        | R1_ADDITIONS
+        | R2_ADDITIONS
+        | R3_ADDITIONS
+        | R4_ADDITIONS
+        | R5_ADDITIONS
+    )
 
 
 def test_kernel_skeleton_imports_without_legacy_runtime() -> None:
@@ -357,19 +364,15 @@ def test_publication_guard_rejects_correct_tag_on_unmerged_commit(
         package_version="0.28.0",
     )
 
-    assert failure == (
-        f"publication SHA {unmerged_sha} is not merged into origin/main"
-    )
+    assert failure == (f"publication SHA {unmerged_sha} is not merged into origin/main")
 
 
 def test_publish_workflow_calls_persistent_kernel_guard() -> None:
-    workflow = (_REPO_ROOT / ".github" / "workflows" / "publish.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = (_REPO_ROOT / ".github" / "workflows" / "publish.yml").read_text(encoding="utf-8")
 
     assert "Enforce kernel publication source" in workflow
     assert "scripts/check_kernel_scope.py" in workflow
     assert '--publication-ref "$GITHUB_REF"' in workflow
-    assert 'git fetch --no-tags origin main:refs/remotes/origin/main' in workflow
+    assert "git fetch --no-tags origin main:refs/remotes/origin/main" in workflow
     assert '--publication-sha "$GITHUB_SHA"' in workflow
     assert "--main-ref origin/main" in workflow

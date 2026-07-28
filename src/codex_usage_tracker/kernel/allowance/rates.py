@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -41,6 +42,7 @@ class ModelRates:
 class RateCard:
     source: dict[str, str]
     models: dict[str, ModelRates]
+    digest: str
 
 
 @dataclass(frozen=True)
@@ -52,6 +54,7 @@ class UsageEstimate:
     coverage_percent: float
     unrated_models: tuple[str, ...]
     provenance: dict[str, str] | None
+    confidence: str | None
 
 
 def load_rate_card(path: Path) -> RateCard | None:
@@ -62,29 +65,24 @@ def load_rate_card(path: Path) -> RateCard | None:
     try:
         if path.stat().st_size > MAX_RATE_CARD_BYTES:
             raise ValueError("rate card exceeds the size limit")
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        encoded = path.read_bytes()
+        payload = json.loads(encoded)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("rate card is unreadable") from exc
     if not isinstance(payload, dict) or payload.get("schema") != RATE_CARD_SCHEMA:
         raise ValueError("rate card schema is invalid")
     source = _source(payload.get("source"))
     raw_models = payload.get("models")
-    if (
-        not isinstance(raw_models, dict)
-        or not 1 <= len(raw_models) <= MAX_RATE_CARD_MODELS
-    ):
+    if not isinstance(raw_models, dict) or not 1 <= len(raw_models) <= MAX_RATE_CARD_MODELS:
         raise ValueError("rate card models are invalid")
     if any(
-        not isinstance(model, str) or _MODEL_NAME.fullmatch(model) is None
-        for model in raw_models
+        not isinstance(model, str) or _MODEL_NAME.fullmatch(model) is None for model in raw_models
     ):
         raise ValueError("rate card model name is invalid")
     return RateCard(
         source=source,
-        models={
-            model: _model_rates(model, raw)
-            for model, raw in raw_models.items()
-        },
+        models={model: _model_rates(model, raw) for model, raw in raw_models.items()},
+        digest="sha256:" + hashlib.sha256(encoded).hexdigest(),
     )
 
 
@@ -102,6 +100,7 @@ def rate_card_status(path: Path) -> dict[str, Any]:
         "status": "ready",
         "source": card.source,
         "model_count": len(card.models),
+        "revision": card.digest,
     }
 
 
@@ -121,17 +120,20 @@ def estimate_local_usage(
             coverage_percent=100.0 if total_tokens == 0 else 0.0,
             unrated_models=tuple(sorted(usage_by_model)),
             provenance=None,
+            confidence=None,
         )
     cost = 0.0
     credits = 0.0
     rated_tokens = 0
     unrated: list[str] = []
+    confidences: set[str] = set()
     for model, usage in usage_by_model.items():
         rates = card.models.get(model)
         if rates is None:
             unrated.append(model)
             continue
         rated_tokens += usage.total_tokens
+        confidences.add(rates.confidence)
         cost += _estimate(
             usage,
             rates.input_per_million,
@@ -153,6 +155,13 @@ def estimate_local_usage(
         coverage_percent=coverage,
         unrated_models=tuple(sorted(unrated)),
         provenance=card.source,
+        confidence=(
+            next(iter(confidences))
+            if len(confidences) == 1
+            else "mixed"
+            if confidences
+            else None
+        ),
     )
 
 

@@ -365,7 +365,7 @@ def test_missing_tool_observations_are_partial_not_zero(tmp_path: Path) -> None:
     )
     assert result.grade == "exact"
     assert result.coverage["measures"]["duration_ms"] == {
-        "basis": "upstream_observed",
+        "basis": "deterministic_observed_timestamps",
         "observed_count": 0,
         "missing_count": 1,
         "coverage_percent": 0.0,

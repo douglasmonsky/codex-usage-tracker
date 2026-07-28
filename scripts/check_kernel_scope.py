@@ -259,6 +259,12 @@ R4_ADDITIONS = frozenset(
         "tests/kernel/query/test_r4_rollups.py",
     }
 )
+R5_ADDITIONS = frozenset(
+    {
+        "src/codex_usage_tracker/kernel/thread_labels.py",
+        "tests/kernel/test_r5_analytical_primitives.py",
+    }
+)
 
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
@@ -281,10 +287,9 @@ INTEGRATION_ADDITIONS = (
     | R2_ADDITIONS
     | R3_ADDITIONS
     | R4_ADDITIONS
+    | R5_ADDITIONS
 )
-_BLOCKED_TASK_REF = re.compile(
-    r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"
-)
+_BLOCKED_TASK_REF = re.compile(r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))")
 
 
 def load_disposition_manifest(path: Path) -> dict[str, Any]:
@@ -312,9 +317,7 @@ def active_paths(repo_root: Path) -> set[str]:
     )
     paths = {line for line in result.stdout.splitlines() if line}
     return {
-        path
-        for path in paths
-        if (repo_root / path).exists() or (repo_root / path).is_symlink()
+        path for path in paths if (repo_root / path).exists() or (repo_root / path).is_symlink()
     }
 
 
@@ -325,9 +328,7 @@ def scope_failures(repo_root: Path, manifest: dict[str, Any]) -> list[str]:
     current = active_paths(repo_root)
     classified = {entry["path"] for entry in entries}
     kept = {entry["path"] for entry in entries if entry["disposition"] == "keep"}
-    removed = {
-        entry["path"] for entry in entries if entry["disposition"] != "keep"
-    }
+    removed = {entry["path"] for entry in entries if entry["disposition"] != "keep"}
     failures: list[str] = []
 
     physically_present = {
@@ -351,13 +352,8 @@ def scope_failures(repo_root: Path, manifest: dict[str, Any]) -> list[str]:
             "retire": {"removed", "verified"},
             "transplant": {"removed", "implemented", "verified"},
         }
-        if (
-            disposition != "keep"
-            and status not in valid_absent_statuses[disposition]
-        ):
-            failures.append(
-                f"{entry['path']}: invalid absent {disposition} status {status}"
-            )
+        if disposition != "keep" and status not in valid_absent_statuses[disposition]:
+            failures.append(f"{entry['path']}: invalid absent {disposition} status {status}")
         if disposition == "transplant":
             if not entry["source_ref"].startswith("v0.25.1:"):
                 failures.append(f"{entry['path']}: transplant lacks tag provenance")

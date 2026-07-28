@@ -51,6 +51,7 @@ vp:
         tests/kernel/test_source_registry_privacy.py \
         tests/kernel/test_oracle_equivalence.py \
         tests/kernel/test_privacy_oracle.py \
+        tests/kernel/test_r5_analytical_primitives.py \
         tests/kernel/test_source_lifecycle_oracle.py \
         tests/kernel/test_stable_contract_028.py \
         tests/kernel/test_watcher.py
@@ -87,6 +88,7 @@ v:
         tests/kernel/test_ingest_*.py \
         tests/kernel/test_oracle_equivalence.py \
         tests/kernel/test_privacy_oracle.py \
+        tests/kernel/test_r5_analytical_primitives.py \
         tests/kernel/test_source_lifecycle_oracle.py \
         tests/kernel/test_stable_contract_028.py \
         tests/kernel/test_watcher.py \

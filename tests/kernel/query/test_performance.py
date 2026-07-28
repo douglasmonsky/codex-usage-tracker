@@ -7,6 +7,7 @@ import math
 import sqlite3
 import time
 from collections.abc import Callable
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,7 @@ from codex_usage_tracker.kernel.query import (
 from codex_usage_tracker.kernel.rollups import rebuild_generation_rollups
 
 _CALL_COUNT = 100_000
+_TOOL_COUNT = 25_000
 
 
 @pytest.fixture(scope="module")
@@ -41,6 +43,8 @@ def large_service(tmp_path_factory: pytest.TempPathFactory) -> QueryService:
     initialize_operational_database(paths.operational)
     _populate_calls(paths.analytical)
     rebuild_generation_rollups(paths.analytical, 1)
+    rate_card = root / "rates.json"
+    _write_rate_card(rate_card)
     with sqlite3.connect(paths.operational) as connection:
         connection.execute(
             """
@@ -74,7 +78,7 @@ def large_service(tmp_path_factory: pytest.TempPathFactory) -> QueryService:
         active_kernel_path=paths.analytical,
         generation=1,
     )
-    return QueryService(paths.operational)
+    return QueryService(paths.operational, rate_card_path=rate_card)
 
 
 def test_100k_common_comparison_and_concentration_budgets(
@@ -153,6 +157,90 @@ def test_100k_common_comparison_and_concentration_budgets(
     assert concentration_result.scanned_count == 250
     assert daily_result.plan_id.endswith("rollup_time_band.v1")
     assert daily_result.scanned_count == 28
+
+
+def test_100k_r5_analytical_primitive_budgets(
+    large_service: QueryService,
+) -> None:
+    top_threads = QueryRequest(
+        "calls",
+        Operation.SHARE,
+        ("thread",),
+        (
+            "calls",
+            "uncached_input_tokens",
+            "cached_input_tokens",
+            "reasoning_tokens",
+            "output_tokens",
+            "total_tokens",
+            "configured_cost_usd",
+            "estimated_credits",
+        ),
+        limit=25,
+    )
+    tool_impact = QueryRequest(
+        "tools",
+        Operation.ROWS,
+        ("tool_call", "operation", "target"),
+        (
+            "adjacent_uncached_input_tokens",
+            "adjacent_cached_input_tokens",
+            "adjacent_reasoning_tokens",
+            "adjacent_output_tokens",
+            "adjacent_total_tokens",
+        ),
+        order_by="adjacent_total_tokens",
+        limit=25,
+    )
+
+    top_threads_p95 = _p95(
+        lambda: large_service.execute(top_threads),
+        repeats=12,
+    )
+    tool_impact_p95 = _p95(
+        lambda: large_service.execute(tool_impact),
+        repeats=12,
+    )
+    top_threads_result = large_service.execute(top_threads)
+    tool_impact_result = large_service.execute(tool_impact)
+    top_threads_bytes = len(
+        json.dumps(
+            asdict(top_threads_result),
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+    )
+    tool_impact_bytes = len(
+        json.dumps(
+            asdict(tool_impact_result),
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+    )
+
+    print(
+        json.dumps(
+            {
+                "calls": _CALL_COUNT,
+                "tools": _TOOL_COUNT,
+                "tool_impact_bytes": tool_impact_bytes,
+                "tool_impact_p95_ms": round(tool_impact_p95, 3),
+                "top_threads_bytes": top_threads_bytes,
+                "top_threads_p95_ms": round(top_threads_p95, 3),
+            },
+            sort_keys=True,
+        )
+    )
+    assert top_threads_p95 <= 1_000.0
+    assert tool_impact_p95 <= 500.0
+    assert top_threads_bytes <= 64_000
+    assert tool_impact_bytes <= 64_000
+    assert top_threads_result.returned_count == 25
+    assert tool_impact_result.returned_count == 25
+    assert all("thread_label" in row for row in top_threads_result.rows)
+    assert (
+        top_threads_result.coverage["measures"]["configured_cost_usd"]["coverage_percent"] == 100.0
+    )
 
 
 def _p95(operation: Callable[[], object], *, repeats: int) -> float:
@@ -234,6 +322,32 @@ def _populate_calls(path: Path) -> None:
             """,
             (_call_row(index) for index in range(_CALL_COUNT)),
         )
+        connection.execute(
+            """
+            INSERT INTO tool_profiles(
+                tool_profile_key, tool_name, server_name_key, namespace_key,
+                tool_category, operation
+            )
+            VALUES (1, 'functions.read_file', '', 'functions', 'function', 'read')
+            """
+        )
+        connection.executemany(
+            """
+            INSERT INTO tool_call_facts(
+                tool_call_id, upstream_call_id_hash, source_key, thread_key,
+                turn_key, tool_profile_key, nearest_model_call_key,
+                target_label, started_at, ended_at, duration_ms, status,
+                error_category, output_bytes, argument_shape,
+                first_source_offset, last_source_offset, generation,
+                observation_confidence
+            )
+            VALUES (
+                ?, ?, 1, ?, ?, 1, ?, ?, ?, ?, ?, 'completed',
+                NULL, ?, '["path"]', ?, ?, 1, 'exact'
+            )
+            """,
+            (_tool_row(index) for index in range(_TOOL_COUNT)),
+        )
 
 
 def _call_row(index: int) -> tuple[object, ...]:
@@ -255,4 +369,54 @@ def _call_row(index: int) -> tuple[object, ...]:
         output_tokens,
         output_tokens // 3,
         index,
+    )
+
+
+def _tool_row(index: int) -> tuple[object, ...]:
+    thread_key = index % 250 + 1
+    call_key = index + 1
+    timestamp = f"2026-01-{1 + (index % 28):02d}T{index % 24:02d}:00:00Z"
+    return (
+        index.to_bytes(16, "big"),
+        f"upstream-{index:08d}",
+        thread_key,
+        thread_key,
+        call_key,
+        f"src/synthetic_{index % 50:02d}.py",
+        timestamp,
+        timestamp,
+        float(index % 1_000),
+        index % 8_192,
+        index,
+        index + 1,
+    )
+
+
+def _write_rate_card(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "codex-usage-tracker.kernel-rate-card.v1",
+                "source": {
+                    "name": "Synthetic performance rates",
+                    "url": "https://example.invalid/performance-rates",
+                    "effective_at": "2026-01-01",
+                    "fetched_at": "2026-01-01T00:00:00Z",
+                },
+                "models": {
+                    model: {
+                        "input_per_million": 1.0,
+                        "cached_input_per_million": 0.5,
+                        "output_per_million": 2.0,
+                        "credits_input_per_million": 3.0,
+                        "credits_cached_input_per_million": 1.0,
+                        "credits_output_per_million": 4.0,
+                        "confidence": "estimated",
+                    }
+                    for model in ("gpt-synthetic-a", "gpt-synthetic-b")
+                },
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
     )

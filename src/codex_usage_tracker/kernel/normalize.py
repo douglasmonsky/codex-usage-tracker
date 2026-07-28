@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from typing import Any
 
 from .discovery import SourcePlan
@@ -30,13 +31,14 @@ def normalize_batch(
     parsed: ParsedBatch,
     *,
     generation: int,
+    thread_labels: dict[str, str] | None = None,
 ) -> NormalizedBatch:
     """Create deterministic rows without reading or writing SQLite."""
 
     threads: dict[str, Row] = {}
     turns: dict[str, Row] = {}
     calls: list[Row] = []
-    tools: list[Row] = []
+    tools: dict[str, Row] = {}
     activities: list[Row] = []
     allowances: list[Row] = []
     thread_ids: dict[
@@ -67,6 +69,7 @@ def normalize_batch(
                 plan,
                 thread_id,
                 generation,
+                thread_labels or {},
             )
         if turn_id not in turns:
             turns[turn_id] = _turn_row(
@@ -79,21 +82,21 @@ def normalize_batch(
         if event.kind == "model_call":
             calls.append(_call_row(event, plan, thread_id, turn_id, generation))
         elif event.kind == "tool":
-            tools.append(_tool_row(event, plan, thread_id, turn_id, generation))
+            tool = _tool_row(event, plan, thread_id, turn_id, generation)
+            identifier = str(tool["tool_call_id"])
+            tools[identifier] = _merge_tool_rows(tools.get(identifier), tool)
         elif event.kind == "activity":
-            activities.append(
-                _activity_row(event, plan, thread_id, turn_id, generation)
-            )
+            activities.append(_activity_row(event, plan, thread_id, turn_id, generation))
         elif event.kind == "allowance":
-            allowances.append(
-                _allowance_row(event, plan, thread_id, generation)
-            )
-    _apply_turn_counts(turns, calls, tools, activities)
+            allowances.append(_allowance_row(event, plan, thread_id, generation))
+        _update_turn_span(turns[turn_id], event)
+    _link_nearest_calls(tuple(tools.values()), calls)
+    _apply_turn_counts(turns, calls, list(tools.values()), activities)
     return NormalizedBatch(
         threads=tuple(threads.values()),
         turns=tuple(turns.values()),
         model_calls=tuple(calls),
-        tool_calls=tuple(tools),
+        tool_calls=tuple(tools.values()),
         activities=tuple(activities),
         allowances=tuple(allowances),
         parser_state_json=_state_json(parsed.final_state),
@@ -134,13 +137,10 @@ def _thread_row(
     plan: SourcePlan,
     thread_id: str,
     generation: int,
+    thread_labels: dict[str, str],
 ) -> Row:
-    label = event.agent_nickname
-    parent = (
-        stable_id("thr", event.parent_session_id)
-        if event.parent_session_id
-        else None
-    )
+    label = thread_labels.get(event.session_id or "") or event.agent_nickname
+    parent = stable_id("thr", event.parent_session_id) if event.parent_session_id else None
     return {
         "thread_id": thread_id,
         "source_id": plan.observation.source_id,
@@ -171,16 +171,14 @@ def _turn_row(
 ) -> Row:
     return {
         "turn_id": turn_id,
-        "source_turn_id_hash": (
-            stable_id("uturn", event.turn_id) if event.turn_id else None
-        ),
+        "source_turn_id_hash": (stable_id("uturn", event.turn_id) if event.turn_id else None),
         "thread_id": thread_id,
         "ordinal": event.turn_ordinal,
-        "started_at": event.timestamp,
-        "ended_at": event.timestamp,
-        "status": "completed",
+        "started_at": event.turn_started_at or event.timestamp,
+        "ended_at": None,
+        "status": "open",
         "start_basis": "turn_context" if event.turn_id else "event_order",
-        "completion_basis": "observed_event",
+        "completion_basis": None,
         "basis_confidence": "exact" if event.turn_id else "inferred",
         "first_source_offset": event.source_offset,
         "last_source_offset": event.source_offset,
@@ -252,25 +250,45 @@ def _tool_row(
     generation: int,
 ) -> Row:
     name = event.tool_name or "unknown"
-    return {
-        "tool_call_id": stable_id(
+    tool_call_id = (
+        stable_id(
             "tool",
-            plan.observation.source_id,
-            event.source_offset,
+            "upstream",
+            event.tool_call_id,
+        )
+        if event.tool_call_id
+        else stable_id(
+            "tool",
+            "structural",
+            event.turn_id or "",
+            event.timestamp,
             name,
+            event.source_offset,
+        )
+    )
+    ended_at = event.timestamp if event.tool_phase == "end" else None
+    return {
+        "tool_call_id": tool_call_id,
+        "upstream_call_id_hash": (
+            stable_id("upcall", event.tool_call_id) if event.tool_call_id else None
         ),
         "source_id": plan.observation.source_id,
         "thread_id": thread_id,
         "turn_id": turn_id,
+        "nearest_model_call_id": None,
         "tool_name": name,
         "server_name": event.server_name,
         "namespace": name.split("__", 1)[0] if "__" in name else None,
         "tool_category": "mcp" if event.server_name else "function",
-        "started_at": event.timestamp,
-        "ended_at": event.timestamp,
-        "status": "completed",
-        "output_bytes": None,
-        "argument_shape": None,
+        "operation": event.tool_operation or "unknown",
+        "target_label": event.tool_target_label,
+        "started_at": None if event.tool_phase == "end" else event.timestamp,
+        "ended_at": ended_at,
+        "duration_ms": None,
+        "status": event.tool_status or "incomplete",
+        "error_category": None,
+        "output_bytes": event.tool_output_bytes,
+        "argument_shape": event.tool_argument_shape,
         "first_source_offset": event.source_offset,
         "last_source_offset": event.source_offset,
         "generation": generation,
@@ -362,6 +380,88 @@ def _apply_turn_counts(
             row["patch_count"] += 1
         elif kind in {"rollback", "turn_aborted"}:
             row["error_count"] += 1
+
+
+def _update_turn_span(row: Row, event: StructuralEvent) -> None:
+    if event.timestamp:
+        row["ended_at"] = max(str(row["ended_at"] or ""), event.timestamp)
+    if event.kind != "activity":
+        return
+    if event.activity_kind == "task":
+        row["status"] = "completed"
+        row["completion_basis"] = "observed_event"
+        row["basis_confidence"] = "exact"
+    elif event.activity_kind == "turn_aborted":
+        row["status"] = "aborted"
+        row["completion_basis"] = "observed_event"
+        row["basis_confidence"] = "exact"
+    elif event.activity_kind == "rollback":
+        row["status"] = "rolled_back"
+        row["completion_basis"] = "observed_event"
+        row["basis_confidence"] = "exact"
+
+
+def _merge_tool_rows(current: Row | None, observed: Row) -> Row:
+    if current is None:
+        return observed
+    merged = dict(current)
+    if current["tool_name"] == "unknown" and observed["tool_name"] != "unknown":
+        for field in (
+            "tool_name",
+            "server_name",
+            "namespace",
+            "tool_category",
+            "operation",
+            "target_label",
+            "argument_shape",
+        ):
+            merged[field] = observed[field]
+    for field in ("started_at", "ended_at", "output_bytes"):
+        if observed[field] is not None:
+            merged[field] = observed[field]
+    merged["status"] = observed["status"]
+    merged["first_source_offset"] = min(
+        int(current["first_source_offset"]),
+        int(observed["first_source_offset"]),
+    )
+    merged["last_source_offset"] = max(
+        int(current["last_source_offset"]),
+        int(observed["last_source_offset"]),
+    )
+    merged["duration_ms"] = _duration_ms(
+        merged["started_at"],
+        merged["ended_at"],
+    )
+    return merged
+
+
+def _link_nearest_calls(tools: tuple[Row, ...], calls: list[Row]) -> None:
+    calls_by_turn: dict[str, list[Row]] = {}
+    for call in calls:
+        calls_by_turn.setdefault(str(call["turn_id"]), []).append(call)
+    for candidates in calls_by_turn.values():
+        candidates.sort(key=lambda item: (str(item["event_at"]), str(item["model_call_id"])))
+    for tool in tools:
+        candidates = calls_by_turn.get(str(tool["turn_id"]), [])
+        boundary = str(tool["ended_at"] or tool["started_at"] or "")
+        following = next(
+            (call for call in candidates if str(call["event_at"]) >= boundary),
+            None,
+        )
+        nearest = following or (candidates[-1] if candidates else None)
+        if nearest is not None:
+            tool["nearest_model_call_id"] = nearest["model_call_id"]
+
+
+def _duration_ms(started_at: Any, ended_at: Any) -> float | None:
+    if not isinstance(started_at, str) or not isinstance(ended_at, str):
+        return None
+    try:
+        start = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        end = datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return max(0.0, (end - start).total_seconds() * 1000.0)
 
 
 def _state_json(state: ParserState) -> str:
