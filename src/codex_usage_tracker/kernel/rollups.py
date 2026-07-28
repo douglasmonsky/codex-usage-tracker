@@ -8,6 +8,52 @@ from pathlib import Path
 
 from .database import open_read_snapshot, short_writer_transaction
 
+_LINK_UNRESOLVED_TOOL_CALLS_SQL = """
+UPDATE tool_call_facts AS tools
+SET nearest_model_call_key = COALESCE(
+    (
+        SELECT calls.model_call_key
+        FROM model_call_facts AS calls
+        WHERE calls.turn_key = tools.turn_key
+          AND calls.generation <= ?
+          AND calls.duplicate_state = 'canonical'
+          AND calls.event_at >= COALESCE(
+              tools.ended_at,
+              tools.started_at,
+              ''
+          )
+        ORDER BY calls.event_at, calls.model_call_key
+        LIMIT 1
+    ),
+    (
+        SELECT calls.model_call_key
+        FROM model_call_facts AS calls
+        WHERE calls.turn_key = tools.turn_key
+          AND calls.generation <= ?
+          AND calls.duplicate_state = 'canonical'
+          AND calls.event_at < COALESCE(
+              tools.ended_at,
+              tools.started_at,
+              ''
+          )
+        ORDER BY calls.event_at DESC, calls.model_call_key DESC
+        LIMIT 1
+    )
+),
+    generation = ?
+WHERE tools.generation <= ?
+  AND (
+      tools.nearest_model_call_key IS NULL
+      OR tools.generation < ?
+  )
+  AND tools.turn_key IN (
+      SELECT changed_calls.turn_key
+      FROM model_call_facts AS changed_calls
+      WHERE changed_calls.generation = ?
+        AND changed_calls.duplicate_state = 'canonical'
+  )
+"""
+
 
 def generation_rollups_ready(path: Path, generation: int) -> bool:
     """Return whether the atomic rollup marker exists for one generation."""
@@ -29,6 +75,7 @@ def rebuild_generation_rollups(
     generation: int,
     *,
     incremental_from: int | None = None,
+    tool_facts_changed: bool = True,
 ) -> float:
     """Replace one unpublished generation's deterministic metadata rollups."""
 
@@ -58,7 +105,11 @@ def rebuild_generation_rollups(
                 generation=generation,
                 prior_generation=incremental_from,
             )
-            _apply_generation_delta(connection, generation=generation)
+            _apply_generation_delta(
+                connection,
+                generation=generation,
+                rebuild_tool_operation=tool_facts_changed,
+            )
             return (time.perf_counter() - started) * 1_000
         connection.execute(
             """
@@ -160,49 +211,8 @@ def _link_unresolved_tool_calls(
     generation: int,
 ) -> None:
     connection.execute(
-        """
-        UPDATE tool_call_facts AS tools
-        SET nearest_model_call_key = COALESCE(
-            (
-                SELECT calls.model_call_key
-                FROM model_call_facts AS calls
-                WHERE calls.turn_key = tools.turn_key
-                  AND calls.generation <= ?
-                  AND calls.duplicate_state = 'canonical'
-                  AND calls.event_at >= COALESCE(
-                      tools.ended_at,
-                      tools.started_at,
-                      ''
-                  )
-                ORDER BY calls.event_at, calls.model_call_key
-                LIMIT 1
-            ),
-            (
-                SELECT calls.model_call_key
-                FROM model_call_facts AS calls
-                WHERE calls.turn_key = tools.turn_key
-                  AND calls.generation <= ?
-                  AND calls.duplicate_state = 'canonical'
-                  AND calls.event_at < COALESCE(
-                      tools.ended_at,
-                      tools.started_at,
-                      ''
-                  )
-                ORDER BY calls.event_at DESC, calls.model_call_key DESC
-                LIMIT 1
-            )
-        ),
-            generation = ?
-        WHERE tools.generation <= ?
-          AND EXISTS (
-              SELECT 1
-              FROM model_call_facts AS changed_calls
-              WHERE changed_calls.turn_key = tools.turn_key
-                AND changed_calls.generation = ?
-                AND changed_calls.duplicate_state = 'canonical'
-          )
-        """,
-        (generation, generation, generation, generation, generation),
+        _LINK_UNRESOLVED_TOOL_CALLS_SQL,
+        (generation, generation, generation, generation, generation, generation),
     )
 
 
@@ -267,6 +277,7 @@ def _apply_generation_delta(
     connection: sqlite3.Connection,
     *,
     generation: int,
+    rebuild_tool_operation: bool,
 ) -> None:
     connection.execute(
         """
@@ -372,23 +383,24 @@ def _apply_generation_delta(
         """,
         (generation, generation, generation),
     )
-    connection.execute(
-        "DELETE FROM rollup_tool_operation WHERE generation = ?",
-        (generation,),
-    )
-    connection.execute(
-        """
-        INSERT INTO rollup_tool_operation(
-            generation, operation, target_label, calls,
-            duration_ms, output_bytes
+    if rebuild_tool_operation:
+        connection.execute(
+            "DELETE FROM rollup_tool_operation WHERE generation = ?",
+            (generation,),
         )
-        SELECT ?, profiles.operation, COALESCE(facts.target_label, ''),
-               COUNT(*), COALESCE(SUM(facts.duration_ms), 0.0),
-               COALESCE(SUM(facts.output_bytes), 0)
-        FROM tool_call_facts AS facts
-        JOIN tool_profiles AS profiles USING (tool_profile_key)
-        WHERE facts.generation <= ?
-        GROUP BY profiles.operation, COALESCE(facts.target_label, '')
-        """,
-        (generation, generation),
-    )
+        connection.execute(
+            """
+            INSERT INTO rollup_tool_operation(
+                generation, operation, target_label, calls,
+                duration_ms, output_bytes
+            )
+            SELECT ?, profiles.operation, COALESCE(facts.target_label, ''),
+                   COUNT(*), COALESCE(SUM(facts.duration_ms), 0.0),
+                   COALESCE(SUM(facts.output_bytes), 0)
+            FROM tool_call_facts AS facts
+            JOIN tool_profiles AS profiles USING (tool_profile_key)
+            WHERE facts.generation <= ?
+            GROUP BY profiles.operation, COALESCE(facts.target_label, '')
+            """,
+            (generation, generation),
+        )

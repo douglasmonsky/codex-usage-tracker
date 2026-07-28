@@ -36,13 +36,21 @@ _TOOL_COUNT = 25_000
 
 
 @pytest.fixture(scope="module")
-def large_service(tmp_path_factory: pytest.TempPathFactory) -> QueryService:
+def large_rollup_metrics() -> dict[str, float]:
+    return {}
+
+
+@pytest.fixture(scope="module")
+def large_service(
+    tmp_path_factory: pytest.TempPathFactory,
+    large_rollup_metrics: dict[str, float],
+) -> QueryService:
     root = tmp_path_factory.mktemp("query-performance")
     paths = kernel_paths(root)
     initialize_analytical_database(paths.analytical)
     initialize_operational_database(paths.operational)
     _populate_calls(paths.analytical)
-    rebuild_generation_rollups(paths.analytical, 1)
+    large_rollup_metrics["elapsed_ms"] = rebuild_generation_rollups(paths.analytical, 1)
     rate_card = root / "rates.json"
     _write_rate_card(rate_card)
     with sqlite3.connect(paths.operational) as connection:
@@ -79,6 +87,14 @@ def large_service(tmp_path_factory: pytest.TempPathFactory) -> QueryService:
         generation=1,
     )
     return QueryService(paths.operational, rate_card_path=rate_card)
+
+
+def test_100k_rollup_rebuild_budget(
+    large_service: QueryService,
+    large_rollup_metrics: dict[str, float],
+) -> None:
+    assert large_service is not None
+    assert large_rollup_metrics["elapsed_ms"] <= 5_500
 
 
 def test_100k_common_comparison_and_concentration_budgets(

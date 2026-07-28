@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
+import os
 import sqlite3
+import sys
 import time
 import uuid
 from collections.abc import Callable
@@ -41,17 +44,20 @@ from .operational import (
     hydrated_source_ids,
     hydrated_source_locations,
     hydration_catalog_checkpoints,
+    hydration_selection_revision,
     initialize_operational_database,
     load_cutover_control,
+    load_hydration_coverage,
     load_staged_hydration,
     promote_cutover,
     record_hydration_catalog,
     record_legacy_cache_metadata,
-    register_source,
+    register_sources,
     reset_cutover_for_schema_upgrade,
     restore_hydration_states,
     stage_hydration_catalog,
     transition_cutover,
+    update_hydration_capture,
 )
 from .parser import (
     PARSER_VERSION,
@@ -60,7 +66,7 @@ from .parser import (
     parse_jsonl,
 )
 from .rollups import generation_rollups_ready, rebuild_generation_rollups
-from .schema import SCHEMA_VERSION
+from .schema import SCHEMA_VERSION, create_missing_secondary_indexes
 from .thread_labels import load_thread_labels
 from .writer import (
     WriteResult,
@@ -156,11 +162,17 @@ class KernelIngestor:
                 self._register_observations(observations)
             active_path = self._active_path()
             plans = self._plans(observations, active_path)
-            stage_hydration_catalog(self.operational_path, selection)
+            catalog_current = (
+                load_hydration_coverage(self.operational_path)["coverage_revision"]
+                == hydration_selection_revision(selection)
+            )
+            if plans or not catalog_current:
+                stage_hydration_catalog(self.operational_path, selection)
             if not plans:
                 return self._complete_without_plans(
                     sources,
                     selection,
+                    catalog_current=catalog_current,
                     active_path=active_path,
                     recovered_generation=recovered_generation,
                     owner_id=owner_id,
@@ -220,18 +232,20 @@ class KernelIngestor:
         self,
         observations: tuple[SourceObservation, ...],
     ) -> None:
-        for observation in observations:
-            register_source(
-                self.operational_path,
-                observation.source_id,
-                observation.path,
-            )
+        register_sources(
+            self.operational_path,
+            tuple(
+                (observation.source_id, observation.path)
+                for observation in observations
+            ),
+        )
 
     def _complete_without_plans(
         self,
         sources: list[Path],
         selection: HydrationSelection,
         *,
+        catalog_current: bool,
         active_path: Path,
         recovered_generation: int,
         owner_id: str,
@@ -241,7 +255,7 @@ class KernelIngestor:
         if recovered_generation > 0:
             if not generation_rollups_ready(active_path, recovered_generation):
                 with leases.maintain(refresh_run_id, owner_id) as guard:
-                    staging_path, _isolated = self._write_path(
+                    staging_path, _isolated, _incremental_safe = self._write_path(
                         active_path,
                         (),
                         (),
@@ -265,11 +279,17 @@ class KernelIngestor:
                 recovered_generation,
                 "no_changes",
             )
-            record_hydration_catalog(
-                self.operational_path,
-                selection,
-                hydrated_generation=recovered_generation,
-            )
+            if not catalog_current:
+                record_hydration_catalog(
+                    self.operational_path,
+                    selection,
+                    hydrated_generation=recovered_generation,
+                )
+            else:
+                update_hydration_capture(
+                    self.operational_path,
+                    selection,
+                )
         else:
             result = self._publish_empty_generation(
                 sources,
@@ -389,7 +409,7 @@ class KernelIngestor:
             requires_rollup_backfill = active_generation > 0 and not generation_rollups_ready(
                 active_path, active_generation
             )
-            write_path, isolated = self._write_path(
+            write_path, isolated, incremental_rollup_safe = self._write_path(
                 active_path,
                 plans,
                 normalized,
@@ -433,8 +453,11 @@ class KernelIngestor:
                 write_path,
                 generation,
                 incremental_from=(
-                    active_generation if active_generation > 0 and not isolated else None
+                    active_generation
+                    if active_generation > 0 and incremental_rollup_safe
+                    else None
                 ),
+                tool_facts_changed=written.inserted_tools > 0,
             )
             written = replace(
                 written,
@@ -557,46 +580,68 @@ class KernelIngestor:
         observations: tuple[SourceObservation, ...],
         analytical_path: Path,
     ) -> tuple[SourcePlan, ...]:
+        with sqlite3.connect(self.operational_path) as connection:
+            registered = connection.execute(
+                "SELECT source_id, source_location FROM source_registry"
+            ).fetchall()
+        source_by_location = {
+            str(location): str(source_id) for source_id, location in registered
+        }
+        registered_ids = {str(source_id) for source_id, _location in registered}
+        selected_ids = tuple(
+            sorted(
+                {
+                    source_by_location.get(
+                        str(observation.path),
+                        observation.source_id,
+                    )
+                    for observation in observations
+                    if (
+                        str(observation.path) in source_by_location
+                        or observation.source_id in registered_ids
+                    )
+                }
+            )
+        )
+        source_rows: dict[str, sqlite3.Row] = {}
+        with open_read_snapshot(analytical_path) as connection:
+            for start in range(0, len(selected_ids), 500):
+                chunk = selected_ids[start : start + 500]
+                placeholders = ", ".join("?" for _ in chunk)
+                for row in connection.execute(
+                    f"SELECT * FROM sources WHERE source_id IN ({placeholders})",
+                    chunk,
+                ):
+                    source_rows[str(row["source_id"])] = row
         plans = []
         for observation in observations:
+            source_id = source_by_location.get(
+                str(observation.path),
+                observation.source_id,
+            )
+            row = source_rows.get(source_id)
+            cursor = None
+            if row is not None:
+                parser_upgrade = str(row["parser_version"]) != PARSER_VERSION
+                cursor = SourceCursor(
+                    source_id=str(row["source_id"]),
+                    parsed_byte_offset=int(row["parsed_byte_offset"]),
+                    parsed_line_number=int(row["parsed_line_number"]),
+                    size_bytes=int(row["size_bytes"]),
+                    prefix_fingerprint=(
+                        "parser-upgrade-required"
+                        if parser_upgrade
+                        else str(row["replacement_fingerprint"])
+                    ),
+                    is_archived=str(row["archive_state"]) == "archived",
+                )
             planned = plan_source(
                 observation,
-                self._cursor(observation, analytical_path),
+                cursor,
             )
             if planned is not None:
                 plans.append(planned)
         return tuple(plans)
-
-    def _cursor(
-        self,
-        observation: SourceObservation,
-        analytical_path: Path,
-    ) -> SourceCursor | None:
-        source = _registered_source_id(
-            self.operational_path,
-            observation.path,
-            observation.source_id,
-        )
-        if source is None:
-            return None
-        with open_read_snapshot(analytical_path) as connection:
-            row = connection.execute(
-                "SELECT * FROM sources WHERE source_id = ?",
-                (source,),
-            ).fetchone()
-        if row is None:
-            return None
-        parser_upgrade = str(row["parser_version"]) != PARSER_VERSION
-        return SourceCursor(
-            source_id=str(row["source_id"]),
-            parsed_byte_offset=int(row["parsed_byte_offset"]),
-            parsed_line_number=int(row["parsed_line_number"]),
-            size_bytes=int(row["size_bytes"]),
-            prefix_fingerprint=(
-                "parser-upgrade-required" if parser_upgrade else str(row["replacement_fingerprint"])
-            ),
-            is_archived=str(row["archive_state"]) == "archived",
-        )
 
     def _prepare(
         self,
@@ -978,100 +1023,62 @@ class KernelIngestor:
         refresh_run_id: str,
         *,
         force_isolation: bool = False,
-    ) -> tuple[Path, bool]:
-        requires_isolation = (
-            force_isolation
-            or any(plan.replace_existing and plan.prior_source_id is not None for plan in plans)
-            or self._active_collision_requires_isolation(
-                active_path,
-                plans,
-                normalized,
+    ) -> tuple[Path, bool, bool]:
+        replacement = any(
+            plan.replace_existing and plan.prior_source_id is not None for plan in plans
+        )
+        index_backfill = self._active_generation() > 0 and not _tool_turn_index_ready(
+            active_path
+        )
+        if force_isolation or replacement or index_backfill:
+            collision, collision_incremental_safe = False, False
+        else:
+            collision, collision_incremental_safe = (
+                self._active_collision_requires_isolation(
+                    active_path,
+                    plans,
+                    normalized,
+                )
             )
+        requires_isolation = force_isolation or replacement or index_backfill or collision
+        incremental_rollup_safe = (
+            not force_isolation
+            and not replacement
+            and not index_backfill
+            and collision_incremental_safe
         )
         if not requires_isolation:
-            return active_path, False
+            return active_path, False, True
         suffix = uuid.uuid5(
             uuid.NAMESPACE_URL,
             f"{generation}:{refresh_run_id}",
         ).hex[:12]
         staging = active_path.with_name(f".{active_path.stem}.g{generation}-{suffix}.sqlite3")
         _clone_database(active_path, staging)
-        return staging, True
+        if index_backfill:
+            with sqlite3.connect(staging) as connection:
+                create_missing_secondary_indexes(connection)
+        return staging, True, incremental_rollup_safe
 
     def _active_collision_requires_isolation(
         self,
         active_path: Path,
         plans: tuple[SourcePlan, ...],
         normalized: tuple[NormalizedBatch, ...],
-    ) -> bool:
+    ) -> tuple[bool, bool]:
         if self._active_generation() == 0:
-            return False
-        tool_ids = tuple(
-            sorted(
-                {
-                    str(row["tool_call_id"])
-                    for batch in normalized
-                    for row in batch.tool_calls
-                }
-            )
-        )
-        call_turn_ids = tuple(
-            sorted(
-                {
-                    str(row["turn_id"])
-                    for batch in normalized
-                    for row in batch.model_calls
-                    if row.get("turn_id") is not None
-                }
-            )
-        )
-        fingerprints = tuple(
-            sorted(
-                {
-                    str(row["canonical_call_id"])
-                    for plan, batch in zip(plans, normalized, strict=True)
-                    if not plan.observation.is_archived
-                    for row in batch.model_calls
-                }
-            )
-        )
+            return False, True
+        tool_ids = _incoming_tool_ids(normalized)
+        call_turn_ids = _incoming_call_turn_ids(normalized)
+        fingerprints = _incoming_active_fingerprints(plans, normalized)
         with open_read_snapshot(active_path) as connection:
-            for column, values in (
-                ("tool_call_id", tool_ids),
-                ("turn_id", call_turn_ids),
-            ):
-                for start in range(0, len(values), 500):
-                    chunk = values[start : start + 500]
-                    placeholders = ", ".join("?" for _ in chunk)
-                    row = connection.execute(
-                        f"""
-                        SELECT 1
-                        FROM tool_calls
-                        WHERE {column} IN ({placeholders})
-                        LIMIT 1
-                        """,
-                        chunk,
-                    ).fetchone()
-                    if row is not None:
-                        return True
-            for start in range(0, len(fingerprints), 500):
-                chunk = fingerprints[start : start + 500]
-                placeholders = ", ".join("?" for _ in chunk)
-                row = connection.execute(
-                    f"""
-                    SELECT 1
-                    FROM model_calls
-                    JOIN sources USING (source_id)
-                    WHERE model_calls.duplicate_state = 'canonical'
-                      AND sources.archive_state = 'archived'
-                      AND model_calls.canonical_call_id IN ({placeholders})
-                    LIMIT 1
-                    """,
-                    chunk,
-                ).fetchone()
-                if row is not None:
-                    return True
-        return False
+            if _has_tool_id_collision(connection, tool_ids):
+                return True, True
+            if _has_tool_turn_collision(connection, call_turn_ids):
+                return True, True
+            if _has_archived_fingerprint_collision(connection, fingerprints):
+                return True, False
+        return False, True
 
 
 def refresh_request_hash(
@@ -1087,34 +1094,131 @@ def refresh_request_hash(
     )
 
 
-def _registered_source_id(
-    path: Path,
-    source: Path,
-    observed_source_id: str,
-) -> str | None:
-    if not path.is_file():
-        return None
-    with sqlite3.connect(path) as connection:
-        row = connection.execute(
-            """
-            SELECT source_id
-            FROM source_registry
-            WHERE source_location = ? OR source_id = ?
-            ORDER BY source_location = ? DESC
-            LIMIT 1
-            """,
-            (
-                str(source.resolve()),
-                observed_source_id,
-                str(source.resolve()),
-            ),
-        ).fetchone()
-        return str(row[0]) if row else None
+def _selector_bytes(value: str, prefix: str) -> bytes:
+    if not value.startswith(prefix):
+        raise ValueError(f"invalid selector prefix: {prefix}")
+    return bytes.fromhex(value[len(prefix) :])
+
+
+def _incoming_tool_ids(
+    normalized: tuple[NormalizedBatch, ...],
+) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            {
+                str(row["tool_call_id"])
+                for batch in normalized
+                for row in batch.tool_calls
+            }
+        )
+    )
+
+
+def _incoming_call_turn_ids(
+    normalized: tuple[NormalizedBatch, ...],
+) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            {
+                str(row["turn_id"])
+                for batch in normalized
+                for row in batch.model_calls
+                if row.get("turn_id") is not None
+            }
+        )
+    )
+
+
+def _incoming_active_fingerprints(
+    plans: tuple[SourcePlan, ...],
+    normalized: tuple[NormalizedBatch, ...],
+) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            {
+                str(row["canonical_call_id"])
+                for plan, batch in zip(plans, normalized, strict=True)
+                if not plan.observation.is_archived
+                for row in batch.model_calls
+            }
+        )
+    )
+
+
+def _has_tool_id_collision(
+    connection: sqlite3.Connection,
+    tool_ids: tuple[str, ...],
+) -> bool:
+    return _has_chunked_collision(
+        connection,
+        """
+        SELECT 1
+        FROM tool_call_facts
+        WHERE tool_call_id IN ({placeholders})
+        LIMIT 1
+        """,
+        tuple(_selector_bytes(value, "tool_") for value in tool_ids),
+    )
+
+
+def _has_tool_turn_collision(
+    connection: sqlite3.Connection,
+    turn_ids: tuple[str, ...],
+) -> bool:
+    return _has_chunked_collision(
+        connection,
+        """
+        SELECT 1
+        FROM turns
+        JOIN tool_call_facts USING (turn_key)
+        WHERE turns.turn_id IN ({placeholders})
+        LIMIT 1
+        """,
+        turn_ids,
+    )
+
+
+def _has_archived_fingerprint_collision(
+    connection: sqlite3.Connection,
+    fingerprints: tuple[str, ...],
+) -> bool:
+    return _has_chunked_collision(
+        connection,
+        """
+        SELECT 1
+        FROM model_call_facts
+        JOIN sources USING (source_key)
+        WHERE model_call_facts.duplicate_state = 'canonical'
+          AND sources.archive_state = 'archived'
+          AND model_call_facts.canonical_call_id IN ({placeholders})
+        LIMIT 1
+        """,
+        tuple(_selector_bytes(value, "fp_") for value in fingerprints),
+    )
+
+
+def _has_chunked_collision(
+    connection: sqlite3.Connection,
+    query: str,
+    values: tuple[object, ...],
+) -> bool:
+    for start in range(0, len(values), 500):
+        chunk = values[start : start + 500]
+        placeholders = ", ".join("?" for _ in chunk)
+        if connection.execute(
+            query.format(placeholders=placeholders),
+            chunk,
+        ).fetchone() is not None:
+            return True
+    return False
 
 
 def _clone_database(source: Path, destination: Path) -> None:
     if destination.exists():
         raise ValueError("staging analytical database already exists")
+    if _clone_checkpointed_database(source, destination):
+        destination.chmod(0o600)
+        return
     source_uri = source.as_uri() + "?mode=ro"
     try:
         with (
@@ -1126,6 +1230,62 @@ def _clone_database(source: Path, destination: Path) -> None:
         destination.unlink(missing_ok=True)
         raise
     destination.chmod(0o600)
+
+
+def _tool_turn_index_ready(path: Path) -> bool:
+    with sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True) as connection:
+        return (
+            connection.execute(
+                """
+                SELECT 1 FROM sqlite_schema
+                WHERE type = 'index' AND name = 'idx_tool_calls_turn'
+                """
+            ).fetchone()
+            is not None
+        )
+
+
+def _clone_checkpointed_database(source: Path, destination: Path) -> bool:
+    """Use a filesystem snapshot only while the validated main file is stable."""
+
+    try:
+        with sqlite3.connect(source, isolation_level=None, timeout=0.25) as guard:
+            guard.execute("BEGIN IMMEDIATE")
+            wal = source.with_name(source.name + "-wal")
+            checkpointed = not wal.exists() or wal.stat().st_size == 0
+            cloned = checkpointed and _copy_on_write_clone(source, destination)
+            guard.execute("ROLLBACK")
+        if not cloned:
+            destination.unlink(missing_ok=True)
+            return False
+        with open_read_snapshot(destination) as connection:
+            connection.execute("SELECT 1").fetchone()
+        return True
+    except (OSError, sqlite3.Error, ValueError):
+        destination.unlink(missing_ok=True)
+        return False
+
+
+def _copy_on_write_clone(source: Path, destination: Path) -> bool:
+    """Clone one file on APFS; other platforms retain SQLite backup."""
+
+    if sys.platform != "darwin":
+        return False
+    library = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+    clonefile = getattr(library, "clonefile", None)
+    if clonefile is None:
+        return False
+    clonefile.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int)
+    clonefile.restype = ctypes.c_int
+    result = clonefile(
+        os.fsencode(source),
+        os.fsencode(destination),
+        0,
+    )
+    if result == 0:
+        return True
+    destination.unlink(missing_ok=True)
+    return False
 
 
 def _request_hash(

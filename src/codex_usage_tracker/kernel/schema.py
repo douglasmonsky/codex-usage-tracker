@@ -6,7 +6,7 @@ import sqlite3
 
 SCHEMA_VERSION = 3
 APPLICATION_ID = 0x43555431
-MAX_INDEX_COUNT = 14
+MAX_INDEX_COUNT = 15
 SCHEMA_CAPABILITIES = frozenset(
     {
         "stable-identities",
@@ -90,6 +90,10 @@ SECONDARY_INDEX_SQL = {
     "idx_tool_calls_thread_time": (
         "CREATE INDEX idx_tool_calls_thread_time "
         "ON tool_call_facts(thread_key, started_at)"
+    ),
+    "idx_tool_calls_turn": (
+        "CREATE INDEX idx_tool_calls_turn "
+        "ON tool_call_facts(turn_key, generation)"
     ),
     "idx_activity_thread_time": (
         "CREATE INDEX idx_activity_thread_time "
@@ -441,6 +445,8 @@ CREATE INDEX idx_model_calls_time
 ON model_call_facts(event_at, generation, duplicate_state);
 CREATE INDEX idx_tool_calls_thread_time
 ON tool_call_facts(thread_key, started_at);
+CREATE INDEX idx_tool_calls_turn
+ON tool_call_facts(turn_key, generation);
 CREATE INDEX idx_activity_thread_time
 ON activity_facts(thread_key, event_at);
 CREATE INDEX idx_allowance_window_time
@@ -833,3 +839,12 @@ def create_secondary_indexes(connection: sqlite3.Connection) -> None:
 
     for statement in SECONDARY_INDEX_SQL.values():
         connection.execute(statement)
+
+
+def create_missing_secondary_indexes(connection: sqlite3.Connection) -> None:
+    """Backfill additive query indexes on an unpublished clone."""
+
+    for statement in SECONDARY_INDEX_SQL.values():
+        connection.execute(
+            statement.replace("CREATE INDEX", "CREATE INDEX IF NOT EXISTS", 1)
+        )

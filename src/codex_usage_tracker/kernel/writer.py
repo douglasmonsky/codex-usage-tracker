@@ -380,18 +380,20 @@ def _read_counts(
     connection = sqlite3.connect(path)
     try:
         calls = connection.execute(
-            "SELECT COUNT(*) FROM model_calls WHERE generation = ?",
+            "SELECT COUNT(*) FROM model_call_facts WHERE generation = ?",
             (generation,),
         ).fetchone()[0]
         tools = connection.execute(
-            "SELECT COUNT(*) FROM tool_calls WHERE generation = ?",
+            "SELECT COUNT(*) FROM tool_call_facts WHERE generation = ?",
             (generation,),
         ).fetchone()[0]
         canonical = connection.execute(
-            "SELECT COUNT(*) FROM model_calls WHERE duplicate_state = 'canonical'"
+            "SELECT COUNT(*) FROM model_call_facts "
+            "WHERE duplicate_state = 'canonical'"
         ).fetchone()[0]
         excluded = connection.execute(
-            "SELECT COUNT(*) FROM model_calls WHERE duplicate_state != 'canonical'"
+            "SELECT COUNT(*) FROM model_call_facts "
+            "WHERE duplicate_state != 'canonical'"
         ).fetchone()[0]
         yield int(calls), int(tools), int(canonical), int(excluded)
     finally:

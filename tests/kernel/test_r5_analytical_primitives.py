@@ -785,6 +785,31 @@ def test_moving_tail_relinks_tool_to_following_model_call(
     )
 
     assert result.rows == ({"adjacent_total_tokens": 102},)
+    control = load_cutover_control(runtime.kernel.operational)
+    assert control.active_kernel_path is not None
+    assert control.active_generation == 2
+    with sqlite3.connect(control.active_kernel_path) as connection:
+        persisted = connection.execute(
+            """
+            SELECT operation, target_label, calls, duration_ms, output_bytes
+            FROM rollup_tool_operation
+            WHERE generation = 2
+            ORDER BY operation, target_label
+            """
+        ).fetchall()
+        exact = connection.execute(
+            """
+            SELECT profiles.operation, COALESCE(facts.target_label, ''),
+                   COUNT(*), COALESCE(SUM(facts.duration_ms), 0.0),
+                   COALESCE(SUM(facts.output_bytes), 0)
+            FROM tool_call_facts AS facts
+            JOIN tool_profiles AS profiles USING (tool_profile_key)
+            WHERE facts.generation <= 2
+            GROUP BY profiles.operation, COALESCE(facts.target_label, '')
+            ORDER BY profiles.operation, COALESCE(facts.target_label, '')
+            """
+        ).fetchall()
+    assert persisted == exact
 
 
 def test_failed_tool_update_never_mutates_active_generation(

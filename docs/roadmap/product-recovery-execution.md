@@ -17,7 +17,7 @@ benchmark, a source-only tag, or an unpublished package.
 | R3 | Complete | R2 | `feature/r3-build-refresh-performance` | PR #344 merged as `f740939`; selective hydration and refresh gates pass |
 | R4 | Complete | R2 | `feature/r4-fast-query-mcp` | PR #345 merged as `da42350`; persisted rollups and fast bounded paths |
 | R5 | Complete | R3, R4 | `feature/r5-analytical-primitives` | PR #346 merged as `34528d1`; analytical facts and human semantics restored |
-| R6 | In progress | R4, R5 | `feature/r6-console-usability` | Human-first Console implementation and browser qualification underway |
+| R6 | Complete | R4, R5 | `feature/r6-console-usability` | PR #347 merged as `10b509d`; human-first Console and browser qualification pass |
 | R7 | Pending | R1; completes after R3–R6 | — | Installed fresh-task qualification |
 | R8 | Pending | R0; completes after R6, R7 | — | Public documentation |
 | R9 | Pending | R7, R8 | — | Public `0.29.0` release |
@@ -549,6 +549,72 @@ reparsing the first 52 sources.
   contract or explicitly document why SQLite integrity, foreign-key checks,
   accounting oracles, and exact release hashes remain the chosen layers.
 
+### R7 qualification correction — issue #348
+
+R7's first production-shaped installed qualification correctly returned a
+cross-cutting refresh failure to R3/R4 ownership instead of patching product
+behavior in the qualification harness. On the 643-source, roughly 1.1 GB
+synthetic corpus, the merged implementation committed facts but did not finish
+within 240 seconds. The candidate contained 1,316,864 calls and 658,432 tools
+but remained in full rollup validation. A one-call complete-history tail then
+took 9.151 seconds.
+
+The root cause was a correlated unresolved-tool query executed once per tool
+row, plus repeated view expansion, source-registry transactions, per-source
+cursor database opens, complete catalog rewrites, and full rollup rebuilds on
+ordinary tails. The correction:
+
+- uses a set-based unresolved-tool candidate set and a turn-key index;
+- incrementally carries forward unaffected rollups and rebuilds tool-operation
+  totals only when tool facts change;
+- batches source planning and registration and avoids rewriting unchanged
+  hydration catalogs;
+- uses physical compact fact tables for validation counts and collision probes;
+- backfills the additive turn-key index only on an unpublished clone; and
+- uses an APFS copy-on-write clone only while a short guarded snapshot proves
+  the WAL empty, retaining SQLite backup everywhere else.
+
+No schema version changed, no integrity or freshness boundary weakened, and no
+real local usage content was read. The additive index remains optional for
+opening an existing schema-v3 database and is created on the next unpublished
+write path.
+
+| Production-shaped workload | Before | Corrected |
+| --- | ---: | ---: |
+| Cold complete build | nonterminal after 240 s | 129.835 s |
+| Warm no-change refresh, five runs | 926–1,067 ms | 185–192 ms after one 306 ms catalog restoration sample |
+| One-call complete-history tail | 9.151 s | 1.078 s |
+| One-tool complete-history tail | not separately frozen | 2.228 s |
+| Published analytical database | 618,766,336 bytes before completion | 627,216,384 bytes, below 700 MiB |
+
+The complete-history one-call result is 88.2% faster but does not satisfy the
+literal 500 ms tail target. Its measured floor includes two full 643-source
+moving-tail catalogs and a roughly 320 ms exact incremental rollup
+transaction. The existing owned 160-source tail gate still passes at 420 ms;
+R7 must report the complete-history residual rather than presenting the smaller
+fixture as universal. A future watcher-provided dirty-source set may remove the
+full-catalog tax, but is not assumed by this correction.
+
+Integrity evidence on the active 1,316,875-call candidate passes
+`PRAGMA quick_check`, has zero foreign-key violations, and exactly matches both
+global canonical-call totals and tool-operation grouped facts. The focused
+ingestion, hydration, reconciliation, concurrency, live-integration, rollup,
+and performance suite passes 92 tests. Ruff, MyPy over 50 kernel source files,
+and Pyright pass. The complete repository suite passes 445 tests; the measured
+kernel source and exact 15-index release-candidate budgets pass with no more
+than 3% headroom. Attribution-only `agent-perf` run
+`20260728T063501Z-8987ee88` completed; unprofiled repeated timings above remain
+the speed evidence. No subagents were used for implementation.
+
+The single final read-only reviewer reported one high-severity finding and it
+was accepted. An old schema-v3 database needing the additive index could meet a
+late active duplicate in the same isolated refresh; canonical reselection then
+made prior-generation rollups unsafe to copy. Index-backfill refreshes now
+perform a one-time full rollup rebuild, with a regression that proves persisted
+global calls and tokens exactly equal canonical facts. Review totals are one
+finding, one accepted finding, and reviewer-token attribution `pending`; no
+retry blocks the correction.
+
 ## R4 — Build Persisted Rollups And Fast MCP/API Paths
 
 **State:** In progress
@@ -919,4 +985,6 @@ below the retained 90,000-byte ceiling.
   performance command passed all eight contracts, and the full repository gate
   passed all 415 tests.
 
-PR/CI merge remains before R6 completion.
+R6 merged through PR #347 as `10b509d`. Its task branch and worktree remain
+preserved. R7 consumes the qualified Console behavior and installed-package
+fixtures.
