@@ -631,6 +631,19 @@ def smoke_install(
         ).stdout
         if any(name not in help_text for name in CLI_HELP_SUBCOMMANDS):
             raise RuntimeError("installed CLI catalog is incomplete")
+        package = _run_json([command, "package"], environment=environment)
+        installed_version = package.get("version")
+        version_text = subprocess.run(
+            [command, "--version"],
+            check=True,
+            capture_output=True,
+            env=environment,
+            text=True,
+        ).stdout.strip()
+        if version_text != f"codex-usage-tracker {installed_version}":
+            raise RuntimeError(
+                f"installed CLI version differs: {version_text}"
+            )
         installed_root = next(
             python.parent.parent.glob(
                 "lib/python*/site-packages/codex_usage_tracker"
@@ -645,7 +658,6 @@ def smoke_install(
             raise RuntimeError(
                 f"installed package resources are missing: {missing_resources}"
             )
-        package = _run_json([command, "package"], environment=environment)
         if version is not None and package.get("version") != version:
             raise RuntimeError(f"installed version differs: {package}")
         _run_json(

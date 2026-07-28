@@ -46,6 +46,11 @@ def build_parser() -> argparse.ArgumentParser:
         prog="codex-usage-tracker",
         description="Exact local Codex usage facts and evidence.",
     )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("setup", help="initialize the kernel cache")
     subparsers.add_parser("status", help="show committed generation status")
