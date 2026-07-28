@@ -22,7 +22,12 @@ from codex_usage_tracker.kernel.ingest import (
 from codex_usage_tracker.kernel.lease import RefreshLeaseRepository
 from codex_usage_tracker.kernel.operational import initialize_operational_database
 
-from .support import ORACLE_ROOT, active_runtime, synthetic_sources
+from .support import (
+    ORACLE_ROOT,
+    active_runtime,
+    logical_split_runtime,
+    synthetic_sources,
+)
 
 
 def test_read_use_cases_share_one_generation_and_never_write(tmp_path: Path) -> None:
@@ -158,6 +163,42 @@ def test_named_top_threads_template_matches_the_explicit_fast_path(
     assert repeated["cache"]["hit"] is True
     assert all(row["thread_label"] for row in named["results"][0]["rows"])
     assert named["results"][0]["evidence_selectors"]
+
+
+def test_named_top_threads_keeps_logical_token_and_cost_results_coherent(
+    tmp_path: Path,
+) -> None:
+    app = KernelApplication(
+        logical_split_runtime(tmp_path),
+        worker_launcher=lambda _paths, _preset: None,
+    )
+
+    first = app.query({"requests": [{"template": "top_threads"}]})
+    repeated = app.query({"requests": [{"template": "top_threads"}]})
+    token_result, cost_result = first["results"]
+    token_threads = [str(row["thread"]) for row in token_result["rows"]]
+    cost_threads = [str(row["thread"]) for row in cost_result["rows"]]
+
+    assert token_threads == cost_threads
+    assert len(token_threads) == len(set(token_threads)) == 2
+    assert [row["thread_label"] for row in token_result["rows"]] == [
+        row["thread_label"] for row in cost_result["rows"]
+    ]
+    assert token_result["rows"][0]["thread_label"] == "Current logical thread"
+    assert token_result["rows"][0]["calls"] == 2
+    assert token_result["rows"][0]["uncached_input_tokens"] == 298
+    assert token_result["rows"][0]["cached_input_tokens"] == 2
+    assert token_result["rows"][0]["reasoning_tokens"] == 2
+    assert token_result["rows"][0]["output_tokens"] == 4
+    assert token_result["rows"][0]["total_tokens"] == 304
+    assert all(
+        "configured_cost_usd" in row and "estimated_credits" in row
+        for row in cost_result["rows"]
+    )
+    assert first["cache"]["hit"] is False
+    assert repeated["cache"]["hit"] is True
+    assert repeated["cache"]["key"] == first["cache"]["key"]
+    assert repeated["results"] == first["results"]
 
 
 def test_curated_period_and_latest_change_templates_use_one_snapshot(

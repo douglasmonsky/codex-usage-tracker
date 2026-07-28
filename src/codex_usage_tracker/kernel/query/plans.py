@@ -246,28 +246,49 @@ def _compile_thread_rollup(
     ):
         return None
     expressions = {
-        "calls": "rollup.calls",
-        "input_tokens": "rollup.input_tokens",
-        "uncached_input_tokens": ("rollup.input_tokens - rollup.cached_input_tokens"),
-        "cached_input_tokens": "rollup.cached_input_tokens",
-        "output_tokens": "rollup.output_tokens",
-        "reasoning_tokens": "rollup.reasoning_tokens",
-        "total_tokens": "rollup.input_tokens + rollup.output_tokens",
+        "calls": "SUM(rollup.calls)",
+        "input_tokens": "SUM(rollup.input_tokens)",
+        "uncached_input_tokens": (
+            "SUM(rollup.input_tokens) - SUM(rollup.cached_input_tokens)"
+        ),
+        "cached_input_tokens": "SUM(rollup.cached_input_tokens)",
+        "output_tokens": "SUM(rollup.output_tokens)",
+        "reasoning_tokens": "SUM(rollup.reasoning_tokens)",
+        "total_tokens": "SUM(rollup.input_tokens) + SUM(rollup.output_tokens)",
     }
     if any(measure not in expressions for measure in request.measures):
         return None
+    thread_label = (
+        "resolved_thread_label("
+        "canonical_threads.session_identity_hash, "
+        "canonical_threads.display_label)"
+    )
     selected = [
         "threads.logical_thread_id AS thread",
-        (f"{DATASETS['calls'].dimensions['thread_label']} AS thread_label"),
+        f"{thread_label} AS thread_label",
         *(f"{expressions[measure]} AS {measure}" for measure in request.measures),
         "COUNT(*) OVER () AS __matched_count",
         "COUNT(*) OVER () AS __scanned_count",
     ]
-    base_query = (
-        f"SELECT {', '.join(selected)} "
+    grouped_rows = (
         "FROM rollup_thread AS rollup "
         "JOIN threads USING (thread_key) "
-        "WHERE rollup.generation = ?"
+        "JOIN threads AS canonical_threads "
+        "ON canonical_threads.thread_key = ("
+        "SELECT candidate_threads.thread_key "
+        "FROM threads AS candidate_threads "
+        "WHERE candidate_threads.logical_thread_id = threads.logical_thread_id "
+        "AND candidate_threads.first_generation <= ? "
+        "ORDER BY candidate_threads.archive_state = 'active' DESC, "
+        "candidate_threads.last_generation DESC, "
+        "candidate_threads.thread_key "
+        "LIMIT 1) "
+        "WHERE rollup.generation = ? "
+        "GROUP BY threads.logical_thread_id, canonical_threads.thread_key"
+    )
+    base_query = (
+        f"SELECT {', '.join(selected)} "
+        f"{grouped_rows}"
     )
     if operation is Operation.SHARE:
         share_columns = ", ".join(
@@ -280,16 +301,17 @@ def _compile_thread_rollup(
     order_name = request.order_by or (request.measures[0] if request.measures else "thread")
     direction = "DESC" if request.descending else "ASC"
     sql = f"{base_query} ORDER BY {order_name} {direction}, thread ASC LIMIT ? OFFSET ?"
-    count_sql = "SELECT COUNT(*) FROM rollup_thread WHERE generation = ?"
+    count_sql = f"SELECT COUNT(*) FROM (SELECT 1 {grouped_rows}) AS grouped"
+    generation_parameters = (generation, generation)
     return CompiledPlan(
         plan_id=f"calls.{operation.value}.rollup_thread.v{PLAN_VERSION}",
         sql=sql,
         count_sql=count_sql,
         scan_sql=count_sql,
         coverage_sql=None,
-        parameters=(generation, request.limit + 1, offset),
-        count_parameters=(generation,),
-        scan_parameters=(generation,),
+        parameters=(*generation_parameters, request.limit + 1, offset),
+        count_parameters=generation_parameters,
+        scan_parameters=generation_parameters,
         coverage_parameters=(),
         offset=offset,
     )

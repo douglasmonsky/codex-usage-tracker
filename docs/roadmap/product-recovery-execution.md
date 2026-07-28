@@ -789,8 +789,8 @@ gates. The plugin bundle measures 5,601 bytes under its 5,620-byte ceiling.
 GitNexus classified the changed materializer itself low risk after refreshing
 the exact worktree index; application, MCP, cache, and coverage callers are
 covered by the focused and complete interface suites. Branch:
-`fix/template-partial-coverage`. Final review, PR CI, merge identity, and
-installed fresh-task confirmation remain pending. The single final read-only
+`fix/template-partial-coverage`. PR #357 merged as `bd0d295`; all three
+required CI jobs passed. The single final read-only
 reviewer reported one medium-severity finding and it was accepted: partial
 facts now require the agent to state the hydration preset/cutoff and never
 generalize the result to all history, with an exact bundled-skill regression.
@@ -820,8 +820,8 @@ seven-test focused set. Release safety passes, and the regenerated plugin
 bundle measures 5,617 bytes under its 5,620-byte ceiling. The maintained
 `just v` profile passes 441 Python tests, nine frontend tests, Ruff, MyPy,
 Pyright, deterministic assets, scope, maintainability, and release-safety
-gates. Branch: `fix/top-threads-result-order`. Final review, PR CI, merge
-identity, and repeated installed fresh-task evidence remain pending.
+gates. Branch: `fix/top-threads-result-order`. PR #359 merged as `2afba3d`;
+all three required CI jobs passed.
 
 The single final read-only reviewer reported one medium-severity finding and
 it was accepted: result order alone did not prove both results cover the same
@@ -830,6 +830,61 @@ totals, shares, token classes, and cost/credit roles in one frozen instruction.
 Review totals are one finding and one accepted finding (`R1`); reviewer-token
 status and tokens per accepted finding are `pending` because the metrics helper
 still invokes the retired `strict` command. No retry or second review was run.
+
+### R7 qualification correction — issue #360
+
+The first fresh installed Desktop task after the issue #358 correction still
+made a necessary second query. The `top_threads` result returned five physical
+rollup rows but only two distinct logical thread identities, while a companion
+cost/credit plan returned five distinct identities. Structural-only installed
+queries reproduced the duplicate multiplicity without persisting or printing
+local labels, selectors, identities, or usage values.
+
+The root cause was `rollup_thread`'s physical `thread_key` grain. The fast
+query plan exposed `threads.logical_thread_id` but did not consolidate physical
+rows that share that logical identity. The corrected plan groups physical
+rollups by logical thread, sums all token classes and calls, derives shares
+from those consolidated rows, and selects the current canonical human label.
+Matched and scanned counts now describe logical results rather than physical
+storage rows. The persisted schema, writer, six-tool surface, public request
+schema, and frozen `0.28` contract remain unchanged.
+
+The contract-red regression first returned three rows where the two-row
+logical result was expected. Its final synthetic fixture builds an active
+continuation, archived physical history, and copied duplicate through normal
+ingestion. It proves unique logical identities, canonical copied-call
+exclusion, every token class against a direct canonical-fact oracle, the
+active/newest human label, exact logical matched/scanned counts, and shares
+that sum to one. Application and MCP regressions prove the token and
+cost/credit results contain the same ordered logical identities and labels,
+the repeated batch hits the application cache, and the model-facing MCP
+payload preserves both results. The focused query and interface set passes
+129 tests. The maintained `just v` profile passes 444 Python
+tests, nine frontend tests, Ruff, MyPy, Pyright, deterministic assets, scope,
+maintainability, and release-safety gates.
+
+On the unchanged 100,000-call synthetic workload, unprofiled common-query p95
+improved from 1.538 ms to 1.197 ms; comparison p95 improved from 145.494 ms to
+140.182 ms; concentration remained effectively flat at 2.072 ms versus
+2.051 ms; and daily p95 improved from 1.597 ms to 1.211 ms. These repeatable
+unprofiled timings are the speed evidence. Agent-perf runs
+`20260728T125643Z-c8f7f1d5` before and
+`20260728T131552Z-b9a5cfc0` after the final review remediation provide
+attribution only. GitNexus classified `_compile_thread_rollup` LOW symbol-level
+risk with five impacted symbols and one direct caller; final-diff detection is
+MEDIUM overall through the `compile_plan` and `execute_batch` query/application
+paths.
+
+The single final read-only reviewer reported three findings and all three were
+accepted: logical consolidation now covers the direct cost/credit companion
+plan, synthetic ingestion and public application/MCP contracts replace the
+narrow direct-rollup mutation, and this ledger distinguishes symbol-level
+LOW impact from final-diff MEDIUM risk. Review totals are three findings and
+three accepted findings (`R1`, `R2`, `R3`); reviewer-token status and tokens
+per accepted finding are `pending` because the metrics helper invokes the
+retired `strict` command. No retry or second review was run. Branch:
+`fix/logical-thread-rollup`. PR CI, merge identity, and repeated installed
+fresh-task confirmation remain pending.
 
 ## R4 — Build Persisted Rollups And Fast MCP/API Paths
 
