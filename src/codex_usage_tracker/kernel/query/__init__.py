@@ -1,6 +1,11 @@
 """Bounded generation-consistent kernel query engine."""
 
-from .catalog import exploration_guidance, materialize_query_requests
+from .catalog import (
+    exploration_guidance,
+    materialize_query_requests,
+    query_template_context_keys,
+    query_template_context_required,
+)
 from .contracts import (
     ComparisonWindow,
     Filter,
@@ -8,7 +13,7 @@ from .contracts import (
     QueryRequest,
     QueryResult,
 )
-from .service import QueryService
+from .service import QueryService, snapshot_query_template_context
 
 __all__ = [
     "ComparisonWindow",
@@ -19,4 +24,7 @@ __all__ = [
     "QueryService",
     "exploration_guidance",
     "materialize_query_requests",
+    "query_template_context_keys",
+    "query_template_context_required",
+    "snapshot_query_template_context",
 ]

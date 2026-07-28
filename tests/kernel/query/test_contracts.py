@@ -22,13 +22,24 @@ _GUIDED_TEMPLATE_IDS = (
     "allowance",
     "concentration",
     "context_composition",
+    "latest_incremental_change",
     "model_effort",
     "period_comparison",
     "subagents",
     "top_threads",
     "tools",
     "turns",
+    "week_over_week",
+    "weekly_drivers",
 )
+_TEMPLATE_CONTEXT = {
+    "current_end": "2026-01-15T00:00:00.001Z",
+    "current_start": "2026-01-08T00:00:00Z",
+    "latest_event_at": "2026-01-15T00:00:00Z",
+    "latest_generation": 3,
+    "previous_end": "2026-01-08T00:00:00Z",
+    "previous_start": "2026-01-01T00:00:00Z",
+}
 
 
 def test_exploration_guidance_is_static_compact_and_decision_complete() -> None:
@@ -112,7 +123,10 @@ def test_every_guided_template_materializes_to_a_valid_query_batch() -> None:
     }
 
     for template in templates.values():
-        requests = _materialize(template["requests"], parameters)
+        requests = _materialize(
+            template["requests"],
+            {**parameters, **_TEMPLATE_CONTEXT},
+        )
         assert 1 <= len(requests) <= 8
         for request in requests:
             query_request(request).normalized()
@@ -136,11 +150,14 @@ def test_server_side_template_materialization_matches_every_guided_template() ->
         if selected:
             named_request["parameters"] = selected
 
-        materialized = materialize_query_requests([named_request])
+        materialized = materialize_query_requests(
+            [named_request],
+            context=_TEMPLATE_CONTEXT,
+        )
 
         assert list(materialized) == _materialize(
             template["requests"],
-            parameters,
+            {**_TEMPLATE_CONTEXT, **selected},
         )
         for request in materialized:
             query_request(request).normalized()
@@ -165,6 +182,55 @@ def test_every_console_dataset_default_is_a_valid_query() -> None:
     for metadata in datasets.values():
         if default_request := metadata.get("default_request"):
             query_request(default_request).normalized()
+
+
+def test_dynamic_templates_require_closed_snapshot_context() -> None:
+    with pytest.raises(ValueError, match="query template context is unavailable"):
+        materialize_query_requests([{"template": "weekly_drivers"}])
+    with pytest.raises(ValueError, match="query template context is unavailable"):
+        materialize_query_requests(
+            [{"template": "week_over_week"}],
+            context={"latest_generation": 3},
+        )
+
+    requests = materialize_query_requests(
+        [
+            {"template": "weekly_drivers"},
+            {"template": "week_over_week"},
+            {"template": "latest_incremental_change"},
+        ],
+        context=_TEMPLATE_CONTEXT,
+    )
+
+    assert len(requests) == 4
+    assert requests[0]["filters"] == [
+        {
+            "field": "event_at",
+            "operator": "gte",
+            "value": _TEMPLATE_CONTEXT["current_start"],
+        },
+        {
+            "field": "event_at",
+            "operator": "lte",
+            "value": _TEMPLATE_CONTEXT["latest_event_at"],
+        },
+    ]
+    assert requests[1]["comparison"] == {
+        "current_start": _TEMPLATE_CONTEXT["current_start"],
+        "current_end": _TEMPLATE_CONTEXT["current_end"],
+        "previous_start": _TEMPLATE_CONTEXT["previous_start"],
+        "previous_end": _TEMPLATE_CONTEXT["previous_end"],
+    }
+    assert all(
+        request["filters"] == [
+            {
+                "field": "generation",
+                "operator": "eq",
+                "value": 3,
+            }
+        ]
+        for request in requests[2:]
+    )
 
 
 def _materialize(value: Any, parameters: dict[str, str]) -> Any:

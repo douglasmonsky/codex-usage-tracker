@@ -208,6 +208,46 @@ def test_mcp_executes_named_top_threads_template_in_one_query_call(
     )
 
 
+@pytest.mark.parametrize(
+    ("template", "result_count"),
+    [
+        ("weekly_drivers", 1),
+        ("week_over_week", 1),
+        ("latest_incremental_change", 2),
+    ],
+)
+def test_mcp_executes_curated_agent_templates_in_one_call(
+    tmp_path: Path,
+    template: str,
+    result_count: int,
+) -> None:
+    server = McpServer(
+        KernelApplication(
+            active_runtime(tmp_path),
+            worker_launcher=lambda _paths, _preset: None,
+            source_provider=lambda _home: synthetic_sources(),
+        )
+    )
+
+    response = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "usage_query",
+                "arguments": {"requests": [{"template": template}]},
+            },
+        }
+    )
+
+    result = response["result"]["structuredContent"]
+    assert len(result["results"]) == result_count
+    assert {item["generation"] for item in result["results"]} == {1}
+    assert all(item["rows"] for item in result["results"])
+    assert len(result["model_summary"].encode()) <= MAX_MODEL_CONTENT_BYTES
+
+
 def test_query_guidance_is_visible_in_bounded_model_summary(
     tmp_path: Path,
 ) -> None:

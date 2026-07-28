@@ -3,7 +3,7 @@
     "name": "Douglas Monsky"
   },
   "bundle": {
-    "digest": "sha256:004b56daff5e8ece6b2a1194bf40df652e275797bf79a22342740579c1a87d6a",
+    "digest": "sha256:bfc2612d4109c49b83717677931e75d58512b106452f6da097cb06e71178fd82",
     "publishable": true,
     "runtime_version": "0.28.0",
     "schema": "codex-usage-tracker.kernel-plugin-bundle.v1"

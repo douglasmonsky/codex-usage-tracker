@@ -146,6 +146,7 @@ JOIN threads ON threads.thread_id = turns.thread_id
 
 _CALL_DIMENSIONS = {
     "call": "model_calls.canonical_call_id",
+    "generation": "model_calls.generation",
     "thread": "threads.logical_thread_id",
     "thread_label": _THREAD_LABEL_SQL,
     "turn": "COALESCE(turns.source_turn_id_hash, turns.turn_id)",
@@ -673,6 +674,46 @@ _GUIDED_TEMPLATES: dict[str, dict[str, Any]] = {
             }
         ],
     },
+    "latest_incremental_change": {
+        "kind": "query_template",
+        "label": "Latest committed generation change",
+        "evidence_policy": "after_ranking",
+        "anchor": "active_generation",
+        "requests": [
+            {
+                "dataset": "calls",
+                "operation": "aggregate",
+                "dimensions": ["generation"],
+                "measures": ["calls", "total_tokens"],
+                "filters": [
+                    {
+                        "field": "generation",
+                        "operator": "eq",
+                        "value": "$latest_generation",
+                    }
+                ],
+                "order_by": "generation",
+                "descending": True,
+                "limit": 1,
+            },
+            {
+                "dataset": "calls",
+                "operation": "aggregate",
+                "dimensions": ["thread", "thread_label"],
+                "measures": ["calls", "total_tokens"],
+                "filters": [
+                    {
+                        "field": "generation",
+                        "operator": "eq",
+                        "value": "$latest_generation",
+                    }
+                ],
+                "order_by": "total_tokens",
+                "descending": True,
+                "limit": 1,
+            },
+        ],
+    },
     "model_effort": {
         "kind": "query_template",
         "label": "Model and reasoning-effort mix",
@@ -800,6 +841,70 @@ _GUIDED_TEMPLATES: dict[str, dict[str, Any]] = {
             }
         ],
     },
+    "week_over_week": {
+        "kind": "query_template",
+        "label": "Latest seven days versus the preceding seven days",
+        "evidence_policy": "aggregate_only",
+        "anchor": "latest_indexed_event",
+        "requests": [
+            {
+                "dataset": "calls",
+                "operation": "comparison",
+                "dimensions": [],
+                "measures": ["total_tokens"],
+                "order_by": "total_tokens",
+                "descending": True,
+                "limit": 1,
+                "comparison": {
+                    "current_start": "$current_start",
+                    "current_end": "$current_end",
+                    "previous_start": "$previous_start",
+                    "previous_end": "$previous_end",
+                },
+            }
+        ],
+    },
+    "weekly_drivers": {
+        "kind": "query_template",
+        "label": "Top threads in the latest seven-day window",
+        "evidence_policy": "after_ranking",
+        "anchor": "latest_indexed_event",
+        "requests": [
+            {
+                "dataset": "calls",
+                "operation": "aggregate",
+                "dimensions": ["thread", "thread_label"],
+                "measures": ["calls", "total_tokens"],
+                "filters": [
+                    {
+                        "field": "event_at",
+                        "operator": "gte",
+                        "value": "$current_start",
+                    },
+                    {
+                        "field": "event_at",
+                        "operator": "lte",
+                        "value": "$latest_event_at",
+                    },
+                ],
+                "order_by": "total_tokens",
+                "descending": True,
+                "limit": 5,
+            }
+        ],
+    },
+}
+_TEMPLATE_CONTEXT_KEYS = {
+    "latest_incremental_change": frozenset({"latest_generation"}),
+    "week_over_week": frozenset(
+        {
+            "current_end",
+            "current_start",
+            "previous_end",
+            "previous_start",
+        }
+    ),
+    "weekly_drivers": frozenset({"current_start", "latest_event_at"}),
 }
 
 _DATASET_DEFAULT_REQUESTS = {
@@ -862,6 +967,8 @@ def exploration_guidance() -> dict[str, Any]:
 
 def materialize_query_requests(
     raw_requests: list[dict[str, Any]],
+    *,
+    context: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], ...]:
     """Expand closed named templates into their deterministic typed requests."""
 
@@ -883,8 +990,19 @@ def materialize_query_requests(
         expected = set(template.get("parameters", ()))
         if not isinstance(parameters, dict) or set(parameters) != expected:
             raise ValueError("query template parameters are invalid")
+        required_context = _TEMPLATE_CONTEXT_KEYS.get(template_name, frozenset())
+        available_context = context or {}
+        if not required_context <= available_context.keys():
+            raise ValueError("query template context is unavailable")
+        resolved_parameters = {
+            **parameters,
+            **{
+                key: available_context[key]
+                for key in required_context
+            },
+        }
         materialized.extend(
-            _resolve_template_value(item, parameters)
+            _resolve_template_value(item, resolved_parameters)
             for item in template["requests"]
         )
     if len(materialized) > MAX_BATCH_QUERIES:
@@ -892,6 +1010,27 @@ def materialize_query_requests(
             f"query supports at most {MAX_BATCH_QUERIES} materialized requests"
         )
     return tuple(materialized)
+
+
+def query_template_context_keys(
+    raw_requests: list[dict[str, Any]],
+) -> frozenset[str]:
+    """Return the snapshot facts required by the selected named templates."""
+
+    return frozenset().union(
+        *(
+            _TEMPLATE_CONTEXT_KEYS.get(str(item.get("template")), frozenset())
+            for item in raw_requests
+        )
+    )
+
+
+def query_template_context_required(
+    raw_requests: list[dict[str, Any]],
+) -> bool:
+    """Return whether a named request needs generation-bound snapshot facts."""
+
+    return bool(query_template_context_keys(raw_requests))
 
 
 def _resolve_template_value(value: Any, parameters: dict[str, Any]) -> Any:

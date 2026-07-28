@@ -140,16 +140,17 @@ def _thread_row(
     thread_labels: dict[str, str],
 ) -> Row:
     label = thread_labels.get(event.session_id or "") or event.agent_nickname
+    logical_thread_id = _logical_thread_id(event)
     parent = stable_id("thr", event.parent_session_id) if event.parent_session_id else None
     return {
         "thread_id": thread_id,
         "source_id": plan.observation.source_id,
-        "logical_thread_id": _logical_thread_id(event),
+        "logical_thread_id": logical_thread_id,
         "session_identity_hash": stable_id(
             "sess",
             event.session_id or "unknown-session",
         ),
-        "display_label": label or f"Thread {thread_id[-8:]}",
+        "display_label": label or f"Thread {logical_thread_id[-8:]}",
         "created_at": event.timestamp,
         "updated_at": event.timestamp,
         "archive_state": "archived" if plan.observation.is_archived else "active",

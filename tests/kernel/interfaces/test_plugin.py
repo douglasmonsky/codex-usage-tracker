@@ -86,4 +86,10 @@ def test_skill_teaches_scope_batch_evidence_and_claim_grading() -> None:
     assert "hypothesis" in skill
     assert "unsupported" in skill
     assert "after ranking" in skill
-    assert '{"template":"top_threads"}' in skill
+    assert '{"requests":[{"template":"top_threads"}]}' in skill
+    assert '{"requests":[{"template":"weekly_drivers"}]}' in skill
+    assert '{"requests":[{"template":"week_over_week"}]}' in skill
+    assert '{"requests":[{"template":"latest_incremental_change"}]}' in skill
+    assert '{"requests":[{"template":"tools"}]}' in skill
+    assert "Do not repeat a" in skill
+    assert "successful curated template" in skill

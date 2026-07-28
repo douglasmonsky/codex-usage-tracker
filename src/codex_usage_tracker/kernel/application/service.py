@@ -32,7 +32,13 @@ from ..operational import (
     load_hydration_coverage,
     load_publication_snapshot,
 )
-from ..query import QueryService, exploration_guidance, materialize_query_requests
+from ..query import (
+    QueryService,
+    exploration_guidance,
+    materialize_query_requests,
+    query_template_context_keys,
+    snapshot_query_template_context,
+)
 from ..query.contracts import MAX_QUERY_RESPONSE_BYTES
 from ..thread_labels import load_thread_label_hashes, thread_label_revision
 from .codec import evidence_request, json_value, query_request
@@ -123,11 +129,17 @@ class KernelApplication:
         include_guidance = _bool(payload.get("include_guidance", False))
         if any(not isinstance(item, dict) for item in raw_requests):
             raise ValueError("every query request must be an object")
-        materialized = materialize_query_requests(raw_requests)
+        materialized, publication = _materialize_query_snapshot(
+            raw_requests,
+            self.paths.kernel.operational,
+        )
         requests = tuple(query_request(item) for item in materialized)
         if not requests and not include_guidance:
             raise ValueError("query requires a query request or guidance")
-        publication = load_publication_snapshot(self.paths.kernel.operational) if requests else None
+        if requests and publication is None:
+            publication = load_publication_snapshot(
+                self.paths.kernel.operational
+            )
         history_coverage = (
             publication[1]
             if publication is not None
@@ -449,6 +461,27 @@ def _history_coverage(operational: Path) -> dict[str, object]:
     if not operational.is_file():
         return _empty_history_coverage()
     return load_hydration_coverage(operational)
+
+
+def _materialize_query_snapshot(
+    raw_requests: list[dict[str, Any]],
+    operational_path: Path,
+) -> tuple[
+    tuple[dict[str, Any], ...],
+    tuple[CutoverControl, dict[str, object]] | None,
+]:
+    required_context = query_template_context_keys(raw_requests)
+    if not required_context:
+        return materialize_query_requests(raw_requests), None
+    publication = load_publication_snapshot(operational_path)
+    context = snapshot_query_template_context(
+        publication,
+        required_keys=required_context,
+    )
+    return (
+        materialize_query_requests(raw_requests, context=context),
+        publication,
+    )
 
 
 def _query_cache_key(

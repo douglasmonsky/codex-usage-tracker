@@ -8,12 +8,15 @@ _QUERY_TEMPLATE_NAMES = [
     "allowance",
     "concentration",
     "context_composition",
+    "latest_incremental_change",
     "model_effort",
     "period_comparison",
     "subagents",
     "top_threads",
     "tools",
     "turns",
+    "week_over_week",
+    "weekly_drivers",
 ]
 _QUERY_FILTER = {
     "type": "object",
