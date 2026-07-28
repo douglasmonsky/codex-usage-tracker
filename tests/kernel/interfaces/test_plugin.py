@@ -79,6 +79,7 @@ def test_skill_teaches_scope_batch_evidence_and_claim_grading() -> None:
     skill = (
         _REPO_ROOT / "skills" / "usage-kernel" / "SKILL.md"
     ).read_text(encoding="utf-8")
+    compact_skill = " ".join(skill.split())
 
     assert "scope → batch → evidence" in skill
     assert "fact" in skill
@@ -89,6 +90,12 @@ def test_skill_teaches_scope_batch_evidence_and_claim_grading() -> None:
     assert "never generalize to all history" in skill
     assert "after ranking" in skill
     assert '{"requests":[{"template":"top_threads"}]}' in skill
+    assert (
+        "For same five ranked threads, use result 1 for labels, selectors, "
+        "totals, shares, and token classes; use result 2 only for cost/credits. "
+        "Do not query again unless user asks for evidence."
+        in compact_skill
+    )
     assert '{"requests":[{"template":"weekly_drivers"}]}' in skill
     assert '{"requests":[{"template":"week_over_week"}]}' in skill
     assert '{"requests":[{"template":"latest_incremental_change"}]}' in skill

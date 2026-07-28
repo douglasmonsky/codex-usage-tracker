@@ -798,6 +798,39 @@ Review totals are one finding and one accepted finding (`R1`); reviewer-token
 status and tokens per accepted finding are `pending` because the metrics helper
 still invokes the retired `strict` command. No retry or second review was run.
 
+### R7 qualification correction — issue #358
+
+The first clean installed Desktop run after issue #356 returned an accurate
+top-five leaderboard, complete generation-3 coverage, human labels, and all
+four token classes. It still made two `usage_query` calls in 57.453 seconds:
+the template took 2.687 seconds, then the agent spent another 0.927 seconds
+re-querying the same five threads because it described the template's two
+results as different rollup grains.
+
+A structural-only inspection confirmed that the first result already contains
+the ranked thread labels, total tokens, all four token classes, shares, and
+selectors. The second result contains only the separate cost/credit context.
+No local labels, selectors, or values were persisted in qualification
+artifacts. The installed skill now names that order explicitly and tells the
+agent not to query again unless the user asks for evidence. The public schema,
+six-tool surface, response shape, and query implementation are unchanged.
+
+The exact skill regression and frozen stable-contract checks pass as a
+seven-test focused set. Release safety passes, and the regenerated plugin
+bundle measures 5,617 bytes under its 5,620-byte ceiling. The maintained
+`just v` profile passes 441 Python tests, nine frontend tests, Ruff, MyPy,
+Pyright, deterministic assets, scope, maintainability, and release-safety
+gates. Branch: `fix/top-threads-result-order`. Final review, PR CI, merge
+identity, and repeated installed fresh-task evidence remain pending.
+
+The single final read-only reviewer reported one medium-severity finding and
+it was accepted: result order alone did not prove both results cover the same
+five ranked threads. The skill now assigns the complete labels, selectors,
+totals, shares, token classes, and cost/credit roles in one frozen instruction.
+Review totals are one finding and one accepted finding (`R1`); reviewer-token
+status and tokens per accepted finding are `pending` because the metrics helper
+still invokes the retired `strict` command. No retry or second review was run.
+
 ## R4 — Build Persisted Rollups And Fast MCP/API Paths
 
 **State:** In progress
