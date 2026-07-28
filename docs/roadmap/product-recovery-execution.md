@@ -639,8 +639,8 @@ query, recovery, and performance contracts, scope allowlist, and this ledger
 | Performance | Pass | 100,000-call query distributions and active-writer 50 ms gate |
 | Ruff, MyPy, Pyright | Pass | active kernel, kernel tests, and scope script |
 | Agent Perf | Pass with one compatibility caveat | one complete Scalene run; direct pytest capture incomplete |
-| Full repository | Pass | 386 Python tests; frontend build/lint/typecheck/tests; Ruff, MyPy, Pyright, maintainability, scope, manifests, and release safety |
-| Distribution and installed | Pass | exact 148,013-byte wheel and 449,670-byte sdist; two-fresh-task installed smoke and installed Console/allowance smoke; warm Console p95 0.853 ms |
+| Full repository | Pass | 387 Python tests; frontend build/lint/typecheck/tests; Ruff, MyPy, Pyright, maintainability, scope, manifests, and release safety |
+| Distribution and installed | Pass | exact 148,034-byte wheel and 449,942-byte sdist; clean and supported 0.26/0.27 upgrade smokes, two fresh MCP tasks each, and installed Console/allowance smoke; observed warm Console p95 no worse than 0.853 ms |
 | Final review | Pass after remediation | one read-only reviewer reported five findings; R1–R5 accepted and fixed; reviewer token attribution pending because the installed tracker CLI lacks the metrics helper's legacy `strict` command |
 
 ### Residual risk and next action
@@ -651,3 +651,8 @@ query, recovery, and performance contracts, scope allowlist, and this ledger
   synthetic allowance fixture relied on the former complete-history default.
   The smoke now explicitly requests `complete`; the local installed
   Console/allowance smoke passes without changing product behavior.
+- The next Python 3.14 attempt exposed a pre-refresh upgrade boundary:
+  read-only status queried schema-v3 coverage before a 0.26/0.27 sidecar had
+  migrated. Publication snapshots now report conservative empty coverage for
+  pre-v3 sidecars without writing. The v2-to-v3 migration creates the exact
+  active/staged coverage schemas, and both published upgrade paths pass locally.

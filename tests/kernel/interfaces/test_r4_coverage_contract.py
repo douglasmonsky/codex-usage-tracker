@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -59,6 +60,28 @@ def test_status_and_query_expose_committed_history_coverage(tmp_path: Path) -> N
         == status["history_coverage"]["coverage_revision"]
     )
     assert query["history_coverage"] | expected == query["history_coverage"]
+
+
+def test_status_reads_pre_coverage_sidecar_conservatively_without_migration(
+    tmp_path: Path,
+) -> None:
+    runtime = active_runtime(tmp_path)
+    with sqlite3.connect(runtime.kernel.operational) as connection:
+        connection.execute("DROP TABLE coverage_control")
+        connection.execute("DROP TABLE staged_coverage_control")
+        connection.execute("PRAGMA user_version = 2")
+    before = runtime.kernel.operational.read_bytes()
+
+    status = KernelApplication(
+        runtime,
+        worker_launcher=lambda _paths, _preset: None,
+    ).status()
+
+    assert status["state"] == "active"
+    assert status["generation"] == 1
+    assert status["history_coverage"]["complete_history"] is False
+    assert status["history_coverage"]["coverage_revision"] is None
+    assert runtime.kernel.operational.read_bytes() == before
 
 
 def test_partial_history_requires_explicit_query_opt_in(tmp_path: Path) -> None:

@@ -569,12 +569,19 @@ def load_publication_snapshot(
 
     with _connect(path) as connection:
         connection.execute("BEGIN")
+        version = int(
+            connection.execute("PRAGMA user_version").fetchone()[0]
+        )
         control_row = connection.execute(
             "SELECT * FROM cutover_control WHERE singleton = 1"
         ).fetchone()
-        coverage_row = connection.execute(
-            "SELECT * FROM coverage_control WHERE singleton = 1"
-        ).fetchone()
+        coverage_row = (
+            connection.execute(
+                "SELECT * FROM coverage_control WHERE singleton = 1"
+            ).fetchone()
+            if version >= OPERATIONAL_SCHEMA_VERSION
+            else None
+        )
     if control_row is None:
         raise ValueError("operational sidecar missing cutover control")
     if coverage_row is None:
@@ -1186,16 +1193,6 @@ def _migrate_operational(path: Path) -> None:
                 ),
                 captured_at TEXT NOT NULL,
                 cutoff_at TEXT,
-                coverage_revision TEXT NOT NULL,
-                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            ) STRICT;
-            CREATE TABLE staged_coverage_control (
-                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-                preset TEXT NOT NULL CHECK (
-                    preset IN ('recent_30d', 'recent_90d', 'complete')
-                ),
-                captured_at TEXT NOT NULL,
-                cutoff_at TEXT,
                 complete_history INTEGER NOT NULL
                     CHECK (complete_history IN (0, 1)),
                 coverage_revision TEXT NOT NULL,
@@ -1213,6 +1210,16 @@ def _migrate_operational(path: Path) -> None:
                     CHECK (deferred_bytes >= 0),
                 uncertain_source_count INTEGER NOT NULL
                     CHECK (uncertain_source_count >= 0),
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ) STRICT;
+            CREATE TABLE staged_coverage_control (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                preset TEXT NOT NULL CHECK (
+                    preset IN ('recent_30d', 'recent_90d', 'complete')
+                ),
+                captured_at TEXT NOT NULL,
+                cutoff_at TEXT,
+                coverage_revision TEXT NOT NULL,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             ) STRICT;
             UPDATE source_registry
