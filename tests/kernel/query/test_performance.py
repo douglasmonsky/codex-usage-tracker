@@ -192,7 +192,20 @@ def test_100k_r5_analytical_primitive_budgets(
             "configured_cost_usd",
             "estimated_credits",
         ),
+        order_by="total_tokens",
         limit=25,
+    )
+    top_thread_costs = QueryRequest(
+        "calls",
+        Operation.AGGREGATE,
+        ("thread",),
+        (
+            "total_tokens",
+            "configured_cost_usd",
+            "estimated_credits",
+        ),
+        order_by="total_tokens",
+        limit=5,
     )
     tool_impact = QueryRequest(
         "tools",
@@ -213,11 +226,16 @@ def test_100k_r5_analytical_primitive_budgets(
         lambda: large_service.execute(top_threads),
         repeats=12,
     )
+    top_thread_costs_p95 = _p95(
+        lambda: large_service.execute(top_thread_costs),
+        repeats=12,
+    )
     tool_impact_p95 = _p95(
         lambda: large_service.execute(tool_impact),
         repeats=12,
     )
     top_threads_result = large_service.execute(top_threads)
+    top_thread_costs_result = large_service.execute(top_thread_costs)
     tool_impact_result = large_service.execute(tool_impact)
     top_threads_bytes = len(
         json.dumps(
@@ -243,15 +261,43 @@ def test_100k_r5_analytical_primitive_budgets(
                 "tool_impact_p95_ms": round(tool_impact_p95, 3),
                 "top_threads_bytes": top_threads_bytes,
                 "top_threads_p95_ms": round(top_threads_p95, 3),
+                "top_thread_costs_p95_ms": round(
+                    top_thread_costs_p95,
+                    3,
+                ),
             },
             sort_keys=True,
         )
     )
     assert top_threads_p95 <= 1_000.0
+    assert top_thread_costs_p95 <= 100.0
     assert tool_impact_p95 <= 500.0
     assert top_threads_bytes <= 64_000
     assert tool_impact_bytes <= 64_000
     assert top_threads_result.returned_count == 25
+    assert top_thread_costs_result.returned_count == 5
+    assert top_thread_costs_result.plan_id == (
+        "calls.aggregate.rollup_thread_cost.v1"
+    )
+    for direct_row, fast_row in zip(
+        top_threads_result.rows[:5],
+        top_thread_costs_result.rows,
+        strict=True,
+    ):
+        assert fast_row["thread"] == direct_row["thread"]
+        assert fast_row["thread_label"] == direct_row["thread_label"]
+        assert fast_row["total_tokens"] == direct_row["total_tokens"]
+        assert fast_row["configured_cost_usd"] == pytest.approx(
+            direct_row["configured_cost_usd"]
+        )
+        assert fast_row["estimated_credits"] == pytest.approx(
+            direct_row["estimated_credits"]
+        )
+    for measure in ("configured_cost_usd", "estimated_credits"):
+        assert (
+            top_thread_costs_result.coverage["measures"][measure]
+            == top_threads_result.coverage["measures"][measure]
+        )
     assert tool_impact_result.returned_count == 25
     assert tool_impact_result.plan_id == "tools.rows.direct_tool_impact.v1"
     assert all("thread_label" in row for row in top_threads_result.rows)

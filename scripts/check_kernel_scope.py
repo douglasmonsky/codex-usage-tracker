@@ -62,6 +62,7 @@ K4_ADDITIONS = frozenset(
         "src/codex_usage_tracker/kernel/query/phases.py",
         "src/codex_usage_tracker/kernel/query/plans.py",
         "src/codex_usage_tracker/kernel/query/service.py",
+        "src/codex_usage_tracker/kernel/query/thread_cost_plan.py",
         "tests/kernel/query/__init__.py",
         "tests/kernel/query/test_contracts.py",
         "tests/kernel/query/test_performance.py",

@@ -7,6 +7,7 @@ from typing import Any
 
 from .catalog import DATASETS, DatasetSpec
 from .contracts import Filter, Operation, QueryRequest
+from .thread_cost_plan import compile_thread_cost_plan
 
 PLAN_VERSION = 1
 
@@ -31,6 +32,14 @@ def compile_plan(
     generation: int,
     offset: int,
 ) -> CompiledPlan:
+    thread_cost_plan = compile_thread_cost_plan(
+        request,
+        generation=generation,
+        offset=offset,
+        plan_version=PLAN_VERSION,
+    )
+    if thread_cost_plan is not None:
+        return CompiledPlan(**thread_cost_plan)
     rollup = _compile_thread_rollup(
         request,
         generation=generation,
