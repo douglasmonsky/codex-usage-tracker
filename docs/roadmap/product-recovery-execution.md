@@ -894,5 +894,13 @@ below the retained 90,000-byte ceiling.
   coverage, durable R8 handoff evidence, and valid ARIA sort ownership.
   Reviewer token attribution is pending because no bounded reviewer-token
   result was available; no retry blocks R6.
+- Initial PR CI exposed inherited performance-test contention: Python 3.10
+  measured top-thread p95 at 1.146 seconds inside the broad suite, while Python
+  3.14 independently measured writer p95 at 70.5 ms. An unchanged rerun moved
+  the miss to tool-impact p95 at 518.6 ms while Python 3.10 passed, confirming
+  runner contention rather than an R6 behavior change. All five hard
+  performance contracts now run together in the dedicated Python 3.14 step
+  and are excluded from the broad matrix; their ceilings are unchanged. The
+  exact dedicated command passed 12 policy and performance tests locally.
 
 PR/CI merge remains before R6 completion.
