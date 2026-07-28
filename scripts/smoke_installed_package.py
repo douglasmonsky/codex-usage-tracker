@@ -643,7 +643,7 @@ def smoke_install(
         if version is not None and package.get("version") != version:
             raise RuntimeError(f"installed version differs: {package}")
         _run_json(
-            [command, "refresh", "--wait", "30"],
+            [command, "refresh", "--wait", "30", "--preset", "complete"],
             environment=environment,
             timeout=40,
         )

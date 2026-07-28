@@ -22,7 +22,7 @@ def test_mcp_catalog_and_calls_use_structured_results_without_duplication(
 ) -> None:
     app = KernelApplication(
         active_runtime(tmp_path),
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: synthetic_sources(),
     )
     server = McpServer(app)
@@ -76,7 +76,7 @@ def test_guided_scope_batch_and_evidence_use_three_read_only_mcp_calls(
     runtime = active_runtime(tmp_path)
     app = KernelApplication(
         runtime,
-        worker_launcher=launches.append,
+        worker_launcher=lambda paths, _preset: launches.append(paths),
         source_provider=lambda _home: synthetic_sources(),
     )
     server = McpServer(app)
@@ -148,6 +148,34 @@ def test_guided_scope_batch_and_evidence_use_three_read_only_mcp_calls(
     assert runtime.kernel.analytical.read_bytes() == analytical_before
 
 
+def test_mcp_refresh_transports_hydration_preset(tmp_path: Path) -> None:
+    launches = []
+    server = McpServer(
+        KernelApplication(
+            RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
+            worker_launcher=lambda _paths, preset: launches.append(
+                preset.value
+            ),
+            source_provider=lambda _home: (),
+        )
+    )
+
+    response = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "usage_refresh",
+                "arguments": {"preset": "complete"},
+            },
+        }
+    )
+
+    assert "error" not in response
+    assert launches == ["complete"]
+
+
 def test_direct_stdio_handshake_lists_exact_catalog(tmp_path: Path) -> None:
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(Path(__file__).parents[3] / "src")
@@ -190,7 +218,7 @@ def test_mcp_query_response_budget_returns_a_structured_tool_error(
     server = McpServer(
         KernelApplication(
             RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
-            worker_launcher=lambda _paths: None,
+            worker_launcher=lambda _paths, _preset: None,
         )
     )
 
@@ -224,7 +252,7 @@ def test_invalid_envelopes_and_inputs_are_rejected_before_side_effects(
     launches = []
     app = KernelApplication(
         active_runtime(tmp_path),
-        worker_launcher=launches.append,
+        worker_launcher=lambda paths, _preset: launches.append(paths),
         source_provider=lambda _home: synthetic_sources(),
     )
     server = McpServer(app)
@@ -267,7 +295,7 @@ def test_corrupt_cache_returns_a_sanitized_tool_error(tmp_path: Path) -> None:
     runtime.kernel.operational.parent.mkdir(parents=True)
     runtime.kernel.operational.write_bytes(b"not sqlite")
     server = McpServer(
-        KernelApplication(runtime, worker_launcher=lambda _paths: None)
+        KernelApplication(runtime, worker_launcher=lambda _paths, _preset: None)
     )
 
     response = server.handle(

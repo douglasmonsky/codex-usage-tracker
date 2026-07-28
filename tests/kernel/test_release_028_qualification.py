@@ -42,21 +42,15 @@ def test_release_028_sdist_rejects_stale_source_bytes(tmp_path: Path) -> None:
             source_root=source,
         )
 
-    assert failures == [
-        "integration sdist contains stale source bytes: README.md"
-    ]
+    assert failures == ["integration sdist contains stale source bytes: README.md"]
 
 
 def test_release_028_identity_is_coherent_and_anchored_to_merged_main() -> None:
     project = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     package = json.loads((_ROOT / "package.json").read_text(encoding="utf-8"))
-    plugin = json.loads(
-        (_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8")
-    )
+    plugin = json.loads((_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
     qualification = json.loads(
-        (_ROOT / "config" / "kernel-release-qualification-v1.json").read_text(
-            encoding="utf-8"
-        )
+        (_ROOT / "config" / "kernel-release-qualification-v1.json").read_text(encoding="utf-8")
     )
 
     assert project["project"]["version"] == _VERSION
@@ -101,25 +95,23 @@ def test_release_028_ci_and_public_install_paths_are_current() -> None:
     assert "github.head_ref == 'release/0.28.0'" in ci
     assert "config/kernel-release-qualification-v1.json" in ci
     assert "--version 0.28.0" in ci
-    assert 'codex-usage-tracking==0.28.0' in readme
+    assert "codex-usage-tracking==0.28.0" in readme
     assert "--ref v0.28.0" in readme
 
 
 def test_release_028_golden_prompt_uses_three_bounded_read_only_mcp_calls(
     tmp_path: Path,
 ) -> None:
-    qualification = json.loads(
-        (_ROOT / "config" / "kernel-release-qualification-v1.json").read_text(
-            encoding="utf-8"
-        )
+    candidate = json.loads(
+        (_ROOT / "config" / "kernel-release-candidate-budget.json").read_text(encoding="utf-8")
     )
-    budget = qualification["golden_prompt"]
+    budget = candidate["mcp_golden_prompt"]
     launches = []
     runtime = active_runtime(tmp_path)
     server = McpServer(
         KernelApplication(
             runtime,
-            worker_launcher=launches.append,
+            worker_launcher=lambda paths, _preset: launches.append(paths),
             source_provider=lambda _home: synthetic_sources(),
         )
     )

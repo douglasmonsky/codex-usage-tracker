@@ -57,7 +57,9 @@ def test_batch_uses_one_generation_and_returns_accounting_rows(
     )
 
     assert {result.generation for result in results} == {1}
-    assert results[0].plan_id == "calls.aggregate.v1"
+    assert results[0].plan_id == (
+        "calls.aggregate.rollup_model_effort.v1"
+    )
     assert results[0].rows == (
         {
             "model": "gpt-synthetic",
@@ -439,8 +441,15 @@ def test_batch_read_snapshot_is_stable_during_concurrent_commit(
             connection: sqlite3.Connection,
             request: QueryRequest,
             generation: int,
+            *,
+            history_coverage: dict[str, object],
         ):
-            result = super()._execute_one(connection, request, generation)
+            result = super()._execute_one(
+                connection,
+                request,
+                generation,
+                history_coverage=history_coverage,
+            )
             if not self.mutated:
                 with short_writer_transaction(analytical) as writer:
                     writer.execute(

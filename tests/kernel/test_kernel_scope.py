@@ -24,6 +24,7 @@ from scripts.check_kernel_scope import (
     R1_ADDITIONS,
     R2_ADDITIONS,
     R3_ADDITIONS,
+    R4_ADDITIONS,
     RECOVERY_ROADMAP_ADDITIONS,
     active_paths,
     load_disposition_manifest,
@@ -247,6 +248,11 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/test_agent_outcome_baseline.py",
     } == R1_ADDITIONS
     assert {"tests/kernel/test_schema_v3.py"} == R2_ADDITIONS
+    assert {
+        "src/codex_usage_tracker/kernel/rollups.py",
+        "tests/kernel/interfaces/test_r4_coverage_contract.py",
+        "tests/kernel/query/test_r4_rollups.py",
+    } == R4_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -267,6 +273,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
             | R1_ADDITIONS
             | R2_ADDITIONS
             | R3_ADDITIONS
+            | R4_ADDITIONS
         )
 
 

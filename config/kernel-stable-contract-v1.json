@@ -10,7 +10,7 @@
     },
     {
       "name": "usage_refresh",
-      "input_schema_sha256": "01ae972862e38edb771a88e742a5f3d8b966335a206bbedb98c73d33504309da"
+      "input_schema_sha256": "d4142c076615f64709570c5e60927c4bf942a362e148b51fe68d65d3de619c17"
     },
     {
       "name": "usage_query",

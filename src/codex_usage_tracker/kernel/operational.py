@@ -196,9 +196,7 @@ def initialize_operational_database(path: Path) -> Path:
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute(f"PRAGMA user_version = {OPERATIONAL_SCHEMA_VERSION}")
             connection.executescript(_OPERATIONAL_SQL)
-            connection.execute(
-                "INSERT INTO cutover_control(singleton, state) VALUES (1, 'absent')"
-            )
+            connection.execute("INSERT INTO cutover_control(singleton, state) VALUES (1, 'absent')")
         staging.chmod(0o600)
         _validate_operational(staging)
         os.replace(staging, target)
@@ -242,9 +240,7 @@ def record_hydration_catalog(
             selection,
             hydrated_generation=hydrated_generation,
         )
-        connection.execute(
-            "DELETE FROM staged_coverage_control WHERE singleton = 1"
-        )
+        connection.execute("DELETE FROM staged_coverage_control WHERE singleton = 1")
     return load_hydration_coverage(path)
 
 
@@ -254,9 +250,7 @@ def stage_hydration_catalog(
 ) -> None:
     """Record build-time source states without changing active coverage."""
 
-    selected_ids = {
-        item.observation.source_id for item in selection.hydrate
-    }
+    selected_ids = {item.observation.source_id for item in selection.hydrate}
     with _connect(path) as connection:
         connection.execute("BEGIN IMMEDIATE")
         connection.execute(
@@ -297,14 +291,10 @@ def stage_hydration_catalog(
             ).fetchone()
             hydrated_generation = (
                 int(prior["hydrated_generation"])
-                if prior is not None
-                and prior["hydrated_generation"] is not None
+                if prior is not None and prior["hydrated_generation"] is not None
                 else None
             )
-            if (
-                prior is not None
-                and str(prior["source_id"]) != observation.source_id
-            ):
+            if prior is not None and str(prior["source_id"]) != observation.source_id:
                 connection.execute(
                     """
                     UPDATE source_registry
@@ -313,11 +303,7 @@ def stage_hydration_catalog(
                     WHERE source_id = ?
                     """,
                     (
-                        (
-                            "hydrating"
-                            if observation.source_id in selected_ids
-                            else "deferred"
-                        ),
+                        ("hydrating" if observation.source_id in selected_ids else "deferred"),
                         str(prior["source_id"]),
                     ),
                 )
@@ -358,11 +344,7 @@ def stage_hydration_catalog(
                 (
                     observation.source_id,
                     str(observation.path),
-                    (
-                        "hydrating"
-                        if observation.source_id in selected_ids
-                        else "deferred"
-                    ),
+                    ("hydrating" if observation.source_id in selected_ids else "deferred"),
                     observation.size_bytes,
                     observation.modified_ns,
                     _timestamp(item.latest_event_at),
@@ -410,9 +392,7 @@ def discard_staged_hydration(path: Path) -> None:
     """Forget an unusable staged selection without changing active coverage."""
 
     with _connect(path) as connection:
-        connection.execute(
-            "DELETE FROM staged_coverage_control WHERE singleton = 1"
-        )
+        connection.execute("DELETE FROM staged_coverage_control WHERE singleton = 1")
 
 
 def _record_hydration_catalog_in_connection(
@@ -421,9 +401,7 @@ def _record_hydration_catalog_in_connection(
     *,
     hydrated_generation: int,
 ) -> None:
-    hydrated_ids = {
-        item.observation.source_id for item in selection.hydrate
-    }
+    hydrated_ids = {item.observation.source_id for item in selection.hydrate}
     catalog = selection.hydrate + selection.deferred
     revision = hydration_selection_revision(selection)
     for item in catalog:
@@ -520,9 +498,7 @@ def _record_hydration_catalog_in_connection(
 def hydration_selection_revision(selection: HydrationSelection) -> str:
     """Return the effective source/preset identity for one coverage selection."""
 
-    hydrated_ids = {
-        item.observation.source_id for item in selection.hydrate
-    }
+    hydrated_ids = {item.observation.source_id for item in selection.hydrate}
     catalog = selection.hydrate + selection.deferred
     payload = {
         "preset": selection.preset.value,
@@ -533,9 +509,7 @@ def hydration_selection_revision(selection: HydrationSelection) -> str:
                 "modified_ns": item.observation.modified_ns,
                 "latest_event_at": _timestamp(item.latest_event_at),
                 "hydration_state": (
-                    "hydrated"
-                    if item.observation.source_id in hydrated_ids
-                    else "deferred"
+                    "hydrated" if item.observation.source_id in hydrated_ids else "deferred"
                 ),
             }
             for item in sorted(
@@ -544,18 +518,19 @@ def hydration_selection_revision(selection: HydrationSelection) -> str:
             )
         ],
     }
-    return "sha256:" + hashlib.sha256(
-        json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
-    ).hexdigest()
+    return (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+        ).hexdigest()
+    )
 
 
 def load_hydration_coverage(path: Path) -> dict[str, object]:
     """Return the active source-coverage truth without touching facts."""
 
     with _connect(path) as connection:
-        row = connection.execute(
-            "SELECT * FROM coverage_control WHERE singleton = 1"
-        ).fetchone()
+        row = connection.execute("SELECT * FROM coverage_control WHERE singleton = 1").fetchone()
     if row is None:
         return {
             "preset": None,
@@ -585,6 +560,54 @@ def load_hydration_coverage(path: Path) -> dict[str, object]:
         "deferred_bytes": int(row["deferred_bytes"]),
         "uncertain_source_count": int(row["uncertain_source_count"]),
     }
+
+
+def load_publication_snapshot(
+    path: Path,
+) -> tuple[CutoverControl, dict[str, object]]:
+    """Read active publication identity and coverage in one SQLite snapshot."""
+
+    with _connect(path) as connection:
+        connection.execute("BEGIN")
+        control_row = connection.execute(
+            "SELECT * FROM cutover_control WHERE singleton = 1"
+        ).fetchone()
+        coverage_row = connection.execute(
+            "SELECT * FROM coverage_control WHERE singleton = 1"
+        ).fetchone()
+    if control_row is None:
+        raise ValueError("operational sidecar missing cutover control")
+    if coverage_row is None:
+        coverage: dict[str, object] = {
+            "preset": None,
+            "captured_at": None,
+            "cutoff_at": None,
+            "complete_history": False,
+            "coverage_revision": None,
+            "cataloged_source_count": 0,
+            "hydrated_source_count": 0,
+            "deferred_source_count": 0,
+            "cataloged_bytes": 0,
+            "hydrated_bytes": 0,
+            "deferred_bytes": 0,
+            "uncertain_source_count": 0,
+        }
+    else:
+        coverage = {
+            "preset": str(coverage_row["preset"]),
+            "captured_at": str(coverage_row["captured_at"]),
+            "cutoff_at": coverage_row["cutoff_at"],
+            "complete_history": bool(coverage_row["complete_history"]),
+            "coverage_revision": str(coverage_row["coverage_revision"]),
+            "cataloged_source_count": int(coverage_row["cataloged_source_count"]),
+            "hydrated_source_count": int(coverage_row["hydrated_source_count"]),
+            "deferred_source_count": int(coverage_row["deferred_source_count"]),
+            "cataloged_bytes": int(coverage_row["cataloged_bytes"]),
+            "hydrated_bytes": int(coverage_row["hydrated_bytes"]),
+            "deferred_bytes": int(coverage_row["deferred_bytes"]),
+            "uncertain_source_count": int(coverage_row["uncertain_source_count"]),
+        }
+    return _control_from_row(control_row), coverage
 
 
 def hydrated_source_ids(path: Path) -> frozenset[str]:
@@ -655,9 +678,7 @@ def load_cutover_control(path: Path) -> CutoverControl:
     """Load the sole operational activation record."""
 
     with _connect(path) as connection:
-        row = connection.execute(
-            "SELECT * FROM cutover_control WHERE singleton = 1"
-        ).fetchone()
+        row = connection.execute("SELECT * FROM cutover_control WHERE singleton = 1").fetchone()
     if row is None:
         raise ValueError("operational sidecar is missing cutover control")
     return _control_from_row(row)
@@ -695,9 +716,7 @@ def rollback_cutover(path: Path) -> CutoverControl:
 
     with _connect(path) as connection:
         connection.execute("BEGIN IMMEDIATE")
-        row = connection.execute(
-            "SELECT * FROM cutover_control WHERE singleton = 1"
-        ).fetchone()
+        row = connection.execute("SELECT * FROM cutover_control WHERE singleton = 1").fetchone()
         if row is None:
             raise ValueError("operational sidecar is missing cutover control")
         current = _control_from_row(row)
@@ -737,9 +756,7 @@ def transition_cutover(
 
     with _connect(path) as connection:
         connection.execute("BEGIN IMMEDIATE")
-        row = connection.execute(
-            "SELECT * FROM cutover_control WHERE singleton = 1"
-        ).fetchone()
+        row = connection.execute("SELECT * FROM cutover_control WHERE singleton = 1").fetchone()
         if row is None:
             raise ValueError("operational sidecar is missing cutover control")
         current = _control_from_row(row)
@@ -774,6 +791,7 @@ def promote_cutover(
     generation: int,
     integrity_digest: str,
     hydration_selection: HydrationSelection | None = None,
+    promote_staged_hydration: bool = False,
 ) -> CutoverControl:
     """Validate one generation once and atomically publish its control record."""
 
@@ -784,9 +802,7 @@ def promote_cutover(
     )
     with _connect(path) as connection:
         connection.execute("BEGIN IMMEDIATE")
-        row = connection.execute(
-            "SELECT * FROM cutover_control WHERE singleton = 1"
-        ).fetchone()
+        row = connection.execute("SELECT * FROM cutover_control WHERE singleton = 1").fetchone()
         if row is None:
             raise ValueError("operational sidecar is missing cutover control")
         current = _control_from_row(row)
@@ -818,9 +834,22 @@ def promote_cutover(
                 hydration_selection,
                 hydrated_generation=generation,
             )
-        connection.execute(
-            "DELETE FROM staged_coverage_control WHERE singleton = 1"
-        )
+        elif promote_staged_hydration:
+            staged = connection.execute(
+                "SELECT * FROM staged_coverage_control WHERE singleton = 1"
+            ).fetchone()
+            if staged is None:
+                raise ValueError("staged hydration coverage is unavailable")
+            connection.execute(
+                """
+                UPDATE source_registry
+                SET hydration_state = 'hydrated',
+                    hydrated_generation = ?
+                WHERE hydration_state = 'hydrating'
+                """,
+                (generation,),
+            )
+        connection.execute("DELETE FROM staged_coverage_control WHERE singleton = 1")
         _write_control(connection, active)
     return load_cutover_control(path)
 
@@ -837,9 +866,7 @@ def _validate_transition(
     failure_code: str | None,
 ) -> None:
     if state not in _TRANSITIONS[current.state]:
-        raise ValueError(
-            f"invalid cutover transition: {current.state.value} -> {state.value}"
-        )
+        raise ValueError(f"invalid cutover transition: {current.state.value} -> {state.value}")
     validators = {
         CutoverState.BUILDING: _validate_building,
         CutoverState.FAILED: _validate_failed,
@@ -1116,9 +1143,7 @@ def _validate_operational(path: Path) -> None:
             raise ValueError("operational schema version is invalid")
         tables = {
             row[0]
-            for row in connection.execute(
-                "SELECT name FROM sqlite_schema WHERE type = 'table'"
-            )
+            for row in connection.execute("SELECT name FROM sqlite_schema WHERE type = 'table'")
         }
         if tables != OPERATIONAL_TABLES:
             raise ValueError(f"operational table set is invalid: {sorted(tables)}")
@@ -1161,6 +1186,16 @@ def _migrate_operational(path: Path) -> None:
                 ),
                 captured_at TEXT NOT NULL,
                 cutoff_at TEXT,
+                coverage_revision TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ) STRICT;
+            CREATE TABLE staged_coverage_control (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                preset TEXT NOT NULL CHECK (
+                    preset IN ('recent_30d', 'recent_90d', 'complete')
+                ),
+                captured_at TEXT NOT NULL,
+                cutoff_at TEXT,
                 complete_history INTEGER NOT NULL
                     CHECK (complete_history IN (0, 1)),
                 coverage_revision TEXT NOT NULL,
@@ -1178,16 +1213,6 @@ def _migrate_operational(path: Path) -> None:
                     CHECK (deferred_bytes >= 0),
                 uncertain_source_count INTEGER NOT NULL
                     CHECK (uncertain_source_count >= 0),
-                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            ) STRICT;
-            CREATE TABLE staged_coverage_control (
-                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-                preset TEXT NOT NULL CHECK (
-                    preset IN ('recent_30d', 'recent_90d', 'complete')
-                ),
-                captured_at TEXT NOT NULL,
-                cutoff_at TEXT,
-                coverage_revision TEXT NOT NULL,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             ) STRICT;
             UPDATE source_registry

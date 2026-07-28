@@ -38,6 +38,10 @@ def query_request(payload: dict[str, Any]) -> QueryRequest:
         limit=_integer(payload.get("limit", 100), "limit"),
         cursor=_optional_text(payload.get("cursor"), "cursor"),
         comparison=comparison,
+        allow_partial=_boolean(
+            payload.get("allow_partial", False),
+            "allow_partial",
+        ),
     )
 
 

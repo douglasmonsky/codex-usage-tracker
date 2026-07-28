@@ -252,6 +252,13 @@ R3_ADDITIONS = frozenset(
         "tests/kernel/test_hydration_policy.py",
     }
 )
+R4_ADDITIONS = frozenset(
+    {
+        "src/codex_usage_tracker/kernel/rollups.py",
+        "tests/kernel/interfaces/test_r4_coverage_contract.py",
+        "tests/kernel/query/test_r4_rollups.py",
+    }
+)
 
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
@@ -273,6 +280,7 @@ INTEGRATION_ADDITIONS = (
     | R1_ADDITIONS
     | R2_ADDITIONS
     | R3_ADDITIONS
+    | R4_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(
     r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))"

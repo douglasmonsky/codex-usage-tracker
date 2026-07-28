@@ -17,7 +17,11 @@ SCHEMAS: dict[str, dict[str, Any]] = {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 30,
-            }
+            },
+            "preset": {
+                "type": "string",
+                "enum": ["recent_30d", "recent_90d", "complete"],
+            },
         },
         "additionalProperties": False,
     },

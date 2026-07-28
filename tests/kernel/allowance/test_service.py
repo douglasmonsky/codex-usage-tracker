@@ -124,7 +124,7 @@ def test_allowance_service_returns_reset_aware_local_facts_and_estimates(
     _write_rate_card(runtime.cache_root / "rate-card.json")
     app = KernelApplication(
         runtime,
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: synthetic_sources(),
     )
     operational_before = runtime.kernel.operational.read_bytes()
@@ -177,7 +177,7 @@ def test_allowance_cursor_is_bound_to_publication_identity(tmp_path: Path) -> No
     runtime = active_runtime(tmp_path)
     app = KernelApplication(
         runtime,
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: synthetic_sources(),
     )
 
@@ -207,7 +207,7 @@ def test_explicit_refresh_rebuilds_pre_k8_schema_before_allowance_read(
     legacy_bytes = legacy_path.read_bytes()
     app = KernelApplication(
         runtime,
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: synthetic_sources(),
     )
 
@@ -310,7 +310,7 @@ def test_appended_allowance_observation_uses_incremental_refresh(
     )
     app = KernelApplication(
         runtime,
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: (source,),
     )
 

@@ -4,12 +4,14 @@ import json
 import socket
 import threading
 from pathlib import Path
+from unittest.mock import create_autospec
 from urllib.request import Request, urlopen
 
 import pytest
 
 import codex_usage_tracker.kernel.application.service as application_service
 from codex_usage_tracker.kernel.application import KernelApplication, RuntimePaths
+from codex_usage_tracker.kernel.hydration import HydrationPreset
 from codex_usage_tracker.kernel.interfaces.http.app import API_PREFIX, HttpApp
 from codex_usage_tracker.kernel.interfaces.http.server import create_server
 
@@ -19,7 +21,7 @@ from .support import active_runtime, synthetic_sources
 def _application(tmp_path: Path) -> KernelApplication:
     return KernelApplication(
         active_runtime(tmp_path),
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: synthetic_sources(),
     )
 
@@ -76,6 +78,31 @@ def test_real_loopback_listener_serves_new_status_prefix(tmp_path: Path) -> None
     assert payload["generation"] == 1
 
 
+def test_http_refresh_transports_hydration_preset() -> None:
+    launches = []
+    application = create_autospec(KernelApplication, instance=True)
+
+    def refresh(
+        *,
+        wait_seconds: float,
+        hydration_preset: HydrationPreset,
+    ) -> dict:
+        launches.append(hydration_preset.value)
+        return {"state": "queued", "wait_seconds": wait_seconds}
+
+    application.refresh.side_effect = refresh
+
+    response = HttpApp(application).handle(
+        "POST",
+        f"{API_PREFIX}/refresh",
+        body=b'{"preset":"recent_90d"}',
+        headers={"Host": "127.0.0.1:8765"},
+    )
+
+    assert response.status == 202
+    assert launches == ["recent_90d"]
+
+
 def test_real_listener_rejects_invalid_content_length(tmp_path: Path) -> None:
     server = create_server(_application(tmp_path))
     worker = threading.Thread(target=server.serve_forever, daemon=True)
@@ -108,7 +135,7 @@ def test_http_query_response_budget_returns_a_bounded_client_error(
     response = HttpApp(
         KernelApplication(
             RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
-            worker_launcher=lambda _paths: None,
+            worker_launcher=lambda _paths, _preset: None,
         )
     ).handle(
         "POST",
@@ -132,7 +159,7 @@ def test_corrupt_cache_returns_sanitized_service_unavailable(
     runtime.kernel.operational.parent.mkdir(parents=True)
     runtime.kernel.operational.write_bytes(b"not sqlite")
     response = HttpApp(
-        KernelApplication(runtime, worker_launcher=lambda _paths: None)
+        KernelApplication(runtime, worker_launcher=lambda _paths, _preset: None)
     ).handle(
         "GET",
         f"{API_PREFIX}/status",

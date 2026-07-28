@@ -16,7 +16,7 @@ def main() -> None:
 
         application = KernelApplication(
             active_runtime(Path(root)),
-            worker_launcher=lambda _paths: None,
+            worker_launcher=lambda _paths, _preset: None,
             source_provider=lambda _home: synthetic_sources(),
         )
         server = create_server(application, port=8898)

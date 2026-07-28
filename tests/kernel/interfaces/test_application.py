@@ -13,6 +13,7 @@ from codex_usage_tracker.kernel.application import (
     build_application,
 )
 from codex_usage_tracker.kernel.application.jobs import JobReader
+from codex_usage_tracker.kernel.hydration import HydrationPreset
 from codex_usage_tracker.kernel.ingest import refresh_request_hash
 from codex_usage_tracker.kernel.lease import RefreshLeaseRepository
 from codex_usage_tracker.kernel.operational import initialize_operational_database
@@ -24,7 +25,7 @@ def test_read_use_cases_share_one_generation_and_never_write(tmp_path: Path) -> 
     runtime = active_runtime(tmp_path)
     app = KernelApplication(
         runtime,
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: synthetic_sources(),
     )
     operational_before = runtime.kernel.operational.read_bytes()
@@ -71,7 +72,7 @@ def test_query_guidance_is_available_without_a_database_or_refresh(
     launches: list[RuntimePaths] = []
     app = KernelApplication(
         RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
-        worker_launcher=launches.append,
+        worker_launcher=lambda paths, _preset: launches.append(paths),
     )
 
     response = app.query({"requests": [], "include_guidance": True})
@@ -95,7 +96,7 @@ def test_query_guidance_is_available_without_a_database_or_refresh(
 def test_query_rejects_an_empty_batch_without_guidance(tmp_path: Path) -> None:
     app = KernelApplication(
         RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
     )
 
     with pytest.raises(ValueError, match="query request or guidance"):
@@ -109,7 +110,7 @@ def test_query_response_budget_fails_closed(
     monkeypatch.setattr(application_service, "MAX_QUERY_RESPONSE_BYTES", 1)
     app = KernelApplication(
         RuntimePaths(tmp_path / "codex-home", tmp_path / "cache"),
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
     )
 
     with pytest.raises(ValueError, match="response exceeds byte budget"):
@@ -121,7 +122,7 @@ def test_repeated_guided_batch_is_deterministic_except_for_elapsed_time(
 ) -> None:
     app = KernelApplication(
         active_runtime(tmp_path),
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: synthetic_sources(),
     )
     payload = {
@@ -149,6 +150,7 @@ def test_repeated_guided_batch_is_deterministic_except_for_elapsed_time(
     for response in (first, second):
         for result in response["results"]:
             result.pop("elapsed_ms")
+        response.pop("cache")
 
     assert first == second
 
@@ -162,13 +164,16 @@ def test_refresh_joins_compatible_live_job_without_launching_worker(
     sources = synthetic_sources()
     repository = RefreshLeaseRepository(runtime.kernel.operational)
     lease = repository.acquire(
-        refresh_request_hash(list(sources)),
+        refresh_request_hash(
+            list(sources),
+            hydration_preset=HydrationPreset.RECENT_30D,
+        ),
         "existing-owner",
     )
     launches: list[RuntimePaths] = []
     app = KernelApplication(
         runtime,
-        worker_launcher=launches.append,
+        worker_launcher=lambda paths, _preset: launches.append(paths),
         source_provider=lambda _home: sources,
     )
 
@@ -187,12 +192,15 @@ def test_concurrent_refresh_callers_launch_one_worker(tmp_path: Path) -> None:
     launches = 0
     launch_lock = threading.Lock()
 
-    def launch(_paths: RuntimePaths) -> None:
+    def launch(_paths: RuntimePaths, _preset: object) -> None:
         nonlocal launches
         with launch_lock:
             launches += 1
         repository.acquire(
-            refresh_request_hash(list(sources)),
+            refresh_request_hash(
+                list(sources),
+                hydration_preset=HydrationPreset.RECENT_30D,
+            ),
             "concurrent-owner",
         )
 
@@ -226,17 +234,23 @@ def test_expired_refresh_is_recovered_and_replaced_once(tmp_path: Path) -> None:
     sources = synthetic_sources()
     repository = RefreshLeaseRepository(runtime.kernel.operational)
     expired = repository.acquire(
-        refresh_request_hash(list(sources)),
+        refresh_request_hash(
+            list(sources),
+            hydration_preset=HydrationPreset.RECENT_30D,
+        ),
         "dead-owner",
         now=1,
     )
     launches = 0
 
-    def launch(_paths: RuntimePaths) -> None:
+    def launch(_paths: RuntimePaths, _preset: object) -> None:
         nonlocal launches
         launches += 1
         repository.acquire(
-            refresh_request_hash(list(sources)),
+            refresh_request_hash(
+                list(sources),
+                hydration_preset=HydrationPreset.RECENT_30D,
+            ),
             "replacement-owner",
         )
 
@@ -263,7 +277,7 @@ def test_job_status_waits_on_host_and_returns_one_terminal_snapshot(
     initialize_operational_database(runtime.kernel.operational)
     repository = RefreshLeaseRepository(runtime.kernel.operational)
     lease = repository.acquire("sha256:synthetic", "owner")
-    app = KernelApplication(runtime, worker_launcher=lambda _paths: None)
+    app = KernelApplication(runtime, worker_launcher=lambda _paths, _preset: None)
 
     def complete() -> None:
         threading.Event().wait(0.05)
@@ -305,8 +319,14 @@ def test_refresh_waits_for_a_new_job_after_a_previous_terminal_run(
     repository.complete(previous.refresh_run_id, generation=1, result={})
     sources = synthetic_sources()
 
-    def launch(_paths: RuntimePaths) -> None:
-        repository.acquire(refresh_request_hash(list(sources)), "new-owner")
+    def launch(_paths: RuntimePaths, _preset: object) -> None:
+        repository.acquire(
+            refresh_request_hash(
+                list(sources),
+                hydration_preset=HydrationPreset.RECENT_30D,
+            ),
+            "new-owner",
+        )
 
     app = KernelApplication(
         runtime,
@@ -327,7 +347,10 @@ def test_real_background_worker_reaches_terminal_on_synthetic_input(
     shutil.copytree(ORACLE_ROOT / "logs", runtime.codex_home / "sessions")
     app = build_application(runtime)
 
-    result = app.refresh(wait_seconds=30)
+    result = app.refresh(
+        wait_seconds=30,
+        hydration_preset=HydrationPreset.COMPLETE,
+    )
 
     assert result["disposition"] == "started"
     assert result["job"]["state"] == "completed"
