@@ -18,9 +18,57 @@ from codex_usage_tracker.kernel.operational import kernel_paths, load_cutover_co
 from tests.kernel.test_ingest_pipeline import _token_line
 
 _CALL_COUNT = 100_000
+_ACTIVE_WRITER_APPEND_CALLS = 2_000
+_ACTIVE_WRITER_MEASURED_REFRESHES = 5
+# Preserve the 50 ms sustained SLO while bounding one isolated lock separately.
 _ACTIVE_WRITER_P95_BUDGET_MS = 50.0
+_ACTIVE_WRITER_MAX_BUDGET_MS = 150.0
+_ACTIVE_WRITER_MIN_SAMPLES = 40
 _INITIAL_WRITER_P95_BUDGET_MS = 2_000.0
 _INITIAL_BUILD_TRANSACTION_BUDGET = 10
+
+
+def _assert_active_writer_latency_budget(
+    timings: tuple[float, ...],
+) -> tuple[float, float]:
+    assert len(timings) >= _ACTIVE_WRITER_MIN_SAMPLES, (
+        f"active writer p95 requires at least {_ACTIVE_WRITER_MIN_SAMPLES} samples; "
+        f"observed={len(timings)}"
+    )
+    ordered = sorted(timings)
+    p95 = ordered[math.ceil(len(ordered) * 0.95) - 1]
+    maximum = ordered[-1]
+    assert p95 <= _ACTIVE_WRITER_P95_BUDGET_MS, (
+        f"active writer p95 {p95:.3f} ms exceeded "
+        f"{_ACTIVE_WRITER_P95_BUDGET_MS:.1f} ms"
+    )
+    assert maximum <= _ACTIVE_WRITER_MAX_BUDGET_MS, (
+        f"active writer maximum {maximum:.3f} ms exceeded "
+        f"{_ACTIVE_WRITER_MAX_BUDGET_MS:.1f} ms"
+    )
+    return p95, maximum
+
+
+def _append_token_lines(source: Path, prefix: str, *, count: int) -> None:
+    with source.open("a", encoding="utf-8") as handle:
+        handle.write(
+            "".join(
+                _token_line(f"{prefix}-{index}", index % 100)
+                for index in range(count)
+            )
+        )
+
+
+def test_active_writer_latency_budget_distinguishes_noise_from_regressions() -> None:
+    one_runner_pause = (30.0,) * 99 + (98.0,)
+    sustained_regression = (30.0,) * 94 + (51.0,) * 6
+    catastrophic_lock = (30.0,) * 99 + (151.0,)
+
+    assert _assert_active_writer_latency_budget(one_runner_pause) == (30.0, 98.0)
+    with pytest.raises(AssertionError, match="p95"):
+        _assert_active_writer_latency_budget(sustained_regression)
+    with pytest.raises(AssertionError, match="maximum"):
+        _assert_active_writer_latency_budget(catastrophic_lock)
 
 
 def test_checkpointed_clone_uses_copy_on_write_snapshot(
@@ -204,38 +252,50 @@ def test_append_safe_refresh_keeps_active_writer_lock_bounded(tmp_path: Path) ->
         trigger=RefreshTrigger.CLI_REFRESH,
         owner_id="performance-owner",
     )
-    with source.open("a", encoding="utf-8") as handle:
-        handle.write(
-            "".join(
-                _token_line(f"event-tail-{index}", index % 100)
-                for index in range(2_000)
-            )
-        )
-
-    result = ingestor.refresh(
+    _append_token_lines(
+        source,
+        "event-tail-warmup",
+        count=_ACTIVE_WRITER_APPEND_CALLS,
+    )
+    warmup = ingestor.refresh(
         [source],
         trigger=RefreshTrigger.CLI_REFRESH,
         owner_id="performance-owner",
     )
+    assert warmup.planner_reason == "append_safe"
+    assert warmup.inserted_calls == _ACTIVE_WRITER_APPEND_CALLS
 
-    ordered = sorted(result.writer_transaction_ms)
-    p95 = ordered[max(0, math.ceil(len(ordered) * 0.95) - 1)]
+    # One refresh currently yields only 15 timings, where nearest-rank p95 is
+    # the single maximum. Aggregate independent tails so p95 is meaningful.
+    timings: list[float] = []
+    for sample in range(_ACTIVE_WRITER_MEASURED_REFRESHES):
+        _append_token_lines(
+            source,
+            f"event-tail-measured-{sample}",
+            count=_ACTIVE_WRITER_APPEND_CALLS,
+        )
+        result = ingestor.refresh(
+            [source],
+            trigger=RefreshTrigger.CLI_REFRESH,
+            owner_id="performance-owner",
+        )
+        assert result.planner_reason == "append_safe"
+        assert result.inserted_calls == _ACTIVE_WRITER_APPEND_CALLS
+        timings.extend(result.writer_transaction_ms)
+
+    p95, maximum = _assert_active_writer_latency_budget(tuple(timings))
     print(
         json.dumps(
             {
                 "active_calls": _CALL_COUNT,
-                "appended_calls": result.inserted_calls,
+                "appended_calls_per_refresh": _ACTIVE_WRITER_APPEND_CALLS,
+                "measured_refreshes": _ACTIVE_WRITER_MEASURED_REFRESHES,
+                "writer_max_ms": round(maximum, 3),
                 "writer_p95_ms": round(p95, 3),
-                "writer_transactions": len(ordered),
+                "writer_transactions": len(timings),
             },
             sort_keys=True,
         )
-    )
-    assert result.planner_reason == "append_safe"
-    assert result.inserted_calls == 2_000
-    assert p95 <= _ACTIVE_WRITER_P95_BUDGET_MS, (
-        f"active writer p95 {p95:.3f} ms exceeded "
-        f"{_ACTIVE_WRITER_P95_BUDGET_MS:.1f} ms"
     )
 
 
