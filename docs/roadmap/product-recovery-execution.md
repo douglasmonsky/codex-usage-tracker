@@ -761,6 +761,43 @@ bounded human label. The exact query, ingestion oracle, equivalence, and R5
 analytical suite passes 30 focused tests. Final PR CI remains pending on this
 cross-host correction.
 
+### R7 qualification correction — issue #356
+
+A fresh installed Desktop task against the default selective-history index
+sent the documented `top_threads` template and received a partial-coverage
+error. The frozen named-template shape had no caller field for opting into the
+hydrated subset, so the agent tried an invalid string parameter, requested
+guidance, called status, and finally started an unnecessary complete-history
+refresh. This made a tens-of-milliseconds leaderboard path appear unavailable
+until long historical hydration completed.
+
+Curated templates now materialize their closed typed requests with
+`allow_partial=true`. The named template itself selects this documented
+coverage-aware behavior; caller-authored typed all-history requests still fail
+closed unless their existing public shape explicitly opts into partial
+coverage. Responses preserve the partial grade and complete coverage metadata,
+and the bundled skill tells agents to state that scope and refresh complete
+history only when the user asks. The exact six-tool schema and frozen `0.28`
+schema hash remain unchanged.
+
+The synthetic partial-history regression proves that `top_threads` returns both
+leaderboard and cost-context results without launching a worker. Materializer,
+schema, plugin, and stable-contract tests pass as a 39-test focused set. The
+maintained `just v` profile passes 441 Python tests, nine frontend tests, Ruff,
+MyPy, Pyright, deterministic assets, scope, maintainability, and release-safety
+gates. The plugin bundle measures 5,601 bytes under its 5,620-byte ceiling.
+GitNexus classified the changed materializer itself low risk after refreshing
+the exact worktree index; application, MCP, cache, and coverage callers are
+covered by the focused and complete interface suites. Branch:
+`fix/template-partial-coverage`. Final review, PR CI, merge identity, and
+installed fresh-task confirmation remain pending. The single final read-only
+reviewer reported one medium-severity finding and it was accepted: partial
+facts now require the agent to state the hydration preset/cutoff and never
+generalize the result to all history, with an exact bundled-skill regression.
+Review totals are one finding and one accepted finding (`R1`); reviewer-token
+status and tokens per accepted finding are `pending` because the metrics helper
+still invokes the retired `strict` command. No retry or second review was run.
+
 ## R4 — Build Persisted Rollups And Fast MCP/API Paths
 
 **State:** In progress

@@ -155,12 +155,25 @@ def test_server_side_template_materialization_matches_every_guided_template() ->
             context=_TEMPLATE_CONTEXT,
         )
 
-        assert list(materialized) == _materialize(
+        expected_requests = _materialize(
             template["requests"],
             {**_TEMPLATE_CONTEXT, **selected},
         )
+        for expected_request in expected_requests:
+            expected_request["allow_partial"] = True
+        assert list(materialized) == expected_requests
         for request in materialized:
             query_request(request).normalized()
+
+
+def test_named_templates_use_the_current_hydrated_snapshot() -> None:
+    materialized = materialize_query_requests(
+        [{"template": "top_threads"}],
+        context=_TEMPLATE_CONTEXT,
+    )
+
+    assert materialized
+    assert all(request["allow_partial"] is True for request in materialized)
 
 
 def test_every_console_dataset_default_is_a_valid_query() -> None:

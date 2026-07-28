@@ -85,6 +85,8 @@ def test_skill_teaches_scope_batch_evidence_and_claim_grading() -> None:
     assert "estimate" in skill
     assert "hypothesis" in skill
     assert "unsupported" in skill
+    assert "for `partial`, state the" in skill
+    assert "never generalize to all history" in skill
     assert "after ranking" in skill
     assert '{"requests":[{"template":"top_threads"}]}' in skill
     assert '{"requests":[{"template":"weekly_drivers"}]}' in skill

@@ -108,6 +108,24 @@ def test_partial_history_requires_explicit_query_opt_in(tmp_path: Path) -> None:
     assert accepted["results"][0]["coverage"]["history_complete"] is False
 
 
+def test_named_template_queries_the_current_hydrated_snapshot(tmp_path: Path) -> None:
+    launches: list[tuple[RuntimePaths, HydrationPreset]] = []
+    application = KernelApplication(
+        _partial_runtime(tmp_path),
+        worker_launcher=lambda paths, preset: launches.append((paths, preset)),
+    )
+
+    accepted = application.query({"requests": [{"template": "top_threads"}]})
+
+    assert accepted["history_coverage"]["complete_history"] is False
+    assert {result["grade"] for result in accepted["results"]} == {"partial"}
+    assert all(
+        result["coverage"]["history_complete"] is False
+        for result in accepted["results"]
+    )
+    assert launches == []
+
+
 def test_query_never_launches_refresh_for_partial_history(tmp_path: Path) -> None:
     launches: list[tuple[RuntimePaths, HydrationPreset]] = []
     application = KernelApplication(
