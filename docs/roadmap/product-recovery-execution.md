@@ -15,8 +15,8 @@ benchmark, a source-only tag, or an unpublished package.
 | R1 | Complete | R0 | `feature/r1-agent-outcome-baseline` | PR #342 merged as `aefb216`; frozen benchmark and measured failures |
 | R2 | Complete | R1 | `feature/r2-schema-v3-compact-storage` | PR #344 merged as `f740939`; compact schema v3 published to `main` |
 | R3 | Complete | R2 | `feature/r3-build-refresh-performance` | PR #344 merged as `f740939`; selective hydration and refresh gates pass |
-| R4 | In progress | R2 | `feature/r4-fast-query-mcp` | Rollup/query contracts pass; final review and merge pending |
-| R5 | Pending | R3, R4 | — | Analytical primitives and human semantics |
+| R4 | Complete | R2 | `feature/r4-fast-query-mcp` | PR #345 merged as `da42350`; persisted rollups and fast bounded paths |
+| R5 | In progress | R3, R4 | `feature/r5-analytical-primitives` | Correctness and privacy contracts pass; full validation pending |
 | R6 | Pending | R4, R5 | — | Console usability |
 | R7 | Pending | R1; completes after R3–R6 | — | Installed fresh-task qualification |
 | R8 | Pending | R0; completes after R6, R7 | — | Public documentation |
@@ -645,8 +645,8 @@ query, recovery, and performance contracts, scope allowlist, and this ledger
 
 ### Residual risk and next action
 
-- Commit and open the R4 pull request, require green CI, and merge before
-  starting R5. No second reviewer is permitted.
+- PR #345 passed CI and squash-merged as `da42350`. The source branch and
+  worktree remain preserved.
 - The first PR CI attempt exposed one stale installed-Console assumption: its
   synthetic allowance fixture relied on the former complete-history default.
   The smoke now explicitly requests `complete`; the local installed
@@ -656,3 +656,120 @@ query, recovery, and performance contracts, scope allowlist, and this ledger
   migrated. Publication snapshots now report conservative empty coverage for
   pre-v3 sidecars without writing. The v2-to-v3 migration creates the exact
   active/staged coverage schemas, and both published upgrade paths pass locally.
+
+## R5 — Restore Analytical Primitives And Human Semantics
+
+State: in progress on `feature/r5-analytical-primitives`, based on merged R4
+commit `da42350`.
+
+### Contract added first
+
+- Added synthetic contracts for the four token classes and total, configured
+  cost, estimated credits, coverage, allowance intervals, human thread labels,
+  turn ordinal/completion basis, bounded tool semantics, adjacent-call impact,
+  and copied-row exclusion.
+- Added explicit upgrade, append, and parser-boundary contracts:
+  parser v1 is replaced once by parser v2 and then returns to `no_changes`; a
+  later completion event closes the existing turn without double-counting its
+  call or tool; and tool start/output records merge across the 1,000-line
+  parser batch boundary.
+- Added privacy contracts proving that raw arguments, tool output, full source
+  paths, and absolute targets are not persisted. Partial rate coverage keeps
+  unrated usage visible rather than presenting it as zero.
+
+### Implementation checkpoint
+
+- Thread results pair a prompt-derived, bounded, control-stripped display label
+  with the stable exact selector. Session-index renames are resolved without
+  reparsing transcript JSONL.
+- Tool facts retain only operation class, safe project-relative target,
+  timestamps, status, duration, output byte count, argument-key shape, turn,
+  and deterministic adjacent model-call token classes. The response caveat
+  states that adjacency is not causal attribution.
+- Turns remain open until an observed completion, abort, or rollback event and
+  accumulate append-safe call/tool counts across generations.
+- Configured cost and estimated credits use the local dated rate card with
+  provenance, confidence, rated/unrated call coverage, and distinct semantics
+  from observed allowance drain.
+- Allowance rows are time-first and expose interval-local calls, turns, four
+  token classes, total tokens, and observed drain without assigning the drain
+  to the revealing call.
+- Parser version 2 deliberately reparses a legacy source once. The source
+  upsert now persists the new parser version; this fixed a defect that would
+  otherwise have forced the same replacement reparse on every subsequent
+  refresh.
+- Tool upserts now report only genuinely new tool rows and preserve the active
+  source/canonical adjacent call when an archived copy is encountered.
+- The final review exposed and the implementation now covers nine additional
+  edge contracts: label-less thread dimensions, pre-promotion tool isolation,
+  moving-tail relinking, non-project target rejection, structural-only copy
+  ownership, missing-ID tool occurrence identity, normalized structured-output
+  byte semantics, invalid-rate-card degradation, and effective turn completion
+  across every evidence view.
+- Refreshes stage whenever an existing tool will be enriched or a new call can
+  relink a prior tool in the same turn. Failed pre-promotion refreshes therefore
+  leave the active generation unchanged, while successful moving-tail refreshes
+  publish the following canonical call as the deterministic adjacent call.
+
+### Unprofiled performance evidence
+
+All measurements use fixed synthetic data; no local usage content was read.
+
+| Workload | Current p95 | Budget/result |
+| --- | ---: | --- |
+| 100,000-call top threads with four token classes, cost, credits, and labels | 508.637 ms | passes 1 s concentration gate |
+| 25,000-tool detailed adjacent-impact first page | 380.419 ms | passes 500 ms common-query gate |
+| 100,000-call allowance read | 402.455 ms | passes 500 ms gate |
+| 100,000-call evidence first page | 117.200 ms | passes 500 ms gate |
+| Warm batched adapter query | 0.370 ms | passes 500 ms gate |
+| Warm status | 0.567 ms | passes 50 ms local gate |
+
+The linked-tool canonicality path was measured at 456.274 ms p95 before the
+bounded fast-path change and 370.013 ms immediately afterward, a 19% reduction
+on the identical 25,000-tool workload. The combined final run measured
+380.419 ms p95. Common responses were 18,442 bytes for top threads and 10,071
+bytes for tool impact, both below the 64,000-byte focused ceiling.
+
+### Profiling evidence
+
+- `agent-perf` run `20260728T021431Z-de01d540` completed the R5 synthetic
+  workload under Scalene 2.3.0 in 22.235 seconds.
+- Ranked application attribution identified query execution and the two
+  deterministic per-call pricing functions on the cost/credit path. The
+  profile is attribution evidence only; the unprofiled timings above are the
+  performance evidence.
+- A pricing lookup micro-optimization did not improve the identical
+  end-to-end workload and was removed rather than retained as speculative
+  complexity.
+
+### Verification checkpoint
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| R5 correctness/privacy focus | Pass | 24 dedicated R5 contracts plus focused query, allowance, evidence, application, rollup, ingestion, and concurrency suites |
+| Performance suite | Pass | 10 synthetic query, allowance, evidence, adapter, ingest, and kernel benchmark tests |
+| Ruff | Pass | changed R5 implementation and tests |
+| MyPy, Pyright | Pass | 62-source MyPy surface; Pyright 0 errors and 0 warnings |
+| Full repository | Pass | 412 Python tests, 7 frontend tests, scope, manifests, maintainability, release safety, lint, typecheck, and deterministic Console assets |
+| Built distributions | Pass | wheel 158,032 bytes and sdist 469,613 bytes before the final ledger-only rebuild; both remain below their release-candidate ceilings; artifact digests stay in the external build manifest because this ledger is packaged in the sdist and ordinary wheel builds carry archive timestamps |
+| Installed package | Pass | clean candidate, public 0.27 upgrade, exact R4-base 0.28 upgrade with one-time parser-v2 replacement, two fresh MCP tasks each, and installed Console/allowance smoke; warm Console p95 no worse than 0.953 ms |
+| Final review | Pass after remediation | one read-only reviewer reported nine findings; R1–R9 were accepted and fixed; reviewer token attribution is pending because the installed tracker CLI lacks the metrics helper's legacy `strict` command |
+
+### Deviations and decisions
+
+- No explicitly authorized subagents were used. Shared parser, writer, query,
+  evidence, and allowance ownership made sequential integration safer.
+- SQLite timestamp subtraction can vary by a few microseconds; duration
+  contracts retain exact observed endpoints and use a 0.02 ms assertion
+  tolerance.
+- Configured-cost concentration currently remains a bounded fact query because
+  token pricing depends on the external rate-card revision. It passes the
+  required 1-second gate without adding a query-time database writer.
+
+### Residual risk and next action
+
+- Rebuild and check the final distributions, rerun installed-package smoke
+  against the corrected wheel, then open the R5 pull request. GitNexus classed
+  the writer/rollup remediation as critical blast radius; the failed-promotion,
+  moving-tail, focused 107-test surface, ingest-performance gates, and full
+  repository gate all pass after the change.

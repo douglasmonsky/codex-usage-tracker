@@ -34,6 +34,7 @@ from ..operational import (
 )
 from ..query import QueryService, exploration_guidance
 from ..query.contracts import MAX_QUERY_RESPONSE_BYTES
+from ..thread_labels import load_thread_label_hashes, thread_label_revision
 from .codec import evidence_request, json_value, query_request
 from .jobs import JobReader
 from .runtime import (
@@ -139,6 +140,8 @@ class KernelApplication:
                 requests,
                 history_coverage=history_coverage,
                 content=self.paths.content,
+                rate_card=self.paths.rate_card,
+                thread_labels=self.paths.codex_home,
             )
         cached = self._cached_query(cache_key) if cache_key is not None else None
         cache_hit = cached is not None
@@ -147,6 +150,10 @@ class KernelApplication:
                 QueryService(
                     self.paths.kernel.operational,
                     content_path=self.paths.content,
+                    rate_card_path=self.paths.rate_card,
+                    thread_labels=load_thread_label_hashes(
+                        self.paths.codex_home,
+                    ),
                     publication=publication,
                 ).execute_batch(requests)
                 if requests
@@ -190,7 +197,12 @@ class KernelApplication:
                 self._query_cache.popitem(last=False)
 
     def evidence(self, payload: dict[str, Any]) -> dict[str, Any]:
-        result = EvidenceService(self.paths.kernel.operational).read(evidence_request(payload))
+        result = EvidenceService(
+            self.paths.kernel.operational,
+            thread_labels=load_thread_label_hashes(
+                self.paths.codex_home,
+            ),
+        ).read(evidence_request(payload))
         return json_value(result)
 
     def allowance(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -444,6 +456,8 @@ def _query_cache_key(
     *,
     history_coverage: dict[str, object],
     content: Path,
+    rate_card: Path,
+    thread_labels: Path,
 ) -> str:
     payload = {
         "generation": control.active_generation,
@@ -452,6 +466,8 @@ def _query_cache_key(
         "coverage_revision": history_coverage["coverage_revision"],
         "requests": [json_value(request.normalized()) for request in requests],
         "content": content_status(content),
+        "rate_card": rate_card_status(rate_card),
+        "thread_labels": thread_label_revision(thread_labels),
     }
     return (
         "sha256:"

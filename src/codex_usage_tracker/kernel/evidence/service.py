@@ -23,6 +23,45 @@ from .contracts import (
 
 EVIDENCE_PLAN_VERSION = 1
 
+_EFFECTIVE_TURNS_CTE = """
+WITH ranked_completion AS (
+    SELECT activity_events.turn_id,
+           activity_events.event_at,
+           activity_events.event_kind,
+           ROW_NUMBER() OVER (
+               PARTITION BY activity_events.turn_id
+               ORDER BY activity_events.event_at DESC,
+                        activity_events.activity_event_id DESC
+           ) AS rank
+    FROM activity_events
+    WHERE activity_events.generation <= ?
+      AND activity_events.event_kind IN ('task', 'turn_aborted', 'rollback')
+),
+completion AS (
+    SELECT turn_id,
+           event_at AS ended_at,
+           'observed_event' AS completion_basis,
+           CASE event_kind
+               WHEN 'task' THEN 'completed'
+               WHEN 'turn_aborted' THEN 'aborted'
+               ELSE 'rolled_back'
+           END AS status
+    FROM ranked_completion
+    WHERE rank = 1
+),
+effective_turns AS (
+    SELECT turns.*,
+           COALESCE(completion.ended_at, turns.ended_at) AS effective_ended_at,
+           COALESCE(completion.status, turns.status) AS effective_status,
+           COALESCE(
+               completion.completion_basis,
+               turns.completion_basis
+           ) AS effective_completion_basis
+    FROM turns
+    LEFT JOIN completion USING (turn_id)
+)
+"""
+
 
 @dataclass(frozen=True)
 class _Resolution:
@@ -43,8 +82,14 @@ class _EvidencePlan:
 class EvidenceService:
     """Resolve stable logical selectors into bounded privacy-safe rows."""
 
-    def __init__(self, operational_path: Path) -> None:
+    def __init__(
+        self,
+        operational_path: Path,
+        *,
+        thread_labels: dict[str, str] | None = None,
+    ) -> None:
         self._operational_path = operational_path.resolve()
+        self._thread_labels = dict(thread_labels or {})
 
     def read(self, request: EvidenceRequest) -> EvidenceResult:
         normalized = request.normalized()
@@ -68,6 +113,10 @@ class EvidenceService:
             limit=normalized.limit,
         )
         with open_read_snapshot(path) as connection:
+            _register_thread_label_function(
+                connection,
+                self._thread_labels,
+            )
             connection.execute("PRAGMA query_only = ON")
             resolution = _resolve(connection, selector, generation)
             plan = _compile_plan(
@@ -114,6 +163,21 @@ class EvidenceService:
                 "generation_bound": True,
                 "logical_selector": True,
                 "content_included": False,
+                "thread_labels": {
+                    "basis": ("prompt_derived_session_index_metadata_when_available"),
+                    "sanitized": True,
+                },
+                "tool_impact": (
+                    {
+                        "basis": "deterministic_adjacent_model_call",
+                        "causal_attribution": False,
+                        "limitation": (
+                            "multiple preceding tools may contribute to one adjacent model call"
+                        ),
+                    }
+                    if view in {EvidenceView.TOOLS, EvidenceView.TIMELINE}
+                    else None
+                ),
             },
         )
 
@@ -129,18 +193,23 @@ def _resolve(
             SELECT thread_id, NULL, NULL, NULL, NULL
             FROM threads
             WHERE logical_thread_id = ? AND first_generation <= ?
-            ORDER BY first_generation
+            ORDER BY archive_state = 'active' DESC,
+                     last_generation DESC,
+                     thread_key
             LIMIT 1
             """,
             (selector.logical_id, generation),
         ),
         "turn": (
             """
-            SELECT thread_id, turn_id, NULL, NULL, NULL
+            SELECT turns.thread_id, turns.turn_id, NULL, NULL, NULL
             FROM turns
-            WHERE COALESCE(source_turn_id_hash, turn_id) = ?
-              AND first_generation <= ?
-            ORDER BY first_generation
+            JOIN threads USING (thread_id)
+            WHERE COALESCE(turns.source_turn_id_hash, turns.turn_id) = ?
+              AND turns.first_generation <= ?
+            ORDER BY threads.archive_state = 'active' DESC,
+                     turns.last_generation DESC,
+                     turns.turn_key
             LIMIT 1
             """,
             (selector.logical_id, generation),
@@ -196,7 +265,7 @@ def _compile_plan(
     offset: int,
 ) -> _EvidencePlan:
     if view is EvidenceView.SUMMARY:
-        sql, parameters = _summary_plan(selector, generation)
+        sql, parameters = _summary_plan(selector, resolution, generation)
     elif view is EvidenceView.CALLS:
         sql, parameters = _calls_plan(resolution, generation)
     elif view is EvidenceView.TOOLS:
@@ -207,10 +276,7 @@ def _compile_plan(
         sql, parameters = _allowance_plan(resolution, generation)
     else:
         sql, parameters = _timeline_plan(selector, resolution, generation)
-    paged = (
-        f"SELECT * FROM ({sql}) AS evidence_rows "
-        f"ORDER BY {_order_by(view)} LIMIT ? OFFSET ?"
-    )
+    paged = f"SELECT * FROM ({sql}) AS evidence_rows ORDER BY {_order_by(view)} LIMIT ? OFFSET ?"
     count = f"SELECT COUNT(*) FROM ({sql}) AS evidence_rows"
     return _EvidencePlan(
         sql=paged,
@@ -221,49 +287,124 @@ def _compile_plan(
 
 def _summary_plan(
     selector: EvidenceSelector,
+    resolution: _Resolution,
     generation: int,
 ) -> tuple[str, tuple[Any, ...]]:
     plans = {
         "thread": (
             """
-            SELECT logical_thread_id AS thread, display_label, project_label,
+            SELECT logical_thread_id AS thread,
+                   resolved_thread_label(
+                       session_identity_hash,
+                       display_label
+                   ) AS display_label,
+                   project_label,
                    created_at, updated_at, archive_state,
                    parent_logical_thread_id, subagent_type, subagent_role
             FROM threads
-            WHERE logical_thread_id = ? AND first_generation <= ?
+            WHERE thread_id = ? AND first_generation <= ?
             ORDER BY first_generation
             """,
-            (selector.logical_id, generation),
+            (resolution.thread_id, generation),
         ),
         "turn": (
-            """
+            _EFFECTIVE_TURNS_CTE
+            + """,
+            call_counts AS (
+                SELECT turn_id, COUNT(*) AS model_call_count
+                FROM model_calls
+                WHERE generation <= ?
+                  AND duplicate_state = 'canonical'
+                GROUP BY turn_id
+            ),
+            tool_counts AS (
+                SELECT turn_id, COUNT(*) AS tool_call_count
+                FROM tool_calls
+                WHERE generation <= ?
+                GROUP BY turn_id
+            ),
+            activity_counts AS (
+                SELECT turn_id,
+                       SUM(event_kind = 'skill') AS skill_count,
+                       SUM(event_kind = 'compaction') AS compaction_count,
+                       SUM(event_kind = 'patch') AS patch_count,
+                       SUM(event_kind IN (
+                           'rollback',
+                           'turn_aborted'
+                       )) AS error_count
+                FROM activity_events
+                WHERE generation <= ?
+                GROUP BY turn_id
+            )
             SELECT COALESCE(turns.source_turn_id_hash, turns.turn_id) AS turn,
-                   threads.logical_thread_id AS thread, turns.ordinal,
-                   turns.started_at, turns.ended_at, turns.status,
-                   turns.model_call_count, turns.tool_call_count,
-                   turns.skill_count, turns.compaction_count,
-                   turns.patch_count, turns.error_count
-            FROM turns JOIN threads USING (thread_id)
-            WHERE COALESCE(turns.source_turn_id_hash, turns.turn_id) = ?
+                   threads.logical_thread_id AS thread,
+                   resolved_thread_label(
+                       threads.session_identity_hash,
+                       threads.display_label
+                   ) AS thread_label,
+                   turns.ordinal,
+                   turns.started_at,
+                   turns.effective_ended_at AS ended_at,
+                   turns.effective_status AS status,
+                   turns.start_basis,
+                   turns.effective_completion_basis AS completion_basis,
+                   CASE WHEN turns.effective_completion_basis = 'observed_event'
+                        THEN 'exact' ELSE turns.basis_confidence
+                   END AS basis_confidence,
+                   COALESCE(call_counts.model_call_count, 0)
+                       AS model_call_count,
+                   COALESCE(tool_counts.tool_call_count, 0)
+                       AS tool_call_count,
+                   COALESCE(activity_counts.skill_count, 0) AS skill_count,
+                   COALESCE(activity_counts.compaction_count, 0)
+                       AS compaction_count,
+                   COALESCE(activity_counts.patch_count, 0) AS patch_count,
+                   COALESCE(activity_counts.error_count, 0) AS error_count
+            FROM effective_turns AS turns JOIN threads USING (thread_id)
+            LEFT JOIN call_counts USING (turn_id)
+            LEFT JOIN tool_counts USING (turn_id)
+            LEFT JOIN activity_counts USING (turn_id)
+            WHERE turns.turn_id = ?
               AND turns.first_generation <= ?
             """,
-            (selector.logical_id, generation),
+            (
+                generation,
+                generation,
+                generation,
+                generation,
+                resolution.turn_id,
+                generation,
+            ),
         ),
         "call": (
             _CALLS_SQL + " AND model_calls.canonical_call_id = ?",
-            (generation, selector.logical_id),
+            (generation, generation, selector.logical_id),
         ),
         "tool": (
             _TOOLS_SQL + " AND tool_calls.tool_call_id = ?",
-            (generation, selector.logical_id),
+            (generation, generation, selector.logical_id),
         ),
         "allowance": (
-            _ALLOWANCE_SQL
-            + " AND allowance_observations.allowance_observation_id = ?",
+            _ALLOWANCE_SQL + " AND allowance_observations.allowance_observation_id = ?",
             (generation, selector.logical_id),
         ),
     }
     return plans[selector.kind]
+
+
+def _register_thread_label_function(
+    connection: sqlite3.Connection,
+    labels: dict[str, str],
+) -> None:
+    connection.create_function(
+        "resolved_thread_label",
+        2,
+        lambda session_hash, stored: labels.get(
+            str(session_hash),
+            str(stored),
+        ),
+        deterministic=True,
+    )
 
 
 def _calls_plan(
@@ -276,7 +417,7 @@ def _calls_plan(
         turn="model_calls.turn_id",
         call="model_calls.model_call_id",
     )
-    return _CALLS_SQL + " AND " + clause, (generation, value)
+    return _CALLS_SQL + " AND " + clause, (generation, generation, value)
 
 
 def _tools_plan(
@@ -290,7 +431,7 @@ def _tools_plan(
         call="tool_calls.nearest_model_call_id",
         tool="tool_calls.tool_call_id",
     )
-    return _TOOLS_SQL + " AND " + clause, (generation, value)
+    return _TOOLS_SQL + " AND " + clause, (generation, generation, value)
 
 
 def _activities_plan(
@@ -349,26 +490,38 @@ def _timeline_plan(
             SELECT 'activity:' || activity_events.activity_event_id,
                    activity_events.event_at, activity_events.event_kind,
                    NULL, activity_events.safe_label, activity_events.category,
+                   activity_turns.ordinal,
+                   activity_turns.effective_completion_basis,
+                   NULL, NULL, NULL, NULL, NULL,
                    NULL, NULL, NULL, NULL, NULL,
                    activity_events.generation
             FROM activity_events
+            LEFT JOIN effective_turns AS activity_turns
+              ON activity_turns.turn_id = activity_events.turn_id
             WHERE activity_events.generation <= ? AND {activity_clause}
         """
         activity_parameters: tuple[Any, ...] = (generation, activity_value)
     else:
         activity_sql = ""
         activity_parameters = ()
-    sql = f"""
+    sql = _EFFECTIVE_TURNS_CTE + f"""
         SELECT 'call:' || model_calls.canonical_call_id AS event_id,
                model_calls.event_at, 'model_call' AS event_kind,
                'call:' || model_calls.canonical_call_id AS selector,
                model_calls.model AS safe_label, 'model_call' AS category,
+               call_turns.ordinal AS turn_ordinal,
+               call_turns.effective_completion_basis AS completion_basis,
+               NULL AS operation, NULL AS target_label,
+               NULL AS duration_ms, NULL AS output_bytes,
+               NULL AS impact_grade,
                model_calls.input_tokens - model_calls.cached_input_tokens
                    AS uncached_input_tokens,
                model_calls.cached_input_tokens, model_calls.reasoning_tokens,
                model_calls.output_tokens, NULL AS status,
                model_calls.generation
         FROM model_calls
+        LEFT JOIN effective_turns AS call_turns
+          ON call_turns.turn_id = model_calls.turn_id
         WHERE model_calls.generation <= ?
           AND model_calls.duplicate_state = 'canonical'
           AND {call_clause}
@@ -377,15 +530,32 @@ def _timeline_plan(
                COALESCE(tool_calls.started_at, tool_calls.ended_at),
                'tool_call', 'tool:' || tool_calls.tool_call_id,
                tool_calls.tool_name, tool_calls.tool_category,
-               NULL, NULL, NULL, NULL, tool_calls.status,
+               tool_turns.ordinal, tool_turns.effective_completion_basis,
+               tool_calls.operation, tool_calls.target_label,
+               tool_calls.duration_ms, tool_calls.output_bytes,
+               CASE WHEN adjacent.model_call_id IS NULL
+                    THEN 'structural_only'
+                    ELSE 'deterministic_adjacent_call'
+               END,
+               adjacent.input_tokens - adjacent.cached_input_tokens,
+               adjacent.cached_input_tokens,
+               adjacent.reasoning_tokens,
+               adjacent.output_tokens,
+               tool_calls.status,
                tool_calls.generation
         FROM tool_calls
+        LEFT JOIN effective_turns AS tool_turns
+          ON tool_turns.turn_id = tool_calls.turn_id
+        LEFT JOIN model_calls AS adjacent
+          ON adjacent.model_call_id = tool_calls.nearest_model_call_id
+         AND adjacent.generation <= tool_calls.generation
         WHERE tool_calls.generation <= ? AND {tool_clause}
         {activity_sql}
     """
     return (
         sql,
         (
+            generation,
             generation,
             call_value,
             generation,
@@ -433,10 +603,16 @@ def _activity_scope(resolution: _Resolution) -> tuple[str, str]:
     raise ValueError("selector has no activity evidence")
 
 
-_CALLS_SQL = """
+_CALLS_SQL = _EFFECTIVE_TURNS_CTE + """
 SELECT model_calls.canonical_call_id AS call,
        threads.logical_thread_id AS thread,
+       resolved_thread_label(
+           threads.session_identity_hash,
+           threads.display_label
+       ) AS thread_label,
        COALESCE(turns.source_turn_id_hash, turns.turn_id) AS turn,
+       turns.ordinal AS turn_ordinal,
+       turns.effective_completion_basis AS completion_basis,
        model_calls.event_at, model_calls.model, model_calls.effort,
        model_calls.service_tier, model_calls.origin,
        model_calls.input_tokens - model_calls.cached_input_tokens
@@ -447,23 +623,44 @@ SELECT model_calls.canonical_call_id AS call,
        model_calls.generation
 FROM model_calls
 JOIN threads USING (thread_id)
-LEFT JOIN turns ON turns.turn_id = model_calls.turn_id
+LEFT JOIN effective_turns AS turns ON turns.turn_id = model_calls.turn_id
 WHERE model_calls.generation <= ?
   AND model_calls.duplicate_state = 'canonical'
 """
 
-_TOOLS_SQL = """
+_TOOLS_SQL = _EFFECTIVE_TURNS_CTE + """
 SELECT tool_calls.tool_call_id AS tool,
        threads.logical_thread_id AS thread,
+       resolved_thread_label(
+           threads.session_identity_hash,
+           threads.display_label
+       ) AS thread_label,
        COALESCE(turns.source_turn_id_hash, turns.turn_id) AS turn,
+       turns.ordinal AS turn_ordinal,
+       turns.effective_completion_basis AS completion_basis,
        tool_calls.tool_name, tool_calls.server_name, tool_calls.namespace,
-       tool_calls.tool_category, tool_calls.started_at, tool_calls.ended_at,
+       tool_calls.tool_category, tool_calls.operation,
+       tool_calls.target_label, tool_calls.started_at, tool_calls.ended_at,
        tool_calls.duration_ms, tool_calls.status, tool_calls.error_category,
        tool_calls.output_bytes, tool_calls.observation_confidence,
+       CASE WHEN nearest.model_call_id IS NULL
+            THEN 'structural_only'
+            ELSE 'deterministic_adjacent_call'
+       END AS impact_grade,
+       nearest.input_tokens - nearest.cached_input_tokens
+           AS adjacent_uncached_input_tokens,
+       nearest.cached_input_tokens AS adjacent_cached_input_tokens,
+       nearest.reasoning_tokens AS adjacent_reasoning_tokens,
+       nearest.output_tokens AS adjacent_output_tokens,
+       nearest.input_tokens + nearest.output_tokens
+           AS adjacent_total_tokens,
        tool_calls.generation
 FROM tool_calls
 JOIN threads USING (thread_id)
-LEFT JOIN turns ON turns.turn_id = tool_calls.turn_id
+LEFT JOIN effective_turns AS turns ON turns.turn_id = tool_calls.turn_id
+LEFT JOIN model_calls AS nearest
+  ON nearest.model_call_id = tool_calls.nearest_model_call_id
+ AND nearest.generation <= tool_calls.generation
 WHERE tool_calls.generation <= ?
 """
 
@@ -510,9 +707,7 @@ def _destination(
     view: EvidenceView,
     live: bool,
 ) -> str:
-    query = urlencode(
-        {"selector": selector.value, "view": view.value, "live": int(live)}
-    )
+    query = urlencode({"selector": selector.value, "view": view.value, "live": int(live)})
     return f"/evidence/{quote(selector.value, safe='')}?{query}"
 
 
@@ -554,9 +749,7 @@ def _decode_cursor(
     if cursor is None:
         return 0
     try:
-        payload = json.loads(
-            base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4))
-        )
+        payload = json.loads(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
         offset = payload["o"]
         if (
             payload["g"] != generation
@@ -575,6 +768,4 @@ def _decode_cursor(
         TypeError,
         ValueError,
     ) as exc:
-        raise ValueError(
-            "evidence cursor does not match selector generation"
-        ) from exc
+        raise ValueError("evidence cursor does not match selector generation") from exc

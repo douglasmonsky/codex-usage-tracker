@@ -12,6 +12,7 @@ from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
+from ..allowance.rates import ModelRates, RateCard, load_rate_card
 from ..content import open_content_snapshot
 from ..database import open_read_snapshot
 from ..models import CutoverControl
@@ -35,10 +36,20 @@ class QueryService:
         operational_path: Path,
         *,
         content_path: Path | None = None,
+        rate_card_path: Path | None = None,
+        thread_labels: dict[str, str] | None = None,
         publication: tuple[CutoverControl, dict[str, object]] | None = None,
     ) -> None:
         self._operational_path = operational_path.resolve()
         self._content_path = content_path.resolve() if content_path else None
+        self._rate_card: RateCard | None = None
+        self._rate_card_error: str | None = None
+        if rate_card_path is not None:
+            try:
+                self._rate_card = load_rate_card(rate_card_path.resolve())
+            except ValueError as exc:
+                self._rate_card_error = str(exc)
+        self._thread_labels = dict(thread_labels or {})
         self._publication = publication
 
     def execute(self, request: QueryRequest) -> QueryResult:
@@ -72,6 +83,11 @@ class QueryService:
                 )
         with ExitStack() as stack:
             analytical = stack.enter_context(open_read_snapshot(path))
+            _register_pricing_functions(analytical, self._rate_card)
+            _register_thread_label_function(
+                analytical,
+                self._thread_labels,
+            )
             analytical.execute("PRAGMA query_only = ON")
             content = (
                 stack.enter_context(open_content_snapshot(self._content_path))
@@ -177,6 +193,8 @@ class QueryService:
             matched=matched,
             counts=coverage_counts,
             history_coverage=history_coverage,
+            rate_card=self._rate_card,
+            rate_card_error=self._rate_card_error,
             content_metadata=(
                 _content_metadata(connection) if request.dataset == "context" else None
             ),
@@ -467,37 +485,26 @@ def _result_coverage(
     matched: int,
     counts: dict[str, int],
     history_coverage: dict[str, object],
+    rate_card: RateCard | None,
+    rate_card_error: str | None,
     content_metadata: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     total = matched if request.dataset == "phases" else scanned
-    measures: dict[str, dict[str, Any]] = {}
-    partial = False
-    for measure in request.measures:
-        observed = counts.get(f"observed_{measure}", total)
-        missing = counts.get(f"missing_{measure}", 0)
-        partial = partial or missing > 0
-        measures[measure] = {
-            "basis": _measure_basis(request.dataset, measure),
-            "observed_count": observed,
-            "missing_count": missing,
-            "coverage_percent": (100.0 if total == 0 else 100.0 * observed / total),
-            "limitations": _measure_limitations(request.dataset, measure),
-        }
-        if request.dataset == "context" and measure == "estimated_tokens":
-            measures[measure]["estimator"] = (
-                content_metadata.get("estimator") if content_metadata is not None else None
-            )
-    grade = (
-        "deterministic"
-        if request.dataset == "phases"
-        else "estimated"
-        if request.dataset == "context" and "estimated_tokens" in request.measures
-        else "exact"
+    measures = {
+        measure: _measure_coverage_entry(
+            request.dataset,
+            measure,
+            total=total,
+            counts=counts,
+            rate_card=rate_card,
+            content_metadata=content_metadata,
+        )
+        for measure in request.measures
+    }
+    grade = _result_grade(
+        request,
+        history_coverage=history_coverage,
     )
-    if not bool(history_coverage["complete_history"]) and _requires_partial_opt_in(
-        request, history_coverage
-    ):
-        grade = "partial"
     coverage: dict[str, Any] = {
         "generation_bound": True,
         "canonical_calls_only": request.dataset == "calls",
@@ -507,29 +514,103 @@ def _result_coverage(
         "history_complete": bool(history_coverage["complete_history"]),
         "coverage_revision": history_coverage["coverage_revision"],
     }
+    if "thread" in request.dimensions:
+        coverage["thread_labels"] = {
+            "basis": "prompt_derived_session_index_metadata_when_available",
+            "fallback": "bounded_opaque_thread_label",
+            "sanitized": True,
+            "content_included": False,
+        }
+    if any(
+        measure in {"configured_cost_usd", "estimated_credits"}
+        for measure in request.measures
+    ):
+        coverage["rate_card"] = {
+            "status": (
+                "invalid"
+                if rate_card_error is not None
+                else "ready"
+                if rate_card is not None
+                else "absent"
+            ),
+            "limitation": (
+                "invalid local rate card; unpriced usage remains visible"
+                if rate_card_error is not None
+                else None
+            ),
+        }
     if request.dataset == "context":
-        source_generation = (
-            content_metadata.get("indexed_generation") if content_metadata is not None else None
-        )
-        coverage.update(
-            {
-                "observed_content_only": True,
-                "source_generation": source_generation,
-                "observed_through": (
-                    content_metadata.get("observed_through")
-                    if content_metadata is not None
-                    else None
-                ),
-                "generation_lag": (
-                    generation - source_generation if isinstance(source_generation, int) else None
-                ),
-                "unattributed_input_tokens": None,
-                "unattributed_limitation": (
-                    "billed input tokens cannot be safely attributed to observed categories"
-                ),
-            }
-        )
+        coverage.update(_content_coverage(generation, content_metadata))
     return grade, coverage
+
+
+def _measure_coverage_entry(
+    dataset: str,
+    measure: str,
+    *,
+    total: int,
+    counts: dict[str, int],
+    rate_card: RateCard | None,
+    content_metadata: dict[str, Any] | None,
+) -> dict[str, Any]:
+    observed = counts.get(f"observed_{measure}", total)
+    missing = counts.get(f"missing_{measure}", 0)
+    entry: dict[str, Any] = {
+        "basis": _measure_basis(dataset, measure),
+        "observed_count": observed,
+        "missing_count": missing,
+        "coverage_percent": 100.0 if total == 0 else 100.0 * observed / total,
+        "limitations": _measure_limitations(dataset, measure),
+    }
+    if measure in {"configured_cost_usd", "estimated_credits"}:
+        entry["provenance"] = rate_card.source if rate_card is not None else None
+        entry["confidence"] = _rate_card_confidence(rate_card)
+    if dataset == "context" and measure == "estimated_tokens":
+        entry["estimator"] = (
+            content_metadata.get("estimator") if content_metadata is not None else None
+        )
+    return entry
+
+
+def _result_grade(
+    request: QueryRequest,
+    *,
+    history_coverage: dict[str, object],
+) -> str:
+    if not bool(history_coverage["complete_history"]) and _requires_partial_opt_in(
+        request, history_coverage
+    ):
+        return "partial"
+    if (
+        request.dataset == "context" and "estimated_tokens" in request.measures
+    ) or "estimated_credits" in request.measures:
+        return "estimated"
+    if request.dataset == "phases" or "configured_cost_usd" in request.measures:
+        return "deterministic"
+    return "exact"
+
+
+def _content_coverage(
+    generation: int,
+    content_metadata: dict[str, Any] | None,
+) -> dict[str, Any]:
+    source_generation = (
+        content_metadata.get("indexed_generation") if content_metadata is not None else None
+    )
+    return {
+        "observed_content_only": True,
+        "source_generation": source_generation,
+        "observed_through": (
+            content_metadata.get("observed_through") if content_metadata is not None else None
+        ),
+        "generation_lag": (
+            generation - source_generation if isinstance(source_generation, int) else None
+        ),
+        "unattributed_input_tokens": None,
+        "unattributed_limitation": (
+            "billed input tokens cannot be safely attributed to observed categories"
+        ),
+    }
 
 
 def _measure_basis(dataset: str, measure: str) -> str:
@@ -541,9 +622,20 @@ def _measure_basis(dataset: str, measure: str) -> str:
         return "tokenizer_estimate"
     if measure in {"uncached_input_tokens", "total_tokens"}:
         return "derived_exact"
+    if measure == "configured_cost_usd":
+        return "configured_dated_rate_card"
+    if measure == "estimated_credits":
+        return "explicit_local_credit_rate_card_estimate"
     if measure in {
         "allowance_delta_percent",
         "allowance_burn_rate",
+        "local_uncached_input_tokens",
+        "local_cached_input_tokens",
+        "local_reasoning_tokens",
+        "local_output_tokens",
+        "local_total_tokens",
+        "local_calls",
+        "local_turns",
         "local_tokens_per_percentage_point",
         "local_calls_per_percentage_point",
         "local_turns_per_percentage_point",
@@ -551,8 +643,14 @@ def _measure_basis(dataset: str, measure: str) -> str:
         return "deterministic_adjacent_observations"
     if measure in {"cache_reuse", "context_pressure"}:
         return "derived_ratio"
+    if dataset == "tools" and measure == "duration_ms":
+        return "deterministic_observed_timestamps"
+    if dataset == "tools" and measure == "output_bytes":
+        return "deterministic_normalized_tool_output_utf8_bytes"
     if measure in {"duration_ms", "output_bytes"}:
         return "upstream_observed"
+    if measure.startswith("adjacent_") and measure.endswith("_tokens"):
+        return "deterministic_adjacent_model_call"
     if measure in {
         "aborts",
         "activities",
@@ -581,6 +679,12 @@ def _measure_limitations(dataset: str, measure: str) -> list[str]:
         limitations.append(
             "reasoning tokens are reported separately; overlap with output tokens is not inferred"
         )
+    if measure == "configured_cost_usd":
+        limitations.append(
+            "configured token cost is a dated local rate-card calculation, not observed billing"
+        )
+    if measure == "estimated_credits":
+        limitations.append("estimated credits are separate from observed allowance drain")
     if dataset == "phases" and measure != "activities":
         limitations.append(
             "tokens are assigned to the preceding or enclosing phase "
@@ -588,6 +692,17 @@ def _measure_limitations(dataset: str, measure: str) -> list[str]:
         )
     if measure in {"duration_ms", "output_bytes", "context_pressure"}:
         limitations.append("null upstream observations are excluded")
+    if dataset == "tools" and measure == "output_bytes":
+        limitations.append(
+            "structured outputs are measured after deterministic JSON normalization"
+        )
+    if measure.startswith("adjacent_") and measure.endswith("_tokens"):
+        limitations.extend(
+            (
+                "adjacency is deterministic but does not prove causal tool attribution",
+                "multiple preceding tools may contribute to one adjacent model call",
+            )
+        )
     if measure in {
         "allowance_delta_percent",
         "allowance_burn_rate",
@@ -602,6 +717,107 @@ def _measure_limitations(dataset: str, measure: str) -> list[str]:
             )
         )
     return limitations
+
+
+def _register_pricing_functions(
+    connection: sqlite3.Connection,
+    card: RateCard | None,
+) -> None:
+    def configured_cost(
+        model: Any,
+        input_tokens: Any,
+        cached_input_tokens: Any,
+        output_tokens: Any,
+    ) -> float | None:
+        rates = _model_rates(card, model)
+        if rates is None:
+            return None
+        return _priced_value(
+            input_tokens,
+            cached_input_tokens,
+            output_tokens,
+            rates.input_per_million,
+            rates.cached_input_per_million,
+            rates.output_per_million,
+        )
+
+    def estimated_credits(
+        model: Any,
+        input_tokens: Any,
+        cached_input_tokens: Any,
+        output_tokens: Any,
+    ) -> float | None:
+        rates = _model_rates(card, model)
+        if rates is None:
+            return None
+        return _priced_value(
+            input_tokens,
+            cached_input_tokens,
+            output_tokens,
+            rates.credits_input_per_million,
+            rates.credits_cached_input_per_million,
+            rates.credits_output_per_million,
+        )
+
+    connection.create_function(
+        "configured_cost_usd",
+        4,
+        configured_cost,
+        deterministic=True,
+    )
+    connection.create_function(
+        "estimated_credits",
+        4,
+        estimated_credits,
+        deterministic=True,
+    )
+
+
+def _register_thread_label_function(
+    connection: sqlite3.Connection,
+    labels: dict[str, str],
+) -> None:
+    def resolved_thread_label(
+        session_identity_hash: Any,
+        stored_label: Any,
+    ) -> str:
+        return labels.get(str(session_identity_hash), str(stored_label))
+
+    connection.create_function(
+        "resolved_thread_label",
+        2,
+        resolved_thread_label,
+        deterministic=True,
+    )
+
+
+def _model_rates(card: RateCard | None, model: Any) -> ModelRates | None:
+    return card.models.get(str(model)) if card is not None else None
+
+
+def _rate_card_confidence(card: RateCard | None) -> str | None:
+    if card is None:
+        return None
+    values = {rates.confidence for rates in card.models.values()}
+    return next(iter(values)) if len(values) == 1 else "mixed"
+
+
+def _priced_value(
+    input_tokens: Any,
+    cached_input_tokens: Any,
+    output_tokens: Any,
+    input_rate: float,
+    cached_rate: float,
+    output_rate: float,
+) -> float:
+    input_count = int(input_tokens or 0)
+    cached_count = int(cached_input_tokens or 0)
+    output_count = int(output_tokens or 0)
+    return (
+        max(0, input_count - cached_count) * input_rate
+        + max(0, cached_count) * cached_rate
+        + max(0, output_count) * output_rate
+    ) / 1_000_000
 
 
 def _content_metadata(connection: sqlite3.Connection) -> dict[str, Any]:

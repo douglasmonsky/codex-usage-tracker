@@ -17,13 +17,9 @@ from codex_usage_tracker.kernel.operational import (
 
 def _token_line(event_id: str, value: int) -> str:
     return (
-        '{"event_id":"'
-        + event_id
-        + '","timestamp":"2026-01-01T00:00:01Z","type":"event_msg",'
+        '{"event_id":"' + event_id + '","timestamp":"2026-01-01T00:00:01Z","type":"event_msg",'
         '"payload":{"type":"token_count","info":{"last_token_usage":'
-        '{"input_tokens":'
-        + str(value)
-        + ',"cached_input_tokens":1,"output_tokens":2,'
+        '{"input_tokens":' + str(value) + ',"cached_input_tokens":1,"output_tokens":2,'
         '"reasoning_output_tokens":1,"total_tokens":'
         + str(value + 2)
         + '},"model_context_window":200000}}}\n'
@@ -162,9 +158,7 @@ def test_source_appended_during_hydration_is_caught_before_promotion(
     assert second.planner_reason == "no_changes"
     assert second.inserted_calls == 0
     with sqlite3.connect(paths.analytical) as connection:
-        assert connection.execute(
-            "SELECT COUNT(*) FROM model_calls"
-        ).fetchone()[0] == 2
+        assert connection.execute("SELECT COUNT(*) FROM model_calls").fetchone()[0] == 2
 
 
 def test_initial_hydration_normalizes_bounded_batches(
@@ -184,9 +178,14 @@ def test_initial_hydration_normalizes_bounded_batches(
     observed_batch_sizes: list[int] = []
     real_normalize = ingest.normalize_batch
 
-    def record_batch(plan, parsed, *, generation):
+    def record_batch(plan, parsed, *, generation, thread_labels=None):
         observed_batch_sizes.append(parsed.parsed_line_count)
-        return real_normalize(plan, parsed, generation=generation)
+        return real_normalize(
+            plan,
+            parsed,
+            generation=generation,
+            thread_labels=thread_labels,
+        )
 
     monkeypatch.setattr(ingest, "normalize_batch", record_batch)
     paths = kernel_paths(tmp_path / "cache")
@@ -342,9 +341,5 @@ def test_partial_batch_crash_retries_same_generation_idempotently(
     assert recovered.inserted_calls == 600
     assert load_cutover_control(paths.operational).state is CutoverState.ACTIVE
     with sqlite3.connect(paths.analytical) as connection:
-        assert connection.execute(
-            "SELECT COUNT(*) FROM generations"
-        ).fetchone()[0] == 1
-        assert connection.execute(
-            "SELECT COUNT(*) FROM model_calls"
-        ).fetchone()[0] == 600
+        assert connection.execute("SELECT COUNT(*) FROM generations").fetchone()[0] == 1
+        assert connection.execute("SELECT COUNT(*) FROM model_calls").fetchone()[0] == 600

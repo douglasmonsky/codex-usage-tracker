@@ -34,6 +34,7 @@ def rebuild_generation_rollups(
 
     started = time.perf_counter()
     with short_writer_transaction(path) as connection:
+        _link_unresolved_tool_calls(connection, generation)
         for table in (
             "rollup_global",
             "rollup_thread",
@@ -152,6 +153,57 @@ def rebuild_generation_rollups(
             (generation, generation),
         )
     return (time.perf_counter() - started) * 1_000
+
+
+def _link_unresolved_tool_calls(
+    connection: sqlite3.Connection,
+    generation: int,
+) -> None:
+    connection.execute(
+        """
+        UPDATE tool_call_facts AS tools
+        SET nearest_model_call_key = COALESCE(
+            (
+                SELECT calls.model_call_key
+                FROM model_call_facts AS calls
+                WHERE calls.turn_key = tools.turn_key
+                  AND calls.generation <= ?
+                  AND calls.duplicate_state = 'canonical'
+                  AND calls.event_at >= COALESCE(
+                      tools.ended_at,
+                      tools.started_at,
+                      ''
+                  )
+                ORDER BY calls.event_at, calls.model_call_key
+                LIMIT 1
+            ),
+            (
+                SELECT calls.model_call_key
+                FROM model_call_facts AS calls
+                WHERE calls.turn_key = tools.turn_key
+                  AND calls.generation <= ?
+                  AND calls.duplicate_state = 'canonical'
+                  AND calls.event_at < COALESCE(
+                      tools.ended_at,
+                      tools.started_at,
+                      ''
+                  )
+                ORDER BY calls.event_at DESC, calls.model_call_key DESC
+                LIMIT 1
+            )
+        ),
+            generation = ?
+        WHERE tools.generation <= ?
+          AND EXISTS (
+              SELECT 1
+              FROM model_call_facts AS changed_calls
+              WHERE changed_calls.turn_key = tools.turn_key
+                AND changed_calls.generation = ?
+                AND changed_calls.duplicate_state = 'canonical'
+          )
+        """,
+        (generation, generation, generation, generation, generation),
+    )
 
 
 def _seed_generation_rollups(
@@ -321,6 +373,10 @@ def _apply_generation_delta(
         (generation, generation, generation),
     )
     connection.execute(
+        "DELETE FROM rollup_tool_operation WHERE generation = ?",
+        (generation,),
+    )
+    connection.execute(
         """
         INSERT INTO rollup_tool_operation(
             generation, operation, target_label, calls,
@@ -331,12 +387,8 @@ def _apply_generation_delta(
                COALESCE(SUM(facts.output_bytes), 0)
         FROM tool_call_facts AS facts
         JOIN tool_profiles AS profiles USING (tool_profile_key)
-        WHERE facts.generation = ?
+        WHERE facts.generation <= ?
         GROUP BY profiles.operation, COALESCE(facts.target_label, '')
-        ON CONFLICT(generation, operation, target_label) DO UPDATE SET
-            calls = calls + excluded.calls,
-            duration_ms = duration_ms + excluded.duration_ms,
-            output_bytes = output_bytes + excluded.output_bytes
         """,
         (generation, generation),
     )

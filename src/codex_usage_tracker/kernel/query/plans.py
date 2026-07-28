@@ -129,6 +129,7 @@ def _compile_thread_rollup(
         return None
     selected = [
         "threads.logical_thread_id AS thread",
+        (f"{DATASETS['calls'].dimensions['thread_label']} AS thread_label"),
         *(f"{expressions[measure]} AS {measure}" for measure in request.measures),
         "COUNT(*) OVER () AS __matched_count",
         "COUNT(*) OVER () AS __scanned_count",
@@ -419,6 +420,12 @@ def _base_query(
         Operation.TIME_SERIES,
     }
     dimensions = [f"{spec.dimensions[name]} AS {name}" for name in request.dimensions]
+    if (
+        "thread" in request.dimensions
+        and "thread_label" not in request.dimensions
+        and "thread_label" in spec.dimensions
+    ):
+        dimensions.append(f"{spec.dimensions['thread_label']} AS thread_label")
     measures_catalog = spec.aggregate_measures if aggregate else spec.row_measures
     measures = [f"{measures_catalog[name]} AS {name}" for name in request.measures]
     selected = dimensions + measures
@@ -439,7 +446,21 @@ def _base_query(
             )
         )
     group_sql = (
-        " GROUP BY " + ", ".join(spec.dimensions[name] for name in request.dimensions)
+        " GROUP BY "
+        + ", ".join(
+            (
+                *(spec.dimensions[name] for name in request.dimensions),
+                *(
+                    (spec.dimensions["thread_label"],)
+                    if (
+                        "thread" in request.dimensions
+                        and "thread_label" not in request.dimensions
+                        and "thread_label" in spec.dimensions
+                    )
+                    else ()
+                ),
+            )
+        )
         if aggregate and request.dimensions
         else ""
     )

@@ -67,7 +67,9 @@ test("every guided query template submits an allowlisted request", async ({ page
   ]) {
     await page.getByLabel("Guided template").selectOption(template);
     await page.getByRole("button", { name: "Run bounded query" }).click();
-    await expect(page.getByText(/Generation 1 · \d+ of \d+ rows/)).toBeVisible();
+    await expect(
+      page.locator(".query-result .result-meta").first(),
+    ).toContainText(/Generation 1 · \d+ of \d+ rows/);
     await expect(page.getByText("This view could not load")).toHaveCount(0);
   }
 });
@@ -78,7 +80,9 @@ test("non-comparison templates ignore blank comparison controls", async ({ page 
   await page.getByLabel("Current end").fill("");
   await page.getByLabel("Guided template").selectOption("tools");
   await page.getByRole("button", { name: "Run bounded query" }).click();
-  await expect(page.getByText(/Generation 1 · \d+ of \d+ rows/)).toBeVisible();
+  await expect(
+    page.locator(".query-result .result-meta").first(),
+  ).toContainText(/Generation 1 · \d+ of \d+ rows/);
   await expect(page.getByText("This view could not load")).toHaveCount(0);
 });
 

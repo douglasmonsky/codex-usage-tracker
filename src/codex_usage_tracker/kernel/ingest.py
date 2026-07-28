@@ -53,9 +53,15 @@ from .operational import (
     stage_hydration_catalog,
     transition_cutover,
 )
-from .parser import ParsedBatch, iter_jsonl_batches, parse_jsonl
+from .parser import (
+    PARSER_VERSION,
+    ParsedBatch,
+    iter_jsonl_batches,
+    parse_jsonl,
+)
 from .rollups import generation_rollups_ready, rebuild_generation_rollups
 from .schema import SCHEMA_VERSION
+from .thread_labels import load_thread_labels
 from .writer import (
     WriteResult,
     commit_empty_initial_refresh,
@@ -107,6 +113,7 @@ class KernelIngestor:
         self.operational_path = operational_path.resolve()
         self._journal = journal
         self._build_path_override: Path | None = None
+        self._thread_labels: dict[str, str] = {}
 
     def refresh(
         self,
@@ -122,6 +129,7 @@ class KernelIngestor:
         if trigger is RefreshTrigger.WATCHER and not self._has_active_kernel():
             raise ValueError("watcher requires an existing active kernel")
         self._initialize_for_explicit_refresh()
+        self._thread_labels = load_thread_labels(sources)
         selection, observations, request_hash = self._select_hydration(
             sources,
             hydration_preset=hydration_preset,
@@ -578,12 +586,15 @@ class KernelIngestor:
             ).fetchone()
         if row is None:
             return None
+        parser_upgrade = str(row["parser_version"]) != PARSER_VERSION
         return SourceCursor(
             source_id=str(row["source_id"]),
             parsed_byte_offset=int(row["parsed_byte_offset"]),
             parsed_line_number=int(row["parsed_line_number"]),
             size_bytes=int(row["size_bytes"]),
-            prefix_fingerprint=str(row["replacement_fingerprint"]),
+            prefix_fingerprint=(
+                "parser-upgrade-required" if parser_upgrade else str(row["replacement_fingerprint"])
+            ),
             is_archived=str(row["archive_state"]) == "archived",
         )
 
@@ -599,7 +610,14 @@ class KernelIngestor:
             prior_state = self._parser_state(plan, analytical_path)
             parsed = parse_jsonl(plan, prior_state)
             parsed_batches.append(parsed)
-            normalized_batches.append(normalize_batch(plan, parsed, generation=generation))
+            normalized_batches.append(
+                normalize_batch(
+                    plan,
+                    parsed,
+                    generation=generation,
+                    thread_labels=self._thread_labels,
+                )
+            )
         return tuple(parsed_batches), tuple(normalized_batches)
 
     def _parser_state(self, plan: SourcePlan, analytical_path: Path):
@@ -664,6 +682,7 @@ class KernelIngestor:
                     chunk_plan,
                     parsed,
                     generation=generation,
+                    thread_labels=self._thread_labels,
                 )
                 for row in normalized.model_calls:
                     row["duplicate_state"] = "canonical"
@@ -737,6 +756,8 @@ class KernelIngestor:
 
         transaction_ms = list(written.transaction_ms)
         deleted_rows = written.deleted_rows
+        inserted_calls = written.inserted_calls
+        inserted_tools = written.inserted_tools
         latest = written
         catch_up_source_ids: set[str] = set()
         selected_source_ids = frozenset(item.observation.source_id for item in selection.hydrate)
@@ -760,8 +781,8 @@ class KernelIngestor:
             if not plans:
                 return (
                     WriteResult(
-                        inserted_calls=latest.inserted_calls,
-                        inserted_tools=latest.inserted_tools,
+                        inserted_calls=inserted_calls,
+                        inserted_tools=inserted_tools,
                         deleted_rows=deleted_rows,
                         canonical_calls=latest.canonical_calls,
                         excluded_calls=latest.excluded_calls,
@@ -781,6 +802,8 @@ class KernelIngestor:
                 assert_fence=assert_fence,
             )
             deleted_rows += latest.deleted_rows
+            inserted_calls += latest.inserted_calls
+            inserted_tools += latest.inserted_tools
             transaction_ms.extend(latest.transaction_ms)
             catch_up_source_ids.update(plan.observation.source_id for plan in plans)
             selected_source_ids = frozenset(
@@ -983,6 +1006,25 @@ class KernelIngestor:
     ) -> bool:
         if self._active_generation() == 0:
             return False
+        tool_ids = tuple(
+            sorted(
+                {
+                    str(row["tool_call_id"])
+                    for batch in normalized
+                    for row in batch.tool_calls
+                }
+            )
+        )
+        call_turn_ids = tuple(
+            sorted(
+                {
+                    str(row["turn_id"])
+                    for batch in normalized
+                    for row in batch.model_calls
+                    if row.get("turn_id") is not None
+                }
+            )
+        )
         fingerprints = tuple(
             sorted(
                 {
@@ -993,9 +1035,25 @@ class KernelIngestor:
                 }
             )
         )
-        if not fingerprints:
-            return False
         with open_read_snapshot(active_path) as connection:
+            for column, values in (
+                ("tool_call_id", tool_ids),
+                ("turn_id", call_turn_ids),
+            ):
+                for start in range(0, len(values), 500):
+                    chunk = values[start : start + 500]
+                    placeholders = ", ".join("?" for _ in chunk)
+                    row = connection.execute(
+                        f"""
+                        SELECT 1
+                        FROM tool_calls
+                        WHERE {column} IN ({placeholders})
+                        LIMIT 1
+                        """,
+                        chunk,
+                    ).fetchone()
+                    if row is not None:
+                        return True
             for start in range(0, len(fingerprints), 500):
                 chunk = fingerprints[start : start + 500]
                 placeholders = ", ".join("?" for _ in chunk)

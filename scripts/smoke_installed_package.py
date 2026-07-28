@@ -295,11 +295,13 @@ def _assert_dogfood_results(results: list[object]) -> None:
         != 360
     ):
         raise RuntimeError("installed MCP comparison differs from the oracle")
-    if (
-        sum(int(row["tools"]) for row in tool_rows) != 2
-        or sum(int(row["turns"]) for row in turn_rows) != 5
-    ):
-        raise RuntimeError("installed MCP structural totals differ from the oracle")
+    actual_tools = sum(int(row["tools"]) for row in tool_rows)
+    actual_turns = sum(int(row["turns"]) for row in turn_rows)
+    if actual_tools != 2 or actual_turns != 4:
+        raise RuntimeError(
+            "installed MCP structural totals differ from the oracle: "
+            f"tools={actual_tools}, turns={actual_turns}"
+        )
 
 
 def _result_rows(
@@ -525,7 +527,11 @@ def smoke_install(
         venv.EnvBuilder(with_pip=True, clear=True).create(venv_root)
         python = _python(venv_root)
         initial_target = (
-            f"{DISTRIBUTION_NAME}=={upgrade_from}"
+            (
+                str(Path(upgrade_from).resolve())
+                if Path(upgrade_from).is_file()
+                else f"{DISTRIBUTION_NAME}=={upgrade_from}"
+            )
             if upgrade_from is not None
             else target
         )
@@ -732,7 +738,10 @@ def main() -> int:
     parser.add_argument("--from-pypi", action="store_true")
     parser.add_argument("--version")
     parser.add_argument("--artifact-dir", type=Path)
-    parser.add_argument("--upgrade-from")
+    parser.add_argument(
+        "--upgrade-from",
+        help="public version or local wheel used to create the pre-upgrade cache",
+    )
     arguments = parser.parse_args()
     if arguments.from_pypi and arguments.artifact_dir is not None:
         parser.error("--from-pypi and --artifact-dir are mutually exclusive")

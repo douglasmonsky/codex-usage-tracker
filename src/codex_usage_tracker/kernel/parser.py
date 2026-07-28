@@ -6,14 +6,21 @@ import json
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
+from pathlib import PurePosixPath
 from typing import Any
 
 from .discovery import SourcePlan
 from .identity import safe_label
 
 PARSER_ADAPTER = "codex-jsonl-structural"
-PARSER_VERSION = "1"
+PARSER_VERSION = "2"
 _SAFE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:/@+-]{0,127}\Z")
+_TEST_COMMAND = re.compile(
+    r"(?:^|[;&|]\s*)(?:[^;&|]*?/)?"
+    r"(?:pytest|ruff|mypy|pyright|just\s+v|npm\s+test|pnpm\s+test)\b"
+)
+_SEARCH_COMMAND = re.compile(r"(?:^|[;&|]\s*)(?:[^;&|]*?/)?(?:rg|grep|find)\b")
+_READ_COMMAND = re.compile(r"(?:^|[;&|]\s*)(?:[^;&|]*?/)?(?:sed|head|tail|cat|ls|wc)\b")
 _ACTIVITY_KINDS = {
     "context_compacted": "compaction",
     "patch_apply_end": "patch",
@@ -32,6 +39,7 @@ class ParserState:
     agent_nickname: str | None = None
     turn_id: str | None = None
     turn_ordinal: int = 0
+    turn_started_at: str | None = None
     model: str = "unknown"
     effort: str | None = None
     service_tier: str | None = None
@@ -49,6 +57,7 @@ class StructuralEvent:
     agent_nickname: str | None
     turn_id: str | None
     turn_ordinal: int
+    turn_started_at: str | None
     model: str
     effort: str | None
     service_tier: str | None
@@ -61,6 +70,13 @@ class StructuralEvent:
     context_window: int | None = None
     tool_name: str | None = None
     server_name: str | None = None
+    tool_call_id: str | None = None
+    tool_phase: str | None = None
+    tool_operation: str | None = None
+    tool_target_label: str | None = None
+    tool_status: str | None = None
+    tool_output_bytes: int | None = None
+    tool_argument_shape: str | None = None
     activity_kind: str | None = None
     activity_label: str | None = None
     allowance_window: str | None = None
@@ -196,16 +212,42 @@ def _parse_envelope(
     if envelope_type == "session_meta":
         return [], _session_state(state, payload), True
     if envelope_type == "turn_context":
-        return [], _turn_state(state, payload), True
+        return [], _turn_state(state, payload, timestamp), True
     if envelope_type == "response_item":
         if payload.get("type") == "function_call":
+            tool_name = _safe_name(payload.get("name")) or "function_call"
+            arguments = _tool_arguments(payload.get("arguments"))
             event = _base_event(
                 "tool",
                 timestamp,
                 source_offset,
                 line_number,
                 state,
-                tool_name=_safe_name(payload.get("name")) or "function_call",
+                upstream_id=_safe_identifier(payload.get("call_id")),
+                tool_name=tool_name,
+                server_name=_tool_server(tool_name),
+                tool_call_id=_safe_identifier(payload.get("call_id")),
+                tool_phase="start",
+                tool_operation=_tool_operation(tool_name, arguments),
+                tool_target_label=_tool_target(arguments),
+                tool_status="started",
+                tool_argument_shape=_argument_shape(arguments),
+            )
+            return [event], state, True
+        if payload.get("type") == "function_call_output":
+            event = _base_event(
+                "tool",
+                timestamp,
+                source_offset,
+                line_number,
+                state,
+                upstream_id=_safe_identifier(payload.get("call_id")),
+                tool_name="unknown",
+                tool_call_id=_safe_identifier(payload.get("call_id")),
+                tool_phase="end",
+                tool_operation="unknown",
+                tool_status="completed",
+                tool_output_bytes=_observed_output_bytes(payload.get("output")),
             )
             return [event], state, True
         return [], state, True
@@ -213,23 +255,34 @@ def _parse_envelope(
         return [], state, False
     event_type = payload.get("type")
     if event_type == "token_count":
-        return _token_events(
-            envelope,
-            payload,
+        return (
+            _token_events(
+                envelope,
+                payload,
+                state,
+                timestamp,
+                source_offset,
+                line_number,
+            ),
             state,
-            timestamp,
-            source_offset,
-            line_number,
-        ), state, True
+            True,
+        )
     if event_type == "mcp_tool_call_end":
+        tool_name = _safe_name(payload.get("tool_name")) or "mcp_tool"
         event = _base_event(
             "tool",
             timestamp,
             source_offset,
             line_number,
             state,
-            tool_name=_safe_name(payload.get("tool_name")) or "mcp_tool",
+            upstream_id=_safe_identifier(payload.get("call_id")),
+            tool_name=tool_name,
             server_name=_safe_name(payload.get("server_name")),
+            tool_call_id=_safe_identifier(payload.get("call_id")),
+            tool_phase="end",
+            tool_operation="mcp",
+            tool_status="completed",
+            tool_output_bytes=_observed_output_bytes(payload.get("result")),
         )
         return [event], state, True
     activity = _ACTIVITY_KINDS.get(str(event_type))
@@ -262,11 +315,16 @@ def _session_state(state: ParserState, payload: dict[str, Any]) -> ParserState:
     )
 
 
-def _turn_state(state: ParserState, payload: dict[str, Any]) -> ParserState:
+def _turn_state(
+    state: ParserState,
+    payload: dict[str, Any],
+    timestamp: str,
+) -> ParserState:
     return replace(
         state,
         turn_id=_safe_identifier(payload.get("turn_id")),
         turn_ordinal=state.turn_ordinal + 1,
+        turn_started_at=timestamp or None,
         model=_safe_name(payload.get("model")) or "unknown",
         effort=_safe_name(payload.get("effort")),
         service_tier=_safe_name(payload.get("service_tier")),
@@ -353,6 +411,7 @@ def _base_event(
         agent_nickname=state.agent_nickname,
         turn_id=state.turn_id,
         turn_ordinal=state.turn_ordinal,
+        turn_started_at=state.turn_started_at,
         model=state.model,
         effort=state.effort,
         service_tier=state.service_tier,
@@ -364,6 +423,103 @@ def _activity_label(activity: str, payload: dict[str, Any]) -> str | None:
     if activity == "skill":
         return _safe_display(payload.get("skill_name"))
     return None
+
+
+def _tool_arguments(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if not isinstance(value, str) or len(value.encode("utf-8")) > 64 * 1024:
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _tool_server(tool_name: str) -> str | None:
+    if not tool_name.startswith("mcp__"):
+        return None
+    parts = tool_name.split("__", 2)
+    return _safe_name(parts[1]) if len(parts) == 3 else None
+
+
+def _tool_operation(tool_name: str, arguments: dict[str, Any]) -> str:
+    lowered = tool_name.lower()
+    leaf = re.split(r"[.:/]|__", lowered)[-1]
+    if lowered.startswith("mcp__"):
+        return "mcp"
+    if any(name in lowered for name in ("browser", "playwright", "chrome")):
+        return "browser"
+    if "apply_patch" in leaf or leaf in {"patch", "patch_file"}:
+        return "patch"
+    if leaf in {"read", "read_file", "view_file", "view_image", "open_file"}:
+        return "read"
+    if leaf in {"write", "write_file", "create_file", "edit_file"}:
+        return "write"
+    if leaf in {"search", "search_files", "find_files", "grep"}:
+        return "search"
+    if leaf in {"test", "run_tests"}:
+        return "test"
+    if leaf in {"exec", "exec_command", "run", "run_command"}:
+        command = arguments.get("cmd")
+        if isinstance(command, str):
+            if _TEST_COMMAND.search(command):
+                return "test"
+            if _SEARCH_COMMAND.search(command):
+                return "search"
+            if _READ_COMMAND.search(command):
+                return "read"
+        return "execute"
+    return "unknown"
+
+
+def _tool_target(arguments: dict[str, Any]) -> str | None:
+    for field in ("path", "file_path", "filename", "target"):
+        value = arguments.get(field)
+        if not isinstance(value, str):
+            continue
+        normalized = value.replace("\\", "/").strip()
+        if (
+            not normalized
+            or len(normalized) > 240
+            or any(ord(character) < 32 for character in normalized)
+            or normalized.startswith(("~", "//"))
+            or re.match(r"^[A-Za-z]:/", normalized) is not None
+            or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", normalized) is not None
+        ):
+            continue
+        path = PurePosixPath(normalized)
+        if path.is_absolute() or ".." in path.parts:
+            continue
+        return str(path)[:160]
+    return None
+
+
+def _argument_shape(arguments: dict[str, Any]) -> str | None:
+    keys = sorted(
+        key
+        for key in arguments
+        if isinstance(key, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", key)
+    )
+    return json.dumps(keys[:32], separators=(",", ":")) if keys else None
+
+
+def _observed_output_bytes(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return len(value.encode("utf-8"))
+    try:
+        encoded = json.dumps(
+            value,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    except (TypeError, ValueError):
+        return None
+    return len(encoded)
 
 
 def _safe_name(value: Any) -> str | None:

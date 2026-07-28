@@ -135,15 +135,11 @@ def test_allowance_service_returns_reset_aware_local_facts_and_estimates(
     interval = next(
         item
         for item in result["intervals"]
-        if item["allowance_observation_id"]
-        == "allow_00000000000000000000000000000002"
+        if item["allowance_observation_id"] == "allow_00000000000000000000000000000002"
     )
     assert result["schema"] == "codex-usage-tracker.allowance-efficiency.v1"
     assert result["generation"] == control.active_generation
-    assert (
-        interval["previous_observation_id"]
-        == "allow_00000000000000000000000000000001"
-    )
+    assert interval["previous_observation_id"] == "allow_00000000000000000000000000000001"
     assert interval["grade"] == "deterministic"
     assert interval["used_percent"] == 12
     assert interval["remaining_percent"] == 88
@@ -161,13 +157,10 @@ def test_allowance_service_returns_reset_aware_local_facts_and_estimates(
         "calls": 2,
         "turns": 2,
     }
-    assert interval["estimated_cost_usd"] == pytest.approx(0.00231)
+    assert interval["configured_cost_usd"] == pytest.approx(0.00231)
     assert interval["estimated_credits"] == pytest.approx(0.001155)
     assert interval["pricing_coverage"]["coverage_percent"] == 100
-    assert (
-        interval["evidence_selector"]
-        == "allowance:allow_00000000000000000000000000000002"
-    )
+    assert interval["evidence_selector"] == "allowance:allow_00000000000000000000000000000002"
     assert interval["limitations"] == ["outside_usage_possible"]
     assert runtime.kernel.operational.read_bytes() == operational_before
     assert control.active_kernel_path.read_bytes() == analytical_before
@@ -322,8 +315,7 @@ def test_appended_allowance_observation_uses_incremental_refresh(
     assert result["generation"] == second.generation
     assert result["returned_count"] == 2
     assert any(
-        interval["grade"] == "deterministic"
-        and interval["delta_used_percent"] == 2
+        interval["grade"] == "deterministic" and interval["delta_used_percent"] == 2
         for interval in result["intervals"]
     )
 
