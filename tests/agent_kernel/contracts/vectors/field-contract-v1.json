@@ -1,0 +1,2672 @@
+{
+  "schema": "codex-usage-tracker.agent-kernel.field-contract-vectors.v1",
+  "version": 1,
+  "vector_ids": [
+    "field.adapter_identity",
+    "field.source",
+    "field.source_manifestation",
+    "field.project",
+    "field.session",
+    "field.turn",
+    "field.point_event",
+    "field.lifecycle_entity",
+    "field.model_profile",
+    "field.canonical_call",
+    "field.tool_invocation",
+    "field.activity",
+    "field.compaction_boundary",
+    "field.resource",
+    "field.state_change",
+    "field.context_component",
+    "field.allowance_limit",
+    "field.allowance_cycle",
+    "field.allowance_observation",
+    "field.allowance_interval",
+    "field.rate_card_revision",
+    "field.valuation_match",
+    "field.publication",
+    "field.publication_delta",
+    "field.source_occurrence",
+    "field.query_window"
+  ],
+  "field_contract_vectors": [
+    {
+      "id": "field.adapter_identity",
+      "entity": "adapter_identity",
+      "record": {
+        "adapter_id": "codex-jsonl",
+        "adapter_version": "codex-jsonl.v1",
+        "source_kind": "session-jsonl",
+        "capability_mask": 1,
+        "identity_version": "identity-v1"
+      },
+      "assertions": {
+        "adapter_id": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "contract_constant",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "adapter_version": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "source_kind": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "capability_mask": {
+          "checks": [
+            "measurement_mask"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "zero_mask",
+          "identity_participation": "excluded"
+        },
+        "identity_version": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "contract_constant",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        }
+      }
+    },
+    {
+      "id": "field.source",
+      "entity": "source",
+      "record": {
+        "source_id": "source:v1:cvn6tcrz6bilh3bo33cesif4iiomw5zgbrueh46cszl5uwb23cia",
+        "adapter_id": "codex-jsonl",
+        "source_kind": "session-jsonl",
+        "adapter_native_source_key": "codex-session-store",
+        "first_seen_publication": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "last_seen_publication": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "selected_history_coverage": "fixture"
+      },
+      "assertions": {
+        "source_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "adapter_id": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "source_kind": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "adapter_native_source_key": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "first_seen_publication": {
+          "checks": [
+            "logical_id"
+          ],
+          "basis": "publication_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "last_seen_publication": {
+          "checks": [
+            "logical_id"
+          ],
+          "basis": "publication_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "selected_history_coverage": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "planner_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.source_manifestation",
+      "entity": "source_manifestation",
+      "record": {
+        "manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+        "source_id": "source:v1:cvn6tcrz6bilh3bo33cesif4iiomw5zgbrueh46cszl5uwb23cia",
+        "technical_path_key": "sessions/2026/07/example.jsonl",
+        "display_label": "fixture",
+        "filesystem_identity": {
+          "fixture": "value"
+        },
+        "size_bytes": 1,
+        "modified_at_us": 100,
+        "content_revision": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "cursor_byte_offset": 1,
+        "cursor_record_ordinal": 1,
+        "state": "active",
+        "parse_diagnostics": [
+          "fixture"
+        ]
+      },
+      "assertions": {
+        "manifestation_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "source_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "technical_path_key": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "display_label": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "filesystem_identity": {
+          "checks": [
+            "mapping"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "size_bytes": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "filesystem_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "modified_at_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "filesystem_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "content_revision": {
+          "checks": [
+            "digest_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "cursor_byte_offset": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "cursor_record_ordinal": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "state": {
+          "checks": [
+            "status_enum"
+          ],
+          "basis": "inventory_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "parse_diagnostics": {
+          "checks": [
+            "sequence"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.project",
+      "entity": "project",
+      "record": {
+        "project_id": "project:v1:gdmt2ndek24pjiu3m3jfnjyod676cfhczbnobuuq3rqpky67myia",
+        "workspace_key": "workspace/example",
+        "label_candidates": [
+          "fixture"
+        ],
+        "first_event_at_us": 100,
+        "last_event_at_us": 100,
+        "provenance": [
+          {
+            "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+            "source_revision": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "record_ordinal": 1,
+            "adapter_version": "codex-jsonl.v1"
+          }
+        ]
+      },
+      "assertions": {
+        "project_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "excluded"
+        },
+        "workspace_key": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "included"
+        },
+        "label_candidates": {
+          "checks": [
+            "sequence"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        },
+        "first_event_at_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "deterministic_min",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "last_event_at_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "deterministic_max",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "provenance": {
+          "checks": [
+            "source_coordinates"
+          ],
+          "basis": "occurrence_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.session",
+      "entity": "session",
+      "record": {
+        "session_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "adapter_native_session_key": "native-session-001",
+        "identity_version": "identity-v1",
+        "project_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "root_session_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "parent_session_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "relationship_basis": "fixture",
+        "delegation_depth": 1,
+        "start_at_us": 100,
+        "end_at_us": 100,
+        "lifecycle_state": "succeeded",
+        "completion_basis": "fixture",
+        "label_candidates": [
+          "fixture"
+        ],
+        "evidence_coordinates": [
+          {
+            "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+            "source_revision": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "record_ordinal": 1,
+            "adapter_version": "codex-jsonl.v1"
+          }
+        ]
+      },
+      "assertions": {
+        "session_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "adapter_native_session_key": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "identity_version": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "contract_constant",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "project_id": {
+          "checks": [
+            "logical_id"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "root_session_id": {
+          "checks": [
+            "logical_id"
+          ],
+          "basis": "deterministic_hierarchy_fold",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "parent_session_id": {
+          "checks": [
+            "logical_id"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "relationship_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "delegation_depth": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "deterministic_hierarchy_fold",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "start_at_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "deterministic_min",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "end_at_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "lifecycle_fold",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "lifecycle_state": {
+          "checks": [
+            "lifecycle_state"
+          ],
+          "basis": "lifecycle_fold",
+          "missing_probe": "unknown_state",
+          "identity_participation": "excluded"
+        },
+        "completion_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "label_candidates": {
+          "checks": [
+            "sequence"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        },
+        "evidence_coordinates": {
+          "checks": [
+            "source_coordinates"
+          ],
+          "basis": "occurrence_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.turn",
+      "entity": "turn",
+      "record": {
+        "turn_id": "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a",
+        "session_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "ordinal": 1,
+        "start_at_us": 100,
+        "end_at_us": 100,
+        "source_order_range": [
+          "fixture"
+        ],
+        "lifecycle_state": "succeeded",
+        "completion_basis": "fixture",
+        "first_boundary_coordinates": {
+          "fixture": "value"
+        },
+        "membership": {
+          "fixture": "value"
+        }
+      },
+      "assertions": {
+        "turn_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "session_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "ordinal": {
+          "checks": [
+            "identity_input",
+            "nonnegative_integer"
+          ],
+          "basis": "adapter_deterministic",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "start_at_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "end_at_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "lifecycle_fold",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "source_order_range": {
+          "checks": [
+            "sequence"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "lifecycle_state": {
+          "checks": [
+            "lifecycle_state"
+          ],
+          "basis": "lifecycle_fold",
+          "missing_probe": "open_state",
+          "identity_participation": "excluded"
+        },
+        "completion_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "first_boundary_coordinates": {
+          "checks": [
+            "mapping"
+          ],
+          "basis": "deterministic_order",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "membership": {
+          "checks": [
+            "mapping"
+          ],
+          "basis": "canonical_relationship",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.point_event",
+      "entity": "point_event",
+      "record": {
+        "event_id": "event:v1:vzqemngqig4fsqfgvso4qtjetxe2d5bgltgw24mihiylofrzk6va",
+        "event_kind": "model_call",
+        "event_at_us": 100,
+        "source_order": [
+          "fixture",
+          1
+        ],
+        "session_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "turn_id": "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a",
+        "occurrence_coordinate": {
+          "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+          "source_revision": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "record_ordinal": 1,
+          "adapter_version": "codex-jsonl.v1"
+        },
+        "measurement_mask": 1,
+        "basis": "fixture",
+        "confidence": "1"
+      },
+      "assertions": {
+        "event_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "event_kind": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "event_at_us": {
+          "checks": [
+            "identity_input",
+            "utc_microseconds"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "source_order": {
+          "checks": [
+            "identity_input",
+            "source_order"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "session_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "turn_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "occurrence_coordinate": {
+          "checks": [
+            "source_coordinate"
+          ],
+          "basis": "occurrence_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "measurement_mask": {
+          "checks": [
+            "measurement_mask"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "confidence": {
+          "checks": [
+            "decimal_value"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.lifecycle_entity",
+      "entity": "lifecycle_entity",
+      "record": {
+        "logical_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "kind": "session",
+        "start_coordinate": {
+          "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+          "source_revision": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "record_ordinal": 1,
+          "adapter_version": "codex-jsonl.v1"
+        },
+        "last_transition_coordinate": {
+          "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+          "source_revision": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "record_ordinal": 1,
+          "adapter_version": "codex-jsonl.v1"
+        },
+        "terminal_coordinate": {
+          "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+          "source_revision": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "record_ordinal": 1,
+          "adapter_version": "codex-jsonl.v1"
+        },
+        "state": "active",
+        "state_basis": "fixture",
+        "transition_version": 1,
+        "observed_duration_us": 1,
+        "terminal_error_category": "fixture"
+      },
+      "assertions": {
+        "logical_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "kind": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "start_coordinate": {
+          "checks": [
+            "source_coordinate"
+          ],
+          "basis": "ordered_transition_fold",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "last_transition_coordinate": {
+          "checks": [
+            "source_coordinate"
+          ],
+          "basis": "ordered_transition_fold",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "terminal_coordinate": {
+          "checks": [
+            "source_coordinate"
+          ],
+          "basis": "ordered_transition_fold",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "state": {
+          "checks": [
+            "status_enum"
+          ],
+          "basis": "ordered_transition_fold",
+          "missing_probe": "unknown_state",
+          "identity_participation": "excluded"
+        },
+        "state_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "unknown_state",
+          "identity_participation": "excluded"
+        },
+        "transition_version": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "contract_constant",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "observed_duration_us": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "deterministic_difference",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "terminal_error_category": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.model_profile",
+      "entity": "model_profile",
+      "record": {
+        "model_profile_id": "model-profile:v1:agrmp4vnr5fai7yfnfentlrtpuaeecflb5zacov4ysdr5ymvlebq",
+        "model": "gpt-5.5",
+        "reasoning_effort": "high",
+        "service_tier": "priority"
+      },
+      "assertions": {
+        "model_profile_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "model": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "included"
+        },
+        "reasoning_effort": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "included"
+        },
+        "service_tier": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "included"
+        }
+      }
+    },
+    {
+      "id": "field.canonical_call",
+      "entity": "canonical_call",
+      "record": {
+        "call_id": "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q",
+        "adapter_native_call_key": "native-call-001",
+        "session_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "turn_id": "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a",
+        "model_profile_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "context_window_tokens": 1,
+        "uncached_input_tokens": 1,
+        "cached_input_tokens": 1,
+        "reasoning_tokens": 1,
+        "output_tokens": 1,
+        "token_basis": "fixture",
+        "lifecycle": "succeeded",
+        "evidence_coordinates": [
+          {
+            "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+            "source_revision": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "record_ordinal": 1,
+            "adapter_version": "codex-jsonl.v1"
+          }
+        ]
+      },
+      "assertions": {
+        "call_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "adapter_native_call_key": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "session_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "turn_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "model_profile_id": {
+          "checks": [
+            "logical_id"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "excluded"
+        },
+        "context_window_tokens": {
+          "checks": [
+            "token_count"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "uncached_input_tokens": {
+          "checks": [
+            "token_count"
+          ],
+          "basis": "observed_or_deterministic",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "cached_input_tokens": {
+          "checks": [
+            "token_count"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "reasoning_tokens": {
+          "checks": [
+            "token_count"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "output_tokens": {
+          "checks": [
+            "token_count"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "token_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "lifecycle": {
+          "checks": [
+            "lifecycle_state"
+          ],
+          "basis": "lifecycle_fold",
+          "missing_probe": "unknown_state",
+          "identity_participation": "excluded"
+        },
+        "evidence_coordinates": {
+          "checks": [
+            "source_coordinates"
+          ],
+          "basis": "occurrence_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.tool_invocation",
+      "entity": "tool_invocation",
+      "record": {
+        "tool_id": "tool:v1:jjedz64fn65ld2h4yybfuc5jze7ytmkpujli7ioli3uib6smyfha",
+        "adapter_native_invocation_key": "native-tool-001",
+        "session_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "turn_id": "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a",
+        "transport_name": "fixture",
+        "semantic_operation": "fixture",
+        "tool_family": "fixture",
+        "resource_links": [
+          "fixture"
+        ],
+        "write_intent": true,
+        "lifecycle": "succeeded",
+        "output_bytes": 1,
+        "duration_us": 1,
+        "error_category": "fixture"
+      },
+      "assertions": {
+        "tool_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "adapter_native_invocation_key": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "session_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "turn_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "transport_name": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "excluded"
+        },
+        "semantic_operation": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_deterministic",
+          "missing_probe": "unknown_state",
+          "identity_participation": "excluded"
+        },
+        "tool_family": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_deterministic",
+          "missing_probe": "unknown_state",
+          "identity_participation": "excluded"
+        },
+        "resource_links": {
+          "checks": [
+            "sequence"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        },
+        "write_intent": {
+          "checks": [
+            "boolean"
+          ],
+          "basis": "adapter_deterministic",
+          "missing_probe": "false_observed",
+          "identity_participation": "excluded"
+        },
+        "lifecycle": {
+          "checks": [
+            "lifecycle_state"
+          ],
+          "basis": "lifecycle_fold",
+          "missing_probe": "unknown_state",
+          "identity_participation": "excluded"
+        },
+        "output_bytes": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "duration_us": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "deterministic_difference",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "error_category": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.activity",
+      "entity": "activity",
+      "record": {
+        "activity_id": "activity:v1:isgkkwlqrx5hxfovhdcgyfwviofd5us4gwvnkc3hjaj57lq5xv4a",
+        "session_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "turn_id": "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a",
+        "activity_kind": "compaction",
+        "lifecycle": "succeeded"
+      },
+      "assertions": {
+        "activity_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "session_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "turn_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "activity_kind": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "lifecycle": {
+          "checks": [
+            "lifecycle_state"
+          ],
+          "basis": "lifecycle_fold",
+          "missing_probe": "unknown_state",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.compaction_boundary",
+      "entity": "compaction_boundary",
+      "record": {
+        "compaction_id": "compaction:v1:seerinpi5x7rhrff7fr4dx525msgilx6ha25mxgo75pmkwxowqmq",
+        "session_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "source_order": [
+          "fixture",
+          8
+        ],
+        "before_context_epoch": 1,
+        "after_context_epoch": 1
+      },
+      "assertions": {
+        "compaction_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "session_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "source_order": {
+          "checks": [
+            "identity_input",
+            "source_order"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "before_context_epoch": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "after_context_epoch": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.resource",
+      "entity": "resource",
+      "record": {
+        "resource_id": "resource:v1:hm3db535gdykbsnhga6t2ylpg3672b27tp35ezssm7aqhtps2y6a",
+        "project_id": "project:v1:gdmt2ndek24pjiu3m3jfnjyod676cfhczbnobuuq3rqpky67myia",
+        "kind": "file",
+        "normalized_key": "src/app.py",
+        "normalization_version": "resource-normalization-v1",
+        "display_label": "fixture",
+        "provenance": [
+          {
+            "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+            "source_revision": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "record_ordinal": 1,
+            "adapter_version": "codex-jsonl.v1"
+          }
+        ]
+      },
+      "assertions": {
+        "resource_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "project_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "included"
+        },
+        "kind": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_deterministic",
+          "missing_probe": "unknown_state",
+          "identity_participation": "included"
+        },
+        "normalized_key": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_deterministic",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "normalization_version": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "contract_constant",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "display_label": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "provenance": {
+          "checks": [
+            "source_coordinates"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.state_change",
+      "entity": "state_change",
+      "record": {
+        "change_id": "state-change:v1:d57pzczkqwqlmkfnt32xo4o4xidizu3tttb464px2ogj2gvs77xa",
+        "change_kind": "write",
+        "resource_id": "resource:v1:hm3db535gdykbsnhga6t2ylpg3672b27tp35ezssm7aqhtps2y6a",
+        "observation_at_us": 200,
+        "session_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "turn_id": "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a",
+        "before_revision": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "after_revision": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "causal_attribution": true,
+        "evidence_coordinates": [
+          {
+            "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+            "source_revision": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "record_ordinal": 1,
+            "adapter_version": "codex-jsonl.v1"
+          }
+        ]
+      },
+      "assertions": {
+        "change_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "change_kind": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "resource_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "observation_at_us": {
+          "checks": [
+            "identity_input",
+            "utc_microseconds"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "session_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "turn_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "before_revision": {
+          "checks": [
+            "digest_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "after_revision": {
+          "checks": [
+            "digest_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "causal_attribution": {
+          "checks": [
+            "boolean"
+          ],
+          "basis": "contract_constant",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "evidence_coordinates": {
+          "checks": [
+            "source_coordinates"
+          ],
+          "basis": "occurrence_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.context_component",
+      "entity": "context_component",
+      "record": {
+        "component_id": "context-component:v1:u2f7id3ocldurdhnvaoyk62ma54u7nhof56a2mjlxj4flbv4d64a",
+        "call_id": "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q",
+        "turn_id": "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a",
+        "category": "tool_output",
+        "observed_utf8_bytes": 1,
+        "event_count": 1,
+        "estimated_tokens": 1,
+        "inclusion_basis": "fixture"
+      },
+      "assertions": {
+        "component_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "call_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "turn_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "category": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "observed_utf8_bytes": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "event_count": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "estimated_tokens": {
+          "checks": [
+            "token_count"
+          ],
+          "basis": "configured_estimate",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "inclusion_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.allowance_limit",
+      "entity": "allowance_limit",
+      "record": {
+        "limit_id": "allowance-limit:v1:eu5ip4ofpzmqt3r2dw2rzh2mk4xywgixiaofvt5tk4y2cqaixlya",
+        "provider": "openai",
+        "account_local_identity": "account-local-1",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "configured_duration_us": 1,
+        "capability_basis": "fixture"
+      },
+      "assertions": {
+        "limit_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "provider": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "account_local_identity": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "included"
+        },
+        "plan_identity": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "included"
+        },
+        "window_kind": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "configured_duration_us": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "configured_estimate",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "capability_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.allowance_cycle",
+      "entity": "allowance_cycle",
+      "record": {
+        "cycle_id": "allowance-cycle:v1:daiagql6qamdpl56ac5vq2gvqed5fn276cbtebyj26n3mjyau7ba",
+        "limit_id": "allowance-limit:v1:eu5ip4ofpzmqt3r2dw2rzh2mk4xywgixiaofvt5tk4y2cqaixlya",
+        "reset_identity": "reset-2026-w31",
+        "start_at_us": 1000,
+        "end_at_us": 2000,
+        "reset_basis": "fixture",
+        "completion_status": "active"
+      },
+      "assertions": {
+        "cycle_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "limit_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "reset_identity": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "included"
+        },
+        "start_at_us": {
+          "checks": [
+            "identity_input",
+            "utc_microseconds"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "end_at_us": {
+          "checks": [
+            "identity_input",
+            "utc_microseconds"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "reset_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "completion_status": {
+          "checks": [
+            "status_enum"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "open_state",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.allowance_observation",
+      "entity": "allowance_observation",
+      "record": {
+        "observation_id": "allowance-observation:v1:dtksjcefe7ttlapfn6mtn4qphqruawelnopydqyrrookorcwpyxa",
+        "limit_id": "allowance-limit:v1:eu5ip4ofpzmqt3r2dw2rzh2mk4xywgixiaofvt5tk4y2cqaixlya",
+        "cycle_id": "allowance-cycle:v1:daiagql6qamdpl56ac5vq2gvqed5fn276cbtebyj26n3mjyau7ba",
+        "observed_at_us": 1100,
+        "used_percent": "50",
+        "remaining_percent": "50",
+        "absolute_fields": {
+          "fixture": "value"
+        },
+        "reset_time_us": 100,
+        "plan_identity": "fixture",
+        "source_occurrence": {
+          "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+          "source_revision": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "record_ordinal": 1,
+          "adapter_version": "codex-jsonl.v1"
+        },
+        "measurement_mask": 1
+      },
+      "assertions": {
+        "observation_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "limit_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "cycle_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "included"
+        },
+        "observed_at_us": {
+          "checks": [
+            "identity_input",
+            "utc_microseconds"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "used_percent": {
+          "checks": [
+            "decimal_percentage"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "remaining_percent": {
+          "checks": [
+            "decimal_percentage"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "absolute_fields": {
+          "checks": [
+            "mapping"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        },
+        "reset_time_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "plan_identity": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "explicit_unknown",
+          "identity_participation": "excluded"
+        },
+        "source_occurrence": {
+          "checks": [
+            "identity_input",
+            "source_coordinate"
+          ],
+          "basis": "occurrence_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "measurement_mask": {
+          "checks": [
+            "measurement_mask"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.allowance_interval",
+      "entity": "allowance_interval",
+      "record": {
+        "interval_id": "allowance-interval:v1:utrf2l6qkqkkj2dz76tzi3acxnakbb7o5kavv4zmezdzd3qws7xq",
+        "start_observation_id": "allowance-observation:v1:dtksjcefe7ttlapfn6mtn4qphqruawelnopydqyrrookorcwpyxa",
+        "end_observation_id": "allowance-observation:v1:pp2tbni6i2rax2lqiat5npzmnt6xfnsus5q7lzxt3gigtbbppbka",
+        "event_bounds": [
+          0,
+          1
+        ],
+        "percent_delta": "1",
+        "compatibility_basis": "fixture",
+        "ratio_eligible": true,
+        "coverage": {
+          "fixture": "value"
+        }
+      },
+      "assertions": {
+        "interval_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "start_observation_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "end_observation_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "event_bounds": {
+          "checks": [
+            "half_open_bounds"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "percent_delta": {
+          "checks": [
+            "decimal_value"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "compatibility_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "ratio_eligible": {
+          "checks": [
+            "boolean"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "false_observed",
+          "identity_participation": "excluded"
+        },
+        "coverage": {
+          "checks": [
+            "mapping"
+          ],
+          "basis": "publication_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.rate_card_revision",
+      "entity": "rate_card_revision",
+      "record": {
+        "rate_card_id": "rate-card:v1:nnz7pn6y5e2tzxsbb4c2duemp2amvjn4nt6vsb6l4377wrm2owda",
+        "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "source_name": "fixture",
+        "source_url": "fixture",
+        "effective_at_us": 100,
+        "fetched_at_us": 100,
+        "currency": "fixture",
+        "model_match_rules": [
+          "fixture"
+        ],
+        "four_class_rates": {
+          "uncached_input_tokens": "1",
+          "cached_input_tokens": "0.1",
+          "reasoning_tokens": "1",
+          "output_tokens": "2"
+        },
+        "credit_rates": {
+          "uncached_input_tokens": "1",
+          "cached_input_tokens": "0.1",
+          "reasoning_tokens": "1",
+          "output_tokens": "2"
+        },
+        "reasoning_in_output": true,
+        "confidence": "1",
+        "validation_status": "active"
+      },
+      "assertions": {
+        "rate_card_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "digest": {
+          "checks": [
+            "identity_input",
+            "digest_text"
+          ],
+          "basis": "configured_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "source_name": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "configured_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "source_url": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "configured_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "effective_at_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "configured_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "fetched_at_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "configured_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "currency": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "configured_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "model_match_rules": {
+          "checks": [
+            "sequence"
+          ],
+          "basis": "configured_exact",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        },
+        "four_class_rates": {
+          "checks": [
+            "decimal_rate_map"
+          ],
+          "basis": "configured_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "credit_rates": {
+          "checks": [
+            "decimal_rate_map"
+          ],
+          "basis": "configured_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "reasoning_in_output": {
+          "checks": [
+            "boolean"
+          ],
+          "basis": "provider_or_rate_card_provenance",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "confidence": {
+          "checks": [
+            "decimal_value"
+          ],
+          "basis": "configured_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "validation_status": {
+          "checks": [
+            "status_enum"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.valuation_match",
+      "entity": "valuation_match",
+      "record": {
+        "valuation_id": "valuation:v1:mrha4ff5csbeqeucteyzpc644oih5rjhd3g3kc6527p6ttd4pv6q",
+        "call_id": "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q",
+        "rate_card_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "match_basis": "fixture",
+        "configured_cost_usd": "1",
+        "estimated_credits": "1",
+        "cost_rated_token_fields": [
+          "fixture"
+        ],
+        "credit_rated_token_fields": [
+          "fixture"
+        ],
+        "cost_unpriced_token_fields": [
+          "fixture"
+        ],
+        "credit_unpriced_token_fields": [
+          "fixture"
+        ],
+        "missing_token_fields": [
+          "fixture"
+        ],
+        "cost_coverage_numerator_tokens": 1,
+        "cost_coverage_denominator_tokens": 1,
+        "cost_coverage": "1",
+        "credit_coverage_numerator_tokens": 1,
+        "credit_coverage_denominator_tokens": 1,
+        "credit_coverage": "1",
+        "cost_unpriced_reason": "fixture",
+        "credit_unpriced_reason": "fixture",
+        "cost_grade": "fixture",
+        "credit_grade": "fixture"
+      },
+      "assertions": {
+        "valuation_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "call_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "rate_card_digest": {
+          "checks": [
+            "identity_input",
+            "digest_text"
+          ],
+          "basis": "configured_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "match_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "configured_cost_usd": {
+          "checks": [
+            "decimal_value"
+          ],
+          "basis": "configured_estimate",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "estimated_credits": {
+          "checks": [
+            "decimal_value"
+          ],
+          "basis": "configured_estimate",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "cost_rated_token_fields": {
+          "checks": [
+            "sequence"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        },
+        "credit_rated_token_fields": {
+          "checks": [
+            "sequence"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        },
+        "cost_unpriced_token_fields": {
+          "checks": [
+            "sequence"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        },
+        "credit_unpriced_token_fields": {
+          "checks": [
+            "sequence"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        },
+        "missing_token_fields": {
+          "checks": [
+            "sequence"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "empty_collection",
+          "identity_participation": "excluded"
+        },
+        "cost_coverage_numerator_tokens": {
+          "checks": [
+            "token_count"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "cost_coverage_denominator_tokens": {
+          "checks": [
+            "token_count"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "cost_coverage": {
+          "checks": [
+            "decimal_value"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "credit_coverage_numerator_tokens": {
+          "checks": [
+            "token_count"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "credit_coverage_denominator_tokens": {
+          "checks": [
+            "token_count"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "credit_coverage": {
+          "checks": [
+            "decimal_value"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "cost_unpriced_reason": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "credit_unpriced_reason": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "cost_grade": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "credit_grade": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.publication",
+      "entity": "publication",
+      "record": {
+        "publication_key": "publication-attempt-001",
+        "publication_id": "publication:v1:rhvnzju6icrcrt2geso6ocup2nl33swccs3y4fncbdgsunm7rdka",
+        "parent_publication_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "schema_versions": {
+          "fixture": "value"
+        },
+        "committed_at_us": 100,
+        "observed_through_us": 100,
+        "history_preset": "fixture",
+        "requested_cutoff_us": 100,
+        "indexed_from_us": 100,
+        "indexed_through_us": 100,
+        "guaranteed_complete_from_us": 100,
+        "source_coverage": {
+          "fixture": "value"
+        },
+        "capability_coverage": {
+          "fixture": "value"
+        },
+        "entity_counts": {
+          "fixture": "value"
+        },
+        "publication_delta": {
+          "fixture": "value"
+        },
+        "artifact_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "active"
+      },
+      "assertions": {
+        "publication_key": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "host_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "publication_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "parent_publication_id": {
+          "checks": [
+            "logical_id"
+          ],
+          "basis": "publication_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "schema_versions": {
+          "checks": [
+            "mapping"
+          ],
+          "basis": "contract_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "committed_at_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "host_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "observed_through_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "deterministic_max",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "history_preset": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "planner_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "requested_cutoff_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "planner_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "indexed_from_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "deterministic_min",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "indexed_through_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "deterministic_max",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "guaranteed_complete_from_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "inventory_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "source_coverage": {
+          "checks": [
+            "mapping"
+          ],
+          "basis": "inventory_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "capability_coverage": {
+          "checks": [
+            "mapping"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "entity_counts": {
+          "checks": [
+            "mapping"
+          ],
+          "basis": "canonical_exact",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "publication_delta": {
+          "checks": [
+            "mapping"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "artifact_digest": {
+          "checks": [
+            "digest_text"
+          ],
+          "basis": "host_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "status": {
+          "checks": [
+            "status_enum"
+          ],
+          "basis": "host_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.publication_delta",
+      "entity": "publication_delta",
+      "record": {
+        "delta_key": "publication-delta-001",
+        "delta_id": "publication-delta:v1:oid5bteiazax2bb5bxonzk4mtf3oiaefwm63qwtcrbb6mnfcurfq",
+        "publication_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "parent_publication_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "inserted_count": 1,
+        "corrected_count": 1,
+        "terminalized_count": 1,
+        "recanonicalized_count": 1,
+        "removed_count": 1,
+        "token_delta": {
+          "fixture": "value"
+        }
+      },
+      "assertions": {
+        "delta_key": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "host_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "delta_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "publication_id": {
+          "checks": [
+            "logical_id"
+          ],
+          "basis": "publication_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "parent_publication_id": {
+          "checks": [
+            "logical_id"
+          ],
+          "basis": "publication_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "inserted_count": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "corrected_count": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "terminalized_count": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "recanonicalized_count": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "removed_count": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "zero_observed",
+          "identity_participation": "excluded"
+        },
+        "token_delta": {
+          "checks": [
+            "mapping"
+          ],
+          "basis": "deterministic",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        }
+      }
+    },
+    {
+      "id": "field.source_occurrence",
+      "entity": "source_occurrence",
+      "record": {
+        "occurrence_id": "occurrence:v1:ykmjovvykqspyd7wnlup74wqtoluq7hk6gw4l2gtzpnmqbvvmela",
+        "semantic_logical_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+        "source_revision": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "record_byte_range": [
+          0,
+          128
+        ],
+        "record_ordinal": 1,
+        "adapter_version": "codex-jsonl.v1"
+      },
+      "assertions": {
+        "occurrence_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "semantic_logical_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "source_manifestation_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "source_revision": {
+          "checks": [
+            "identity_input",
+            "digest_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "record_byte_range": {
+          "checks": [
+            "identity_input",
+            "half_open_bounds"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "record_ordinal": {
+          "checks": [
+            "identity_input",
+            "nonnegative_integer"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "included"
+        },
+        "adapter_version": {
+          "checks": [
+            "identity_input",
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        }
+      }
+    },
+    {
+      "id": "field.query_window",
+      "entity": "query_window",
+      "record": {
+        "window_id": "window:v1:45zbxkpom4tqf7jerpd22cqnwcx74gbdrwwc56gniprax5struyq",
+        "start_us": 0,
+        "end_us": 86400000000,
+        "timezone": "UTC",
+        "preset": "fixture"
+      },
+      "assertions": {
+        "window_id": {
+          "checks": [
+            "derived_identity",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "start_us": {
+          "checks": [
+            "identity_input",
+            "utc_microseconds"
+          ],
+          "basis": "calendar_conversion",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "end_us": {
+          "checks": [
+            "identity_input",
+            "utc_microseconds"
+          ],
+          "basis": "calendar_conversion",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "timezone": {
+          "checks": [
+            "identity_input",
+            "iana_timezone"
+          ],
+          "basis": "request_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "preset": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "request_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        }
+      }
+    }
+  ]
+}

@@ -296,6 +296,34 @@ CK01_AGENT_KERNEL_CONTRACT_ADDITIONS = frozenset(
     }
 )
 
+CK02_LOGICAL_CONTRACT_ADDITIONS = frozenset(
+    {
+        "config/agent-kernel/logical-contract-v1.json",
+        "tests/agent_kernel/contracts/reference/__init__.py",
+        "tests/agent_kernel/contracts/reference/accounting.py",
+        "tests/agent_kernel/contracts/reference/allowance.py",
+        "tests/agent_kernel/contracts/reference/contract.py",
+        "tests/agent_kernel/contracts/reference/field_contract.py",
+        "tests/agent_kernel/contracts/reference/identity.py",
+        "tests/agent_kernel/contracts/reference/lifecycle.py",
+        "tests/agent_kernel/contracts/reference/selectors.py",
+        "tests/agent_kernel/contracts/reference/time.py",
+        "tests/agent_kernel/contracts/test_accounting_vectors.py",
+        "tests/agent_kernel/contracts/test_allowance_vectors.py",
+        "tests/agent_kernel/contracts/test_identity_vectors.py",
+        "tests/agent_kernel/contracts/test_lifecycle_vectors.py",
+        "tests/agent_kernel/contracts/test_selector_vectors.py",
+        "tests/agent_kernel/contracts/test_time_vectors.py",
+        "tests/agent_kernel/contracts/vectors/accounting-v1.json",
+        "tests/agent_kernel/contracts/vectors/allowance-v1.json",
+        "tests/agent_kernel/contracts/vectors/field-contract-v1.json",
+        "tests/agent_kernel/contracts/vectors/identity-v1.json",
+        "tests/agent_kernel/contracts/vectors/lifecycle-v1.json",
+        "tests/agent_kernel/contracts/vectors/selector-v1.json",
+        "tests/agent_kernel/contracts/vectors/time-v1.json",
+    }
+)
+
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
     | K2_ADDITIONS
@@ -319,6 +347,7 @@ INTEGRATION_ADDITIONS = (
     | R4_ADDITIONS
     | R5_ADDITIONS
     | CK01_AGENT_KERNEL_CONTRACT_ADDITIONS
+    | CK02_LOGICAL_CONTRACT_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))")
 

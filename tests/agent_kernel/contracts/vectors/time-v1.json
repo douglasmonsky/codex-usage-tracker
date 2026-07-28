@@ -1,0 +1,199 @@
+{
+  "schema": "codex-usage-tracker.agent-kernel.time-vectors.v1",
+  "version": 1,
+  "vector_ids": [
+    "time.epoch",
+    "time.pre_epoch",
+    "time.offset",
+    "time.submicrosecond",
+    "time.submicrosecond_zero",
+    "time.dst_fold_0",
+    "time.dst_fold_1",
+    "time.dst_gap",
+    "time.dst_ambiguous",
+    "time.int64_boundaries",
+    "time.total_order",
+    "time.late_event",
+    "time.missing_order"
+  ],
+  "instant_vectors": [
+    {
+      "id": "time.epoch",
+      "instant": "1970-01-01T00:00:00Z",
+      "expected_us": 0
+    },
+    {
+      "id": "time.pre_epoch",
+      "instant": "1969-12-31T23:59:59.999999Z",
+      "expected_us": -1
+    },
+    {
+      "id": "time.offset",
+      "instant": "2026-07-28T17:00:00-04:00",
+      "expected_us": 1785272400000000
+    },
+    {
+      "id": "time.submicrosecond",
+      "instant": "2026-07-28T17:00:00.1234567Z",
+      "error": "timestamp exceeds exact microsecond precision"
+    },
+    {
+      "id": "time.submicrosecond_zero",
+      "instant": "2026-07-28T17:00:00.1234560Z",
+      "error": "timestamp exceeds exact microsecond precision"
+    }
+  ],
+  "calendar_vectors": [
+    {
+      "id": "time.dst_fold_0",
+      "local": "2026-11-01T01:30:00",
+      "timezone": "America/New_York",
+      "fold": 0,
+      "expected_us": 1793511000000000
+    },
+    {
+      "id": "time.dst_fold_1",
+      "local": "2026-11-01T01:30:00",
+      "timezone": "America/New_York",
+      "fold": 1,
+      "expected_us": 1793514600000000
+    },
+    {
+      "id": "time.dst_gap",
+      "local": "2026-03-08T02:30:00",
+      "timezone": "America/New_York",
+      "error": "nonexistent DST local time"
+    },
+    {
+      "id": "time.dst_ambiguous",
+      "local": "2026-11-01T01:30:00",
+      "timezone": "America/New_York",
+      "error": "ambiguous DST local time requires fold"
+    }
+  ],
+  "integer_vectors": [
+    {
+      "id": "time.int64_boundaries",
+      "value": -9223372036854775808,
+      "valid": true
+    },
+    {
+      "id": "time.int64_boundaries",
+      "value": 9223372036854775807,
+      "valid": true
+    },
+    {
+      "id": "time.int64_boundaries",
+      "value": -9223372036854775809,
+      "valid": false
+    },
+    {
+      "id": "time.int64_boundaries",
+      "value": 9223372036854775808,
+      "valid": false
+    }
+  ],
+  "ordering_vectors": [
+    {
+      "id": "time.total_order",
+      "events": [
+        {
+          "event_at_us": 100,
+          "source_order": [
+            "source-a",
+            2
+          ],
+          "event_kind_order": 1,
+          "logical_id": "event:v1:bbbbbbbbbbbbbbbb"
+        },
+        {
+          "event_at_us": 100,
+          "source_order": [
+            "source-a",
+            1
+          ],
+          "event_kind_order": 2,
+          "logical_id": "event:v1:aaaaaaaaaaaaaaaa"
+        },
+        {
+          "event_at_us": 100,
+          "source_order": [
+            "source-a",
+            1
+          ],
+          "event_kind_order": 1,
+          "logical_id": "event:v1:cccccccccccccccc"
+        }
+      ],
+      "expected_ids": [
+        "event:v1:cccccccccccccccc",
+        "event:v1:aaaaaaaaaaaaaaaa",
+        "event:v1:bbbbbbbbbbbbbbbb"
+      ]
+    },
+    {
+      "id": "time.late_event",
+      "events": [
+        {
+          "event_at_us": 300,
+          "source_order": [
+            "source-a",
+            3
+          ],
+          "event_kind_order": 1,
+          "logical_id": "event:v1:cccccccccccccccc"
+        },
+        {
+          "event_at_us": 100,
+          "source_order": [
+            "source-a",
+            1
+          ],
+          "event_kind_order": 1,
+          "logical_id": "event:v1:aaaaaaaaaaaaaaaa"
+        },
+        {
+          "event_at_us": 200,
+          "source_order": [
+            "source-a",
+            2
+          ],
+          "event_kind_order": 1,
+          "logical_id": "event:v1:bbbbbbbbbbbbbbbb"
+        }
+      ],
+      "expected_ids": [
+        "event:v1:aaaaaaaaaaaaaaaa",
+        "event:v1:bbbbbbbbbbbbbbbb",
+        "event:v1:cccccccccccccccc"
+      ]
+    },
+    {
+      "id": "time.missing_order",
+      "events": [
+        {
+          "event_at_us": null,
+          "source_order": [
+            "source-a",
+            1
+          ],
+          "event_kind_order": 1,
+          "logical_id": "event:v1:missingmissingmiss"
+        },
+        {
+          "event_at_us": 0,
+          "source_order": [
+            "source-a",
+            2
+          ],
+          "event_kind_order": 1,
+          "logical_id": "event:v1:observedobserved"
+        }
+      ],
+      "expected_ids": [
+        "event:v1:observedobserved",
+        "event:v1:missingmissingmiss"
+      ]
+    }
+  ]
+}

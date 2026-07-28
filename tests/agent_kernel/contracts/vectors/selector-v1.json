@@ -1,0 +1,230 @@
+{
+  "schema": "codex-usage-tracker.agent-kernel.selector-vectors.v1",
+  "version": 1,
+  "vector_ids": [
+    "selector.session",
+    "selector.state_change",
+    "selector.source_manifestation",
+    "selector.rebuild_stable",
+    "selector.invalid_prefix",
+    "selector.invalid_digest_length",
+    "selector.invalid_digest_case",
+    "selector.invalid_digest_padding",
+    "selector.kind_mismatch",
+    "selector.alias_same",
+    "selector.alias_distinct",
+    "publication.committed_snapshot",
+    "publication.mixed_snapshot",
+    "publication.rolled_back"
+  ],
+  "prefixes": {
+    "allowance_interval": "allowance-interval",
+    "allowance_observation": "allowance-observation",
+    "call": "call",
+    "model_profile": "model-profile",
+    "project": "project",
+    "publication": "publication",
+    "rate_card": "rate-card",
+    "resource": "resource",
+    "session": "session",
+    "source_manifestation": "source-manifestation",
+    "state_change": "state-change",
+    "tool": "tool",
+    "turn": "turn",
+    "window": "window"
+  },
+  "identity_kinds": {
+    "allowance_interval": "allowance-interval",
+    "allowance_observation": "allowance-observation",
+    "call": "call",
+    "model_profile": "model-profile",
+    "project": "project",
+    "publication": "publication",
+    "rate_card": "rate-card",
+    "resource": "resource",
+    "session": "session",
+    "source_manifestation": "source-manifestation",
+    "state_change": "state-change",
+    "tool": "tool",
+    "turn": "turn",
+    "window": "window"
+  },
+  "selector_vectors": [
+    {
+      "id": "selector.session",
+      "kind": "session",
+      "logical_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+      "expected_selector": "session:session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+      "selector_after_rebuild": "session:session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+      "old_coordinate": {
+        "source_revision": "sha256:old",
+        "record_ordinal": 1
+      },
+      "replacement_coordinate": {
+        "source_revision": "sha256:new",
+        "record_ordinal": 7
+      },
+      "prefixes": {
+        "session": "session"
+      },
+      "identity_kinds": {
+        "session": "session"
+      }
+    },
+    {
+      "id": "selector.state_change",
+      "kind": "state_change",
+      "logical_id": "state-change:v1:acys4xwbzjqqoolyxvrr6h22mdahlmqw7tyqj27tlrxwqi6p2cqa",
+      "expected_selector": "state-change:state-change:v1:acys4xwbzjqqoolyxvrr6h22mdahlmqw7tyqj27tlrxwqi6p2cqa",
+      "selector_after_rebuild": "state-change:state-change:v1:acys4xwbzjqqoolyxvrr6h22mdahlmqw7tyqj27tlrxwqi6p2cqa",
+      "old_coordinate": {
+        "source_revision": "sha256:old",
+        "record_ordinal": 2
+      },
+      "replacement_coordinate": {
+        "source_revision": "sha256:new",
+        "record_ordinal": 8
+      },
+      "prefixes": {
+        "state_change": "state-change"
+      },
+      "identity_kinds": {
+        "state_change": "state-change"
+      }
+    },
+    {
+      "id": "selector.source_manifestation",
+      "kind": "source_manifestation",
+      "logical_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+      "expected_selector": "source-manifestation:source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+      "selector_after_rebuild": "source-manifestation:source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+      "old_coordinate": {
+        "source_revision": "sha256:old",
+        "record_ordinal": 3
+      },
+      "replacement_coordinate": {
+        "source_revision": "sha256:new",
+        "record_ordinal": 9
+      },
+      "prefixes": {
+        "source_manifestation": "source-manifestation"
+      },
+      "identity_kinds": {
+        "source_manifestation": "source-manifestation"
+      }
+    }
+  ],
+  "invalid_selector_vectors": [
+    {
+      "id": "selector.invalid_prefix",
+      "selector": "unknown:session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+      "error": "unknown selector prefix unknown"
+    },
+    {
+      "id": "selector.invalid_digest_length",
+      "selector": "session:session:v1:ly4h5wl3xcwosiub",
+      "error": "selector contains an invalid logical ID"
+    },
+    {
+      "id": "selector.invalid_digest_case",
+      "selector": "session:session:v1:Ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+      "error": "selector contains an invalid logical ID"
+    },
+    {
+      "id": "selector.invalid_digest_padding",
+      "selector": "session:session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna=",
+      "error": "selector contains an invalid logical ID"
+    },
+    {
+      "id": "selector.kind_mismatch",
+      "selector": "session:tool:v1:jjedz64fn65ld2h4yybfuc5jze7ytmkpujli7ioli3uib6smyfha",
+      "error": "selector kind does not match logical ID kind"
+    }
+  ],
+  "alias_vectors": [
+    {
+      "id": "selector.alias_same",
+      "selector": "session:session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+      "aliases": {
+        "session:session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna": "session:session:v1:dpf63lfge2y2nt7dpyywmlwklnwh4wrrx2b4cxnujxvtqusuropq"
+      },
+      "entities": {
+        "session:session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna": {
+          "entity_key": "native-session-1"
+        },
+        "session:session:v1:dpf63lfge2y2nt7dpyywmlwklnwh4wrrx2b4cxnujxvtqusuropq": {
+          "entity_key": "native-session-1"
+        }
+      },
+      "expected": {
+        "requested_selector": "session:session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "resolved_selector": "session:session:v1:dpf63lfge2y2nt7dpyywmlwklnwh4wrrx2b4cxnujxvtqusuropq",
+        "alias_applied": true,
+        "entity_key": "native-session-1"
+      }
+    },
+    {
+      "id": "selector.alias_distinct",
+      "selector": "session:session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+      "aliases": {
+        "session:session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna": "session:session:v1:dpf63lfge2y2nt7dpyywmlwklnwh4wrrx2b4cxnujxvtqusuropq"
+      },
+      "entities": {
+        "session:session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna": {
+          "entity_key": "native-session-1"
+        },
+        "session:session:v1:dpf63lfge2y2nt7dpyywmlwklnwh4wrrx2b4cxnujxvtqusuropq": {
+          "entity_key": "native-session-2"
+        }
+      },
+      "error": "selector alias would join distinct entities"
+    }
+  ],
+  "publication_vectors": [
+    {
+      "id": "publication.committed_snapshot",
+      "publication": {
+        "publication_id": "publication:v1:rhvnzju6icrcrt2geso6ocup2nl33swccs3y4fncbdgsunm7rdka",
+        "status": "committed"
+      },
+      "rows": [
+        {
+          "publication_id": "publication:v1:rhvnzju6icrcrt2geso6ocup2nl33swccs3y4fncbdgsunm7rdka",
+          "entity_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna"
+        },
+        {
+          "publication_id": "publication:v1:rhvnzju6icrcrt2geso6ocup2nl33swccs3y4fncbdgsunm7rdka",
+          "entity_id": "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q"
+        }
+      ],
+      "expected_publication_id": "publication:v1:rhvnzju6icrcrt2geso6ocup2nl33swccs3y4fncbdgsunm7rdka"
+    },
+    {
+      "id": "publication.mixed_snapshot",
+      "publication": {
+        "publication_id": "publication:v1:rhvnzju6icrcrt2geso6ocup2nl33swccs3y4fncbdgsunm7rdka",
+        "status": "committed"
+      },
+      "rows": [
+        {
+          "publication_id": "publication:v1:rhvnzju6icrcrt2geso6ocup2nl33swccs3y4fncbdgsunm7rdka",
+          "entity_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna"
+        },
+        {
+          "publication_id": "publication:v1:s2dvctcs3wzjhj5cnc43japv7acxg2vheqgyucc4zuyjsjrsu5wa",
+          "entity_id": "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q"
+        }
+      ],
+      "error": "snapshot mixes publication identities"
+    },
+    {
+      "id": "publication.rolled_back",
+      "publication": {
+        "publication_id": "publication:v1:laniwk2dhjeojyl4u7fir5w2qjo56wjiz4fz7hy4r6xz5shvuw5a",
+        "status": "rolled_back"
+      },
+      "rows": [],
+      "error": "publication is not committed"
+    }
+  ]
+}

@@ -1,0 +1,745 @@
+{
+  "schema": "codex-usage-tracker.agent-kernel.allowance-vectors.v1",
+  "version": 1,
+  "vector_ids": [
+    "allowance.compatible_used",
+    "allowance.compatible_remaining",
+    "allowance.repeated",
+    "allowance.negative",
+    "allowance.reset_incompatible",
+    "allowance.plan_incompatible",
+    "allowance.cycle_incompatible",
+    "allowance.time_decrease",
+    "valuation.full",
+    "valuation.partial",
+    "valuation.unmatched",
+    "valuation.cost_only",
+    "valuation.credit_only",
+    "valuation.asymmetric",
+    "valuation.reasoning_overlap",
+    "valuation.reasoning_credit_overlap",
+    "valuation.negative_rate",
+    "decimal.canonical",
+    "decimal.noncanonical",
+    "decimal.percentage_domain"
+  ],
+  "interval_vectors": [
+    {
+      "id": "allowance.compatible_used",
+      "start": {
+        "observation_id": "allowance-observation:v1:aaaaaaaaaaaaaaaa",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 100,
+        "used_percent": "10.5",
+        "remaining_percent": null
+      },
+      "end": {
+        "observation_id": "allowance-observation:v1:bbbbbbbbbbbbbbbb",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 200,
+        "used_percent": "12.75",
+        "remaining_percent": null
+      },
+      "expected": {
+        "start_selector": "allowance-observation:allowance-observation:v1:aaaaaaaaaaaaaaaa",
+        "end_selector": "allowance-observation:allowance-observation:v1:bbbbbbbbbbbbbbbb",
+        "event_bounds": {
+          "start_us": 100,
+          "end_us": 200,
+          "semantics": "[start,end)"
+        },
+        "percent_delta": "2.25",
+        "ratio_eligible": true,
+        "compatibility_basis": "exact_identity_tuple_v1"
+      }
+    },
+    {
+      "id": "allowance.compatible_remaining",
+      "start": {
+        "observation_id": "allowance-observation:v1:aaaaaaaaaaaaaaaa",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 100,
+        "used_percent": null,
+        "remaining_percent": "89.5"
+      },
+      "end": {
+        "observation_id": "allowance-observation:v1:bbbbbbbbbbbbbbbb",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 200,
+        "used_percent": null,
+        "remaining_percent": "87.25"
+      },
+      "expected": {
+        "start_selector": "allowance-observation:allowance-observation:v1:aaaaaaaaaaaaaaaa",
+        "end_selector": "allowance-observation:allowance-observation:v1:bbbbbbbbbbbbbbbb",
+        "event_bounds": {
+          "start_us": 100,
+          "end_us": 200,
+          "semantics": "[start,end)"
+        },
+        "percent_delta": "2.25",
+        "ratio_eligible": true,
+        "compatibility_basis": "exact_identity_tuple_v1"
+      }
+    },
+    {
+      "id": "allowance.reset_incompatible",
+      "start": {
+        "observation_id": "allowance-observation:v1:aaaaaaaaaaaaaaaa",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 100,
+        "used_percent": "99",
+        "remaining_percent": null
+      },
+      "end": {
+        "observation_id": "allowance-observation:v1:bbbbbbbbbbbbbbbb",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-b",
+        "observed_at_us": 200,
+        "used_percent": "1",
+        "remaining_percent": null
+      },
+      "error": "incompatible allowance observations: reset_identity"
+    },
+    {
+      "id": "allowance.plan_incompatible",
+      "start": {
+        "observation_id": "allowance-observation:v1:6lf2ino7z4ocppmtbjxxqkmhpznuznws3mwzxjc5ylyklejxmqrq",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 100,
+        "used_percent": "10",
+        "remaining_percent": null
+      },
+      "end": {
+        "observation_id": "allowance-observation:v1:siheoew57wfulrgsapeqrbxvxdcv6gbacjzydze4bicfzmla6u7q",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-b",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 200,
+        "used_percent": "11",
+        "remaining_percent": null
+      },
+      "error": "incompatible allowance observations: plan_identity"
+    },
+    {
+      "id": "allowance.cycle_incompatible",
+      "start": {
+        "observation_id": "allowance-observation:v1:6lf2ino7z4ocppmtbjxxqkmhpznuznws3mwzxjc5ylyklejxmqrq",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 100,
+        "used_percent": "10",
+        "remaining_percent": null
+      },
+      "end": {
+        "observation_id": "allowance-observation:v1:siheoew57wfulrgsapeqrbxvxdcv6gbacjzydze4bicfzmla6u7q",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-b",
+        "reset_identity": "reset-a",
+        "observed_at_us": 200,
+        "used_percent": "11",
+        "remaining_percent": null
+      },
+      "error": "incompatible allowance observations: cycle_id"
+    },
+    {
+      "id": "allowance.time_decrease",
+      "start": {
+        "observation_id": "allowance-observation:v1:aaaaaaaaaaaaaaaa",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 200,
+        "used_percent": "10",
+        "remaining_percent": null
+      },
+      "end": {
+        "observation_id": "allowance-observation:v1:bbbbbbbbbbbbbbbb",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 100,
+        "used_percent": "11",
+        "remaining_percent": null
+      },
+      "error": "allowance observation time decreases"
+    }
+  ],
+  "ratio_vectors": [
+    {
+      "id": "allowance.repeated",
+      "start": {
+        "observation_id": "allowance-observation:v1:aaaaaaaaaaaaaaaa",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 100,
+        "used_percent": "10",
+        "remaining_percent": "90"
+      },
+      "end": {
+        "observation_id": "allowance-observation:v1:bbbbbbbbbbbbbbbb",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 200,
+        "used_percent": "10",
+        "remaining_percent": "90"
+      },
+      "expected_percent_delta": "0",
+      "expected_ratio_eligible": false
+    },
+    {
+      "id": "allowance.negative",
+      "start": {
+        "observation_id": "allowance-observation:v1:aaaaaaaaaaaaaaaa",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 100,
+        "used_percent": "20",
+        "remaining_percent": null
+      },
+      "end": {
+        "observation_id": "allowance-observation:v1:bbbbbbbbbbbbbbbb",
+        "provider": "openai",
+        "limit_id": "weekly",
+        "plan_identity": "plan-a",
+        "window_kind": "rolling_week",
+        "cycle_id": "cycle-a",
+        "reset_identity": "reset-a",
+        "observed_at_us": 200,
+        "used_percent": "18",
+        "remaining_percent": null
+      },
+      "expected_percent_delta": "-2",
+      "expected_ratio_eligible": false
+    }
+  ],
+  "valuation_vectors": [
+    {
+      "id": "valuation.full",
+      "tokens": {
+        "uncached_input_tokens": 1000,
+        "cached_input_tokens": 2000,
+        "reasoning_tokens": 300,
+        "output_tokens": 500
+      },
+      "rate_card": {
+        "digest": "sha256:full",
+        "match_basis": "exact_model_profile",
+        "matched": true,
+        "reasoning_in_output": true,
+        "rates_per_million": {
+          "uncached_input_tokens": "10",
+          "cached_input_tokens": "1",
+          "reasoning_tokens": null,
+          "output_tokens": "20"
+        },
+        "credit_rates_per_million": {
+          "uncached_input_tokens": "2",
+          "cached_input_tokens": "0.2",
+          "reasoning_tokens": null,
+          "output_tokens": "4"
+        }
+      },
+      "expected": {
+        "rate_card_digest": "sha256:full",
+        "match_basis": "exact_model_profile",
+        "configured_cost_usd": "0.022",
+        "estimated_credits": "0.0044",
+        "cost_rated_token_fields": [
+          "uncached_input_tokens",
+          "cached_input_tokens",
+          "output_tokens"
+        ],
+        "credit_rated_token_fields": [
+          "uncached_input_tokens",
+          "cached_input_tokens",
+          "output_tokens"
+        ],
+        "cost_unpriced_token_fields": [],
+        "credit_unpriced_token_fields": [],
+        "missing_token_fields": [],
+        "cost_coverage_numerator_tokens": 3500,
+        "cost_coverage_denominator_tokens": 3500,
+        "cost_coverage": "1",
+        "credit_coverage_numerator_tokens": 3500,
+        "credit_coverage_denominator_tokens": 3500,
+        "credit_coverage": "1",
+        "cost_unpriced_reason": null,
+        "credit_unpriced_reason": null,
+        "cost_grade": "configured_estimate",
+        "credit_grade": "configured_estimate"
+      }
+    },
+    {
+      "id": "valuation.partial",
+      "tokens": {
+        "uncached_input_tokens": 1000,
+        "cached_input_tokens": 2000,
+        "reasoning_tokens": null,
+        "output_tokens": 1000
+      },
+      "rate_card": {
+        "digest": "sha256:partial",
+        "match_basis": "model_alias",
+        "matched": true,
+        "reasoning_in_output": false,
+        "rates_per_million": {
+          "uncached_input_tokens": "10",
+          "cached_input_tokens": null,
+          "reasoning_tokens": "5",
+          "output_tokens": "20"
+        },
+        "credit_rates_per_million": {
+          "uncached_input_tokens": "2",
+          "cached_input_tokens": null,
+          "reasoning_tokens": "1",
+          "output_tokens": "4"
+        }
+      },
+      "expected": {
+        "rate_card_digest": "sha256:partial",
+        "match_basis": "model_alias",
+        "configured_cost_usd": "0.03",
+        "estimated_credits": "0.006",
+        "cost_rated_token_fields": [
+          "uncached_input_tokens",
+          "output_tokens"
+        ],
+        "credit_rated_token_fields": [
+          "uncached_input_tokens",
+          "output_tokens"
+        ],
+        "cost_unpriced_token_fields": [
+          "cached_input_tokens"
+        ],
+        "credit_unpriced_token_fields": [
+          "cached_input_tokens"
+        ],
+        "missing_token_fields": [
+          "reasoning_tokens"
+        ],
+        "cost_coverage_numerator_tokens": 2000,
+        "cost_coverage_denominator_tokens": 4000,
+        "cost_coverage": "0.5",
+        "credit_coverage_numerator_tokens": 2000,
+        "credit_coverage_denominator_tokens": 4000,
+        "credit_coverage": "0.5",
+        "cost_unpriced_reason": "partial_rate_card",
+        "credit_unpriced_reason": "partial_rate_card",
+        "cost_grade": "configured_estimate",
+        "credit_grade": "configured_estimate"
+      }
+    },
+    {
+      "id": "valuation.unmatched",
+      "tokens": {
+        "uncached_input_tokens": 100,
+        "cached_input_tokens": 0,
+        "reasoning_tokens": 0,
+        "output_tokens": 0
+      },
+      "rate_card": {
+        "digest": "sha256:unmatched",
+        "match_basis": "no_match",
+        "matched": false,
+        "reasoning_in_output": false,
+        "rates_per_million": {
+          "uncached_input_tokens": "10",
+          "cached_input_tokens": "1",
+          "reasoning_tokens": "5",
+          "output_tokens": "20"
+        },
+        "credit_rates_per_million": {
+          "uncached_input_tokens": "2",
+          "cached_input_tokens": "0.2",
+          "reasoning_tokens": "1",
+          "output_tokens": "4"
+        }
+      },
+      "expected": {
+        "rate_card_digest": "sha256:unmatched",
+        "match_basis": "no_match",
+        "configured_cost_usd": null,
+        "estimated_credits": null,
+        "cost_rated_token_fields": [],
+        "credit_rated_token_fields": [],
+        "cost_unpriced_token_fields": [
+          "uncached_input_tokens",
+          "cached_input_tokens",
+          "reasoning_tokens",
+          "output_tokens"
+        ],
+        "credit_unpriced_token_fields": [
+          "uncached_input_tokens",
+          "cached_input_tokens",
+          "reasoning_tokens",
+          "output_tokens"
+        ],
+        "missing_token_fields": [],
+        "cost_coverage_numerator_tokens": 0,
+        "cost_coverage_denominator_tokens": 100,
+        "cost_coverage": "0",
+        "credit_coverage_numerator_tokens": 0,
+        "credit_coverage_denominator_tokens": 100,
+        "credit_coverage": "0",
+        "cost_unpriced_reason": "model_unmatched",
+        "credit_unpriced_reason": "model_unmatched",
+        "cost_grade": "unsupported",
+        "credit_grade": "unsupported"
+      }
+    },
+    {
+      "id": "valuation.reasoning_overlap",
+      "tokens": {
+        "uncached_input_tokens": 100,
+        "cached_input_tokens": 0,
+        "reasoning_tokens": 10,
+        "output_tokens": 20
+      },
+      "rate_card": {
+        "digest": "sha256:invalid",
+        "match_basis": "exact_model_profile",
+        "matched": true,
+        "reasoning_in_output": true,
+        "rates_per_million": {
+          "uncached_input_tokens": "10",
+          "cached_input_tokens": "1",
+          "reasoning_tokens": "5",
+          "output_tokens": "20"
+        },
+        "credit_rates_per_million": {
+          "uncached_input_tokens": "2",
+          "cached_input_tokens": "0.2",
+          "reasoning_tokens": "1",
+          "output_tokens": "4"
+        }
+      },
+      "error": "reasoning cost rate would double-count output"
+    },
+    {
+      "id": "valuation.cost_only",
+      "tokens": {
+        "uncached_input_tokens": 1000,
+        "cached_input_tokens": 0,
+        "reasoning_tokens": 0,
+        "output_tokens": 0
+      },
+      "rate_card": {
+        "digest": "sha256:cost-only",
+        "match_basis": "exact_model_profile",
+        "matched": true,
+        "reasoning_in_output": false,
+        "rates_per_million": {
+          "uncached_input_tokens": "10",
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "output_tokens": null
+        }
+      },
+      "expected": {
+        "rate_card_digest": "sha256:cost-only",
+        "match_basis": "exact_model_profile",
+        "configured_cost_usd": "0.01",
+        "estimated_credits": null,
+        "cost_rated_token_fields": [
+          "uncached_input_tokens"
+        ],
+        "credit_rated_token_fields": [],
+        "cost_unpriced_token_fields": [
+          "cached_input_tokens",
+          "reasoning_tokens",
+          "output_tokens"
+        ],
+        "credit_unpriced_token_fields": [
+          "uncached_input_tokens",
+          "cached_input_tokens",
+          "reasoning_tokens",
+          "output_tokens"
+        ],
+        "missing_token_fields": [],
+        "cost_coverage_numerator_tokens": 1000,
+        "cost_coverage_denominator_tokens": 1000,
+        "cost_coverage": "1",
+        "credit_coverage_numerator_tokens": 0,
+        "credit_coverage_denominator_tokens": 1000,
+        "credit_coverage": "0",
+        "cost_unpriced_reason": "partial_rate_card",
+        "credit_unpriced_reason": "partial_rate_card",
+        "cost_grade": "configured_estimate",
+        "credit_grade": "unsupported"
+      }
+    },
+    {
+      "id": "valuation.credit_only",
+      "tokens": {
+        "uncached_input_tokens": 1000,
+        "cached_input_tokens": 0,
+        "reasoning_tokens": 0,
+        "output_tokens": 0
+      },
+      "rate_card": {
+        "digest": "sha256:credit-only",
+        "match_basis": "exact_model_profile",
+        "matched": true,
+        "reasoning_in_output": false,
+        "credit_rates_per_million": {
+          "uncached_input_tokens": "2",
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "output_tokens": null
+        }
+      },
+      "expected": {
+        "rate_card_digest": "sha256:credit-only",
+        "match_basis": "exact_model_profile",
+        "configured_cost_usd": null,
+        "estimated_credits": "0.002",
+        "cost_rated_token_fields": [],
+        "credit_rated_token_fields": [
+          "uncached_input_tokens"
+        ],
+        "cost_unpriced_token_fields": [
+          "uncached_input_tokens",
+          "cached_input_tokens",
+          "reasoning_tokens",
+          "output_tokens"
+        ],
+        "credit_unpriced_token_fields": [
+          "cached_input_tokens",
+          "reasoning_tokens",
+          "output_tokens"
+        ],
+        "missing_token_fields": [],
+        "cost_coverage_numerator_tokens": 0,
+        "cost_coverage_denominator_tokens": 1000,
+        "cost_coverage": "0",
+        "credit_coverage_numerator_tokens": 1000,
+        "credit_coverage_denominator_tokens": 1000,
+        "credit_coverage": "1",
+        "cost_unpriced_reason": "partial_rate_card",
+        "credit_unpriced_reason": "partial_rate_card",
+        "cost_grade": "unsupported",
+        "credit_grade": "configured_estimate"
+      }
+    },
+    {
+      "id": "valuation.asymmetric",
+      "tokens": {
+        "uncached_input_tokens": 1000,
+        "cached_input_tokens": 1000,
+        "reasoning_tokens": 1000,
+        "output_tokens": 1000
+      },
+      "rate_card": {
+        "digest": "sha256:asymmetric",
+        "match_basis": "exact_model_profile",
+        "matched": true,
+        "reasoning_in_output": false,
+        "rates_per_million": {
+          "uncached_input_tokens": "10",
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "output_tokens": "20"
+        },
+        "credit_rates_per_million": {
+          "uncached_input_tokens": null,
+          "cached_input_tokens": "0.2",
+          "reasoning_tokens": null,
+          "output_tokens": null
+        }
+      },
+      "expected": {
+        "rate_card_digest": "sha256:asymmetric",
+        "match_basis": "exact_model_profile",
+        "configured_cost_usd": "0.03",
+        "estimated_credits": "0.0002",
+        "cost_rated_token_fields": [
+          "uncached_input_tokens",
+          "output_tokens"
+        ],
+        "credit_rated_token_fields": [
+          "cached_input_tokens"
+        ],
+        "cost_unpriced_token_fields": [
+          "cached_input_tokens",
+          "reasoning_tokens"
+        ],
+        "credit_unpriced_token_fields": [
+          "uncached_input_tokens",
+          "reasoning_tokens",
+          "output_tokens"
+        ],
+        "missing_token_fields": [],
+        "cost_coverage_numerator_tokens": 2000,
+        "cost_coverage_denominator_tokens": 4000,
+        "cost_coverage": "0.5",
+        "credit_coverage_numerator_tokens": 1000,
+        "credit_coverage_denominator_tokens": 4000,
+        "credit_coverage": "0.25",
+        "cost_unpriced_reason": "partial_rate_card",
+        "credit_unpriced_reason": "partial_rate_card",
+        "cost_grade": "configured_estimate",
+        "credit_grade": "configured_estimate"
+      }
+    },
+    {
+      "id": "valuation.reasoning_credit_overlap",
+      "tokens": {
+        "uncached_input_tokens": 100,
+        "cached_input_tokens": 0,
+        "reasoning_tokens": 10,
+        "output_tokens": 20
+      },
+      "rate_card": {
+        "digest": "sha256:invalid-credit-overlap",
+        "match_basis": "exact_model_profile",
+        "matched": true,
+        "reasoning_in_output": true,
+        "rates_per_million": {
+          "uncached_input_tokens": "10",
+          "cached_input_tokens": "1",
+          "reasoning_tokens": null,
+          "output_tokens": "20"
+        },
+        "credit_rates_per_million": {
+          "uncached_input_tokens": "2",
+          "cached_input_tokens": "0.2",
+          "reasoning_tokens": "1",
+          "output_tokens": "4"
+        }
+      },
+      "error": "reasoning credit rate would double-count output"
+    },
+    {
+      "id": "valuation.negative_rate",
+      "tokens": {
+        "uncached_input_tokens": 100,
+        "cached_input_tokens": 0,
+        "reasoning_tokens": 0,
+        "output_tokens": 0
+      },
+      "rate_card": {
+        "digest": "sha256:negative-rate",
+        "match_basis": "exact_model_profile",
+        "matched": true,
+        "reasoning_in_output": false,
+        "rates_per_million": {
+          "uncached_input_tokens": "-1",
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "output_tokens": null
+        },
+        "credit_rates_per_million": {
+          "uncached_input_tokens": null,
+          "cached_input_tokens": null,
+          "reasoning_tokens": null,
+          "output_tokens": null
+        }
+      },
+      "error": "uncached_input_tokens cost rate is below its allowed domain"
+    }
+  ],
+  "decimal_vectors": [
+    {
+      "id": "decimal.canonical",
+      "field": "used_percent",
+      "value": "2.25",
+      "minimum": "0",
+      "maximum": "100",
+      "expected": "2.25"
+    },
+    {
+      "id": "decimal.noncanonical",
+      "field": "used_percent",
+      "value": "2.250",
+      "minimum": "0",
+      "maximum": "100",
+      "error": "used_percent is not a canonical decimal string"
+    },
+    {
+      "id": "decimal.noncanonical",
+      "field": "rate",
+      "value": "1e1",
+      "minimum": "0",
+      "error": "rate is not a canonical decimal string"
+    },
+    {
+      "id": "decimal.percentage_domain",
+      "field": "used_percent",
+      "value": "101",
+      "minimum": "0",
+      "maximum": "100",
+      "error": "used_percent is above its allowed domain"
+    },
+    {
+      "id": "decimal.percentage_domain",
+      "field": "remaining_percent",
+      "value": "-1",
+      "minimum": "0",
+      "maximum": "100",
+      "error": "remaining_percent is below its allowed domain"
+    }
+  ]
+}

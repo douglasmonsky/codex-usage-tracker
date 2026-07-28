@@ -1,6 +1,6 @@
 # CK-02 — Freeze logical contract vectors
 
-**Status:** Not started
+**Status:** Completed
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -47,5 +47,44 @@ primitive resolves.
 Breaking a locked decision requires a documented decision amendment.
 
 **Cleanup/docs:** Update logical contract and question mappings together.
+
+## Completion evidence
+
+- The physical-independent contract freezes **26 logical entities**, one
+  ordered exact identity tuple per entity, and **245 admitted fields**. A
+  checked-in synthetic field matrix executes one semantic assertion for every
+  field, including basis, missingness, identity participation, ordered
+  identity-input consumption, and derived-ID validation.
+- The versioned bundle contains **119 unique vectors** in **146,658 bytes**.
+  Its canonical bundle digest is
+  `f310f9e6dc6e65e8f1944a347b6d3bfbf18fe68f2f8ddcf9eb0d1c81e9396848`.
+  Logical IDs use exactly 52 lowercase unpadded base32 digest characters.
+- Exact vectors lock nonrecursive publication-ID/artifact-digest derivation,
+  zero-to-six-digit timestamp precision, canonical decimal domains,
+  result-only grade rejection in canonical missing measurements, joined
+  allowance compatibility, and independent cost/credit valuation coverage.
+- Focused qualification passed with **37 tests in 0.67 seconds**. Final
+  repository qualification passed with **497 tests in 68.58 seconds**, Ruff,
+  MyPy, Pyright, scope/manifests/interfaces, frontend checks,
+  maintainability, release safety, and `git diff --check`.
+- Final review produced **9 findings; 9 were accepted and resolved**.
+  Reviewer-token attribution is **pending** because the required strict usage
+  command is unavailable; tokens per accepted finding remain pending rather
+  than triggering retries.
+
+### Deviations and residual risks
+
+- No production database, parser, query, MCP, or presentation code was added.
+  The packet uses pure reference functions and synthetic fixtures exactly as
+  scoped.
+- The field matrix replaces tag-only completeness as the executable gate.
+  Existing `vector_ids` remain as traceability metadata, but contract
+  completeness now regenerates and executes the exact matrix.
+- Physical implementations in CK-03 onward must prove they reproduce these
+  vectors. Adapter-specific source keys, provider rate-card contents, and
+  real publication storage remain intentionally unresolved here.
+- Independent cost and credit estimates are configured estimates, never
+  observed billing truth. Unsupported channels remain null with explicit
+  grades and reasons.
 
 **Suggested commit:** `test: freeze agent-kernel logical vectors`

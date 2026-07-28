@@ -1,0 +1,234 @@
+{
+  "schema": "codex-usage-tracker.agent-kernel.lifecycle-vectors.v1",
+  "version": 1,
+  "vector_ids": [
+    "lifecycle.cross_publication",
+    "lifecycle.late_transition",
+    "lifecycle.invalid_terminal",
+    "hierarchy.late_parent",
+    "hierarchy.multilevel",
+    "hierarchy.cycle"
+  ],
+  "lifecycle_vectors": [
+    {
+      "id": "lifecycle.cross_publication",
+      "transitions": [
+        {
+          "logical_id": "tool:v1:aaaaaaaaaaaaaaaa",
+          "state": "running",
+          "basis": "observed_start",
+          "event_at_us": 100,
+          "source_order": [
+            "source-a",
+            1
+          ],
+          "event_kind_order": 1,
+          "coordinate": {
+            "publication_id": "publication:v1:aaaaaaaaaaaaaaaa",
+            "record_ordinal": 1
+          }
+        },
+        {
+          "logical_id": "tool:v1:aaaaaaaaaaaaaaaa",
+          "state": "succeeded",
+          "basis": "observed_terminal",
+          "event_at_us": 250,
+          "source_order": [
+            "source-a",
+            2
+          ],
+          "event_kind_order": 1,
+          "coordinate": {
+            "publication_id": "publication:v1:bbbbbbbbbbbbbbbb",
+            "record_ordinal": 2
+          }
+        }
+      ],
+      "expected": {
+        "logical_id": "tool:v1:aaaaaaaaaaaaaaaa",
+        "state": "succeeded",
+        "state_basis": "observed_terminal",
+        "start_coordinate": {
+          "publication_id": "publication:v1:aaaaaaaaaaaaaaaa",
+          "record_ordinal": 1
+        },
+        "terminal_coordinate": {
+          "publication_id": "publication:v1:bbbbbbbbbbbbbbbb",
+          "record_ordinal": 2
+        },
+        "observed_duration_us": 150,
+        "duration_diagnostic": null,
+        "transition_count": 2
+      }
+    },
+    {
+      "id": "lifecycle.late_transition",
+      "transitions": [
+        {
+          "logical_id": "call:v1:aaaaaaaaaaaaaaaa",
+          "state": "succeeded",
+          "basis": "observed_terminal",
+          "event_at_us": 300,
+          "source_order": [
+            "source-a",
+            3
+          ],
+          "event_kind_order": 1,
+          "coordinate": {
+            "publication_id": "publication:v1:aaaaaaaaaaaaaaaa",
+            "record_ordinal": 3
+          }
+        },
+        {
+          "logical_id": "call:v1:aaaaaaaaaaaaaaaa",
+          "state": "running",
+          "basis": "late_observed_start",
+          "event_at_us": 100,
+          "source_order": [
+            "source-a",
+            1
+          ],
+          "event_kind_order": 1,
+          "coordinate": {
+            "publication_id": "publication:v1:bbbbbbbbbbbbbbbb",
+            "record_ordinal": 1
+          }
+        }
+      ],
+      "expected": {
+        "logical_id": "call:v1:aaaaaaaaaaaaaaaa",
+        "state": "succeeded",
+        "state_basis": "observed_terminal",
+        "start_coordinate": {
+          "publication_id": "publication:v1:bbbbbbbbbbbbbbbb",
+          "record_ordinal": 1
+        },
+        "terminal_coordinate": {
+          "publication_id": "publication:v1:aaaaaaaaaaaaaaaa",
+          "record_ordinal": 3
+        },
+        "observed_duration_us": 200,
+        "duration_diagnostic": null,
+        "transition_count": 2
+      }
+    },
+    {
+      "id": "lifecycle.invalid_terminal",
+      "transitions": [
+        {
+          "logical_id": "tool:v1:bbbbbbbbbbbbbbbb",
+          "state": "succeeded",
+          "basis": "observed_terminal",
+          "event_at_us": 100,
+          "source_order": [
+            "source-a",
+            1
+          ],
+          "event_kind_order": 1,
+          "coordinate": {
+            "record_ordinal": 1
+          }
+        },
+        {
+          "logical_id": "tool:v1:bbbbbbbbbbbbbbbb",
+          "state": "failed",
+          "basis": "conflicting_terminal",
+          "event_at_us": 200,
+          "source_order": [
+            "source-a",
+            2
+          ],
+          "event_kind_order": 1,
+          "coordinate": {
+            "record_ordinal": 2
+          }
+        }
+      ],
+      "error": "invalid lifecycle transition succeeded -> failed"
+    }
+  ],
+  "hierarchy_vectors": [
+    {
+      "id": "hierarchy.late_parent",
+      "session_id": "root",
+      "before_parent_by_session": {
+        "root": null,
+        "child": null
+      },
+      "after_parent_by_session": {
+        "root": null,
+        "child": "root"
+      },
+      "exclusive_usage": {
+        "root": 100,
+        "child": 50
+      },
+      "session_identity_before": "session:v1:aaaaaaaaaaaaaaaa",
+      "session_identity_after": "session:v1:aaaaaaaaaaaaaaaa",
+      "expected_before": {
+        "parent_exclusive": 100,
+        "descendant_exclusive": 0,
+        "family_inclusive": 100,
+        "child_count": 0,
+        "descendant_count": 0
+      },
+      "expected_after": {
+        "parent_exclusive": 100,
+        "descendant_exclusive": 50,
+        "family_inclusive": 150,
+        "child_count": 1,
+        "descendant_count": 1
+      }
+    },
+    {
+      "id": "hierarchy.multilevel",
+      "session_id": "root",
+      "before_parent_by_session": {
+        "root": null,
+        "child": "root",
+        "grandchild": "child"
+      },
+      "after_parent_by_session": {
+        "root": null,
+        "child": "root",
+        "grandchild": "child"
+      },
+      "exclusive_usage": {
+        "root": 100,
+        "child": 50,
+        "grandchild": 25
+      },
+      "session_identity_before": "session:v1:aaaaaaaaaaaaaaaa",
+      "session_identity_after": "session:v1:aaaaaaaaaaaaaaaa",
+      "expected_before": {
+        "parent_exclusive": 100,
+        "descendant_exclusive": 75,
+        "family_inclusive": 175,
+        "child_count": 1,
+        "descendant_count": 2
+      },
+      "expected_after": {
+        "parent_exclusive": 100,
+        "descendant_exclusive": 75,
+        "family_inclusive": 175,
+        "child_count": 1,
+        "descendant_count": 2
+      }
+    }
+  ],
+  "invalid_hierarchy_vectors": [
+    {
+      "id": "hierarchy.cycle",
+      "session_id": "a",
+      "parent_by_session": {
+        "a": "b",
+        "b": "a"
+      },
+      "exclusive_usage": {
+        "a": 10,
+        "b": 20
+      },
+      "error": "session hierarchy contains a cycle"
+    }
+  ]
+}

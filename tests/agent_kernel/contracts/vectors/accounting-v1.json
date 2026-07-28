@@ -1,0 +1,274 @@
+{
+  "schema": "codex-usage-tracker.agent-kernel.accounting-vectors.v1",
+  "version": 1,
+  "vector_ids": [
+    "accounting.four_tokens",
+    "accounting.missing_cached",
+    "accounting.zero_tokens",
+    "accounting.invalid_negative",
+    "accounting.aggregate_partial",
+    "accounting.aggregate_all_missing",
+    "accounting.measurement_mask",
+    "accounting.measurement_missing",
+    "accounting.measurement_grade",
+    "accounting.measurement_result_grade",
+    "accounting.tool_separation"
+  ],
+  "measurement_bits": {
+    "allowance_limit": 0,
+    "allowance_percent": 1,
+    "cached_input_tokens": 2,
+    "call_count": 3,
+    "completion_state": 4,
+    "configured_cost_usd": 5,
+    "context_window_tokens": 6,
+    "duration_us": 7,
+    "estimated_credits": 8,
+    "event_time_us": 9,
+    "hierarchy_depth": 10,
+    "model_profile": 11,
+    "mutation_count": 12,
+    "output_tokens": 13,
+    "reasoning_tokens": 14,
+    "resource_operation": 15,
+    "source_occurrence_count": 16,
+    "tool_output_bytes": 17,
+    "tool_status": 18,
+    "turn_count": 19,
+    "uncached_input_tokens": 20
+  },
+  "token_vectors": [
+    {
+      "id": "accounting.four_tokens",
+      "tokens": {
+        "uncached_input_tokens": 100,
+        "cached_input_tokens": 200,
+        "reasoning_tokens": 50,
+        "output_tokens": 25
+      },
+      "expected": {
+        "uncached_input_tokens": 100,
+        "cached_input_tokens": 200,
+        "reasoning_tokens": 50,
+        "output_tokens": 25,
+        "input_tokens": 300,
+        "total_tokens": 325
+      }
+    },
+    {
+      "id": "accounting.missing_cached",
+      "tokens": {
+        "uncached_input_tokens": 100,
+        "cached_input_tokens": null,
+        "reasoning_tokens": 50,
+        "output_tokens": 25
+      },
+      "expected": {
+        "uncached_input_tokens": 100,
+        "cached_input_tokens": null,
+        "reasoning_tokens": 50,
+        "output_tokens": 25,
+        "input_tokens": null,
+        "total_tokens": null
+      }
+    },
+    {
+      "id": "accounting.zero_tokens",
+      "tokens": {
+        "uncached_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "reasoning_tokens": 0,
+        "output_tokens": 0
+      },
+      "expected": {
+        "uncached_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "reasoning_tokens": 0,
+        "output_tokens": 0,
+        "input_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    {
+      "id": "accounting.invalid_negative",
+      "tokens": {
+        "uncached_input_tokens": -1,
+        "cached_input_tokens": 0,
+        "reasoning_tokens": 0,
+        "output_tokens": 0
+      },
+      "error": "uncached_input_tokens must be a nonnegative integer or null"
+    }
+  ],
+  "aggregation_vectors": [
+    {
+      "id": "accounting.aggregate_partial",
+      "values": [
+        10,
+        null,
+        0,
+        5
+      ],
+      "expected": {
+        "value": 15,
+        "observed_count": 3,
+        "missing_count": 1,
+        "complete": false
+      }
+    },
+    {
+      "id": "accounting.aggregate_all_missing",
+      "values": [
+        null,
+        null
+      ],
+      "expected": {
+        "value": null,
+        "observed_count": 0,
+        "missing_count": 2,
+        "complete": false
+      }
+    }
+  ],
+  "measurement_vectors": [
+    {
+      "id": "accounting.measurement_mask",
+      "available": [
+        "cached_input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "uncached_input_tokens"
+      ],
+      "expected_mask": 1073156,
+      "valid": true,
+      "record": {
+        "cached_input_tokens": {
+          "value": 200,
+          "grade": "exact",
+          "basis": "observed_upstream"
+        },
+        "output_tokens": {
+          "value": 25,
+          "grade": "exact",
+          "basis": "observed_upstream"
+        },
+        "reasoning_tokens": {
+          "value": 50,
+          "grade": "exact",
+          "basis": "observed_upstream"
+        },
+        "uncached_input_tokens": {
+          "value": 100,
+          "grade": "deterministic",
+          "basis": "input_total_minus_cached_v1"
+        }
+      }
+    },
+    {
+      "id": "accounting.measurement_missing",
+      "available": [
+        "cached_input_tokens"
+      ],
+      "expected_mask": 4,
+      "valid": false,
+      "error": "missing measurement has availability bit",
+      "record": {
+        "cached_input_tokens": {
+          "value": null,
+          "grade": null,
+          "basis": "unobserved"
+        }
+      }
+    },
+    {
+      "id": "accounting.measurement_missing",
+      "available": [],
+      "expected_mask": 0,
+      "valid": false,
+      "error": "observed measurement lacks availability bit",
+      "record": {
+        "uncached_input_tokens": {
+          "value": 100,
+          "grade": "exact",
+          "basis": "observed_upstream"
+        }
+      }
+    },
+    {
+      "id": "accounting.measurement_grade",
+      "available": [
+        "cached_input_tokens"
+      ],
+      "expected_mask": 4,
+      "valid": false,
+      "error": "canonical measurement has a result-only grade",
+      "record": {
+        "cached_input_tokens": {
+          "value": 200,
+          "grade": "model_inference",
+          "basis": "model_guess"
+        }
+      }
+    },
+    {
+      "id": "accounting.measurement_result_grade",
+      "available": [],
+      "expected_mask": 0,
+      "valid": false,
+      "error": "canonical measurement has a result-only grade",
+      "record": {
+        "cached_input_tokens": {
+          "value": null,
+          "grade": "unsupported",
+          "basis": "unobserved"
+        }
+      }
+    },
+    {
+      "id": "accounting.measurement_result_grade",
+      "available": [],
+      "expected_mask": 0,
+      "valid": false,
+      "error": "canonical measurement has a result-only grade",
+      "record": {
+        "cached_input_tokens": {
+          "value": null,
+          "grade": "model_inference",
+          "basis": "unobserved"
+        }
+      }
+    }
+  ],
+  "tool_outcome_vectors": [
+    {
+      "id": "accounting.tool_separation",
+      "records": [
+        {
+          "tool_id": "tool:v1:aaaaaaaaaaaaaaaa",
+          "write_intent": true,
+          "lifecycle_state": "succeeded",
+          "state_change_id": null
+        },
+        {
+          "tool_id": "tool:v1:bbbbbbbbbbbbbbbb",
+          "write_intent": false,
+          "lifecycle_state": "succeeded",
+          "state_change_id": null
+        },
+        {
+          "tool_id": "tool:v1:cccccccccccccccc",
+          "write_intent": false,
+          "lifecycle_state": "failed",
+          "state_change_id": "state-change:v1:aaaaaaaaaaaaaaaa"
+        }
+      ],
+      "expected": {
+        "invocations": 3,
+        "write_intents": 1,
+        "succeeded": 2,
+        "observed_mutations": 1,
+        "causal_attribution": false
+      }
+    }
+  ]
+}
