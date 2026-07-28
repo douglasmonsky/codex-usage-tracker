@@ -615,6 +615,66 @@ global calls and tokens exactly equal canonical facts. Review totals are one
 finding, one accepted finding, and reviewer-token attribution `pending`; no
 retry blocks the correction.
 
+### R7 qualification correction — issue #350
+
+The first installed fresh-task `top_threads` qualification exposed two
+independent contract failures that endpoint tests could not see. The model
+naturally sent `{"requests":[{"template":"top_threads"}]}`, but named
+templates were descriptive guidance only and the server rejected the request
+with `dataset must be a string`. After the typed request was expanded
+manually, Codex retained the complete structured response in its event record
+but its model-facing MCP summary omitted `rows`; the agent then spent up to
+seventeen evidence calls reconstructing a five-row leaderboard.
+
+The focused R4-style correction keeps the exact six-tool surface and makes
+curated templates directly executable:
+
+- the public `usage_query` schema now teaches closed named templates and
+  explicit typed requests instead of accepting an untyped object;
+- all nine guidance templates materialize deterministically on the server,
+  with exact parameter and expanded-batch validation;
+- `top_threads` returns an exact five-row token leaderboard first and separate
+  cost/credit context second in one MCP call, so estimates cannot downgrade
+  exact token claims;
+- MCP retains the complete structured response and adds a privacy-safe,
+  aggregate-only, 64 KiB-capped model summary with decision rows first; and
+- the bundled skill directs the agent to use the named template once and not
+  fan out across every selector unless deeper evidence is requested.
+
+The R7 runner was corrected independently: it launches from a neutral
+synthetic workspace, pins the MCP child cache, derives current-task exposure
+from observed calls, classifies host authentication failures, and gives the
+machine scorer fact keys and multiplicities without revealing oracle values,
+labels, or selectors. Human-label metadata is separately deterministic and
+attested instead of changing the frozen R1 log corpus.
+
+On the eight-thread synthetic installed candidate, the final corrected fresh
+CLI task has 100% oracle accuracy, valid human labels, usefulness 4/4, exactly
+one query batch, **one total MCP call**, zero refreshes, and 37.690 ms tracker
+time. The previous natural control required up to seventeen MCP calls because
+rows were absent from the model-visible envelope. The intermediate two-call
+qualification still called status first; final review caught that violation
+of the R4 warm-path contract and the skill and runner now query first, falling
+back to status only when the query reports absent or insufficient freshness.
+No raw content was indexed or returned.
+
+End-to-end CLI time remains 24.556 seconds against the 15-second R7 target;
+the first and only tracker call began at 15.884 seconds. Disabling every
+unrelated plugin in the earlier two-call control reduced model input from
+roughly 188,000 to 134,000 tokens but did not improve wall time (34.24
+seconds), while tracker execution stayed below 51 ms throughout. R7 therefore
+retains the end-to-end gate as a visible host/model residual rather than
+misattributing it to query latency or weakening the target.
+
+The single final read-only review reported three findings and all three were
+accepted: remove the avoidable warm status call, make compact guidance visible
+to the model, and remove the duplicate textual projection while retaining the
+host-required bounded scalar summary. The corrected MCP envelope now fails
+closed at its byte budget. Reviewer-token attribution is `pending`; no second
+review was run. The installed 170,773-byte wheel passed the one-call task, and
+the pre-ledger 500,499-byte sdist remained within its measured-plus-3% release
+budget.
+
 ## R4 — Build Persisted Rollups And Fast MCP/API Paths
 
 **State:** In progress

@@ -565,6 +565,54 @@ _FILTER_GRAMMAR = {
     },
 }
 
+_CONCENTRATION_REQUEST = {
+    "dataset": "calls",
+    "operation": "share",
+    "dimensions": ["thread"],
+    "measures": [
+        "calls",
+        "uncached_input_tokens",
+        "cached_input_tokens",
+        "reasoning_tokens",
+        "output_tokens",
+        "total_tokens",
+        "configured_cost_usd",
+        "estimated_credits",
+    ],
+    "order_by": "total_tokens",
+    "descending": True,
+    "limit": 25,
+}
+_TOP_THREADS_EXACT_REQUEST = {
+    "dataset": "calls",
+    "operation": "share",
+    "dimensions": ["thread"],
+    "measures": [
+        "calls",
+        "uncached_input_tokens",
+        "cached_input_tokens",
+        "reasoning_tokens",
+        "output_tokens",
+        "total_tokens",
+    ],
+    "order_by": "total_tokens",
+    "descending": True,
+    "limit": 5,
+}
+_TOP_THREADS_COST_REQUEST = {
+    "dataset": "calls",
+    "operation": "share",
+    "dimensions": ["thread"],
+    "measures": [
+        "total_tokens",
+        "configured_cost_usd",
+        "estimated_credits",
+    ],
+    "order_by": "total_tokens",
+    "descending": True,
+    "limit": 5,
+}
+
 _GUIDED_TEMPLATES: dict[str, dict[str, Any]] = {
     "allowance": {
         "kind": "query_template",
@@ -607,26 +655,7 @@ _GUIDED_TEMPLATES: dict[str, dict[str, Any]] = {
         "kind": "query_template",
         "label": "Usage concentration by thread",
         "evidence_policy": "after_ranking",
-        "requests": [
-            {
-                "dataset": "calls",
-                "operation": "share",
-                "dimensions": ["thread"],
-                "measures": [
-                    "calls",
-                    "uncached_input_tokens",
-                    "cached_input_tokens",
-                    "reasoning_tokens",
-                    "output_tokens",
-                    "total_tokens",
-                    "configured_cost_usd",
-                    "estimated_credits",
-                ],
-                "order_by": "total_tokens",
-                "descending": True,
-                "limit": 25,
-            }
-        ],
+        "requests": [deepcopy(_CONCENTRATION_REQUEST)],
     },
     "context_composition": {
         "kind": "query_template",
@@ -711,6 +740,15 @@ _GUIDED_TEMPLATES: dict[str, dict[str, Any]] = {
                 "descending": True,
                 "limit": 25,
             }
+        ],
+    },
+    "top_threads": {
+        "kind": "query_template",
+        "label": "Top threads by exact total token usage",
+        "evidence_policy": "after_ranking",
+        "requests": [
+            deepcopy(_TOP_THREADS_EXACT_REQUEST),
+            deepcopy(_TOP_THREADS_COST_REQUEST),
         ],
     },
     "tools": {
@@ -820,6 +858,53 @@ def exploration_guidance() -> dict[str, Any]:
         "datasets": datasets,
         "templates": deepcopy(_GUIDED_TEMPLATES),
     }
+
+
+def materialize_query_requests(
+    raw_requests: list[dict[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    """Expand closed named templates into their deterministic typed requests."""
+
+    materialized: list[dict[str, Any]] = []
+    for raw_request in raw_requests:
+        if "template" not in raw_request:
+            materialized.append(deepcopy(raw_request))
+            continue
+        unexpected = sorted(set(raw_request) - {"template", "parameters"})
+        if unexpected:
+            raise ValueError("query template request has unexpected fields")
+        template_name = raw_request.get("template")
+        if not isinstance(template_name, str):
+            raise ValueError("query template must be a string")
+        template = _GUIDED_TEMPLATES.get(template_name)
+        if template is None:
+            raise ValueError("query template is not allowlisted")
+        parameters = raw_request.get("parameters", {})
+        expected = set(template.get("parameters", ()))
+        if not isinstance(parameters, dict) or set(parameters) != expected:
+            raise ValueError("query template parameters are invalid")
+        materialized.extend(
+            _resolve_template_value(item, parameters)
+            for item in template["requests"]
+        )
+    if len(materialized) > MAX_BATCH_QUERIES:
+        raise ValueError(
+            f"query supports at most {MAX_BATCH_QUERIES} materialized requests"
+        )
+    return tuple(materialized)
+
+
+def _resolve_template_value(value: Any, parameters: dict[str, Any]) -> Any:
+    if isinstance(value, str) and value.startswith("$"):
+        return deepcopy(parameters[value[1:]])
+    if isinstance(value, dict):
+        return {
+            key: _resolve_template_value(item, parameters)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_resolve_template_value(item, parameters) for item in value]
+    return deepcopy(value)
 
 
 def validate_request(request: QueryRequest) -> None:

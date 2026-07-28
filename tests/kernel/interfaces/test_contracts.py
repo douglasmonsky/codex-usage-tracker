@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from codex_usage_tracker.kernel.interfaces.cli.main import COMMANDS
 from codex_usage_tracker.kernel.interfaces.http.app import API_PREFIX, ROUTES
 from codex_usage_tracker.kernel.interfaces.mcp.catalog import (
@@ -77,6 +79,32 @@ def test_usage_query_schema_allows_compact_guidance_discovery() -> None:
         "usage_query",
         {"requests": [], "include_guidance": True},
     )
+
+
+def test_usage_query_schema_teaches_closed_named_and_typed_requests() -> None:
+    validate_input(
+        "usage_query",
+        {
+            "requests": [
+                {"template": "top_threads"},
+                {
+                    "dataset": "calls",
+                    "operation": "share",
+                    "dimensions": ["thread"],
+                    "measures": ["total_tokens"],
+                    "limit": 5,
+                },
+            ]
+        },
+    )
+
+    for request in (
+        {"template": "missing"},
+        {"template": "top_threads", "dataset": "calls"},
+        {"dataset": "calls", "operation": "share", "unknown": True},
+    ):
+        with pytest.raises(ValueError):
+            validate_input("usage_query", {"requests": [request]})
 
 
 def test_release_plugin_declares_one_server_and_is_publishable() -> None:

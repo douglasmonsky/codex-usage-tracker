@@ -9,14 +9,14 @@
   "mcp_tools": 6,
   "http_routes": 7,
   "cli_commands": 11,
-  "wheel_bytes": 168154,
-  "sdist_bytes": 497039,
-  "plugin_bundle_bytes": 3900,
+  "wheel_bytes": 175625,
+  "sdist_bytes": 515011,
+  "plugin_bundle_bytes": 4768,
   "mcp_golden_prompt": {
     "mcp_calls": 3,
-    "measured_response_bytes": [889, 12096, 1023],
-    "response_byte_ceilings": [915, 12458, 1053],
-    "measured_total_bytes": 14008,
-    "total_byte_ceiling": 14428
+    "measured_response_bytes": [889, 19591, 1023],
+    "response_byte_ceilings": [915, 20178, 1053],
+    "measured_total_bytes": 21503,
+    "total_byte_ceiling": 22148
   }
 }

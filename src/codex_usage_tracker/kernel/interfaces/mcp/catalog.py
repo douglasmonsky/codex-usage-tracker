@@ -38,8 +38,9 @@ TOOL_SPECS = tuple(
         ),
         (
             "usage_query",
-            "Discover compact query guidance and run one bounded "
-            "generation-consistent query batch.",
+            "Run one bounded generation-consistent query batch using closed "
+            "named templates such as top_threads or explicit typed requests; "
+            "optionally return compact guidance.",
         ),
         (
             "usage_evidence",

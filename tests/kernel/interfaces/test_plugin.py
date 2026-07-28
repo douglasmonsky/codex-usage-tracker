@@ -86,3 +86,4 @@ def test_skill_teaches_scope_batch_evidence_and_claim_grading() -> None:
     assert "hypothesis" in skill
     assert "unsupported" in skill
     assert "after ranking" in skill
+    assert '{"template":"top_threads"}' in skill
