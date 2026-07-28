@@ -20,7 +20,7 @@ from codex_usage_tracker.kernel.interfaces.mcp.server import (
 )
 from scripts.smoke_installed_package import _write_mcp
 
-from .support import active_runtime, synthetic_sources
+from .support import active_runtime, logical_split_runtime, synthetic_sources
 
 
 def test_mcp_catalog_and_calls_use_structured_results_without_duplication(
@@ -206,6 +206,40 @@ def test_mcp_executes_named_top_threads_template_in_one_query_call(
     assert len(json.dumps(response, separators=(",", ":")).encode()) <= (
         MAX_MESSAGE_BYTES
     )
+
+
+def test_mcp_top_threads_preserves_logical_identity_across_both_results(
+    tmp_path: Path,
+) -> None:
+    server = McpServer(
+        KernelApplication(
+            logical_split_runtime(tmp_path),
+            worker_launcher=lambda _paths, _preset: None,
+        )
+    )
+
+    response = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": "usage_query",
+                "arguments": {
+                    "requests": [{"template": "top_threads"}],
+                },
+            },
+        }
+    )
+
+    result = response["result"]["structuredContent"]
+    model_content = json.loads(result["model_summary"])
+    token_threads = [row["thread"] for row in result["results"][0]["rows"]]
+    cost_threads = [row["thread"] for row in result["results"][1]["rows"]]
+    assert token_threads == cost_threads
+    assert len(token_threads) == len(set(token_threads)) == 2
+    assert model_content["results"][0]["rows"] == result["results"][0]["rows"]
+    assert model_content["results"][1]["rows"] == result["results"][1]["rows"]
 
 
 @pytest.mark.parametrize(

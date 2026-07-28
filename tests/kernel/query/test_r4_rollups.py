@@ -22,7 +22,7 @@ from codex_usage_tracker.kernel.rollups import (
     _LINK_UNRESOLVED_TOOL_CALLS_SQL,
     generation_rollups_ready,
 )
-from tests.kernel.interfaces.support import active_runtime
+from tests.kernel.interfaces.support import active_runtime, logical_split_runtime
 from tests.kernel.test_ingest_pipeline import _token_line
 
 
@@ -72,6 +72,100 @@ def test_top_threads_uses_bounded_rollup_plan(tmp_path: Path) -> None:
     assert result.scanned_count == 2
     assert result.returned_count == 2
     assert sum(int(row["calls"]) for row in result.rows) == 4
+
+
+def test_top_threads_consolidates_physical_rows_by_logical_thread(
+    tmp_path: Path,
+) -> None:
+    runtime = logical_split_runtime(tmp_path)
+    control = load_cutover_control(runtime.kernel.operational)
+    assert control.active_kernel_path is not None
+    assert control.active_generation is not None
+    request = QueryRequest(
+        dataset="calls",
+        operation=Operation.SHARE,
+        dimensions=("thread",),
+        measures=(
+            "calls",
+            "uncached_input_tokens",
+            "cached_input_tokens",
+            "reasoning_tokens",
+            "output_tokens",
+            "total_tokens",
+        ),
+        order_by="total_tokens",
+        limit=25,
+    )
+    result = QueryService(runtime.kernel.operational).execute(request)
+
+    with sqlite3.connect(control.active_kernel_path) as connection:
+        oracle_rows = connection.execute(
+            """
+            SELECT threads.logical_thread_id,
+                   COUNT(*) AS calls,
+                   SUM(model_calls.input_tokens) AS input_tokens,
+                   SUM(
+                       model_calls.input_tokens
+                       - model_calls.cached_input_tokens
+                   ) AS uncached_input_tokens,
+                   SUM(model_calls.cached_input_tokens)
+                       AS cached_input_tokens,
+                   SUM(model_calls.reasoning_tokens) AS reasoning_tokens,
+                   SUM(model_calls.output_tokens) AS output_tokens,
+                   SUM(
+                       model_calls.input_tokens
+                       + model_calls.output_tokens
+                   ) AS total_tokens
+            FROM model_calls
+            JOIN threads ON threads.thread_id = model_calls.thread_id
+            WHERE model_calls.generation <= ?
+              AND model_calls.duplicate_state = 'canonical'
+            GROUP BY threads.logical_thread_id
+            ORDER BY total_tokens DESC, threads.logical_thread_id
+            """,
+            (control.active_generation,),
+        ).fetchall()
+        copied_calls = connection.execute(
+            "SELECT COUNT(*) FROM model_calls WHERE duplicate_state != 'canonical'"
+        ).fetchone()
+
+    actual_rows = {
+        str(row["thread"]): {
+            measure: int(row[measure])
+            for measure in (
+                "calls",
+                "uncached_input_tokens",
+                "cached_input_tokens",
+                "reasoning_tokens",
+                "output_tokens",
+                "total_tokens",
+            )
+        }
+        for row in result.rows
+    }
+    oracle = {
+        str(row[0]): {
+            "calls": int(row[1]),
+            "uncached_input_tokens": int(row[3]),
+            "cached_input_tokens": int(row[4]),
+            "reasoning_tokens": int(row[5]),
+            "output_tokens": int(row[6]),
+            "total_tokens": int(row[7]),
+        }
+        for row in oracle_rows
+    }
+
+    assert result.plan_id == "calls.share.rollup_thread.v1"
+    assert copied_calls == (1,)
+    assert actual_rows == oracle
+    assert result.returned_count == len(oracle)
+    assert result.matched_count == len(oracle)
+    assert result.scanned_count == len(oracle)
+    assert len(result.rows) == len({str(row["thread"]) for row in result.rows})
+    assert result.rows[0]["thread_label"] == "Current logical thread"
+    assert sum(float(row["share_total_tokens"]) for row in result.rows) == pytest.approx(
+        1.0
+    )
 
 
 def test_model_effort_and_global_queries_use_small_rollups(tmp_path: Path) -> None:

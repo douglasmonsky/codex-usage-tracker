@@ -54,7 +54,20 @@ _CONTEXT_OPERATIONS = frozenset(
         Operation.SHARE,
     }
 )
-_THREAD_LABEL_SQL = "resolved_thread_label(threads.session_identity_hash, threads.display_label)"
+_THREAD_LABEL_SQL = """
+(
+    SELECT resolved_thread_label(
+        candidate_threads.session_identity_hash,
+        candidate_threads.display_label
+    )
+    FROM threads AS candidate_threads
+    WHERE candidate_threads.logical_thread_id = threads.logical_thread_id
+    ORDER BY candidate_threads.archive_state = 'active' DESC,
+             candidate_threads.last_generation DESC,
+             candidate_threads.thread_key
+    LIMIT 1
+)
+"""
 _CANONICAL_THREAD_SQL = """
 (
     threads.thread_key = (
