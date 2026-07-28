@@ -373,6 +373,153 @@ def test_missing_tool_observations_are_partial_not_zero(tmp_path: Path) -> None:
     }
 
 
+def test_direct_tool_impact_plan_matches_generic_canonical_rows(
+    tmp_path: Path,
+) -> None:
+    service, analytical = _service(tmp_path)
+    measures = (
+        "adjacent_uncached_input_tokens",
+        "adjacent_cached_input_tokens",
+        "adjacent_reasoning_tokens",
+        "adjacent_output_tokens",
+        "adjacent_total_tokens",
+    )
+    direct = service.execute(
+        QueryRequest(
+            "tools",
+            Operation.ROWS,
+            ("tool_call", "operation", "target"),
+            measures,
+            order_by="adjacent_total_tokens",
+        )
+    )
+    generic = service.execute(
+        QueryRequest(
+            "tools",
+            Operation.ROWS,
+            ("tool_call", "operation", "target"),
+            measures,
+            (Filter("started_at", "gte", "2020-01-01T00:00:00Z"),),
+            order_by="adjacent_total_tokens",
+        )
+    )
+
+    assert direct.plan_id == "tools.rows.direct_tool_impact.v1"
+    assert generic.plan_id == "tools.rows.v1"
+    assert direct.rows == generic.rows
+    assert direct.matched_count == generic.matched_count
+    assert direct.scanned_count == generic.scanned_count
+    assert direct.coverage == generic.coverage
+    assert direct.evidence_selectors == generic.evidence_selectors
+    plan = compile_plan(
+        QueryRequest(
+            "tools",
+            Operation.ROWS,
+            ("tool_call", "operation", "target"),
+            measures,
+            order_by="adjacent_total_tokens",
+        ).normalized(),
+        generation=1,
+        offset=0,
+    )
+    assert "FROM tool_call_facts AS facts" in plan.sql
+    assert "FROM tool_calls " not in plan.sql
+    with sqlite3.connect(analytical) as connection:
+        details = [
+            str(row[3])
+            for row in connection.execute(
+                f"EXPLAIN QUERY PLAN {plan.sql}",
+                plan.parameters,
+            )
+        ]
+    assert details
+
+
+def test_direct_tool_impact_plan_keeps_one_structural_copy_owner(
+    tmp_path: Path,
+) -> None:
+    rows = (
+        {
+            "timestamp": "2026-01-01T00:00:00Z",
+            "type": "session_meta",
+            "payload": {"id": "structural-tool-session"},
+        },
+        {
+            "timestamp": "2026-01-01T00:00:00.100Z",
+            "type": "turn_context",
+            "payload": {
+                "turn_id": "structural-tool-turn",
+                "model": "gpt-synthetic",
+                "effort": "low",
+            },
+        },
+        {
+            "timestamp": "2026-01-01T00:00:00.200Z",
+            "type": "response_item",
+            "payload": {
+                "type": "function_call",
+                "name": "functions.exec_command",
+            },
+        },
+        {
+            "timestamp": "2026-01-01T00:00:00.300Z",
+            "type": "event_msg",
+            "payload": {"type": "task_complete"},
+        },
+    )
+    active = tmp_path / "sessions" / "rollout-structural-tool.jsonl"
+    archived = tmp_path / "archived_sessions" / active.name
+    active.parent.mkdir()
+    archived.parent.mkdir()
+    payload = "".join(json.dumps(row) + "\n" for row in rows)
+    active.write_text(payload, encoding="utf-8")
+    archived.write_text(payload, encoding="utf-8")
+    paths = kernel_paths(tmp_path / "cache")
+    KernelIngestor(paths.analytical, paths.operational).refresh(
+        [archived, active],
+        trigger=RefreshTrigger.CLI_REFRESH,
+        owner_id="structural-tool-query-fixture",
+    )
+    service = QueryService(paths.operational)
+    measures = (
+        "adjacent_uncached_input_tokens",
+        "adjacent_cached_input_tokens",
+        "adjacent_reasoning_tokens",
+        "adjacent_output_tokens",
+        "adjacent_total_tokens",
+    )
+    direct = service.execute(
+        QueryRequest(
+            "tools",
+            Operation.ROWS,
+            ("tool_call", "operation", "target"),
+            measures,
+            order_by="adjacent_total_tokens",
+        )
+    )
+    generic = service.execute(
+        QueryRequest(
+            "tools",
+            Operation.ROWS,
+            ("tool_call", "operation", "target"),
+            measures,
+            (Filter("started_at", "gte", "2020-01-01T00:00:00Z"),),
+            order_by="adjacent_total_tokens",
+        )
+    )
+
+    assert direct.plan_id == "tools.rows.direct_tool_impact.v1"
+    assert generic.plan_id == "tools.rows.v1"
+    assert direct.matched_count == direct.scanned_count == 1
+    assert direct.rows == generic.rows
+    assert all(
+        direct.rows[0][measure] is None
+        for measure in measures
+    )
+    assert direct.coverage == generic.coverage
+    assert direct.evidence_selectors == generic.evidence_selectors
+
+
 def test_named_plan_has_explainable_static_sql(tmp_path: Path) -> None:
     _service_instance, analytical = _service(tmp_path)
     request = QueryRequest(

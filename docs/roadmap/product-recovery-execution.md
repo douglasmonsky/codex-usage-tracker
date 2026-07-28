@@ -848,22 +848,22 @@ below the retained 90,000-byte ceiling.
   pagination, exact evidence links, cross-generation enrichment rejection,
   small monetary facts, time-scaled graphs, responsive rendering, and the
   Limits graph.
-- The complete repository gate passed 412 Python tests, Ruff, MyPy, Pyright,
+- The complete repository gate passed 415 Python tests, Ruff, MyPy, Pyright,
   frontend lint/type/unit checks, deterministic assets, scope, maintainability,
   release-safety, and diff checks.
 - The clean installed-wheel Console and allowance smoke passed. The package
-  smoke passed two fresh MCP tasks and measured warm Console p95 at 0.873 ms.
+  smoke passed two fresh MCP tasks and measured warm Console p95 below 1 ms.
 
 ### Release-candidate evidence
 
 | Artifact or gate | Result |
 | --- | --- |
-| Wheel | 165,088-byte installed candidate passed Console, allowance, and two-fresh-task MCP smoke; exact build digest is reported by PR qualification |
+| Wheel | Current installed candidate passed Console, allowance, and two-fresh-task MCP smoke; exact build size and digest are reported by PR qualification |
 | Sdist | Source-complete candidate passed composition and measured-plus-3% budget; the exact post-ledger artifact is reported by PR qualification rather than self-embedded |
 | Release composition | Pass; built distributions contain current deterministic source and remain within measured-plus-3% ceilings |
 | Installed Console | Pass; Console and allowance render from the exact wheel |
-| Installed package | Pass; two fresh MCP tasks and warm Console p95 0.873 ms |
-| Full repository | Pass; 412 tests and all static, type, scope, budget, and release gates |
+| Installed package | Pass; two fresh MCP tasks and warm Console p95 below 1 ms |
+| Full repository | Pass; 415 tests and all static, type, scope, budget, and release gates |
 
 ### Visual, accessibility, and review handoff
 
@@ -904,7 +904,19 @@ below the retained 90,000-byte ceiling.
   writer metric now begins only after `BEGIN IMMEDIATE` has acquired the lock
   and ends after commit, so connection open, capability validation, and lock
   acquisition wait no longer masquerade as lock occupancy. A deterministic
-  ordering regression test freezes that boundary. The exact dedicated command
-  passed 12 policy and performance tests locally.
+  ordering regression test freezes that boundary.
+- The next dedicated CI run proved the writer correction and isolated its only
+  failure to the 100,000-call tool-impact query: 517.054 ms p95 against the
+  unchanged 500 ms ceiling. That query expanded the public `tool_calls` and
+  `model_calls` views, then repeated thread, turn, and model joins for a result
+  needing only compact tool facts, profile semantics, and the adjacent call.
+  The exact unfiltered tool-impact row shape now uses a named direct physical
+  plan; filtered and broader tool queries retain the generic path. Canonical
+  call ownership, structural-only copy ownership, generation fencing,
+  coverage, ordering, and evidence selectors have direct-versus-generic parity
+  tests. The 25,000-tool synthetic workload measured 69.859 ms p95 locally,
+  while Top Threads measured 496.883 ms p95. The complete dedicated
+  performance command passed all eight contracts, and the full repository gate
+  passed all 415 tests.
 
 PR/CI merge remains before R6 completion.
