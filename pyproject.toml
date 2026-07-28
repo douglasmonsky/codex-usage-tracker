@@ -103,6 +103,7 @@ files = [
   "scripts/smoke_installed_package.py",
   "src/codex_usage_tracker/release/artifact_manifest.py",
   "src/codex_usage_tracker/kernel",
+  "tests/agent_kernel/contracts/reference",
 ]
 
 [tool.pyright]
@@ -118,6 +119,7 @@ include = [
   "scripts/smoke_installed_console.py",
   "scripts/smoke_installed_catalog.py",
   "src/codex_usage_tracker/kernel",
+  "tests/agent_kernel/contracts/reference",
 ]
 pythonVersion = "3.10"
 typeCheckingMode = "standard"

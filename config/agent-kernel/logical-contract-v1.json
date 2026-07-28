@@ -1,0 +1,1165 @@
+{
+  "schema": "codex-usage-tracker.agent-kernel.logical.v1",
+  "version": 1,
+  "database_identity": "codex-usage-tracker.agent-kernel.v1",
+  "authority": [
+    "docs/architecture/LOGICAL_KERNEL_CONTRACT.md",
+    "docs/architecture/ADAPTER_CONTRACT.md",
+    "config/agent-kernel/question-catalog-v1.json"
+  ],
+  "vector_bundle_sha256": "f310f9e6dc6e65e8f1944a347b6d3bfbf18fe68f2f8ddcf9eb0d1c81e9396848",
+  "identity": {
+    "version": "v1",
+    "tuple_encoding": "canonical_cbor",
+    "digest": "sha256",
+    "text_encoding": "lowercase_base32_without_padding",
+    "digest_characters": 52,
+    "shape": "<kind>:v1:<digest>",
+    "collision_policy": "fail_publication_when_one_logical_id_has_distinct_canonical_identity_bytes",
+    "mutable_labels_in_identity": false,
+    "publication_derivation": {
+      "publication_id": "semantic_id('publication', [publication_key])",
+      "artifact_digest": "sha256(canonical_artifact_with_publication_id_and_without_artifact_digest)",
+      "order": [
+        "allocate_publication_key",
+        "derive_publication_id",
+        "assemble_canonical_artifact_without_artifact_digest",
+        "derive_artifact_digest"
+      ]
+    }
+  },
+  "time": {
+    "storage": "signed_64_bit_integer_utc_microseconds",
+    "epoch": "1970-01-01T00:00:00Z",
+    "missing": "null",
+    "calendar_timezone": "required_iana_name",
+    "window_bounds": "[start,end)",
+    "duration_unit": "integer_microseconds",
+    "fractional_precision": "zero_to_six_decimal_digits_only",
+    "total_order": [
+      "event_time_availability",
+      "event_at_us",
+      "source_order",
+      "event_kind_order",
+      "logical_id"
+    ],
+    "missing_time_order": "after_observed_instants_then_source_order",
+    "invalid_duration": "null_with_diagnostic"
+  },
+  "missingness": {
+    "missing_value": null,
+    "zero_is_observed": true,
+    "mask_version": "measurement-mask-v1",
+    "canonical_grades": [
+      "exact",
+      "deterministic",
+      "configured_estimate"
+    ],
+    "result_only_grades": [
+      "model_inference",
+      "unsupported"
+    ],
+    "missing_bases": [
+      "unobserved",
+      "unavailable",
+      "inapplicable",
+      "invalid"
+    ]
+  },
+  "token_accounting": {
+    "classes": [
+      "uncached_input_tokens",
+      "cached_input_tokens",
+      "reasoning_tokens",
+      "output_tokens"
+    ],
+    "input_formula": "uncached_input_tokens + cached_input_tokens",
+    "total_formula": "uncached_input_tokens + cached_input_tokens + output_tokens",
+    "reasoning_in_default_total": false,
+    "partial_total": "null",
+    "negative_value": "invalid"
+  },
+  "decimal_contract": {
+    "encoding": "plain_finite_decimal_without_sign_plus_exponent_trailing_fraction_zeros_or_negative_zero",
+    "zero": "0",
+    "rates": {
+      "minimum": "0",
+      "maximum": null
+    },
+    "percentages": {
+      "minimum": "0",
+      "maximum": "100"
+    },
+    "missing": null
+  },
+  "semantic_operations": [
+    "read",
+    "search",
+    "list",
+    "execute",
+    "write",
+    "patch",
+    "test",
+    "navigate",
+    "delegate",
+    "wait",
+    "unknown"
+  ],
+  "resource_kinds": [
+    "file",
+    "directory",
+    "repository",
+    "command_family",
+    "url_origin_path_template",
+    "mcp_tool",
+    "browser_route",
+    "test_target",
+    "unknown"
+  ],
+  "lifecycle_states": [
+    "pending",
+    "running",
+    "succeeded",
+    "failed",
+    "cancelled",
+    "rolled_back",
+    "open",
+    "unknown"
+  ],
+  "source_states": [
+    "active",
+    "archived",
+    "replaced",
+    "truncated",
+    "missing",
+    "malformed",
+    "deferred"
+  ],
+  "publication_states": [
+    "committed",
+    "rolled_back"
+  ],
+  "logical_primitives": {
+    "allowance_observation": "allowance_observation",
+    "canonical_call": "canonical_call",
+    "compaction_boundary": "compaction_boundary",
+    "context_component": "context_component",
+    "model_profile": "model_profile",
+    "project": "project",
+    "publication": "publication",
+    "publication_delta": "publication_delta",
+    "resource": "resource",
+    "session": "session",
+    "source_manifestation": "source_manifestation",
+    "source_occurrence": "source_occurrence",
+    "state_change": "state_change",
+    "tool_invocation": "tool_invocation",
+    "turn": "turn",
+    "valuation_match": "valuation_match"
+  },
+  "capabilities": {
+    "allowance_observation": {
+      "owner": "allowance",
+      "semantics": "Exact provider allowance observations and compatible intervals are observable."
+    },
+    "completion_lifecycle": {
+      "owner": "facts/lifecycle",
+      "semantics": "Structural start and terminal transitions are observable."
+    },
+    "compaction_boundary": {
+      "owner": "facts/activities",
+      "semantics": "Compaction or context-epoch boundaries are observable."
+    },
+    "context_window": {
+      "owner": "facts/model_calls",
+      "semantics": "A call context-window measurement is structurally observable."
+    },
+    "model_call_usage": {
+      "owner": "facts/model_calls",
+      "semantics": "Canonical calls expose independent token measurements."
+    },
+    "project_identity": {
+      "owner": "identity/projects",
+      "semantics": "Normalized project identity is observable."
+    },
+    "publication_delta": {
+      "owner": "publication",
+      "semantics": "Accepted mutation summaries between committed publications are observable."
+    },
+    "publication_state": {
+      "owner": "publication",
+      "semantics": "Committed truth identity, coverage, and freshness are observable."
+    },
+    "resource_identity": {
+      "owner": "facts/resources",
+      "semantics": "Normalized metadata-only resource identities are observable."
+    },
+    "session_hierarchy": {
+      "owner": "identity/sessions",
+      "semantics": "Direct parent and descendant relationships are structurally observable."
+    },
+    "session_identity": {
+      "owner": "identity/sessions",
+      "semantics": "Stable session identity is observable."
+    },
+    "source_inventory": {
+      "owner": "sources",
+      "semantics": "Bounded source discovery and state are observable."
+    },
+    "source_occurrence": {
+      "owner": "evidence",
+      "semantics": "Physical occurrence provenance for a semantic entity is observable."
+    },
+    "state_change_observation": {
+      "owner": "facts/state_changes",
+      "semantics": "A structured resource mutation is observed without causal attribution."
+    },
+    "structural_context": {
+      "owner": "capabilities/context",
+      "semantics": "Optional structural context components are observable without raw bodies."
+    },
+    "tool_lifecycle": {
+      "owner": "facts/tools",
+      "semantics": "Tool invocation transitions and structured measurements are observable."
+    },
+    "turn_identity": {
+      "owner": "identity/turns",
+      "semantics": "Deterministic user-intent boundaries are observable."
+    },
+    "valuation": {
+      "owner": "valuation",
+      "semantics": "A configured rate-card revision can be applied with explicit coverage."
+    }
+  },
+  "measurements": {
+    "allowance_limit": {
+      "bit": 0,
+      "grade": "exact",
+      "basis": "observed_limit_identity",
+      "missing": "null_when_provider_limit_is_unobserved",
+      "vector_ids": [
+        "allowance.compatible_used"
+      ]
+    },
+    "allowance_percent": {
+      "bit": 1,
+      "grade": "exact",
+      "basis": "observed_decimal_percent",
+      "missing": "null_when_neither_used_nor_remaining_is_observed",
+      "vector_ids": [
+        "allowance.compatible_used",
+        "allowance.compatible_remaining"
+      ]
+    },
+    "cached_input_tokens": {
+      "bit": 2,
+      "grade": "exact",
+      "basis": "observed_or_compatible_deterministic_derivation",
+      "missing": "null_when_upstream_does_not_establish_cached_input",
+      "vector_ids": [
+        "accounting.four_tokens",
+        "accounting.missing_cached"
+      ]
+    },
+    "call_count": {
+      "bit": 3,
+      "grade": "exact",
+      "basis": "canonical_entity_count",
+      "missing": "null_when_call_capability_is_unavailable",
+      "vector_ids": [
+        "identity.source_copy"
+      ]
+    },
+    "completion_state": {
+      "bit": 4,
+      "grade": "deterministic",
+      "basis": "ordered_lifecycle_fold",
+      "missing": "unknown_state_when_no_compatible_transition_exists",
+      "vector_ids": [
+        "lifecycle.cross_publication"
+      ]
+    },
+    "configured_cost_usd": {
+      "bit": 5,
+      "grade": "configured_estimate",
+      "basis": "selected_rate_card_revision",
+      "missing": "null_when_no_tokens_are_rated",
+      "vector_ids": [
+        "valuation.full",
+        "valuation.unmatched"
+      ]
+    },
+    "context_window_tokens": {
+      "bit": 6,
+      "grade": "exact",
+      "basis": "observed_model_call_field",
+      "missing": "null_when_adapter_capability_is_absent",
+      "vector_ids": [
+        "accounting.measurement_missing"
+      ]
+    },
+    "duration_us": {
+      "bit": 7,
+      "grade": "deterministic",
+      "basis": "valid_terminal_time_minus_start_time",
+      "missing": "null_when_boundary_is_missing_or_negative",
+      "vector_ids": [
+        "lifecycle.cross_publication"
+      ]
+    },
+    "estimated_credits": {
+      "bit": 8,
+      "grade": "configured_estimate",
+      "basis": "selected_rate_card_revision",
+      "missing": "null_when_no_credit_rate_applies",
+      "vector_ids": [
+        "valuation.full",
+        "valuation.unmatched"
+      ]
+    },
+    "event_time_us": {
+      "bit": 9,
+      "grade": "exact",
+      "basis": "documented_upstream_timestamp_conversion",
+      "missing": "null_without_timestamp_substitution",
+      "vector_ids": [
+        "time.epoch",
+        "time.missing_order"
+      ]
+    },
+    "hierarchy_depth": {
+      "bit": 10,
+      "grade": "deterministic",
+      "basis": "acyclic_parent_fold",
+      "missing": "null_while_parent_chain_is_unresolved",
+      "vector_ids": [
+        "hierarchy.late_parent",
+        "hierarchy.multilevel"
+      ]
+    },
+    "model_profile": {
+      "bit": 11,
+      "grade": "exact",
+      "basis": "observed_model_effort_tier_tuple_with_unknown_members",
+      "missing": "explicit_unknown_members_not_empty_strings",
+      "vector_ids": [
+        "identity.model_profile"
+      ]
+    },
+    "mutation_count": {
+      "bit": 12,
+      "grade": "exact",
+      "basis": "canonical_state_change_count",
+      "missing": "null_when_state_change_capability_is_absent",
+      "vector_ids": [
+        "accounting.tool_separation"
+      ]
+    },
+    "output_tokens": {
+      "bit": 13,
+      "grade": "exact",
+      "basis": "observed_model_usage",
+      "missing": "null_when_upstream_does_not_establish_output",
+      "vector_ids": [
+        "accounting.four_tokens"
+      ]
+    },
+    "reasoning_tokens": {
+      "bit": 14,
+      "grade": "exact",
+      "basis": "observed_model_usage",
+      "missing": "null_when_upstream_does_not_establish_reasoning",
+      "vector_ids": [
+        "accounting.four_tokens",
+        "valuation.reasoning_overlap"
+      ]
+    },
+    "resource_operation": {
+      "bit": 15,
+      "grade": "deterministic",
+      "basis": "metadata_only_transport_classification",
+      "missing": "unknown_enum_when_unrecognized",
+      "vector_ids": [
+        "accounting.tool_separation"
+      ]
+    },
+    "source_occurrence_count": {
+      "bit": 16,
+      "grade": "exact",
+      "basis": "preserved_occurrence_coordinate_count",
+      "missing": "null_when_occurrence_capability_is_absent",
+      "vector_ids": [
+        "identity.source_copy"
+      ]
+    },
+    "tool_output_bytes": {
+      "bit": 17,
+      "grade": "exact",
+      "basis": "bounded_structural_size_observation",
+      "missing": "null_when_host_does_not_expose_size",
+      "vector_ids": [
+        "accounting.measurement_missing"
+      ]
+    },
+    "tool_status": {
+      "bit": 18,
+      "grade": "deterministic",
+      "basis": "ordered_lifecycle_fold",
+      "missing": "unknown_state_without_transition",
+      "vector_ids": [
+        "lifecycle.cross_publication",
+        "accounting.tool_separation"
+      ]
+    },
+    "turn_count": {
+      "bit": 19,
+      "grade": "exact",
+      "basis": "canonical_turn_count",
+      "missing": "null_when_turn_capability_is_unavailable",
+      "vector_ids": [
+        "hierarchy.multilevel"
+      ]
+    },
+    "uncached_input_tokens": {
+      "bit": 20,
+      "grade": "deterministic",
+      "basis": "observed_value_or_compatible_input_total_minus_cached",
+      "missing": "null_when_required_inputs_are_absent_or_invalid",
+      "vector_ids": [
+        "accounting.four_tokens",
+        "accounting.invalid_negative"
+      ]
+    }
+  },
+  "selector_kinds": {
+    "allowance_interval": {
+      "entity": "allowance_interval",
+      "prefix": "allowance-interval",
+      "identity_kind": "allowance-interval"
+    },
+    "allowance_observation": {
+      "entity": "allowance_observation",
+      "prefix": "allowance-observation",
+      "identity_kind": "allowance-observation"
+    },
+    "call": {
+      "entity": "canonical_call",
+      "prefix": "call",
+      "identity_kind": "call"
+    },
+    "model_profile": {
+      "entity": "model_profile",
+      "prefix": "model-profile",
+      "identity_kind": "model-profile"
+    },
+    "project": {
+      "entity": "project",
+      "prefix": "project",
+      "identity_kind": "project"
+    },
+    "publication": {
+      "entity": "publication",
+      "prefix": "publication",
+      "identity_kind": "publication"
+    },
+    "rate_card": {
+      "entity": "rate_card_revision",
+      "prefix": "rate-card",
+      "identity_kind": "rate-card"
+    },
+    "resource": {
+      "entity": "resource",
+      "prefix": "resource",
+      "identity_kind": "resource"
+    },
+    "session": {
+      "entity": "session",
+      "prefix": "session",
+      "identity_kind": "session"
+    },
+    "source_manifestation": {
+      "entity": "source_manifestation",
+      "prefix": "source-manifestation",
+      "identity_kind": "source-manifestation"
+    },
+    "state_change": {
+      "entity": "state_change",
+      "prefix": "state-change",
+      "identity_kind": "state-change"
+    },
+    "tool": {
+      "entity": "tool_invocation",
+      "prefix": "tool",
+      "identity_kind": "tool"
+    },
+    "turn": {
+      "entity": "turn",
+      "prefix": "turn",
+      "identity_kind": "turn"
+    },
+    "window": {
+      "entity": "query_window",
+      "prefix": "window",
+      "identity_kind": "window"
+    }
+  },
+  "entities": [
+    {
+      "id": "adapter_identity",
+      "identity": {
+        "kind": "adapter",
+        "input_fields": ["adapter_id", "adapter_version", "source_kind", "identity_version"],
+        "derived_id_field": null
+      },
+      "owner": "adapters/contracts",
+      "semantics": "Versioned source-observation family and the capabilities it can establish.",
+      "vector_ids": ["identity.adapter_identity", "field.adapter_identity"],
+      "fields": [
+        {"name": "adapter_id", "semantics": "Stable adapter family.", "identity_participation": "included", "missing": "forbidden", "basis": "contract_constant", "vector_ids": ["field.adapter_identity"]},
+        {"name": "adapter_version", "semantics": "Parser and normalization contract version.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.adapter_identity"]},
+        {"name": "source_kind", "semantics": "Versioned upstream representation kind.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.adapter_identity"]},
+        {"name": "capability_mask", "semantics": "Fields and lifecycle observations this adapter can establish.", "identity_participation": "excluded", "missing": "empty_mask_means_no_capabilities", "basis": "adapter_exact", "vector_ids": ["field.adapter_identity"]},
+        {"name": "identity_version", "semantics": "Identity algorithm suite emitted by the adapter.", "identity_participation": "included", "missing": "forbidden", "basis": "contract_constant", "vector_ids": ["field.adapter_identity"]}
+      ]
+    },
+    {
+      "id": "source",
+      "identity": {
+        "kind": "source",
+        "input_fields": ["adapter_id", "source_kind", "adapter_native_source_key"],
+        "derived_id_field": "source_id"
+      },
+      "owner": "sources",
+      "semantics": "Stable upstream source identity across observed manifestations.",
+      "vector_ids": ["identity.source", "field.source"],
+      "fields": [
+        {"name": "source_id", "semantics": "Versioned semantic source identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.source"]},
+        {"name": "adapter_id", "semantics": "Adapter family that owns source interpretation.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.source"]},
+        {"name": "source_kind", "semantics": "Upstream representation family.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.source"]},
+        {"name": "adapter_native_source_key", "semantics": "Stable adapter-native structural source key.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.source"]},
+        {"name": "first_seen_publication", "semantics": "First committed publication that observed the source.", "identity_participation": "excluded", "missing": "null_before_commit", "basis": "publication_exact", "vector_ids": ["field.source"]},
+        {"name": "last_seen_publication", "semantics": "Latest committed publication that observed the source.", "identity_participation": "excluded", "missing": "null_before_commit", "basis": "publication_exact", "vector_ids": ["field.source"]},
+        {"name": "selected_history_coverage", "semantics": "Whether this source was selected, deferred, uncertain, malformed, or missing.", "identity_participation": "excluded", "missing": "forbidden_after_inventory", "basis": "planner_exact", "vector_ids": ["field.source"]}
+      ]
+    },
+    {
+      "id": "source_manifestation",
+      "identity": {
+        "kind": "source-manifestation",
+        "input_fields": ["source_id", "technical_path_key"],
+        "derived_id_field": "manifestation_id"
+      },
+      "owner": "sources",
+      "semantics": "One observed path and revision of a stable source.",
+      "vector_ids": ["identity.source_manifestation", "field.source_manifestation"],
+      "fields": [
+        {"name": "manifestation_id", "semantics": "Stable identity for one adapter manifestation key.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.source_manifestation"]},
+        {"name": "source_id", "semantics": "Owning stable source.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.source_manifestation"]},
+        {"name": "technical_path_key", "semantics": "Normalized local technical locator.", "identity_participation": "included", "missing": "forbidden_for_file_sources", "basis": "adapter_exact", "vector_ids": ["field.source_manifestation"]},
+        {"name": "display_label", "semantics": "Mutable local presentation label.", "identity_participation": "excluded", "missing": "null_when_no_label_candidate", "basis": "adapter_exact", "vector_ids": ["field.source_manifestation"]},
+        {"name": "filesystem_identity", "semantics": "Filesystem identity when the platform exposes one.", "identity_participation": "excluded", "missing": "null_when_unavailable", "basis": "adapter_exact", "vector_ids": ["field.source_manifestation"]},
+        {"name": "size_bytes", "semantics": "Observed manifestation byte size.", "identity_participation": "excluded", "missing": "null_when_stat_fails", "basis": "filesystem_exact", "vector_ids": ["field.source_manifestation"]},
+        {"name": "modified_at_us", "semantics": "Filesystem modification time used only for discovery.", "identity_participation": "excluded", "missing": "null_when_stat_fails", "basis": "filesystem_exact", "vector_ids": ["field.source_manifestation"]},
+        {"name": "content_revision", "semantics": "Observed content-revision fingerprint.", "identity_participation": "excluded", "missing": "null_until_hashed", "basis": "adapter_exact", "vector_ids": ["field.source_manifestation"]},
+        {"name": "cursor_byte_offset", "semantics": "Offset after the last committed complete record.", "identity_participation": "excluded", "missing": "zero_only_when_observed_at_file_start", "basis": "adapter_exact", "vector_ids": ["field.source_manifestation"]},
+        {"name": "cursor_record_ordinal", "semantics": "Stable ordinal of the last committed complete record.", "identity_participation": "excluded", "missing": "null_when_no_complete_record", "basis": "adapter_exact", "vector_ids": ["field.source_manifestation"]},
+        {"name": "state", "semantics": "Current manifestation lifecycle state.", "identity_participation": "excluded", "missing": "forbidden_after_inventory", "basis": "inventory_exact", "vector_ids": ["field.source_manifestation"]},
+        {"name": "parse_diagnostics", "semantics": "Bounded malformed or unsupported ranges.", "identity_participation": "excluded", "missing": "empty_collection_means_no_observed_diagnostic", "basis": "adapter_exact", "vector_ids": ["field.source_manifestation"]}
+      ]
+    },
+    {
+      "id": "project",
+      "identity": {
+        "kind": "project",
+        "input_fields": ["workspace_key"],
+        "derived_id_field": "project_id"
+      },
+      "owner": "identity/projects",
+      "semantics": "Stable normalized workspace grouping with mutable label candidates.",
+      "vector_ids": ["identity.project", "field.project"],
+      "fields": [
+        {"name": "project_id", "semantics": "Versioned normalized project identity.", "identity_participation": "excluded", "missing": "explicit_unknown_project_bucket", "basis": "identity_v1", "vector_ids": ["field.project"]},
+        {"name": "workspace_key", "semantics": "Normalized observed workspace key.", "identity_participation": "included", "missing": "explicit_unknown_key", "basis": "adapter_exact", "vector_ids": ["field.project"]},
+        {"name": "label_candidates", "semantics": "Current human-readable project labels with provenance.", "identity_participation": "excluded", "missing": "empty_collection_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.project"]},
+        {"name": "first_event_at_us", "semantics": "Earliest observed project event time.", "identity_participation": "excluded", "missing": "null_when_all_event_times_missing", "basis": "deterministic_min", "vector_ids": ["field.project"]},
+        {"name": "last_event_at_us", "semantics": "Latest observed project event time.", "identity_participation": "excluded", "missing": "null_when_all_event_times_missing", "basis": "deterministic_max", "vector_ids": ["field.project"]},
+        {"name": "provenance", "semantics": "Occurrence coordinates supporting project observation.", "identity_participation": "excluded", "missing": "forbidden_for_observed_project", "basis": "occurrence_exact", "vector_ids": ["field.project"]}
+      ]
+    },
+    {
+      "id": "session",
+      "identity": {
+        "kind": "session",
+        "input_fields": ["adapter_native_session_key", "identity_version"],
+        "derived_id_field": "session_id"
+      },
+      "owner": "identity/sessions",
+      "semantics": "Stable adapter-native session whose hierarchy may be discovered later.",
+      "vector_ids": ["identity.session", "field.session"],
+      "fields": [
+        {"name": "session_id", "semantics": "Versioned session identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.session"]},
+        {"name": "adapter_native_session_key", "semantics": "Stable upstream session key.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.session"]},
+        {"name": "identity_version", "semantics": "Session identity tuple version.", "identity_participation": "included", "missing": "forbidden", "basis": "contract_constant", "vector_ids": ["field.session"]},
+        {"name": "project_id", "semantics": "Observed project relation.", "identity_participation": "excluded", "missing": "null_until_observed", "basis": "adapter_exact", "vector_ids": ["field.session"]},
+        {"name": "root_session_id", "semantics": "Current resolved hierarchy root.", "identity_participation": "excluded", "missing": "null_while_unresolved", "basis": "deterministic_hierarchy_fold", "vector_ids": ["field.session"]},
+        {"name": "parent_session_id", "semantics": "Current direct parent relation.", "identity_participation": "excluded", "missing": "null_while_unresolved_or_root", "basis": "adapter_exact", "vector_ids": ["field.session"]},
+        {"name": "relationship_basis", "semantics": "Upstream evidence supporting parent relation.", "identity_participation": "excluded", "missing": "null_without_parent", "basis": "adapter_exact", "vector_ids": ["field.session"]},
+        {"name": "delegation_depth", "semantics": "Acyclic distance from resolved root.", "identity_participation": "excluded", "missing": "null_while_chain_unresolved", "basis": "deterministic_hierarchy_fold", "vector_ids": ["field.session"]},
+        {"name": "start_at_us", "semantics": "Earliest valid observed session event.", "identity_participation": "excluded", "missing": "null_without_observed_time", "basis": "deterministic_min", "vector_ids": ["field.session"]},
+        {"name": "end_at_us", "semantics": "Compatible terminal session time.", "identity_participation": "excluded", "missing": "null_while_open_or_unobserved", "basis": "lifecycle_fold", "vector_ids": ["field.session"]},
+        {"name": "lifecycle_state", "semantics": "Current folded session lifecycle state.", "identity_participation": "excluded", "missing": "unknown_without_transition", "basis": "lifecycle_fold", "vector_ids": ["field.session"]},
+        {"name": "completion_basis", "semantics": "Structural evidence for completion state.", "identity_participation": "excluded", "missing": "null_without_terminal_evidence", "basis": "adapter_exact", "vector_ids": ["field.session"]},
+        {"name": "label_candidates", "semantics": "Mutable human-readable session labels.", "identity_participation": "excluded", "missing": "empty_collection_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.session"]},
+        {"name": "evidence_coordinates", "semantics": "First and last structural source coordinates.", "identity_participation": "excluded", "missing": "forbidden_for_observed_session", "basis": "occurrence_exact", "vector_ids": ["field.session"]}
+      ]
+    },
+    {
+      "id": "turn",
+      "identity": {
+        "kind": "turn",
+        "input_fields": ["session_id", "ordinal"],
+        "derived_id_field": "turn_id"
+      },
+      "owner": "identity/turns",
+      "semantics": "Deterministic user-intent boundary through the next intent or explicit terminal event.",
+      "vector_ids": ["identity.turn", "field.turn"],
+      "fields": [
+        {"name": "turn_id", "semantics": "Versioned turn identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.turn"]},
+        {"name": "session_id", "semantics": "Owning canonical session.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.turn"]},
+        {"name": "ordinal", "semantics": "One-based deterministic ordinal within session order.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_deterministic", "vector_ids": ["field.turn"]},
+        {"name": "start_at_us", "semantics": "User-intent boundary time.", "identity_participation": "excluded", "missing": "null_without_upstream_time", "basis": "adapter_exact", "vector_ids": ["field.turn"]},
+        {"name": "end_at_us", "semantics": "Next boundary or explicit terminal time.", "identity_participation": "excluded", "missing": "null_while_open", "basis": "lifecycle_fold", "vector_ids": ["field.turn"]},
+        {"name": "source_order_range", "semantics": "First and last stable adapter source order.", "identity_participation": "excluded", "missing": "forbidden_for_observed_turn", "basis": "adapter_exact", "vector_ids": ["field.turn"]},
+        {"name": "lifecycle_state", "semantics": "Current folded turn state.", "identity_participation": "excluded", "missing": "open_without_terminal_evidence", "basis": "lifecycle_fold", "vector_ids": ["field.turn"]},
+        {"name": "completion_basis", "semantics": "Structural basis for terminal state.", "identity_participation": "excluded", "missing": "null_while_open", "basis": "adapter_exact", "vector_ids": ["field.turn"]},
+        {"name": "first_boundary_coordinates", "semantics": "First call, action, success, and mutation coordinates when available.", "identity_participation": "excluded", "missing": "null_per_unobserved_boundary", "basis": "deterministic_order", "vector_ids": ["field.turn"]},
+        {"name": "membership", "semantics": "Exact call, tool, activity, and state-change members.", "identity_participation": "excluded", "missing": "empty_collection_is_observed_zero", "basis": "canonical_relationship", "vector_ids": ["field.turn"]}
+      ]
+    },
+    {
+      "id": "point_event",
+      "identity": {
+        "kind": "event",
+        "input_fields": ["event_kind", "event_at_us", "source_order", "session_id", "turn_id"],
+        "derived_id_field": "event_id"
+      },
+      "owner": "facts/events",
+      "semantics": "Immutable instantaneous observation in the canonical total order.",
+      "vector_ids": ["identity.point_event", "field.point_event"],
+      "fields": [
+        {"name": "event_id", "semantics": "Versioned event identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.point_event"]},
+        {"name": "event_kind", "semantics": "Typed observation kind.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.point_event"]},
+        {"name": "event_at_us", "semantics": "Observed signed UTC microsecond instant.", "identity_participation": "included", "missing": "null_without_substitution", "basis": "adapter_exact", "vector_ids": ["field.point_event"]},
+        {"name": "source_order", "semantics": "Stable adapter-provided tie-break tuple.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.point_event"]},
+        {"name": "session_id", "semantics": "Owning session when observed.", "identity_participation": "included", "missing": "null_for_global_observation", "basis": "adapter_exact", "vector_ids": ["field.point_event"]},
+        {"name": "turn_id", "semantics": "Containing turn when observed.", "identity_participation": "included", "missing": "null_outside_turn", "basis": "adapter_exact", "vector_ids": ["field.point_event"]},
+        {"name": "occurrence_coordinate", "semantics": "Physical structural record evidence.", "identity_participation": "excluded", "missing": "forbidden_for_observed_event", "basis": "occurrence_exact", "vector_ids": ["field.point_event"]},
+        {"name": "measurement_mask", "semantics": "Availability bits for optional event measurements.", "identity_participation": "excluded", "missing": "zero_mask_means_none_observed", "basis": "adapter_exact", "vector_ids": ["field.point_event"]},
+        {"name": "basis", "semantics": "Observation or derivation basis.", "identity_participation": "excluded", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.point_event"]},
+        {"name": "confidence", "semantics": "Structured confidence enum without model inference.", "identity_participation": "excluded", "missing": "null_when_not_applicable", "basis": "adapter_exact", "vector_ids": ["field.point_event"]}
+      ]
+    },
+    {
+      "id": "lifecycle_entity",
+      "identity": {
+        "kind": "lifecycle",
+        "input_fields": ["logical_id", "kind"],
+        "derived_id_field": null
+      },
+      "owner": "facts/lifecycle",
+      "semantics": "Deterministic current state folded from append-only transition observations.",
+      "vector_ids": ["identity.lifecycle_entity", "field.lifecycle_entity"],
+      "fields": [
+        {"name": "logical_id", "semantics": "Identity of the lifecycle-bearing entity.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.lifecycle_entity"]},
+        {"name": "kind", "semantics": "Call, tool, activity, or turn lifecycle kind.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.lifecycle_entity"]},
+        {"name": "start_coordinate", "semantics": "Earliest compatible start transition.", "identity_participation": "excluded", "missing": "null_without_start", "basis": "ordered_transition_fold", "vector_ids": ["field.lifecycle_entity"]},
+        {"name": "last_transition_coordinate", "semantics": "Latest compatible transition in semantic event order.", "identity_participation": "excluded", "missing": "forbidden_when_transition_exists", "basis": "ordered_transition_fold", "vector_ids": ["field.lifecycle_entity"]},
+        {"name": "terminal_coordinate", "semantics": "Compatible terminal transition.", "identity_participation": "excluded", "missing": "null_while_nonterminal", "basis": "ordered_transition_fold", "vector_ids": ["field.lifecycle_entity"]},
+        {"name": "state", "semantics": "Current deterministic lifecycle state.", "identity_participation": "excluded", "missing": "unknown_without_transition", "basis": "ordered_transition_fold", "vector_ids": ["field.lifecycle_entity"]},
+        {"name": "state_basis", "semantics": "Basis from the winning transition.", "identity_participation": "excluded", "missing": "unknown_without_transition", "basis": "adapter_exact", "vector_ids": ["field.lifecycle_entity"]},
+        {"name": "transition_version", "semantics": "Lifecycle fold contract version.", "identity_participation": "excluded", "missing": "forbidden", "basis": "contract_constant", "vector_ids": ["field.lifecycle_entity"]},
+        {"name": "observed_duration_us", "semantics": "Valid terminal time minus start time.", "identity_participation": "excluded", "missing": "null_without_valid_boundaries", "basis": "deterministic_difference", "vector_ids": ["field.lifecycle_entity"]},
+        {"name": "terminal_error_category", "semantics": "Structural terminal error category.", "identity_participation": "excluded", "missing": "null_when_unobserved_or_not_failed", "basis": "adapter_exact", "vector_ids": ["field.lifecycle_entity"]}
+      ]
+    },
+    {
+      "id": "model_profile",
+      "identity": {
+        "kind": "model-profile",
+        "input_fields": ["model", "reasoning_effort", "service_tier"],
+        "derived_id_field": "model_profile_id"
+      },
+      "owner": "facts/model_calls",
+      "semantics": "Exact observed model, effort, service-tier tuple with explicit unknown members.",
+      "vector_ids": ["identity.model_profile", "field.model_profile"],
+      "fields": [
+        {"name": "model_profile_id", "semantics": "Versioned identity of the exact profile tuple.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.model_profile"]},
+        {"name": "model", "semantics": "Observed model label or explicit unknown.", "identity_participation": "included", "missing": "explicit_unknown_member", "basis": "adapter_exact", "vector_ids": ["field.model_profile"]},
+        {"name": "reasoning_effort", "semantics": "Observed reasoning effort or explicit unknown.", "identity_participation": "included", "missing": "explicit_unknown_member", "basis": "adapter_exact", "vector_ids": ["field.model_profile"]},
+        {"name": "service_tier", "semantics": "Observed service tier or explicit unknown.", "identity_participation": "included", "missing": "explicit_unknown_member", "basis": "adapter_exact", "vector_ids": ["field.model_profile"]}
+      ]
+    },
+    {
+      "id": "canonical_call",
+      "identity": {
+        "kind": "call",
+        "input_fields": ["adapter_native_call_key", "session_id", "turn_id"],
+        "derived_id_field": "call_id"
+      },
+      "owner": "facts/model_calls",
+      "semantics": "Canonical accounting grain for one model call across duplicate occurrences.",
+      "vector_ids": ["identity.canonical_call", "field.canonical_call"],
+      "fields": [
+        {"name": "call_id", "semantics": "Versioned model-call identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.canonical_call"]},
+        {"name": "adapter_native_call_key", "semantics": "Stable upstream call key or deterministic source coordinate.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.canonical_call"]},
+        {"name": "session_id", "semantics": "Owning canonical session.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.canonical_call"]},
+        {"name": "turn_id", "semantics": "Containing canonical turn.", "identity_participation": "included", "missing": "null_only_when_adapter_cannot_bound_turn", "basis": "adapter_exact", "vector_ids": ["field.canonical_call"]},
+        {"name": "model_profile_id", "semantics": "Exact observed model-profile tuple.", "identity_participation": "excluded", "missing": "explicit_unknown_profile", "basis": "adapter_exact", "vector_ids": ["field.canonical_call"]},
+        {"name": "context_window_tokens", "semantics": "Observed model context capacity.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.canonical_call"]},
+        {"name": "uncached_input_tokens", "semantics": "Uncached input token class.", "identity_participation": "excluded", "missing": "null_when_unobserved_or_invalid", "basis": "observed_or_deterministic", "vector_ids": ["field.canonical_call"]},
+        {"name": "cached_input_tokens", "semantics": "Cached input token class.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.canonical_call"]},
+        {"name": "reasoning_tokens", "semantics": "Reasoning token class kept separate from default total.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.canonical_call"]},
+        {"name": "output_tokens", "semantics": "Output token class.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.canonical_call"]},
+        {"name": "token_basis", "semantics": "Per-class observation or derivation basis.", "identity_participation": "excluded", "missing": "forbidden_for_nonnull_token", "basis": "adapter_exact", "vector_ids": ["field.canonical_call"]},
+        {"name": "lifecycle", "semantics": "Current start and terminal state.", "identity_participation": "excluded", "missing": "unknown_without_transitions", "basis": "lifecycle_fold", "vector_ids": ["field.canonical_call"]},
+        {"name": "evidence_coordinates", "semantics": "All valid physical occurrences for this call.", "identity_participation": "excluded", "missing": "forbidden_for_observed_call", "basis": "occurrence_exact", "vector_ids": ["field.canonical_call"]}
+      ]
+    },
+    {
+      "id": "tool_invocation",
+      "identity": {
+        "kind": "tool",
+        "input_fields": ["adapter_native_invocation_key", "session_id", "turn_id"],
+        "derived_id_field": "tool_id"
+      },
+      "owner": "facts/tools",
+      "semantics": "One tool activity with transport, semantic operation, lifecycle, and target metadata kept distinct.",
+      "vector_ids": ["identity.tool_invocation", "field.tool_invocation"],
+      "fields": [
+        {"name": "tool_id", "semantics": "Versioned tool-invocation identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.tool_invocation"]},
+        {"name": "adapter_native_invocation_key", "semantics": "Stable upstream invocation key or deterministic coordinate.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.tool_invocation"]},
+        {"name": "session_id", "semantics": "Owning session.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.tool_invocation"]},
+        {"name": "turn_id", "semantics": "Containing turn.", "identity_participation": "included", "missing": "null_when_unresolved", "basis": "adapter_exact", "vector_ids": ["field.tool_invocation"]},
+        {"name": "transport_name", "semantics": "Exact observed callable or host transport.", "identity_participation": "excluded", "missing": "explicit_unknown_transport", "basis": "adapter_exact", "vector_ids": ["field.tool_invocation"]},
+        {"name": "semantic_operation", "semantics": "Deterministic metadata-only operation enum.", "identity_participation": "excluded", "missing": "unknown_enum_when_unrecognized", "basis": "adapter_deterministic", "vector_ids": ["field.tool_invocation"]},
+        {"name": "tool_family", "semantics": "Stable grouping of equivalent transport purposes.", "identity_participation": "excluded", "missing": "unknown_family_when_unclassified", "basis": "adapter_deterministic", "vector_ids": ["field.tool_invocation"]},
+        {"name": "resource_links", "semantics": "Normalized target identities and relationship roles.", "identity_participation": "excluded", "missing": "empty_collection_when_no_target_observed", "basis": "adapter_exact", "vector_ids": ["field.tool_invocation"]},
+        {"name": "write_intent", "semantics": "Invocation expressed a write-like intent only.", "identity_participation": "excluded", "missing": "false_only_when_classification_observed", "basis": "adapter_deterministic", "vector_ids": ["field.tool_invocation"]},
+        {"name": "lifecycle", "semantics": "Current tool state and completion basis.", "identity_participation": "excluded", "missing": "unknown_without_transition", "basis": "lifecycle_fold", "vector_ids": ["field.tool_invocation"]},
+        {"name": "output_bytes", "semantics": "Bounded structural output size, not body content.", "identity_participation": "excluded", "missing": "null_when_host_does_not_expose_size", "basis": "adapter_exact", "vector_ids": ["field.tool_invocation"]},
+        {"name": "duration_us", "semantics": "Valid terminal time minus start time.", "identity_participation": "excluded", "missing": "null_without_valid_boundaries", "basis": "deterministic_difference", "vector_ids": ["field.tool_invocation"]},
+        {"name": "error_category", "semantics": "Structurally observed terminal error category.", "identity_participation": "excluded", "missing": "null_when_unobserved_or_not_failed", "basis": "adapter_exact", "vector_ids": ["field.tool_invocation"]}
+      ]
+    },
+    {
+      "id": "activity",
+      "identity": {
+        "kind": "activity",
+        "input_fields": ["session_id", "turn_id", "activity_kind"],
+        "derived_id_field": "activity_id"
+      },
+      "owner": "facts/activities",
+      "semantics": "Structured host phase or task marker with lifecycle semantics.",
+      "vector_ids": ["identity.activity", "field.activity"],
+      "fields": [
+        {"name": "activity_id", "semantics": "Versioned structured activity identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.activity"]},
+        {"name": "session_id", "semantics": "Owning session.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.activity"]},
+        {"name": "turn_id", "semantics": "Containing turn when observed.", "identity_participation": "included", "missing": "null_outside_turn", "basis": "adapter_exact", "vector_ids": ["field.activity"]},
+        {"name": "activity_kind", "semantics": "Structured host phase enum.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.activity"]},
+        {"name": "lifecycle", "semantics": "Current folded activity state.", "identity_participation": "excluded", "missing": "unknown_without_transition", "basis": "lifecycle_fold", "vector_ids": ["field.activity"]}
+      ]
+    },
+    {
+      "id": "compaction_boundary",
+      "identity": {
+        "kind": "compaction",
+        "input_fields": ["session_id", "source_order"],
+        "derived_id_field": "compaction_id"
+      },
+      "owner": "facts/activities",
+      "semantics": "Observed compaction point or lifecycle boundary between context epochs.",
+      "vector_ids": ["identity.compaction_boundary", "field.compaction_boundary"],
+      "fields": [
+        {"name": "compaction_id", "semantics": "Versioned boundary identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.compaction_boundary"]},
+        {"name": "session_id", "semantics": "Owning session.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.compaction_boundary"]},
+        {"name": "source_order", "semantics": "Stable adapter boundary coordinate.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.compaction_boundary"]},
+        {"name": "before_context_epoch", "semantics": "Observed pre-boundary epoch identity.", "identity_participation": "excluded", "missing": "null_when_host_does_not_expose_epoch", "basis": "adapter_exact", "vector_ids": ["field.compaction_boundary"]},
+        {"name": "after_context_epoch", "semantics": "Observed post-boundary epoch identity.", "identity_participation": "excluded", "missing": "null_when_host_does_not_expose_epoch", "basis": "adapter_exact", "vector_ids": ["field.compaction_boundary"]}
+      ]
+    },
+    {
+      "id": "resource",
+      "identity": {
+        "kind": "resource",
+        "input_fields": ["project_id", "kind", "normalized_key", "normalization_version"],
+        "derived_id_field": "resource_id"
+      },
+      "owner": "facts/resources",
+      "semantics": "Normalized metadata-only local target without raw body content.",
+      "vector_ids": ["identity.resource", "field.resource"],
+      "fields": [
+        {"name": "resource_id", "semantics": "Versioned resource identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.resource"]},
+        {"name": "project_id", "semantics": "Related project when provable.", "identity_participation": "included", "missing": "explicit_unknown_project", "basis": "identity_v1", "vector_ids": ["field.resource"]},
+        {"name": "kind", "semantics": "Resource-kind enum.", "identity_participation": "included", "missing": "unknown_enum_when_unclassified", "basis": "adapter_deterministic", "vector_ids": ["field.resource"]},
+        {"name": "normalized_key", "semantics": "Versioned project-relative or technical identity key.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_deterministic", "vector_ids": ["field.resource"]},
+        {"name": "normalization_version", "semantics": "Resource normalization rule version.", "identity_participation": "included", "missing": "forbidden", "basis": "contract_constant", "vector_ids": ["field.resource"]},
+        {"name": "display_label", "semantics": "Concise mutable local display label.", "identity_participation": "excluded", "missing": "null_when_no_label_candidate", "basis": "adapter_exact", "vector_ids": ["field.resource"]},
+        {"name": "provenance", "semantics": "Structural extraction basis and occurrence evidence.", "identity_participation": "excluded", "missing": "forbidden_for_observed_resource", "basis": "adapter_exact", "vector_ids": ["field.resource"]}
+      ]
+    },
+    {
+      "id": "state_change",
+      "identity": {
+        "kind": "state-change",
+        "input_fields": ["change_kind", "resource_id", "observation_at_us", "session_id", "turn_id"],
+        "derived_id_field": "change_id"
+      },
+      "owner": "facts/state_changes",
+      "semantics": "Structured observed mutation kept separate from tool intent and success.",
+      "vector_ids": ["identity.state_change", "field.state_change"],
+      "fields": [
+        {"name": "change_id", "semantics": "Versioned observed-change identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.state_change"]},
+        {"name": "change_kind", "semantics": "Structured mutation kind.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.state_change"]},
+        {"name": "resource_id", "semantics": "Affected normalized resource.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.state_change"]},
+        {"name": "observation_at_us", "semantics": "Time the mutation was structurally observed.", "identity_participation": "included", "missing": "null_without_upstream_time", "basis": "adapter_exact", "vector_ids": ["field.state_change"]},
+        {"name": "session_id", "semantics": "Containing session.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.state_change"]},
+        {"name": "turn_id", "semantics": "Containing turn or phase.", "identity_participation": "included", "missing": "null_when_unresolved", "basis": "adapter_exact", "vector_ids": ["field.state_change"]},
+        {"name": "before_revision", "semantics": "Technical resource revision before mutation.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.state_change"]},
+        {"name": "after_revision", "semantics": "Technical resource revision after mutation.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.state_change"]},
+        {"name": "causal_attribution", "semantics": "Always false for canonical state-change facts.", "identity_participation": "excluded", "missing": "forbidden", "basis": "contract_constant", "vector_ids": ["field.state_change"]},
+        {"name": "evidence_coordinates", "semantics": "Structural mutation occurrence evidence.", "identity_participation": "excluded", "missing": "forbidden", "basis": "occurrence_exact", "vector_ids": ["field.state_change"]}
+      ]
+    },
+    {
+      "id": "context_component",
+      "identity": {
+        "kind": "context-component",
+        "input_fields": ["call_id", "turn_id", "category"],
+        "derived_id_field": "component_id"
+      },
+      "owner": "capabilities/context",
+      "semantics": "Optional structural context category measurement without persisted raw body.",
+      "vector_ids": ["identity.context_component", "field.context_component"],
+      "fields": [
+        {"name": "component_id", "semantics": "Versioned component observation identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.context_component"]},
+        {"name": "call_id", "semantics": "Related call when known included.", "identity_participation": "included", "missing": "null_when_inclusion_unknown", "basis": "adapter_exact", "vector_ids": ["field.context_component"]},
+        {"name": "turn_id", "semantics": "Containing turn.", "identity_participation": "included", "missing": "null_when_unresolved", "basis": "adapter_exact", "vector_ids": ["field.context_component"]},
+        {"name": "category", "semantics": "Structural context category.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.context_component"]},
+        {"name": "observed_utf8_bytes", "semantics": "Observed structural byte count.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.context_component"]},
+        {"name": "event_count", "semantics": "Observed structural event count.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.context_component"]},
+        {"name": "estimated_tokens", "semantics": "Optional estimator output.", "identity_participation": "excluded", "missing": "null_without_named_estimator", "basis": "configured_estimate", "vector_ids": ["field.context_component"]},
+        {"name": "inclusion_basis", "semantics": "Observed, selected, known included, or inclusion unknown.", "identity_participation": "excluded", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.context_component"]}
+      ]
+    },
+    {
+      "id": "allowance_limit",
+      "identity": {
+        "kind": "allowance-limit",
+        "input_fields": ["provider", "account_local_identity", "plan_identity", "window_kind"],
+        "derived_id_field": "limit_id"
+      },
+      "owner": "allowance",
+      "semantics": "Provider/account-local allowance window identity and capability basis.",
+      "vector_ids": ["identity.allowance_limit", "field.allowance_limit"],
+      "fields": [
+        {"name": "limit_id", "semantics": "Versioned allowance-limit identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.allowance_limit"]},
+        {"name": "provider", "semantics": "Observed allowance provider.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.allowance_limit"]},
+        {"name": "account_local_identity", "semantics": "Opaque local account identity when exposed.", "identity_participation": "included", "missing": "explicit_unknown_account", "basis": "adapter_exact", "vector_ids": ["field.allowance_limit"]},
+        {"name": "plan_identity", "semantics": "Observed plan identity.", "identity_participation": "included", "missing": "explicit_unknown_plan", "basis": "adapter_exact", "vector_ids": ["field.allowance_limit"]},
+        {"name": "window_kind", "semantics": "Provider allowance-window kind.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.allowance_limit"]},
+        {"name": "configured_duration_us", "semantics": "Observed or configured window duration.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "configured_estimate", "vector_ids": ["field.allowance_limit"]},
+        {"name": "capability_basis", "semantics": "Adapter basis for available allowance fields.", "identity_participation": "excluded", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.allowance_limit"]}
+      ]
+    },
+    {
+      "id": "allowance_cycle",
+      "identity": {
+        "kind": "allowance-cycle",
+        "input_fields": ["limit_id", "reset_identity", "start_at_us", "end_at_us"],
+        "derived_id_field": "cycle_id"
+      },
+      "owner": "allowance",
+      "semantics": "Stable reset-bounded allowance cycle.",
+      "vector_ids": ["identity.allowance_cycle", "field.allowance_cycle"],
+      "fields": [
+        {"name": "cycle_id", "semantics": "Versioned allowance-cycle identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.allowance_cycle"]},
+        {"name": "limit_id", "semantics": "Owning allowance limit.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.allowance_cycle"]},
+        {"name": "reset_identity", "semantics": "Provider reset identity or deterministic boundary tuple.", "identity_participation": "included", "missing": "explicit_unknown_reset", "basis": "adapter_exact", "vector_ids": ["field.allowance_cycle"]},
+        {"name": "start_at_us", "semantics": "Cycle start UTC microseconds.", "identity_participation": "included", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.allowance_cycle"]},
+        {"name": "end_at_us", "semantics": "Cycle end UTC microseconds.", "identity_participation": "included", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.allowance_cycle"]},
+        {"name": "reset_basis", "semantics": "Observed or deterministic reset-boundary basis.", "identity_participation": "excluded", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.allowance_cycle"]},
+        {"name": "completion_status", "semantics": "Whether both reset boundaries are established.", "identity_participation": "excluded", "missing": "open_when_end_unobserved", "basis": "deterministic", "vector_ids": ["field.allowance_cycle"]}
+      ]
+    },
+    {
+      "id": "allowance_observation",
+      "identity": {
+        "kind": "allowance-observation",
+        "input_fields": ["limit_id", "cycle_id", "observed_at_us", "source_occurrence"],
+        "derived_id_field": "observation_id"
+      },
+      "owner": "allowance",
+      "semantics": "Every exact provider observation, including repeated identical values.",
+      "vector_ids": ["identity.allowance_observation", "field.allowance_observation"],
+      "fields": [
+        {"name": "observation_id", "semantics": "Versioned observation identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.allowance_observation"]},
+        {"name": "limit_id", "semantics": "Owning compatible allowance limit.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.allowance_observation"]},
+        {"name": "cycle_id", "semantics": "Owning reset cycle.", "identity_participation": "included", "missing": "explicit_unknown_cycle", "basis": "identity_v1", "vector_ids": ["field.allowance_observation"]},
+        {"name": "observed_at_us", "semantics": "Exact observation UTC microseconds.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.allowance_observation"]},
+        {"name": "used_percent", "semantics": "Canonical decimal-string used percentage.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.allowance_observation"]},
+        {"name": "remaining_percent", "semantics": "Canonical decimal-string remaining percentage.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.allowance_observation"]},
+        {"name": "absolute_fields", "semantics": "Provider absolute allowance measurements when exposed.", "identity_participation": "excluded", "missing": "empty_collection_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.allowance_observation"]},
+        {"name": "reset_time_us", "semantics": "Observed next reset instant.", "identity_participation": "excluded", "missing": "null_when_unobserved", "basis": "adapter_exact", "vector_ids": ["field.allowance_observation"]},
+        {"name": "plan_identity", "semantics": "Plan observed with this measurement.", "identity_participation": "excluded", "missing": "explicit_unknown_plan", "basis": "adapter_exact", "vector_ids": ["field.allowance_observation"]},
+        {"name": "source_occurrence", "semantics": "Exact structural source coordinate.", "identity_participation": "included", "missing": "forbidden", "basis": "occurrence_exact", "vector_ids": ["field.allowance_observation"]},
+        {"name": "measurement_mask", "semantics": "Availability of used, remaining, reset, and absolute fields.", "identity_participation": "excluded", "missing": "zero_mask_means_none_observed", "basis": "adapter_exact", "vector_ids": ["field.allowance_observation"]}
+      ]
+    },
+    {
+      "id": "allowance_interval",
+      "identity": {
+        "kind": "allowance-interval",
+        "input_fields": ["start_observation_id", "end_observation_id"],
+        "derived_id_field": "interval_id"
+      },
+      "owner": "allowance",
+      "semantics": "Deterministic relation between adjacent compatible observations.",
+      "vector_ids": ["identity.allowance_interval", "field.allowance_interval"],
+      "fields": [
+        {"name": "interval_id", "semantics": "Identity of ordered boundary observation pair.", "identity_participation": "excluded", "missing": "forbidden_for_compatible_pair", "basis": "identity_v1", "vector_ids": ["field.allowance_interval"]},
+        {"name": "start_observation_id", "semantics": "Inclusive observation boundary selector.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.allowance_interval"]},
+        {"name": "end_observation_id", "semantics": "Exclusive observation boundary selector.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.allowance_interval"]},
+        {"name": "event_bounds", "semantics": "Half-open event interval between observations.", "identity_participation": "excluded", "missing": "forbidden", "basis": "deterministic", "vector_ids": ["field.allowance_interval"]},
+        {"name": "percent_delta", "semantics": "Used increase or remaining decrease as canonical decimal string.", "identity_participation": "excluded", "missing": "null_when_compatible_values_are_unavailable", "basis": "deterministic", "vector_ids": ["field.allowance_interval"]},
+        {"name": "compatibility_basis", "semantics": "Exact joined match of provider, limit_id, plan_identity, window_kind, cycle_id, and reset_identity.", "identity_participation": "excluded", "missing": "no_interval_when_incompatible", "basis": "deterministic", "vector_ids": ["field.allowance_interval"]},
+        {"name": "ratio_eligible", "semantics": "True only for a positive compatible percentage delta.", "identity_participation": "excluded", "missing": "false_for_zero_negative_or_missing_delta", "basis": "deterministic", "vector_ids": ["field.allowance_interval"]},
+        {"name": "coverage", "semantics": "Local fact coverage inside the half-open bounds.", "identity_participation": "excluded", "missing": "null_when_history_is_incomplete", "basis": "publication_exact", "vector_ids": ["field.allowance_interval"]}
+      ]
+    },
+    {
+      "id": "rate_card_revision",
+      "identity": {
+        "kind": "rate-card",
+        "input_fields": ["digest"],
+        "derived_id_field": "rate_card_id"
+      },
+      "owner": "valuation",
+      "semantics": "Immutable configured pricing and credit provenance applied at query time.",
+      "vector_ids": ["identity.rate_card_revision", "field.rate_card_revision"],
+      "fields": [
+        {"name": "rate_card_id", "semantics": "Versioned rate-card identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "digest", "semantics": "Digest of normalized rate-card content.", "identity_participation": "included", "missing": "forbidden", "basis": "configured_exact", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "source_name", "semantics": "Human-readable pricing source name.", "identity_participation": "excluded", "missing": "null_when_unnamed", "basis": "configured_exact", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "source_url", "semantics": "Configured source URL when applicable.", "identity_participation": "excluded", "missing": "null_when_local_or_unknown", "basis": "configured_exact", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "effective_at_us", "semantics": "Configured rate effective time.", "identity_participation": "excluded", "missing": "null_when_unstated", "basis": "configured_exact", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "fetched_at_us", "semantics": "Time source material was obtained.", "identity_participation": "excluded", "missing": "null_when_unstated", "basis": "configured_exact", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "currency", "semantics": "Configured valuation currency.", "identity_participation": "excluded", "missing": "forbidden_for_cost_rates", "basis": "configured_exact", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "model_match_rules", "semantics": "Versioned exact or alias match rules.", "identity_participation": "excluded", "missing": "empty_rules_match_nothing", "basis": "configured_exact", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "four_class_rates", "semantics": "Per-million decimal-string rates for independent token classes.", "identity_participation": "excluded", "missing": "null_per_unpriced_class", "basis": "configured_exact", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "credit_rates", "semantics": "Per-million decimal-string credit estimates.", "identity_participation": "excluded", "missing": "null_per_unpriced_class", "basis": "configured_exact", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "reasoning_in_output", "semantics": "Provider/rate-card provenance declaring reasoning already included in output accounting.", "identity_participation": "excluded", "missing": "forbidden_when_reasoning_or_output_rates_are_configured", "basis": "provider_or_rate_card_provenance", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "confidence", "semantics": "Configured source confidence.", "identity_participation": "excluded", "missing": "null_when_unstated", "basis": "configured_exact", "vector_ids": ["field.rate_card_revision"]},
+        {"name": "validation_status", "semantics": "Contract validation outcome for this revision.", "identity_participation": "excluded", "missing": "forbidden", "basis": "deterministic", "vector_ids": ["field.rate_card_revision"]}
+      ]
+    },
+    {
+      "id": "valuation_match",
+      "identity": {
+        "kind": "valuation",
+        "input_fields": ["call_id", "rate_card_digest"],
+        "derived_id_field": "valuation_id"
+      },
+      "owner": "valuation",
+      "semantics": "Current configured estimate for one call and selected rate-card revision.",
+      "vector_ids": ["identity.valuation_match", "field.valuation_match"],
+      "fields": [
+        {"name": "valuation_id", "semantics": "Identity of call and selected rate-card revision.", "identity_participation": "excluded", "missing": "forbidden_when_match_attempted", "basis": "identity_v1", "vector_ids": ["field.valuation_match"]},
+        {"name": "call_id", "semantics": "Canonical call being valued.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.valuation_match"]},
+        {"name": "rate_card_digest", "semantics": "Selected immutable rate-card revision.", "identity_participation": "included", "missing": "forbidden", "basis": "configured_exact", "vector_ids": ["field.valuation_match"]},
+        {"name": "match_basis", "semantics": "Exact, alias, or no-match basis.", "identity_participation": "excluded", "missing": "forbidden", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "configured_cost_usd", "semantics": "Current configured cost estimate.", "identity_participation": "excluded", "missing": "null_when_no_token_class_is_rated", "basis": "configured_estimate", "vector_ids": ["field.valuation_match"]},
+        {"name": "estimated_credits", "semantics": "Current configured credit estimate.", "identity_participation": "excluded", "missing": "null_when_no_credit_rate_is_applied", "basis": "configured_estimate", "vector_ids": ["field.valuation_match"]},
+        {"name": "cost_rated_token_fields", "semantics": "Observed token classes with independently applied cost rates.", "identity_participation": "excluded", "missing": "empty_collection_when_no_cost_rate_applies", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "credit_rated_token_fields", "semantics": "Observed token classes with independently applied credit rates.", "identity_participation": "excluded", "missing": "empty_collection_when_no_credit_rate_applies", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "cost_unpriced_token_fields", "semantics": "Observed eligible token classes without a cost rate.", "identity_participation": "excluded", "missing": "empty_collection_when_all_observed_classes_are_cost_rated", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "credit_unpriced_token_fields", "semantics": "Observed eligible token classes without a credit rate.", "identity_participation": "excluded", "missing": "empty_collection_when_all_observed_classes_are_credit_rated", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "missing_token_fields", "semantics": "Eligible token classes whose measurements are absent.", "identity_participation": "excluded", "missing": "empty_collection_when_all_eligible_classes_are_observed", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "cost_coverage_numerator_tokens", "semantics": "Observed tokens with an applied cost rate.", "identity_participation": "excluded", "missing": "zero_when_observed_but_cost_unpriced", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "cost_coverage_denominator_tokens", "semantics": "Observed eligible tokens for cost coverage.", "identity_participation": "excluded", "missing": "zero_when_no_eligible_tokens_are_observed", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "cost_coverage", "semantics": "Cost-rated token coverage ratio as canonical decimal.", "identity_participation": "excluded", "missing": "null_when_denominator_is_zero", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "credit_coverage_numerator_tokens", "semantics": "Observed tokens with an applied credit rate.", "identity_participation": "excluded", "missing": "zero_when_observed_but_credit_unpriced", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "credit_coverage_denominator_tokens", "semantics": "Observed eligible tokens for credit coverage.", "identity_participation": "excluded", "missing": "zero_when_no_eligible_tokens_are_observed", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "credit_coverage", "semantics": "Credit-rated token coverage ratio as canonical decimal.", "identity_participation": "excluded", "missing": "null_when_denominator_is_zero", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "cost_unpriced_reason", "semantics": "Structured reason for absent or partial cost valuation.", "identity_participation": "excluded", "missing": "null_when_cost_is_fully_priced", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "credit_unpriced_reason", "semantics": "Structured reason for absent or partial credit valuation.", "identity_participation": "excluded", "missing": "null_when_credits_are_fully_priced", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "cost_grade", "semantics": "Configured-estimate or unsupported result grade for cost.", "identity_participation": "excluded", "missing": "unsupported_when_no_cost_rate_applies", "basis": "deterministic", "vector_ids": ["field.valuation_match"]},
+        {"name": "credit_grade", "semantics": "Configured-estimate or unsupported result grade for credits.", "identity_participation": "excluded", "missing": "unsupported_when_no_credit_rate_applies", "basis": "deterministic", "vector_ids": ["field.valuation_match"]}
+      ]
+    },
+    {
+      "id": "publication",
+      "identity": {
+        "kind": "publication",
+        "input_fields": ["publication_key"],
+        "derived_id_field": "publication_id"
+      },
+      "owner": "publication",
+      "semantics": "Only committed queryable truth identity with facts, projections, coverage, and selectors from one snapshot.",
+      "vector_ids": ["identity.publication", "field.publication"],
+      "fields": [
+        {"name": "publication_key", "semantics": "Immutable host-allocated publication-attempt key assigned before artifact assembly.", "identity_participation": "included", "missing": "forbidden", "basis": "host_exact", "vector_ids": ["field.publication"]},
+        {"name": "publication_id", "semantics": "Opaque versioned publication identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.publication"]},
+        {"name": "parent_publication_id", "semantics": "Immediate accepted predecessor.", "identity_participation": "excluded", "missing": "null_for_initial_publication", "basis": "publication_exact", "vector_ids": ["field.publication"]},
+        {"name": "schema_versions", "semantics": "Schema, adapter, identity, derivation, projection, and rate-card versions.", "identity_participation": "excluded", "missing": "forbidden", "basis": "contract_exact", "vector_ids": ["field.publication"]},
+        {"name": "committed_at_us", "semantics": "Commit instant for the truth unit.", "identity_participation": "excluded", "missing": "forbidden_when_committed", "basis": "host_exact", "vector_ids": ["field.publication"]},
+        {"name": "observed_through_us", "semantics": "Latest observed event instant in selected sources.", "identity_participation": "excluded", "missing": "null_when_all_event_times_missing", "basis": "deterministic_max", "vector_ids": ["field.publication"]},
+        {"name": "history_preset", "semantics": "Selected initial or expanded history policy.", "identity_participation": "excluded", "missing": "forbidden", "basis": "planner_exact", "vector_ids": ["field.publication"]},
+        {"name": "requested_cutoff_us", "semantics": "Requested history cutoff.", "identity_participation": "excluded", "missing": "null_for_all_time", "basis": "planner_exact", "vector_ids": ["field.publication"]},
+        {"name": "indexed_from_us", "semantics": "Earliest indexed event time.", "identity_participation": "excluded", "missing": "null_when_no_timed_events", "basis": "deterministic_min", "vector_ids": ["field.publication"]},
+        {"name": "indexed_through_us", "semantics": "Latest indexed event time.", "identity_participation": "excluded", "missing": "null_when_no_timed_events", "basis": "deterministic_max", "vector_ids": ["field.publication"]},
+        {"name": "guaranteed_complete_from_us", "semantics": "Earliest time after which inventory proves selection completeness.", "identity_participation": "excluded", "missing": "null_when_inventory_cannot_guarantee_completeness", "basis": "inventory_exact", "vector_ids": ["field.publication"]},
+        {"name": "source_coverage", "semantics": "Selected, deferred, uncertain, malformed, and missing source counts and bytes.", "identity_participation": "excluded", "missing": "forbidden", "basis": "inventory_exact", "vector_ids": ["field.publication"]},
+        {"name": "capability_coverage", "semantics": "Capabilities and measurement availability in this truth unit.", "identity_participation": "excluded", "missing": "forbidden", "basis": "deterministic", "vector_ids": ["field.publication"]},
+        {"name": "entity_counts", "semantics": "Canonical entity counts by kind.", "identity_participation": "excluded", "missing": "zero_is_observed_empty_kind", "basis": "canonical_exact", "vector_ids": ["field.publication"]},
+        {"name": "publication_delta", "semantics": "Accepted mutation summary from parent.", "identity_participation": "excluded", "missing": "null_for_initial_publication", "basis": "deterministic", "vector_ids": ["field.publication"]},
+        {"name": "artifact_digest", "semantics": "Digest of the complete committed truth artifact.", "identity_participation": "excluded", "missing": "forbidden", "basis": "host_exact", "vector_ids": ["field.publication"]},
+        {"name": "status", "semantics": "Committed or rolled-back publication state.", "identity_participation": "excluded", "missing": "forbidden", "basis": "host_exact", "vector_ids": ["field.publication"]}
+      ]
+    },
+    {
+      "id": "publication_delta",
+      "identity": {
+        "kind": "publication-delta",
+        "input_fields": ["delta_key"],
+        "derived_id_field": "delta_id"
+      },
+      "owner": "publication",
+      "semantics": "Accepted mutation summary between a publication and its parent without calling recanonicalization new activity.",
+      "vector_ids": ["identity.publication_delta", "field.publication_delta"],
+      "fields": [
+        {"name": "delta_key", "semantics": "Immutable host-allocated delta computation key.", "identity_participation": "included", "missing": "forbidden", "basis": "host_exact", "vector_ids": ["field.publication_delta"]},
+        {"name": "delta_id", "semantics": "Identity of parent and child publication pair.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.publication_delta"]},
+        {"name": "publication_id", "semantics": "Child publication.", "identity_participation": "excluded", "missing": "forbidden", "basis": "publication_exact", "vector_ids": ["field.publication_delta"]},
+        {"name": "parent_publication_id", "semantics": "Compared parent publication.", "identity_participation": "excluded", "missing": "null_for_initial_publication", "basis": "publication_exact", "vector_ids": ["field.publication_delta"]},
+        {"name": "inserted_count", "semantics": "New semantic entities accepted.", "identity_participation": "excluded", "missing": "zero_is_observed_none", "basis": "deterministic", "vector_ids": ["field.publication_delta"]},
+        {"name": "corrected_count", "semantics": "Existing entities with accepted canonical corrections.", "identity_participation": "excluded", "missing": "zero_is_observed_none", "basis": "deterministic", "vector_ids": ["field.publication_delta"]},
+        {"name": "terminalized_count", "semantics": "Lifecycle entities newly reaching terminal state.", "identity_participation": "excluded", "missing": "zero_is_observed_none", "basis": "deterministic", "vector_ids": ["field.publication_delta"]},
+        {"name": "recanonicalized_count", "semantics": "Existing semantic owners recomputed after source replacement.", "identity_participation": "excluded", "missing": "zero_is_observed_none", "basis": "deterministic", "vector_ids": ["field.publication_delta"]},
+        {"name": "removed_count", "semantics": "Semantic entities no longer selected after accepted correction.", "identity_participation": "excluded", "missing": "zero_is_observed_none", "basis": "deterministic", "vector_ids": ["field.publication_delta"]},
+        {"name": "token_delta", "semantics": "Exact four-class token change by accepted mutation class.", "identity_participation": "excluded", "missing": "null_per_unavailable_token_class", "basis": "deterministic", "vector_ids": ["field.publication_delta"]}
+      ]
+    },
+    {
+      "id": "source_occurrence",
+      "identity": {
+        "kind": "occurrence",
+        "input_fields": ["semantic_logical_id", "source_manifestation_id", "source_revision", "record_byte_range", "record_ordinal", "adapter_version"],
+        "derived_id_field": "occurrence_id"
+      },
+      "owner": "evidence",
+      "semantics": "Physical provenance coordinate for one occurrence of a semantic entity.",
+      "vector_ids": ["identity.source_occurrence", "field.source_occurrence"],
+      "fields": [
+        {"name": "occurrence_id", "semantics": "Versioned coordinate identity.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.source_occurrence"]},
+        {"name": "semantic_logical_id", "semantics": "Canonical entity evidenced by this occurrence.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.source_occurrence"]},
+        {"name": "source_manifestation_id", "semantics": "Containing manifestation.", "identity_participation": "included", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.source_occurrence"]},
+        {"name": "source_revision", "semantics": "Revision containing the structural record.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.source_occurrence"]},
+        {"name": "record_byte_range", "semantics": "Half-open complete-record byte range when available.", "identity_participation": "included", "missing": "null_when_stable_ordinal_is_used", "basis": "adapter_exact", "vector_ids": ["field.source_occurrence"]},
+        {"name": "record_ordinal", "semantics": "Stable complete-record ordinal when available.", "identity_participation": "included", "missing": "null_when_byte_range_is_stable", "basis": "adapter_exact", "vector_ids": ["field.source_occurrence"]},
+        {"name": "adapter_version", "semantics": "Adapter needed to interpret the structural record.", "identity_participation": "included", "missing": "forbidden", "basis": "adapter_exact", "vector_ids": ["field.source_occurrence"]}
+      ]
+    },
+    {
+      "id": "query_window",
+      "identity": {
+        "kind": "window",
+        "input_fields": ["start_us", "end_us", "timezone"],
+        "derived_id_field": "window_id"
+      },
+      "owner": "evidence",
+      "semantics": "Stable half-open UTC query window derived once from an IANA calendar request.",
+      "vector_ids": ["identity.query_window", "field.query_window"],
+      "fields": [
+        {"name": "window_id", "semantics": "Versioned identity of normalized bounds and timezone basis.", "identity_participation": "excluded", "missing": "forbidden", "basis": "identity_v1", "vector_ids": ["field.query_window"]},
+        {"name": "start_us", "semantics": "Inclusive UTC microsecond boundary.", "identity_participation": "included", "missing": "forbidden", "basis": "calendar_conversion", "vector_ids": ["field.query_window"]},
+        {"name": "end_us", "semantics": "Exclusive UTC microsecond boundary.", "identity_participation": "included", "missing": "forbidden", "basis": "calendar_conversion", "vector_ids": ["field.query_window"]},
+        {"name": "timezone", "semantics": "IANA timezone used for calendar conversion.", "identity_participation": "included", "missing": "forbidden_for_calendar_window", "basis": "request_exact", "vector_ids": ["field.query_window"]},
+        {"name": "preset", "semantics": "Optional current-session, day, week, month, quarter, year, or all-time label.", "identity_participation": "excluded", "missing": "null_for_explicit_bounds", "basis": "request_exact", "vector_ids": ["field.query_window"]}
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "CK02-D001",
+      "decision": "Logical IDs use exactly 52 lowercase unpadded base32 SHA-256 characters over restricted canonical-CBOR identity tuples, and publication identity is derived before its nonrecursive artifact digest.",
+      "rationale": "The exact wire grammar and ordered identity inputs make identities portable; deriving a publication from its allocated key before hashing the artifact breaks the publication-ID/artifact-digest cycle.",
+      "vector_ids": ["identity.collision", "identity.publication_artifact"]
+    },
+    {
+      "id": "CK02-D002",
+      "decision": "A NULL event time remains NULL, observed timestamp text accepts at most six fractional digits, and events sort by exact UTC microseconds then stable semantic tie-breakers.",
+      "rationale": "Rejecting submicrosecond source text avoids hidden rounding while preserving missingness and deterministic ordering without ingestion-time or sentinel substitutions.",
+      "vector_ids": ["time.epoch", "time.pre_epoch", "time.offset", "time.submicrosecond", "time.submicrosecond_zero", "time.total_order", "time.late_event", "time.missing_order"]
+    },
+    {
+      "id": "CK02-D003",
+      "decision": "Ambiguous IANA wall times require an explicit fold and nonexistent DST wall times fail closed.",
+      "rationale": "Calendar boundaries must convert once to exact UTC microseconds without silently selecting a DST interpretation.",
+      "vector_ids": ["time.dst_fold_0", "time.dst_fold_1", "time.dst_gap", "time.dst_ambiguous", "time.int64_boundaries"]
+    },
+    {
+      "id": "CK02-D004",
+      "decision": "Lifecycle transitions fold by semantic event order across publications; conflicting terminal states fail closed.",
+      "rationale": "Late observations must reach the same current state as in-order observations without allowing arrival order to overwrite terminal truth.",
+      "vector_ids": ["lifecycle.cross_publication", "lifecycle.late_transition", "lifecycle.invalid_terminal"]
+    },
+    {
+      "id": "CK02-D005",
+      "decision": "Hierarchy links are mutable relationships outside session identity and all three usage scopes reconcile from exclusive session facts.",
+      "rationale": "Late parent discovery must not change session or usage identity and family totals must not double-count descendants.",
+      "vector_ids": ["hierarchy.late_parent", "hierarchy.multilevel", "hierarchy.cycle"]
+    },
+    {
+      "id": "CK02-D006",
+      "decision": "Allowance joins require exact provider, limit_id, plan_identity, window_kind, cycle_id, and reset_identity compatibility; percentages and rates use canonical bounded decimal strings; interval events use [start,end).",
+      "rationale": "Joined-shape compatibility prevents cross-plan, cross-cycle, or cross-reset ratios, while canonical decimal domains and half-open bounds avoid binary drift and boundary double counting.",
+      "vector_ids": ["allowance.compatible_used", "allowance.compatible_remaining", "allowance.repeated", "allowance.negative", "allowance.reset_incompatible", "allowance.plan_incompatible", "allowance.cycle_incompatible", "allowance.time_decrease", "decimal.canonical", "decimal.noncanonical", "decimal.percentage_domain"]
+    },
+    {
+      "id": "CK02-D007",
+      "decision": "Configured cost and credit valuation are independent channels with separate rated fields, estimates, coverage, caveats, and reasoning-overlap controls.",
+      "rationale": "A cost rate does not imply a credit rate (or vice versa), and provider provenance must prevent reasoning/output overlap independently in each channel.",
+      "vector_ids": ["valuation.full", "valuation.partial", "valuation.unmatched", "valuation.cost_only", "valuation.credit_only", "valuation.asymmetric", "valuation.reasoning_overlap", "valuation.reasoning_credit_overlap", "valuation.negative_rate"]
+    },
+    {
+      "id": "CK02-D008",
+      "decision": "Selector registry IDs retain CK-01 underscore names while public selectors require real semantic IDs with exactly 52 lowercase unpadded base32 digest characters.",
+      "rationale": "The wire grammar remains stable and interoperable while rejecting shortened, uppercase, or padded digests that could alias distinct identities.",
+      "vector_ids": ["selector.session", "selector.state_change", "selector.source_manifestation", "selector.invalid_prefix", "selector.invalid_digest_length", "selector.invalid_digest_case", "selector.invalid_digest_padding", "selector.kind_mismatch", "selector.alias_same", "selector.alias_distinct"]
+    },
+    {
+      "id": "CK02-D009",
+      "decision": "Only a committed publication may answer a query and every returned row must name that same publication identity.",
+      "rationale": "Facts, coverage, valuation, and selectors must be read from one truth snapshot.",
+      "vector_ids": ["publication.committed_snapshot", "publication.mixed_snapshot", "publication.rolled_back"]
+    },
+    {
+      "id": "CK02-D010",
+      "decision": "Observed zero, missing NULL, measurement availability, grade, and basis remain mechanically distinct; canonical missing measurements reject result-only grades.",
+      "rationale": "Canonical facts cannot fabricate observations or carry unsupported/model-inference grades that are meaningful only in result envelopes.",
+      "vector_ids": ["accounting.four_tokens", "accounting.missing_cached", "accounting.zero_tokens", "accounting.invalid_negative", "accounting.aggregate_partial", "accounting.aggregate_all_missing", "accounting.measurement_mask", "accounting.measurement_missing", "accounting.measurement_grade", "accounting.measurement_result_grade", "accounting.tool_separation"]
+    },
+    {
+      "id": "CK02-D011",
+      "decision": "Duplicate source occurrences preserve every coordinate while one semantic identity is counted once.",
+      "rationale": "Copied, archived, and replacement manifestations are evidence, not additional user activity.",
+      "vector_ids": ["identity.source_copy", "selector.rebuild_stable"]
+    },
+    {
+      "id": "CK02-D012",
+      "decision": "Every admitted entity field is consumed by one checked-in synthetic record and an executable per-field assertion covering basis, missingness, identity participation, and field semantics.",
+      "rationale": "Traceability tags alone cannot prove the field contract; regenerating and executing the complete matrix makes added or changed fields fail unless their semantics are maintained.",
+      "vector_ids": ["field.adapter_identity", "field.source", "field.source_manifestation", "field.project", "field.session", "field.turn", "field.point_event", "field.lifecycle_entity", "field.model_profile", "field.canonical_call", "field.tool_invocation", "field.activity", "field.compaction_boundary", "field.resource", "field.state_change", "field.context_component", "field.allowance_limit", "field.allowance_cycle", "field.allowance_observation", "field.allowance_interval", "field.rate_card_revision", "field.valuation_match", "field.publication", "field.publication_delta", "field.source_occurrence", "field.query_window"]
+    }
+  ]
+}

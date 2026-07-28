@@ -1,0 +1,546 @@
+{
+  "schema": "codex-usage-tracker.agent-kernel.identity-vectors.v1",
+  "version": 1,
+  "vector_ids": [
+    "identity.adapter_identity",
+    "identity.source",
+    "identity.source_manifestation",
+    "identity.project",
+    "identity.session",
+    "identity.turn",
+    "identity.point_event",
+    "identity.lifecycle_entity",
+    "identity.model_profile",
+    "identity.canonical_call",
+    "identity.tool_invocation",
+    "identity.activity",
+    "identity.compaction_boundary",
+    "identity.resource",
+    "identity.state_change",
+    "identity.context_component",
+    "identity.allowance_limit",
+    "identity.allowance_cycle",
+    "identity.allowance_observation",
+    "identity.allowance_interval",
+    "identity.rate_card_revision",
+    "identity.valuation_match",
+    "identity.publication",
+    "identity.publication_delta",
+    "identity.source_occurrence",
+    "identity.query_window",
+    "identity.publication_artifact",
+    "identity.collision",
+    "identity.source_copy"
+  ],
+  "identity_vectors": [
+    {
+      "id": "identity.adapter_identity",
+      "entity": "adapter_identity",
+      "kind": "adapter",
+      "identity_input_fields": [
+        "adapter_id",
+        "adapter_version",
+        "source_kind",
+        "identity_version"
+      ],
+      "identity_tuple": [
+        "codex-jsonl",
+        "codex-jsonl.v1",
+        "session-jsonl",
+        "identity-v1"
+      ],
+      "expected_id": "adapter:v1:hc5336lztbvfctvohv3kk5s5xznqwf6m5zcqvwnfhd4iareqnrna"
+    },
+    {
+      "id": "identity.source",
+      "entity": "source",
+      "kind": "source",
+      "identity_input_fields": [
+        "adapter_id",
+        "source_kind",
+        "adapter_native_source_key"
+      ],
+      "identity_tuple": [
+        "codex-jsonl",
+        "session-jsonl",
+        "codex-session-store"
+      ],
+      "expected_id": "source:v1:cvn6tcrz6bilh3bo33cesif4iiomw5zgbrueh46cszl5uwb23cia"
+    },
+    {
+      "id": "identity.source_manifestation",
+      "entity": "source_manifestation",
+      "kind": "source-manifestation",
+      "identity_input_fields": [
+        "source_id",
+        "technical_path_key"
+      ],
+      "identity_tuple": [
+        "source:v1:cvn6tcrz6bilh3bo33cesif4iiomw5zgbrueh46cszl5uwb23cia",
+        "sessions/2026/07/example.jsonl"
+      ],
+      "expected_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea"
+    },
+    {
+      "id": "identity.project",
+      "entity": "project",
+      "kind": "project",
+      "identity_input_fields": [
+        "workspace_key"
+      ],
+      "identity_tuple": [
+        "workspace/example"
+      ],
+      "expected_id": "project:v1:gdmt2ndek24pjiu3m3jfnjyod676cfhczbnobuuq3rqpky67myia"
+    },
+    {
+      "id": "identity.session",
+      "entity": "session",
+      "kind": "session",
+      "identity_input_fields": [
+        "adapter_native_session_key",
+        "identity_version"
+      ],
+      "identity_tuple": [
+        "native-session-001",
+        "identity-v1"
+      ],
+      "expected_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna"
+    },
+    {
+      "id": "identity.turn",
+      "entity": "turn",
+      "kind": "turn",
+      "identity_input_fields": [
+        "session_id",
+        "ordinal"
+      ],
+      "identity_tuple": [
+        "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        1
+      ],
+      "expected_id": "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a"
+    },
+    {
+      "id": "identity.point_event",
+      "entity": "point_event",
+      "kind": "event",
+      "identity_input_fields": [
+        "event_kind",
+        "event_at_us",
+        "source_order",
+        "session_id",
+        "turn_id"
+      ],
+      "identity_tuple": [
+        "model_call",
+        100,
+        [
+          "fixture",
+          1
+        ],
+        "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a"
+      ],
+      "expected_id": "event:v1:vzqemngqig4fsqfgvso4qtjetxe2d5bgltgw24mihiylofrzk6va"
+    },
+    {
+      "id": "identity.lifecycle_entity",
+      "entity": "lifecycle_entity",
+      "kind": "lifecycle",
+      "identity_input_fields": [
+        "logical_id",
+        "kind"
+      ],
+      "identity_tuple": [
+        "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "session"
+      ],
+      "expected_id": "lifecycle:v1:cwv5mbs7rxid7ri2oyfgldv76wm5rmeu6dnr44g4ja2rnlgbzhxa"
+    },
+    {
+      "id": "identity.model_profile",
+      "entity": "model_profile",
+      "kind": "model-profile",
+      "identity_input_fields": [
+        "model",
+        "reasoning_effort",
+        "service_tier"
+      ],
+      "identity_tuple": [
+        "gpt-5.5",
+        "high",
+        "priority"
+      ],
+      "expected_id": "model-profile:v1:agrmp4vnr5fai7yfnfentlrtpuaeecflb5zacov4ysdr5ymvlebq"
+    },
+    {
+      "id": "identity.canonical_call",
+      "entity": "canonical_call",
+      "kind": "call",
+      "identity_input_fields": [
+        "adapter_native_call_key",
+        "session_id",
+        "turn_id"
+      ],
+      "identity_tuple": [
+        "native-call-001",
+        "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a"
+      ],
+      "expected_id": "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q"
+    },
+    {
+      "id": "identity.tool_invocation",
+      "entity": "tool_invocation",
+      "kind": "tool",
+      "identity_input_fields": [
+        "adapter_native_invocation_key",
+        "session_id",
+        "turn_id"
+      ],
+      "identity_tuple": [
+        "native-tool-001",
+        "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a"
+      ],
+      "expected_id": "tool:v1:jjedz64fn65ld2h4yybfuc5jze7ytmkpujli7ioli3uib6smyfha"
+    },
+    {
+      "id": "identity.activity",
+      "entity": "activity",
+      "kind": "activity",
+      "identity_input_fields": [
+        "session_id",
+        "turn_id",
+        "activity_kind"
+      ],
+      "identity_tuple": [
+        "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a",
+        "compaction"
+      ],
+      "expected_id": "activity:v1:isgkkwlqrx5hxfovhdcgyfwviofd5us4gwvnkc3hjaj57lq5xv4a"
+    },
+    {
+      "id": "identity.compaction_boundary",
+      "entity": "compaction_boundary",
+      "kind": "compaction",
+      "identity_input_fields": [
+        "session_id",
+        "source_order"
+      ],
+      "identity_tuple": [
+        "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        [
+          "fixture",
+          8
+        ]
+      ],
+      "expected_id": "compaction:v1:seerinpi5x7rhrff7fr4dx525msgilx6ha25mxgo75pmkwxowqmq"
+    },
+    {
+      "id": "identity.resource",
+      "entity": "resource",
+      "kind": "resource",
+      "identity_input_fields": [
+        "project_id",
+        "kind",
+        "normalized_key",
+        "normalization_version"
+      ],
+      "identity_tuple": [
+        "project:v1:gdmt2ndek24pjiu3m3jfnjyod676cfhczbnobuuq3rqpky67myia",
+        "file",
+        "src/app.py",
+        "resource-normalization-v1"
+      ],
+      "expected_id": "resource:v1:hm3db535gdykbsnhga6t2ylpg3672b27tp35ezssm7aqhtps2y6a"
+    },
+    {
+      "id": "identity.state_change",
+      "entity": "state_change",
+      "kind": "state-change",
+      "identity_input_fields": [
+        "change_kind",
+        "resource_id",
+        "observation_at_us",
+        "session_id",
+        "turn_id"
+      ],
+      "identity_tuple": [
+        "write",
+        "resource:v1:hm3db535gdykbsnhga6t2ylpg3672b27tp35ezssm7aqhtps2y6a",
+        200,
+        "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a"
+      ],
+      "expected_id": "state-change:v1:d57pzczkqwqlmkfnt32xo4o4xidizu3tttb464px2ogj2gvs77xa"
+    },
+    {
+      "id": "identity.context_component",
+      "entity": "context_component",
+      "kind": "context-component",
+      "identity_input_fields": [
+        "call_id",
+        "turn_id",
+        "category"
+      ],
+      "identity_tuple": [
+        "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q",
+        "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a",
+        "tool_output"
+      ],
+      "expected_id": "context-component:v1:u2f7id3ocldurdhnvaoyk62ma54u7nhof56a2mjlxj4flbv4d64a"
+    },
+    {
+      "id": "identity.allowance_limit",
+      "entity": "allowance_limit",
+      "kind": "allowance-limit",
+      "identity_input_fields": [
+        "provider",
+        "account_local_identity",
+        "plan_identity",
+        "window_kind"
+      ],
+      "identity_tuple": [
+        "openai",
+        "account-local-1",
+        "plan-a",
+        "rolling_week"
+      ],
+      "expected_id": "allowance-limit:v1:eu5ip4ofpzmqt3r2dw2rzh2mk4xywgixiaofvt5tk4y2cqaixlya"
+    },
+    {
+      "id": "identity.allowance_cycle",
+      "entity": "allowance_cycle",
+      "kind": "allowance-cycle",
+      "identity_input_fields": [
+        "limit_id",
+        "reset_identity",
+        "start_at_us",
+        "end_at_us"
+      ],
+      "identity_tuple": [
+        "allowance-limit:v1:eu5ip4ofpzmqt3r2dw2rzh2mk4xywgixiaofvt5tk4y2cqaixlya",
+        "reset-2026-w31",
+        1000,
+        2000
+      ],
+      "expected_id": "allowance-cycle:v1:daiagql6qamdpl56ac5vq2gvqed5fn276cbtebyj26n3mjyau7ba"
+    },
+    {
+      "id": "identity.allowance_observation",
+      "entity": "allowance_observation",
+      "kind": "allowance-observation",
+      "identity_input_fields": [
+        "limit_id",
+        "cycle_id",
+        "observed_at_us",
+        "source_occurrence"
+      ],
+      "identity_tuple": [
+        "allowance-limit:v1:eu5ip4ofpzmqt3r2dw2rzh2mk4xywgixiaofvt5tk4y2cqaixlya",
+        "allowance-cycle:v1:daiagql6qamdpl56ac5vq2gvqed5fn276cbtebyj26n3mjyau7ba",
+        1100,
+        {
+          "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+          "source_revision": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "record_ordinal": 1,
+          "adapter_version": "codex-jsonl.v1"
+        }
+      ],
+      "expected_id": "allowance-observation:v1:dtksjcefe7ttlapfn6mtn4qphqruawelnopydqyrrookorcwpyxa"
+    },
+    {
+      "id": "identity.allowance_interval",
+      "entity": "allowance_interval",
+      "kind": "allowance-interval",
+      "identity_input_fields": [
+        "start_observation_id",
+        "end_observation_id"
+      ],
+      "identity_tuple": [
+        "allowance-observation:v1:dtksjcefe7ttlapfn6mtn4qphqruawelnopydqyrrookorcwpyxa",
+        "allowance-observation:v1:pp2tbni6i2rax2lqiat5npzmnt6xfnsus5q7lzxt3gigtbbppbka"
+      ],
+      "expected_id": "allowance-interval:v1:utrf2l6qkqkkj2dz76tzi3acxnakbb7o5kavv4zmezdzd3qws7xq"
+    },
+    {
+      "id": "identity.rate_card_revision",
+      "entity": "rate_card_revision",
+      "kind": "rate-card",
+      "identity_input_fields": [
+        "digest"
+      ],
+      "identity_tuple": [
+        "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      ],
+      "expected_id": "rate-card:v1:nnz7pn6y5e2tzxsbb4c2duemp2amvjn4nt6vsb6l4377wrm2owda"
+    },
+    {
+      "id": "identity.valuation_match",
+      "entity": "valuation_match",
+      "kind": "valuation",
+      "identity_input_fields": [
+        "call_id",
+        "rate_card_digest"
+      ],
+      "identity_tuple": [
+        "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q",
+        "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      ],
+      "expected_id": "valuation:v1:mrha4ff5csbeqeucteyzpc644oih5rjhd3g3kc6527p6ttd4pv6q"
+    },
+    {
+      "id": "identity.publication",
+      "entity": "publication",
+      "kind": "publication",
+      "identity_input_fields": [
+        "publication_key"
+      ],
+      "identity_tuple": [
+        "publication-attempt-001"
+      ],
+      "expected_id": "publication:v1:rhvnzju6icrcrt2geso6ocup2nl33swccs3y4fncbdgsunm7rdka"
+    },
+    {
+      "id": "identity.publication_delta",
+      "entity": "publication_delta",
+      "kind": "publication-delta",
+      "identity_input_fields": [
+        "delta_key"
+      ],
+      "identity_tuple": [
+        "publication-delta-001"
+      ],
+      "expected_id": "publication-delta:v1:oid5bteiazax2bb5bxonzk4mtf3oiaefwm63qwtcrbb6mnfcurfq"
+    },
+    {
+      "id": "identity.source_occurrence",
+      "entity": "source_occurrence",
+      "kind": "occurrence",
+      "identity_input_fields": [
+        "semantic_logical_id",
+        "source_manifestation_id",
+        "source_revision",
+        "record_byte_range",
+        "record_ordinal",
+        "adapter_version"
+      ],
+      "identity_tuple": [
+        "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+        "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+        "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        [
+          0,
+          128
+        ],
+        1,
+        "codex-jsonl.v1"
+      ],
+      "expected_id": "occurrence:v1:ykmjovvykqspyd7wnlup74wqtoluq7hk6gw4l2gtzpnmqbvvmela"
+    },
+    {
+      "id": "identity.query_window",
+      "entity": "query_window",
+      "kind": "window",
+      "identity_input_fields": [
+        "start_us",
+        "end_us",
+        "timezone"
+      ],
+      "identity_tuple": [
+        0,
+        86400000000,
+        "UTC"
+      ],
+      "expected_id": "window:v1:45zbxkpom4tqf7jerpd22cqnwcx74gbdrwwc56gniprax5struyq"
+    }
+  ],
+  "publication_derivation_vectors": [
+    {
+      "id": "identity.publication_artifact",
+      "publication_key": "publication-attempt-001",
+      "expected_publication_id": "publication:v1:rhvnzju6icrcrt2geso6ocup2nl33swccs3y4fncbdgsunm7rdka",
+      "artifact_without_digest": {
+        "publication_id": "publication:v1:rhvnzju6icrcrt2geso6ocup2nl33swccs3y4fncbdgsunm7rdka",
+        "database_identity": "codex-usage-tracker.agent-kernel.v1",
+        "status": "committed",
+        "entity_counts": {
+          "session": 1
+        }
+      },
+      "expected_artifact_digest": "6f461e2badb0d84abd7aaf41e415831451ff805cc87a10a87b9781ada22a4841",
+      "derivation_order": [
+        "allocate_publication_key",
+        "derive_publication_id",
+        "assemble_canonical_artifact_without_artifact_digest",
+        "derive_artifact_digest"
+      ]
+    }
+  ],
+  "collision_vectors": [
+    {
+      "id": "identity.collision",
+      "logical_id": "session:v1:eriwi3rtswlcz6ap5k2jt7ywypijkhi6hcxdwxgoaoev2jepaita",
+      "first_tuple": [
+        "native-session-collision-a",
+        "identity-v1"
+      ],
+      "second_tuple": [
+        "native-session-collision-b",
+        "identity-v1"
+      ]
+    }
+  ],
+  "occurrence_vectors": [
+    {
+      "id": "identity.source_copy",
+      "occurrences": [
+        {
+          "logical_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+          "identity_tuple": [
+            "native-session-001",
+            "identity-v1"
+          ],
+          "coordinate": {
+            "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+            "source_revision": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+            "record_ordinal": 7,
+            "adapter_version": "codex-jsonl.v1"
+          }
+        },
+        {
+          "logical_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+          "identity_tuple": [
+            "native-session-001",
+            "identity-v1"
+          ],
+          "coordinate": {
+            "source_manifestation_id": "source-manifestation:v1:xf7ybcedaztxb5bcray7ufhpe2tntltawxsdhbmemp5fqvpjdrsa",
+            "source_revision": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+            "record_ordinal": 7,
+            "adapter_version": "codex-jsonl.v1"
+          }
+        }
+      ],
+      "expected_logical_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna",
+      "expected_entity_count": 1,
+      "expected_coordinates": [
+        {
+          "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+          "source_revision": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "record_ordinal": 7,
+          "adapter_version": "codex-jsonl.v1"
+        },
+        {
+          "source_manifestation_id": "source-manifestation:v1:xf7ybcedaztxb5bcray7ufhpe2tntltawxsdhbmemp5fqvpjdrsa",
+          "source_revision": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+          "record_ordinal": 7,
+          "adapter_version": "codex-jsonl.v1"
+        }
+      ]
+    }
+  ]
+}
