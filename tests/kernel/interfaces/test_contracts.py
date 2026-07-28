@@ -101,6 +101,7 @@ def test_usage_query_schema_teaches_closed_named_and_typed_requests() -> None:
     for request in (
         {"template": "missing"},
         {"template": "top_threads", "dataset": "calls"},
+        {"template": "top_threads", "allow_partial": True},
         {"dataset": "calls", "operation": "share", "unknown": True},
     ):
         with pytest.raises(ValueError):

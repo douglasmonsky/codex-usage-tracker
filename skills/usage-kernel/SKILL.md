@@ -24,10 +24,11 @@ Use the three-step loop **scope → batch → evidence**:
    one or more query requests in the `requests` array. Execute a curated
    server-side template with
    `{"requests":[{"template":"<name>"}]}`; for the common thread leaderboard
-   use `{"requests":[{"template":"top_threads"}]}`. That template returns the
-   exact token leaderboard first and the cost/credit context second in the same
-   batch; do not run another query or resolve every selector unless the user
-   asks for deeper evidence. Use
+   use `{"requests":[{"template":"top_threads"}]}`. Templates query the
+   hydrated snapshot and report its coverage; refresh complete history only
+   when the user asks. This template returns the token leaderboard and
+   cost/credit context together; do not run another query or resolve every
+   selector unless the user asks for deeper evidence. Use
    `{"requests":[{"template":"weekly_drivers"}]}` for the latest indexed
    seven-day thread leaderboard,
    `{"requests":[{"template":"week_over_week"}]}` for that window versus the
@@ -54,7 +55,8 @@ Use the three-step loop **scope → batch → evidence**:
 
 Label every claim:
 
-- **fact** — directly returned exact or deterministic data with generation;
+- **fact** — returned exact/deterministic data; for `partial`, state the
+  hydration preset/cutoff and never generalize to all history;
 - **estimate** — returned estimated data with coverage and provenance;
 - **hypothesis** — model inference that still needs evidence;
 - **unsupported** — unavailable from the returned scope and not asserted.

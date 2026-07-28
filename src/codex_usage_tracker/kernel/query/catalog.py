@@ -1001,10 +1001,13 @@ def materialize_query_requests(
                 for key in required_context
             },
         }
-        materialized.extend(
+        resolved_requests = [
             _resolve_template_value(item, resolved_parameters)
             for item in template["requests"]
-        )
+        ]
+        for resolved_request in resolved_requests:
+            resolved_request["allow_partial"] = True
+        materialized.extend(resolved_requests)
     if len(materialized) > MAX_BATCH_QUERIES:
         raise ValueError(
             f"query supports at most {MAX_BATCH_QUERIES} materialized requests"
