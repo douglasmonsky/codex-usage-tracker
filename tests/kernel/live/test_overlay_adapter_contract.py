@@ -211,7 +211,7 @@ def test_contract_routes_work_through_a_real_read_only_loopback_listener(
     launches = []
     application = KernelApplication(
         runtime,
-        worker_launcher=launches.append,
+        worker_launcher=lambda paths, _preset: launches.append(paths),
         source_provider=lambda _home: synthetic_sources(),
     )
     query = application.query(

@@ -146,7 +146,7 @@ def test_unavailable_content_database_does_not_break_accounting_status(
     ).status()["state"] == "unavailable"
     assert KernelApplication(
         runtime,
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
     ).status()["content"]["state"] == "unavailable"
     assert _accounting_total(runtime) == 120
 
@@ -463,9 +463,17 @@ def test_context_batch_holds_one_read_snapshot(
         connection,
         normalized,
         generation,
+        *,
+        history_coverage,
     ):
         nonlocal calls
-        result = original(service, connection, normalized, generation)
+        result = original(
+            service,
+            connection,
+            normalized,
+            generation,
+            history_coverage=history_coverage,
+        )
         calls += 1
         if calls == 1:
             with sqlite3.connect(runtime.content, timeout=5) as writer:

@@ -88,6 +88,7 @@ class QueryRequest:
     limit: int = 100
     cursor: str | None = None
     comparison: ComparisonWindow | None = None
+    allow_partial: bool = False
 
     def normalized(self) -> QueryRequest:
         from .catalog import validate_request

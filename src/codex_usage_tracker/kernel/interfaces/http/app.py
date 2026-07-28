@@ -9,6 +9,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from ...application import KernelApplication
+from ...hydration import HydrationPreset
 from ...live import parse_last_event_id, validate_loopback_origin
 
 API_PREFIX = "/api/kernel/v1"
@@ -84,7 +85,8 @@ class HttpApp:
             return _json_response(
                 202,
                 self._application.refresh(
-                    wait_seconds=_float(payload.get("wait_seconds", 0))
+                    wait_seconds=_float(payload.get("wait_seconds", 0)),
+                    hydration_preset=_preset(payload.get("preset")),
                 ),
             )
         if method == "POST" and path == f"{API_PREFIX}/query":
@@ -204,3 +206,14 @@ def _float(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError) as exc:
         raise ValueError("wait_seconds must be numeric") from exc
+
+
+def _preset(value: Any) -> HydrationPreset | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("preset must be a string")
+    try:
+        return HydrationPreset(value)
+    except ValueError as exc:
+        raise ValueError("preset is not allowlisted") from exc

@@ -82,7 +82,10 @@ def test_append_safe_refresh_keeps_active_writer_lock_bounded(tmp_path: Path) ->
         '"payload":{"id":"synthetic-tail-session"}}\n'
         '{"timestamp":"2026-01-01T00:00:00Z","type":"turn_context",'
         '"payload":{"turn_id":"turn-1","model":"gpt-synthetic","effort":"low"}}\n'
-        + _token_line("event-initial", 1),
+        + "".join(
+            _token_line(f"event-initial-{index}", index % 100)
+            for index in range(_CALL_COUNT)
+        ),
         encoding="utf-8",
     )
     paths = kernel_paths(tmp_path / "cache")
@@ -108,6 +111,17 @@ def test_append_safe_refresh_keeps_active_writer_lock_bounded(tmp_path: Path) ->
 
     ordered = sorted(result.writer_transaction_ms)
     p95 = ordered[max(0, math.ceil(len(ordered) * 0.95) - 1)]
+    print(
+        json.dumps(
+            {
+                "active_calls": _CALL_COUNT,
+                "appended_calls": result.inserted_calls,
+                "writer_p95_ms": round(p95, 3),
+                "writer_transactions": len(ordered),
+            },
+            sort_keys=True,
+        )
+    )
     assert result.planner_reason == "append_safe"
     assert result.inserted_calls == 2_000
     assert p95 <= _ACTIVE_WRITER_P95_BUDGET_MS, (

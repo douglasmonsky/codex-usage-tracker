@@ -106,7 +106,7 @@ def test_bounded_allowance_read_stays_within_common_query_budget(
             )
     application = KernelApplication(
         runtime,
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: (source,),
     )
     application.allowance({"limit": 500})

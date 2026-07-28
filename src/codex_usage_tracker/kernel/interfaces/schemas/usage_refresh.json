@@ -1,1 +1,1 @@
-{"additionalProperties":false,"properties":{"wait_seconds":{"maximum":30,"minimum":0,"type":"number"}},"type":"object"}
+{"additionalProperties":false,"properties":{"preset":{"enum":["recent_30d","recent_90d","complete"],"type":"string"},"wait_seconds":{"maximum":30,"minimum":0,"type":"number"}},"type":"object"}

@@ -67,6 +67,7 @@ _CALL_DIMENSIONS = {
     "agent_role": "threads.subagent_role",
     "event_at": "model_calls.event_at",
     "time_day": "substr(model_calls.event_at, 1, 10)",
+    "time_hour": "substr(model_calls.event_at, 1, 13) || ':00:00Z'",
 }
 _CALL_ROWS = {
     "calls": "1",
@@ -143,6 +144,8 @@ DATASETS: dict[str, DatasetSpec] = {
         stable_id_sql="tool_calls.tool_call_id",
         dimensions={
             "tool": "tool_calls.tool_name",
+            "operation": "tool_calls.operation",
+            "target": "tool_calls.target_label",
             "server": "tool_calls.server_name",
             "namespace": "tool_calls.namespace",
             "category": "tool_calls.tool_category",
@@ -152,6 +155,9 @@ DATASETS: dict[str, DatasetSpec] = {
             "tool_call": "tool_calls.tool_call_id",
             "event_at": "tool_calls.started_at",
             "time_day": "substr(tool_calls.started_at, 1, 10)",
+            "time_hour": (
+                "substr(tool_calls.started_at, 1, 13) || ':00:00Z'"
+            ),
         },
         row_measures={
             "tools": "1",
@@ -165,6 +171,8 @@ DATASETS: dict[str, DatasetSpec] = {
         },
         filter_fields={
             "tool": "tool_calls.tool_name",
+            "operation": "tool_calls.operation",
+            "target": "tool_calls.target_label",
             "server": "tool_calls.server_name",
             "namespace": "tool_calls.namespace",
             "category": "tool_calls.tool_category",
@@ -714,9 +722,9 @@ def _validate_operation_shape(
         raise ValueError("comparison windows require the comparison operation")
     if (
         request.operation is Operation.TIME_SERIES
-        and "time_day" not in request.dimensions
+        and not {"time_day", "time_hour"} & set(request.dimensions)
     ):
-        raise ValueError("time series requires time_day dimension")
+        raise ValueError("time series requires time_day or time_hour dimension")
     if (
         request.operation is Operation.TIMELINE
         and "event_at" not in request.dimensions

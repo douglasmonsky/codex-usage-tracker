@@ -19,7 +19,7 @@ from ..interfaces.support import active_runtime, synthetic_sources
 def _application(tmp_path: Path, launches: list[object]) -> KernelApplication:
     return KernelApplication(
         active_runtime(tmp_path),
-        worker_launcher=launches.append,
+        worker_launcher=lambda paths, _preset: launches.append(paths),
         source_provider=lambda _home: synthetic_sources(),
     )
 

@@ -19,7 +19,7 @@ _GUIDANCE_RESPONSE_BUDGET_BYTES = 24_000
 def test_warm_status_and_batched_query_adapter_budgets(tmp_path: Path) -> None:
     application = KernelApplication(
         active_runtime(tmp_path),
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: synthetic_sources(),
     )
     query = {

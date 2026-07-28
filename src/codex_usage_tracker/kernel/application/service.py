@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 import os
 import subprocess
@@ -9,6 +11,7 @@ import sys
 import threading
 import time
 import uuid
+from collections import OrderedDict
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -19,11 +22,15 @@ from ..allowance import AllowanceService
 from ..allowance.rates import rate_card_status
 from ..content import content_status
 from ..evidence import EvidenceService
+from ..hydration import HydrationPreset
 from ..ingest import KernelIngestor, RefreshTrigger, refresh_request_hash
 from ..live import GenerationJournal, LiveStream
+from ..models import CutoverControl
 from ..operational import (
     initialize_operational_database,
     load_cutover_control,
+    load_hydration_coverage,
+    load_publication_snapshot,
 )
 from ..query import QueryService, exploration_guidance
 from ..query.contracts import MAX_QUERY_RESPONSE_BYTES
@@ -37,8 +44,9 @@ from .runtime import (
     discover_sources,
 )
 
-WorkerLauncher = Callable[[RuntimePaths], None]
+WorkerLauncher = Callable[[RuntimePaths, HydrationPreset], None]
 WORKER_START_TIMEOUT_SECONDS = 5.0
+HYDRATION_PRESET_ENV = "CODEX_USAGE_TRACKER_HYDRATION_PRESET"
 _THREAD_LAUNCH_GUARD = threading.Lock()
 
 
@@ -55,12 +63,15 @@ class KernelApplication:
         self.paths = paths
         self._launch_worker = worker_launcher
         self._sources = source_provider
+        self._query_cache: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
+        self._query_cache_lock = threading.Lock()
 
     def dispatch(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         handlers = {
             "usage_status": lambda: self.status(),
             "usage_refresh": lambda: self.refresh(
-                wait_seconds=_number(arguments.get("wait_seconds", 0))
+                wait_seconds=_number(arguments.get("wait_seconds", 0)),
+                hydration_preset=_hydration_preset(arguments.get("preset")),
             ),
             "usage_query": lambda: self.query(arguments),
             "usage_evidence": lambda: self.evidence(arguments),
@@ -87,10 +98,11 @@ class KernelApplication:
                 "generation": None,
                 "publication_id": None,
                 "refresh": None,
+                "history_coverage": _empty_history_coverage(),
                 "rate_card": rates,
                 "content": content_status(self.paths.content),
             }
-        control = load_cutover_control(operational)
+        control, history_coverage = load_publication_snapshot(operational)
         active = JobReader(operational).active()
         return {
             "version": __version__,
@@ -98,6 +110,7 @@ class KernelApplication:
             "generation": control.active_generation,
             "publication_id": control.integrity_digest,
             "refresh": json_value(active),
+            "history_coverage": history_coverage,
             "rate_card": rates,
             "content": content_status(self.paths.content),
         }
@@ -107,24 +120,47 @@ class KernelApplication:
         if not isinstance(raw_requests, list):
             raise ValueError("requests must be an array")
         include_guidance = _bool(payload.get("include_guidance", False))
-        requests = tuple(
-            query_request(item)
-            for item in raw_requests
-            if isinstance(item, dict)
-        )
+        requests = tuple(query_request(item) for item in raw_requests if isinstance(item, dict))
         if len(requests) != len(raw_requests):
             raise ValueError("every query request must be an object")
         if not requests and not include_guidance:
             raise ValueError("query requires a query request or guidance")
-        results = (
-            QueryService(
-                self.paths.kernel.operational,
-                content_path=self.paths.content,
-            ).execute_batch(requests)
-            if requests
-            else ()
+        publication = load_publication_snapshot(self.paths.kernel.operational) if requests else None
+        history_coverage = (
+            publication[1]
+            if publication is not None
+            else _history_coverage(self.paths.kernel.operational)
         )
-        response = {"results": json_value(results)}
+        cache_key = None
+        if requests:
+            assert publication is not None
+            cache_key = _query_cache_key(
+                publication[0],
+                requests,
+                history_coverage=history_coverage,
+                content=self.paths.content,
+            )
+        cached = self._cached_query(cache_key) if cache_key is not None else None
+        cache_hit = cached is not None
+        if cached is None:
+            results = (
+                QueryService(
+                    self.paths.kernel.operational,
+                    content_path=self.paths.content,
+                    publication=publication,
+                ).execute_batch(requests)
+                if requests
+                else ()
+            )
+            serialized_results = json_value(results)
+            if cache_key is not None:
+                self._store_query(cache_key, serialized_results)
+        else:
+            serialized_results = cached
+        response = {"results": serialized_results}
+        response["history_coverage"] = history_coverage
+        if cache_key is not None:
+            response["cache"] = {"hit": cache_hit, "key": cache_key}
         if include_guidance:
             response["guidance"] = exploration_guidance()
         response_size = len(
@@ -135,15 +171,26 @@ class KernelApplication:
             ).encode()
         )
         if response_size > MAX_QUERY_RESPONSE_BYTES:
-            raise ValueError(
-                "query response exceeds byte budget; lower request limits"
-            )
+            raise ValueError("query response exceeds byte budget; lower request limits")
         return response
 
+    def _cached_query(self, key: str) -> list[dict[str, Any]] | None:
+        with self._query_cache_lock:
+            cached = self._query_cache.get(key)
+            if cached is None:
+                return None
+            self._query_cache.move_to_end(key)
+            return copy.deepcopy(cached)
+
+    def _store_query(self, key: str, results: list[dict[str, Any]]) -> None:
+        with self._query_cache_lock:
+            self._query_cache[key] = copy.deepcopy(results)
+            self._query_cache.move_to_end(key)
+            while len(self._query_cache) > 32:
+                self._query_cache.popitem(last=False)
+
     def evidence(self, payload: dict[str, Any]) -> dict[str, Any]:
-        result = EvidenceService(
-            self.paths.kernel.operational
-        ).read(evidence_request(payload))
+        result = EvidenceService(self.paths.kernel.operational).read(evidence_request(payload))
         return json_value(result)
 
     def allowance(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -157,10 +204,22 @@ class KernelApplication:
             cursor=cursor,
         )
 
-    def refresh(self, *, wait_seconds: float = 0) -> dict[str, Any]:
+    def refresh(
+        self,
+        *,
+        wait_seconds: float = 0,
+        hydration_preset: HydrationPreset | None = None,
+    ) -> dict[str, Any]:
         operational = self.paths.kernel.operational
+        selected_preset = _selected_hydration_preset(
+            operational,
+            requested=hydration_preset,
+        )
         sources = self._sources(self.paths.codex_home)
-        request_hash = refresh_request_hash(list(sources))
+        request_hash = refresh_request_hash(
+            list(sources),
+            hydration_preset=selected_preset,
+        )
         with _launch_guard(self.paths.cache_root):
             initialize_operational_database(operational)
             reader = JobReader(operational)
@@ -168,15 +227,13 @@ class KernelApplication:
             disposition = "started"
             if active is None:
                 latest = reader.latest()
-                self._launch_worker(self.paths)
+                self._launch_worker(self.paths, selected_preset)
                 active = _await_worker_start(
                     reader,
                     previous_job_id=latest.job_id if latest else None,
                 )
             else:
-                disposition = (
-                    "joined" if active.request_hash == request_hash else "busy"
-                )
+                disposition = "joined" if active.request_hash == request_hash else "busy"
         reader = JobReader(operational)
         snapshot = reader.get(
             active.job_id,
@@ -214,9 +271,7 @@ class KernelApplication:
 
         validate_loopback_origin(origin)
         control = load_cutover_control(self.paths.kernel.operational)
-        batch = LiveStream(
-            GenerationJournal(self.paths.kernel.operational)
-        ).read(
+        batch = LiveStream(GenerationJournal(self.paths.kernel.operational)).read(
             last_event_id=last_event_id,
             limit=limit,
             active_generation=control.active_generation or 0,
@@ -236,10 +291,14 @@ def build_application(
     )
 
 
-def launch_refresh_worker(paths: RuntimePaths) -> None:
+def launch_refresh_worker(
+    paths: RuntimePaths,
+    hydration_preset: HydrationPreset,
+) -> None:
     environment = os.environ.copy()
     environment[CODEX_HOME_ENV] = str(paths.codex_home)
     environment[CACHE_ROOT_ENV] = str(paths.cache_root)
+    environment[HYDRATION_PRESET_ENV] = hydration_preset.value
     package_root = str(Path(__file__).resolve().parents[3])
     inherited_path = environment.get("PYTHONPATH")
     environment["PYTHONPATH"] = os.pathsep.join(
@@ -260,8 +319,16 @@ def launch_refresh_worker(paths: RuntimePaths) -> None:
     )
 
 
-def run_refresh_worker(paths: RuntimePaths | None = None) -> dict[str, Any]:
+def run_refresh_worker(
+    paths: RuntimePaths | None = None,
+    *,
+    hydration_preset: HydrationPreset | None = None,
+) -> dict[str, Any]:
     runtime = paths or default_runtime_paths()
+    selected_preset = hydration_preset or _selected_hydration_preset(
+        runtime.kernel.operational,
+        requested=_hydration_preset(os.environ.get(HYDRATION_PRESET_ENV)),
+    )
     sources = list(discover_sources(runtime.codex_home))
     result = KernelIngestor(
         runtime.kernel.analytical,
@@ -271,6 +338,7 @@ def run_refresh_worker(paths: RuntimePaths | None = None) -> dict[str, Any]:
         sources,
         trigger=RefreshTrigger.MCP_USAGE_REFRESH,
         owner_id=f"interface-worker-{uuid.uuid4().hex}",
+        hydration_preset=selected_preset,
     )
     return json_value(result)
 
@@ -320,6 +388,77 @@ def _number(value: Any) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("wait_seconds must be numeric")
     return float(value)
+
+
+def _hydration_preset(value: Any) -> HydrationPreset | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("preset must be a string")
+    try:
+        return HydrationPreset(value)
+    except ValueError as exc:
+        raise ValueError("preset must be recent_30d, recent_90d, or complete") from exc
+
+
+def _selected_hydration_preset(
+    operational: Path,
+    *,
+    requested: HydrationPreset | None,
+) -> HydrationPreset:
+    if requested is not None:
+        return requested
+    if operational.is_file():
+        active = load_hydration_coverage(operational)["preset"]
+        if isinstance(active, str):
+            return HydrationPreset(active)
+    return HydrationPreset.RECENT_30D
+
+
+def _empty_history_coverage() -> dict[str, object]:
+    return {
+        "preset": None,
+        "captured_at": None,
+        "cutoff_at": None,
+        "complete_history": False,
+        "coverage_revision": None,
+        "cataloged_source_count": 0,
+        "hydrated_source_count": 0,
+        "deferred_source_count": 0,
+        "cataloged_bytes": 0,
+        "hydrated_bytes": 0,
+        "deferred_bytes": 0,
+        "uncertain_source_count": 0,
+    }
+
+
+def _history_coverage(operational: Path) -> dict[str, object]:
+    if not operational.is_file():
+        return _empty_history_coverage()
+    return load_hydration_coverage(operational)
+
+
+def _query_cache_key(
+    control: CutoverControl,
+    requests: tuple[Any, ...],
+    *,
+    history_coverage: dict[str, object],
+    content: Path,
+) -> str:
+    payload = {
+        "generation": control.active_generation,
+        "publication_id": control.integrity_digest,
+        "active_kernel_path": str(control.active_kernel_path),
+        "coverage_revision": history_coverage["coverage_revision"],
+        "requests": [json_value(request.normalized()) for request in requests],
+        "content": content_status(content),
+    }
+    return (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+        ).hexdigest()
+    )
 
 
 def _int(value: Any, label: str) -> int:

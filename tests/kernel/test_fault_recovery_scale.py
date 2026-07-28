@@ -348,7 +348,7 @@ def test_console_mcp_and_export_reads_stay_on_the_active_generation_during_refre
     runtime = RuntimePaths(tmp_path / "codex-home", tmp_path / "cache")
     application = KernelApplication(
         runtime,
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: (source,),
     )
     writer_paused = threading.Event()
@@ -465,7 +465,7 @@ def test_real_sse_slow_and_disconnected_clients_do_not_block_reads(
     runtime = RuntimePaths(tmp_path / "codex-home", tmp_path / "cache")
     application = KernelApplication(
         runtime,
-        worker_launcher=lambda _paths: None,
+        worker_launcher=lambda _paths, _preset: None,
         source_provider=lambda _home: (),
     )
     server = create_server(application)

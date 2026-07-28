@@ -13,9 +13,9 @@ benchmark, a source-only tag, or an unpublished package.
 | --- | --- | --- | --- | --- |
 | R0 | Complete | — | `docs/product-recovery-roadmap` | Recovery authority merged as `117fff8` |
 | R1 | Complete | R0 | `feature/r1-agent-outcome-baseline` | PR #342 merged as `aefb216`; frozen benchmark and measured failures |
-| R2 | In progress | R1 | `feature/r2-schema-v3-compact-storage` | Schema v3 implementation complete; final review/merge pending |
-| R3 | In progress | R2 | `feature/r3-build-refresh-performance` | Cold and incremental gates pass; final review/merge pending |
-| R4 | Pending | R2 | — | Persisted rollups and fast API/MCP |
+| R2 | Complete | R1 | `feature/r2-schema-v3-compact-storage` | PR #344 merged as `f740939`; compact schema v3 published to `main` |
+| R3 | Complete | R2 | `feature/r3-build-refresh-performance` | PR #344 merged as `f740939`; selective hydration and refresh gates pass |
+| R4 | In progress | R2 | `feature/r4-fast-query-mcp` | Rollup/query contracts pass; final review and merge pending |
 | R5 | Pending | R3, R4 | — | Analytical primitives and human semantics |
 | R6 | Pending | R4, R5 | — | Console usability |
 | R7 | Pending | R1; completes after R3–R6 | — | Installed fresh-task qualification |
@@ -81,8 +81,8 @@ disjoint file sets.
 | Wave | Lane | Owner | Base | Files | State |
 | --- | --- | --- | --- | --- | --- |
 | 1 | R1 baseline | primary | `96c6335` | task packet allowlist | In progress |
-| 2 | R3 ingestion | primary | `1f241f9` | ingest-owned files | In progress |
-| 2 | R4 query | unassigned | R2 contract | query-owned files | Blocked |
+| 2 | R3 ingestion | primary | `1f241f9` | ingest-owned files | Complete |
+| 2 | R4 query | primary | `f740939` | R4 packet plus integrated rollup publication hook | In progress |
 | 2 | R7 harness | unassigned | R1 harness | test/runner-owned files | Blocked |
 | 2 | R8 copy audit | unassigned | R0 merge | docs-only files | Blocked |
 
@@ -548,3 +548,111 @@ reparsing the first 52 sources.
   byte. R8/R9 must either freeze a broader deterministic artifact-integrity
   contract or explicitly document why SQLite integrity, foreign-key checks,
   accounting oracles, and exact release hashes remain the chosen layers.
+
+## R4 — Build Persisted Rollups And Fast MCP/API Paths
+
+**State:** In progress
+**Branch:** `feature/r4-fast-query-mcp`
+**Base:** `f740939a58f1a1bbba60d3fd19016e14b154ba89`
+**Commits:** pending
+**Owned files:** rollup updater, query catalog/plans/contracts/service,
+application cache, refresh preset adapters and schemas, focused interface,
+query, recovery, and performance contracts, scope allowlist, and this ledger
+**Parallel lane:** none
+
+### Contract added first
+
+- Four initial R4 contracts failed because status/query omitted history
+  coverage, partial all-history reads did not fail closed, query execution did
+  not prove refresh absence, and refresh had no hydration-preset transport.
+- A production-shaped append contract then exposed a critical integration
+  defect: rebuilding every rollup from 100,000 prior calls held the active
+  writer lock for 229.652 ms against the 50 ms ceiling.
+- The current contracts cover generation/request cache reuse and invalidation,
+  exact partial-history opt-in, new-install `recent_30d` default, monotonic
+  explicit expansion, atomic rollup recovery, no-change upgrade backfill,
+  HTTP/MCP preset transport, bounded time-band/tool-operation plans, and
+  exact incremental-rollup parity.
+- Final review added deterministic coverage for publication/coverage
+  interleaving, cross-preset interrupted append recovery, regrouping stored
+  model/tool dimensions, nullable tool-measure fallback, and immutable
+  historical release evidence.
+
+### Implementation checkpoint
+
+- `usage_refresh` retains the six-tool surface and accepts `recent_30d`,
+  `recent_90d`, or `complete` through MCP, HTTP, CLI, and the background
+  worker. New installs default to 30 days; an existing or explicitly expanded
+  complete generation never silently narrows.
+- Status and query envelopes expose the committed preset, cutoff,
+  completeness, source/byte coverage, and coverage revision. Partial
+  all-history queries fail closed unless `allow_partial=true`; bounded queries
+  never launch refresh or deferred hydration.
+- Query cache lookup, partial-history validation, execution, and response
+  coverage bind to one operational SQLite publication snapshot. Interrupted
+  valid generations publish before a different-preset retry continues, while
+  retaining prior conservative coverage until the retry publishes its own.
+- Common global, thread, model/effort/tier, daily/hourly, and tool-operation
+  aggregates read generation-scoped persisted rollups. Subset dimensions are
+  regrouped exactly; nullable tool duration/output measures retain the generic
+  exact path instead of converting missing values to zero. Query responses are
+  cached by publication, generation, normalized request, coverage revision,
+  and optional-content status, with observable hit/miss metadata and bounded
+  deep-copy isolation.
+- Append-safe refreshes seed compact prior-generation rollups and apply only
+  the new generation delta. Replacement, expansion, and one-time upgrade
+  backfill rebuild on unpublished clones. The atomic global rollup row is the
+  publication marker; interrupted post-fact updates recover the rollups before
+  promotion, while readers remain on the prior generation.
+- R4 integrated the updater call site after R3 merged. This is an intentional
+  deviation from the packet's earlier parallel ownership wording; there was no
+  concurrent R3 writer and no ingestion file was edited by another lane.
+
+### Unprofiled performance evidence
+
+| Workload | Before | Current | Result |
+| --- | ---: | ---: | --- |
+| 100,000-call model/effort query | generic fact scan | 4.744 ms p95; 4 rollup rows | passes 500 ms stretch |
+| 100,000-call thread concentration | generic fact scan | 2.157 ms p95; 250 rollup rows | passes 1 s gate |
+| 100,000-call daily bands | generic fact scan | 2.258 ms p95; 28 rollup rows | passes 500 ms stretch |
+| 100,000-call week comparison | unchanged generic path | 145.575 ms p95 | passes 1 s gate |
+| 2,000-call append over 100,000 active calls | 229.652 ms writer p95 | 35.565 ms writer p95 | 84.5% lower; passes 50 ms gate |
+| Synthetic 100,000-call kernel benchmark | — | 5.00 s unprofiled | attribution baseline |
+
+### Profiling evidence
+
+- Unprofiled timings above are the only speedup evidence.
+- `agent-perf` run `20260727T235119Z-a3ca6bb7` was incomplete because Scalene
+  did not emit JSON for the direct pytest workload.
+- `agent-perf` run `20260727T235209Z-3f902139` completed the identical
+  100,000-call synthetic kernel workload in 6.113 seconds under Scalene 2.3.0.
+  Its ranked application hotspots were existing writer insertion/deletion and
+  selector mapping; the rollup updater did not appear among the ranked
+  hotspots. This is attribution evidence only.
+
+### Verification checkpoint
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| R4 query/coverage/recovery focus | Pass | 21 final rollup/query/coverage tests plus focused interruption, upgrade-backfill, and preset contracts |
+| Broad touched surface | Pass | 144 query, interface, Console, content, live, allowance, ingestion, fault, and concurrency tests |
+| Performance | Pass | 100,000-call query distributions and active-writer 50 ms gate |
+| Ruff, MyPy, Pyright | Pass | active kernel, kernel tests, and scope script |
+| Agent Perf | Pass with one compatibility caveat | one complete Scalene run; direct pytest capture incomplete |
+| Full repository | Pass | 387 Python tests; frontend build/lint/typecheck/tests; Ruff, MyPy, Pyright, maintainability, scope, manifests, and release safety |
+| Distribution and installed | Pass | exact 148,034-byte wheel and 449,942-byte sdist; clean and supported 0.26/0.27 upgrade smokes, two fresh MCP tasks each, and installed Console/allowance smoke; observed warm Console p95 no worse than 0.853 ms |
+| Final review | Pass after remediation | one read-only reviewer reported five findings; R1–R5 accepted and fixed; reviewer token attribution pending because the installed tracker CLI lacks the metrics helper's legacy `strict` command |
+
+### Residual risk and next action
+
+- Commit and open the R4 pull request, require green CI, and merge before
+  starting R5. No second reviewer is permitted.
+- The first PR CI attempt exposed one stale installed-Console assumption: its
+  synthetic allowance fixture relied on the former complete-history default.
+  The smoke now explicitly requests `complete`; the local installed
+  Console/allowance smoke passes without changing product behavior.
+- The next Python 3.14 attempt exposed a pre-refresh upgrade boundary:
+  read-only status queried schema-v3 coverage before a 0.26/0.27 sidecar had
+  migrated. Publication snapshots now report conservative empty coverage for
+  pre-v3 sidecars without writing. The v2-to-v3 migration creates the exact
+  active/staged coverage schemas, and both published upgrade paths pass locally.

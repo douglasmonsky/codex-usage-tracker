@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import sqlite3
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -27,6 +28,7 @@ from codex_usage_tracker.kernel.query import (
     QueryRequest,
     QueryService,
 )
+from codex_usage_tracker.kernel.rollups import rebuild_generation_rollups
 
 _CALL_COUNT = 100_000
 
@@ -38,6 +40,23 @@ def large_service(tmp_path_factory: pytest.TempPathFactory) -> QueryService:
     initialize_analytical_database(paths.analytical)
     initialize_operational_database(paths.operational)
     _populate_calls(paths.analytical)
+    rebuild_generation_rollups(paths.analytical, 1)
+    with sqlite3.connect(paths.operational) as connection:
+        connection.execute(
+            """
+            INSERT INTO coverage_control(
+                singleton, preset, captured_at, cutoff_at, complete_history,
+                coverage_revision, cataloged_source_count,
+                hydrated_source_count, deferred_source_count,
+                cataloged_bytes, hydrated_bytes, deferred_bytes,
+                uncertain_source_count
+            )
+            VALUES (
+                1, 'complete', '2026-01-29T00:00:00Z', NULL, 1,
+                'sha256:synthetic-complete', 1, 1, 0, 1, 1, 0, 0
+            )
+            """
+        )
     transition_cutover(
         paths.operational,
         CutoverState.BUILDING,
@@ -88,6 +107,15 @@ def test_100k_common_comparison_and_concentration_budgets(
         ("calls", "total_tokens"),
         limit=25,
     )
+    daily = QueryRequest(
+        "calls",
+        Operation.TIME_SERIES,
+        ("time_day",),
+        ("calls", "total_tokens"),
+        order_by="time_day",
+        descending=False,
+        limit=31,
+    )
 
     common_p95 = _p95(lambda: large_service.execute(common), repeats=20)
     comparison_p95 = _p95(
@@ -98,6 +126,10 @@ def test_100k_common_comparison_and_concentration_budgets(
         lambda: large_service.execute(concentration),
         repeats=12,
     )
+    daily_p95 = _p95(lambda: large_service.execute(daily), repeats=12)
+    common_result = large_service.execute(common)
+    concentration_result = large_service.execute(concentration)
+    daily_result = large_service.execute(daily)
 
     print(
         json.dumps(
@@ -106,6 +138,7 @@ def test_100k_common_comparison_and_concentration_budgets(
                 "common_p95_ms": round(common_p95, 3),
                 "comparison_p95_ms": round(comparison_p95, 3),
                 "concentration_p95_ms": round(concentration_p95, 3),
+                "daily_p95_ms": round(daily_p95, 3),
             },
             sort_keys=True,
         )
@@ -113,6 +146,13 @@ def test_100k_common_comparison_and_concentration_budgets(
     assert common_p95 <= 500.0
     assert comparison_p95 <= 1_000.0
     assert concentration_p95 <= 1_000.0
+    assert daily_p95 <= 500.0
+    assert common_result.plan_id.endswith("rollup_model_effort.v1")
+    assert common_result.scanned_count == 4
+    assert concentration_result.plan_id.endswith("rollup_thread.v1")
+    assert concentration_result.scanned_count == 250
+    assert daily_result.plan_id.endswith("rollup_time_band.v1")
+    assert daily_result.scanned_count == 28
 
 
 def _p95(operation: Callable[[], object], *, repeats: int) -> float:

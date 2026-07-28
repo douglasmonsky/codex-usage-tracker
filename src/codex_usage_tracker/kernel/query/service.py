@@ -14,7 +14,8 @@ from typing import Any
 
 from ..content import open_content_snapshot
 from ..database import open_read_snapshot
-from ..operational import load_cutover_control
+from ..models import CutoverControl
+from ..operational import load_publication_snapshot
 from .contracts import (
     MAX_BATCH_QUERIES,
     MAX_CURSOR_OFFSET,
@@ -34,9 +35,11 @@ class QueryService:
         operational_path: Path,
         *,
         content_path: Path | None = None,
+        publication: tuple[CutoverControl, dict[str, object]] | None = None,
     ) -> None:
         self._operational_path = operational_path.resolve()
         self._content_path = content_path.resolve() if content_path else None
+        self._publication = publication
 
     def execute(self, request: QueryRequest) -> QueryResult:
         return self.execute_batch((request,))[0]
@@ -48,11 +51,25 @@ class QueryService:
         if not 1 <= len(requests) <= MAX_BATCH_QUERIES:
             raise ValueError(f"query batch must contain 1 to {MAX_BATCH_QUERIES} items")
         normalized = tuple(request.normalized() for request in requests)
-        control = load_cutover_control(self._operational_path)
+        control, history_coverage = (
+            self._publication
+            if self._publication is not None
+            else load_publication_snapshot(self._operational_path)
+        )
         path = control.active_kernel_path
         generation = control.active_generation
         if path is None or generation is None:
             raise ValueError("no active analytical generation")
+        for request in normalized:
+            if (
+                not bool(history_coverage["complete_history"])
+                and _requires_partial_opt_in(request, history_coverage)
+                and not request.allow_partial
+            ):
+                raise ValueError(
+                    "all-history query requires complete coverage; "
+                    "set allow_partial=true to query the hydrated subset"
+                )
         with ExitStack() as stack:
             analytical = stack.enter_context(open_read_snapshot(path))
             analytical.execute("PRAGMA query_only = ON")
@@ -62,21 +79,20 @@ class QueryService:
                 and self._content_path is not None
                 else None
             )
-            if any(request.dataset == "context" for request in normalized) and (
-                content is None
-            ):
+            if any(request.dataset == "context" for request in normalized) and (content is None):
                 raise ValueError("context composition database is not configured")
             results: list[QueryResult] = []
             for request in normalized:
-                connection = (
-                    content if request.dataset == "context" else analytical
-                )
+                connection = content if request.dataset == "context" else analytical
                 if connection is None:
-                    raise ValueError(
-                        "context composition database is not configured"
-                    )
+                    raise ValueError("context composition database is not configured")
                 results.append(
-                    self._execute_one(connection, request, generation)
+                    self._execute_one(
+                        connection,
+                        request,
+                        generation,
+                        history_coverage=history_coverage,
+                    )
                 )
             return tuple(results)
 
@@ -85,6 +101,8 @@ class QueryService:
         connection: sqlite3.Connection,
         request: QueryRequest,
         generation: int,
+        *,
+        history_coverage: dict[str, object],
     ) -> QueryResult:
         started = time.perf_counter()
         request_hash = _request_hash(request)
@@ -101,9 +119,7 @@ class QueryService:
                 request,
                 offset,
             )
-            plan_id = (
-                f"phases.{Operation(request.operation).value}.v{PLAN_VERSION}"
-            )
+            plan_id = f"phases.{Operation(request.operation).value}.v{PLAN_VERSION}"
             coverage_counts: dict[str, int] = {}
         else:
             plan = compile_plan(request, generation=generation, offset=offset)
@@ -138,11 +154,7 @@ class QueryService:
                 else {}
             )
             rows = [
-                {
-                    key: value
-                    for key, value in dict(row).items()
-                    if not key.startswith("__")
-                }
+                {key: value for key, value in dict(row).items() if not key.startswith("__")}
                 for row in raw_rows
             ]
             plan_id = plan.plan_id
@@ -164,10 +176,9 @@ class QueryService:
             scanned=scanned,
             matched=matched,
             counts=coverage_counts,
+            history_coverage=history_coverage,
             content_metadata=(
-                _content_metadata(connection)
-                if request.dataset == "context"
-                else None
+                _content_metadata(connection) if request.dataset == "context" else None
             ),
         )
         return QueryResult(
@@ -455,6 +466,7 @@ def _result_coverage(
     scanned: int,
     matched: int,
     counts: dict[str, int],
+    history_coverage: dict[str, object],
     content_metadata: dict[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     total = matched if request.dataset == "phases" else scanned
@@ -468,39 +480,36 @@ def _result_coverage(
             "basis": _measure_basis(request.dataset, measure),
             "observed_count": observed,
             "missing_count": missing,
-            "coverage_percent": (
-                100.0 if total == 0 else 100.0 * observed / total
-            ),
+            "coverage_percent": (100.0 if total == 0 else 100.0 * observed / total),
             "limitations": _measure_limitations(request.dataset, measure),
         }
         if request.dataset == "context" and measure == "estimated_tokens":
             measures[measure]["estimator"] = (
-                content_metadata.get("estimator")
-                if content_metadata is not None
-                else None
+                content_metadata.get("estimator") if content_metadata is not None else None
             )
     grade = (
         "deterministic"
         if request.dataset == "phases"
         else "estimated"
-        if request.dataset == "context"
-        and "estimated_tokens" in request.measures
+        if request.dataset == "context" and "estimated_tokens" in request.measures
         else "exact"
     )
+    if not bool(history_coverage["complete_history"]) and _requires_partial_opt_in(
+        request, history_coverage
+    ):
+        grade = "partial"
     coverage: dict[str, Any] = {
         "generation_bound": True,
         "canonical_calls_only": request.dataset == "calls",
         "raw_content": False,
-        "phase_attribution": (
-            "deterministic" if request.dataset == "phases" else None
-        ),
+        "phase_attribution": ("deterministic" if request.dataset == "phases" else None),
         "measures": measures,
+        "history_complete": bool(history_coverage["complete_history"]),
+        "coverage_revision": history_coverage["coverage_revision"],
     }
     if request.dataset == "context":
         source_generation = (
-            content_metadata.get("indexed_generation")
-            if content_metadata is not None
-            else None
+            content_metadata.get("indexed_generation") if content_metadata is not None else None
         )
         coverage.update(
             {
@@ -512,14 +521,11 @@ def _result_coverage(
                     else None
                 ),
                 "generation_lag": (
-                    generation - source_generation
-                    if isinstance(source_generation, int)
-                    else None
+                    generation - source_generation if isinstance(source_generation, int) else None
                 ),
                 "unattributed_input_tokens": None,
                 "unattributed_limitation": (
-                    "billed input tokens cannot be safely attributed to "
-                    "observed categories"
+                    "billed input tokens cannot be safely attributed to observed categories"
                 ),
             }
         )
@@ -566,17 +572,14 @@ def _measure_basis(dataset: str, measure: str) -> str:
 def _measure_limitations(dataset: str, measure: str) -> list[str]:
     limitations: list[str] = []
     if dataset == "context" and measure == "observed_bytes":
-        limitations.append(
-            "observed payload bytes are not exact billed input tokens"
-        )
+        limitations.append("observed payload bytes are not exact billed input tokens")
     if dataset == "context" and measure == "estimated_tokens":
         limitations.append(
             "category tokens are estimates only when an explicit tokenizer is configured"
         )
     if measure == "reasoning_tokens":
         limitations.append(
-            "reasoning tokens are reported separately; overlap with output "
-            "tokens is not inferred"
+            "reasoning tokens are reported separately; overlap with output tokens is not inferred"
         )
     if dataset == "phases" and measure != "activities":
         limitations.append(
@@ -609,15 +612,11 @@ def _content_metadata(connection: sqlite3.Connection) -> dict[str, Any]:
         WHERE singleton = 1
         """
     ).fetchone()
-    observed = connection.execute(
-        "SELECT MAX(event_at) FROM composition_events"
-    ).fetchone()
+    observed = connection.execute("SELECT MAX(event_at) FROM composition_events").fetchone()
     return {
         "indexed_generation": settings[0] if settings is not None else None,
         "estimator": (
-            str(settings[1])
-            if settings is not None and settings[1] is not None
-            else None
+            str(settings[1]) if settings is not None and settings[1] is not None else None
         ),
         "observed_through": observed[0] if observed is not None else None,
     }
@@ -652,15 +651,10 @@ def _phase_scope(
         if item.operator == "in":
             values = item.value
             assert isinstance(values, tuple)
-            clauses.append(
-                f"{expression} IN "
-                f"({', '.join(parameter_sql for _ in values)})"
-            )
+            clauses.append(f"{expression} IN ({', '.join(parameter_sql for _ in values)})")
             parameters.extend(values)
         else:
-            clauses.append(
-                f"{expression} {operators[item.operator]} {parameter_sql}"
-            )
+            clauses.append(f"{expression} {operators[item.operator]} {parameter_sql}")
             parameters.append(item.value)
     return " AND ".join(f"({clause})" for clause in clauses), tuple(parameters)
 
@@ -671,12 +665,11 @@ def _request_hash(request: QueryRequest) -> str:
         "operation": Operation(request.operation).value,
         "dimensions": request.dimensions,
         "measures": request.measures,
-        "filters": [
-            (item.field, item.operator, item.value) for item in request.filters
-        ],
+        "filters": [(item.field, item.operator, item.value) for item in request.filters],
         "order_by": request.order_by,
         "descending": request.descending,
         "limit": request.limit,
+        "allow_partial": request.allow_partial,
         "comparison": (
             (
                 request.comparison.current_start,
@@ -694,6 +687,31 @@ def _request_hash(request: QueryRequest) -> str:
         separators=(",", ":"),
     ).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _requires_partial_opt_in(
+    request: QueryRequest,
+    history_coverage: dict[str, object],
+) -> bool:
+    cutoff = history_coverage.get("cutoff_at")
+    if not isinstance(cutoff, str):
+        return True
+    if request.comparison is not None:
+        return (
+            min(
+                request.comparison.current_start,
+                request.comparison.previous_start,
+            )
+            < cutoff
+        )
+    lower_bounds = [
+        item.value
+        for item in request.filters
+        if item.operator in {"gte", "gt"}
+        and item.field in {"event_at", "observed_at", "started_at", "time_day", "time_hour"}
+        and isinstance(item.value, str)
+    ]
+    return not lower_bounds or min(lower_bounds) < cutoff
 
 
 def _encode_cursor(*, generation: int, request_hash: str, offset: int) -> str:
