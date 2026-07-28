@@ -26,9 +26,9 @@ Use the three-step loop **scope → batch → evidence**:
    `{"requests":[{"template":"<name>"}]}`; for the common thread leaderboard
    use `{"requests":[{"template":"top_threads"}]}`. Templates query the
    hydrated snapshot and report its coverage; refresh complete history only
-   when the user asks. This template returns the token leaderboard and
-   cost/credit context together; do not run another query or resolve every
-   selector unless the user asks for deeper evidence. Use
+   when the user asks. For same five ranked threads, use result 1 for
+   labels, selectors, totals, shares, and token classes; use result 2 only for
+   cost/credits. Do not query again unless user asks for evidence. Use
    `{"requests":[{"template":"weekly_drivers"}]}` for the latest indexed
    seven-day thread leaderboard,
    `{"requests":[{"template":"week_over_week"}]}` for that window versus the
