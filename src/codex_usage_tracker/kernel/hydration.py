@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from functools import partial
 from pathlib import Path
 
 from .discovery import SourceObservation, observe_source
 
 _TAIL_SCAN_BYTES = 256 * 1024
+_CATALOG_WORKERS = 4
+_PARALLEL_CATALOG_MIN_SOURCES = 8
 
 
 class HydrationPreset(str, Enum):
@@ -68,26 +72,33 @@ def catalog_sources(
     """Observe every source and extract one bounded structural high water."""
 
     known = checkpoints or {}
-    catalog = []
-    for path in paths:
-        observation = observe_source(path)
-        checkpoint = known.get(observation.source_id)
-        unchanged = (
-            checkpoint is not None
-            and checkpoint.size_bytes == observation.size_bytes
-            and checkpoint.modified_ns == observation.modified_ns
-        )
-        catalog.append(
-            CatalogSource(
-                observation=observation,
-                latest_event_at=(
-                    checkpoint.latest_event_at
-                    if unchanged and checkpoint is not None
-                    else _latest_structural_timestamp(observation)
-                ),
-            )
-        )
-    return tuple(catalog)
+    catalog_one = partial(_catalog_source, checkpoints=known)
+    if len(paths) < _PARALLEL_CATALOG_MIN_SOURCES:
+        return tuple(map(catalog_one, paths))
+    with ThreadPoolExecutor(max_workers=_CATALOG_WORKERS) as pool:
+        return tuple(pool.map(catalog_one, paths))
+
+
+def _catalog_source(
+    path: Path,
+    *,
+    checkpoints: Mapping[str, CatalogCheckpoint],
+) -> CatalogSource:
+    observation = observe_source(path)
+    checkpoint = checkpoints.get(observation.source_id)
+    unchanged = (
+        checkpoint is not None
+        and checkpoint.size_bytes == observation.size_bytes
+        and checkpoint.modified_ns == observation.modified_ns
+    )
+    return CatalogSource(
+        observation=observation,
+        latest_event_at=(
+            checkpoint.latest_event_at
+            if unchanged and checkpoint is not None
+            else _latest_structural_timestamp(observation)
+        ),
+    )
 
 
 def catalog_checkpoints(

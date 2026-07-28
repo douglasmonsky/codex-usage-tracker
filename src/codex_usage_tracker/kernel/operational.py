@@ -209,8 +209,19 @@ def initialize_operational_database(path: Path) -> Path:
 def register_source(path: Path, identifier: str, source: Path) -> None:
     """Record the minimum source mapping in the non-exportable sidecar."""
 
+    register_sources(path, ((identifier, source),))
+
+
+def register_sources(
+    path: Path,
+    sources: tuple[tuple[str, Path], ...],
+) -> None:
+    """Record source mappings in one bounded sidecar transaction."""
+
+    if not sources:
+        return
     with _connect(path) as connection:
-        connection.execute(
+        connection.executemany(
             """
             INSERT OR REPLACE INTO source_registry(
                 source_id, source_location, first_seen_at, last_seen_at, state
@@ -221,7 +232,10 @@ def register_source(path: Path, identifier: str, source: Path) -> None:
                 last_seen_at = CURRENT_TIMESTAMP,
                 state = 'tracked'
             """,
-            (identifier, str(source.resolve())),
+            (
+                (identifier, str(source.resolve()))
+                for identifier, source in sources
+            ),
         )
 
 
@@ -560,6 +574,33 @@ def load_hydration_coverage(path: Path) -> dict[str, object]:
         "deferred_bytes": int(row["deferred_bytes"]),
         "uncertain_source_count": int(row["uncertain_source_count"]),
     }
+
+
+def update_hydration_capture(
+    path: Path,
+    selection: HydrationSelection,
+) -> None:
+    """Advance no-change capture metadata without rewriting source rows."""
+
+    with _connect(path) as connection:
+        cursor = connection.execute(
+            """
+            UPDATE coverage_control
+            SET captured_at = ?,
+                cutoff_at = ?,
+                complete_history = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE singleton = 1 AND coverage_revision = ?
+            """,
+            (
+                _timestamp(selection.captured_at),
+                _timestamp(selection.cutoff_at),
+                int(selection.complete_history),
+                hydration_selection_revision(selection),
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError("hydration capture revision changed")
 
 
 def load_publication_snapshot(

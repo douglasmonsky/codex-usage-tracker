@@ -18,7 +18,10 @@ from codex_usage_tracker.kernel.operational import (
     load_cutover_control,
 )
 from codex_usage_tracker.kernel.query import Operation, QueryRequest, QueryService
-from codex_usage_tracker.kernel.rollups import generation_rollups_ready
+from codex_usage_tracker.kernel.rollups import (
+    _LINK_UNRESOLVED_TOOL_CALLS_SQL,
+    generation_rollups_ready,
+)
 from tests.kernel.interfaces.support import active_runtime
 from tests.kernel.test_ingest_pipeline import _token_line
 
@@ -167,6 +170,32 @@ def test_time_bands_and_tool_operations_use_bounded_rollups(
         )
     )
     assert nullable_metrics.plan_id == "tools.aggregate.v1"
+
+
+def test_tool_relink_changed_turn_filter_is_set_based(tmp_path: Path) -> None:
+    runtime = active_runtime(tmp_path)
+    control = load_cutover_control(runtime.kernel.operational)
+    assert control.active_kernel_path is not None
+    assert control.active_generation is not None
+
+    generation = control.active_generation
+    with sqlite3.connect(control.active_kernel_path) as connection:
+        plan = connection.execute(
+            "EXPLAIN QUERY PLAN " + _LINK_UNRESOLVED_TOOL_CALLS_SQL,
+            (
+                generation,
+                generation,
+                generation,
+                generation,
+                generation,
+                generation,
+            ),
+        ).fetchall()
+
+    details = tuple(str(row[3]) for row in plan)
+    assert any("idx_tool_calls_turn" in detail for detail in details)
+    assert any("LIST SUBQUERY" in detail for detail in details)
+    assert sum("CORRELATED SCALAR SUBQUERY" in detail for detail in details) == 2
 
 
 def test_model_rollup_regroups_unselected_effort_and_tier(

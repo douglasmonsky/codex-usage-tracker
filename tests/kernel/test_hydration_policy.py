@@ -169,6 +169,40 @@ def test_unchanged_catalog_reuses_bounded_structural_timestamp(
     assert second == first
 
 
+def test_no_change_refresh_reuses_committed_coverage_catalog(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _usage_source(
+        tmp_path / "sessions" / "unchanged.jsonl",
+        session_id="unchanged",
+        timestamp="2026-07-20T00:00:00Z",
+    )
+    paths = kernel_paths(tmp_path / "cache")
+    ingestor = KernelIngestor(paths.analytical, paths.operational)
+    ingestor.refresh(
+        [source],
+        trigger=RefreshTrigger.CLI_REFRESH,
+        owner_id="coverage-initial",
+        captured_at=_AS_OF,
+    )
+
+    def unexpected_catalog_write(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("unchanged coverage must not be rewritten")
+
+    monkeypatch.setattr(ingest, "stage_hydration_catalog", unexpected_catalog_write)
+    monkeypatch.setattr(ingest, "record_hydration_catalog", unexpected_catalog_write)
+    result = ingestor.refresh(
+        [source],
+        trigger=RefreshTrigger.CLI_REFRESH,
+        owner_id="coverage-no-change",
+        captured_at=_AS_OF,
+    )
+
+    assert result.planner_reason == "no_changes"
+    assert result.writer_transaction_ms == ()
+
+
 def test_previously_hydrated_source_stays_selected_when_window_narrows(
     tmp_path: Path,
 ) -> None:
