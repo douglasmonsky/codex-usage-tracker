@@ -9,6 +9,7 @@ import json
 import sqlite3
 import time
 from contextlib import ExitStack
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,59 @@ from .contracts import (
 )
 from .phases import ActivityFact, TokenFact, attribute_tokens, segment_phases
 from .plans import PLAN_VERSION, compile_plan
+
+
+def snapshot_query_template_context(
+    publication: tuple[CutoverControl, dict[str, object]],
+    *,
+    required_keys: frozenset[str] | None = None,
+) -> dict[str, str | int]:
+    """Resolve generation-bound anchors for curated named query templates."""
+
+    control, _history_coverage = publication
+    path = control.active_kernel_path
+    generation = control.active_generation
+    if path is None or generation is None:
+        raise ValueError("no active analytical generation")
+    context: dict[str, str | int] = {"latest_generation": generation}
+    if required_keys is not None and required_keys <= context.keys():
+        return context
+    with open_read_snapshot(path) as connection:
+        latest_value = connection.execute(
+            """
+            SELECT MAX(event_at)
+            FROM model_call_facts
+            WHERE generation <= ? AND duplicate_state = 'canonical'
+            """,
+            (generation,),
+        ).fetchone()[0]
+    if latest_value is None:
+        raise ValueError("query template requires indexed model calls")
+    try:
+        latest = datetime.fromisoformat(
+            str(latest_value).replace("Z", "+00:00")
+        )
+    except ValueError as exc:
+        raise ValueError("latest indexed event timestamp is invalid") from exc
+    if latest.tzinfo is None:
+        raise ValueError("latest indexed event timestamp is invalid")
+    latest = latest.astimezone(timezone.utc)
+    current_start = latest - timedelta(days=7)
+    previous_start = latest - timedelta(days=14)
+    context.update({
+        "current_end": _template_timestamp(latest + timedelta(milliseconds=1)),
+        "current_start": _template_timestamp(current_start),
+        "latest_event_at": _template_timestamp(latest),
+        "previous_end": _template_timestamp(current_start),
+        "previous_start": _template_timestamp(previous_start),
+    })
+    if required_keys is None:
+        return context
+    return {key: context[key] for key in required_keys}
+
+
+def _template_timestamp(value: datetime) -> str:
+    return value.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 class QueryService:

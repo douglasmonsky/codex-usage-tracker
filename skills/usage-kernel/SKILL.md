@@ -20,15 +20,29 @@ Use the three-step loop **scope → batch → evidence**:
    the needed fields are unfamiliar, set `include_guidance=true` on the same
    `usage_query` call that carries the first batch; use an empty batch only for
    standalone capability discovery.
-2. **Batch.** Prefer one batched `usage_query` request. Execute a curated
-   server-side template directly with `{"template":"<name>"}`; for the common
-   thread leaderboard use `{"template":"top_threads"}`. That template returns
-   the exact token leaderboard first and the cost/credit context second in the
-   same batch; do not run another query or resolve every selector unless the
-   user asks for deeper evidence. Supply `parameters` only when the selected
-   template requires them. Otherwise send only the typed dataset, operation,
-   dimensions, measures, filters, and limits needed for the question. Do not
-   copy or reconstruct a returned template body.
+2. **Batch.** Prefer one batched `usage_query` call. Its arguments always wrap
+   one or more query requests in the `requests` array. Execute a curated
+   server-side template with
+   `{"requests":[{"template":"<name>"}]}`; for the common thread leaderboard
+   use `{"requests":[{"template":"top_threads"}]}`. That template returns the
+   exact token leaderboard first and the cost/credit context second in the same
+   batch; do not run another query or resolve every selector unless the user
+   asks for deeper evidence. Use
+   `{"requests":[{"template":"weekly_drivers"}]}` for the latest indexed
+   seven-day thread leaderboard,
+   `{"requests":[{"template":"week_over_week"}]}` for that window versus the
+   immediately preceding seven days, and
+   `{"requests":[{"template":"latest_incremental_change"}]}` for the active
+   generation's inserted calls and leading affected thread. These templates
+   derive their anchors from the committed snapshot; do not discover dates or
+   generation numbers first. Use
+   `{"requests":[{"template":"model_effort"}]}` for model/effort mix and
+   `{"requests":[{"template":"tools"}]}` for structural tool facts. Do not repeat a
+   successful curated template or request guidance after it returns rows.
+   Supply `parameters` only when the selected template requires them.
+   Otherwise send only the typed dataset, operation, dimensions, measures,
+   filters, and limits needed for the question. Do not copy or reconstruct a
+   returned template body.
    Preserve the returned generation, grade, coverage, counts, and explicit
    row/byte limits. Compose filters as
    `{field, operator, value}` using only the dataset fields and operators in

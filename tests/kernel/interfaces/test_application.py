@@ -14,7 +14,11 @@ from codex_usage_tracker.kernel.application import (
 )
 from codex_usage_tracker.kernel.application.jobs import JobReader
 from codex_usage_tracker.kernel.hydration import HydrationPreset
-from codex_usage_tracker.kernel.ingest import refresh_request_hash
+from codex_usage_tracker.kernel.ingest import (
+    KernelIngestor,
+    RefreshTrigger,
+    refresh_request_hash,
+)
 from codex_usage_tracker.kernel.lease import RefreshLeaseRepository
 from codex_usage_tracker.kernel.operational import initialize_operational_database
 
@@ -83,12 +87,15 @@ def test_query_guidance_is_available_without_a_database_or_refresh(
         "allowance",
         "concentration",
         "context_composition",
+        "latest_incremental_change",
         "model_effort",
         "period_comparison",
         "subagents",
         "top_threads",
         "tools",
         "turns",
+        "week_over_week",
+        "weekly_drivers",
     )
     assert launches == []
     assert not app.paths.kernel.operational.exists()
@@ -151,6 +158,103 @@ def test_named_top_threads_template_matches_the_explicit_fast_path(
     assert repeated["cache"]["hit"] is True
     assert all(row["thread_label"] for row in named["results"][0]["rows"])
     assert named["results"][0]["evidence_selectors"]
+
+
+def test_curated_period_and_latest_change_templates_use_one_snapshot(
+    tmp_path: Path,
+) -> None:
+    app = KernelApplication(
+        active_runtime(tmp_path),
+        worker_launcher=lambda _paths, _preset: None,
+        source_provider=lambda _home: synthetic_sources(),
+    )
+
+    weekly = app.query({"requests": [{"template": "weekly_drivers"}]})
+    comparison = app.query({"requests": [{"template": "week_over_week"}]})
+    latest = app.query(
+        {"requests": [{"template": "latest_incremental_change"}]}
+    )
+
+    assert len(weekly["results"]) == 1
+    assert weekly["results"][0]["rows"]
+    assert weekly["results"][0]["generation"] == 1
+    assert weekly["results"][0]["normalized_scope"]["filters"] == [
+        {
+            "field": "event_at",
+            "operator": "gte",
+            "value": "2025-12-26T00:00:04.500Z",
+        },
+        {
+            "field": "event_at",
+            "operator": "lte",
+            "value": "2026-01-02T00:00:04.500Z",
+        },
+    ]
+    assert comparison["results"][0]["rows"] == [
+        {
+            "change_percent_total_tokens": None,
+            "change_total_tokens": 515,
+            "current_total_tokens": 515,
+            "previous_total_tokens": 0,
+        }
+    ]
+    assert comparison["results"][0]["generation"] == 1
+    assert [result["rows"] for result in latest["results"]] == [
+        [
+            {
+                "calls": 4,
+                "generation": 1,
+                "total_tokens": 515,
+            }
+        ],
+        [
+                {
+                    "calls": 3,
+                    "thread": "thr_110d88d20a0cf11ee23996ca93651d87",
+                    "thread_label": "Thread 4f5cda07",
+                    "total_tokens": 420,
+                }
+        ],
+    ]
+    assert {result["generation"] for result in latest["results"]} == {1}
+    assert all(result["grade"] == "exact" for result in latest["results"])
+
+
+def test_latest_incremental_template_supports_an_empty_active_generation(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "sessions" / "empty.jsonl"
+    source.parent.mkdir()
+    source.write_text(
+        '{"payload":{"id":"00000000-0000-4000-8000-000000000001"},'
+        '"timestamp":"2026-07-28T00:00:00.000Z","type":"session_meta"}\n',
+        encoding="utf-8",
+    )
+    runtime = RuntimePaths(tmp_path / "codex-home", tmp_path / "cache")
+    refresh = KernelIngestor(
+        runtime.kernel.analytical,
+        runtime.kernel.operational,
+    ).refresh(
+        [source],
+        trigger=RefreshTrigger.CLI_REFRESH,
+        owner_id="empty-active-generation",
+        hydration_preset=HydrationPreset.COMPLETE,
+    )
+    app = KernelApplication(
+        runtime,
+        worker_launcher=lambda _paths, _preset: None,
+        source_provider=lambda _home: (source,),
+    )
+
+    response = app.query(
+        {"requests": [{"template": "latest_incremental_change"}]}
+    )
+
+    assert refresh.generation == 1
+    assert len(response["results"]) == 2
+    assert {result["generation"] for result in response["results"]} == {1}
+    assert all(result["matched_count"] == 0 for result in response["results"])
+    assert all(result["rows"] == [] for result in response["results"])
 
 
 @pytest.mark.parametrize(

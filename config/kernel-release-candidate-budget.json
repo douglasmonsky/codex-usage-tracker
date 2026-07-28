@@ -1,7 +1,7 @@
 {
   "schema": "codex-usage-tracker.kernel-rc-budget.v1",
   "headroom_percent": 3,
-  "kernel_source_bytes": 640718,
+  "kernel_source_bytes": 662656,
   "console_asset_bytes": 81450,
   "analytical_tables": 17,
   "analytical_indexes": 15,
@@ -11,12 +11,12 @@
   "cli_commands": 11,
   "wheel_bytes": 175625,
   "sdist_bytes": 515011,
-  "plugin_bundle_bytes": 4768,
+  "plugin_bundle_bytes": 5620,
   "mcp_golden_prompt": {
     "mcp_calls": 3,
-    "measured_response_bytes": [889, 19591, 1023],
-    "response_byte_ceilings": [915, 20178, 1053],
-    "measured_total_bytes": 21503,
-    "total_byte_ceiling": 22148
+    "measured_response_bytes": [889, 21630, 1023],
+    "response_byte_ceilings": [915, 22278, 1053],
+    "measured_total_bytes": 23542,
+    "total_byte_ceiling": 24248
   }
 }

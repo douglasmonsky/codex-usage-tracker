@@ -675,6 +675,83 @@ review was run. The installed 170,773-byte wheel passed the one-call task, and
 the pre-ledger 500,499-byte sdist remained within its measured-plus-3% release
 budget.
 
+### R7 qualification correction — issue #353
+
+The expanded R7 prompt suite showed that several common questions still made
+four to six query calls, while latest-change reporting failed outright. The
+underlying typed queries were exact and fast, but agents had to discover time
+windows and generation filters themselves. Issue #353 adds three deterministic
+query plans inside the existing `usage_query` contract:
+
+- `weekly_drivers` anchors a seven-day thread leaderboard to the latest
+  committed event;
+- `week_over_week` compares that window with the immediately preceding
+  non-overlapping seven days; and
+- `latest_incremental_change` reports active-generation call/token totals and
+  the leading affected human-labeled thread.
+
+The templates bind their derived time and generation filters to the same
+generation-scoped publication snapshot as execution. The additive call
+`generation` dimension remains available for explicit typed exploration. No
+tool, narrative-analysis surface, migration, or refresh behavior was added.
+
+The installed qualification then exposed a second boundary defect. The public
+schema correctly required template requests inside the top-level `requests`
+array, but the bundled skill taught agents to send a template object as the
+entire tool payload. Direct installed MCP reproduction returned
+`usage_query is missing requests` for all three new templates, explaining both
+the fallback query fan-out and the unsupported latest-change answer. A failing
+plugin contract now freezes the exact copyable form
+`{"requests":[{"template":"<name>"}]}`, and the skill uses that form for every
+named template.
+
+Against the deterministic eight-thread R7 fixture, three fresh ephemeral Codex
+CLI tasks now each use one `usage_query` call, one query batch, zero refreshes,
+zero polls, and return 100% oracle-accurate facts:
+
+| Prompt | End to end | Tracker time | MCP calls | Accuracy | Usefulness |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Weekly drivers | 28.200 s | 37.033 ms | 1 | 100% | 4/4 |
+| Week over week | 24.572 s | 39.177 ms | 1 | 100% | 4/4 |
+| Latest incremental change | 35.413 s | 37.681 ms | 1 | 100% | 4/4 |
+
+The one-call product behavior is fixed, but the 15-second end-to-end R7 target
+still fails because the first tool begins 18.696–21.153 seconds into each fresh
+host task. Tracker execution is below 40 ms, so R7 records this as host/model
+startup and response latency rather than weakening the target or adding hidden
+precomputation. The identical unprofiled interface workload measured all three
+curated templates together at 4.812 ms p95. Attribution-only `agent-perf` run
+`20260728T102056Z-44385ed3` completed without the new template path appearing
+as a hotspot.
+
+Focused template, application, MCP, plugin, and performance contracts pass.
+Ruff and MyPy pass, generated schemas and the bundle manifest are canonical,
+and the maintained `just vp` profile passes. The broad repository run passes
+437 Python tests plus frontend lint, type, and unit checks, Pyright, scope,
+maintainability, privacy, deterministic-interface, and release-safety gates.
+The public schema hash and measured budgets were ratcheted for the additive
+query contract: 643,356 measured kernel-source bytes under a 662,656-byte
+ceiling, a 5,457-byte plugin bundle under 5,620 bytes, and 23,542 measured
+golden-response bytes under 24,248 bytes. The pre-ledger wheel and sdist pass
+exact composition and distribution budgets; the PR qualification reports the
+exact post-ledger artifact sizes and digests rather than self-embedding a
+changing sdist identity. GitNexus classified the diff high risk because
+`KernelApplication.query` and `QueryService.execute_batch` feed twelve
+dispatch/query processes; the complete application, interface, query, cache,
+response-budget, and release suites cover those paths.
+
+The single final read-only reviewer reported one medium-severity finding and it
+was accepted. `latest_incremental_change` needs only the active generation, but
+the shared context resolver also required a latest model-call timestamp. A
+valid empty or structural-only generation therefore failed before returning
+exact empty results. Context resolution now derives only the keys selected
+templates require, and a new active-empty-generation regression passes.
+Review totals are one finding, one accepted finding (`R1`), reviewer-token
+status `pending`, and tokens per accepted finding `pending`; the aggregate-only
+metrics helper could not attribute tokens because the installed CLI no longer
+provides its historical `strict` command. No retry or second reviewer was run.
+PR and CI evidence remains pending on the corrected stable diff.
+
 ## R4 — Build Persisted Rollups And Fast MCP/API Paths
 
 **State:** In progress
