@@ -36,12 +36,14 @@ Issues = "https://github.com/douglasmonsky/codex-usage-tracker/issues"
 [project.optional-dependencies]
 dev = [
   "build>=1.2",
+  "jsonschema>=4.23",
   "mypy>=1.10",
   "pytest>=8.0",
   "pyright>=1.1.405",
   "ruff>=0.8",
   "scalene==2.3.0",
   "tomli>=2.0; python_version < '3.11'",
+  "types-jsonschema>=4.23",
   "xenon>=0.9.3",
 ]
 
@@ -69,7 +71,7 @@ namespaces = true
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/kernel", "tests/release"]
+testpaths = ["tests/agent_kernel", "tests/kernel", "tests/release"]
 pythonpath = [".", "src"]
 addopts = ["--import-mode=importlib"]
 
@@ -89,6 +91,7 @@ explicit_package_bases = true
 files = [
   "scripts/benchmark_agent_outcome.py",
   "scripts/benchmark_kernel.py",
+  "scripts/check_agent_kernel_contracts.py",
   "scripts/check_kernel_maintainability.py",
   "scripts/check_kernel_release_candidate.py",
   "scripts/check_kernel_scope.py",
@@ -106,6 +109,7 @@ files = [
 include = [
   "scripts/benchmark_agent_outcome.py",
   "scripts/benchmark_kernel.py",
+  "scripts/check_agent_kernel_contracts.py",
   "scripts/check_kernel_maintainability.py",
   "scripts/check_kernel_release_candidate.py",
   "scripts/check_kernel_scope.py",

@@ -7,10 +7,10 @@ in the linked files under [`docs/roadmap/tasks/`](tasks/).
 
 ## Overall
 
-- Completed packets: **1 / 17**
+- Completed packets: **2 / 17**
 - In progress: **None**
-- Not started: **16**
-- Critical-path completion: **1 / 16**
+- Not started: **15**
+- Critical-path completion: **2 / 16**
 - Optional packets: **CK-15**
 
 A packet may be checked only after its acceptance criteria and required checks
@@ -21,7 +21,8 @@ line and the milestone accounting below.
 ## Milestones
 
 - [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
-- [ ] **M1 — Architecture Selected** · 0 / 4 · CK-01–CK-04 not started
+- [ ] **M1 — Architecture Selected** · 1 / 4 · CK-01 complete; CK-02–CK-04
+  not started
 - [ ] **M2 — Kernel Alpha** · 0 / 5 · CK-05–CK-09 not started
 - [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
 - [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
@@ -38,7 +39,7 @@ line and the milestone accounting below.
 
 ### M1 — Architecture Selected
 
-- [ ] **CK-01 — Make the question catalog executable** · Not started ·
+- [x] **CK-01 — Make the question catalog executable** · **Completed** ·
   depends on CK-00
   · [packet](tasks/ck-01-make-question-catalog-executable.md)
 - [ ] **CK-02 — Freeze logical contract vectors** · Not started ·

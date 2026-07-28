@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.check_kernel_scope import (
+    CK01_AGENT_KERNEL_CONTRACT_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     INTEGRATION_ADDITIONS,
     K1A_ADDITIONS,
@@ -256,6 +257,14 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "src/codex_usage_tracker/kernel/thread_labels.py",
         "tests/kernel/test_r5_analytical_primitives.py",
     } == R5_ADDITIONS
+    assert {
+        "config/agent-kernel/question-catalog-v1.json",
+        "config/agent-kernel/question-catalog-v1.schema.json",
+        "config/agent-kernel/question-guidance-v1.json",
+        "scripts/check_agent_kernel_contracts.py",
+        "tests/agent_kernel/contracts/__init__.py",
+        "tests/agent_kernel/contracts/test_question_catalog.py",
+    } == CK01_AGENT_KERNEL_CONTRACT_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -278,6 +287,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | R3_ADDITIONS
         | R4_ADDITIONS
         | R5_ADDITIONS
+        | CK01_AGENT_KERNEL_CONTRACT_ADDITIONS
     )
 
 

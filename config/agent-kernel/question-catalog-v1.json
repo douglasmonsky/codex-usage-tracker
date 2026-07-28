@@ -1,0 +1,2133 @@
+{
+  "schema": "codex-usage-tracker.question-catalog.v1",
+  "version": 1,
+  "source": "docs/product/SUPPORTED_QUESTION_CONTRACTS.md",
+  "guidance_budget_bytes": 16384,
+  "parameter_ids": [
+    "allowance_selector",
+    "cohort",
+    "context_epoch",
+    "current_project",
+    "current_session",
+    "current_window",
+    "cursor",
+    "driver_dimension",
+    "end_observation",
+    "entity_kind",
+    "evidence_view",
+    "family_mode",
+    "left_session",
+    "limit",
+    "minimum_samples",
+    "percentile",
+    "previous_window",
+    "project_selector",
+    "rate_card",
+    "resource_selector",
+    "right_session",
+    "scope",
+    "session_selector",
+    "start_observation",
+    "threshold",
+    "timezone",
+    "tool_selector",
+    "week_start",
+    "window"
+  ],
+  "capabilities": [
+    "allowance_observation",
+    "completion_lifecycle",
+    "compaction_boundary",
+    "context_window",
+    "model_call_usage",
+    "project_identity",
+    "publication_delta",
+    "publication_state",
+    "resource_identity",
+    "session_hierarchy",
+    "session_identity",
+    "source_inventory",
+    "source_occurrence",
+    "state_change_observation",
+    "structural_context",
+    "tool_lifecycle",
+    "turn_identity",
+    "valuation"
+  ],
+  "measurements": [
+    "allowance_limit",
+    "allowance_percent",
+    "cached_input_tokens",
+    "call_count",
+    "completion_state",
+    "configured_cost_usd",
+    "context_window_tokens",
+    "duration_us",
+    "estimated_credits",
+    "event_time_us",
+    "hierarchy_depth",
+    "model_profile",
+    "mutation_count",
+    "output_tokens",
+    "reasoning_tokens",
+    "resource_operation",
+    "source_occurrence_count",
+    "tool_output_bytes",
+    "tool_status",
+    "turn_count",
+    "uncached_input_tokens"
+  ],
+  "logical_primitives": [
+    "allowance_observation",
+    "canonical_call",
+    "compaction_boundary",
+    "context_component",
+    "model_profile",
+    "project",
+    "publication",
+    "publication_delta",
+    "resource",
+    "session",
+    "source_manifestation",
+    "source_occurrence",
+    "state_change",
+    "tool_invocation",
+    "turn",
+    "valuation_match"
+  ],
+  "coverage_dimensions": [
+    "allowance",
+    "capability",
+    "comparison",
+    "completion",
+    "context",
+    "freshness",
+    "hierarchy",
+    "history",
+    "lifecycle",
+    "measurement",
+    "occurrence",
+    "publication",
+    "resource",
+    "valuation",
+    "window"
+  ],
+  "selector_kinds": [
+    "allowance_interval",
+    "allowance_observation",
+    "call",
+    "model_profile",
+    "project",
+    "publication",
+    "rate_card",
+    "resource",
+    "session",
+    "source_manifestation",
+    "state_change",
+    "tool",
+    "turn",
+    "window"
+  ],
+  "projection_ids": [
+    "allowance_interval_current",
+    "daily_usage_current",
+    "latest_publication_delta_current",
+    "model_effort_time_current",
+    "root_family_usage_current",
+    "session_usage_current",
+    "tool_resource_current"
+  ],
+  "evidence_classes": [
+    {
+      "id": "E0",
+      "selector_kinds": [
+        "publication",
+        "rate_card",
+        "window"
+      ]
+    },
+    {
+      "id": "E1",
+      "selector_kinds": [
+        "call",
+        "model_profile",
+        "project",
+        "resource",
+        "session",
+        "tool",
+        "turn"
+      ]
+    },
+    {
+      "id": "E2",
+      "selector_kinds": [
+        "call",
+        "model_profile",
+        "resource",
+        "session",
+        "state_change",
+        "tool",
+        "turn"
+      ]
+    },
+    {
+      "id": "E3",
+      "selector_kinds": [
+        "model_profile",
+        "project",
+        "session",
+        "tool",
+        "window"
+      ]
+    },
+    {
+      "id": "E4",
+      "selector_kinds": [
+        "allowance_interval",
+        "allowance_observation"
+      ]
+    },
+    {
+      "id": "E5",
+      "selector_kinds": [
+        "call",
+        "resource",
+        "session",
+        "state_change",
+        "tool",
+        "turn"
+      ]
+    },
+    {
+      "id": "E6",
+      "selector_kinds": [
+        "source_manifestation"
+      ]
+    },
+    {
+      "id": "E7",
+      "selector_kinds": [
+        "call",
+        "session",
+        "turn"
+      ]
+    }
+  ],
+  "performance_classes": [
+    {
+      "id": "P0",
+      "sql_p95_ms": 10,
+      "mcp_p95_ms": 250,
+      "query_calls": 1,
+      "evidence_calls": 0,
+      "response_bytes": 4096
+    },
+    {
+      "id": "P1",
+      "sql_p95_ms": 25,
+      "mcp_p95_ms": 500,
+      "query_calls": 1,
+      "evidence_calls": 0,
+      "response_bytes": 8192
+    },
+    {
+      "id": "P2",
+      "sql_p95_ms": 100,
+      "mcp_p95_ms": 500,
+      "query_calls": 1,
+      "evidence_calls": 0,
+      "response_bytes": 16384
+    },
+    {
+      "id": "P3",
+      "sql_p95_ms": 100,
+      "mcp_p95_ms": 750,
+      "query_calls": 1,
+      "evidence_calls": 1,
+      "response_bytes": 16384
+    },
+    {
+      "id": "P4",
+      "sql_p95_ms": 250,
+      "mcp_p95_ms": 750,
+      "query_calls": 1,
+      "evidence_calls": 1,
+      "response_bytes": 16384
+    },
+    {
+      "id": "P5",
+      "sql_p95_ms": 100,
+      "mcp_p95_ms": 500,
+      "query_calls": 1,
+      "evidence_calls": 0,
+      "response_bytes": 16384
+    }
+  ],
+  "questions": [
+    {
+      "question_id": "Q-ACC-01",
+      "version": 1,
+      "title": "Current usage",
+      "plan_id": "current_usage",
+      "support_classes": ["N"],
+      "stage": "Foundation",
+      "intent_phrases": ["How much usage is in this session/today/this week/the selected window? Variants include token breakdown and current project"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["current_project", "current_session", "scope", "timezone"]
+      },
+      "required_capabilities": ["model_call_usage", "session_identity"],
+      "required_measurements": ["cached_input_tokens", "call_count", "output_tokens", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "project", "session", "valuation_match"],
+        "operations": ["aggregate"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "cached_input_tokens": "exact",
+          "calls": "exact",
+          "configured_cost_usd": "configured_estimate",
+          "estimated_credits": "configured_estimate",
+          "output_tokens": "exact",
+          "reasoning_tokens": "exact",
+          "total_tokens": "exact",
+          "uncached_input_tokens": "exact"
+        },
+        "formulas": ["total_tokens_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["freshness", "history", "measurement", "publication", "valuation", "window"],
+      "evidence": {
+        "classes": ["E0"],
+        "selector_kinds": ["publication", "window"]
+      },
+      "prohibited_claims": ["infer completion, productivity, or remaining allowance"],
+      "order": ["window_start_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["daily_usage_current", "session_usage_current"],
+      "oracle_ids": ["oracle:q-acc-01:boundaries", "oracle:q-acc-01:missing_measurement"],
+      "lower_model_hint": "Report the four token classes and stated total formula; keep missing values null and do not infer outcomes."
+    },
+    {
+      "question_id": "Q-ACC-02",
+      "version": 1,
+      "title": "Top sessions and concentration",
+      "plan_id": "top_sessions",
+      "support_classes": ["N"],
+      "stage": "Foundation",
+      "intent_phrases": ["List my top threads/sessions by usage and How concentrated is usage?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "project_selector", "timezone"]
+      },
+      "required_capabilities": ["model_call_usage", "session_identity"],
+      "required_measurements": ["cached_input_tokens", "call_count", "output_tokens", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "session"],
+        "operations": ["aggregate", "share"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "cached_input_tokens": "exact",
+          "calls": "exact",
+          "output_tokens": "exact",
+          "reasoning_tokens": "exact",
+          "remainder_share": "deterministic",
+          "top_share": "deterministic",
+          "total_tokens": "exact",
+          "uncached_input_tokens": "exact"
+        },
+        "formulas": ["hhi_v1", "top_n_share_v1", "total_tokens_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["history", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E0", "E1"],
+        "selector_kinds": ["publication", "session", "window"]
+      },
+      "prohibited_claims": ["call a large session wasteful or semantically group sessions by label"],
+      "order": ["total_tokens_desc", "session_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["session_usage_current"],
+      "oracle_ids": ["oracle:q-acc-02:ties", "oracle:q-acc-02:duplicate_source"],
+      "lower_model_hint": "Use returned labels and selectors, state concentration arithmetically, and never translate size into quality."
+    },
+    {
+      "question_id": "Q-ACC-03",
+      "version": 1,
+      "title": "Period change and drivers",
+      "plan_id": "period_drivers",
+      "support_classes": ["N"],
+      "stage": "Cutover",
+      "intent_phrases": ["Compare the last seven days to the previous seven and explain which sessions/projects/models/tools account for the arithmetic change"],
+      "parameters": {
+        "required": ["current_window", "driver_dimension", "previous_window", "timezone"],
+        "optional": ["limit", "week_start"]
+      },
+      "required_capabilities": ["model_call_usage", "session_identity"],
+      "required_measurements": ["cached_input_tokens", "output_tokens", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "model_profile", "project", "session", "tool_invocation"],
+        "operations": ["aggregate", "comparison"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "current_total_tokens": "exact",
+          "driver_contribution": "deterministic",
+          "previous_total_tokens": "exact",
+          "total_delta": "deterministic"
+        },
+        "formulas": ["equal_window_delta_v1", "signed_driver_reconciliation_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["comparison", "history", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E3", "E1"],
+        "selector_kinds": ["model_profile", "project", "session", "tool", "window"]
+      },
+      "prohibited_claims": ["turn arithmetic contribution into causal explanation"],
+      "order": ["absolute_contribution_desc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": ["daily_usage_current", "model_effort_time_current"],
+      "oracle_ids": ["oracle:q-acc-03:nonoverlap", "oracle:q-acc-03:reconciliation"],
+      "lower_model_hint": "Describe signed arithmetic drivers that reconcile to the delta; label them non-causal."
+    },
+    {
+      "question_id": "Q-ACC-04",
+      "version": 1,
+      "title": "Model, effort, and service-tier mix",
+      "plan_id": "model_effort_mix",
+      "support_classes": ["N"],
+      "stage": "Foundation",
+      "intent_phrases": ["Which model/effort combinations consume each token class?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "project_selector", "timezone"]
+      },
+      "required_capabilities": ["model_call_usage"],
+      "required_measurements": ["cached_input_tokens", "model_profile", "output_tokens", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "model_profile"],
+        "operations": ["aggregate", "share"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "cached_input_tokens": "exact",
+          "calls": "exact",
+          "output_tokens": "exact",
+          "reasoning_tokens": "exact",
+          "share": "deterministic",
+          "uncached_input_tokens": "exact"
+        },
+        "formulas": ["observed_share_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E0"],
+        "selector_kinds": ["publication", "window"]
+      },
+      "prohibited_claims": ["claim one profile is better without comparable outcomes"],
+      "order": ["total_tokens_desc", "model_profile_id_asc"],
+      "limits": {
+        "default_rows": 20,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["model_effort_time_current"],
+      "oracle_ids": ["oracle:q-acc-04:unknown_effort", "oracle:q-acc-04:profile_transition"],
+      "lower_model_hint": "Keep unknown model attributes explicit and compare usage mix only, not model quality."
+    },
+    {
+      "question_id": "Q-ACC-05",
+      "version": 1,
+      "title": "Project and session-family usage",
+      "plan_id": "project_family_usage",
+      "support_classes": ["N"],
+      "stage": "Cutover",
+      "intent_phrases": ["Which projects or parent/subagent families dominate?"],
+      "parameters": {
+        "required": ["family_mode", "window"],
+        "optional": ["limit", "project_selector", "timezone"]
+      },
+      "required_capabilities": ["project_identity", "session_hierarchy", "session_identity"],
+      "required_measurements": ["call_count", "hierarchy_depth", "output_tokens", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "project", "session"],
+        "operations": ["aggregate", "share"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "exclusive_tokens": "exact",
+          "family_tokens": "exact",
+          "session_count": "exact",
+          "share": "deterministic"
+        },
+        "formulas": ["exclusive_inclusive_scope_v1", "observed_share_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["hierarchy", "history", "publication", "window"],
+      "evidence": {
+        "classes": ["E0", "E1"],
+        "selector_kinds": ["project", "publication", "session", "window"]
+      },
+      "prohibited_claims": ["infer semantic task families from labels"],
+      "order": ["total_tokens_desc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["root_family_usage_current"],
+      "oracle_ids": ["oracle:q-acc-05:multilevel_hierarchy", "oracle:q-acc-05:late_parent"],
+      "lower_model_hint": "Keep project-exclusive and family-inclusive modes separate and do not invent semantic grouping."
+    },
+    {
+      "question_id": "Q-ACC-06",
+      "version": 1,
+      "title": "Most expensive entities",
+      "plan_id": "top_valued_entities",
+      "support_classes": ["N"],
+      "stage": "Cutover",
+      "intent_phrases": ["Which calls, turns, or sessions have the highest current estimated dollar or credit value?"],
+      "parameters": {
+        "required": ["entity_kind", "rate_card", "window"],
+        "optional": ["limit", "project_selector", "timezone"]
+      },
+      "required_capabilities": ["model_call_usage", "valuation"],
+      "required_measurements": ["cached_input_tokens", "configured_cost_usd", "estimated_credits", "output_tokens", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "session", "turn", "valuation_match"],
+        "operations": ["aggregate", "rows"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "configured_cost_usd": "configured_estimate",
+          "estimated_credits": "configured_estimate",
+          "rated_calls": "exact",
+          "total_tokens": "exact",
+          "unrated_calls": "exact"
+        },
+        "formulas": ["current_valuation_v1", "total_tokens_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["measurement", "publication", "valuation", "window"],
+      "evidence": {
+        "classes": ["E0", "E1"],
+        "selector_kinds": ["call", "publication", "rate_card", "session", "turn", "window"]
+      },
+      "prohibited_claims": ["label estimate as billed cost or reconstruct historical prices"],
+      "order": ["configured_value_desc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["session_usage_current"],
+      "oracle_ids": ["oracle:q-acc-06:mixed_pricing", "oracle:q-acc-06:zero_coverage"],
+      "lower_model_hint": "Call values configured estimates, disclose rated and unrated coverage, and retain unpriced rows."
+    },
+    {
+      "question_id": "Q-ACC-07",
+      "version": 1,
+      "title": "Pricing and credit gaps",
+      "plan_id": "pricing_coverage",
+      "support_classes": ["N"],
+      "stage": "Cutover",
+      "intent_phrases": ["How much usage lacks cost or credit estimates, and which models explain the gap?"],
+      "parameters": {
+        "required": ["rate_card", "window"],
+        "optional": ["limit", "timezone"]
+      },
+      "required_capabilities": ["model_call_usage", "valuation"],
+      "required_measurements": ["call_count", "model_profile", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "model_profile", "valuation_match"],
+        "operations": ["aggregate", "distribution"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "priced_calls": "exact",
+          "pricing_coverage": "deterministic",
+          "unpriced_calls": "exact",
+          "unpriced_tokens": "exact"
+        },
+        "formulas": ["valuation_coverage_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["measurement", "publication", "valuation", "window"],
+      "evidence": {
+        "classes": ["E0", "E1"],
+        "selector_kinds": ["call", "model_profile", "publication", "rate_card", "window"]
+      },
+      "prohibited_claims": ["report total spend as complete below 100% coverage"],
+      "order": ["unpriced_tokens_desc", "model_profile_id_asc"],
+      "limits": {
+        "default_rows": 20,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["model_effort_time_current"],
+      "oracle_ids": ["oracle:q-acc-07:missing_rate_card", "oracle:q-acc-07:unmatched_alias"],
+      "lower_model_hint": "Lead with valuation coverage and reasons; never present partial estimated spend as complete."
+    },
+    {
+      "question_id": "Q-CTX-01",
+      "version": 1,
+      "title": "Poor cache reuse under high input",
+      "plan_id": "cache_reuse_candidates",
+      "support_classes": ["N"],
+      "stage": "Foundation",
+      "intent_phrases": ["Where is cache reuse low despite high input?"],
+      "parameters": {
+        "required": ["threshold", "window"],
+        "optional": ["limit", "percentile", "project_selector", "timezone"]
+      },
+      "required_capabilities": ["model_call_usage", "session_identity"],
+      "required_measurements": ["cached_input_tokens", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "session", "turn"],
+        "operations": ["feature_vector", "rows"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "cached_share": "deterministic",
+          "cached_input_tokens": "exact",
+          "total_input_tokens": "deterministic",
+          "uncached_input_tokens": "exact"
+        },
+        "formulas": ["cached_share_v1", "total_input_tokens_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E1", "E5"],
+        "selector_kinds": ["call", "session", "turn"]
+      },
+      "prohibited_claims": ["equate poor cache reuse with workflow quality"],
+      "order": ["total_input_tokens_desc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["session_usage_current"],
+      "oracle_ids": ["oracle:q-ctx-01:missing_cached_input", "oracle:q-ctx-01:percentile_ties"],
+      "lower_model_hint": "Return candidates with the observed threshold and cache formula; do not grade workflow quality."
+    },
+    {
+      "question_id": "Q-CTX-02",
+      "version": 1,
+      "title": "Context-pressure trajectory",
+      "plan_id": "context_pressure_trajectory",
+      "support_classes": ["N"],
+      "stage": "Cutover",
+      "intent_phrases": ["Which sessions approach context limits or deteriorate across turns?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["context_epoch", "limit", "session_selector", "timezone"]
+      },
+      "required_capabilities": ["compaction_boundary", "context_window", "session_identity", "turn_identity"],
+      "required_measurements": ["cached_input_tokens", "context_window_tokens", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "compaction_boundary", "session", "turn"],
+        "operations": ["feature_vector", "timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "cached_share": "deterministic",
+          "context_pressure": "deterministic",
+          "context_window_tokens": "exact",
+          "ordered_input_tokens": "exact"
+        },
+        "formulas": ["cached_share_v1", "context_pressure_v1", "trajectory_slope_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["context", "history", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E1", "E2"],
+        "selector_kinds": ["call", "session", "turn"]
+      },
+      "prohibited_claims": ["prescribe splitting or claim causality"],
+      "order": ["context_pressure_desc", "session_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": ["session_usage_current"],
+      "oracle_ids": ["oracle:q-ctx-02:compaction_epoch", "oracle:q-ctx-02:missing_window"],
+      "lower_model_hint": "Keep epochs separate, disclose context-window coverage, and describe trajectory without prescribing a split."
+    },
+    {
+      "question_id": "Q-CTX-03",
+      "version": 1,
+      "title": "Token acceleration",
+      "plan_id": "token_acceleration",
+      "support_classes": ["C"],
+      "stage": "Advanced",
+      "intent_phrases": ["Which sessions accelerate across successive turns?"],
+      "parameters": {
+        "required": ["minimum_samples", "window"],
+        "optional": ["limit", "session_selector", "timezone"]
+      },
+      "required_capabilities": ["session_identity", "turn_identity"],
+      "required_measurements": ["cached_input_tokens", "output_tokens", "turn_count", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "session", "turn"],
+        "operations": ["feature_vector"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "later_earlier_ratio": "deterministic",
+          "second_difference": "deterministic",
+          "turn_tokens": "exact"
+        },
+        "formulas": ["later_earlier_median_ratio_v1", "second_difference_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["history", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E1", "E5"],
+        "selector_kinds": ["session", "turn"]
+      },
+      "prohibited_claims": ["call acceleration waste or caused by context"],
+      "order": ["acceleration_desc", "session_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-ctx-03:constant_sequence", "oracle:q-ctx-03:outlier_policy"],
+      "lower_model_hint": "Repeat the versioned statistic and sample rule; acceleration is a feature, not a waste judgment."
+    },
+    {
+      "question_id": "Q-CTX-04",
+      "version": 1,
+      "title": "Largest uncached-input jumps",
+      "plan_id": "uncached_input_jumps",
+      "support_classes": ["N"],
+      "stage": "Cutover",
+      "intent_phrases": ["Where did new input jump most between consecutive calls/turns?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["context_epoch", "limit", "session_selector", "timezone"]
+      },
+      "required_capabilities": ["compaction_boundary", "model_call_usage", "session_identity"],
+      "required_measurements": ["event_time_us", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "compaction_boundary", "session", "turn"],
+        "operations": ["comparison", "rows"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "current_uncached_input_tokens": "exact",
+          "input_delta": "deterministic",
+          "previous_uncached_input_tokens": "exact"
+        },
+        "formulas": ["consecutive_delta_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["context", "history", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E2"],
+        "selector_kinds": ["call", "turn"]
+      },
+      "prohibited_claims": ["attribute jump to the preceding event"],
+      "order": ["input_delta_desc", "call_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-ctx-04:compaction_boundary", "oracle:q-ctx-04:equal_time"],
+      "lower_model_hint": "Show both boundary calls and the delta inside one epoch; state that temporal adjacency is non-causal."
+    },
+    {
+      "question_id": "Q-CTX-05",
+      "version": 1,
+      "title": "Tool-output adjacency",
+      "plan_id": "tool_output_adjacency",
+      "support_classes": ["C", "I"],
+      "stage": "Advanced",
+      "intent_phrases": ["Which large tool outputs were followed by the largest new-input increase?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "session_selector", "threshold", "timezone", "tool_selector"]
+      },
+      "required_capabilities": ["model_call_usage", "tool_lifecycle"],
+      "required_measurements": ["event_time_us", "tool_output_bytes", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "tool_invocation", "turn"],
+        "operations": ["feature_vector", "timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "following_input_delta": "deterministic",
+          "intervening_events": "exact",
+          "tool_output_bytes": "exact"
+        },
+        "formulas": ["bounded_adjacency_v1", "consecutive_delta_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["lifecycle", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E2", "E5"],
+        "selector_kinds": ["call", "tool", "turn"]
+      },
+      "prohibited_claims": ["say tool output was included or caused the increase"],
+      "order": ["following_input_delta_desc", "tool_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-ctx-05:multiple_tools", "oracle:q-ctx-05:no_following_call"],
+      "lower_model_hint": "Use adjacent sequence facts only, include intervening events, and explicitly reject causal attribution."
+    },
+    {
+      "question_id": "Q-CTX-06",
+      "version": 1,
+      "title": "Cached replay with small output",
+      "plan_id": "cached_replay_small_output",
+      "support_classes": ["C", "I"],
+      "stage": "Advanced",
+      "intent_phrases": ["Where is large cached replay producing little model output?"],
+      "parameters": {
+        "required": ["threshold", "window"],
+        "optional": ["limit", "session_selector", "timezone"]
+      },
+      "required_capabilities": ["model_call_usage", "session_identity"],
+      "required_measurements": ["cached_input_tokens", "output_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "session", "turn"],
+        "operations": ["feature_vector", "rows"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "cached_input_tokens": "exact",
+          "cached_output_ratio": "deterministic",
+          "output_tokens": "exact"
+        },
+        "formulas": ["cached_output_ratio_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E1", "E5"],
+        "selector_kinds": ["call", "session", "turn"]
+      },
+      "prohibited_claims": ["infer little useful work because tools may carry the action"],
+      "order": ["cached_input_tokens_desc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-ctx-06:zero_output", "oracle:q-ctx-06:tool_heavy_turn"],
+      "lower_model_hint": "Report the observed pair and ratio; do not treat small model output as low task value."
+    },
+    {
+      "question_id": "Q-CTX-07",
+      "version": 1,
+      "title": "Context composition",
+      "plan_id": "context_composition",
+      "support_classes": ["O", "D"],
+      "stage": "Optional",
+      "intent_phrases": ["How much observed context belongs to tools, MCP, files, messages, or other structural categories?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "session_selector", "timezone"]
+      },
+      "required_capabilities": ["structural_context"],
+      "required_measurements": ["source_occurrence_count", "tool_output_bytes"],
+      "logical_plan": {
+        "primitives": ["context_component", "session", "turn"],
+        "operations": ["aggregate", "distribution"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "component_bytes": "exact",
+          "component_count": "exact",
+          "estimated_component_tokens": "configured_estimate",
+          "unattributed_bytes": "deterministic"
+        },
+        "formulas": ["context_component_coverage_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["capability", "context", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E7"],
+        "selector_kinds": ["call", "session", "turn"]
+      },
+      "prohibited_claims": ["expose raw bodies or claim observed source content was included in a call"],
+      "order": ["component_bytes_desc", "component_kind_asc"],
+      "limits": {
+        "default_rows": 20,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P5"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-ctx-07:capability_absent", "oracle:q-ctx-07:unattributed_bytes"],
+      "lower_model_hint": "Run only when structural-context capability exists; return categories and basis without raw content."
+    },
+    {
+      "question_id": "Q-CTX-08",
+      "version": 1,
+      "title": "Compaction effect",
+      "plan_id": "compaction_comparison",
+      "support_classes": ["C"],
+      "stage": "Advanced",
+      "intent_phrases": ["How did token/context behavior differ immediately before and after compaction?"],
+      "parameters": {
+        "required": ["context_epoch", "window"],
+        "optional": ["limit", "session_selector", "timezone"]
+      },
+      "required_capabilities": ["compaction_boundary", "model_call_usage"],
+      "required_measurements": ["cached_input_tokens", "context_window_tokens", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "compaction_boundary", "session", "turn"],
+        "operations": ["comparison", "feature_vector"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "after_tokens": "exact",
+          "before_tokens": "exact",
+          "context_delta": "deterministic"
+        },
+        "formulas": ["symmetric_boundary_comparison_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["comparison", "context", "history", "measurement", "publication"],
+      "evidence": {
+        "classes": ["E2", "E5"],
+        "selector_kinds": ["call", "session", "turn"]
+      },
+      "prohibited_claims": ["claim compaction caused improvement or degradation"],
+      "order": ["event_time_asc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-ctx-08:missing_side", "oracle:q-ctx-08:multiple_compactions"],
+      "lower_model_hint": "Compare symmetric disclosed windows around the boundary and keep any causal interpretation model-owned."
+    },
+    {
+      "question_id": "Q-CTX-09",
+      "version": 1,
+      "title": "Growth without observed state change",
+      "plan_id": "growth_without_mutation",
+      "support_classes": ["I"],
+      "stage": "Inference",
+      "intent_phrases": ["Which sessions combine context growth with few observed mutations?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "minimum_samples", "session_selector", "timezone"]
+      },
+      "required_capabilities": ["context_window", "state_change_observation"],
+      "required_measurements": ["context_window_tokens", "mutation_count", "turn_count"],
+      "logical_plan": {
+        "primitives": ["session", "state_change", "turn"],
+        "operations": ["feature_vector"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "context_growth": "deterministic",
+          "mutation_count": "exact",
+          "turn_count": "exact"
+        },
+        "formulas": ["context_growth_v1", "mutation_density_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["capability", "context", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E2", "E5"],
+        "selector_kinds": ["session", "state_change", "turn"]
+      },
+      "prohibited_claims": ["say no useful work occurred or a tool failed to change state"],
+      "order": ["context_growth_desc", "session_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-ctx-09:delayed_mutation", "oracle:q-ctx-09:missing_capability"],
+      "lower_model_hint": "Treat returned values as investigation features; few observed mutations do not prove little useful work."
+    },
+    {
+      "question_id": "Q-CTX-10",
+      "version": 1,
+      "title": "Long versus split sessions",
+      "plan_id": "long_vs_split_cohorts",
+      "support_classes": ["D", "I"],
+      "stage": "Deferred",
+      "intent_phrases": ["Do long sessions differ from newly split related sessions?"],
+      "parameters": {
+        "required": ["cohort", "window"],
+        "optional": ["minimum_samples", "timezone"]
+      },
+      "required_capabilities": ["session_identity"],
+      "required_measurements": ["cached_input_tokens", "turn_count", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "session", "turn"],
+        "operations": ["comparison", "feature_vector"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "cohort_size": "exact",
+          "context_features": "deterministic",
+          "usage_features": "exact"
+        },
+        "formulas": ["explicit_cohort_comparison_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["comparison", "history", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E3", "E5"],
+        "selector_kinds": ["session", "window"]
+      },
+      "prohibited_claims": ["recommend splitting from label similarity or length alone"],
+      "order": ["cohort_id_asc", "session_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P4"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-ctx-10:explicit_cohort", "oracle:q-ctx-10:unrelated_labels"],
+      "lower_model_hint": "This question is deferred unless the user supplies explicit cohorts; never infer related work from labels."
+    },
+    {
+      "question_id": "Q-WF-01",
+      "version": 1,
+      "title": "Turn count and completion efficiency",
+      "plan_id": "turn_completion_efficiency",
+      "support_classes": ["N"],
+      "stage": "Foundation",
+      "intent_phrases": ["How many turns/calls/tokens did sessions use before observed completion?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "project_selector", "timezone"]
+      },
+      "required_capabilities": ["completion_lifecycle", "session_identity", "turn_identity"],
+      "required_measurements": ["call_count", "completion_state", "turn_count", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "session", "turn"],
+        "operations": ["aggregate", "distribution"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "calls": "exact",
+          "completion_state": "exact",
+          "tokens_per_completed_turn": "deterministic",
+          "total_tokens": "exact",
+          "turns": "exact"
+        },
+        "formulas": ["completion_cohort_ratio_v1", "total_tokens_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["completion", "history", "lifecycle", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E0", "E1"],
+        "selector_kinds": ["publication", "session", "turn", "window"]
+      },
+      "prohibited_claims": ["treat fewer turns as better or end-of-file as completion"],
+      "order": ["total_tokens_desc", "session_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["session_usage_current"],
+      "oracle_ids": ["oracle:q-wf-01:open_tail", "oracle:q-wf-01:terminal_basis"],
+      "lower_model_hint": "Separate completed, open, failed, and cancelled cohorts and repeat the observed completion basis."
+    },
+    {
+      "question_id": "Q-WF-02",
+      "version": 1,
+      "title": "Before first action and mutation",
+      "plan_id": "first_action_mutation",
+      "support_classes": ["N"],
+      "stage": "Foundation",
+      "intent_phrases": ["How much time/tokens occurred before first tool action, successful tool, and observed mutation?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "session_selector", "timezone"]
+      },
+      "required_capabilities": ["state_change_observation", "tool_lifecycle", "turn_identity"],
+      "required_measurements": ["event_time_us", "mutation_count", "tool_status", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "state_change", "tool_invocation", "turn"],
+        "operations": ["comparison", "timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "first_action_tokens": "deterministic",
+          "first_mutation_tokens": "deterministic",
+          "first_success_tokens": "deterministic",
+          "mutation_observed": "exact"
+        },
+        "formulas": ["first_boundary_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["capability", "lifecycle", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E1", "E2"],
+        "selector_kinds": ["state_change", "tool", "turn"]
+      },
+      "prohibited_claims": ["attribute later mutation to only the boundary call/tool"],
+      "order": ["event_time_asc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-wf-02:failed_then_success", "oracle:q-wf-02:delayed_mutation"],
+      "lower_model_hint": "Report action, successful completion, and observed mutation as three separate boundaries; do not assign causality."
+    },
+    {
+      "question_id": "Q-WF-03",
+      "version": 1,
+      "title": "Repeated resource operations",
+      "plan_id": "repeated_resource_operations",
+      "support_classes": ["C"],
+      "stage": "Advanced",
+      "intent_phrases": ["Which files/resources were repeatedly read, searched, written, tested, or revisited?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "project_selector", "resource_selector", "session_selector", "timezone"]
+      },
+      "required_capabilities": ["resource_identity", "tool_lifecycle"],
+      "required_measurements": ["event_time_us", "resource_operation"],
+      "logical_plan": {
+        "primitives": ["resource", "session", "tool_invocation", "turn"],
+        "operations": ["aggregate", "feature_vector", "timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "operation_count": "exact",
+          "revisit_count": "deterministic",
+          "revisit_distance": "deterministic"
+        },
+        "formulas": ["resource_revisit_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["history", "lifecycle", "publication", "resource", "window"],
+      "evidence": {
+        "classes": ["E2", "E5"],
+        "selector_kinds": ["resource", "tool", "turn"]
+      },
+      "prohibited_claims": ["call repetition unnecessary"],
+      "order": ["operation_count_desc", "resource_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-wf-03:path_aliases", "oracle:q-wf-03:read_write_mix"],
+      "lower_model_hint": "Describe exact repeated operations and revisit distance; leave whether repetition was necessary to the user/model."
+    },
+    {
+      "question_id": "Q-WF-04",
+      "version": 1,
+      "title": "Inspect-fail-reinspect-retry cycles",
+      "plan_id": "retry_cycles",
+      "support_classes": ["C"],
+      "stage": "Advanced",
+      "intent_phrases": ["Show repeated inspect, attempt, failure, reinspect, retry sequences"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "resource_selector", "session_selector", "timezone"]
+      },
+      "required_capabilities": ["resource_identity", "tool_lifecycle"],
+      "required_measurements": ["event_time_us", "resource_operation", "tool_status"],
+      "logical_plan": {
+        "primitives": ["resource", "tool_invocation", "turn"],
+        "operations": ["feature_vector", "timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "matched_events": "exact",
+          "retry_cycles": "deterministic",
+          "terminal_status": "exact"
+        },
+        "formulas": ["retry_sequence_matcher_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["history", "lifecycle", "publication", "resource", "window"],
+      "evidence": {
+        "classes": ["E2", "E5"],
+        "selector_kinds": ["resource", "tool", "turn"]
+      },
+      "prohibited_claims": ["label cycle waste or failure cause"],
+      "order": ["cycle_start_asc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-wf-04:unrelated_interleave", "oracle:q-wf-04:success_first_try"],
+      "lower_model_hint": "Show the exact matched sequence and status; do not infer waste or why a failure occurred."
+    },
+    {
+      "question_id": "Q-WF-05",
+      "version": 1,
+      "title": "Tool family behavior",
+      "plan_id": "tool_family_behavior",
+      "support_classes": ["N"],
+      "stage": "Foundation",
+      "intent_phrases": ["Which tools/operations dominate calls, latency, output, failures, and adjacent token activity?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "project_selector", "timezone", "tool_selector"]
+      },
+      "required_capabilities": ["model_call_usage", "tool_lifecycle"],
+      "required_measurements": ["cached_input_tokens", "duration_us", "output_tokens", "reasoning_tokens", "resource_operation", "tool_output_bytes", "tool_status", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "resource", "tool_invocation", "turn"],
+        "operations": ["aggregate", "distribution"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "calls": "exact",
+          "duration_us": "exact",
+          "failure_count": "exact",
+          "following_tokens": "deterministic",
+          "tool_output_bytes": "exact"
+        },
+        "formulas": ["bounded_adjacency_v1", "observed_duration_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["capability", "history", "lifecycle", "measurement", "publication", "resource", "window"],
+      "evidence": {
+        "classes": ["E0", "E1"],
+        "selector_kinds": ["publication", "resource", "tool", "window"]
+      },
+      "prohibited_claims": ["convert unknown to zero or name tool ID before human tool name"],
+      "order": ["calls_desc", "tool_name_asc"],
+      "limits": {
+        "default_rows": 20,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["tool_resource_current"],
+      "oracle_ids": ["oracle:q-wf-05:unknown_operation", "oracle:q-wf-05:missing_duration"],
+      "lower_model_hint": "Lead with human tool name and semantic operation; keep missing duration/output null and adjacency non-causal."
+    },
+    {
+      "question_id": "Q-WF-06",
+      "version": 1,
+      "title": "Tool output versus following model activity",
+      "plan_id": "tool_following_activity",
+      "support_classes": ["C", "I"],
+      "stage": "Advanced",
+      "intent_phrases": ["Compare tool output size with the next model-call token mix"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "session_selector", "timezone", "tool_selector"]
+      },
+      "required_capabilities": ["model_call_usage", "tool_lifecycle"],
+      "required_measurements": ["cached_input_tokens", "output_tokens", "tool_output_bytes", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "tool_invocation", "turn"],
+        "operations": ["feature_vector", "timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "following_cached_input_tokens": "exact",
+          "following_output_tokens": "exact",
+          "following_uncached_input_tokens": "exact",
+          "intervening_events": "exact",
+          "tool_output_bytes": "exact"
+        },
+        "formulas": ["bounded_adjacency_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["lifecycle", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E2", "E5"],
+        "selector_kinds": ["call", "tool", "turn"]
+      },
+      "prohibited_claims": ["claim output caused or was included in context"],
+      "order": ["tool_output_bytes_desc", "tool_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-wf-06:long_gap", "oracle:q-wf-06:no_following_call"],
+      "lower_model_hint": "Present tool output and following token classes as adjacent observations, not inclusion or causality."
+    },
+    {
+      "question_id": "Q-WF-07",
+      "version": 1,
+      "title": "Resource hotspots",
+      "plan_id": "resource_hotspots",
+      "support_classes": ["N"],
+      "stage": "Cutover",
+      "intent_phrases": ["Which resources receive the most reads, writes, tests, time, output, or observed changes?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "project_selector", "resource_selector", "timezone"]
+      },
+      "required_capabilities": ["resource_identity", "state_change_observation", "tool_lifecycle"],
+      "required_measurements": ["duration_us", "mutation_count", "resource_operation", "tool_output_bytes"],
+      "logical_plan": {
+        "primitives": ["resource", "state_change", "tool_invocation"],
+        "operations": ["aggregate", "distribution"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "duration_us": "exact",
+          "observed_mutations": "exact",
+          "operation_count": "exact",
+          "tool_output_bytes": "exact"
+        },
+        "formulas": ["resource_operation_breakdown_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["capability", "lifecycle", "measurement", "publication", "resource", "window"],
+      "evidence": {
+        "classes": ["E1", "E2"],
+        "selector_kinds": ["resource", "state_change", "tool"]
+      },
+      "prohibited_claims": ["call a hot resource a bottleneck without supporting timing"],
+      "order": ["operation_count_desc", "resource_id_asc"],
+      "limits": {
+        "default_rows": 20,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": ["tool_resource_current"],
+      "oracle_ids": ["oracle:q-wf-07:resource_alias", "oracle:q-wf-07:write_without_change"],
+      "lower_model_hint": "Separate operations, durations, output, and observed mutations; use bottleneck language only with timing evidence."
+    },
+    {
+      "question_id": "Q-WF-08",
+      "version": 1,
+      "title": "Model and effort transitions",
+      "plan_id": "model_effort_transitions",
+      "support_classes": ["C"],
+      "stage": "Advanced",
+      "intent_phrases": ["Where did model, effort, or service tier change within a session?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "session_selector", "timezone"]
+      },
+      "required_capabilities": ["model_call_usage", "session_identity"],
+      "required_measurements": ["event_time_us", "model_profile", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "model_profile", "session"],
+        "operations": ["comparison", "timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "current_profile": "exact",
+          "previous_profile": "exact",
+          "token_delta": "deterministic",
+          "transition_count": "exact"
+        },
+        "formulas": ["consecutive_profile_transition_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["history", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E2"],
+        "selector_kinds": ["call", "model_profile", "session"]
+      },
+      "prohibited_claims": ["infer why the host/model changed or which choice was better"],
+      "order": ["event_time_asc", "call_id_asc"],
+      "limits": {
+        "default_rows": 20,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-wf-08:unknown_effort", "oracle:q-wf-08:repeated_profile"],
+      "lower_model_hint": "Report exact consecutive profile changes and token deltas without explaining motivation or quality."
+    },
+    {
+      "question_id": "Q-WF-09",
+      "version": 1,
+      "title": "Automation or skill candidates",
+      "plan_id": "automation_candidates",
+      "support_classes": ["I"],
+      "stage": "Inference",
+      "intent_phrases": ["Which repeated structural workflows might deserve a script, skill, or optimized endpoint?"],
+      "parameters": {
+        "required": ["minimum_samples", "window"],
+        "optional": ["limit", "project_selector", "timezone"]
+      },
+      "required_capabilities": ["resource_identity", "state_change_observation", "tool_lifecycle"],
+      "required_measurements": ["mutation_count", "resource_operation", "tool_status"],
+      "logical_plan": {
+        "primitives": ["resource", "state_change", "tool_invocation", "turn"],
+        "operations": ["feature_vector"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "failure_coverage": "deterministic",
+          "frequency": "exact",
+          "mutation_coverage": "deterministic",
+          "structural_features": "deterministic"
+        },
+        "formulas": ["structural_workflow_features_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["capability", "history", "lifecycle", "publication", "resource", "window"],
+      "evidence": {
+        "classes": ["E5", "E2"],
+        "selector_kinds": ["resource", "state_change", "tool", "turn"]
+      },
+      "prohibited_claims": ["persist `skill_candidate` or promise savings"],
+      "order": ["frequency_desc", "feature_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P4"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-wf-09:one_off_pattern", "oracle:q-wf-09:conflicting_outcomes"],
+      "lower_model_hint": "Use the returned structural features to propose investigations only; do not persist candidacy or promise savings."
+    },
+    {
+      "question_id": "Q-WF-10",
+      "version": 1,
+      "title": "Tool durations and gaps",
+      "plan_id": "tool_duration_gaps",
+      "support_classes": ["C"],
+      "stage": "Advanced",
+      "intent_phrases": ["Where did long completed-tool durations or observed inactive event gaps occur?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "session_selector", "threshold", "timezone", "tool_selector"]
+      },
+      "required_capabilities": ["tool_lifecycle"],
+      "required_measurements": ["duration_us", "event_time_us", "tool_status"],
+      "logical_plan": {
+        "primitives": ["tool_invocation", "turn"],
+        "operations": ["rows", "timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "event_gap_us": "deterministic",
+          "tool_duration_us": "exact",
+          "tool_status": "exact"
+        },
+        "formulas": ["adjacent_event_gap_v1", "observed_duration_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["history", "lifecycle", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E2"],
+        "selector_kinds": ["tool", "turn"]
+      },
+      "prohibited_claims": ["call a gap thinking time, hang, user delay, or waste"],
+      "order": ["observed_duration_desc", "tool_id_asc"],
+      "limits": {
+        "default_rows": 20,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-wf-10:incomplete_tool", "oracle:q-wf-10:user_gap"],
+      "lower_model_hint": "Keep completed-tool duration and adjacent event gap in separate fields and avoid interpreting gaps."
+    },
+    {
+      "question_id": "Q-DEL-01",
+      "version": 1,
+      "title": "Parent and subagent usage",
+      "plan_id": "parent_subagent_usage",
+      "support_classes": ["N"],
+      "stage": "Cutover",
+      "intent_phrases": ["Which parents delegated most, and how much usage is exclusive to parents, descendants, or the whole family?"],
+      "parameters": {
+        "required": ["family_mode", "window"],
+        "optional": ["limit", "project_selector", "timezone"]
+      },
+      "required_capabilities": ["session_hierarchy", "session_identity"],
+      "required_measurements": ["call_count", "hierarchy_depth", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "session"],
+        "operations": ["aggregate", "share"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "child_count": "exact",
+          "descendant_exclusive_tokens": "exact",
+          "family_inclusive_tokens": "exact",
+          "parent_exclusive_tokens": "exact"
+        },
+        "formulas": ["exclusive_inclusive_scope_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["hierarchy", "history", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E0", "E1"],
+        "selector_kinds": ["publication", "session", "window"]
+      },
+      "prohibited_claims": ["claim delegation benefit or necessity"],
+      "order": ["family_inclusive_tokens_desc", "session_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["root_family_usage_current"],
+      "oracle_ids": ["oracle:q-del-01:multilevel_family", "oracle:q-del-01:orphan_parent"],
+      "lower_model_hint": "State parent-exclusive, descendant-exclusive, and family-inclusive scopes separately; do not claim benefit."
+    },
+    {
+      "question_id": "Q-DEL-02",
+      "version": 1,
+      "title": "Delegation behavior comparison",
+      "plan_id": "delegation_cohorts",
+      "support_classes": ["I"],
+      "stage": "Inference",
+      "intent_phrases": ["How do parent and subagent cohorts differ observationally?"],
+      "parameters": {
+        "required": ["cohort", "window"],
+        "optional": ["minimum_samples", "project_selector", "timezone"]
+      },
+      "required_capabilities": ["session_hierarchy", "session_identity"],
+      "required_measurements": ["call_count", "model_profile", "mutation_count", "tool_status", "turn_count"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "session", "state_change", "tool_invocation", "turn"],
+        "operations": ["comparison", "feature_vector"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "cohort_size": "exact",
+          "model_mix": "exact",
+          "mutation_features": "deterministic",
+          "usage_features": "exact"
+        },
+        "formulas": ["observational_cohort_comparison_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["comparison", "hierarchy", "measurement", "publication", "window"],
+      "evidence": {
+        "classes": ["E3", "E5"],
+        "selector_kinds": ["session", "window"]
+      },
+      "prohibited_claims": ["claim counterfactual savings, quality improvement, or task equivalence"],
+      "order": ["cohort_id_asc", "session_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P4"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-del-02:model_mix_confounder", "oracle:q-del-02:unequal_cohorts"],
+      "lower_model_hint": "Describe observational cohort differences and confounders only; never claim counterfactual savings."
+    },
+    {
+      "question_id": "Q-ALW-01",
+      "version": 1,
+      "title": "Allowance movement and local usage",
+      "plan_id": "allowance_movement",
+      "support_classes": ["N"],
+      "stage": "Foundation",
+      "intent_phrases": ["Show exact allowance observations/reset boundaries beside local calls, turns, four tokens, cost, and credits"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["allowance_selector", "limit", "rate_card", "timezone"]
+      },
+      "required_capabilities": ["allowance_observation", "model_call_usage", "valuation"],
+      "required_measurements": ["allowance_percent", "cached_input_tokens", "call_count", "output_tokens", "turn_count", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["allowance_observation", "canonical_call", "turn", "valuation_match"],
+        "operations": ["aggregate", "timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "allowance_percent": "exact",
+          "cached_input_tokens": "exact",
+          "calls": "exact",
+          "configured_cost_usd": "configured_estimate",
+          "estimated_credits": "configured_estimate",
+          "output_tokens": "exact",
+          "reasoning_tokens": "exact",
+          "turns": "exact",
+          "uncached_input_tokens": "exact"
+        },
+        "formulas": ["compatible_allowance_interval_v1", "total_tokens_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["allowance", "freshness", "measurement", "publication", "valuation", "window"],
+      "evidence": {
+        "classes": ["E0", "E4"],
+        "selector_kinds": ["allowance_interval", "allowance_observation", "publication", "window"]
+      },
+      "prohibited_claims": ["claim local events fully explain drain or one call caused a percentage change"],
+      "order": ["observation_time_asc", "allowance_observation_id_asc"],
+      "limits": {
+        "default_rows": 20,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["allowance_interval_current", "daily_usage_current"],
+      "oracle_ids": ["oracle:q-alw-01:compatible_interval", "oracle:q-alw-01:reset_boundary"],
+      "lower_model_hint": "Report exact observations and compatible local facts together; never claim the local events explain provider drain."
+    },
+    {
+      "question_id": "Q-ALW-02",
+      "version": 1,
+      "title": "Events between observations",
+      "plan_id": "allowance_interval_events",
+      "support_classes": ["N"],
+      "stage": "Cutover",
+      "intent_phrases": ["Which exact calls, turns, tools, or mutations occurred between these adjacent observations?"],
+      "parameters": {
+        "required": ["end_observation", "start_observation"],
+        "optional": ["cursor", "evidence_view", "limit"]
+      },
+      "required_capabilities": ["allowance_observation", "state_change_observation", "tool_lifecycle", "turn_identity"],
+      "required_measurements": ["event_time_us"],
+      "logical_plan": {
+        "primitives": ["allowance_observation", "canonical_call", "state_change", "tool_invocation", "turn"],
+        "operations": ["timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "boundary_compatibility": "deterministic",
+          "event_kind": "exact",
+          "event_time_us": "exact",
+          "included_in_interval": "deterministic"
+        },
+        "formulas": ["half_open_interval_membership_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["allowance", "history", "lifecycle", "publication", "window"],
+      "evidence": {
+        "classes": ["E4", "E2"],
+        "selector_kinds": ["allowance_interval", "allowance_observation", "call", "state_change", "tool", "turn"]
+      },
+      "prohibited_claims": ["assign equal or causal contribution"],
+      "order": ["event_time_asc", "event_kind_asc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 100,
+        "maximum_rows": 100,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P3"],
+      "projection_consumers": ["allowance_interval_current"],
+      "oracle_ids": ["oracle:q-alw-02:empty_interval", "oracle:q-alw-02:same_time_boundary"],
+      "lower_model_hint": "List the exact half-open interval and ordered events; do not assign contribution or causality."
+    },
+    {
+      "question_id": "Q-ALW-03",
+      "version": 1,
+      "title": "Local efficiency per percentage point",
+      "plan_id": "allowance_local_efficiency",
+      "support_classes": ["C"],
+      "stage": "Advanced",
+      "intent_phrases": ["Estimate observed tokens/calls/turns/cost/credits per allowance percentage point"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["allowance_selector", "limit", "rate_card", "timezone"]
+      },
+      "required_capabilities": ["allowance_observation", "model_call_usage", "valuation"],
+      "required_measurements": ["allowance_percent", "call_count", "configured_cost_usd", "estimated_credits", "turn_count", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["allowance_observation", "canonical_call", "turn", "valuation_match"],
+        "operations": ["aggregate", "comparison"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "allowance_delta": "exact",
+          "calls_per_point": "deterministic",
+          "cost_per_point": "configured_estimate",
+          "credits_per_point": "configured_estimate",
+          "tokens_per_point": "deterministic",
+          "turns_per_point": "deterministic"
+        },
+        "formulas": ["compatible_positive_allowance_ratio_v1", "total_tokens_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["allowance", "measurement", "publication", "valuation", "window"],
+      "evidence": {
+        "classes": ["E4", "E0"],
+        "selector_kinds": ["allowance_interval", "allowance_observation", "publication", "rate_card", "window"]
+      },
+      "prohibited_claims": ["call the ratio the provider conversion formula"],
+      "order": ["interval_start_asc", "allowance_interval_id_asc"],
+      "limits": {
+        "default_rows": 20,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": ["allowance_interval_current"],
+      "oracle_ids": ["oracle:q-alw-03:negative_delta", "oracle:q-alw-03:unpriced_interval"],
+      "lower_model_hint": "Call each ratio a local observation over compatible positive intervals, not a provider conversion formula."
+    },
+    {
+      "question_id": "Q-ALW-04",
+      "version": 1,
+      "title": "Completed cycle comparison",
+      "plan_id": "allowance_cycle_comparison",
+      "support_classes": ["C"],
+      "stage": "Advanced",
+      "intent_phrases": ["Compare local usage and observed allowance movement across completed reset windows"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["allowance_selector", "limit", "rate_card", "timezone"]
+      },
+      "required_capabilities": ["allowance_observation", "model_call_usage", "valuation"],
+      "required_measurements": ["allowance_limit", "allowance_percent", "call_count", "configured_cost_usd", "estimated_credits", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["allowance_observation", "canonical_call", "valuation_match"],
+        "operations": ["comparison"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "allowance_movement": "exact",
+          "calls": "exact",
+          "configured_cost_usd": "configured_estimate",
+          "cycle_duration_us": "deterministic",
+          "estimated_credits": "configured_estimate",
+          "total_tokens": "exact"
+        },
+        "formulas": ["completed_allowance_cycle_comparison_v1", "total_tokens_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["allowance", "comparison", "history", "publication", "valuation", "window"],
+      "evidence": {
+        "classes": ["E3", "E4"],
+        "selector_kinds": ["allowance_interval", "allowance_observation", "window"]
+      },
+      "prohibited_claims": ["infer provider-accounting changes"],
+      "order": ["cycle_start_asc", "allowance_interval_id_asc"],
+      "limits": {
+        "default_rows": 12,
+        "maximum_rows": 24,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": ["allowance_interval_current"],
+      "oracle_ids": ["oracle:q-alw-04:incomplete_cycle", "oracle:q-alw-04:plan_change"],
+      "lower_model_hint": "Compare only completed compatible cycles and disclose plan, duration, valuation, and observation coverage."
+    },
+    {
+      "question_id": "Q-OPS-01",
+      "version": 1,
+      "title": "Latest publication changes",
+      "plan_id": "latest_publication_delta",
+      "support_classes": ["N"],
+      "stage": "Foundation",
+      "intent_phrases": ["What changed in the latest incremental refresh/publication?"],
+      "parameters": {
+        "required": [],
+        "optional": ["entity_kind", "limit"]
+      },
+      "required_capabilities": ["publication_delta"],
+      "required_measurements": ["cached_input_tokens", "output_tokens", "reasoning_tokens", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["publication", "publication_delta"],
+        "operations": ["status"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "corrected_count": "exact",
+          "inserted_count": "exact",
+          "recanonicalized_count": "exact",
+          "removed_count": "exact",
+          "terminalized_count": "exact",
+          "token_delta": "exact"
+        },
+        "formulas": ["accepted_mutation_summary_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["freshness", "publication"],
+      "evidence": {
+        "classes": ["E0", "E1"],
+        "selector_kinds": ["call", "project", "publication", "resource", "session", "tool", "turn"]
+      },
+      "prohibited_claims": ["label recanonicalization or updated rows as new activity"],
+      "order": ["change_kind_asc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 25,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P1"],
+      "projection_consumers": ["latest_publication_delta_current"],
+      "oracle_ids": ["oracle:q-ops-01:no_change", "oracle:q-ops-01:recanonicalized_owner"],
+      "lower_model_hint": "Separate inserted, terminalized, corrected, removed, and recanonicalized changes; do not relabel updates as activity."
+    },
+    {
+      "question_id": "Q-OPS-02",
+      "version": 1,
+      "title": "Data health and freshness",
+      "plan_id": "data_health",
+      "support_classes": ["N"],
+      "stage": "Foundation",
+      "intent_phrases": ["Is the index fresh/complete enough, and what capabilities or measurements are missing?"],
+      "parameters": {
+        "required": [],
+        "optional": ["scope", "window"]
+      },
+      "required_capabilities": ["publication_state", "source_inventory"],
+      "required_measurements": ["event_time_us"],
+      "logical_plan": {
+        "primitives": ["publication", "source_manifestation"],
+        "operations": ["status"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "capabilities": "exact",
+          "freshness_age_us": "deterministic",
+          "guaranteed_complete_from_us": "exact",
+          "indexed_from_us": "exact",
+          "measurements": "exact",
+          "valuation_coverage": "deterministic"
+        },
+        "formulas": ["freshness_age_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["capability", "freshness", "history", "measurement", "occurrence", "publication", "valuation"],
+      "evidence": {
+        "classes": ["E0"],
+        "selector_kinds": ["publication", "window"]
+      },
+      "prohibited_claims": ["claim deferred/uncertain sources do not exist"],
+      "order": ["publication_committed_at_desc"],
+      "limits": {
+        "default_rows": 1,
+        "maximum_rows": 1,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P0"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-ops-02:deferred_history", "oracle:q-ops-02:missing_capability"],
+      "lower_model_hint": "Distinguish indexed, guaranteed-complete, deferred, uncertain, and missing coverage without claiming absence."
+    },
+    {
+      "question_id": "Q-OPS-03",
+      "version": 1,
+      "title": "Deduplication/source audit",
+      "plan_id": "dedup_source_audit",
+      "support_classes": ["C"],
+      "stage": "Advanced",
+      "intent_phrases": ["Are copied, archived, replaced, or truncated sources changing totals?"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "scope"]
+      },
+      "required_capabilities": ["source_occurrence"],
+      "required_measurements": ["source_occurrence_count"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "source_manifestation", "source_occurrence"],
+        "operations": ["aggregate", "rows"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "canonical_basis": "exact",
+          "excluded_occurrence_count": "exact",
+          "manifestation_count": "exact",
+          "semantic_entity_count": "exact"
+        },
+        "formulas": ["semantic_occurrence_reconciliation_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["history", "occurrence", "publication", "window"],
+      "evidence": {
+        "classes": ["E6"],
+        "selector_kinds": ["source_manifestation"]
+      },
+      "prohibited_claims": ["call physical copies duplicate user work"],
+      "order": ["manifestation_count_desc", "source_manifestation_id_asc"],
+      "limits": {
+        "default_rows": 20,
+        "maximum_rows": 50,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-ops-03:exact_copy", "oracle:q-ops-03:owner_change"],
+      "lower_model_hint": "Reconcile semantic entities and physical occurrences; never call copied manifestations duplicate work."
+    },
+    {
+      "question_id": "Q-OPS-04",
+      "version": 1,
+      "title": "Evidence timeline",
+      "plan_id": "evidence_timeline",
+      "support_classes": ["N"],
+      "stage": "Foundation",
+      "intent_phrases": ["Show the exact timeline for this session/turn/call/tool/resource or allowance interval"],
+      "parameters": {
+        "required": ["evidence_view"],
+        "optional": ["allowance_selector", "cursor", "limit", "resource_selector", "session_selector", "tool_selector"]
+      },
+      "required_capabilities": ["session_identity", "source_occurrence", "tool_lifecycle", "turn_identity"],
+      "required_measurements": ["event_time_us"],
+      "logical_plan": {
+        "primitives": ["allowance_observation", "canonical_call", "resource", "source_occurrence", "state_change", "tool_invocation", "turn"],
+        "operations": ["timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "event_kind": "exact",
+          "event_time_us": "exact",
+          "lifecycle_basis": "exact",
+          "occurrence_coordinates": "exact",
+          "token_measurements": "exact"
+        },
+        "formulas": ["total_order_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["allowance", "history", "lifecycle", "measurement", "occurrence", "publication"],
+      "evidence": {
+        "classes": ["E2", "E4"],
+        "selector_kinds": ["allowance_interval", "call", "resource", "session", "state_change", "tool", "turn"]
+      },
+      "prohibited_claims": ["expose raw content, infer causality, or omit blanks by replacing them with zero"],
+      "order": ["event_time_asc", "event_kind_asc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 100,
+        "maximum_rows": 100,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P3"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-ops-04:equal_time_event", "oracle:q-ops-04:stable_rebuild_selector"],
+      "lower_model_hint": "Preserve exact order, lifecycle basis, token classes, and nulls; never expose bodies or infer causality."
+    },
+    {
+      "question_id": "Q-REV-01",
+      "version": 1,
+      "title": "Weekly review",
+      "plan_id": "weekly_review",
+      "support_classes": ["N"],
+      "stage": "Cutover",
+      "intent_phrases": ["Give me a compact weekly usage review with concentration, change drivers, model/tool/context/allowance facts, coverage, and evidence routes"],
+      "parameters": {
+        "required": ["current_window", "previous_window"],
+        "optional": ["current_project", "rate_card", "timezone", "week_start"]
+      },
+      "required_capabilities": ["model_call_usage", "session_identity"],
+      "required_measurements": ["cached_input_tokens", "call_count", "output_tokens", "reasoning_tokens", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["allowance_observation", "canonical_call", "model_profile", "session", "tool_invocation", "turn", "valuation_match"],
+        "operations": ["aggregate", "comparison", "share"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "allowance_facts": "exact",
+          "change_drivers": "deterministic",
+          "context_facts": "deterministic",
+          "model_mix": "exact",
+          "session_concentration": "deterministic",
+          "tool_mix": "exact",
+          "usage_totals": "exact"
+        },
+        "formulas": ["signed_driver_contribution_v1", "top_share_v1", "total_tokens_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["allowance", "comparison", "context", "freshness", "history", "measurement", "publication", "valuation", "window"],
+      "evidence": {
+        "classes": ["E0", "E1", "E3", "E4"],
+        "selector_kinds": ["allowance_interval", "model_profile", "publication", "session", "tool", "window"]
+      },
+      "prohibited_claims": ["claim productivity, causal waste, or server-authored findings"],
+      "order": ["section_order_asc", "metric_order_asc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 40,
+        "maximum_rows": 100,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P4"],
+      "projection_consumers": ["allowance_interval_current", "daily_usage_current", "model_effort_time_current", "session_usage_current", "tool_resource_current"],
+      "oracle_ids": ["oracle:q-rev-01:partial_history", "oracle:q-rev-01:unpriced_model"],
+      "lower_model_hint": "Synthesize only from graded sections, repeat limitations, and route to selectors without claiming productivity or causal waste."
+    },
+    {
+      "question_id": "Q-REV-02",
+      "version": 1,
+      "title": "Actionable investigations",
+      "plan_id": "investigation_candidates",
+      "support_classes": ["I"],
+      "stage": "Inference",
+      "intent_phrases": ["Choose up to three evidence-backed investigations"],
+      "parameters": {
+        "required": ["window"],
+        "optional": ["limit", "minimum_samples", "project_selector", "timezone"]
+      },
+      "required_capabilities": ["completion_lifecycle", "resource_identity", "state_change_observation", "tool_lifecycle"],
+      "required_measurements": ["call_count", "completion_state", "mutation_count", "tool_status", "turn_count", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "resource", "session", "state_change", "tool_invocation", "turn"],
+        "operations": ["feature_vector"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "baseline": "deterministic",
+          "candidate_features": "deterministic",
+          "coverage": "exact",
+          "representative_selectors": "exact"
+        },
+        "formulas": ["investigation_feature_vector_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["capability", "completion", "history", "lifecycle", "measurement", "publication", "resource", "window"],
+      "evidence": {
+        "classes": ["E5"],
+        "selector_kinds": ["call", "resource", "session", "state_change", "tool", "turn"]
+      },
+      "prohibited_claims": ["claim proven waste, guaranteed savings, or causal diagnosis"],
+      "order": ["feature_strength_desc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 10,
+        "maximum_rows": 10,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P4"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-rev-02:conflicting_signals", "oracle:q-rev-02:no_candidate"],
+      "lower_model_hint": "Rank no more than three investigations from exact feature vectors, citing baselines, limitations, and evidence routes."
+    },
+    {
+      "question_id": "Q-REV-03",
+      "version": 1,
+      "title": "Compare two sessions",
+      "plan_id": "compare_sessions",
+      "support_classes": ["C"],
+      "stage": "Advanced",
+      "intent_phrases": ["Compare two sessions structurally by turns, calls, four tokens, tools, resources, changes, context, delegation, and completion"],
+      "parameters": {
+        "required": ["left_session", "right_session"],
+        "optional": ["evidence_view", "family_mode", "limit", "window"]
+      },
+      "required_capabilities": ["completion_lifecycle", "resource_identity", "session_hierarchy", "session_identity", "state_change_observation", "tool_lifecycle", "turn_identity"],
+      "required_measurements": ["cached_input_tokens", "call_count", "completion_state", "mutation_count", "output_tokens", "reasoning_tokens", "turn_count", "uncached_input_tokens"],
+      "logical_plan": {
+        "primitives": ["canonical_call", "resource", "session", "state_change", "tool_invocation", "turn"],
+        "operations": ["comparison", "timeline"],
+        "compiler_id": null
+      },
+      "answers": {
+        "fields": {
+          "completion_state": "exact",
+          "context_features": "deterministic",
+          "delegation_metrics": "exact",
+          "resource_metrics": "exact",
+          "state_change_metrics": "exact",
+          "token_deltas": "deterministic",
+          "tool_metrics": "exact",
+          "turn_call_counts": "exact"
+        },
+        "formulas": ["exclusive_inclusive_scope_v1", "side_by_side_delta_v1", "total_tokens_v1"],
+        "kernel_conclusion_fields": []
+      },
+      "coverage_requirements": ["capability", "comparison", "completion", "context", "hierarchy", "measurement", "publication"],
+      "evidence": {
+        "classes": ["E1", "E3", "E2"],
+        "selector_kinds": ["call", "resource", "session", "state_change", "tool", "turn", "window"]
+      },
+      "prohibited_claims": ["assert semantic task equivalence or which session/model is better"],
+      "order": ["session_side_asc", "event_time_asc", "logical_id_asc"],
+      "limits": {
+        "default_rows": 100,
+        "maximum_rows": 100,
+        "exact_count_default": false
+      },
+      "performance_classes": ["P2", "P3"],
+      "projection_consumers": [],
+      "oracle_ids": ["oracle:q-rev-03:differing_coverage", "oracle:q-rev-03:open_session"],
+      "lower_model_hint": "Compare exact structural facts and deterministic deltas only; disclose scope and coverage and avoid quality judgments."
+    }
+  ]
+}

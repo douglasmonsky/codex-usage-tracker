@@ -285,6 +285,17 @@ R5_ADDITIONS = frozenset(
     }
 )
 
+CK01_AGENT_KERNEL_CONTRACT_ADDITIONS = frozenset(
+    {
+        "config/agent-kernel/question-catalog-v1.json",
+        "config/agent-kernel/question-catalog-v1.schema.json",
+        "config/agent-kernel/question-guidance-v1.json",
+        "scripts/check_agent_kernel_contracts.py",
+        "tests/agent_kernel/contracts/__init__.py",
+        "tests/agent_kernel/contracts/test_question_catalog.py",
+    }
+)
+
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
     | K2_ADDITIONS
@@ -307,6 +318,7 @@ INTEGRATION_ADDITIONS = (
     | R3_ADDITIONS
     | R4_ADDITIONS
     | R5_ADDITIONS
+    | CK01_AGENT_KERNEL_CONTRACT_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))")
 
