@@ -1,6 +1,6 @@
 # CK-01 — Make the question catalog executable
 
-**Status:** Not started
+**Status:** Completed
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -50,5 +50,41 @@ is deterministic and under its measured budget.
 before CK-02; do not encode guessed fields.
 
 **Cleanup/docs:** Amend catalog and index for any deliberate catalog change.
+
+## Completion evidence
+
+- The executable registry contains all **40** authoritative question IDs
+  exactly once. The catalog is **84,923 bytes**, its JSON Schema is
+  **10,211 bytes**, and its deterministic compact guidance projection is
+  **14,459 / 16,384 bytes**.
+- Schema, reference, support/stage, evidence-selector, answer-dependency,
+  prohibited-claim, raw/SQL-input, and Markdown reconciliation checks pass.
+  All physical compiler IDs remain `null`; CK-01 implements no query or
+  physical plan.
+- Focused qualification passed with **36 tests**. The final bounded
+  repository qualification passed with **473 tests**, Ruff, MyPy, Pyright,
+  scope/manifests/interfaces, frontend checks, maintainability, release
+  safety, and `git diff --check`.
+- Final review produced **5 findings; 5 were accepted and resolved**.
+  Reviewer-token attribution is **pending** because the installed Usage
+  Tracker CLI does not expose the expected `strict` command; tokens per
+  accepted finding therefore remain pending rather than triggering retries.
+
+### Deviations and residual risks
+
+- No catalog intent, support class, stage, or evidence-class assignment was
+  deliberately changed. The generated compact guidance fixture was included
+  as the packet's allowed optional artifact.
+- The registry remains deliberately unconsumed and repository-only in CK-01.
+  Later packets must implement and qualify compilers, packaging/runtime
+  loading, synthetic oracles, and plan performance before these contracts
+  become product behavior.
+- Cross-field dependency validation currently covers the admitted
+  `following_tokens` answer. Future answer fields with hidden capability,
+  measurement, primitive, or coverage dependencies must add an equivalent
+  fail-closed rule when introduced.
+- No runtime latency, CPU, or database-storage claim applies to this
+  documentation/config-only packet; the byte measurements above are the
+  relevant packet measurements.
 
 **Suggested commit:** `docs: make question contracts executable`
