@@ -6,8 +6,9 @@ import hashlib
 import json
 import os
 import sqlite3
+import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -117,6 +118,7 @@ def short_writer_transaction(
     *,
     require_capabilities: bool = True,
     staging_bulk: bool = False,
+    on_transaction_ms: Callable[[float], None] | None = None,
 ) -> Iterator[sqlite3.Connection]:
     """Hold one explicit writer transaction only for the caller's small batch."""
 
@@ -126,6 +128,7 @@ def short_writer_transaction(
         staging_bulk=staging_bulk,
     ) as connection:
         connection.execute("BEGIN IMMEDIATE")
+        started = time.perf_counter()
         try:
             yield connection
         except BaseException:
@@ -133,6 +136,9 @@ def short_writer_transaction(
             raise
         else:
             connection.commit()
+        finally:
+            if on_transaction_ms is not None:
+                on_transaction_ms((time.perf_counter() - started) * 1000)
 
 
 def validate_analytical_database(path: Path) -> list[str]:

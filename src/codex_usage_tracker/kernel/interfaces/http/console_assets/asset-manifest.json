@@ -1,9 +1,9 @@
 {
   "schema": "codex-usage-tracker.kernel-console-assets.v1",
   "assets": {
-    "app.js": "fa317102c63797ddb8052655d8d83274b57291b46bb8b8a0b118970d5c79d229",
+    "app.js": "d7937620127c92b3ad263bffcc88e41540137bc1748d7f7f3ac6279a20c29576",
     "index.html": "17151aa63c5c47da7202aec87054693481797e11696beca840a165c07f8931da",
-    "model.js": "c9b8105c739168bf9d4495b452723012063e0e25b335ef786b2dd12d7cf52f26",
-    "styles.css": "3cdc1f35de12d142fe8ec64b86d345c0156e43d31cf8119c78dc73ad87674d1c"
+    "model.js": "fe055e912c10af545d117465550561e67cd280a35d59d467f758ae84f3b37652",
+    "styles.css": "29c43210f90fd14899f1419c4045035db33f4d3d53658da4e26aad052fc6cc5b"
   }
 }

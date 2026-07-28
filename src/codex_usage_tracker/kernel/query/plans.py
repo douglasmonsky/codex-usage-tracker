@@ -66,6 +66,13 @@ def compile_plan(
     )
     if rollup is not None:
         return rollup
+    direct_tool_impact = _compile_direct_tool_impact_rows(
+        request,
+        generation=generation,
+        offset=offset,
+    )
+    if direct_tool_impact is not None:
+        return direct_tool_impact
     spec = DATASETS[request.dataset]
     if request.operation is Operation.COMPARISON:
         return _compile_comparison(
@@ -97,6 +104,128 @@ def compile_plan(
         count_parameters=parameters,
         scan_parameters=parameters,
         coverage_parameters=parameters if coverage_sql else (),
+        offset=offset,
+    )
+
+
+def _compile_direct_tool_impact_rows(
+    request: QueryRequest,
+    *,
+    generation: int,
+    offset: int,
+) -> CompiledPlan | None:
+    dimensions = {"tool_call", "operation", "target"}
+    measures = {
+        "adjacent_uncached_input_tokens",
+        "adjacent_cached_input_tokens",
+        "adjacent_reasoning_tokens",
+        "adjacent_output_tokens",
+        "adjacent_total_tokens",
+    }
+    if (
+        request.dataset != "tools"
+        or Operation(request.operation) is not Operation.ROWS
+        or set(request.dimensions) != dimensions
+        or set(request.measures) != measures
+        or request.filters
+        or request.comparison is not None
+    ):
+        return None
+    expressions = {
+        "tool_call": "'tool_' || lower(hex(facts.tool_call_id))",
+        "operation": "profiles.operation",
+        "target": "facts.target_label",
+        "adjacent_uncached_input_tokens": (
+            "nearest.input_tokens - nearest.cached_input_tokens"
+        ),
+        "adjacent_cached_input_tokens": "nearest.cached_input_tokens",
+        "adjacent_reasoning_tokens": "nearest.reasoning_tokens",
+        "adjacent_output_tokens": "nearest.output_tokens",
+        "adjacent_total_tokens": "nearest.input_tokens + nearest.output_tokens",
+    }
+    selected = ", ".join(
+        f"{expressions[name]} AS {name}"
+        for name in (*request.dimensions, *request.measures)
+    )
+    nearest_join = (
+        "ON nearest.model_call_key = facts.nearest_model_call_key "
+        "AND nearest.generation <= facts.generation"
+    )
+    canonical_rows = (
+        f"SELECT {selected} "
+        "FROM tool_call_facts AS facts "
+        "JOIN tool_profiles AS profiles USING (tool_profile_key) "
+        f"JOIN model_call_facts AS nearest {nearest_join} "
+        "WHERE facts.generation <= ? "
+        "AND nearest.duplicate_state = 'canonical'"
+    )
+    structural_rows = (
+        f"SELECT {selected} "
+        "FROM tool_call_facts AS facts "
+        "JOIN tool_profiles AS profiles USING (tool_profile_key) "
+        f"LEFT JOIN model_call_facts AS nearest {nearest_join} "
+        "JOIN threads AS threads USING (thread_key) "
+        "WHERE facts.generation <= ? "
+        "AND nearest.model_call_id IS NULL "
+        "AND threads.thread_key = ("
+        "SELECT candidate_threads.thread_key "
+        "FROM threads AS candidate_threads "
+        "WHERE candidate_threads.logical_thread_id = threads.logical_thread_id "
+        "AND candidate_threads.first_generation <= ? "
+        "ORDER BY candidate_threads.archive_state = 'active' DESC, "
+        "candidate_threads.last_generation DESC, "
+        "candidate_threads.thread_key "
+        "LIMIT 1)"
+    )
+    matched = f"{canonical_rows} UNION ALL {structural_rows}"
+    order_name = request.order_by or request.measures[0]
+    direction = "DESC" if request.descending else "ASC"
+    tie_breakers = [
+        name
+        for name in (*request.dimensions, *request.measures)
+        if name != order_name
+    ]
+    order_sql = ", ".join(
+        (
+            f"{order_name} {direction}",
+            *(f"{name} ASC" for name in tie_breakers),
+            "tool_call ASC",
+        )
+    )
+    sql = (
+        f"WITH matched AS ({matched}) "
+        "SELECT matched.*, "
+        "COUNT(*) OVER () AS __matched_count, "
+        "COUNT(*) OVER () AS __scanned_count "
+        "FROM matched "
+        f"ORDER BY {order_sql} LIMIT ? OFFSET ?"
+    )
+    count_sql = f"SELECT COUNT(*) FROM ({matched}) AS matched"
+    coverage_columns = [
+        "COUNT(*) AS coverage_total",
+        *(
+            f"SUM(CASE WHEN {measure} IS NOT NULL THEN 1 ELSE 0 END) "
+            f"AS observed_{measure}, "
+            f"SUM(CASE WHEN {measure} IS NULL THEN 1 ELSE 0 END) "
+            f"AS missing_{measure}"
+            for measure in request.measures
+        ),
+    ]
+    coverage_sql = (
+        f"WITH matched AS ({matched}) "
+        f"SELECT {', '.join(coverage_columns)} FROM matched"
+    )
+    generation_parameters = (generation, generation, generation)
+    return CompiledPlan(
+        plan_id=f"tools.rows.direct_tool_impact.v{PLAN_VERSION}",
+        sql=sql,
+        count_sql=count_sql,
+        scan_sql=count_sql,
+        coverage_sql=coverage_sql,
+        parameters=(*generation_parameters, request.limit + 1, offset),
+        count_parameters=generation_parameters,
+        scan_parameters=generation_parameters,
+        coverage_parameters=generation_parameters,
         offset=offset,
     )
 

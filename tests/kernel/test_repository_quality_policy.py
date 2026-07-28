@@ -72,12 +72,19 @@ def test_repository_verification_wrappers_do_not_use_generic_maintainer_profiles
         assert retired_command not in justfile
 
 
-def test_ci_runs_ingest_performance_only_in_the_dedicated_step() -> None:
+def test_ci_runs_performance_contracts_only_in_the_dedicated_step() -> None:
     workflow = (
         _REPO_ROOT / ".github" / "workflows" / "ci.yml"
     ).read_text(encoding="utf-8")
 
     assert "tests/kernel/test_ingest_*.py" not in workflow
-    assert workflow.count("tests/kernel/test_ingest_performance.py") == 2
+    for path in (
+        "tests/kernel/test_ingest_performance.py",
+        "tests/kernel/allowance/test_performance.py",
+        "tests/kernel/evidence/test_performance.py",
+        "tests/kernel/interfaces/test_performance.py",
+        "tests/kernel/query/test_performance.py",
+    ):
+        assert workflow.count(path) == 2
+        assert f"--ignore={path}" in workflow
     assert 'if [ "$MATRIX_PYTHON" = "3.14" ]; then' not in workflow
-    assert "--ignore=tests/kernel/test_ingest_performance.py" in workflow

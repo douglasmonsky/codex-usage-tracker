@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
-import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -341,21 +340,20 @@ def _timed_writer(
 ) -> Iterator[sqlite3.Connection]:
     if assert_fence is not None:
         assert_fence()
-    started = time.perf_counter()
     transaction = (
-        short_writer_transaction(path)
+        short_writer_transaction(path, on_transaction_ms=timings.append)
         if require_capabilities and not staging_bulk
         else short_writer_transaction(
             path,
             require_capabilities=require_capabilities,
             staging_bulk=staging_bulk,
+            on_transaction_ms=timings.append,
         )
     )
     with transaction as connection:
         yield connection
         if assert_fence is not None:
             assert_fence()
-    timings.append((time.perf_counter() - started) * 1000)
 
 
 def _rows(

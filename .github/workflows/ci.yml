@@ -58,12 +58,22 @@ jobs:
           python -m mypy
           python scripts/check_kernel_maintainability.py
           python -m pytest -p no:tach \
-            --ignore=tests/kernel/test_ingest_performance.py
+            --ignore=tests/kernel/test_ingest_performance.py \
+            --ignore=tests/kernel/allowance/test_performance.py \
+            --ignore=tests/kernel/evidence/test_performance.py \
+            --ignore=tests/kernel/interfaces/test_performance.py \
+            --ignore=tests/kernel/query/test_performance.py
           python -m pyright --pythonpath "$(command -v python)"
           python scripts/check_release.py
       - name: Run synthetic performance contracts
         if: matrix.python-version == '3.14'
-        run: python -m pytest -p no:tach tests/kernel/test_ingest_performance.py
+        run: |
+          python -m pytest -p no:tach \
+            tests/kernel/test_ingest_performance.py \
+            tests/kernel/allowance/test_performance.py \
+            tests/kernel/evidence/test_performance.py \
+            tests/kernel/interfaces/test_performance.py \
+            tests/kernel/query/test_performance.py
       - name: Build isolated development package
         if: matrix.python-version == '3.14'
         run: |

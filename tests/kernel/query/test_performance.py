@@ -237,6 +237,7 @@ def test_100k_r5_analytical_primitive_budgets(
     assert tool_impact_bytes <= 64_000
     assert top_threads_result.returned_count == 25
     assert tool_impact_result.returned_count == 25
+    assert tool_impact_result.plan_id == "tools.rows.direct_tool_impact.v1"
     assert all("thread_label" in row for row in top_threads_result.rows)
     assert (
         top_threads_result.coverage["measures"]["configured_cost_usd"]["coverage_percent"] == 100.0
