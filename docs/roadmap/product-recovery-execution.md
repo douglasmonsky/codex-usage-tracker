@@ -16,8 +16,8 @@ benchmark, a source-only tag, or an unpublished package.
 | R2 | Complete | R1 | `feature/r2-schema-v3-compact-storage` | PR #344 merged as `f740939`; compact schema v3 published to `main` |
 | R3 | Complete | R2 | `feature/r3-build-refresh-performance` | PR #344 merged as `f740939`; selective hydration and refresh gates pass |
 | R4 | Complete | R2 | `feature/r4-fast-query-mcp` | PR #345 merged as `da42350`; persisted rollups and fast bounded paths |
-| R5 | In progress | R3, R4 | `feature/r5-analytical-primitives` | Correctness and privacy contracts pass; full validation pending |
-| R6 | Pending | R4, R5 | — | Console usability |
+| R5 | Complete | R3, R4 | `feature/r5-analytical-primitives` | PR #346 merged as `34528d1`; analytical facts and human semantics restored |
+| R6 | In progress | R4, R5 | `feature/r6-console-usability` | Human-first Console implementation and browser qualification underway |
 | R7 | Pending | R1; completes after R3–R6 | — | Installed fresh-task qualification |
 | R8 | Pending | R0; completes after R6, R7 | — | Public documentation |
 | R9 | Pending | R7, R8 | — | Public `0.29.0` release |
@@ -768,8 +768,131 @@ bytes for tool impact, both below the 64,000-byte focused ceiling.
 
 ### Residual risk and next action
 
-- Rebuild and check the final distributions, rerun installed-package smoke
-  against the corrected wheel, then open the R5 pull request. GitNexus classed
-  the writer/rollup remediation as critical blast radius; the failed-promotion,
-  moving-tail, focused 107-test surface, ingest-performance gates, and full
-  repository gate all pass after the change.
+- R5 merged through PR #346 as `34528d1`. Its task branch and worktree remain
+  preserved. R6 consumes the frozen presentation fields; R7 consumes the
+  installed-package and fresh-task qualification fixtures.
+
+## R6 — Rebuild Console Usability
+
+State: in progress on `feature/r6-console-usability`, based on merged R5
+commit `34528d1`.
+
+### Contract added first
+
+- Tightened warm committed-generation rendering to 500 ms and asserted one
+  status read plus one batched query per open, with no refresh request.
+- Added browser contracts for immediately useful Top Threads and Recent Calls
+  Explore results, Calls/Threads dataset switching, keyboard sorting, local
+  filtering, local pagination, exact evidence links, human-first evidence
+  columns, cost/credit visibility, and the allowance graph.
+- Added pure model contracts for deterministic column order, human labels,
+  null-safe sorting, pagination, allowance reset/drain presentation, and
+  estimated-credit ratios that never coerce missing estimates to zero.
+
+### Implementation checkpoint
+
+- Live now shows calls, total tokens with all four token classes, cache reuse,
+  configured cost, estimated credits, a compact token timeline, and human
+  thread leaders. Snapshot and implementation-first cards were removed.
+- Explore performs one batched request that returns guidance, Top Threads, and
+  Recent Calls. The useful results precede the custom composer; exact call and
+  thread identities remain available through evidence links and collapsed
+  technical details.
+- Shared tables provide keyboard-operable sorting, local filtering, and
+  pagination without additional API calls. Time, human labels, totals, compact
+  token mix, cost, credits, and actions precede technical identity.
+- Evidence timelines show turn ordinal, event/tool semantics, compact call or
+  adjacent-tool token impact, cost, credits, duration, and action. Selectors,
+  generation, raw identifiers, and provenance are collapsed and copyable.
+- Limits restores a real SVG usage-over-time graph. Its primary table begins
+  with observation time, drain, local tokens, estimated credits,
+  credits-per-point, tokens-per-point, reset boundary, and window; secondary
+  ratios and coverage remain in technical details.
+
+### Unprofiled performance evidence
+
+All measurements use the committed synthetic browser fixture. No local usage
+content was read.
+
+| Route/workload | Runs | Median | p95 | Requests per open | Refreshes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Live desktop warm open | 25 | 39.3 ms | 57.2 ms | 1 status + 1 query | 0 |
+| Live mobile warm open | 25 | 35.4 ms | 53.5 ms | 1 status + 1 query | 0 |
+| Explore useful defaults | 25 | 39.6 ms | 52.0 ms | 1 status + 1 query | 0 |
+| Limits graph and intervals | 25 | 38.7 ms | 54.2 ms | 1 status + 1 allowance | 0 |
+
+Sorting, filtering, and pagination remain browser-local and add zero API
+requests. The generated Console source totals 70,310 bytes at this checkpoint,
+below the retained 90,000-byte ceiling.
+
+### Profiling evidence
+
+- `agent-perf` Node runs `20260728T034955Z-a60e89fe` and
+  `20260728T035047Z-890b5e78` completed their synthetic workloads, but the
+  pinned wrapper mishandled the space in its Application Support profile path
+  and reported both as incomplete despite creating V8 profile files.
+- No hotspot or speedup claim is inferred from those incomplete profiles. The
+  repeated unprofiled browser measurements above are the performance evidence.
+
+### Visual and verification checkpoint
+
+- Desktop Live, Explore, and Limits were inspected from synthetic screenshots.
+  The visual pass caught and fixed raw thread/share columns, incorrect aggregate
+  call metadata, invisible SVG geometry, raw epoch reset timestamps, and
+  missing-credit coercion.
+- Frontend unit tests, JavaScript syntax checks, TypeScript checks, the bundle
+  budget, and the deterministic asset build pass.
+- The final desktop/mobile Chromium matrix passed 35 tests with three
+  intentional skips. It covers cached reopen request counts, default Explore
+  results, Calls/Threads switching, keyboard sorting, local filtering and
+  pagination, exact evidence links, cross-generation enrichment rejection,
+  small monetary facts, time-scaled graphs, responsive rendering, and the
+  Limits graph.
+- The complete repository gate passed 412 Python tests, Ruff, MyPy, Pyright,
+  frontend lint/type/unit checks, deterministic assets, scope, maintainability,
+  release-safety, and diff checks.
+- The clean installed-wheel Console and allowance smoke passed. The package
+  smoke passed two fresh MCP tasks and measured warm Console p95 at 0.873 ms.
+
+### Release-candidate evidence
+
+| Artifact or gate | Result |
+| --- | --- |
+| Wheel | 165,088-byte installed candidate passed Console, allowance, and two-fresh-task MCP smoke; exact build digest is reported by PR qualification |
+| Sdist | Source-complete candidate passed composition and measured-plus-3% budget; the exact post-ledger artifact is reported by PR qualification rather than self-embedded |
+| Release composition | Pass; built distributions contain current deterministic source and remain within measured-plus-3% ceilings |
+| Installed Console | Pass; Console and allowance render from the exact wheel |
+| Installed package | Pass; two fresh MCP tasks and warm Console p95 0.873 ms |
+| Full repository | Pass; 412 tests and all static, type, scope, budget, and release gates |
+
+### Visual, accessibility, and review handoff
+
+- Final synthetic fixture screenshots are reproducible under `test-results/`:
+  `r6-live-final.png`
+  (`6cc4b2ac38ad9dd7b75beb020b88fccd1572575735a9552454b97f1b62f8791e`),
+  `r6-explore-final.png`
+  (`f9dbc54ca45b1e268f82300f5dbca86c53fd442e11d8602017c56799684987ad`),
+  and `r6-limits-final.png`
+  (`2fbe2e46a7dd1d71f188c31fea04521bd58fedabfc00fd33aa738180a19058b6`).
+  These ignored local artifacts were visually inspected after the final asset
+  build; R8 owns publishing qualified copies.
+- Keyboard navigation, skip-link focus, sortable column-header state, local
+  pagination, desktop/mobile responsive flows, chart accessible names, and
+  evidence actions pass the Chromium matrix. Sort state now belongs only to
+  the semantic column header.
+- Final source asset identities are `app.js`
+  `d7937620127c92b3ad263bffcc88e41540137bc1748d7f7f3ac6279a20c29576`,
+  `model.js`
+  `fe055e912c10af545d117465550561e67cd280a35d59d467f758ae84f3b37652`,
+  `styles.css`
+  `29c43210f90fd14899f1419c4045035db33f4d3d53658da4e26aad052fc6cc5b`,
+  and `index.html`
+  `17151aa63c5c47da7202aec87054693481797e11696beca840a165c07f8931da`.
+- The single stable-diff reviewer reported seven findings and all seven were
+  accepted: significant small-value formatting, numeric reset timestamps,
+  generation-fenced evidence enrichment, real time-scaled graphs, pricing
+  coverage, durable R8 handoff evidence, and valid ARIA sort ownership.
+  Reviewer token attribution is pending because no bounded reviewer-token
+  result was available; no retry blocks R6.
+
+PR/CI merge remains before R6 completion.
