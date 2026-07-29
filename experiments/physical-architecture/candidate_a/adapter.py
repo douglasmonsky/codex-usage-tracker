@@ -139,6 +139,14 @@ class Adapter:
                 "secondary_indexes_restored": (
                     artifact.stats.secondary_indexes_restored
                 ),
+                "staging_journal_mode": artifact.stats.staging_journal_mode,
+                "staging_synchronous": artifact.stats.staging_synchronous,
+                "final_journal_mode": artifact.stats.final_journal_mode,
+                "final_synchronous": artifact.stats.final_synchronous,
+                "durability_transition_ns": (
+                    artifact.stats.durability_transition_ns
+                ),
+                "validation_ns": artifact.stats.validation_ns,
                 "parser_workers": request.case.parameter("parser_workers") or 1,
                 "writer_mode": request.case.parameter("writer_mode") or "single",
             },

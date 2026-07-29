@@ -346,6 +346,62 @@ def test_default_initial_build_defers_and_restores_indexes_before_publication(
         ).fetchone()[0] == events[1][1]
 
 
+def test_unpublished_build_uses_disposable_io_then_restores_normal_wal(
+    fixture: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    staging_settings: list[tuple[str, int]] = []
+    original_insert_manifestations = ingest_module._insert_manifestations
+
+    def observed_insert_manifestations(
+        connection: Any,
+        fixture_bundle: Any,
+        stats: Any,
+        *,
+        selected_paths: frozenset[str],
+    ) -> dict[str, int]:
+        staging_settings.append(
+            (
+                str(connection.execute("PRAGMA journal_mode").fetchone()[0]),
+                int(connection.execute("PRAGMA synchronous").fetchone()[0]),
+            )
+        )
+        return original_insert_manifestations(
+            connection,
+            fixture_bundle,
+            stats,
+            selected_paths=selected_paths,
+        )
+
+    monkeypatch.setattr(
+        ingest_module,
+        "_insert_manifestations",
+        observed_insert_manifestations,
+    )
+    artifact = candidate_a.build_artifact(
+        fixture,
+        tmp_path / "staging-durability.sqlite",
+    )
+
+    assert staging_settings == [("off", 0)]
+    assert artifact.stats.staging_journal_mode == "off"
+    assert artifact.stats.staging_synchronous == 0
+    assert artifact.stats.final_journal_mode == "wal"
+    assert artifact.stats.final_synchronous == 1
+    assert artifact.stats.durability_transition_ns > 0
+    assert artifact.stats.validation_ns > 0
+    with database(artifact.path, read_only=True) as connection:
+        assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        schema_module.validate_database(connection)
+    with database(artifact.path) as connection:
+        assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        assert connection.execute("PRAGMA synchronous").fetchone()[0] == 1
+    assert not artifact.path.with_name(f"{artifact.path.name}-journal").exists()
+    assert not artifact.path.with_name(f"{artifact.path.name}-wal").exists()
+    assert not artifact.path.with_name(f"{artifact.path.name}-shm").exists()
+
+
 def test_explicit_present_build_keeps_secondary_indexes_present(
     fixture: Any,
     tmp_path: Path,
@@ -637,6 +693,12 @@ def test_all_mandatory_workloads_pass_with_only_optional_writer_unsupported(
         == default_build.oracle_results["secondary_indexes_restored"]
         > 0
     )
+    assert default_build.oracle_results["staging_journal_mode"] == "off"
+    assert default_build.oracle_results["staging_synchronous"] == 0
+    assert default_build.oracle_results["final_journal_mode"] == "wal"
+    assert default_build.oracle_results["final_synchronous"] == 1
+    assert default_build.oracle_results["durability_transition_ns"] > 0
+    assert default_build.oracle_results["validation_ns"] > 0
     present_build = results["build.index.present"]
     assert present_build.oracle_results["index_mode"] == "present"
     assert present_build.oracle_results["secondary_indexes_deferred"] == 0

@@ -11,7 +11,11 @@ from typing import Any
 
 import shared
 
-from .schema import create_database, validate_database
+from .schema import (
+    create_database,
+    finalize_unpublished_database,
+    validate_database,
+)
 
 _CONTROL_EVENT_KINDS = frozenset(
     {
@@ -102,6 +106,12 @@ class IngestStats:
     secondary_indexes_deferred: int = 0
     secondary_indexes_restored: int = 0
     index_maintenance_ns: int = 0
+    staging_journal_mode: str = ""
+    staging_synchronous: int = 0
+    final_journal_mode: str = ""
+    final_synchronous: int = 0
+    durability_transition_ns: int = 0
+    validation_ns: int = 0
 
 
 @dataclass(frozen=True)
@@ -799,8 +809,14 @@ def build_artifact(
     hook: Callable[[str], None] | None = None,
     defer_secondary_indexes: bool = True,
 ) -> BuildArtifact:
-    connection = create_database(path)
+    connection = create_database(path, unpublished_staging=True)
     stats = IngestStats()
+    stats.staging_journal_mode = str(
+        connection.execute("PRAGMA journal_mode").fetchone()[0]
+    )
+    stats.staging_synchronous = int(
+        connection.execute("PRAGMA synchronous").fetchone()[0]
+    )
     try:
         if defer_secondary_indexes:
             index_drop_started = time.perf_counter_ns()
@@ -949,7 +965,20 @@ def build_artifact(
         connection.commit()
         stats.writer_transactions += 1
         connection.execute("PRAGMA optimize")
+        durability_started = time.perf_counter_ns()
+        finalize_unpublished_database(connection)
+        stats.durability_transition_ns = (
+            time.perf_counter_ns() - durability_started
+        )
+        stats.final_journal_mode = str(
+            connection.execute("PRAGMA journal_mode").fetchone()[0]
+        )
+        stats.final_synchronous = int(
+            connection.execute("PRAGMA synchronous").fetchone()[0]
+        )
+        validation_started = time.perf_counter_ns()
         validate_database(connection)
+        stats.validation_ns = time.perf_counter_ns() - validation_started
         return BuildArtifact(
             path=path,
             publication_id=publication_id,

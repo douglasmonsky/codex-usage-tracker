@@ -18,6 +18,15 @@ SQLITE_SETTINGS = (
     ("wal_autocheckpoint", "1000"),
 )
 
+_UNPUBLISHED_STAGING_SETTINGS = (
+    ("page_size", "4096"),
+    ("journal_mode", "off"),
+    ("synchronous", "off"),
+    ("cache_size", "-20000"),
+    ("mmap_size", "0"),
+    ("temp_store", "memory"),
+)
+
 _DDL = """
 CREATE TABLE metadata (
     key TEXT PRIMARY KEY,
@@ -466,13 +475,27 @@ def _apply_pragmas(connection: sqlite3.Connection) -> None:
     connection.execute("PRAGMA busy_timeout=5000")
 
 
-def create_database(path: Path) -> sqlite3.Connection:
+def _apply_unpublished_staging_pragmas(connection: sqlite3.Connection) -> None:
+    for name, value in _UNPUBLISHED_STAGING_SETTINGS:
+        connection.execute(f"PRAGMA {name}={value}")
+    connection.execute("PRAGMA foreign_keys=ON")
+    connection.execute("PRAGMA busy_timeout=5000")
+
+
+def create_database(
+    path: Path,
+    *,
+    unpublished_staging: bool = False,
+) -> sqlite3.Connection:
     if path.exists():
         raise FileExistsError(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
     connection.row_factory = sqlite3.Row
-    _apply_pragmas(connection)
+    if unpublished_staging:
+        _apply_unpublished_staging_pragmas(connection)
+    else:
+        _apply_pragmas(connection)
     connection.executescript(_DDL)
     connection.executemany(
         "INSERT INTO metadata(key, value) VALUES (?, ?)",
@@ -484,6 +507,19 @@ def create_database(path: Path) -> sqlite3.Connection:
     )
     connection.commit()
     return connection
+
+
+def finalize_unpublished_database(connection: sqlite3.Connection) -> None:
+    if connection.in_transaction:
+        raise ValueError("candidate A staging transaction must commit before finalization")
+    _apply_pragmas(connection)
+    if connection.execute("PRAGMA journal_mode").fetchone()[0] != "wal":
+        raise ValueError("candidate A failed to restore WAL before publication")
+    if int(connection.execute("PRAGMA synchronous").fetchone()[0]) != 1:
+        raise ValueError("candidate A failed to restore NORMAL sync before publication")
+    checkpoint = tuple(connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone())
+    if checkpoint != (0, 0, 0):
+        raise ValueError(f"candidate A final WAL checkpoint was incomplete: {checkpoint}")
 
 
 def open_database(path: Path, *, read_only: bool = False) -> sqlite3.Connection:
