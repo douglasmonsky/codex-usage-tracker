@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import ctypes
-import errno
-import os
-import platform
-import shutil
 import stat
+import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,10 +17,13 @@ class PreparedArtifactError(ValueError):
 class PreparationEvidence:
     clone_method: str
     source_bytes: int
+    preparation_wall_time_ns: int
 
     def as_oracle_result(self, *, source_case_id: str) -> dict[str, object]:
         return {
             "clone_method": self.clone_method,
+            "mode": "prepared_scale_clone",
+            "preparation_wall_time_ns": self.preparation_wall_time_ns,
             "copy_sidecars": False,
             "destination_distinct_inode": True,
             "source_case_id": source_case_id,
@@ -53,7 +53,9 @@ def clone_prepared_artifact(
         raise PreparedArtifactError("prepared destination must differ from source")
 
     try:
+        started = time.perf_counter_ns()
         method = _clone_file(source, destination)
+        preparation_wall_time_ns = time.perf_counter_ns() - started
         destination_stat = destination.stat()
         if not stat.S_ISREG(destination_stat.st_mode):
             raise PreparedArtifactError("prepared destination is not a regular file")
@@ -71,7 +73,11 @@ def clone_prepared_artifact(
             observed_through_us=artifact.observed_through_us,
             stats=IngestStats(occurrence_rows=artifact.stats.occurrence_rows),
         ),
-        PreparationEvidence(clone_method=method, source_bytes=source_stat.st_size),
+        PreparationEvidence(
+            clone_method=method,
+            source_bytes=source_stat.st_size,
+            preparation_wall_time_ns=preparation_wall_time_ns,
+        ),
     )
 
 
@@ -87,24 +93,8 @@ def _validate_source_sidecars(source: Path, retained_root: Path) -> None:
 
 
 def _clone_file(source: Path, destination: Path) -> str:
-    if platform.system() != "Darwin":
-        shutil.copyfile(source, destination)
-        return "copyfile"
     try:
-        _darwin_clonefile(source, destination)
-        return "clonefile"
-    except OSError as error:
-        if error.errno not in {errno.ENOTSUP, errno.EXDEV}:
-            raise PreparedArtifactError("native clonefile failed") from error
-    shutil.copyfile(source, destination)
-    return "copyfile_fallback"
-
-
-def _darwin_clonefile(source: Path, destination: Path) -> None:
-    library = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
-    clonefile = library.clonefile
-    clonefile.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int)
-    clonefile.restype = ctypes.c_int
-    if clonefile(os.fsencode(source), os.fsencode(destination), 0) != 0:
-        error_number = ctypes.get_errno()
-        raise OSError(error_number, os.strerror(error_number), str(source), str(destination))
+        subprocess.run(("/bin/cp", "-c", "--", str(source), str(destination)), check=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise PreparedArtifactError("prepared scale clone is unavailable") from error
+    return "cp_clone"

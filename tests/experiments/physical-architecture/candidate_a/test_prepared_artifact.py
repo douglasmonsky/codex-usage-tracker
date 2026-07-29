@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import errno
 import importlib
-import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -32,15 +31,19 @@ def _artifact(path: Path) -> Any:
     )
 
 
-def test_native_clone_is_isolated_and_has_fresh_ordinary_stats(
+def test_cp_clone_is_isolated_and_has_fresh_ordinary_stats(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source_path = tmp_path / "scale" / "publication.sqlite"
     source_path.parent.mkdir(parents=True)
     source = _artifact(source_path)
-    monkeypatch.setattr(prepared_artifact.platform, "system", lambda: "Darwin")
-    monkeypatch.setattr(prepared_artifact, "_darwin_clonefile", shutil.copyfile)
+    def clone(argv: tuple[str, ...], *, check: bool) -> None:
+        assert argv == ("/bin/cp", "-c", "--", str(source.path), str(tmp_path / "ordinary" / "ordinary.sqlite"))
+        assert check is True
+        (tmp_path / "ordinary" / "ordinary.sqlite").write_bytes(source.path.read_bytes())
+
+    monkeypatch.setattr(prepared_artifact.subprocess, "run", clone)
 
     cloned, evidence = prepared_artifact.clone_prepared_artifact(
         source,
@@ -48,7 +51,7 @@ def test_native_clone_is_isolated_and_has_fresh_ordinary_stats(
         destination=tmp_path / "ordinary" / "ordinary.sqlite",
     )
 
-    assert evidence.clone_method == "clonefile"
+    assert evidence.clone_method == "cp_clone"
     assert cloned.path.read_bytes() == source.path.read_bytes()
     assert cloned.path.stat().st_ino != source.path.stat().st_ino
     assert cloned.publication_id == source.publication_id
@@ -61,33 +64,7 @@ def test_native_clone_is_isolated_and_has_fresh_ordinary_stats(
     assert source.path.read_bytes() == b"prepared database"
 
 
-@pytest.mark.parametrize("error_number", [errno.ENOTSUP, errno.EXDEV])
-def test_native_clone_supported_fallbacks_copyfile(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    error_number: int,
-) -> None:
-    source_path = tmp_path / "scale" / "publication.sqlite"
-    source_path.parent.mkdir(parents=True)
-    source = _artifact(source_path)
-    monkeypatch.setattr(prepared_artifact.platform, "system", lambda: "Darwin")
-    monkeypatch.setattr(
-        prepared_artifact,
-        "_darwin_clonefile",
-        lambda *_: (_ for _ in ()).throw(OSError(error_number, "unsupported")),
-    )
-
-    cloned, evidence = prepared_artifact.clone_prepared_artifact(
-        source,
-        retained_root=source.path.parent,
-        destination=tmp_path / "ordinary.sqlite",
-    )
-
-    assert evidence.clone_method == "copyfile_fallback"
-    assert cloned.path.read_bytes() == source.path.read_bytes()
-
-
-def test_native_clone_other_errors_fail_closed(
+def test_cp_clone_failure_fails_closed_without_copy_fallback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -95,14 +72,9 @@ def test_native_clone_other_errors_fail_closed(
     source_path.parent.mkdir(parents=True)
     source = _artifact(source_path)
     destination = tmp_path / "ordinary.sqlite"
-    monkeypatch.setattr(prepared_artifact.platform, "system", lambda: "Darwin")
-    monkeypatch.setattr(
-        prepared_artifact,
-        "_darwin_clonefile",
-        lambda *_: (_ for _ in ()).throw(OSError(errno.EIO, "io error")),
-    )
+    monkeypatch.setattr(prepared_artifact.subprocess, "run", lambda *_args, **_kwargs: (_ for _ in ()).throw(subprocess.CalledProcessError(1, "/bin/cp")))
 
-    with pytest.raises(prepared_artifact.PreparedArtifactError, match="native clonefile failed"):
+    with pytest.raises(prepared_artifact.PreparedArtifactError, match="clone is unavailable"):
         prepared_artifact.clone_prepared_artifact(
             source,
             retained_root=source.path.parent,
@@ -111,7 +83,7 @@ def test_native_clone_other_errors_fail_closed(
     assert not destination.exists()
 
 
-def test_copy_error_removes_a_partial_destination(
+def test_cp_clone_error_removes_a_partial_destination(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -120,14 +92,13 @@ def test_copy_error_removes_a_partial_destination(
     source = _artifact(source_path)
     destination = tmp_path / "ordinary.sqlite"
 
-    def partial_copy(*_: object) -> None:
+    def partial_copy(*_: object, **__: object) -> None:
         destination.write_bytes(b"partial")
-        raise OSError(errno.EIO, "io error")
+        raise OSError("io error")
 
-    monkeypatch.setattr(prepared_artifact.platform, "system", lambda: "Linux")
-    monkeypatch.setattr(prepared_artifact.shutil, "copyfile", partial_copy)
+    monkeypatch.setattr(prepared_artifact.subprocess, "run", partial_copy)
 
-    with pytest.raises(OSError, match="io error"):
+    with pytest.raises(prepared_artifact.PreparedArtifactError, match="clone is unavailable"):
         prepared_artifact.clone_prepared_artifact(
             source,
             retained_root=source.path.parent,

@@ -12,7 +12,10 @@ from .canonical import canonical_json_bytes
 from .outcomes import RunOutcome
 from .stop import StopDecision, StopMetric
 
-MEASUREMENT_SCHEMA = "codex-usage-tracker.physical-bakeoff-measurement.v1"
+MEASUREMENT_SCHEMA = "codex-usage-tracker.physical-bakeoff-measurement.v2"
+_ORDINARY_TAIL_LATENCY_BASIS = "ordinary_operation_after_preparation.v1"
+_PAGES_WRITTEN_BASIS = "sqlite_wal_frames_clean_epoch.v1"
+_WRITER_TRANSACTIONS_BASIS = "explicit_committed_analytical_transactions.v1"
 _REQUIRED_SQLITE_SETTINGS = frozenset(
     {
         "cache_size",
@@ -111,6 +114,8 @@ class MeasurementIdentity:
 
 @dataclass(frozen=True)
 class MeasurementValues:
+    ordinary_tail_latency_ns: int | None = None
+    ordinary_tail_latency_basis: str | None = None
     peak_rss_bytes: int = 0
     cpu_utilization_ppm: int = 0
     parser_worker_time_ns: int = 0
@@ -131,8 +136,10 @@ class MeasurementValues:
     journal_bytes: int = 0
     temporary_bytes: int = 0
     pages_read: int = 0
-    pages_written: int = 0
-    writer_transactions: int = 0
+    pages_written: int | None = None
+    pages_written_basis: str | None = None
+    writer_transactions: int | None = None
+    writer_transactions_basis: str | None = None
     source_files_inventoried: int = 0
     source_files_selected: int = 0
     source_files_parsed: int = 0
@@ -179,8 +186,23 @@ class MeasurementValues:
     answer_correct: bool = False
 
     def __post_init__(self) -> None:
+        for value_name, basis_name, expected in (
+            ("ordinary_tail_latency_ns", "ordinary_tail_latency_basis", _ORDINARY_TAIL_LATENCY_BASIS),
+            ("pages_written", "pages_written_basis", _PAGES_WRITTEN_BASIS),
+            ("writer_transactions", "writer_transactions_basis", _WRITER_TRANSACTIONS_BASIS),
+        ):
+            value = getattr(self, value_name)
+            basis = getattr(self, basis_name)
+            # Candidate C/D elimination runs remain projectable.  Their legacy
+            # measurements leave these Candidate-A-only write metrics unavailable.
+            if value is None and basis is not None:
+                raise MeasurementContractError(f"measurement {value_name} and {basis_name} must be paired")
+            if basis is not None and basis != expected:
+                raise MeasurementContractError(f"measurement {basis_name} is unsupported")
         for field in fields(self):
             value = getattr(self, field.name)
+            if value is None:
+                continue
             if isinstance(value, (bool, str)):
                 continue
             if isinstance(value, int):
@@ -239,6 +261,9 @@ class MeasurementRecord:
     def __post_init__(self) -> None:
         if self.wall_time_ns < 0 or self.process_cpu_ns < 0:
             raise MeasurementContractError("measurement clocks moved backwards")
+        latency = self.values.ordinary_tail_latency_ns
+        if latency is not None and self.wall_time_ns < latency:
+            raise MeasurementContractError("measurement wall time cannot be shorter than ordinary latency")
         if (self.outcome is RunOutcome.STOPPED) != (self.stop_decision is not None):
             raise MeasurementContractError("stopped measurement requires one stop decision")
         if self.outcome in {RunOutcome.FAILED, RunOutcome.UNSUPPORTED} and not self.detail_code:

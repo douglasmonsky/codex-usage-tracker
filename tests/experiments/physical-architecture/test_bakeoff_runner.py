@@ -448,9 +448,10 @@ def test_candidate_a_reuses_scale_build_for_query_and_cloned_ordinary_repetition
     assert invocation["prepared_scale_artifact_policy"] == {
         "candidate_ids": ["A"],
         "mode": "reuse_scale_build_per_repetition",
-        "ordinary_change": {
-            "copy_sidecars": False,
-            "mode": "clone_before_measurement",
+            "ordinary_change": {
+                "clone_command": ["/bin/cp", "-c"],
+                "copy_sidecars": False,
+                "mode": "prepared_scale_clone",
             "source_validation": [
                 "regular_file",
                 "no_journal",

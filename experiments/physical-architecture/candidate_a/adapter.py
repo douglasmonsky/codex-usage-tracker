@@ -184,11 +184,10 @@ class Adapter:
     def _ordinary(self, request: shared.CandidateRequest) -> shared.CandidateResult:
         artifact, preparation = self._ordinary_artifact(request)
         change = str(request.case.parameter("change"))
-        started = time.perf_counter_ns()
         try:
             maintenance = apply_ordinary_change(artifact.path, change)
         except TailFoldRequired as fold:
-            elapsed = time.perf_counter_ns() - started
+            elapsed = 0
             storage = artifact_metrics(
                 artifact.path,
                 occurrence_rows=artifact.stats.occurrence_rows,
@@ -213,7 +212,7 @@ class Adapter:
                 },
                 detail_code="candidate_a.tail_fold_required",
             )
-        elapsed = time.perf_counter_ns() - started
+        elapsed = maintenance.ordinary_tail_latency_ns
         storage = artifact_metrics(
             artifact.path,
             occurrence_rows=artifact.stats.occurrence_rows + maintenance.facts_inserted,
@@ -222,7 +221,7 @@ class Adapter:
             artifact,
             storage,
             maintenance=maintenance,
-            sql_latencies_ns=(elapsed,),
+            sql_latencies_ns=(elapsed,) if elapsed else (),
         )
         if self._observe_stop(
             request,
@@ -500,7 +499,6 @@ class Adapter:
                 selector_pages_gap_free=True,
                 prior_publication_survived=observation.prior_publication_queryable,
                 answer_correct=True,
-                writer_transactions=1,
             ),
             oracle_results={
                 **asdict(observation),
@@ -648,8 +646,20 @@ class Adapter:
             free_list_bytes=storage.free_list_bytes,
             wal_bytes=storage.wal_bytes,
             journal_bytes=storage.journal_bytes,
-            pages_written=storage.pages_written,
-            writer_transactions=ingest.writer_transactions + update.writer_transactions,
+            ordinary_tail_latency_ns=(
+                update.ordinary_tail_latency_ns if maintenance is not None else None
+            ),
+            ordinary_tail_latency_basis=(
+                "ordinary_operation_after_preparation.v1" if maintenance is not None else None
+            ),
+            pages_written=(update.pages_written if maintenance is not None else None),
+            pages_written_basis=(
+                "sqlite_wal_frames_clean_epoch.v1" if maintenance is not None else None
+            ),
+            writer_transactions=(update.writer_transactions if maintenance is not None else None),
+            writer_transactions_basis=(
+                "explicit_committed_analytical_transactions.v1" if maintenance is not None else None
+            ),
             source_files_inventoried=ingest.source_files_inventoried,
             source_files_selected=ingest.source_files_selected,
             source_files_parsed=ingest.source_files_parsed,

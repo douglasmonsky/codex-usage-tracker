@@ -50,10 +50,13 @@ the required question cases. It rejects absolute, escaping, missing, or non-CK-0
   attribution workload.
 
 The matrix digest includes the qualification host's physical-core input. Candidate result
-files use `codex-usage-tracker.physical-bakeoff-measurement.v1`. The collector owns wall and
+files use `codex-usage-tracker.physical-bakeoff-measurement.v2`. The collector owns wall and
 process clocks; the candidate supplies the remaining explicit resource, storage, ingestion,
 projection, plan, MCP, call, token, correctness, selector, and publication measurements.
-JSON Lines records are canonical and append-only.
+JSON Lines records are canonical and append-only. Candidate A ordinary-tail records separately
+report operation latency after preparation, WAL frames written during a clean checkpoint epoch,
+and explicit committed analytical transactions; each value carries its exact provenance basis.
+Host wall time remains separate from operation latency.
 
 Speed claims require at least five unprofiled samples. `distribution_summary()` fixes median,
 nearest-rank p95, maximum, and population coefficient of variation. `rank_candidates()` uses
@@ -66,7 +69,9 @@ case, query cases, and ordinary changes share an invocation, invocation schema v
 `prepared_scale_artifact_policy`: each query repetition opens that repetition's completed
 scale artifact read-only, while each ordinary change receives an independent clone before
 measured execution. The clone validates a regular retained database, no rollback journal,
-an absent or empty WAL, and no Candidate A publication lease; it never copies sidecars.
+an absent or empty WAL, and no Candidate A publication lease; it uses argv-only `/bin/cp -c`
+and never copies sidecars or falls back to a full copy. Preparation timing is recorded as
+preparation evidence, outside the ordinary-operation measurement.
 Build timing remains isolated in the scale case, ordinary timing begins after cloning, query
 timing begins after artifact selection, and the runner deletes the temporarily retained
 scale roots after all consumers finish. This avoids rebuilding an identical multi-gigabyte

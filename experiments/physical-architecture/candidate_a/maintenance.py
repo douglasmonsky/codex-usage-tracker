@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,6 +20,8 @@ class MaintenanceStats:
     dirty_keys: int = 0
     projection_rows_read: int = 0
     projection_rows_written: int = 0
+    ordinary_tail_latency_ns: int = 0
+    pages_written: int = 0
     writer_transactions: int = 0
     source_files_rescanned: int = 0
     source_bytes_rescanned: int = 0
@@ -648,10 +651,9 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
     projection_read = 0
     projection_written = 0
     try:
-        connection.execute("BEGIN IMMEDIATE")
+        _require_clean_wal_epoch(connection, "before ordinary operation")
         if change == "no_source_change":
-            unchanged = int(
-                connection.execute(
+            connection.execute(
                     """
                     SELECT
                         (
@@ -665,8 +667,12 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
                         )
                     """
                 ).fetchone()[0]
-            )
-        elif change in {"one_model_call", "32_call_tail", "2000_call_tail", "late_event"}:
+            _require_checkpointed_wal(connection, "after no-source-change read")
+            _require_clean_wal_epoch(connection, "after no-source-change read")
+            return MaintenanceStats()
+        started = time.perf_counter_ns()
+        connection.execute("BEGIN IMMEDIATE")
+        if change in {"one_model_call", "32_call_tail", "2000_call_tail", "late_event"}:
             count = {
                 "one_model_call": 1,
                 "32_call_tail": 32,
@@ -733,6 +739,9 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
         else:
             raise ValueError(f"unknown candidate A ordinary change: {change}")
         connection.commit()
+        latency = time.perf_counter_ns() - started
+        pages_written = _require_checkpointed_wal(connection, "after ordinary operation")
+        _require_clean_wal_epoch(connection, "after ordinary operation")
         return MaintenanceStats(
             facts_inserted=inserted,
             facts_updated=updated,
@@ -740,6 +749,8 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
             dirty_keys=dirty_keys,
             projection_rows_read=projection_read,
             projection_rows_written=projection_written,
+            ordinary_tail_latency_ns=latency,
+            pages_written=pages_written,
             writer_transactions=1,
         )
     except BaseException:
@@ -747,6 +758,26 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
         raise
     finally:
         connection.close()
+
+
+def _checkpoint(connection: sqlite3.Connection, mode: str) -> tuple[int, int, int]:
+    row = connection.execute(f"PRAGMA wal_checkpoint({mode})").fetchone()
+    if row is None or len(row) != 3 or any(type(value) is not int for value in row):
+        raise RuntimeError(f"SQLite {mode} checkpoint returned ambiguous result")
+    return tuple(int(value) for value in row)
+
+
+def _require_clean_wal_epoch(connection: sqlite3.Connection, stage: str) -> None:
+    result = _checkpoint(connection, "TRUNCATE")
+    if result != (0, 0, 0):
+        raise RuntimeError(f"SQLite WAL is not clean {stage}: {result!r}")
+
+
+def _require_checkpointed_wal(connection: sqlite3.Connection, stage: str) -> int:
+    busy, log_frames, checkpointed = _checkpoint(connection, "PASSIVE")
+    if busy != 0 or log_frames != checkpointed:
+        raise RuntimeError(f"SQLite WAL checkpoint is ambiguous {stage}: {(busy, log_frames, checkpointed)!r}")
+    return log_frames
 
 
 def apply_source_phase(

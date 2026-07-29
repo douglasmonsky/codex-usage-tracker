@@ -266,7 +266,7 @@ def _score_evidence_bundle(
     environment_digest = shared.canonical_sha256(environment)
     manifest_digest, oracle_digest = fixture_digests[profile]
     invocation_base = {
-        "schema": "codex-usage-tracker.physical-bakeoff-invocation.v1",
+        "schema": "codex-usage-tracker.physical-bakeoff-invocation.v3",
         "run_id": run_id,
         "code_commit": code_commit,
         "fixture": {
@@ -315,13 +315,17 @@ def _score_evidence_bundle(
             values = {
                 "automatic_index_count": 0,
                 "database_bytes": 100,
+                "dirty_keys": 1,
                 "facts_inserted": 1,
                 "facts_updated": 0,
                 "full_scan_count": 0,
                 "index_bytes": 20,
                 "mcp_latency_ns": 20,
+                "ordinary_tail_latency_ns": 1,
+                "ordinary_tail_latency_basis": "ordinary_operation_after_preparation.v1",
                 "pages_read": 4,
                 "pages_written": 2,
+                "pages_written_basis": "sqlite_wal_frames_clean_epoch.v1",
                 "prior_publication_survived": True,
                 "projection_rows_written": 3,
                 "response_bytes": 30,
@@ -335,7 +339,18 @@ def _score_evidence_bundle(
                 "refresh_jobs": 0,
                 "wal_bytes": 5,
                 "writer_transactions": 1,
+                "writer_transactions_basis": "explicit_committed_analytical_transactions.v1",
             }
+            if case_id == "ordinary.no_source_change":
+                values.update(
+                    {
+                        "facts_inserted": 0,
+                        "dirty_keys": 0,
+                        "pages_written": 0,
+                        "projection_rows_written": 0,
+                        "writer_transactions": 0,
+                    }
+                )
             measurement: dict[str, object] = {
                 "schema": shared.MEASUREMENT_SCHEMA,
                 "identity": identity,
@@ -365,7 +380,16 @@ def _score_evidence_bundle(
                 "partial": False,
                 "stop_decision": None,
                 "detail_code": None,
-                "oracle_results": None,
+                "oracle_results": (
+                    {
+                        "preparation": {
+                            "clone_method": "cp_clone",
+                            "copy_sidecars": False,
+                        }
+                    }
+                    if case_id.startswith("ordinary.")
+                    else None
+                ),
             }
             detail = {**detail_base, "detail_digest": shared.canonical_sha256(detail_base)}
             if mutate_detail is not None:
@@ -1443,9 +1467,9 @@ def test_extracts_all_score_dimensions_from_authenticated_qualification_evidence
         "crash_recovery_lifecycle_simplicity": "25000025",
         "database_index_wal_size": "125",
         "evidence_stability_selector_cost": "20050",
-        "implementation_complexity_operability": "70",
+        "implementation_complexity_operability": "69",
         "named_query_evidence_mcp_payload_efficiency": "69002072070",
-        "ordinary_tail_latency_write_amplification": "54000045",
+        "ordinary_tail_latency_write_amplification": "48000009",
     }
 
 

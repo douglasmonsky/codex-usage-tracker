@@ -614,7 +614,8 @@ def _prepared_scale_artifact_policy(
         "query": {"mode": "read_only_reuse"},
         "ordinary_change": {
             "copy_sidecars": False,
-            "mode": "clone_before_measurement",
+            "mode": "prepared_scale_clone",
+            "clone_command": ("/bin/cp", "-c"),
             "source_validation": (
                 "regular_file",
                 "no_journal",

@@ -50,7 +50,7 @@ SCORE_FORMULA_IDS = {
     shared.ScoreDimension.CRASH_RECOVERY.value: "ck04.score.crash-recovery-lifecycle.v1",
     shared.ScoreDimension.EVIDENCE_STABILITY.value: "ck04.score.evidence-selector-cost.v1",
     shared.ScoreDimension.OPERABILITY.value: "ck04.score.implementation-operability.v1",
-    shared.ScoreDimension.ORDINARY_TAIL.value: "ck04.score.ordinary-tail-write-amplification.v1",
+    shared.ScoreDimension.ORDINARY_TAIL.value: "ck04.score.ordinary-tail-write-amplification.v2",
     shared.ScoreDimension.QUERY_EFFICIENCY.value: "ck04.score.query-mcp-payload-efficiency.v1",
     shared.ScoreDimension.STORAGE.value: "ck04.score.database-index-wal-bytes.v1",
 }
@@ -124,7 +124,7 @@ SCORE_FORMULA_SOURCE_CASES = {
     shared.ScoreDimension.STORAGE.value: (("$scale", "build.scale.{scale}"),),
 }
 SCORE_FORMULA_CONTRACT = {
-    "schema": "codex-usage-tracker.ck04-score-formulas.v1",
+    "schema": "codex-usage-tracker.ck04-score-formulas.v2",
     "nearest_rank_p95": "sort ascending; select ceil(0.95 * sample_count), one-based",
     "missingness": (
         "fail closed on a missing case/field, non-passed or profiled record, "
@@ -190,14 +190,17 @@ SCORE_FORMULA_CONTRACT = {
             "formula_id": SCORE_FORMULA_IDS[shared.ScoreDimension.ORDINARY_TAIL.value],
             "source_cases": SCORE_FORMULA_SOURCE_CASES[shared.ScoreDimension.ORDINARY_TAIL.value],
             "source_fields": (
-                "wall_time_ns",
+                "values.ordinary_tail_latency_ns",
+                "values.ordinary_tail_latency_basis",
                 "values.pages_written",
+                "values.pages_written_basis",
                 "values.projection_rows_written",
                 "values.writer_transactions",
+                "values.writer_transactions_basis",
             ),
             "aggregation": (
-                "sum per-case p95 wall_time_ns plus 1000000 ns per maximum page "
-                "written, projection row written, and writer transaction"
+                "sum per-case p95 ordinary operation latency plus 1000000 ns per maximum "
+                "clean-WAL page frame, projection row written, and committed transaction"
             ),
             "unit": "normalized_nanoseconds",
         },
@@ -530,11 +533,7 @@ def _authenticate_score_evidence(
     summary = _canonical_score_object(bundle.summary_bytes, f"{context} summary")
     _verify_score_digest(invocation, "invocation_digest", f"{context} invocation")
     _verify_score_digest(summary, "summary_digest", f"{context} summary")
-    if invocation.get("schema") not in {
-        "codex-usage-tracker.physical-bakeoff-invocation.v1",
-        "codex-usage-tracker.physical-bakeoff-invocation.v2",
-        "codex-usage-tracker.physical-bakeoff-invocation.v3",
-    }:
+    if invocation.get("schema") != "codex-usage-tracker.physical-bakeoff-invocation.v3":
         raise DecisionEvidenceContractError(f"{context} invocation schema is unsupported")
     if summary.get("schema") != "codex-usage-tracker.physical-bakeoff-summary.v1":
         raise DecisionEvidenceContractError(f"{context} summary schema is unsupported")
@@ -660,6 +659,10 @@ def _authenticate_score_evidence(
             or detail.get("partial") is not False
         ):
             raise DecisionEvidenceContractError(f"{item_context} must be complete and passed")
+        if candidate_id == "A":
+            _validate_candidate_a_score_measurement(
+                measurement, detail, context=item_context
+            )
         repetition_coverage[str(case_id)].append(repetition)
         rows.append(
             _ScoreMeasurement(
@@ -697,6 +700,41 @@ def _authenticate_score_evidence(
                 f"{context} case {case_id} lacks exact repetition coverage"
             )
     return tuple(rows)
+
+
+def _validate_candidate_a_score_measurement(
+    measurement: Mapping[str, Any], detail: Mapping[str, Any], *, context: str
+) -> None:
+    values = _object_mapping(measurement.get("values"), f"{context}.values")
+    case_id = _text(
+        _object_mapping(measurement.get("identity"), f"{context}.identity").get("case_id"),
+        f"{context}.case_id", maximum=256
+    )
+    if not case_id.startswith("ordinary."):
+        return
+    expected = {
+        "ordinary_tail_latency_basis": "ordinary_operation_after_preparation.v1",
+        "pages_written_basis": "sqlite_wal_frames_clean_epoch.v1",
+        "writer_transactions_basis": "explicit_committed_analytical_transactions.v1",
+    }
+    for field, value in expected.items():
+        if values.get(field) != value:
+            raise DecisionEvidenceContractError(f"{context} {field} is not authenticated")
+    for field in ("ordinary_tail_latency_ns", "pages_written", "writer_transactions"):
+        _integer(values.get(field), f"{context} values.{field}", minimum=0)
+    if _integer(measurement.get("wall_time_ns"), f"{context}.wall_time_ns", minimum=0) < int(values["ordinary_tail_latency_ns"]):
+        raise DecisionEvidenceContractError(f"{context} wall time is shorter than ordinary latency")
+    oracle = _object_mapping(detail.get("oracle_results"), f"{context}.oracle_results")
+    preparation = _object_mapping(oracle.get("preparation"), f"{context}.preparation")
+    if preparation.get("clone_method") != "cp_clone" or preparation.get("copy_sidecars") is not False:
+        raise DecisionEvidenceContractError(f"{context} preparation evidence is not exact")
+    if case_id == "ordinary.no_source_change":
+        for field in ("pages_written", "writer_transactions", "facts_inserted", "facts_updated", "dirty_keys", "projection_rows_written"):
+            if _integer(values.get(field), f"{context} values.{field}", minimum=0) != 0:
+                raise DecisionEvidenceContractError(f"{context} no-change operation is not zero-write")
+    else:
+        if int(values["writer_transactions"]) != 1 or int(values["pages_written"]) < 1:
+            raise DecisionEvidenceContractError(f"{context} mutation lacks one committed WAL transaction")
 
 
 def _canonical_score_object(payload: bytes, artifact: str) -> dict[str, Any]:
@@ -753,7 +791,7 @@ def _extract_dimension_cost(
         value = sum(_p95(row.wall_time_ns for row in rows) for rows in case_rows)
     elif dimension is shared.ScoreDimension.ORDINARY_TAIL:
         value = sum(
-            _p95(row.wall_time_ns for row in rows)
+            _p95(_integer_value(row, "ordinary_tail_latency_ns") for row in rows)
             + 1_000_000
             * (
                 _maximum_value(rows, "pages_written")
