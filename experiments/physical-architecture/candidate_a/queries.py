@@ -9,7 +9,12 @@ from typing import Any
 
 import shared
 
-from .evidence import EvidencePage, evidence_page
+from .evidence import (
+    MAXIMUM_ANCHORED_PAGE_POSITION,
+    EvidencePage,
+    cursor_for_order_key,
+    evidence_page,
+)
 
 
 @dataclass(frozen=True)
@@ -28,12 +33,10 @@ class QueryResult:
 _PLAN_SQL = {
     "current_usage": """
         SELECT
-            count(*) AS calls,
-            sum(uncached_input_tokens) AS uncached_input_tokens,
-            sum(cached_input_tokens) AS cached_input_tokens,
-            sum(reasoning_tokens) AS reasoning_tokens,
-            sum(output_tokens) AS output_tokens
-        FROM model_calls
+            calls, uncached_input_tokens, cached_input_tokens,
+            reasoning_tokens, output_tokens
+        FROM usage_total_current
+        WHERE singleton = 1
     """,
     "top_sessions": """
         SELECT * FROM session_usage_current
@@ -43,36 +46,27 @@ _PLAN_SQL = {
     """,
     "model_effort_mix": """
         SELECT
-            model, reasoning_effort, count(*) AS calls,
-            sum(uncached_input_tokens) AS uncached_input_tokens,
-            sum(cached_input_tokens) AS cached_input_tokens,
-            sum(reasoning_tokens) AS reasoning_tokens,
-            sum(output_tokens) AS output_tokens
-        FROM model_calls
-        GROUP BY model, reasoning_effort
-        ORDER BY uncached_input_tokens DESC, model, reasoning_effort
+            model,
+            CASE
+                WHEN reasoning_effort_is_null = 1 THEN NULL
+                ELSE reasoning_effort_value
+            END AS reasoning_effort,
+            calls, uncached_input_tokens, cached_input_tokens,
+            reasoning_tokens, output_tokens
+        FROM model_effort_usage_current
+            INDEXED BY model_effort_usage_current_rank
+        ORDER BY
+            uncached_input_tokens DESC, model,
+            reasoning_effort_is_null DESC, reasoning_effort_value
         LIMIT 25
     """,
     "project_family_usage": """
-        WITH RECURSIVE family(session_id, root_session_id) AS (
-            SELECT session_id, session_id FROM sessions
-            WHERE parent_session_id IS NULL
-            UNION ALL
-            SELECT child.session_id, family.root_session_id
-            FROM sessions AS child
-            JOIN family ON child.parent_session_id = family.session_id
-        )
         SELECT
-            family.root_session_id,
-            sum(usage.calls) AS calls,
-            sum(usage.uncached_input_tokens) AS uncached_input_tokens,
-            sum(usage.cached_input_tokens) AS cached_input_tokens,
-            sum(usage.reasoning_tokens) AS reasoning_tokens,
-            sum(usage.output_tokens) AS output_tokens
-        FROM family
-        JOIN session_usage_current AS usage USING (session_id)
-        GROUP BY family.root_session_id
-        ORDER BY uncached_input_tokens DESC, family.root_session_id
+            root_session_id, calls, uncached_input_tokens,
+            cached_input_tokens, reasoning_tokens, output_tokens
+        FROM project_family_usage_current
+            INDEXED BY project_family_usage_current_rank
+        ORDER BY uncached_input_tokens DESC, root_session_id
         LIMIT 25
     """,
     "top_valued_entities": """
@@ -85,13 +79,8 @@ _PLAN_SQL = {
         LIMIT 25
     """,
     "pricing_coverage": """
-        SELECT
-            model,
-            count(*) AS calls,
-            sum(CASE WHEN model = 'synthetic-unpriced' THEN 0 ELSE 1 END)
-                AS rated_calls
-        FROM model_calls
-        GROUP BY model
+        SELECT model, calls, rated_calls
+        FROM model_usage_current INDEXED BY model_usage_current_rank
         ORDER BY calls DESC, model
     """,
     "allowance_movement": """
@@ -183,33 +172,26 @@ _PLAN_SQL = {
             usage.calls, usage.uncached_input_tokens,
             usage.cached_input_tokens, usage.reasoning_tokens,
             usage.output_tokens
-        FROM sessions AS session
-        JOIN session_usage_current AS usage USING (session_id)
-        ORDER BY usage.uncached_input_tokens DESC, session.session_id
+        FROM session_usage_current AS usage
+            INDEXED BY session_usage_current_completion_rank
+        JOIN sessions AS session USING (session_id)
+        ORDER BY usage.uncached_input_tokens DESC, usage.session_id
         LIMIT 25
     """,
     "first_action_mutation": """
         SELECT
-            turn.turn_id,
-            min(tool.start_at_us) AS first_action_at_us,
-            min(CASE WHEN tool.state = 'succeeded' THEN tool.terminal_at_us END)
-                AS first_success_at_us,
-            min(change.event_at_us) AS first_mutation_at_us
-        FROM turns AS turn
-        LEFT JOIN tool_invocations AS tool USING (turn_id)
-        LEFT JOIN state_changes AS change USING (turn_id)
-        GROUP BY turn.turn_id
-        ORDER BY first_action_at_us, turn.turn_id
+            turn_id, first_action_at_us,
+            first_success_at_us, first_mutation_at_us
+        FROM turn_action_current INDEXED BY turn_action_current_rank
+        ORDER BY first_action_at_us, turn_id
         LIMIT 100
     """,
     "repeated_resource_operations": """
         SELECT
-            resource_id, count(*) AS operation_count,
-            min(start_at_us) AS first_at_us, max(start_at_us) AS last_at_us
-        FROM tool_invocations
-        WHERE resource_id IS NOT NULL
-        GROUP BY resource_id
-        HAVING count(*) > 1
+            resource_id, operation_count, first_at_us, last_at_us
+        FROM resource_operation_current
+            INDEXED BY resource_operation_current_rank
+        WHERE operation_count > 1
         ORDER BY operation_count DESC, resource_id
         LIMIT 100
     """,
@@ -395,6 +377,8 @@ def _evidence_payload(
     page: EvidencePage,
     *,
     exact_count: int | None = None,
+    page_position: int = 1,
+    anchor_basis: str = "first_page",
 ) -> dict[str, Any]:
     return {
         "schema": "codex-usage-tracker.evidence.v1",
@@ -405,8 +389,72 @@ def _evidence_payload(
             "has_more": page.has_more,
             "next_cursor": page.next_cursor,
             "exact_count": exact_count,
+            "page_position": page_position,
+            "anchor_basis": anchor_basis,
+            "anchor_maximum_page_position": MAXIMUM_ANCHORED_PAGE_POSITION,
         },
     }
+
+
+def _evidence_anchor(
+    connection: sqlite3.Connection,
+    *,
+    publication_id: str,
+    page_position: int,
+) -> tuple[int, str | None, tuple[str, ...], int, str]:
+    sql = """
+        SELECT
+            page_position, event_at_us, source_rank, source_order,
+            event_kind_order, logical_id, transition_rank
+        FROM evidence_page_anchor_current
+        WHERE page_position <= ?
+          AND EXISTS (
+              SELECT 1
+              FROM metadata
+              WHERE key = 'evidence_anchors_valid' AND value = 'true'
+          )
+        ORDER BY page_position DESC
+        LIMIT 1
+    """
+    plans = tuple(
+        str(row[3])
+        for row in connection.execute(
+            "EXPLAIN QUERY PLAN " + sql,
+            (page_position,),
+        )
+    )
+    started = time.perf_counter_ns()
+    row = connection.execute(sql, (page_position,)).fetchone()
+    latency = time.perf_counter_ns() - started
+    if row is None:
+        valid = connection.execute(
+            """
+            SELECT value = 'true'
+            FROM metadata
+            WHERE key = 'evidence_anchors_valid'
+            """
+        ).fetchone()
+        basis = (
+            "exact_keyset_from_start"
+            if valid is not None and bool(valid[0])
+            else "exact_keyset_fallback_anchors_invalid"
+        )
+        return 1, None, plans, latency, basis
+    order_key = (
+        int(row["event_at_us"]),
+        int(row["source_rank"]),
+        int(row["source_order"]),
+        int(row["event_kind_order"]),
+        str(row["logical_id"]),
+        int(row["transition_rank"]),
+    )
+    return (
+        int(row["page_position"]),
+        cursor_for_order_key(publication_id, order_key),
+        plans,
+        latency,
+        "persisted_sparse_anchor",
+    )
 
 
 def run_evidence_feature(
@@ -417,23 +465,49 @@ def run_evidence_feature(
     exact_count: bool = False,
     selected_session_id: str | None = None,
 ) -> QueryResult:
+    target_page = page_position or 1
+    if target_page < 1:
+        raise ValueError("candidate A evidence page position must be positive")
+    current_page = 1
     cursor: str | None = None
-    rows_seen = 0
     plans: tuple[str, ...] = ()
     full_scans = 0
     temporary_sorts = 0
     latencies: list[int] = []
+    anchor_basis = (
+        "selected_session_keyset"
+        if selected_session_id is not None
+        else "first_page"
+    )
+    if selected_session_id is None and target_page > 1:
+        (
+            current_page,
+            cursor,
+            anchor_plans,
+            anchor_latency,
+            anchor_basis,
+        ) = _evidence_anchor(
+            connection,
+            publication_id=publication_id,
+            page_position=target_page,
+        )
+        plans += anchor_plans
+        latencies.append(anchor_latency)
     page = evidence_page(
         connection,
         publication_id=publication_id,
         page_size=10,
+        cursor=cursor,
         selected_session_id=selected_session_id,
     )
-    while page_position > rows_seen + len(page.rows) and page.has_more:
-        rows_seen += len(page.rows)
+    plans += page.query_plans
+    full_scans += page.full_scan_count
+    temporary_sorts += page.temporary_sort_count
+    while current_page < target_page and page.has_more:
         cursor = page.next_cursor
         if cursor is None:
             break
+        current_page += 1
         page = evidence_page(
             connection,
             publication_id=publication_id,
@@ -441,9 +515,9 @@ def run_evidence_feature(
             cursor=cursor,
             selected_session_id=selected_session_id,
         )
-    plans += page.query_plans
-    full_scans += page.full_scan_count
-    temporary_sorts += page.temporary_sort_count
+        plans += page.query_plans
+        full_scans += page.full_scan_count
+        temporary_sorts += page.temporary_sort_count
     exact: int | None = None
     if exact_count:
         count_sql = """
@@ -466,7 +540,12 @@ def run_evidence_feature(
         exact = int(connection.execute(count_sql).fetchone()[0])
         latencies.append(time.perf_counter_ns() - count_started)
         plans += _plan(connection, count_sql)
-    payload = _evidence_payload(page, exact_count=exact)
+    payload = _evidence_payload(
+        page,
+        exact_count=exact,
+        page_position=current_page,
+        anchor_basis=anchor_basis,
+    )
     encoded = shared.canonical_json_bytes(payload)
     return QueryResult(
         payload=payload,
@@ -483,31 +562,70 @@ def run_evidence_feature(
 
 def run_bounded_sort(connection: sqlite3.Connection) -> QueryResult:
     sql = """
+        WITH admitted AS (
+            SELECT
+                session_id, calls, uncached_input_tokens, cached_input_tokens,
+                reasoning_tokens, output_tokens
+            FROM session_usage_current
+            WHERE session_id >= ''
+            ORDER BY session_id
+            LIMIT 100
+        )
         SELECT
             session_id, calls, uncached_input_tokens, cached_input_tokens,
             reasoning_tokens, output_tokens
-        FROM session_usage_current
+        FROM admitted
         ORDER BY
             (uncached_input_tokens + cached_input_tokens + output_tokens) DESC,
             session_id
-        LIMIT 100
     """
     plans = _plan(connection, sql)
     started = time.perf_counter_ns()
-    rows = [dict(row) for row in connection.execute(sql)]
-    latency = time.perf_counter_ns() - started
+    rows = tuple(connection.execute(sql))
+    sort_latency = time.perf_counter_ns() - started
+    boundary = max((str(row["session_id"]) for row in rows), default="")
+    remainder_sql = """
+        SELECT 1
+        FROM session_usage_current
+        WHERE session_id > ?
+        LIMIT 1
+    """
+    plans += tuple(
+        str(row[3])
+        for row in connection.execute(
+            "EXPLAIN QUERY PLAN " + remainder_sql,
+            (boundary,),
+        )
+    )
+    remainder_started = time.perf_counter_ns()
+    source_has_more = (
+        connection.execute(remainder_sql, (boundary,)).fetchone() is not None
+    )
+    remainder_latency = time.perf_counter_ns() - remainder_started
     publication = _publication(connection)
+    columns = (
+        "session_id",
+        "calls",
+        "uncached_input_tokens",
+        "cached_input_tokens",
+        "reasoning_tokens",
+        "output_tokens",
+    )
     payload = {
         "schema": "codex-usage-tracker.result.v1",
         "publication": publication,
         "results": [
             {
                 "plan_id": "all_admitted_bounded_domains",
-                "rows": rows,
-                "page": {
-                    "returned_rows": len(rows),
-                    "has_more": False,
-                    "next_cursor": None,
+                "columns": list(columns),
+                "rows": [
+                    [row[column] for column in columns]
+                    for row in rows
+                ],
+                "admission": {
+                    "admitted_order": ["session_id", "ascending"],
+                    "maximum_rows": 100,
+                    "source_has_more": source_has_more,
                 },
             }
         ],
@@ -517,7 +635,7 @@ def run_bounded_sort(connection: sqlite3.Connection) -> QueryResult:
     return QueryResult(
         payload=payload,
         encoded=encoded,
-        sql_latencies_ns=(latency,),
+        sql_latencies_ns=(sort_latency, remainder_latency),
         query_plans=plans,
         rows_scanned=len(rows),
         full_scan_count=full_scans,

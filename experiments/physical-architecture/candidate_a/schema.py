@@ -15,7 +15,7 @@ PREPUBLICATION_VALIDATION = "quick_check+foreign_key_check+schema_metadata"
 # Digest of ordered, non-SQLite-owned sqlite_schema rows. An intentional DDL
 # change must update this only alongside schema-contract and corruption tests.
 _EXPECTED_SCHEMA_DIGEST = (
-    "19b341b7c1d91c16d6ffeda9216eac7f8d95682ab45bea97ab135bb0d79146ee"
+    "4a9076e6255867c0bb8806f1f35ea7d16f92973fda5ca8567d41ba727d8ede65"
 )
 _HISTORY_SELECTIONS = frozenset(
     {
@@ -474,6 +474,84 @@ CREATE INDEX session_usage_current_rank
         uncached_input_tokens DESC, cached_input_tokens DESC,
         output_tokens DESC, session_id
     );
+CREATE INDEX session_usage_current_completion_rank
+    ON session_usage_current(uncached_input_tokens DESC, session_id);
+
+CREATE TABLE usage_total_current (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    calls INTEGER NOT NULL,
+    uncached_input_tokens INTEGER NOT NULL,
+    cached_input_tokens INTEGER NOT NULL,
+    reasoning_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL
+) STRICT, WITHOUT ROWID;
+
+CREATE TABLE model_effort_usage_current (
+    model TEXT NOT NULL,
+    reasoning_effort_is_null INTEGER NOT NULL
+        CHECK (reasoning_effort_is_null IN (0, 1)),
+    reasoning_effort_value TEXT NOT NULL,
+    calls INTEGER NOT NULL,
+    uncached_input_tokens INTEGER NOT NULL,
+    cached_input_tokens INTEGER NOT NULL,
+    reasoning_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL,
+    PRIMARY KEY (model, reasoning_effort_is_null, reasoning_effort_value)
+) STRICT, WITHOUT ROWID;
+CREATE INDEX model_effort_usage_current_rank
+    ON model_effort_usage_current(
+        uncached_input_tokens DESC, model,
+        reasoning_effort_is_null DESC, reasoning_effort_value
+    );
+
+CREATE TABLE project_family_usage_current (
+    root_session_id TEXT PRIMARY KEY,
+    calls INTEGER NOT NULL,
+    uncached_input_tokens INTEGER NOT NULL,
+    cached_input_tokens INTEGER NOT NULL,
+    reasoning_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL
+) STRICT, WITHOUT ROWID;
+CREATE INDEX project_family_usage_current_rank
+    ON project_family_usage_current(
+        uncached_input_tokens DESC, root_session_id
+    );
+
+CREATE TABLE model_usage_current (
+    model TEXT PRIMARY KEY,
+    calls INTEGER NOT NULL,
+    rated_calls INTEGER NOT NULL
+) STRICT, WITHOUT ROWID;
+CREATE INDEX model_usage_current_rank
+    ON model_usage_current(calls DESC, model);
+
+CREATE TABLE turn_action_current (
+    turn_id TEXT PRIMARY KEY,
+    first_action_at_us INTEGER,
+    first_success_at_us INTEGER,
+    first_mutation_at_us INTEGER
+) STRICT, WITHOUT ROWID;
+CREATE INDEX turn_action_current_rank
+    ON turn_action_current(first_action_at_us, turn_id);
+
+CREATE TABLE resource_operation_current (
+    resource_id TEXT PRIMARY KEY,
+    operation_count INTEGER NOT NULL,
+    first_at_us INTEGER NOT NULL,
+    last_at_us INTEGER NOT NULL
+) STRICT, WITHOUT ROWID;
+CREATE INDEX resource_operation_current_rank
+    ON resource_operation_current(operation_count DESC, resource_id);
+
+CREATE TABLE evidence_page_anchor_current (
+    page_position INTEGER PRIMARY KEY CHECK (page_position > 1),
+    event_at_us INTEGER NOT NULL,
+    source_rank INTEGER NOT NULL,
+    source_order INTEGER NOT NULL,
+    event_kind_order INTEGER NOT NULL,
+    logical_id TEXT NOT NULL,
+    transition_rank INTEGER NOT NULL
+) STRICT, WITHOUT ROWID;
 
 CREATE TABLE tool_family_current (
     transport_name TEXT NOT NULL,

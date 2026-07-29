@@ -24,6 +24,18 @@ class MaintenanceStats:
     source_bytes_rescanned: int = 0
 
 
+@dataclass(frozen=True)
+class _UsageDelta:
+    session_id: str
+    model: str
+    reasoning_effort: str | None
+    calls: int
+    uncached_input_tokens: int
+    cached_input_tokens: int
+    reasoning_tokens: int
+    output_tokens: int
+
+
 def _tail_identity(connection: sqlite3.Connection) -> tuple[str, str, sqlite3.Row]:
     call = connection.execute(
         """
@@ -49,39 +61,218 @@ def _tail_identity(connection: sqlite3.Connection) -> tuple[str, str, sqlite3.Ro
 
 def _refresh_session(
     connection: sqlite3.Connection,
-    session_id: str,
+    delta: _UsageDelta,
 ) -> tuple[int, int]:
-    before = int(
-        connection.execute(
-            "SELECT count(*) FROM session_usage_current WHERE session_id=?",
-            (session_id,),
-        ).fetchone()[0]
-    )
     connection.execute(
         """
         INSERT INTO session_usage_current(
             session_id, calls, uncached_input_tokens, cached_input_tokens,
             reasoning_tokens, output_tokens
         )
-        SELECT
-            session_id, count(*),
-            coalesce(sum(uncached_input_tokens), 0),
-            coalesce(sum(cached_input_tokens), 0),
-            coalesce(sum(reasoning_tokens), 0),
-            coalesce(sum(output_tokens), 0)
-        FROM model_calls
-        WHERE session_id=?
-        GROUP BY session_id
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
-            calls=excluded.calls,
-            uncached_input_tokens=excluded.uncached_input_tokens,
-            cached_input_tokens=excluded.cached_input_tokens,
-            reasoning_tokens=excluded.reasoning_tokens,
-            output_tokens=excluded.output_tokens
+            calls=calls + excluded.calls,
+            uncached_input_tokens=uncached_input_tokens
+                + excluded.uncached_input_tokens,
+            cached_input_tokens=cached_input_tokens
+                + excluded.cached_input_tokens,
+            reasoning_tokens=reasoning_tokens + excluded.reasoning_tokens,
+            output_tokens=output_tokens + excluded.output_tokens
+        """,
+        (
+            delta.session_id,
+            delta.calls,
+            delta.uncached_input_tokens,
+            delta.cached_input_tokens,
+            delta.reasoning_tokens,
+            delta.output_tokens,
+        ),
+    )
+    return 1, 1
+
+
+def _root_session_id(connection: sqlite3.Connection, session_id: str) -> str:
+    row = connection.execute(
+        """
+        WITH RECURSIVE ancestor(session_id, parent_session_id) AS (
+            SELECT session_id, parent_session_id
+            FROM sessions
+            WHERE session_id = ?
+            UNION ALL
+            SELECT parent.session_id, parent.parent_session_id
+            FROM sessions AS parent
+            JOIN ancestor ON parent.session_id = ancestor.parent_session_id
+        )
+        SELECT session_id
+        FROM ancestor
+        WHERE parent_session_id IS NULL
+        LIMIT 1
         """,
         (session_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError("candidate A session has no rooted project family")
+    return str(row["session_id"])
+
+
+def _increment_call_projections(
+    connection: sqlite3.Connection,
+    delta: _UsageDelta,
+) -> tuple[int, int]:
+    reads, writes = _refresh_session(connection, delta)
+    values = (
+        delta.calls,
+        delta.uncached_input_tokens,
+        delta.cached_input_tokens,
+        delta.reasoning_tokens,
+        delta.output_tokens,
     )
-    return before, 1
+    connection.execute(
+        """
+        INSERT INTO usage_total_current(
+            singleton, calls, uncached_input_tokens, cached_input_tokens,
+            reasoning_tokens, output_tokens
+        ) VALUES (1, ?, ?, ?, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+            calls=calls + excluded.calls,
+            uncached_input_tokens=uncached_input_tokens
+                + excluded.uncached_input_tokens,
+            cached_input_tokens=cached_input_tokens
+                + excluded.cached_input_tokens,
+            reasoning_tokens=reasoning_tokens + excluded.reasoning_tokens,
+            output_tokens=output_tokens + excluded.output_tokens
+        """,
+        values,
+    )
+    connection.execute(
+        """
+        INSERT INTO model_effort_usage_current(
+            model, reasoning_effort_is_null, reasoning_effort_value,
+            calls, uncached_input_tokens, cached_input_tokens,
+            reasoning_tokens, output_tokens
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(
+            model, reasoning_effort_is_null, reasoning_effort_value
+        ) DO UPDATE SET
+            calls=calls + excluded.calls,
+            uncached_input_tokens=uncached_input_tokens
+                + excluded.uncached_input_tokens,
+            cached_input_tokens=cached_input_tokens
+                + excluded.cached_input_tokens,
+            reasoning_tokens=reasoning_tokens + excluded.reasoning_tokens,
+            output_tokens=output_tokens + excluded.output_tokens
+        """,
+        (
+            delta.model,
+            int(delta.reasoning_effort is None),
+            delta.reasoning_effort or "",
+            *values,
+        ),
+    )
+    connection.execute(
+        """
+        INSERT INTO model_usage_current(model, calls, rated_calls)
+        VALUES (?, ?, ?)
+        ON CONFLICT(model) DO UPDATE SET
+            calls=calls + excluded.calls,
+            rated_calls=rated_calls + excluded.rated_calls
+        """,
+        (
+            delta.model,
+            delta.calls,
+            0 if delta.model == "synthetic-unpriced" else delta.calls,
+        ),
+    )
+    connection.execute(
+        """
+        INSERT INTO project_family_usage_current(
+            root_session_id, calls, uncached_input_tokens,
+            cached_input_tokens, reasoning_tokens, output_tokens
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(root_session_id) DO UPDATE SET
+            calls=calls + excluded.calls,
+            uncached_input_tokens=uncached_input_tokens
+                + excluded.uncached_input_tokens,
+            cached_input_tokens=cached_input_tokens
+                + excluded.cached_input_tokens,
+            reasoning_tokens=reasoning_tokens + excluded.reasoning_tokens,
+            output_tokens=output_tokens + excluded.output_tokens
+        """,
+        (_root_session_id(connection, delta.session_id), *values),
+    )
+    return reads + 4, writes + 4
+
+
+def _refresh_turn_action(
+    connection: sqlite3.Connection,
+    turn_id: str,
+) -> tuple[int, int]:
+    connection.execute(
+        """
+        INSERT INTO turn_action_current(
+            turn_id, first_action_at_us,
+            first_success_at_us, first_mutation_at_us
+        )
+        SELECT
+            turn_id,
+            (
+                SELECT min(start_at_us)
+                FROM tool_invocations
+                WHERE turn_id = turn.turn_id
+            ),
+            (
+                SELECT min(terminal_at_us)
+                FROM tool_invocations
+                WHERE turn_id = turn.turn_id AND state = 'succeeded'
+            ),
+            (
+                SELECT min(event_at_us)
+                FROM state_changes
+                WHERE turn_id = turn.turn_id
+            )
+        FROM turns AS turn
+        WHERE turn_id = ?
+        ON CONFLICT(turn_id) DO UPDATE SET
+            first_action_at_us=excluded.first_action_at_us,
+            first_success_at_us=excluded.first_success_at_us,
+            first_mutation_at_us=excluded.first_mutation_at_us
+        """,
+        (turn_id,),
+    )
+    return 1, 1
+
+
+def _refresh_resource_operation(
+    connection: sqlite3.Connection,
+    resource_id: str,
+) -> tuple[int, int]:
+    connection.execute(
+        """
+        INSERT INTO resource_operation_current(
+            resource_id, operation_count, first_at_us, last_at_us
+        )
+        SELECT resource_id, count(*), min(start_at_us), max(start_at_us)
+        FROM tool_invocations
+        WHERE resource_id = ?
+        GROUP BY resource_id
+        ON CONFLICT(resource_id) DO UPDATE SET
+            operation_count=excluded.operation_count,
+            first_at_us=excluded.first_at_us,
+            last_at_us=excluded.last_at_us
+        """,
+        (resource_id,),
+    )
+    return 1, 1
+
+
+def _invalidate_evidence_anchors(connection: sqlite3.Connection) -> tuple[int, int]:
+    connection.execute(
+        """
+        INSERT OR REPLACE INTO metadata(key, value)
+        VALUES ('evidence_anchors_valid', 'false')
+        """
+    )
+    return 1, 1
 
 
 def _refresh_tool_family(
@@ -127,7 +318,7 @@ def _insert_calls(
     *,
     count: int,
     late: bool = False,
-) -> tuple[int, str]:
+) -> tuple[int, _UsageDelta]:
     session_id, turn_id, source = _tail_identity(connection)
     if late:
         event_at = int(
@@ -185,14 +376,26 @@ def _insert_calls(
         """,
         rows,
     )
-    return len(rows), session_id
+    return (
+        len(rows),
+        _UsageDelta(
+            session_id=session_id,
+            model="synthetic-tail-model",
+            reasoning_effort="medium",
+            calls=len(rows),
+            uncached_input_tokens=sum(int(row[6]) for row in rows),
+            cached_input_tokens=sum(int(row[7]) for row in rows),
+            reasoning_tokens=sum(int(row[8]) for row in rows),
+            output_tokens=sum(int(row[9]) for row in rows),
+        ),
+    )
 
 
 def _insert_tool(
     connection: sqlite3.Connection,
     *,
     include_state_change: bool,
-) -> tuple[int, int, str, str]:
+) -> tuple[int, int, str, str, str, str]:
     session_id, turn_id, source = _tail_identity(connection)
     event_at = int(
         connection.execute(
@@ -267,13 +470,22 @@ def _insert_tool(
             ),
         )
         inserted += 1
-    return inserted, 0, "synthetic_write", "write"
+    return (
+        inserted,
+        0,
+        "synthetic_write",
+        "write",
+        turn_id,
+        resource_id,
+    )
 
 
-def _terminal_transition(connection: sqlite3.Connection) -> tuple[int, str, str]:
+def _terminal_transition(
+    connection: sqlite3.Connection,
+) -> tuple[int, str, str, str]:
     tool = connection.execute(
         """
-        SELECT tool_id, transport_name, semantic_operation, start_at_us,
+        SELECT tool_id, turn_id, transport_name, semantic_operation, start_at_us,
             start_source_rank, start_source_order, start_event_kind_order,
             start_occurrence_source_key,
             start_record_ordinal, start_byte_start, start_byte_end
@@ -312,7 +524,12 @@ def _terminal_transition(connection: sqlite3.Connection) -> tuple[int, str, str]
             str(tool["tool_id"]),
         ),
     )
-    return 1, str(tool["transport_name"]), str(tool["semantic_operation"])
+    return (
+        1,
+        str(tool["transport_name"]),
+        str(tool["semantic_operation"]),
+        str(tool["turn_id"]),
+    )
 
 
 def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
@@ -342,15 +559,28 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
                 "2000_call_tail": 2_000,
                 "late_event": 1,
             }[change]
-            inserted, session_id = _insert_calls(
+            inserted, delta = _insert_calls(
                 connection,
                 count=count,
                 late=change == "late_event",
             )
-            projection_read, projection_written = _refresh_session(connection, session_id)
-            dirty_keys = 1
+            projection_read, projection_written = _increment_call_projections(
+                connection,
+                delta,
+            )
+            anchor_read, anchor_written = _invalidate_evidence_anchors(connection)
+            projection_read += anchor_read
+            projection_written += anchor_written
+            dirty_keys = projection_written
         elif change in {"one_tool_start", "tool_plus_state_change"}:
-            inserted, updated, transport, operation = _insert_tool(
+            (
+                inserted,
+                updated,
+                transport,
+                operation,
+                turn_id,
+                resource_id,
+            ) = _insert_tool(
                 connection,
                 include_state_change=change == "tool_plus_state_change",
             )
@@ -359,15 +589,27 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
                 transport,
                 operation,
             )
-            dirty_keys = 1 + int(change == "tool_plus_state_change")
+            turn_read, turn_written = _refresh_turn_action(connection, turn_id)
+            resource_read, resource_written = _refresh_resource_operation(
+                connection,
+                resource_id,
+            )
+            anchor_read, anchor_written = _invalidate_evidence_anchors(connection)
+            projection_read += turn_read + resource_read + anchor_read
+            projection_written += turn_written + resource_written + anchor_written
+            dirty_keys = projection_written
         elif change == "tool_terminal_transition":
-            updated, transport, operation = _terminal_transition(connection)
+            updated, transport, operation, turn_id = _terminal_transition(connection)
             projection_read, projection_written = _refresh_tool_family(
                 connection,
                 transport,
                 operation,
             )
-            dirty_keys = 1
+            turn_read, turn_written = _refresh_turn_action(connection, turn_id)
+            anchor_read, anchor_written = _invalidate_evidence_anchors(connection)
+            projection_read += turn_read + anchor_read
+            projection_written += turn_written + anchor_written
+            dirty_keys = projection_written
         elif change == "rate_card_change":
             connection.execute(
                 """
@@ -434,4 +676,5 @@ def apply_source_phase(
                 int(record["event_kind_order"]),
             ),
         )
+    _invalidate_evidence_anchors(connection)
     return tuple(occurrence_ids)

@@ -5,13 +5,16 @@ import hashlib
 import heapq
 import json
 import sqlite3
+from collections.abc import Iterator
 from dataclasses import dataclass
+from itertools import islice
 from typing import Any
 
 import shared
 
 _CURSOR_SCHEMA = "candidate-a-keyset-v1"
 _CURSOR_DOMAIN = b"codex-usage-tracker-ck04-candidate-a"
+MAXIMUM_ANCHORED_PAGE_POSITION = 10_000
 OrderKey = tuple[int, int, int, int, str, int]
 
 
@@ -50,6 +53,10 @@ def _encode_cursor(publication_id: str, order_key: OrderKey) -> str:
     payload = _cursor_payload(publication_id, order_key)
     signature = hashlib.sha256(_CURSOR_DOMAIN + b"\0" + payload).digest()
     return base64.urlsafe_b64encode(signature + payload).decode("ascii").rstrip("=")
+
+
+def cursor_for_order_key(publication_id: str, order_key: OrderKey) -> str:
+    return _encode_cursor(publication_id, order_key)
 
 
 def _decode_cursor(cursor: str, publication_id: str) -> OrderKey:
@@ -606,6 +613,53 @@ def _result_row(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def _merged_rows(
+    connection: sqlite3.Connection,
+    streams: tuple[_Stream, ...],
+) -> Iterator[sqlite3.Row]:
+    iterators = [iter(connection.execute(stream.sql, stream.parameters)) for stream in streams]
+    heap: list[tuple[OrderKey, int, sqlite3.Row]] = []
+    for index, iterator in enumerate(iterators):
+        first = next(iterator, None)
+        if first is not None:
+            heapq.heappush(heap, (_row_order(first), index, first))
+    while heap:
+        _, index, row = heapq.heappop(heap)
+        yield row
+        following = next(iterators[index], None)
+        if following is not None:
+            heapq.heappush(heap, (_row_order(following), index, following))
+
+
+def iter_evidence_page_anchors(
+    connection: sqlite3.Connection,
+    *,
+    page_size: int = 10,
+    page_stride: int = 10,
+    maximum_page_position: int = MAXIMUM_ANCHORED_PAGE_POSITION,
+) -> Iterator[tuple[object, ...]]:
+    if page_size < 1 or page_stride < 1 or maximum_page_position < 1:
+        raise EvidenceContractError("candidate A anchor dimensions must be positive")
+    rows_per_anchor = page_size * page_stride
+    maximum_rows = (
+        (maximum_page_position - 1) * page_size // rows_per_anchor
+    ) * rows_per_anchor
+    if maximum_rows == 0:
+        return
+    streams = _streams(
+        selected_session_id=None,
+        after=None,
+        limit=2_147_483_647,
+    )
+    for row_count, row in enumerate(_merged_rows(connection, streams), start=1):
+        if row_count % rows_per_anchor:
+            continue
+        order_key = _row_order(row)
+        yield (row_count // page_size + 1, *order_key)
+        if row_count >= maximum_rows:
+            break
+
+
 def evidence_page(
     connection: sqlite3.Connection,
     *,
@@ -628,19 +682,7 @@ def evidence_page(
         for plan in plans
     )
     temporary_sorts = sum("USE TEMP B-TREE" in plan for plan in plans)
-    iterators = [iter(connection.execute(stream.sql, stream.parameters)) for stream in streams]
-    heap: list[tuple[OrderKey, int, sqlite3.Row]] = []
-    for index, iterator in enumerate(iterators):
-        first = next(iterator, None)
-        if first is not None:
-            heapq.heappush(heap, (_row_order(first), index, first))
-    selected: list[sqlite3.Row] = []
-    while heap and len(selected) <= page_size:
-        _, index, row = heapq.heappop(heap)
-        selected.append(row)
-        following = next(iterators[index], None)
-        if following is not None:
-            heapq.heappush(heap, (_row_order(following), index, following))
+    selected = list(islice(_merged_rows(connection, streams), page_size + 1))
     has_more = len(selected) > page_size
     visible = selected[:page_size]
     next_cursor = (

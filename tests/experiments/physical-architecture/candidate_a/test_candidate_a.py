@@ -845,7 +845,7 @@ def test_ordinary_changes_are_incremental_and_preserve_lifecycle_semantics(
                 == call_count_before + 2_000
             )
             assert stats.facts_inserted == 2_000
-            assert stats.dirty_keys == 1
+            assert stats.dirty_keys == 6
         elif change == "late_event":
             assert (
                 connection.execute(

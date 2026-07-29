@@ -12,6 +12,7 @@ from typing import Any
 
 import shared
 
+from .evidence import iter_evidence_page_anchors
 from .schema import (
     PREPUBLICATION_VALIDATION,
     create_database,
@@ -120,6 +121,37 @@ class Coordinate:
             "revision": self.source_revision,
             "source_path": self.source_path,
         }
+
+
+@dataclass
+class _ModelEffortAggregate:
+    calls: int = 0
+    uncached_input_tokens: int = 0
+    cached_input_tokens: int = 0
+    reasoning_tokens: int = 0
+    output_tokens: int = 0
+
+
+_ModelEffortAccumulator = dict[tuple[str, int, str], _ModelEffortAggregate]
+
+
+def _accumulate_model_effort(
+    accumulator: _ModelEffortAccumulator,
+    payload: Mapping[str, Any],
+) -> None:
+    effort = (
+        str(payload["reasoning_effort"])
+        if payload.get("reasoning_effort") is not None
+        else None
+    )
+    key = (str(payload["model"]), int(effort is None), effort or "")
+    aggregate = accumulator.setdefault(key, _ModelEffortAggregate())
+    tokens = payload["tokens"]
+    aggregate.calls += 1
+    aggregate.uncached_input_tokens += int(tokens.get("uncached_input_tokens") or 0)
+    aggregate.cached_input_tokens += int(tokens.get("cached_input_tokens") or 0)
+    aggregate.reasoning_tokens += int(tokens.get("reasoning_tokens") or 0)
+    aggregate.output_tokens += int(tokens.get("output_tokens") or 0)
 
 
 @dataclass
@@ -421,6 +453,7 @@ def _insert_record(
     record_type: str,
     payload: Mapping[str, Any],
     coordinate: Coordinate,
+    model_effort_accumulator: _ModelEffortAccumulator,
 ) -> tuple[int, int]:
     inserted = 0
     updated = 0
@@ -501,7 +534,7 @@ def _insert_record(
         ).rowcount
     elif record_type == "model_call":
         tokens = payload["tokens"]
-        inserted += connection.execute(
+        model_call_inserted = connection.execute(
             """
             INSERT OR IGNORE INTO model_calls(
                 call_id, session_id, turn_id, model, reasoning_effort,
@@ -549,6 +582,9 @@ def _insert_record(
                 *coordinate.compact_values(),
             ),
         ).rowcount
+        inserted += model_call_inserted
+        if model_call_inserted:
+            _accumulate_model_effort(model_effort_accumulator, payload)
     elif record_type == "tool_start":
         inserted += connection.execute(
             """
@@ -778,8 +814,20 @@ def _insert_record(
 def _refresh_projections(
     connection: sqlite3.Connection,
     hook: Callable[[str], None] | None,
+    model_effort_accumulator: _ModelEffortAccumulator,
 ) -> int:
-    connection.execute("DELETE FROM session_usage_current")
+    projection_tables = (
+        "session_usage_current",
+        "usage_total_current",
+        "model_effort_usage_current",
+        "project_family_usage_current",
+        "model_usage_current",
+        "turn_action_current",
+        "resource_operation_current",
+        "tool_family_current",
+    )
+    for table in projection_tables:
+        connection.execute(f"DELETE FROM {table}")
     if hook is not None:
         hook("during_projection_update")
     connection.execute(
@@ -799,7 +847,136 @@ def _refresh_projections(
         GROUP BY session_id
         """
     )
-    connection.execute("DELETE FROM tool_family_current")
+    connection.execute(
+        """
+        INSERT INTO usage_total_current(
+            singleton, calls, uncached_input_tokens, cached_input_tokens,
+            reasoning_tokens, output_tokens
+        )
+        SELECT
+            1,
+            coalesce(sum(calls), 0),
+            coalesce(sum(uncached_input_tokens), 0),
+            coalesce(sum(cached_input_tokens), 0),
+            coalesce(sum(reasoning_tokens), 0),
+            coalesce(sum(output_tokens), 0)
+        FROM session_usage_current
+        """
+    )
+    connection.executemany(
+        """
+        INSERT INTO model_effort_usage_current(
+            model, reasoning_effort_is_null, reasoning_effort_value,
+            calls, uncached_input_tokens, cached_input_tokens,
+            reasoning_tokens, output_tokens
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            (
+                model,
+                effort_is_null,
+                effort_value,
+                aggregate.calls,
+                aggregate.uncached_input_tokens,
+                aggregate.cached_input_tokens,
+                aggregate.reasoning_tokens,
+                aggregate.output_tokens,
+            )
+            for (model, effort_is_null, effort_value), aggregate in sorted(
+                model_effort_accumulator.items()
+            )
+        ),
+    )
+    accumulated_calls = sum(
+        aggregate.calls for aggregate in model_effort_accumulator.values()
+    )
+    canonical_calls = int(
+        connection.execute("SELECT count(*) FROM model_calls").fetchone()[0]
+    )
+    if accumulated_calls != canonical_calls:
+        raise ValueError("candidate A model-effort accumulator diverged from canonical calls")
+    connection.execute(
+        """
+        INSERT INTO model_usage_current(model, calls, rated_calls)
+        SELECT
+            model,
+            sum(calls),
+            CASE WHEN model = 'synthetic-unpriced' THEN 0 ELSE sum(calls) END
+        FROM model_effort_usage_current
+        GROUP BY model
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO project_family_usage_current(
+            root_session_id, calls, uncached_input_tokens,
+            cached_input_tokens, reasoning_tokens, output_tokens
+        )
+        WITH RECURSIVE family(session_id, root_session_id) AS (
+            SELECT session_id, session_id
+            FROM sessions
+            WHERE parent_session_id IS NULL
+            UNION ALL
+            SELECT child.session_id, family.root_session_id
+            FROM sessions AS child
+            JOIN family ON child.parent_session_id = family.session_id
+        )
+        SELECT
+            family.root_session_id,
+            sum(usage.calls),
+            sum(usage.uncached_input_tokens),
+            sum(usage.cached_input_tokens),
+            sum(usage.reasoning_tokens),
+            sum(usage.output_tokens)
+        FROM family
+        JOIN session_usage_current AS usage USING (session_id)
+        GROUP BY family.root_session_id
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO turn_action_current(
+            turn_id, first_action_at_us,
+            first_success_at_us, first_mutation_at_us
+        )
+        WITH tool AS (
+            SELECT
+                turn_id,
+                min(start_at_us) AS first_action_at_us,
+                min(
+                    CASE WHEN state = 'succeeded' THEN terminal_at_us END
+                ) AS first_success_at_us
+            FROM tool_invocations
+            GROUP BY turn_id
+        ),
+        mutation AS (
+            SELECT turn_id, min(event_at_us) AS first_mutation_at_us
+            FROM state_changes
+            GROUP BY turn_id
+        )
+        SELECT
+            turn.turn_id,
+            tool.first_action_at_us,
+            tool.first_success_at_us,
+            mutation.first_mutation_at_us
+        FROM turns AS turn
+        LEFT JOIN tool USING (turn_id)
+        LEFT JOIN mutation USING (turn_id)
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO resource_operation_current(
+            resource_id, operation_count, first_at_us, last_at_us
+        )
+        SELECT
+            resource_id, count(*), min(start_at_us), max(start_at_us)
+        FROM tool_invocations
+        WHERE resource_id IS NOT NULL
+        GROUP BY resource_id
+        """
+    )
     connection.execute(
         """
         INSERT INTO tool_family_current(
@@ -822,8 +999,32 @@ def _refresh_projections(
             """
             SELECT
                 (SELECT count(*) FROM session_usage_current) +
+                (SELECT count(*) FROM usage_total_current) +
+                (SELECT count(*) FROM model_effort_usage_current) +
+                (SELECT count(*) FROM project_family_usage_current) +
+                (SELECT count(*) FROM model_usage_current) +
+                (SELECT count(*) FROM turn_action_current) +
+                (SELECT count(*) FROM resource_operation_current) +
                 (SELECT count(*) FROM tool_family_current)
             """
+        ).fetchone()[0]
+    )
+
+
+def _refresh_evidence_page_anchors(connection: sqlite3.Connection) -> int:
+    connection.execute("DELETE FROM evidence_page_anchor_current")
+    connection.executemany(
+        """
+        INSERT INTO evidence_page_anchor_current(
+            page_position, event_at_us, source_rank, source_order,
+            event_kind_order, logical_id, transition_rank
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        iter_evidence_page_anchors(connection),
+    )
+    return int(
+        connection.execute(
+            "SELECT count(*) FROM evidence_page_anchor_current"
         ).fetchone()[0]
     )
 
@@ -855,6 +1056,7 @@ def build_artifact(
 ) -> BuildArtifact:
     connection = create_database(path, unpublished_staging=True)
     stats = IngestStats()
+    model_effort_accumulator: _ModelEffortAccumulator = {}
     stats.staging_journal_mode = str(
         connection.execute("PRAGMA journal_mode").fetchone()[0]
     )
@@ -951,6 +1153,7 @@ def build_artifact(
                         record_type,
                         payload,
                         coordinate,
+                        model_effort_accumulator,
                     )
                     if hook is not None and not fact_hook_called and (inserted or updated):
                         fact_hook_called = True
@@ -962,13 +1165,18 @@ def build_artifact(
                 byte_start = byte_end
         if hook is not None:
             hook("after_facts_before_projections")
-        projection_rows = _refresh_projections(connection, hook)
+        projection_rows = _refresh_projections(
+            connection,
+            hook,
+            model_effort_accumulator,
+        )
         if deferred_index_sql:
             stats.index_maintenance_ns += _restore_secondary_indexes(
                 connection,
                 deferred_index_sql,
             )
             stats.secondary_indexes_restored = len(deferred_index_sql)
+        projection_rows += _refresh_evidence_page_anchors(connection)
         publication_id = _publication_id(
             fixture,
             history_selection,
@@ -1003,6 +1211,7 @@ def build_artifact(
                 ("fixture_oracle_digest", fixture.oracle_digest),
                 ("history_selection", history_selection),
                 ("projection_rows", str(projection_rows)),
+                ("evidence_anchors_valid", "true"),
                 (
                     "prepublication_validation",
                     PREPUBLICATION_VALIDATION,
