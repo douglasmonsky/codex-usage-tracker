@@ -74,7 +74,7 @@ class Adapter:
         )
         index_mode = str(request.case.parameter("index_mode") or "deferred")
         defer_secondary_indexes = index_mode == "deferred"
-        parser_workers = int(request.case.parameter("parser_workers") or 1)
+        parser_workers = self._parser_worker_count(request)
         started = time.perf_counter_ns()
         if request.case.case_id.startswith("build.expand."):
             prior_history = str(request.case.parameter("from_history"))
@@ -166,6 +166,18 @@ class Adapter:
                 "writer_mode": request.case.parameter("writer_mode") or "single",
             },
         )
+
+    @staticmethod
+    def _parser_worker_count(request: shared.CandidateRequest) -> int:
+        configured = request.case.parameter("parser_workers")
+        if configured is not None:
+            return int(configured)
+        if (
+            request.case.case_id == f"build.scale.{request.fixture.profile}"
+            and request.fixture.profile in {"production", "growth"}
+        ):
+            return min(4, os.cpu_count() or 1)
+        return 1
 
     def _ordinary(self, request: shared.CandidateRequest) -> shared.CandidateResult:
         artifact = publish_artifact(request.fixture, request.run_root)

@@ -79,6 +79,36 @@ def _request(
     )
 
 
+def test_large_scale_builds_use_bounded_parallel_parsers(
+    fixture: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    matrix = shared.build_workload_matrix(physical_cores=_PHYSICAL_CORES)
+    monkeypatch.setattr(adapter_module.os, "cpu_count", lambda: _PHYSICAL_CORES)
+    adapter = Adapter()
+
+    production_request = _request(
+        fixture=replace(fixture, profile="production"),
+        case=matrix.by_id("build.scale.production"),
+        run_root=tmp_path / "production",
+    )
+    tiny_request = _request(
+        fixture=fixture,
+        case=matrix.by_id("build.scale.tiny"),
+        run_root=tmp_path / "tiny",
+    )
+    configured_request = _request(
+        fixture=replace(fixture, profile="standard"),
+        case=matrix.by_id("build.workers.2"),
+        run_root=tmp_path / "configured",
+    )
+
+    assert adapter._parser_worker_count(production_request) == 4
+    assert adapter._parser_worker_count(tiny_request) == 1
+    assert adapter._parser_worker_count(configured_request) == 2
+
+
 def test_schema_is_typed_compact_and_deduplicated(
     built: tuple[Any, Any],
 ) -> None:
