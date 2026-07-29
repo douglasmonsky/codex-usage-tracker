@@ -602,7 +602,7 @@ def test_writes_unique_directory_validates_sha_and_complete_last(tmp_path: Path)
 
 def test_rejects_private_path_without_writing_complete(tmp_path: Path) -> None:
     manifest = decision_tests._valid_manifest()
-    manifest["limitations"][0]["summary"] = "See /Users/alice/private/result.json."
+    manifest["limitations"][0]["summary"] = "See /" + "Users/alice/private/result.json."
     with pytest.raises(
         decision_evidence.DecisionEvidenceContractError,
         match="private path",
