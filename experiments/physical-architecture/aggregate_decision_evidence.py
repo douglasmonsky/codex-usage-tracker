@@ -26,6 +26,11 @@ _MAX_INPUT_BYTES = 32 * 1024 * 1024
 _MAX_RECORDS = 20_000
 _SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _EXPECTED_SCORE_FORMULA_SHA256 = "3456939c1b5f5fd015d98ed84b03bafd0b7df99f27b39e4df0187f264c8664fc"
+_AGENT_PERF_TOOL_VERSIONS = {
+    "agent_perf": "0.1.0",
+    "psutil": "7.2.2",
+    "scalene": "2.3.0",
+}
 _FILES = ("invocation.json", "measurements.jsonl", "details.jsonl", "summary.json")
 
 
@@ -439,13 +444,19 @@ def authenticate_agent_perf(path: Path) -> dict[str, Any]:
         raise AggregateEvidenceError("Agent Perf evidence candidate differs")
     fixture = payload.get("fixture")
     workload = payload.get("workload")
+    tool_versions = payload.get("tool_versions")
     unprofiled = payload.get("unprofiled_runs")
     profiled = payload.get("profiled_run")
     if (
         not isinstance(fixture, dict)
+        or fixture.get("profile") != "standard"
+        or fixture.get("revision") != shared.FIXTURE_REVISION
         or fixture.get("synthetic_only") is not True
         or not isinstance(workload, dict)
+        or workload.get("id") != "build.scale.standard"
+        or workload.get("minimum_unprofiled_runs") != 5
         or workload.get("profile_is_attribution_only") is not True
+        or tool_versions != _AGENT_PERF_TOOL_VERSIONS
         or not isinstance(unprofiled, list)
         or len(unprofiled) != 5
         or not isinstance(profiled, dict)
@@ -660,37 +671,238 @@ def assemble_manifest(
     if dbhub.get("input_artifact_id") != draft_dbhub.get("input_artifact_id"):
         raise AggregateEvidenceError("DBHub invocation artifact differs from decision draft")
     manifest["dbhub"] = copy.deepcopy(dict(dbhub))
-    _require_agent_perf_projection(manifest, agent_perf)
+    _project_agent_perf(
+        manifest,
+        agent_perf,
+        qualification_bundles=qualification_bundles,
+    )
     return manifest
 
 
-def _require_agent_perf_projection(
-    manifest: Mapping[str, object],
+def _project_agent_perf(
+    manifest: dict[str, object],
     evidence: Mapping[str, Any],
+    *,
+    qualification_bundles: Sequence[QualificationBundle],
 ) -> None:
     rows = manifest.get("agent_perf")
     if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
         raise AggregateEvidenceError("decision draft Agent Perf projection is missing")
     projected = rows[0]
+    if projected.get("candidate_id") != "A":
+        raise AggregateEvidenceError("decision draft Agent Perf candidate differs")
+    workload = projected.get("workload")
+    if not isinstance(workload, dict):
+        raise AggregateEvidenceError("decision draft Agent Perf workload is missing")
+    expected_workload = {
+        "candidate_id": "A",
+        "fixture_profile": "standard",
+        "fixture_revision": shared.FIXTURE_REVISION,
+        "minimum_unprofiled_runs": 5,
+        "profile_is_attribution_only": True,
+        "schema": shared.AGENT_PERF_WORKLOAD_SCHEMA,
+        "synthetic_only": True,
+        "version": 1,
+        "workload_id": "build.scale.standard",
+    }
+    if any(workload.get(key) != value for key, value in expected_workload.items()):
+        raise AggregateEvidenceError("decision draft Agent Perf workload contract differs")
+
+    fixture = evidence["fixture"]
+    evidence_workload = evidence["workload"]
+    if (
+        fixture.get("manifest_sha256") != workload.get("fixture_manifest_digest")
+        or fixture.get("oracle_sha256") != workload.get("fixture_oracle_digest")
+        or fixture.get("profile") != workload.get("fixture_profile")
+        or fixture.get("revision") != workload.get("fixture_revision")
+        or evidence_workload.get("digest") != shared.canonical_sha256(workload)
+        or evidence_workload.get("id") != workload.get("workload_id")
+        or evidence_workload.get("matrix_sha256") != workload.get("workload_matrix_digest")
+        or evidence_workload.get("minimum_unprofiled_runs")
+        != workload.get("minimum_unprofiled_runs")
+        or evidence_workload.get("profile_is_attribution_only")
+        != workload.get("profile_is_attribution_only")
+    ):
+        raise AggregateEvidenceError("Agent Perf fixture or workload differs from decision draft")
+
+    profiler = projected.get("profiler")
+    if (
+        not isinstance(profiler, dict)
+        or profiler.get("name") != "agent-perf"
+        or not isinstance(profiler.get("version"), str)
+        or not profiler["version"]
+    ):
+        raise AggregateEvidenceError("decision draft Agent Perf profiler identity differs")
+    _require_agent_perf_artifact_links(manifest, projected, workload, evidence)
+    _require_agent_perf_qualification(
+        manifest,
+        projected,
+        workload,
+        qualification_bundles=qualification_bundles,
+    )
+
     unprofiled = evidence["unprofiled_runs"]
     profiled = evidence["profiled_run"]
     profile = profiled["profile"]
-    if (
-        projected.get("candidate_id") != "A"
-        or projected.get("hotspots") != profile["hotspots"]
-        or projected.get("unprofiled_runs")
-        != [{"run_id": row["run_id"], "wall_time_ns": row["wall_time_ns"]} for row in unprofiled]
-        or projected.get("profiled_run")
-        != {
-            "process_cpu_ns": {
-                "status": "observed",
-                "value": profiled["process_tree_cpu_ns"],
+    projected.update(
+        {
+            "hotspots": copy.deepcopy(profile["hotspots"]),
+            "unprofiled_runs": [
+                {"run_id": row["run_id"], "wall_time_ns": row["wall_time_ns"]} for row in unprofiled
+            ],
+            "profiled_run": {
+                "process_cpu_ns": {
+                    "status": "observed",
+                    "value": profiled["process_tree_cpu_ns"],
+                },
+                "run_id": profiled["run_id"],
+                "wall_time_ns": profiled["wall_time_ns"],
             },
-            "run_id": profiled["run_id"],
-            "wall_time_ns": profiled["wall_time_ns"],
         }
+    )
+
+
+def _require_agent_perf_artifact_links(
+    manifest: Mapping[str, object],
+    projected: Mapping[str, Any],
+    workload: Mapping[str, Any],
+    evidence: Mapping[str, Any],
+) -> None:
+    artifacts = manifest.get("canonical_artifacts")
+    if not isinstance(artifacts, dict):
+        raise AggregateEvidenceError("decision draft canonical artifacts are missing")
+    inputs = artifacts.get("inputs")
+    outputs = artifacts.get("outputs")
+    if not isinstance(inputs, list) or not isinstance(outputs, list):
+        raise AggregateEvidenceError("decision draft canonical artifact lists are missing")
+    workload_id = projected.get("workload_input_id")
+    measurement_id = projected.get("measurements_output_id")
+    workload_rows = [
+        row for row in inputs if isinstance(row, dict) and row.get("artifact_id") == workload_id
+    ]
+    measurement_rows = [
+        row for row in outputs if isinstance(row, dict) and row.get("artifact_id") == measurement_id
+    ]
+    if (
+        len(workload_rows) != 1
+        or workload_rows[0].get("kind") != "agent_perf_workload"
+        or workload_rows[0].get("encoding") != "canonical_json"
+        or workload_rows[0].get("canonical_sha256") != shared.canonical_sha256(workload)
+        or len(measurement_rows) != 1
+        or measurement_rows[0].get("kind") != "agent_perf_measurements"
+        or measurement_rows[0].get("encoding") != "canonical_json"
+        or measurement_rows[0].get("canonical_sha256") != shared.canonical_sha256(evidence)
     ):
-        raise AggregateEvidenceError("decision draft Agent Perf projection is stale")
+        raise AggregateEvidenceError("decision draft Agent Perf artifact links differ")
+
+
+def _require_agent_perf_qualification(
+    manifest: Mapping[str, object],
+    projected: Mapping[str, Any],
+    workload: Mapping[str, Any],
+    *,
+    qualification_bundles: Sequence[QualificationBundle],
+) -> None:
+    run_id = projected.get("qualification_run_id")
+    draft_runs = manifest.get("qualification_runs")
+    if not isinstance(draft_runs, list):
+        raise AggregateEvidenceError("decision draft qualification runs are missing")
+    matching_draft = [
+        row for row in draft_runs if isinstance(row, dict) and row.get("run_id") == run_id
+    ]
+    matching_bundles = [
+        bundle for bundle in qualification_bundles if bundle.invocation.get("run_id") == run_id
+    ]
+    if len(matching_draft) != 1 or len(matching_bundles) != 1:
+        raise AggregateEvidenceError("Agent Perf qualification run is missing or ambiguous")
+    draft_run = matching_draft[0]
+    bundle = matching_bundles[0]
+    invocation = bundle.invocation
+    fixture = invocation.get("fixture")
+    case_ids = invocation.get("case_ids")
+    agent_perf_measurements = [
+        measurement
+        for measurement in bundle.measurements
+        if measurement["identity"].get("candidate_id") == "A"
+        and measurement["identity"].get("case_id") == "agent_perf.standard_cpu_attribution"
+    ]
+    if (
+        draft_run.get("candidate_ids") != ["A"]
+        or draft_run.get("case_ids") != case_ids
+        or draft_run.get("case_ids_sha256") != shared.canonical_sha256(case_ids)
+        or draft_run.get("fixture_id") != "standard"
+        or draft_run.get("profiled") is not False
+        or draft_run.get("repetitions") != 5
+        or draft_run.get("speed_claim") is not True
+        or invocation.get("candidate_ids") != ["A"]
+        or not isinstance(case_ids, list)
+        or "agent_perf.standard_cpu_attribution" not in case_ids
+        or invocation.get("profiled") is not False
+        or invocation.get("repetitions") != 5
+        or not isinstance(fixture, dict)
+        or fixture.get("profile") != "standard"
+        or fixture.get("fixture_revision") != workload.get("fixture_revision")
+        or fixture.get("manifest_digest") != workload.get("fixture_manifest_digest")
+        or fixture.get("oracle_digest") != workload.get("fixture_oracle_digest")
+        or invocation.get("workload_matrix_digest") != workload.get("workload_matrix_digest")
+        or len(agent_perf_measurements) != 5
+        or {measurement["identity"].get("repetition") for measurement in agent_perf_measurements}
+        != set(range(5))
+    ):
+        raise AggregateEvidenceError("Agent Perf qualification identity differs")
+    _require_qualification_artifact_links(manifest, draft_run, bundle)
+
+
+def _require_qualification_artifact_links(
+    manifest: Mapping[str, object],
+    draft_run: Mapping[str, Any],
+    bundle: QualificationBundle,
+) -> None:
+    artifacts = manifest.get("canonical_artifacts")
+    if not isinstance(artifacts, dict):
+        raise AggregateEvidenceError("decision draft canonical artifacts are missing")
+    inputs = artifacts.get("inputs")
+    outputs = artifacts.get("outputs")
+    if not isinstance(inputs, list) or not isinstance(outputs, list):
+        raise AggregateEvidenceError("decision draft canonical artifact lists are missing")
+
+    expected = (
+        (
+            inputs,
+            draft_run.get("invocation_input_id"),
+            "qualification_invocation",
+            "invocation.json",
+            1,
+        ),
+        (
+            outputs,
+            draft_run.get("measurements_output_id"),
+            "qualification_measurements",
+            "measurements.jsonl",
+            len(bundle.measurements),
+        ),
+        (
+            outputs,
+            draft_run.get("summary_output_id"),
+            "qualification_summary",
+            "summary.json",
+            1,
+        ),
+    )
+    for rows, artifact_id, kind, file_name, record_count in expected:
+        matches = [
+            row for row in rows if isinstance(row, dict) and row.get("artifact_id") == artifact_id
+        ]
+        if (
+            len(matches) != 1
+            or matches[0].get("kind") != kind
+            or matches[0].get("canonical_sha256")
+            != hashlib.sha256(bundle.canonical_bytes[file_name]).hexdigest()
+            or matches[0].get("record_count") != record_count
+        ):
+            raise AggregateEvidenceError(
+                "decision draft Agent Perf qualification artifact links differ"
+            )
 
 
 def _write_exclusive(path: Path, payload: bytes) -> None:

@@ -4,6 +4,7 @@ import hashlib
 import importlib
 import json
 import sys
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,8 @@ def _write_bundle(
     code_commit: str = "a" * 40,
     fixture_manifest_digest: str = "b" * 64,
     fixture_oracle_digest: str = "c" * 64,
+    workload_matrix_digest: str = "d" * 64,
+    run_id: str | None = None,
     oracle_results: dict[str, object] | None = None,
 ) -> Path:
     root.mkdir()
@@ -45,7 +48,7 @@ def _write_bundle(
     environment_digest = shared.canonical_sha256(environment)
     invocation_base = {
         "schema": "codex-usage-tracker.physical-bakeoff-invocation.v1",
-        "run_id": f"{candidate_id.lower()}-{profile}",
+        "run_id": run_id or f"{candidate_id.lower()}-{profile}",
         "code_commit": code_commit,
         "fixture": {
             "profile": profile,
@@ -53,7 +56,7 @@ def _write_bundle(
             "manifest_digest": fixture_manifest_digest,
             "oracle_digest": fixture_oracle_digest,
         },
-        "workload_matrix_digest": "d" * 64,
+        "workload_matrix_digest": workload_matrix_digest,
         "environment": environment,
         "environment_digest": environment_digest,
         "candidate_ids": [candidate_id],
@@ -300,37 +303,71 @@ def test_projects_authenticated_c_and_uncensored_d_failures(tmp_path: Path) -> N
         aggregate.project_candidate_failure(censored)
 
 
-def test_authenticates_agent_perf_and_dbhub_artifacts(tmp_path: Path) -> None:
-    run_identity = "a" * 64
+def _agent_perf_run(
+    run_id: str,
+    *,
+    wall_time_ns: int = 20,
+    process_cpu_ns: int = 10,
+) -> dict[str, object]:
+    return {
+        "observed_processes": 1,
+        "process_tree_cpu_ns": process_cpu_ns,
+        "result_identity_sha256": "a" * 64,
+        "run_id": run_id,
+        "stderr_bytes": 0,
+        "stderr_sha256": hashlib.sha256(b"").hexdigest(),
+        "stdout_bytes": 0,
+        "stdout_sha256": hashlib.sha256(b"").hexdigest(),
+        "wall_time_ns": wall_time_ns,
+    }
 
-    def run(run_id: str) -> dict[str, object]:
-        return {
-            "observed_processes": 1,
-            "process_tree_cpu_ns": 10,
-            "result_identity_sha256": run_identity,
-            "run_id": run_id,
-            "stderr_bytes": 0,
-            "stderr_sha256": hashlib.sha256(b"").hexdigest(),
-            "stdout_bytes": 0,
-            "stdout_sha256": hashlib.sha256(b"").hexdigest(),
-            "wall_time_ns": 20,
-        }
 
-    agent_perf = {
+def _agent_perf_evidence(
+    workload: dict[str, object] | None = None,
+) -> dict[str, object]:
+    fixture_manifest_digest = (
+        workload["fixture_manifest_digest"] if workload is not None else "b" * 64
+    )
+    fixture_oracle_digest = workload["fixture_oracle_digest"] if workload is not None else "c" * 64
+    workload_matrix_digest = (
+        workload["workload_matrix_digest"] if workload is not None else "e" * 64
+    )
+    evidence = {
         "candidate_id": "A",
-        "fixture": {"synthetic_only": True},
+        "fixture": {
+            "manifest_sha256": fixture_manifest_digest,
+            "oracle_sha256": fixture_oracle_digest,
+            "profile": "standard",
+            "revision": shared.FIXTURE_REVISION,
+            "synthetic_only": True,
+        },
         "profiled_run": {
-            **run("profiled"),
+            **_agent_perf_run("profiled"),
             "profile": {
                 "hotspots": [],
                 "profile_is_attribution_only": True,
             },
         },
         "schema": "codex-usage-tracker.ck04-agent-perf-evidence.v1",
-        "tool_versions": {"agent_perf": "0.1.0"},
-        "unprofiled_runs": [run(f"unprofiled-{index}") for index in range(5)],
-        "workload": {"profile_is_attribution_only": True},
+        "tool_versions": {
+            "agent_perf": "0.1.0",
+            "psutil": "7.2.2",
+            "scalene": "2.3.0",
+        },
+        "unprofiled_runs": [_agent_perf_run(f"unprofiled-{index}") for index in range(5)],
+        "workload": {
+            "digest": (shared.canonical_sha256(workload) if workload is not None else "d" * 64),
+            "id": "build.scale.standard",
+            "matrix_sha256": workload_matrix_digest,
+            "minimum_unprofiled_runs": 5,
+            "profile_is_attribution_only": True,
+        },
     }
+    return evidence
+
+
+def test_authenticates_agent_perf_and_dbhub_artifacts(tmp_path: Path) -> None:
+    agent_perf = _agent_perf_evidence()
     agent_path = tmp_path / "agent.json"
     agent_path.write_bytes(_canonical(agent_perf))
     assert aggregate.authenticate_agent_perf(agent_path)["candidate_id"] == "A"
@@ -339,6 +376,205 @@ def test_authenticates_agent_perf_and_dbhub_artifacts(tmp_path: Path) -> None:
     dbhub_path = tmp_path / "dbhub.json"
     dbhub_path.write_bytes(_canonical(dbhub))
     assert aggregate.authenticate_dbhub(dbhub_path)["version"] == "0.24.0"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("fixture.profile", "growth"),
+        ("fixture.revision", "old-revision"),
+        ("workload.id", "build.scale.production"),
+        ("workload.minimum_unprofiled_runs", 4),
+        ("workload.profile_is_attribution_only", False),
+        ("tool_versions.agent_perf", "0.2.0"),
+        ("tool_versions.psutil", "7.2.1"),
+        ("tool_versions.scalene", "2.2.0"),
+    ],
+)
+def test_agent_perf_authentication_rejects_contract_drift(
+    tmp_path: Path,
+    field: str,
+    value: object,
+) -> None:
+    evidence = _agent_perf_evidence()
+    section, key = field.split(".", 1)
+    section_value = evidence[section]
+    assert isinstance(section_value, dict)
+    section_value[key] = value
+    path = tmp_path / "agent.json"
+    path.write_bytes(_canonical(evidence))
+    with pytest.raises(aggregate.AggregateEvidenceError, match="incomplete"):
+        aggregate.authenticate_agent_perf(path)
+
+
+def test_assemble_derives_agent_perf_telemetry_and_preserves_links(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    draft = decision_tests._valid_manifest()
+    projection = draft["agent_perf"][0]
+    workload = projection["workload"]
+    qualification_run = next(
+        row
+        for row in draft["qualification_runs"]
+        if row["run_id"] == projection["qualification_run_id"]
+    )
+    qualification_run.update(
+        {
+            "candidate_ids": ["A"],
+            "case_ids": ["agent_perf.standard_cpu_attribution"],
+            "case_ids_sha256": shared.canonical_sha256(["agent_perf.standard_cpu_attribution"]),
+            "repetitions": 5,
+        }
+    )
+    standard = aggregate.authenticate_qualification_bundle(
+        _write_bundle(
+            tmp_path / "standard",
+            case_id="agent_perf.standard_cpu_attribution",
+            profile="standard",
+            repetitions=5,
+            fixture_manifest_digest=workload["fixture_manifest_digest"],
+            fixture_oracle_digest=workload["fixture_oracle_digest"],
+            workload_matrix_digest=workload["workload_matrix_digest"],
+            run_id=projection["qualification_run_id"],
+        )
+    )
+    fresh = _agent_perf_evidence(workload)
+    fresh["profiled_run"] = {
+        **_agent_perf_run("fresh-profile", wall_time_ns=701, process_cpu_ns=601),
+        "profile": {
+            "hotspots": [
+                {
+                    "python_cpu_percent": "42.25",
+                    "rank": 1,
+                    "source": ("experiments/physical-architecture/candidate_a/publication.py"),
+                    "symbol": "publish_artifact",
+                }
+            ],
+            "profile_is_attribution_only": True,
+        },
+    }
+    fresh["unprofiled_runs"] = [
+        _agent_perf_run(
+            f"fresh-{index}",
+            wall_time_ns=100 + index,
+            process_cpu_ns=50 + index,
+        )
+        for index in range(5)
+    ]
+    artifact_rows = [
+        *draft["canonical_artifacts"]["inputs"],
+        *draft["canonical_artifacts"]["outputs"],
+    ]
+    for artifact_id, file_name, record_count in (
+        (qualification_run["invocation_input_id"], "invocation.json", 1),
+        (
+            qualification_run["measurements_output_id"],
+            "measurements.jsonl",
+            5,
+        ),
+        (qualification_run["summary_output_id"], "summary.json", 1),
+    ):
+        artifact = next(row for row in artifact_rows if row["artifact_id"] == artifact_id)
+        artifact["canonical_sha256"] = hashlib.sha256(
+            standard.canonical_bytes[file_name]
+        ).hexdigest()
+        artifact["record_count"] = record_count
+    agent_measurements = next(
+        row
+        for row in draft["canonical_artifacts"]["outputs"]
+        if row["artifact_id"] == projection["measurements_output_id"]
+    )
+    agent_measurements["canonical_sha256"] = shared.canonical_sha256(fresh)
+    original_links = {
+        key: projection[key]
+        for key in (
+            "candidate_id",
+            "measurements_output_id",
+            "profiler",
+            "qualification_run_id",
+            "workload",
+            "workload_input_id",
+        )
+    }
+    failures = iter(
+        [
+            {
+                key: value
+                for key, value in draft["candidates"][index]["failures"][0].items()
+                if key != "output_artifact_id"
+            }
+            for index in (1, 2)
+        ]
+    )
+    monkeypatch.setattr(aggregate, "project_query_rows", lambda _: tuple(draft["query_plans"]))
+    monkeypatch.setattr(
+        aggregate,
+        "project_crash_rows",
+        lambda _: tuple(draft["crash_observations"]),
+    )
+    monkeypatch.setattr(
+        aggregate,
+        "derive_candidate_a_score_inputs",
+        lambda _: tuple(draft["candidates"][0]["score_inputs"]),
+    )
+    monkeypatch.setattr(aggregate, "project_candidate_failure", lambda _: next(failures))
+
+    built = aggregate.assemble_manifest(
+        draft,
+        qualification_bundles=[standard],
+        candidate_c=standard,
+        candidate_d=standard,
+        agent_perf=fresh,
+        dbhub=draft["dbhub"],
+    )
+
+    built_agent_perf = built["agent_perf"]
+    assert isinstance(built_agent_perf, list)
+    updated = built_agent_perf[0]
+    assert isinstance(updated, dict)
+    assert {key: updated[key] for key in original_links} == original_links
+    fresh_profiled = fresh["profiled_run"]
+    assert isinstance(fresh_profiled, dict)
+    fresh_profile = fresh_profiled["profile"]
+    assert isinstance(fresh_profile, dict)
+    assert updated["hotspots"] == fresh_profile["hotspots"]
+    assert updated["unprofiled_runs"] == [
+        {"run_id": f"fresh-{index}", "wall_time_ns": 100 + index} for index in range(5)
+    ]
+    assert updated["profiled_run"] == {
+        "process_cpu_ns": {"status": "observed", "value": 601},
+        "run_id": "fresh-profile",
+        "wall_time_ns": 701,
+    }
+
+    for mutation in (
+        lambda value: value["agent_perf"][0]["workload"].update(
+            {"fixture_manifest_digest": "0" * 64}
+        ),
+        lambda value: value["agent_perf"][0]["workload"].update(
+            {"fixture_oracle_digest": "0" * 64}
+        ),
+        lambda value: value["agent_perf"][0]["workload"].update(
+            {"workload_matrix_digest": "0" * 64}
+        ),
+        lambda value: next(
+            row
+            for row in value["qualification_runs"]
+            if row["run_id"] == projection["qualification_run_id"]
+        ).update({"candidate_ids": ["A", "C"]}),
+    ):
+        drifted = deepcopy(draft)
+        mutation(drifted)
+        with pytest.raises(
+            aggregate.AggregateEvidenceError,
+            match="Agent Perf",
+        ):
+            aggregate._project_agent_perf(
+                drifted,
+                fresh,
+                qualification_bundles=[standard],
+            )
 
 
 def test_writes_unique_directory_validates_sha_and_complete_last(tmp_path: Path) -> None:
