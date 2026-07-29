@@ -146,6 +146,7 @@ class Adapter:
                 "durability_transition_ns": (
                     artifact.stats.durability_transition_ns
                 ),
+                "validation_mode": artifact.stats.validation_mode,
                 "validation_ns": artifact.stats.validation_ns,
                 "parser_workers": request.case.parameter("parser_workers") or 1,
                 "writer_mode": request.case.parameter("writer_mode") or "single",

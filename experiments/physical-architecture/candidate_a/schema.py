@@ -1,12 +1,33 @@
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Literal
 
 SCHEMA_ID = "codex-usage-tracker.physical-bakeoff.candidate-a.v1"
 SCHEMA_VERSION = 1
+ValidationMode = Literal["prepublication", "exhaustive"]
+PREPUBLICATION_VALIDATION = "quick_check+foreign_key_check+schema_metadata"
+
+# Digest of ordered, non-SQLite-owned sqlite_schema rows. An intentional DDL
+# change must update this only alongside schema-contract and corruption tests.
+_EXPECTED_SCHEMA_DIGEST = (
+    "eeb45b56062ab77930da82fbc5a16f5b5f1e552f7bc2815309de4e1f8188b069"
+)
+_HISTORY_SELECTIONS = frozenset(
+    {
+        "current_session",
+        "24_hours",
+        "7_days",
+        "30_days",
+        "90_days",
+        "one_year",
+        "all_time",
+    }
+)
 
 SQLITE_SETTINGS = (
     ("cache_size", "-20000"),
@@ -545,11 +566,104 @@ def database(path: Path, *, read_only: bool = False) -> Iterator[sqlite3.Connect
         connection.close()
 
 
-def validate_database(connection: sqlite3.Connection) -> None:
-    if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
-        raise ValueError("candidate A SQLite integrity check failed")
+def _validate_sqlite_pages(
+    connection: sqlite3.Connection,
+    *,
+    mode: ValidationMode,
+) -> None:
+    pragma = "quick_check" if mode == "prepublication" else "integrity_check"
+    results = tuple(str(row[0]) for row in connection.execute(f"PRAGMA {pragma}"))
+    if results != ("ok",):
+        raise ValueError(f"candidate A SQLite {pragma} failed")
+
+
+def _validate_schema_contract(connection: sqlite3.Connection) -> None:
+    rows = connection.execute(
+        """
+        SELECT type, name, tbl_name, sql
+        FROM sqlite_schema
+        WHERE sql IS NOT NULL
+          AND name NOT LIKE 'sqlite_%'
+        ORDER BY type, name
+        """
+    ).fetchall()
+    encoded = "\n".join(
+        "\x1f".join(str(value) for value in row)
+        for row in rows
+    ).encode()
+    if hashlib.sha256(encoded).hexdigest() != _EXPECTED_SCHEMA_DIGEST:
+        raise ValueError("candidate A schema contract mismatch")
+
+
+def _is_sha256(value: str | None) -> bool:
+    return (
+        value is not None
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _validate_metadata_contract(connection: sqlite3.Connection) -> None:
     metadata = dict(connection.execute("SELECT key, value FROM metadata"))
     if metadata.get("schema_id") != SCHEMA_ID:
         raise ValueError("candidate A schema identity mismatch")
     if metadata.get("schema_version") != str(SCHEMA_VERSION):
         raise ValueError("candidate A schema version mismatch")
+    if metadata.get("candidate_id") != "A":
+        raise ValueError("candidate A identity metadata mismatch")
+    if metadata.get("raw_content_stored") != "false":
+        raise ValueError("candidate A raw-content metadata mismatch")
+    if metadata.get("history_selection") not in _HISTORY_SELECTIONS:
+        raise ValueError("candidate A history-selection metadata mismatch")
+    if metadata.get("prepublication_validation") != PREPUBLICATION_VALIDATION:
+        raise ValueError("candidate A prepublication-validation metadata mismatch")
+    if not metadata.get("fixture_revision") or not metadata.get("fixture_profile"):
+        raise ValueError("candidate A fixture metadata is incomplete")
+    manifest_digest = metadata.get("fixture_manifest_digest")
+    oracle_digest = metadata.get("fixture_oracle_digest")
+    if not _is_sha256(manifest_digest) or not _is_sha256(oracle_digest):
+        raise ValueError("candidate A fixture digest metadata is invalid")
+    try:
+        projection_rows = int(metadata.get("projection_rows", ""))
+    except ValueError as error:
+        raise ValueError("candidate A projection-row metadata is invalid") from error
+    if projection_rows < 0:
+        raise ValueError("candidate A projection-row metadata is invalid")
+    publications = connection.execute(
+        """
+        SELECT publication_id, fixture_manifest_digest, fixture_oracle_digest
+        FROM publications
+        WHERE status = 'committed'
+        """
+    ).fetchall()
+    if len(publications) != 1:
+        raise ValueError("candidate A must contain exactly one committed publication")
+    publication = publications[0]
+    if not str(publication["publication_id"]).startswith("publication:candidate-a:"):
+        raise ValueError("candidate A publication identity mismatch")
+    if (
+        publication["fixture_manifest_digest"] != manifest_digest
+        or publication["fixture_oracle_digest"] != oracle_digest
+    ):
+        raise ValueError("candidate A publication digest metadata mismatch")
+
+
+def validate_database(
+    connection: sqlite3.Connection,
+    *,
+    mode: ValidationMode = "exhaustive",
+) -> None:
+    """Validate a candidate artifact without making the fast mode implicit.
+
+    The disposable staging artifact gets the bounded prepublication mode.
+    Deep/read validation defaults to exhaustive SQLite index-consistency
+    checking. Both modes independently enforce relationship, schema, metadata,
+    and committed-publication invariants.
+    """
+    if mode not in {"prepublication", "exhaustive"}:
+        raise ValueError(f"candidate A validation mode is invalid: {mode}")
+    _validate_sqlite_pages(connection, mode=mode)
+    if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
+        raise ValueError("candidate A foreign-key check failed")
+    _validate_schema_contract(connection)
+    _validate_metadata_contract(connection)

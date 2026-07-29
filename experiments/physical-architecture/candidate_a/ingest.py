@@ -12,6 +12,7 @@ from typing import Any
 import shared
 
 from .schema import (
+    PREPUBLICATION_VALIDATION,
     create_database,
     finalize_unpublished_database,
     validate_database,
@@ -111,6 +112,7 @@ class IngestStats:
     final_journal_mode: str = ""
     final_synchronous: int = 0
     durability_transition_ns: int = 0
+    validation_mode: str = ""
     validation_ns: int = 0
 
 
@@ -959,6 +961,10 @@ def build_artifact(
                 ("fixture_oracle_digest", fixture.oracle_digest),
                 ("history_selection", history_selection),
                 ("projection_rows", str(projection_rows)),
+                (
+                    "prepublication_validation",
+                    PREPUBLICATION_VALIDATION,
+                ),
                 ("raw_content_stored", "false"),
             ),
         )
@@ -976,8 +982,9 @@ def build_artifact(
         stats.final_synchronous = int(
             connection.execute("PRAGMA synchronous").fetchone()[0]
         )
+        stats.validation_mode = "prepublication"
         validation_started = time.perf_counter_ns()
-        validate_database(connection)
+        validate_database(connection, mode="prepublication")
         stats.validation_ns = time.perf_counter_ns() - validation_started
         return BuildArtifact(
             path=path,

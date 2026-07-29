@@ -390,9 +390,17 @@ def test_unpublished_build_uses_disposable_io_then_restores_normal_wal(
     assert artifact.stats.final_journal_mode == "wal"
     assert artifact.stats.final_synchronous == 1
     assert artifact.stats.durability_transition_ns > 0
+    assert artifact.stats.validation_mode == "prepublication"
     assert artifact.stats.validation_ns > 0
     with database(artifact.path, read_only=True) as connection:
         assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        assert connection.execute(
+            """
+            SELECT value
+            FROM metadata
+            WHERE key = 'prepublication_validation'
+            """
+        ).fetchone()[0] == "quick_check+foreign_key_check+schema_metadata"
         schema_module.validate_database(connection)
     with database(artifact.path) as connection:
         assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
@@ -400,6 +408,86 @@ def test_unpublished_build_uses_disposable_io_then_restores_normal_wal(
     assert not artifact.path.with_name(f"{artifact.path.name}-journal").exists()
     assert not artifact.path.with_name(f"{artifact.path.name}-wal").exists()
     assert not artifact.path.with_name(f"{artifact.path.name}-shm").exists()
+
+
+def test_validation_modes_keep_exhaustive_integrity_as_the_default(
+    built: tuple[Any, Any],
+) -> None:
+    _, artifact = built
+    statements: list[str] = []
+    with database(artifact.path, read_only=True) as connection:
+        connection.set_trace_callback(statements.append)
+        schema_module.validate_database(connection)
+        connection.set_trace_callback(None)
+    assert any("PRAGMA integrity_check" in statement for statement in statements)
+    assert not any("PRAGMA quick_check" in statement for statement in statements)
+
+    statements.clear()
+    with database(artifact.path, read_only=True) as connection:
+        connection.set_trace_callback(statements.append)
+        schema_module.validate_database(
+            connection,
+            mode="prepublication",
+        )
+        connection.set_trace_callback(None)
+    assert any("PRAGMA quick_check" in statement for statement in statements)
+    assert not any("PRAGMA integrity_check" in statement for statement in statements)
+
+
+def test_prepublication_validation_rejects_schema_drift_after_quick_check(
+    built: tuple[Any, Any],
+) -> None:
+    _, artifact = built
+    with database(artifact.path) as connection:
+        connection.execute("DROP INDEX model_calls_timeline")
+        connection.commit()
+        assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+        with pytest.raises(ValueError, match="schema contract mismatch"):
+            schema_module.validate_database(
+                connection,
+                mode="prepublication",
+            )
+
+
+def test_prepublication_validation_rejects_foreign_key_violations(
+    built: tuple[Any, Any],
+) -> None:
+    _, artifact = built
+    with database(artifact.path) as connection:
+        connection.execute("PRAGMA foreign_keys=OFF")
+        connection.execute("CREATE TABLE validation_parent(id INTEGER PRIMARY KEY)")
+        connection.execute(
+            """
+            CREATE TABLE validation_child(
+                parent_id INTEGER REFERENCES validation_parent(id)
+            )
+            """
+        )
+        connection.execute("INSERT INTO validation_child(parent_id) VALUES (1)")
+        connection.commit()
+        assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+        with pytest.raises(ValueError, match="foreign-key check failed"):
+            schema_module.validate_database(
+                connection,
+                mode="prepublication",
+            )
+
+
+def test_prepublication_validation_rejects_metadata_drift(
+    built: tuple[Any, Any],
+) -> None:
+    _, artifact = built
+    with database(artifact.path) as connection:
+        connection.execute(
+            "UPDATE metadata SET value='wrong' WHERE key='schema_id'"
+        )
+        connection.commit()
+        assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+        with pytest.raises(ValueError, match="schema identity mismatch"):
+            schema_module.validate_database(
+                connection,
+                mode="prepublication",
+            )
 
 
 def test_explicit_present_build_keeps_secondary_indexes_present(
@@ -698,6 +786,7 @@ def test_all_mandatory_workloads_pass_with_only_optional_writer_unsupported(
     assert default_build.oracle_results["final_journal_mode"] == "wal"
     assert default_build.oracle_results["final_synchronous"] == 1
     assert default_build.oracle_results["durability_transition_ns"] > 0
+    assert default_build.oracle_results["validation_mode"] == "prepublication"
     assert default_build.oracle_results["validation_ns"] > 0
     present_build = results["build.index.present"]
     assert present_build.oracle_results["index_mode"] == "present"
