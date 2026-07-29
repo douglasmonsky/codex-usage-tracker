@@ -257,6 +257,7 @@ def _score_evidence_bundle(
     case_ids: list[str],
     code_commit: str,
     fixture_digests: dict[str, tuple[str, str]],
+    mutate_invocation: Any = None,
     mutate_measurement: Any = None,
     mutate_detail: Any = None,
 ) -> object:
@@ -306,6 +307,8 @@ def _score_evidence_bundle(
         },
         "completion_marker": "summary.json",
     }
+    if mutate_invocation is not None:
+        mutate_invocation(invocation_base)
     invocation = {
         **invocation_base,
         "invocation_digest": shared.canonical_sha256(invocation_base),
@@ -1736,3 +1739,72 @@ def test_deferred_model_operability_requires_explicit_ck11_limitation() -> None:
         match="owner_packet_id must be CK-11",
     ):
         decision_evidence.build_manifest(wrong_owner)
+
+
+@pytest.mark.parametrize(
+    ("mutate_invocation", "mutate_measurement", "mutate_detail", "match"),
+    [
+        (
+            lambda row: row.pop("prepared_scale_artifact_policy"),
+            None,
+            None,
+            "prepared-scale policy",
+        ),
+        (
+            None,
+            None,
+            lambda row: row["oracle_results"]["preparation"].update({"mode": "copy"}),
+            "detail.*digest",
+        ),
+        (
+            None,
+            None,
+            lambda row: row["oracle_results"]["preparation"].update({"source_unchanged": False}),
+            "detail.*digest",
+        ),
+        (
+            None,
+            None,
+            lambda row: row["oracle_results"]["preparation"].update(
+                {"source_case_id": "build.scale.tiny"}
+            ),
+            "detail.*digest",
+        ),
+        (
+            None,
+            None,
+            lambda row: row["oracle_results"]["preparation"].update(
+                {"destination_publication_id": "other"}
+            ),
+            "detail.*digest",
+        ),
+        (None, lambda row: row["values"].pop("pages_written_basis"), None, "pages_written_basis"),
+        (
+            None,
+            lambda row: row["values"].update({"pages_written_basis": "wrong.v1"}),
+            None,
+            "pages_written_basis",
+        ),
+        (None, lambda row: row["values"].update({"source_files_rescanned": 1}), None, "zero-write"),
+        (None, lambda row: row["values"].update({"facts_updated": 1}), None, "zero-write"),
+        (None, lambda row: row["values"].update({"facts_recanonicalized": 1}), None, "zero-write"),
+        (None, lambda row: row["values"].update({"projection_rows_read": 1}), None, "zero-write"),
+    ],
+)
+def test_candidate_a_ordinary_score_authentication_rejects_tampering(
+    mutate_invocation: Any, mutate_measurement: Any, mutate_detail: Any, match: str
+) -> None:
+    _, digests = _fixture_rows()
+    bundle = _score_evidence_bundle(
+        profile="production",
+        case_ids=["ordinary.no_source_change"],
+        code_commit="a" * 40,
+        fixture_digests=digests,
+        mutate_invocation=mutate_invocation,
+        mutate_measurement=mutate_measurement,
+        mutate_detail=mutate_detail,
+    )
+    with pytest.raises(decision_evidence.DecisionEvidenceContractError, match=match):
+        decision_evidence._authenticate_score_evidence(  # noqa: SLF001
+            bundle, context="tamper", candidate_id="A"
+        )

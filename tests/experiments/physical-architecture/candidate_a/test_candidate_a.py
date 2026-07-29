@@ -1057,3 +1057,23 @@ def test_ordinary_change_fails_closed_on_ambiguous_clean_epoch(
             int(connection.execute("SELECT count(*) FROM model_calls_visible").fetchone()[0])
             == before
         )
+
+
+def test_no_change_excludes_preexisting_committed_wal_frames(fixture: Any, tmp_path: Path) -> None:
+    artifact = candidate_a.build_artifact(fixture, tmp_path / "preexisting-wal.sqlite")
+    reader = sqlite3.connect(artifact.path)
+    writer = sqlite3.connect(artifact.path)
+    try:
+        writer.execute("PRAGMA journal_mode=WAL")
+        reader.execute("BEGIN")
+        reader.execute("SELECT count(*) FROM metadata").fetchone()
+        writer.execute(
+            "INSERT OR REPLACE INTO metadata(key, value) VALUES ('preexisting_wal', 'synthetic')"
+        )
+        writer.commit()
+        assert int(writer.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()[1]) > 0
+    finally:
+        writer.close()
+        reader.close()
+    stats = apply_ordinary_change(artifact.path, "no_source_change")
+    assert stats.pages_written == stats.writer_transactions == 0
