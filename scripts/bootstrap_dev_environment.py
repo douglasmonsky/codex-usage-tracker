@@ -44,6 +44,19 @@ _GITNEXUS_ANALYZER_TAIL_CHARS = 65_536
 _GITNEXUS_ANALYZER_TRUNCATION_NOTICE = (
     f"[GitNexus output truncated; last {_GITNEXUS_ANALYZER_TAIL_CHARS} characters retained]\n"
 )
+_GITNEXUS_TERMINAL_ESCAPE_PATTERN = re.compile(
+    r"(?:"
+    r"\x1B(?:"
+    r"\[[0-?]*[ -/]*[@-~]"
+    r"|\][\s\S]*?(?:\x07|\x1B\\|\Z)"
+    r"|[PX^_][\s\S]*?(?:\x1B\\|\Z)"
+    r"|[78]"
+    r"|[@-Z\\-_]"
+    r")"
+    r"|\x9B[0-?]*[ -/]*[@-~]"
+    r")"
+)
+_GITNEXUS_TERMINAL_CONTROL_PATTERN = re.compile(r"[\x00-\x08\x0B-\x1F\x7F-\x9F]")
 _GITNEXUS_FTS_CORRUPTION_PATTERN = re.compile(
     r"FTS\s+index\s+'file_fts'\s+(?:is\s+)?inconsistent\s*:\s*"
     r"(?:document\s+)?node\s+offset\s+\d+\s+missing\s+during\s+delete\.\s*"
@@ -925,7 +938,9 @@ def _run_gitnexus_analyzer(
 
 def _is_recognized_gitnexus_fts_corruption(result: CommandResult) -> bool:
     output = f"{result.stdout}\n{result.stderr}"
-    return _GITNEXUS_FTS_CORRUPTION_PATTERN.search(output) is not None
+    without_escapes = _GITNEXUS_TERMINAL_ESCAPE_PATTERN.sub("", output)
+    normalized = _GITNEXUS_TERMINAL_CONTROL_PATTERN.sub("", without_escapes)
+    return _GITNEXUS_FTS_CORRUPTION_PATTERN.search(normalized) is not None
 
 
 def _cache_root() -> Path:
