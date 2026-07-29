@@ -396,6 +396,7 @@ CK04_PHYSICAL_BAKEOFF_ADDITIONS = frozenset(
     {
         ".gitignore",
         "experiments/physical-architecture/README.md",
+        "experiments/physical-architecture/aggregate_decision_evidence.py",
         "experiments/physical-architecture/decision_evidence.py",
         "experiments/physical-architecture/qualification.py",
         "experiments/physical-architecture/run_agent_perf_evidence.py",
@@ -452,6 +453,7 @@ CK04_PHYSICAL_BAKEOFF_ADDITIONS = frozenset(
         "tests/experiments/physical-architecture/candidate_c/test_candidate_c.py",
         "tests/experiments/physical-architecture/candidate_d/test_candidate_d.py",
         "tests/experiments/physical-architecture/test_agent_perf_evidence.py",
+        "tests/experiments/physical-architecture/test_aggregate_decision_evidence.py",
         "tests/experiments/physical-architecture/test_decision_evidence.py",
         "tests/experiments/physical-architecture/test_bakeoff_runner.py",
         "tests/experiments/physical-architecture/test_dbhub_runner.py",
