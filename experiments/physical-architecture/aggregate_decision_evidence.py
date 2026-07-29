@@ -726,12 +726,10 @@ def _project_agent_perf(
         raise AggregateEvidenceError("Agent Perf fixture or workload differs from decision draft")
 
     profiler = projected.get("profiler")
-    if (
-        not isinstance(profiler, dict)
-        or profiler.get("name") != "agent-perf"
-        or not isinstance(profiler.get("version"), str)
-        or not profiler["version"]
-    ):
+    if profiler != {
+        "name": "agent-perf",
+        "version": evidence["tool_versions"]["agent_perf"],
+    }:
         raise AggregateEvidenceError("decision draft Agent Perf profiler identity differs")
     _require_agent_perf_artifact_links(manifest, projected, workload, evidence)
     _require_agent_perf_qualification(

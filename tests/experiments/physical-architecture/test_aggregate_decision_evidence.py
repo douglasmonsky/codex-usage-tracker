@@ -413,6 +413,7 @@ def test_assemble_derives_agent_perf_telemetry_and_preserves_links(
 ) -> None:
     draft = decision_tests._valid_manifest()
     projection = draft["agent_perf"][0]
+    projection["profiler"]["version"] = "0.1.0"
     workload = projection["workload"]
     qualification_run = next(
         row
@@ -558,6 +559,7 @@ def test_assemble_derives_agent_perf_telemetry_and_preserves_links(
         lambda value: value["agent_perf"][0]["workload"].update(
             {"workload_matrix_digest": "0" * 64}
         ),
+        lambda value: value["agent_perf"][0]["profiler"].update({"version": "1.0"}),
         lambda value: next(
             row
             for row in value["qualification_runs"]
