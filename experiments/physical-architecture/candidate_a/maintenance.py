@@ -770,7 +770,7 @@ def _checkpoint(connection: sqlite3.Connection, mode: str) -> tuple[int, int, in
     row = connection.execute(f"PRAGMA wal_checkpoint({mode})").fetchone()
     if row is None or len(row) != 3 or any(type(value) is not int for value in row):
         raise RuntimeError(f"SQLite {mode} checkpoint returned ambiguous result")
-    return tuple(int(value) for value in row)
+    return int(row[0]), int(row[1]), int(row[2])
 
 
 def _require_clean_wal_epoch(connection: sqlite3.Connection, stage: str) -> None:
