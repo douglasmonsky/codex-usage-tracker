@@ -194,6 +194,15 @@ def test_mandatory_failed_or_stopped_case_fails_closed(
     assert artifact.status == "failed"
     assert artifact.summary["failure"]["case_id"] == case_id
     assert artifact.records[0].outcome is outcome
+    detail = qualification.load_execution_details(
+        artifact.details_path,
+        measurements_path=artifact.measurements_path,
+        expected_records=1,
+    )[0]
+    assert detail["outcome"] == outcome.value
+    assert detail["detail_code"] == f"fake.{outcome.value}"
+    assert detail["partial"] is (outcome is shared.RunOutcome.STOPPED)
+    assert (detail["stop_decision"] is not None) is (outcome is shared.RunOutcome.STOPPED)
 
 
 def test_unsupported_is_retained_only_for_optional_capability(
@@ -225,6 +234,13 @@ def test_unsupported_is_retained_only_for_optional_capability(
     assert artifact.successful
     assert artifact.records[0].outcome is shared.RunOutcome.UNSUPPORTED
     assert artifact.summary["cases"][0]["mandatory"] is False
+    unsupported_detail = qualification.load_execution_details(
+        artifact.details_path,
+        measurements_path=artifact.measurements_path,
+        expected_records=1,
+    )[0]
+    assert unsupported_detail["outcome"] == "unsupported"
+    assert unsupported_detail["detail_code"] == "fake.unsupported"
 
     mandatory = _FakeAdapter("A", outcome=shared.RunOutcome.UNSUPPORTED)
     with pytest.raises(
@@ -426,6 +442,171 @@ def test_artifacts_are_canonical_bounded_and_have_current_digests(
         summary["measurement_sha256"]
         == __import__("hashlib").sha256(artifact.measurements_path.read_bytes()).hexdigest()
     )
+    assert (
+        summary["details_sha256"]
+        == __import__("hashlib").sha256(artifact.details_path.read_bytes()).hexdigest()
+    )
+    assert summary["detail_records"] == summary["records"] == 1
+
+
+def test_detail_stream_preserves_bounded_oracle_and_process_evidence_before_cleanup(
+    tmp_path: Path,
+) -> None:
+    class DetailedAdapter(_FakeAdapter):
+        def execute(self, request: Any) -> Any:
+            (request.run_root / "ephemeral.sqlite").write_bytes(b"synthetic")
+            result = super().execute(request)
+            return replace(
+                result,
+                oracle_results={
+                    "query_rows": [
+                        {
+                            "session_id": "session:v1:synthetic",
+                            "total_tokens": 12_345,
+                        }
+                    ],
+                    "recovery": {
+                        "worker_pid": 42_424,
+                        "worker_exit_code": 86,
+                        "subsequent_publication_succeeds": True,
+                    },
+                },
+            )
+
+    artifact = qualification.run_qualification(
+        _config(tmp_path, run_id="detail-evidence"),
+        environment=_environment(),
+        adapter_loader=lambda _: DetailedAdapter("A"),
+    )
+
+    details = qualification.load_execution_details(
+        artifact.details_path,
+        measurements_path=artifact.measurements_path,
+        expected_sha256=artifact.summary["details_sha256"],
+        expected_records=artifact.summary["detail_records"],
+    )
+    assert len(details) == 1
+    detail = details[0]
+    assert detail["execution_index"] == 0
+    assert detail["measurement_identity"] == {
+        "candidate_id": "A",
+        "case_id": "build.scale.tiny",
+        "code_commit": "c" * 40,
+        "environment_digest": artifact.summary["environment_digest"],
+        "fixture_manifest_digest": artifact.summary["fixture_manifest_digest"],
+        "fixture_oracle_digest": artifact.summary["fixture_oracle_digest"],
+        "fixture_profile": "tiny",
+        "profiled": False,
+        "qualification_model": None,
+        "repetition": 0,
+        "run_id": "detail-evidence",
+        "workload_matrix_digest": artifact.summary["workload_matrix_digest"],
+    }
+    assert detail["oracle_results"]["query_rows"][0]["total_tokens"] == 12_345
+    assert detail["oracle_results"]["recovery"] == {
+        "subsequent_publication_succeeds": True,
+        "worker_exit_code": 86,
+        "worker_pid": 42_424,
+    }
+    assert (
+        detail["measurement_record_digest"]
+        == __import__("hashlib").sha256(artifact.measurements_path.read_bytes()).hexdigest()
+    )
+    runs = artifact.invocation_root / "runs"
+    assert not runs.exists() or not any(path.is_file() for path in runs.rglob("*"))
+
+
+def test_detail_stream_rejects_canonical_tampering(
+    tmp_path: Path,
+) -> None:
+    artifact = qualification.run_qualification(
+        _config(tmp_path, run_id="detail-tamper"),
+        environment=_environment(),
+        adapter_loader=lambda _: _FakeAdapter("A"),
+    )
+    detail = json.loads(artifact.details_path.read_text(encoding="utf-8"))
+    detail["outcome"] = "failed"
+    artifact.details_path.write_bytes(shared.canonical_json_bytes(detail))
+
+    with pytest.raises(
+        qualification.QualificationContractError,
+        match="wrong detail digest",
+    ):
+        qualification.load_execution_details(artifact.details_path)
+
+
+def test_detail_stream_rejects_oversize_oracle_and_cleans_run_root(
+    tmp_path: Path,
+) -> None:
+    class OversizeAdapter(_FakeAdapter):
+        def execute(self, request: Any) -> Any:
+            (request.run_root / "ephemeral.sqlite").write_bytes(b"synthetic")
+            result = super().execute(request)
+            return replace(
+                result,
+                oracle_results={"value": "x" * (qualification.MAX_DETAIL_STRING_BYTES + 1)},
+            )
+
+    config = _config(tmp_path, run_id="detail-oversize")
+    with pytest.raises(
+        qualification.QualificationContractError,
+        match="string exceeds bounded capacity",
+    ):
+        qualification.run_qualification(
+            config,
+            environment=_environment(),
+            adapter_loader=lambda _: OversizeAdapter("A"),
+        )
+
+    runs = tmp_path / config.run_id / "runs"
+    assert not runs.exists() or not any(path.is_file() for path in runs.rglob("*"))
+
+
+@pytest.mark.parametrize(
+    ("oracle_results", "message"),
+    [
+        ({"api_key": "sk-synthetic-placeholder"}, "safe structural evidence"),
+        ({"artifact": "/private/tmp/candidate.sqlite"}, "machine-specific path"),
+    ],
+)
+def test_detail_stream_rejects_secret_like_or_machine_specific_values(
+    tmp_path: Path,
+    oracle_results: dict[str, str],
+    message: str,
+) -> None:
+    class UnsafeAdapter(_FakeAdapter):
+        def execute(self, request: Any) -> Any:
+            return replace(super().execute(request), oracle_results=oracle_results)
+
+    run_id = f"unsafe-{len(list(tmp_path.iterdir()))}"
+    with pytest.raises(qualification.QualificationContractError, match=message):
+        qualification.run_qualification(
+            _config(tmp_path, run_id=run_id),
+            environment=_environment(),
+            adapter_loader=lambda _: UnsafeAdapter("A"),
+        )
+
+
+def test_detail_execution_count_is_bounded_before_output_is_created(
+    tmp_path: Path,
+) -> None:
+    config = _config(
+        tmp_path,
+        run_id="too-many-details",
+        repetitions=qualification.MAX_DETAIL_RECORDS + 1,
+    )
+
+    with pytest.raises(
+        qualification.QualificationContractError,
+        match="bounded detail capacity",
+    ):
+        qualification.run_qualification(
+            config,
+            environment=_environment(),
+            adapter_loader=lambda _: _FakeAdapter("A"),
+        )
+
+    assert not (tmp_path / config.run_id).exists()
 
 
 def test_runner_has_no_production_imports() -> None:

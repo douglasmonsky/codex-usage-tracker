@@ -37,12 +37,24 @@ MAX_TEXT_LENGTH = 2_048
 
 _CANDIDATE_IDS = ("A", "C", "D")
 _SCALE_ORDER = ("standard", "production", "growth")
-_SCALE_MODEL_CALLS = {
+_FIXTURE_ORDER = ("tiny", *_SCALE_ORDER)
+_FIXTURE_MODEL_CALLS = {
+    "tiny": 102,
     "standard": 100_000,
     "production": 1_316_864,
     "growth": 2_500_000,
 }
 _SCORE_DIMENSIONS = tuple(sorted(dimension.value for dimension in shared.ScoreDimension))
+SCORE_FORMULA_IDS = {
+    shared.ScoreDimension.COLD_BUILD.value: "ck04.score.cold-build-expansion-p95.v1",
+    shared.ScoreDimension.CRASH_RECOVERY.value: "ck04.score.crash-recovery-lifecycle.v1",
+    shared.ScoreDimension.EVIDENCE_STABILITY.value: "ck04.score.evidence-selector-cost.v1",
+    shared.ScoreDimension.OPERABILITY.value: "ck04.score.implementation-operability.v1",
+    shared.ScoreDimension.ORDINARY_TAIL.value: "ck04.score.ordinary-tail-write-amplification.v1",
+    shared.ScoreDimension.QUERY_EFFICIENCY.value: "ck04.score.query-mcp-payload-efficiency.v1",
+    shared.ScoreDimension.STORAGE.value: "ck04.score.database-index-wal-bytes.v1",
+}
+SCORE_FORMULA_CONTRACT_SHA256 = shared.canonical_sha256(SCORE_FORMULA_IDS)
 _REQUIRED_QUESTION_IDS = frozenset(shared.P1_QUESTION_IDS) | frozenset(
     shared.REQUIRED_SLICE_QUESTION_IDS
 )
@@ -71,8 +83,10 @@ _SECRET_VALUE = re.compile(
 _SECRET_ENVIRONMENT_PARTS = ("CREDENTIAL", "KEY", "PASSWORD", "SECRET", "TOKEN")
 _SHELL_PROGRAMS = frozenset({"bash", "dash", "fish", "sh", "zsh"})
 _WORKLOAD_PLACEHOLDERS = frozenset({"{python}", "{fixture_root}", "{output_root}"})
-_PLAN_COUNTER_FIELDS = frozenset(
-    {"automatic_indexes", "full_scans", "sql_statements", "temporary_sorts"}
+_APPROVED_PLAN_COUNTER_FIELDS = frozenset({"automatic_indexes", "full_scans", "temporary_sorts"})
+_OBSERVED_PLAN_COUNTER_FIELDS = frozenset({*_APPROVED_PLAN_COUNTER_FIELDS, "sql_statements"})
+_UNAVAILABLE_REASON_CODES = frozenset(
+    {"host_does_not_report", "telemetry_not_exposed", "tooling_does_not_report"}
 )
 
 _ARTIFACT_SPECS = {
@@ -202,8 +216,10 @@ class _ArtifactIndex:
 @dataclass(frozen=True)
 class _FixtureIdentity:
     fixture_id: str
-    manifest_sha256: str
-    oracle_sha256: str
+    manifest_artifact_sha256: str
+    manifest_semantic_sha256: str
+    oracle_artifact_sha256: str
+    oracle_semantic_sha256: str
 
 
 @dataclass(frozen=True)
@@ -389,7 +405,7 @@ def _validate_manifest(payload: Mapping[str, object]) -> None:
         candidates,
         qualification_runs,
     )
-    _validate_agent_perf(
+    agent_perf_unavailable = _validate_agent_perf(
         document["agent_perf"],
         artifacts,
         fixtures,
@@ -397,15 +413,18 @@ def _validate_manifest(payload: Mapping[str, object]) -> None:
         workload_matrix_sha256=workload.matrix_sha256,
         selected_candidate=selected_candidate,
     )
-    dbhub_tokens_unavailable = _validate_dbhub(
+    dbhub_unavailable = _validate_dbhub(
         document["dbhub"],
         artifacts,
         qualification_runs,
     )
-    _validate_limitations(
+    _validate_telemetry_limitations(
         document["limitations"],
         artifacts,
-        require_dbhub_token_limitation=dbhub_tokens_unavailable,
+        required_telemetry_limitations={
+            *agent_perf_unavailable,
+            *dbhub_unavailable,
+        },
     )
     artifacts.require_all_used()
 
@@ -622,7 +641,7 @@ def _validate_fixtures(
     value: object,
     artifacts: _ArtifactIndex,
 ) -> Mapping[str, _FixtureIdentity]:
-    rows = _list(value, "$.fixtures", minimum=3, maximum=3)
+    rows = _list(value, "$.fixtures", minimum=4, maximum=4)
     fixture_ids: list[str] = []
     fixtures: dict[str, _FixtureIdentity] = {}
     for index, row in enumerate(rows):
@@ -633,8 +652,10 @@ def _validate_fixtures(
             {
                 "fixture_id",
                 "fixture_revision",
+                "manifest_semantic_sha256",
                 "manifest_input_id",
                 "model_calls",
+                "oracle_semantic_sha256",
                 "oracle_input_id",
                 "source_bytes",
                 "source_records",
@@ -642,7 +663,7 @@ def _validate_fixtures(
         )
         fixture_id = _identifier(fixture["fixture_id"], f"{context}.fixture_id")
         fixture_ids.append(fixture_id)
-        if fixture_id not in _SCALE_MODEL_CALLS:
+        if fixture_id not in _FIXTURE_MODEL_CALLS:
             raise DecisionEvidenceContractError(f"{context}.fixture_id is unsupported")
         if fixture["fixture_revision"] != shared.FIXTURE_REVISION:
             raise DecisionEvidenceContractError(
@@ -654,7 +675,7 @@ def _validate_fixtures(
                 f"{context}.model_calls",
                 minimum=1,
             )
-            != _SCALE_MODEL_CALLS[fixture_id]
+            != _FIXTURE_MODEL_CALLS[fixture_id]
         ):
             raise DecisionEvidenceContractError(
                 f"{context}.model_calls does not match the required scale"
@@ -675,12 +696,20 @@ def _validate_fixtures(
         )
         fixtures[fixture_id] = _FixtureIdentity(
             fixture_id=fixture_id,
-            manifest_sha256=manifest.canonical_sha256,
-            oracle_sha256=oracle.canonical_sha256,
+            manifest_artifact_sha256=manifest.canonical_sha256,
+            manifest_semantic_sha256=_sha256(
+                fixture["manifest_semantic_sha256"],
+                f"{context}.manifest_semantic_sha256",
+            ),
+            oracle_artifact_sha256=oracle.canonical_sha256,
+            oracle_semantic_sha256=_sha256(
+                fixture["oracle_semantic_sha256"],
+                f"{context}.oracle_semantic_sha256",
+            ),
         )
-    if tuple(fixture_ids) != _SCALE_ORDER:
+    if tuple(fixture_ids) != _FIXTURE_ORDER:
         raise DecisionEvidenceContractError(
-            "$.fixtures must be ordered standard, production, growth"
+            "$.fixtures must be ordered tiny, standard, production, growth"
         )
     return fixtures
 
@@ -863,6 +892,7 @@ def _validate_candidates(
             {
                 "candidate_id",
                 "eligible",
+                "evaluation_status",
                 "failures",
                 "qualification_run_ids",
                 "score_inputs",
@@ -872,6 +902,13 @@ def _validate_candidates(
         candidate_id = _candidate_id(candidate["candidate_id"], f"{context}.candidate_id")
         candidate_ids.append(candidate_id)
         eligible = _boolean(candidate["eligible"], f"{context}.eligible")
+        expected_evaluation_status = (
+            "eligible_for_scoring" if eligible else "eliminated_before_scoring"
+        )
+        if candidate["evaluation_status"] != expected_evaluation_status:
+            raise DecisionEvidenceContractError(
+                f"{context}.evaluation_status differs from eligibility"
+            )
         run_ids = _string_list(
             candidate["qualification_run_ids"],
             f"{context}.qualification_run_ids",
@@ -902,6 +939,7 @@ def _validate_candidates(
             candidate_id=candidate_id,
             code_commit=code_commit,
             candidate_case_ids=candidate_case_ids,
+            eligible=eligible,
             context=f"{context}.score_inputs",
         )
         score_results = _validate_score_results(
@@ -1057,8 +1095,12 @@ def _validate_score_inputs(
     candidate_id: str,
     code_commit: str,
     candidate_case_ids: set[str],
+    eligible: bool,
     context: str,
 ) -> Mapping[str, shared.CandidateScoreInput]:
+    if not eligible:
+        _list(value, context, minimum=0, maximum=0)
+        return {}
     rows = _list(value, context, minimum=3, maximum=3)
     scales: list[str] = []
     score_inputs: dict[str, shared.CandidateScoreInput] = {}
@@ -1067,7 +1109,13 @@ def _validate_score_inputs(
         score = _object(
             row,
             item_context,
-            {"dimensions", "fixture_id", "input_sha256", "scale"},
+            {
+                "dimensions",
+                "fixture_id",
+                "formula_contract_sha256",
+                "input_sha256",
+                "scale",
+            },
         )
         scale = _identifier(score["scale"], f"{item_context}.scale")
         fixture_id = _identifier(score["fixture_id"], f"{item_context}.fixture_id")
@@ -1076,6 +1124,14 @@ def _validate_score_inputs(
                 f"{item_context} scale and fixture_id must identify the same required scale"
             )
         scales.append(scale)
+        if (
+            _sha256(
+                score["formula_contract_sha256"],
+                f"{item_context}.formula_contract_sha256",
+            )
+            != SCORE_FORMULA_CONTRACT_SHA256
+        ):
+            raise DecisionEvidenceContractError(f"{item_context}.formula_contract_sha256 is stale")
         dimensions = _list(
             score["dimensions"],
             f"{item_context}.dimensions",
@@ -1089,7 +1145,7 @@ def _validate_score_inputs(
             dimension = _object(
                 row_value,
                 dimension_context,
-                {"dimension", "source_case_ids", "value"},
+                {"dimension", "formula_id", "source_case_ids", "value"},
             )
             dimension_name = _text(
                 dimension["dimension"],
@@ -1099,6 +1155,10 @@ def _validate_score_inputs(
             if dimension_name not in _SCORE_DIMENSIONS:
                 raise DecisionEvidenceContractError(f"{dimension_context}.dimension is unsupported")
             dimension_names.append(dimension_name)
+            if dimension["formula_id"] != SCORE_FORMULA_IDS[dimension_name]:
+                raise DecisionEvidenceContractError(
+                    f"{dimension_context}.formula_id differs from frozen scoring formula"
+                )
             source_case_ids = _string_list(
                 dimension["source_case_ids"],
                 f"{dimension_context}.source_case_ids",
@@ -1135,8 +1195,8 @@ def _validate_score_inputs(
         fixture = fixtures[fixture_id]
         score_input = shared.CandidateScoreInput(
             candidate_id=candidate_id,
-            fixture_manifest_digest=fixture.manifest_sha256,
-            fixture_oracle_digest=fixture.oracle_sha256,
+            fixture_manifest_digest=fixture.manifest_semantic_sha256,
+            fixture_oracle_digest=fixture.oracle_semantic_sha256,
             code_commit=code_commit,
             scale=scale,
             costs=tuple(costs),
@@ -1160,6 +1220,13 @@ def _validate_score_results(
     eligible: bool,
     context: str,
 ) -> Mapping[str, Mapping[str, Any]]:
+    if not eligible:
+        if score_inputs:
+            raise DecisionEvidenceContractError(
+                f"{context} eliminated candidate unexpectedly has score inputs"
+            )
+        _list(value, context, minimum=0, maximum=0)
+        return {}
     rows = _list(value, context, minimum=3, maximum=3)
     scales: list[str] = []
     results: dict[str, Mapping[str, Any]] = {}
@@ -1199,33 +1266,6 @@ def _validate_score_results(
                     maximum=Decimal(100),
                 )
             )
-        elif status == "eliminated":
-            result = _object(
-                row,
-                item_context,
-                {
-                    "elimination_failure_ids",
-                    "input_sha256",
-                    "output_artifact_id",
-                    "scale",
-                    "status",
-                },
-            )
-            if eligible:
-                raise DecisionEvidenceContractError(
-                    f"{item_context} eligible candidate cannot be eliminated"
-                )
-            recorded_failure_ids = _string_list(
-                result["elimination_failure_ids"],
-                f"{item_context}.elimination_failure_ids",
-                minimum=1,
-                maximum=32,
-                item_maximum=128,
-            )
-            if tuple(recorded_failure_ids) != failure_ids:
-                raise DecisionEvidenceContractError(
-                    f"{item_context}.elimination_failure_ids is stale"
-                )
         else:
             raise DecisionEvidenceContractError(f"{item_context}.status is unsupported")
         scale = _identifier(result["scale"], f"{item_context}.scale")
@@ -1279,7 +1319,7 @@ def _validate_sensitivity(
         scales.append(scale)
         if (
             _integer(sensitivity["model_calls"], f"{context}.model_calls", minimum=1)
-            != _SCALE_MODEL_CALLS[scale]
+            != _FIXTURE_MODEL_CALLS[scale]
         ):
             raise DecisionEvidenceContractError(
                 f"{context}.model_calls does not match sensitivity scale"
@@ -1324,6 +1364,7 @@ def _validate_query_plans(
     qualification_runs: Mapping[str, _QualificationRun],
 ) -> None:
     rows = _list(value, "$.query_plans", minimum=1, maximum=MAX_QUERY_PLANS)
+    expected_cases = _query_case_contracts()
     case_ids: list[str] = []
     question_ids: set[str] = set()
     for index, row in enumerate(rows):
@@ -1352,20 +1393,44 @@ def _validate_query_plans(
         )
         case_id = _identifier(query["query_case_id"], f"{context}.query_case_id")
         case_ids.append(case_id)
-        question_id = _text(query["question_id"], f"{context}.question_id", maximum=16)
-        if not _QUESTION_ID.fullmatch(question_id) or question_id not in _REQUIRED_QUESTION_IDS:
-            raise DecisionEvidenceContractError(f"{context}.question_id is unsupported")
-        question_ids.add(question_id)
+        expected = expected_cases.get(case_id)
+        if expected is None:
+            raise DecisionEvidenceContractError(
+                f"{context}.query_case_id is absent from frozen query workload"
+            )
+        expected_question = expected["question_id"]
+        if expected_question is None:
+            if query["question_id"] is not None:
+                raise DecisionEvidenceContractError(
+                    f"{context}.question_id must be null for non-question feature case"
+                )
+        else:
+            question_id = _text(
+                query["question_id"],
+                f"{context}.question_id",
+                maximum=16,
+            )
+            if (
+                not _QUESTION_ID.fullmatch(question_id)
+                or question_id not in _REQUIRED_QUESTION_IDS
+                or question_id != expected_question
+            ):
+                raise DecisionEvidenceContractError(
+                    f"{context}.question_id differs from frozen query workload"
+                )
+            question_ids.add(question_id)
         plan_id = _identifier(query["plan_id"], f"{context}.plan_id")
         performance_class = _text(
             query["performance_class"],
             f"{context}.performance_class",
             maximum=4,
         )
-        expected_plan, expected_class = shared.QUESTION_WORKLOAD_CONTRACTS[question_id]
-        if (plan_id, performance_class) != (expected_plan, expected_class):
+        if (plan_id, performance_class) != (
+            expected["plan_id"],
+            expected["performance_class"],
+        ):
             raise DecisionEvidenceContractError(
-                f"{context} plan identity differs from frozen question workload"
+                f"{context} plan identity differs from frozen query workload"
             )
         fixture_id = _identifier(query["fixture_id"], f"{context}.fixture_id")
         if fixture_id not in fixtures:
@@ -1381,6 +1446,7 @@ def _validate_query_plans(
         _validate_plan_counts(
             query["approved_plan_counts"],
             query["observed_plan_counts"],
+            expected_approved=expected["approved_plan_counts"],
             context=context,
         )
         _integer(query["repetitions"], f"{context}.repetitions", minimum=5, maximum=100)
@@ -1413,6 +1479,13 @@ def _validate_query_plans(
             kinds=frozenset({"query_plan_measurements"}),
         )
     _require_ordered_unique(case_ids, "$.query_plans")
+    if tuple(case_ids) != tuple(expected_cases):
+        missing_cases = sorted(set(expected_cases) - set(case_ids))
+        extra_cases = sorted(set(case_ids) - set(expected_cases))
+        raise DecisionEvidenceContractError(
+            "query plan evidence differs from exact frozen query matrix; "
+            f"missing={missing_cases}, extra={extra_cases}"
+        )
     missing = sorted(_REQUIRED_QUESTION_IDS - question_ids)
     if missing:
         raise DecisionEvidenceContractError(
@@ -1420,24 +1493,58 @@ def _validate_query_plans(
         )
 
 
-def _validate_plan_counts(approved: object, observed: object, *, context: str) -> None:
+def _query_case_contracts() -> Mapping[str, Mapping[str, object]]:
+    matrix = shared.build_workload_matrix(physical_cores=1)
+    contracts: dict[str, Mapping[str, object]] = {}
+    for case in matrix.cases:
+        if case.group is not shared.WorkloadGroup.QUERY:
+            continue
+        contracts[case.case_id] = {
+            "approved_plan_counts": {
+                "automatic_indexes": int(case.parameter("maximum_automatic_indexes") or 0),
+                "full_scans": int(case.parameter("maximum_full_scans") or 0),
+                "temporary_sorts": int(case.parameter("maximum_temporary_sorts") or 0),
+            },
+            "performance_class": str(case.parameter("performance_class")),
+            "plan_id": str(case.parameter("plan_id")),
+            "question_id": case.parameter("question_id"),
+        }
+    return dict(sorted(contracts.items()))
+
+
+def _validate_plan_counts(
+    approved: object,
+    observed: object,
+    *,
+    expected_approved: object,
+    context: str,
+) -> None:
     approved_counts = _object(
         approved,
         f"{context}.approved_plan_counts",
-        _PLAN_COUNTER_FIELDS,
+        _APPROVED_PLAN_COUNTER_FIELDS,
     )
     observed_counts = _object(
         observed,
         f"{context}.observed_plan_counts",
-        _PLAN_COUNTER_FIELDS,
+        _OBSERVED_PLAN_COUNTER_FIELDS,
     )
-    for field_name in sorted(_PLAN_COUNTER_FIELDS):
+    expected_counts = _object(
+        expected_approved,
+        f"{context}.expected_plan_counts",
+        _APPROVED_PLAN_COUNTER_FIELDS,
+    )
+    for field_name in sorted(_APPROVED_PLAN_COUNTER_FIELDS):
         limit = _integer(
             approved_counts[field_name],
             f"{context}.approved_plan_counts.{field_name}",
             minimum=0,
             maximum=1_000_000,
         )
+        if limit != expected_counts[field_name]:
+            raise DecisionEvidenceContractError(
+                f"{context}.approved_plan_counts.{field_name} differs from frozen workload contract"
+            )
         actual = _integer(
             observed_counts[field_name],
             f"{context}.observed_plan_counts.{field_name}",
@@ -1448,6 +1555,12 @@ def _validate_plan_counts(approved: object, observed: object, *, context: str) -
             raise DecisionEvidenceContractError(
                 f"{context}.observed_plan_counts.{field_name} exceeds approval"
             )
+    _integer(
+        observed_counts["sql_statements"],
+        f"{context}.observed_plan_counts.sql_statements",
+        minimum=0,
+        maximum=1_000_000,
+    )
 
 
 def _validate_crash_observations(
@@ -1494,13 +1607,17 @@ def _validate_crash_observations(
                 f"crash case duplicated for candidate {candidate_id}: {case_id}"
             )
         candidate_cases[candidate_id].add(case_id)
-        _qualification_case(
+        run = _qualification_case(
             observation["qualification_run_id"],
             case_id,
             qualification_runs,
             context=f"{context}.qualification_run_id",
             candidate_id=candidate_id,
         )
+        if run.fixture_id != "tiny":
+            raise DecisionEvidenceContractError(
+                f"{context} crash evidence must use the tiny fixture"
+            )
         mode = observation["mode"]
         if mode == "process_termination":
             boundary = _text(observation["boundary"], f"{context}.boundary", maximum=64)
@@ -1561,29 +1678,10 @@ def _validate_process_termination(value: object, *, context: str) -> None:
     process = _object(
         value,
         f"{context}.process",
-        {
-            "boundary_reached",
-            "exit_kind",
-            "return_code",
-            "signal",
-            "status",
-            "termination_observed",
-            "worker_pid",
-            "worker_started",
-        },
+        {"status", "termination_observed"},
     )
     if process["status"] != "observed":
         raise DecisionEvidenceContractError(f"{context}.process.status must be observed")
-    if _boolean(process["worker_started"], f"{context}.process.worker_started") is not True:
-        raise DecisionEvidenceContractError(f"{context}.process worker start was not observed")
-    if (
-        _boolean(
-            process["boundary_reached"],
-            f"{context}.process.boundary_reached",
-        )
-        is not True
-    ):
-        raise DecisionEvidenceContractError(f"{context}.process boundary was not observed")
     if (
         _boolean(
             process["termination_observed"],
@@ -1594,28 +1692,6 @@ def _validate_process_termination(value: object, *, context: str) -> None:
         raise DecisionEvidenceContractError(
             f"{context}.process termination was asserted rather than observed"
         )
-    _integer(process["worker_pid"], f"{context}.process.worker_pid", minimum=1)
-    return_code = _integer(
-        process["return_code"],
-        f"{context}.process.return_code",
-        minimum=-255,
-        maximum=255,
-    )
-    if return_code == 0:
-        raise DecisionEvidenceContractError(
-            f"{context}.process return code does not prove termination"
-        )
-    exit_kind = process["exit_kind"]
-    if exit_kind == "signal":
-        if process["signal"] not in {"SIGKILL", "SIGTERM"}:
-            raise DecisionEvidenceContractError(f"{context}.process signal is unsupported")
-    elif exit_kind == "forced_exit":
-        if process["signal"] is not None:
-            raise DecisionEvidenceContractError(
-                f"{context}.process forced_exit cannot claim a signal"
-            )
-    else:
-        raise DecisionEvidenceContractError(f"{context}.process exit_kind is unsupported")
 
 
 def _validate_recovery(value: object, *, context: str) -> None:
@@ -1625,11 +1701,8 @@ def _validate_recovery(value: object, *, context: str) -> None:
         {
             "abandoned_artifact_disposition",
             "candidate_publication_committed",
-            "post_recovery_query_sha256",
             "prior_publication_queryable",
-            "prior_publication_sha256",
             "rollback_available",
-            "rollback_publication_sha256",
             "sidecar_terminal_state",
             "subsequent_operation_succeeds",
         },
@@ -1647,16 +1720,6 @@ def _validate_recovery(value: object, *, context: str) -> None:
         recovery["candidate_publication_committed"],
         f"{context}.recovery.candidate_publication_committed",
     )
-    for field_name in (
-        "post_recovery_query_sha256",
-        "prior_publication_sha256",
-        "rollback_publication_sha256",
-    ):
-        _sha256(recovery[field_name], f"{context}.recovery.{field_name}")
-    if recovery["prior_publication_sha256"] != recovery["rollback_publication_sha256"]:
-        raise DecisionEvidenceContractError(
-            f"{context}.recovery rollback does not identify prior publication"
-        )
     _identifier(
         recovery["sidecar_terminal_state"],
         f"{context}.recovery.sidecar_terminal_state",
@@ -1675,10 +1738,11 @@ def _validate_agent_perf(
     *,
     workload_matrix_sha256: str,
     selected_candidate: str,
-) -> None:
+) -> set[str]:
     rows = _list(value, "$.agent_perf", minimum=1, maximum=3)
     candidate_ids: list[str] = []
     run_ids: set[str] = set()
+    unavailable: set[str] = set()
     for index, row in enumerate(rows):
         context = f"$.agent_perf[{index}]"
         evidence = _object(
@@ -1741,11 +1805,12 @@ def _validate_agent_perf(
             f"{context}.profiled_run.wall_time_ns",
             minimum=1,
         )
-        _integer(
+        if _validate_observed_integer(
             profiled_run["process_cpu_ns"],
             f"{context}.profiled_run.process_cpu_ns",
             minimum=1,
-        )
+        ):
+            unavailable.add("agent_perf.process_cpu")
         unprofiled = _list(
             evidence["unprofiled_runs"],
             f"{context}.unprofiled_runs",
@@ -1773,6 +1838,7 @@ def _validate_agent_perf(
     _require_ordered_unique(candidate_ids, "$.agent_perf")
     if selected_candidate not in candidate_ids:
         raise DecisionEvidenceContractError("Agent Perf evidence must include selected candidate")
+    return unavailable
 
 
 def _validate_agent_perf_workload(
@@ -1817,8 +1883,8 @@ def _validate_agent_perf_workload(
         raise DecisionEvidenceContractError(f"{context} must use exact CK-04 standard workload")
     standard = fixtures["standard"]
     if (
-        workload["fixture_manifest_digest"] != standard.manifest_sha256
-        or workload["fixture_oracle_digest"] != standard.oracle_sha256
+        workload["fixture_manifest_digest"] != standard.manifest_semantic_sha256
+        or workload["fixture_oracle_digest"] != standard.oracle_semantic_sha256
     ):
         raise DecisionEvidenceContractError(f"{context} fixture digests are stale")
     if (
@@ -1935,7 +2001,7 @@ def _validate_dbhub(
     value: object,
     artifacts: _ArtifactIndex,
     qualification_runs: Mapping[str, _QualificationRun],
-) -> bool:
+) -> set[str]:
     dbhub = _object(
         value,
         "$.dbhub",
@@ -1985,7 +2051,7 @@ def _validate_dbhub(
     combinations: set[tuple[str, str]] = set()
     sample_ids_seen: set[str] = set()
     result_identity: tuple[int, str] | None = None
-    tokens_unavailable = False
+    unavailable: set[str] = set()
     for index, row in enumerate(trials):
         context = f"$.dbhub.trials[{index}]"
         trial = _object(
@@ -2055,7 +2121,12 @@ def _validate_dbhub(
                 f"{sample_context}.process_cpu_ns",
                 minimum=1,
             )
-            _integer(sample["scanned_rows"], f"{sample_context}.scanned_rows", minimum=0)
+            if _validate_observed_integer(
+                sample["scanned_rows"],
+                f"{sample_context}.scanned_rows",
+                minimum=0,
+            ):
+                unavailable.add("dbhub.scanned_rows")
             _integer(
                 sample["sql_statements"],
                 f"{sample_context}.sql_statements",
@@ -2090,10 +2161,11 @@ def _validate_dbhub(
                     "DBHub routes did not return identical correct result"
                 )
         _require_ordered_unique(sample_ids, f"{context}.samples")
-        tokens_unavailable = (
-            _validate_model_tokens(trial["model_tokens"], context=f"{context}.model_tokens")
-            or tokens_unavailable
-        )
+        if _validate_model_tokens(
+            trial["model_tokens"],
+            context=f"{context}.model_tokens",
+        ):
+            unavailable.add("dbhub.model_tokens")
     _require_ordered_unique(trial_ids, "$.dbhub.trials")
     expected_combinations = {
         (model_class, mode)
@@ -2102,14 +2174,37 @@ def _validate_dbhub(
     }
     if combinations != expected_combinations:
         raise DecisionEvidenceContractError("DBHub four-trial matrix is incomplete")
-    return tokens_unavailable
+    return unavailable
+
+
+def _validate_observed_integer(
+    value: object,
+    context: str,
+    *,
+    minimum: int,
+) -> bool:
+    if not isinstance(value, dict):
+        raise DecisionEvidenceContractError(
+            f"{context} must be an observed/unavailable provenance object"
+        )
+    status = value.get("status")
+    if status == "observed":
+        measurement = _object(value, context, {"status", "value"})
+        _integer(measurement["value"], f"{context}.value", minimum=minimum)
+        return False
+    if status == "unavailable":
+        unavailable = _object(value, context, {"reason_code", "status"})
+        if unavailable["reason_code"] not in _UNAVAILABLE_REASON_CODES:
+            raise DecisionEvidenceContractError(f"{context}.reason_code is unsupported")
+        return True
+    raise DecisionEvidenceContractError(f"{context}.status is unsupported")
 
 
 def _validate_model_tokens(value: object, *, context: str) -> bool:
     if not isinstance(value, dict):
         raise DecisionEvidenceContractError(f"{context} must be an object")
     status = value.get("status")
-    if status == "available":
+    if status == "observed":
         tokens = _object(
             value,
             context,
@@ -2131,11 +2226,7 @@ def _validate_model_tokens(value: object, *, context: str) -> bool:
         return False
     if status == "unavailable":
         unavailable = _object(value, context, {"reason_code", "status"})
-        if unavailable["reason_code"] not in {
-            "host_does_not_report",
-            "telemetry_not_exposed",
-            "tooling_does_not_report",
-        }:
+        if unavailable["reason_code"] not in _UNAVAILABLE_REASON_CODES:
             raise DecisionEvidenceContractError(f"{context}.reason_code is unsupported")
         return True
     raise DecisionEvidenceContractError(f"{context}.status is unsupported")
@@ -2145,10 +2236,11 @@ def _validate_limitations(
     value: object,
     artifacts: _ArtifactIndex,
     *,
-    require_dbhub_token_limitation: bool,
+    required_telemetry_limitations: set[str],
 ) -> None:
     rows = _list(value, "$.limitations", minimum=1, maximum=MAX_LIMITATIONS)
     limitation_ids: list[str] = []
+    require_dbhub_token_limitation = "dbhub.model_tokens" in required_telemetry_limitations
     dbhub_token_limitation = False
     for index, row in enumerate(rows):
         context = f"$.limitations[{index}]"
@@ -2213,6 +2305,52 @@ def _validate_limitations(
     if require_dbhub_token_limitation and not dbhub_token_limitation:
         raise DecisionEvidenceContractError(
             "unavailable DBHub model tokens require explicit limitation"
+        )
+
+
+def _validate_telemetry_limitations(
+    value: object,
+    artifacts: _ArtifactIndex,
+    *,
+    required_telemetry_limitations: set[str],
+) -> None:
+    _validate_limitations(
+        value,
+        artifacts,
+        required_telemetry_limitations=required_telemetry_limitations,
+    )
+    rows = _list(value, "$.limitations", minimum=1, maximum=MAX_LIMITATIONS)
+    telemetry_limitations: set[str] = set()
+    for index, row in enumerate(rows):
+        context = f"$.limitations[{index}]"
+        limitation = _object(
+            row,
+            context,
+            {
+                "area",
+                "category",
+                "evidence_output_ids",
+                "limitation_id",
+                "owner_packet_ids",
+                "summary",
+            },
+        )
+        if limitation["category"] == "telemetry_unavailable":
+            telemetry_limitations.add(_identifier(limitation["area"], f"{context}.area"))
+    missing = sorted(required_telemetry_limitations - telemetry_limitations)
+    if missing:
+        raise DecisionEvidenceContractError(
+            "unavailable telemetry requires explicit limitations: " + ", ".join(missing)
+        )
+    optional_telemetry = {
+        "agent_perf.process_cpu",
+        "dbhub.model_tokens",
+        "dbhub.scanned_rows",
+    }
+    stale = sorted((telemetry_limitations & optional_telemetry) - required_telemetry_limitations)
+    if stale:
+        raise DecisionEvidenceContractError(
+            "telemetry limitation contradicts observed measurement: " + ", ".join(stale)
         )
 
 

@@ -54,6 +54,28 @@ def test_parser_worker_matrix_is_bounded_and_byte_identical(
         assert 0 <= stats.parser_parallel_efficiency_ppm <= 1_000_000
 
 
+def test_single_worker_streams_without_materializing_a_parsed_source(
+    fixture: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reject_materialization(*_args: object, **_kwargs: object) -> Any:
+        raise AssertionError("single-worker parsing materialized the source")
+
+    monkeypatch.setattr(ingest_module, "_parse_source", reject_materialization)
+
+    artifact = candidate_a.build_artifact(
+        fixture,
+        tmp_path / "candidate-a-streaming.sqlite",
+        parser_workers=1,
+    )
+
+    assert artifact.stats.parser_workers == 1
+    assert artifact.stats.parser_tasks_submitted == artifact.stats.source_files_parsed
+    assert artifact.stats.parser_worker_time_ns > 0
+    assert artifact.stats.parser_merge_time_ns > 0
+
+
 @pytest.mark.parametrize("parser_workers", (False, 0, 9))
 def test_parser_worker_count_fails_before_creating_sqlite(
     fixture: Any,

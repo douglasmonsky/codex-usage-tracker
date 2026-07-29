@@ -217,8 +217,34 @@ class _ParsedLine:
 class _ParsedSource:
     source_path: str
     source_bytes: int
-    lines: tuple[_ParsedLine, ...]
+    lines: tuple[_ParsedLine, ...] | _StreamingParsedLines
     worker_time_ns: int
+
+
+class _StreamingParsedLines(Iterator[_ParsedLine]):
+    """Time one-worker parsing while yielding each line directly to the writer."""
+
+    def __init__(
+        self,
+        source: shared.SourceArtifact,
+        source_rank: int,
+        stats: IngestStats,
+    ) -> None:
+        self._lines = _iter_source_lines(source, source_rank)
+        self._stats = stats
+        self.wall_time_ns = 0
+
+    def __iter__(self) -> _StreamingParsedLines:
+        return self
+
+    def __next__(self) -> _ParsedLine:
+        wall_started = time.perf_counter_ns()
+        worker_started = time.process_time_ns()
+        try:
+            return next(self._lines)
+        finally:
+            self._stats.parser_worker_time_ns += time.process_time_ns() - worker_started
+            self.wall_time_ns += time.perf_counter_ns() - wall_started
 
 
 def _drop_secondary_indexes(connection: sqlite3.Connection) -> tuple[str, ...]:
@@ -428,57 +454,59 @@ def _validate_parser_workers(parser_workers: int) -> None:
         raise ValueError(f"candidate A parser_workers must be between 1 and {_MAX_PARSER_WORKERS}")
 
 
-def _parse_source(
+def _iter_source_lines(
     source: shared.SourceArtifact,
     source_rank: int,
-) -> _ParsedSource:
-    started = time.process_time_ns()
+) -> Iterator[_ParsedLine]:
     source_path = source.relative_path.as_posix()
     body = source.absolute_path.read_bytes()
-    parsed_lines: list[_ParsedLine] = []
     byte_start = 0
     for ordinal, line in enumerate(body.splitlines(keepends=True)):
         byte_end = byte_start + len(line)
         try:
             record = json.loads(line)
         except json.JSONDecodeError:
-            parsed_lines.append(
-                _ParsedLine(
-                    record_type=None,
-                    payload=None,
-                    coordinate=None,
-                    record_ordinal=ordinal,
-                    byte_start=byte_start,
-                    byte_end=byte_end,
-                    diagnostic_code="malformed_json",
-                )
+            yield _ParsedLine(
+                record_type=None,
+                payload=None,
+                coordinate=None,
+                record_ordinal=ordinal,
+                byte_start=byte_start,
+                byte_end=byte_end,
+                diagnostic_code="malformed_json",
             )
             byte_start = byte_end
             continue
         if not isinstance(record, dict) or not isinstance(record.get("payload"), dict):
             raise ValueError(f"candidate A source record is invalid: {source_path}")
-        parsed_lines.append(
-            _ParsedLine(
-                record_type=str(record["type"]),
-                payload=record["payload"],
-                coordinate=_record_coordinate(
-                    source=source,
-                    source_rank=source_rank,
-                    record=record,
-                    ordinal=ordinal,
-                    byte_start=byte_start,
-                    byte_end=byte_end,
-                ),
-                record_ordinal=ordinal,
+        yield _ParsedLine(
+            record_type=str(record["type"]),
+            payload=record["payload"],
+            coordinate=_record_coordinate(
+                source=source,
+                source_rank=source_rank,
+                record=record,
+                ordinal=ordinal,
                 byte_start=byte_start,
                 byte_end=byte_end,
-            )
+            ),
+            record_ordinal=ordinal,
+            byte_start=byte_start,
+            byte_end=byte_end,
         )
         byte_start = byte_end
+
+
+def _parse_source(
+    source: shared.SourceArtifact,
+    source_rank: int,
+) -> _ParsedSource:
+    started = time.process_time_ns()
+    parsed_lines = tuple(_iter_source_lines(source, source_rank))
     return _ParsedSource(
-        source_path=source_path,
+        source_path=source.relative_path.as_posix(),
         source_bytes=source.byte_count,
-        lines=tuple(parsed_lines),
+        lines=parsed_lines,
         worker_time_ns=time.process_time_ns() - started,
     )
 
@@ -510,12 +538,16 @@ def _iter_parsed_sources(
         for source in sources:
             stats.parser_tasks_submitted += 1
             stats.parser_peak_pending = 1
-            parsed = _parse_source(
-                source,
-                ranks[source.relative_path.as_posix()],
+            yield _ParsedSource(
+                source_path=source.relative_path.as_posix(),
+                source_bytes=source.byte_count,
+                lines=_StreamingParsedLines(
+                    source,
+                    ranks[source.relative_path.as_posix()],
+                    stats,
+                ),
+                worker_time_ns=0,
             )
-            stats.parser_worker_time_ns += parsed.worker_time_ns
-            yield parsed
         return
 
     queue_capacity = min(
@@ -1339,6 +1371,8 @@ def build_artifact(
                     if inserted == 0 and updated == 0:
                         stats.facts_unchanged += 1
             stats.parser_merge_time_ns += time.perf_counter_ns() - merge_started
+            if isinstance(parsed_source.lines, _StreamingParsedLines):
+                stats.parser_merge_time_ns -= parsed_source.lines.wall_time_ns
         stats.parser_pipeline_time_ns = time.perf_counter_ns() - parser_pipeline_started
         stats.parser_parallel_efficiency_ppm = min(
             1_000_000,

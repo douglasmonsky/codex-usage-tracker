@@ -79,21 +79,24 @@ def _fixture_rows() -> tuple[list[dict[str, object]], dict[str, tuple[str, str]]
     rows: list[dict[str, object]] = []
     digests: dict[str, tuple[str, str]] = {}
     for scale, model_calls in (
+        ("tiny", 102),
         ("standard", 100_000),
         ("production", 1_316_864),
         ("growth", 2_500_000),
     ):
         manifest_id = f"fixture.{scale}.manifest"
         oracle_id = f"fixture.{scale}.oracle"
-        manifest_digest = _hash(manifest_id)
-        oracle_digest = _hash(oracle_id)
+        manifest_digest = _hash(f"{manifest_id}.semantic")
+        oracle_digest = _hash(f"{oracle_id}.semantic")
         digests[scale] = (manifest_digest, oracle_digest)
         rows.append(
             {
                 "fixture_id": scale,
                 "fixture_revision": shared.FIXTURE_REVISION,
+                "manifest_semantic_sha256": manifest_digest,
                 "manifest_input_id": manifest_id,
                 "model_calls": model_calls,
+                "oracle_semantic_sha256": oracle_digest,
                 "oracle_input_id": oracle_id,
                 "source_bytes": model_calls * 100,
                 "source_records": model_calls * 2,
@@ -105,27 +108,33 @@ def _fixture_rows() -> tuple[list[dict[str, object]], dict[str, tuple[str, str]]
 def _query_rows() -> tuple[list[dict[str, object]], list[str]]:
     rows: list[dict[str, object]] = []
     case_ids: list[str] = []
-    questions = sorted(set(shared.P1_QUESTION_IDS) | set(shared.REQUIRED_SLICE_QUESTION_IDS))
-    for question_id in questions:
-        plan_id, performance_class = shared.QUESTION_WORKLOAD_CONTRACTS[question_id]
-        case_id = f"query.{question_id.lower()}.warm_first_page"
+    matrix = shared.build_workload_matrix(physical_cores=10)
+    cases = sorted(
+        (case for case in matrix.cases if case.group is shared.WorkloadGroup.QUERY),
+        key=lambda case: case.case_id,
+    )
+    for case in cases:
+        case_id = case.case_id
+        question_id = case.parameter("question_id")
+        plan_id = str(case.parameter("plan_id"))
+        performance_class = str(case.parameter("performance_class"))
+        approved_plan_counts = {
+            "automatic_indexes": int(case.parameter("maximum_automatic_indexes") or 0),
+            "full_scans": int(case.parameter("maximum_full_scans") or 0),
+            "temporary_sorts": int(case.parameter("maximum_temporary_sorts") or 0),
+        }
         case_ids.append(case_id)
         rows.append(
             {
                 "answer_correct": True,
-                "approved_plan_counts": {
-                    "automatic_indexes": 0,
-                    "full_scans": 2,
-                    "sql_statements": 4,
-                    "temporary_sorts": 6,
-                },
+                "approved_plan_counts": approved_plan_counts,
                 "fixture_id": "standard",
                 "mcp_latency_p95_ns": 50_000_000,
                 "observed_plan_counts": {
-                    "automatic_indexes": 0,
-                    "full_scans": 1,
+                    "automatic_indexes": approved_plan_counts["automatic_indexes"],
+                    "full_scans": approved_plan_counts["full_scans"],
                     "sql_statements": 2,
-                    "temporary_sorts": 1,
+                    "temporary_sorts": approved_plan_counts["temporary_sorts"],
                 },
                 "oracle_equivalent": True,
                 "output_artifact_id": "query.measurements",
@@ -146,7 +155,6 @@ def _query_rows() -> tuple[list[dict[str, object]], list[str]]:
 def _crash_rows() -> tuple[list[dict[str, object]], list[str]]:
     rows: list[dict[str, object]] = []
     case_ids: list[str] = []
-    prior_digest = _hash("prior-publication")
     for boundary in shared.CRASH_BOUNDARIES:
         case_id = f"crash.terminate.{boundary}"
         case_ids.append(case_id)
@@ -160,24 +168,15 @@ def _crash_rows() -> tuple[list[dict[str, object]], list[str]]:
                 "observation_id": f"A.{case_id}",
                 "output_artifact_id": "crash.measurements",
                 "process": {
-                    "boundary_reached": True,
-                    "exit_kind": "forced_exit",
-                    "return_code": 97,
-                    "signal": None,
                     "status": "observed",
                     "termination_observed": True,
-                    "worker_pid": 1234,
-                    "worker_started": True,
                 },
-                "qualification_run_id": "run.standard",
+                "qualification_run_id": "run.crash",
                 "recovery": {
                     "abandoned_artifact_disposition": "abandon_candidate",
                     "candidate_publication_committed": False,
-                    "post_recovery_query_sha256": _hash(f"query-{boundary}"),
                     "prior_publication_queryable": True,
-                    "prior_publication_sha256": prior_digest,
                     "rollback_available": True,
-                    "rollback_publication_sha256": prior_digest,
                     "sidecar_terminal_state": "failed",
                     "subsequent_operation_succeeds": True,
                 },
@@ -196,15 +195,12 @@ def _crash_rows() -> tuple[list[dict[str, object]], list[str]]:
                 "observation_id": f"A.{case_id}",
                 "output_artifact_id": "crash.measurements",
                 "process": {"status": "not_applicable"},
-                "qualification_run_id": "run.standard",
+                "qualification_run_id": "run.crash",
                 "recovery": {
                     "abandoned_artifact_disposition": "abandon_candidate",
                     "candidate_publication_committed": False,
-                    "post_recovery_query_sha256": _hash(f"query-{fault}"),
                     "prior_publication_queryable": True,
-                    "prior_publication_sha256": prior_digest,
                     "rollback_available": True,
-                    "rollback_publication_sha256": prior_digest,
                     "sidecar_terminal_state": "failed",
                     "subsequent_operation_succeeds": True,
                 },
@@ -224,6 +220,7 @@ def _score_input(
     dimensions = [
         {
             "dimension": dimension.value,
+            "formula_id": decision_evidence.SCORE_FORMULA_IDS[dimension.value],
             "source_case_ids": [case_id],
             "value": str(base_value),
         }
@@ -248,6 +245,7 @@ def _score_input(
     return {
         "dimensions": dimensions,
         "fixture_id": scale,
+        "formula_contract_sha256": decision_evidence.SCORE_FORMULA_CONTRACT_SHA256,
         "input_sha256": score.digest,
         "scale": scale,
     }
@@ -288,10 +286,15 @@ def _candidate_rows(
         ],
     }
     for candidate_id in ("A", "C", "D"):
-        score_inputs = [
-            _score_input(candidate_id, scale, fixture_digests, code_commit)
-            for scale in ("standard", "production", "growth")
-        ]
+        eligible = candidate_id == "A"
+        score_inputs = (
+            [
+                _score_input(candidate_id, scale, fixture_digests, code_commit)
+                for scale in ("standard", "production", "growth")
+            ]
+            if eligible
+            else []
+        )
         score_results: list[dict[str, object]] = []
         for score_input in score_inputs:
             common = {
@@ -299,29 +302,24 @@ def _candidate_rows(
                 "output_artifact_id": "score.results",
                 "scale": score_input["scale"],
             }
-            if candidate_id == "A":
-                score_results.append(
-                    {
-                        **common,
-                        "rank": 1,
-                        "status": "ranked",
-                        "weighted_score": "100",
-                    }
-                )
-            else:
-                score_results.append(
-                    {
-                        **common,
-                        "elimination_failure_ids": [str(failures[candidate_id][0]["failure_id"])],
-                        "status": "eliminated",
-                    }
-                )
+            score_results.append(
+                {
+                    **common,
+                    "rank": 1,
+                    "status": "ranked",
+                    "weighted_score": "100",
+                }
+            )
         rows.append(
             {
                 "candidate_id": candidate_id,
-                "eligible": candidate_id == "A",
+                "eligible": eligible,
+                "evaluation_status": (
+                    "eligible_for_scoring" if eligible else "eliminated_before_scoring"
+                ),
                 "failures": failures[candidate_id],
                 "qualification_run_ids": [
+                    "run.crash",
                     "run.growth",
                     "run.production",
                     "run.standard",
@@ -384,7 +382,10 @@ def _dbhub_trials() -> list[dict[str, object]]:
                     "result_rows": 25,
                     "result_sha256": result_digest,
                     "sample_id": f"{trial_id}.{index:02d}",
-                    "scanned_rows": 25,
+                    "scanned_rows": {
+                        "reason_code": "tooling_does_not_report",
+                        "status": "unavailable",
+                    },
                     "sql_statements": 2 if mode == "generic" else 1,
                     "wall_time_ns": 4_000_000 + index,
                 }
@@ -421,7 +422,6 @@ def _valid_manifest() -> dict[str, Any]:
             "agent_perf.standard_cpu_attribution",
             "build.scale.standard",
             *query_case_ids,
-            *crash_case_ids,
             *(
                 f"dbhub.{mode}.{model_class}"
                 for model_class in shared.DBHUB_MODEL_CLASSES
@@ -430,6 +430,19 @@ def _valid_manifest() -> dict[str, Any]:
         }
     )
     runs = [
+        {
+            "candidate_ids": ["A", "C", "D"],
+            "case_ids": sorted(crash_case_ids),
+            "case_ids_sha256": shared.canonical_sha256(sorted(crash_case_ids)),
+            "fixture_id": "tiny",
+            "invocation_input_id": "qualification.crash.invocation",
+            "measurements_output_id": "qualification.crash.measurements",
+            "profiled": False,
+            "repetitions": 1,
+            "run_id": "run.crash",
+            "speed_claim": False,
+            "summary_output_id": "qualification.crash.summary",
+        },
         {
             "candidate_ids": ["A", "C", "D"],
             "case_ids": ["build.scale.growth"],
@@ -475,9 +488,9 @@ def _valid_manifest() -> dict[str, Any]:
             _artifact(
                 f"fixture.{scale}.{kind}",
                 f"fixture_{kind}",
-                fixture_digests[scale][0 if kind == "manifest" else 1],
+                _hash(f"fixture.{scale}.{kind}.file"),
             )
-            for scale in ("standard", "production", "growth")
+            for scale in ("tiny", "standard", "production", "growth")
             for kind in ("manifest", "oracle")
         ),
         _artifact(
@@ -486,6 +499,11 @@ def _valid_manifest() -> dict[str, Any]:
             shared.canonical_sha256(agent_workload),
         ),
         _artifact("dbhub.invocation", "dbhub_invocation", _hash("dbhub-invocation")),
+        _artifact(
+            "qualification.crash.invocation",
+            "qualification_invocation",
+            _hash("qualification-crash-invocation"),
+        ),
         *(
             _artifact(
                 f"qualification.{scale}.invocation",
@@ -504,6 +522,12 @@ def _valid_manifest() -> dict[str, Any]:
         ),
         _artifact("crash.measurements", "crash_measurements", _hash("crash")),
         _artifact("dbhub.measurements", "dbhub_measurements", _hash("dbhub")),
+        _artifact(
+            "qualification.crash.measurements",
+            "qualification_measurements",
+            _hash("qualification-crash-measurements"),
+            record_count=75,
+        ),
         *(
             _artifact(
                 f"qualification.{scale}.measurements",
@@ -512,6 +536,11 @@ def _valid_manifest() -> dict[str, Any]:
                 record_count=15,
             )
             for scale in ("standard", "production", "growth")
+        ),
+        _artifact(
+            "qualification.crash.summary",
+            "qualification_summary",
+            _hash("qualification-crash-summary"),
         ),
         *(
             _artifact(
@@ -549,7 +578,10 @@ def _valid_manifest() -> dict[str, Any]:
                 ],
                 "measurements_output_id": "agent-perf.measurements",
                 "profiled_run": {
-                    "process_cpu_ns": 9_000_000_000,
+                    "process_cpu_ns": {
+                        "reason_code": "tooling_does_not_report",
+                        "status": "unavailable",
+                    },
                     "run_id": "agent-perf.profiled",
                     "wall_time_ns": 9_746_000_000,
                 },
@@ -597,13 +629,29 @@ def _valid_manifest() -> dict[str, Any]:
         "fixtures": fixtures,
         "limitations": [
             {
+                "area": "agent_perf.process_cpu",
+                "category": "telemetry_unavailable",
+                "evidence_output_ids": ["agent-perf.measurements"],
+                "limitation_id": "agent-perf-process-cpu",
+                "owner_packet_ids": ["CK-04"],
+                "summary": "Profiler output did not expose process CPU time.",
+            },
+            {
                 "area": "dbhub.model_tokens",
                 "category": "telemetry_unavailable",
                 "evidence_output_ids": ["dbhub.measurements"],
                 "limitation_id": "dbhub-model-tokens",
                 "owner_packet_ids": ["CK-11"],
                 "summary": "Qualification host did not expose per-trial model token telemetry.",
-            }
+            },
+            {
+                "area": "dbhub.scanned_rows",
+                "category": "telemetry_unavailable",
+                "evidence_output_ids": ["dbhub.measurements"],
+                "limitation_id": "dbhub-scanned-rows",
+                "owner_packet_ids": ["CK-11"],
+                "summary": "DBHub did not expose rows scanned by SQLite.",
+            },
         ],
         "qualification_runs": runs,
         "query_plans": query_rows,
@@ -635,7 +683,9 @@ def _valid_manifest() -> dict[str, Any]:
         ],
         "workload": {
             "case_count": len(
-                set(standard_cases) | {"build.scale.production", "build.scale.growth"}
+                set(standard_cases)
+                | set(crash_case_ids)
+                | {"build.scale.production", "build.scale.growth"}
             ),
             "contract_version": shared.CANDIDATE_ADAPTER_CONTRACT_VERSION,
             "matrix_input_id": "workload.matrix",
@@ -765,6 +815,213 @@ def test_rejects_stale_score_hash_and_sensitivity_result() -> None:
         decision_evidence.build_manifest(stale_sensitivity)
 
 
+def test_fixture_file_hashes_and_signed_semantic_digests_are_distinct() -> None:
+    manifest = _valid_manifest()
+    standard = next(row for row in manifest["fixtures"] if row["fixture_id"] == "standard")
+    manifest_artifact = next(
+        row
+        for row in manifest["canonical_artifacts"]["inputs"]
+        if row["artifact_id"] == standard["manifest_input_id"]
+    )
+    assert manifest_artifact["canonical_sha256"] != standard["manifest_semantic_sha256"]
+    decision_evidence.build_manifest(manifest)
+
+    stale_workload = _valid_manifest()
+    standard = next(row for row in stale_workload["fixtures"] if row["fixture_id"] == "standard")
+    manifest_artifact = next(
+        row
+        for row in stale_workload["canonical_artifacts"]["inputs"]
+        if row["artifact_id"] == standard["manifest_input_id"]
+    )
+    stale_workload["agent_perf"][0]["workload"]["fixture_manifest_digest"] = manifest_artifact[
+        "canonical_sha256"
+    ]
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="fixture digests are stale",
+    ):
+        decision_evidence.build_manifest(stale_workload)
+
+
+def test_query_evidence_covers_exact_matrix_and_non_question_feature() -> None:
+    manifest = _valid_manifest()
+    assert len(manifest["query_plans"]) == 69
+    bounded = next(
+        row
+        for row in manifest["query_plans"]
+        if row["query_case_id"] == "query.feature.bounded_full_sort"
+    )
+    assert bounded["question_id"] is None
+    decision_evidence.build_manifest(manifest)
+
+    missing_case = _valid_manifest()
+    missing_case["query_plans"].pop()
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="exact frozen query matrix",
+    ):
+        decision_evidence.build_manifest(missing_case)
+
+    invented_question = _valid_manifest()
+    bounded = next(
+        row
+        for row in invented_question["query_plans"]
+        if row["query_case_id"] == "query.feature.bounded_full_sort"
+    )
+    bounded["question_id"] = "Q-OPS-04"
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="must be null",
+    ):
+        decision_evidence.build_manifest(invented_question)
+
+
+def test_only_frozen_planner_allowances_are_gated() -> None:
+    manifest = _valid_manifest()
+    manifest["query_plans"][0]["observed_plan_counts"]["sql_statements"] = 999
+    decision_evidence.build_manifest(manifest)
+
+    invented_allowance = _valid_manifest()
+    invented_allowance["query_plans"][0]["approved_plan_counts"]["sql_statements"] = 999
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="unsupported=.*sql_statements",
+    ):
+        decision_evidence.build_manifest(invented_allowance)
+
+    weakened_allowance = _valid_manifest()
+    weakened_allowance["query_plans"][0]["approved_plan_counts"]["full_scans"] = 1
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="differs from frozen workload contract",
+    ):
+        decision_evidence.build_manifest(weakened_allowance)
+
+
+def test_crash_evidence_uses_tiny_fixture_and_durable_observation_fields() -> None:
+    manifest = _valid_manifest()
+    crash_run = next(row for row in manifest["qualification_runs"] if row["run_id"] == "run.crash")
+    assert crash_run["fixture_id"] == "tiny"
+    decision_evidence.build_manifest(manifest)
+
+    wrong_fixture = _valid_manifest()
+    crash_run = next(
+        row for row in wrong_fixture["qualification_runs"] if row["run_id"] == "run.crash"
+    )
+    crash_run["fixture_id"] = "standard"
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="must use the tiny fixture",
+    ):
+        decision_evidence.build_manifest(wrong_fixture)
+
+    discarded_process_field = _valid_manifest()
+    termination = next(
+        row
+        for row in discarded_process_field["crash_observations"]
+        if row["mode"] == "process_termination"
+    )
+    termination["process"]["worker_pid"] = 1234
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="unsupported=.*worker_pid",
+    ):
+        decision_evidence.build_manifest(discarded_process_field)
+
+
+def test_optional_telemetry_requires_explicit_provenance_and_limitations() -> None:
+    observed_agent_cpu = _valid_manifest()
+    observed_agent_cpu["agent_perf"][0]["profiled_run"]["process_cpu_ns"] = {
+        "status": "observed",
+        "value": 9_000_000_000,
+    }
+    observed_agent_cpu["limitations"] = [
+        row for row in observed_agent_cpu["limitations"] if row["area"] != "agent_perf.process_cpu"
+    ]
+    decision_evidence.build_manifest(observed_agent_cpu)
+
+    bare_agent_cpu = _valid_manifest()
+    bare_agent_cpu["agent_perf"][0]["profiled_run"]["process_cpu_ns"] = 9_000_000_000
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="observed/unavailable provenance object",
+    ):
+        decision_evidence.build_manifest(bare_agent_cpu)
+
+    observed_scans = _valid_manifest()
+    for trial in observed_scans["dbhub"]["trials"]:
+        for sample in trial["samples"]:
+            sample["scanned_rows"] = {"status": "observed", "value": 25}
+    observed_scans["limitations"] = [
+        row for row in observed_scans["limitations"] if row["area"] != "dbhub.scanned_rows"
+    ]
+    decision_evidence.build_manifest(observed_scans)
+
+    bare_scans = _valid_manifest()
+    bare_scans["dbhub"]["trials"][0]["samples"][0]["scanned_rows"] = 25
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="observed/unavailable provenance object",
+    ):
+        decision_evidence.build_manifest(bare_scans)
+
+    observed_tokens = _valid_manifest()
+    for trial in observed_tokens["dbhub"]["trials"]:
+        trial["model_tokens"] = {
+            "cached_input_tokens": 100,
+            "input_tokens": 200,
+            "output_tokens": 50,
+            "reasoning_tokens": 25,
+            "status": "observed",
+        }
+    observed_tokens["limitations"] = [
+        row for row in observed_tokens["limitations"] if row["area"] != "dbhub.model_tokens"
+    ]
+    decision_evidence.build_manifest(observed_tokens)
+
+    legacy_token_status = _valid_manifest()
+    legacy_token_status["dbhub"]["trials"][0]["model_tokens"] = {
+        "cached_input_tokens": 100,
+        "input_tokens": 200,
+        "output_tokens": 50,
+        "reasoning_tokens": 25,
+        "status": "available",
+    }
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="status is unsupported",
+    ):
+        decision_evidence.build_manifest(legacy_token_status)
+
+
+def test_scoring_formula_and_eliminate_before_score_are_frozen() -> None:
+    manifest = _valid_manifest()
+    assert manifest["candidates"][1]["evaluation_status"] == "eliminated_before_scoring"
+    assert manifest["candidates"][1]["score_inputs"] == []
+    assert manifest["candidates"][1]["score_results"] == []
+    decision_evidence.build_manifest(manifest)
+
+    stale_formula = _valid_manifest()
+    stale_formula["candidates"][0]["score_inputs"][0]["dimensions"][0]["formula_id"] = (
+        "ck04.score.post-hoc.v1"
+    )
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="frozen scoring formula",
+    ):
+        decision_evidence.build_manifest(stale_formula)
+
+    fabricated_scores = _valid_manifest()
+    fabricated_scores["candidates"][1]["score_inputs"] = [
+        fabricated_scores["candidates"][0]["score_inputs"][0]
+    ]
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="between 0 and 0",
+    ):
+        decision_evidence.build_manifest(fabricated_scores)
+
+
 def test_rejects_stale_schema_and_agent_perf_workload_identity() -> None:
     stale_schema = _valid_manifest()
     stale_schema["schema_identity"]["production_contract_sha256"] = "0" * 64
@@ -835,6 +1092,6 @@ def test_unavailable_model_tokens_require_explicit_limitation() -> None:
     manifest["limitations"][0]["area"] = "other.measurement"
     with pytest.raises(
         decision_evidence.DecisionEvidenceContractError,
-        match="require explicit limitation",
+        match="explicit limitations",
     ):
         decision_evidence.build_manifest(manifest)
