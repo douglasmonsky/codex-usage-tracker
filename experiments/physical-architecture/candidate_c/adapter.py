@@ -361,6 +361,7 @@ def _execute_crash(
     result = {
         "boundary": observation.boundary,
         "fault": observation.fault,
+        "process_termination_observed": False,
         "prior_publication_queryable": observation.prior_publication_queryable,
         "candidate_publication_committed": observation.candidate_publication_committed,
         "subsequent_operation_succeeds": observation.subsequent_operation_succeeds,

@@ -421,6 +421,25 @@ def test_crash_driver_matches_all_boundaries_and_faults(tmp_path: Path) -> None:
         assert observed.subsequent_operation_succeeds is True
 
 
+@pytest.mark.parametrize(
+    "case_id",
+    ("crash.terminate.before_staging", "crash.fault.disk_full"),
+)
+def test_adapter_crash_evidence_does_not_claim_process_termination(
+    tmp_path: Path,
+    case_id: str,
+) -> None:
+    fixture = _fixture()
+    case = shared.build_workload_matrix(physical_cores=4).by_id(case_id)
+    request = _request(fixture=fixture, case=case, run_root=tmp_path / case_id)
+
+    result = shared.execute_candidate(candidate_c.Adapter(), request)
+
+    assert result.outcome is shared.RunOutcome.PASSED
+    assert result.oracle_results is not None
+    assert result.oracle_results["process_termination_observed"] is False
+
+
 def test_adapter_supports_each_mandatory_group_and_optional_staging(
     tmp_path: Path,
 ) -> None:
