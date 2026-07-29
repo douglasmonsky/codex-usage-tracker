@@ -139,9 +139,10 @@ The maintainer authorizes execution subagents for this roadmap:
 
 Use `rg` for exact paths, strings, routes, schema fields, and documentation
 claims. Use GitNexus first for unfamiliar cross-cutting architecture, execution
-flows, or impact. Use Serena for exact symbols, callers, references,
-diagnostics, and symbol-level edits. Do not repeat the same lookup across all
-three tools without a concrete uncertainty.
+flows, or impact. For exact symbols, callers, references, diagnostics, and
+edits, use GitNexus with native repository tools such as `rg`, the editor,
+type-checker diagnostics, and focused tests. Do not repeat the same lookup
+across tools without a concrete uncertainty.
 
 Before editing a function, class, or method, run upstream GitNexus impact and
 report any HIGH or CRITICAL blast radius. Before committing, rerun
