@@ -21,6 +21,22 @@ class SourceSpec:
     revision: str = "revision-1"
 
 
+def clustered_source_index(
+    ordinal: int,
+    *,
+    model_calls: int,
+    active_sources: int,
+) -> int:
+    """Map chronological call ordinals into contiguous active-source clusters."""
+    if model_calls <= 0:
+        raise ValueError("model_calls must be positive")
+    if active_sources <= 0:
+        raise ValueError("active_sources must be positive")
+    if ordinal < 0 or ordinal >= model_calls:
+        raise ValueError("ordinal outside model-call range")
+    return min(active_sources - 1, ordinal * active_sources // model_calls)
+
+
 def source_specs(profile: FixtureProfile) -> tuple[SourceSpec, ...]:
     """Return a stable source layout including every lifecycle edge case."""
 

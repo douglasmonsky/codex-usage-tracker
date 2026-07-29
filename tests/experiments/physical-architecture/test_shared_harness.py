@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import json
 import os
+import shutil
 import sqlite3
 import sys
 from dataclasses import replace
@@ -82,7 +83,7 @@ def test_fixture_ingestion_verifies_ck03_bytes_and_contract() -> None:
     assert fixture.seed == 20260728
     assert fixture.fixture_revision == "agent-kernel-structural-v1"
     assert fixture.manifest_digest == (
-        "a599cf149783af04d861699b0ff587a169f20dec4d372e4ffbe3f21c51995817"
+        "78003a7cfdee8beb1a263b3027fec162a612352be6fbefd13a65e821640bc7ae"
     )
     assert fixture.oracle_digest == (
         "9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b"
@@ -141,6 +142,66 @@ def test_fixture_ingestion_rejects_tampering_and_escaping_paths(
     )
 
     with pytest.raises(FixtureContractError, match="relative source path"):
+        load_fixture_bundle(fixture_root)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "missing_contract",
+        "missing_confidence",
+        "missing_hint",
+        "unknown_confidence",
+        "missing_trusted_hint",
+        "empty_trusted_range",
+        "unavailable_with_hint",
+        "underbounded_start",
+        "fabricated_no_timestamp",
+    ),
+)
+def test_fixture_ingestion_rejects_invalid_source_time_inventory(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    fixture_root = tmp_path / mutation
+    shutil.copytree(_TINY, fixture_root)
+    manifest_path = fixture_root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    source = manifest["sources"][0]
+    if mutation == "missing_contract":
+        manifest.pop("source_time_inventory")
+    elif mutation == "missing_confidence":
+        source.pop("time_range_confidence")
+    elif mutation == "missing_hint":
+        source.pop("time_range_hint")
+    elif mutation == "unknown_confidence":
+        source["time_range_confidence"] = "maybe"
+    elif mutation == "missing_trusted_hint":
+        source["time_range_hint"] = None
+    elif mutation == "empty_trusted_range":
+        source["time_range_hint"]["end_us"] = source["time_range_hint"]["start_us"]
+    elif mutation == "underbounded_start":
+        source["time_range_hint"]["start_us"] += 1
+    elif mutation == "fabricated_no_timestamp":
+        source = next(
+            entry
+            for entry in manifest["sources"]
+            if entry["path"] == "sources/truncated/truncated.jsonl"
+        )
+        source["time_range_confidence"] = "uncertain"
+        source["time_range_hint"] = {"end_us": 2, "start_us": 1}
+    else:
+        source["time_range_confidence"] = "unavailable"
+
+    unsigned_manifest = dict(manifest)
+    unsigned_manifest.pop("manifest_digest")
+    manifest["manifest_digest"] = shared.canonical_sha256(unsigned_manifest)
+    manifest_path.write_text(
+        json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(FixtureContractError, match="time range"):
         load_fixture_bundle(fixture_root)
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -13,6 +14,15 @@ from .crash import CRASH_BOUNDARIES
 FIXTURE_SCHEMA = "codex-usage-tracker.synthetic-fixture-manifest.v1"
 ORACLE_SCHEMA = "codex-usage-tracker.synthetic-oracle-bundle.v1"
 FIXTURE_REVISION = "agent-kernel-structural-v1"
+_SOURCE_TIME_CONFIDENCE = frozenset(
+    {"trusted", "uncertain", "unavailable"}
+)
+_SOURCE_TIME_INVENTORY_CONTRACT = {
+    "confidence_values": ["trusted", "uncertain", "unavailable"],
+    "hint_interval": "half_open_utc_microseconds",
+    "selection_policy": "skip_nonoverlapping_trusted_only",
+    "version": 1,
+}
 REQUIRED_VERTICAL_SLICES = (
     "context_deterioration",
     "workflow_sequence_first_mutation",
@@ -53,6 +63,8 @@ class SourceArtifact:
     manifestation_id: str
     revision: str
     adapter_version: str
+    time_range_hint: tuple[int, int] | None
+    time_range_confidence: str
 
 
 @dataclass(frozen=True)
@@ -146,23 +158,47 @@ def _safe_relative_path(value: object) -> PurePosixPath:
     return relative
 
 
-def _source_stats(path: Path) -> tuple[int, int, str]:
+def _source_stats(path: Path) -> tuple[int, int, str, tuple[int, int] | None]:
     digest = hashlib.sha256()
     byte_count = 0
     record_count = 0
     last_byte = b""
+    time_range_start_us: int | None = None
+    time_range_end_us: int | None = None
     try:
         with path.open("rb") as source:
-            while chunk := source.read(1024 * 1024):
-                digest.update(chunk)
-                byte_count += len(chunk)
-                record_count += chunk.count(b"\n")
-                last_byte = chunk[-1:]
+            for line in source:
+                digest.update(line)
+                byte_count += len(line)
+                record_count += line.count(b"\n")
+                last_byte = line[-1:]
+                try:
+                    record = json.loads(line)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                if isinstance(record, dict) and type(record.get("event_at_us")) is int:
+                    event_at_us = record["event_at_us"]
+                    time_range_start_us = (
+                        event_at_us
+                        if time_range_start_us is None
+                        else min(time_range_start_us, event_at_us)
+                    )
+                    event_end_us = event_at_us + 1
+                    time_range_end_us = (
+                        event_end_us
+                        if time_range_end_us is None
+                        else max(time_range_end_us, event_end_us)
+                    )
     except OSError as error:
         raise FixtureContractError(f"persisted source cannot be read: {path.name}") from error
     if byte_count and last_byte != b"\n":
         raise FixtureContractError(f"persisted source lacks final LF: {path.name}")
-    return byte_count, record_count, digest.hexdigest()
+    time_range = (
+        None
+        if time_range_start_us is None or time_range_end_us is None
+        else (time_range_start_us, time_range_end_us)
+    )
+    return byte_count, record_count, digest.hexdigest(), time_range
 
 
 def _verified_artifact_path(
@@ -179,7 +215,49 @@ def _verified_artifact_path(
     return artifact_path
 
 
+def _source_time_range(
+    entry: Mapping[str, Any],
+) -> tuple[tuple[int, int] | None, str]:
+    if (
+        "time_range_confidence" not in entry
+        or "time_range_hint" not in entry
+    ):
+        raise FixtureContractError("source time range fields are required")
+    confidence = entry["time_range_confidence"]
+    if (
+        not isinstance(confidence, str)
+        or confidence not in _SOURCE_TIME_CONFIDENCE
+    ):
+        raise FixtureContractError("source time range confidence is invalid")
+    hint = entry["time_range_hint"]
+    if hint is None:
+        if confidence != "unavailable":
+            raise FixtureContractError(
+                "source time range hint is required when available"
+            )
+        return None, confidence
+    if confidence == "unavailable":
+        raise FixtureContractError(
+            "unavailable source time range cannot include a hint"
+        )
+    if not isinstance(hint, dict) or set(hint) != {"end_us", "start_us"}:
+        raise FixtureContractError("source time range hint is invalid")
+    start_us = hint["start_us"]
+    end_us = hint["end_us"]
+    if (
+        type(start_us) is not int
+        or type(end_us) is not int
+        or start_us >= end_us
+    ):
+        raise FixtureContractError(
+            "source time range must be a non-empty half-open interval"
+        )
+    return (start_us, end_us), confidence
+
+
 def _load_sources(root: Path, manifest: Mapping[str, Any]) -> tuple[SourceArtifact, ...]:
+    if manifest.get("source_time_inventory") != _SOURCE_TIME_INVENTORY_CONTRACT:
+        raise FixtureContractError("source time range contract is invalid")
     source_entries = manifest.get("sources")
     if not isinstance(source_entries, list):
         raise FixtureContractError("manifest sources must be a list")
@@ -188,6 +266,7 @@ def _load_sources(root: Path, manifest: Mapping[str, Any]) -> tuple[SourceArtifa
     for entry in source_entries:
         if not isinstance(entry, dict):
             raise FixtureContractError("manifest source entry must be an object")
+        time_range_hint, time_range_confidence = _source_time_range(entry)
         if entry.get("persisted_when_requested") is not True:
             continue
         relative = _safe_relative_path(entry.get("path"))
@@ -202,13 +281,35 @@ def _load_sources(root: Path, manifest: Mapping[str, Any]) -> tuple[SourceArtifa
             raise FixtureContractError(f"invalid byte count for {relative.as_posix()}")
         if not isinstance(expected_records, int) or expected_records < 0:
             raise FixtureContractError(f"invalid record count for {relative.as_posix()}")
-        actual_bytes, actual_records, actual_digest = _source_stats(source_path)
+        actual_bytes, actual_records, actual_digest, actual_time_range = _source_stats(
+            source_path
+        )
         if actual_bytes != expected_bytes:
             raise FixtureContractError(f"source byte count mismatch: {relative.as_posix()}")
         if actual_records != expected_records:
             raise FixtureContractError(f"source record count mismatch: {relative.as_posix()}")
         if expected_digest != actual_digest:
             raise FixtureContractError(f"source digest mismatch: {relative.as_posix()}")
+        if actual_time_range is None and time_range_hint is not None:
+            raise FixtureContractError(
+                f"source time range hint has no persisted timestamps: {relative.as_posix()}"
+            )
+        if actual_time_range is not None and time_range_hint is None:
+            raise FixtureContractError(
+                f"source time range hint missing persisted timestamps: {relative.as_posix()}"
+            )
+        if (
+            actual_time_range is not None
+            and time_range_hint is not None
+            and (
+                time_range_hint[0] > actual_time_range[0]
+                or time_range_hint[1] < actual_time_range[1]
+            )
+        ):
+            raise FixtureContractError(
+                f"source time range hint excludes persisted timestamps: "
+                f"{relative.as_posix()}"
+            )
         artifacts.append(
             SourceArtifact(
                 relative_path=relative,
@@ -220,6 +321,8 @@ def _load_sources(root: Path, manifest: Mapping[str, Any]) -> tuple[SourceArtifa
                 manifestation_id=str(entry.get("manifestation_id")),
                 revision=str(entry.get("revision")),
                 adapter_version=str(entry.get("adapter_version")),
+                time_range_hint=time_range_hint,
+                time_range_confidence=time_range_confidence,
             )
         )
     return tuple(artifacts)
@@ -245,7 +348,7 @@ def _load_phases(root: Path, manifest: Mapping[str, Any]) -> tuple[PhaseArtifact
             raise FixtureContractError(f"invalid phase byte count for {relative.as_posix()}")
         if not isinstance(expected_records, int) or expected_records < 0:
             raise FixtureContractError(f"invalid phase record count for {relative.as_posix()}")
-        actual_bytes, actual_records, actual_digest = _source_stats(phase_path)
+        actual_bytes, actual_records, actual_digest, _ = _source_stats(phase_path)
         if actual_bytes != expected_bytes or actual_records != expected_records:
             raise FixtureContractError(f"lifecycle phase size mismatch: {relative.as_posix()}")
         if actual_digest != entry.get("content_sha256"):
