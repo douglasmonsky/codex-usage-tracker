@@ -441,7 +441,9 @@ def collect_dbhub_research(
         "trials": [
             {
                 "executed_route": route,
-                "executed_tool": "execute_sql" if route == "generic" else "top_sessions",
+                "executed_tool": (
+                    "search_objects+execute_sql" if route == "generic" else "top_sessions"
+                ),
                 "qualification_run_id": qualification_run_id,
                 "samples": samples[route],
                 "trial_id": route,

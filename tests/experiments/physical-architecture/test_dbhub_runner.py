@@ -207,6 +207,8 @@ def test_collect_dbhub_research_runs_two_routes_in_global_alternating_order(
         (9, "named_preset"),
     ]
     generic, named = trials
+    assert generic["executed_tool"] == "search_objects+execute_sql"
+    assert named["executed_tool"] == "top_sessions"
     assert {sample["response_bytes"] for sample in generic["samples"]} == {30}
     assert {sample["response_bytes"] for sample in named["samples"]} == {15}
     assert {sample["mcp_calls"] for sample in generic["samples"]} == {2}
