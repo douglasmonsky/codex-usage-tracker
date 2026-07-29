@@ -13,6 +13,7 @@ from codex_usage_tracker.kernel.evidence import (
 )
 from codex_usage_tracker.kernel.ingest import KernelIngestor, RefreshTrigger
 from codex_usage_tracker.kernel.operational import kernel_paths
+from tests.kernel.performance_qualification import record_wall_clock_budget
 from tests.kernel.test_ingest_pipeline import _token_line
 
 _CALL_COUNT = 100_000
@@ -73,4 +74,8 @@ def test_100k_timeline_first_page_meets_budget(tmp_path: Path) -> None:
 
     assert result.returned_count == 100
     assert result.matched_count == _CALL_COUNT
-    assert p95 <= _TIMELINE_P95_BUDGET_MS
+    record_wall_clock_budget(
+        "timeline_first_page_p95_ms",
+        p95,
+        _TIMELINE_P95_BUDGET_MS,
+    )

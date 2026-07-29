@@ -157,6 +157,18 @@ Record median, p95, maximum, and coefficient of variation over at least five
 unprofiled runs. Cold filesystem tests state how cache was controlled. Warm
 tests reuse the same process and committed database.
 
+Required pull-request CI runs the same scale workloads in invariants mode:
+deterministic correctness, plans, bounds, transaction shape, and response sizes
+remain blocking, while shared-host wall clock is not a merge gate. The separate
+repeated qualification protocol in
+[`CI_PERFORMANCE_QUALIFICATION.md`](CI_PERFORMANCE_QUALIFICATION.md) owns
+absolute timing evidence. A GitHub-hosted runner may enforce absolute latency
+only when same-run calibration qualifies it. Explicit strict mode on a known
+qualification host remains the authoritative absolute-budget command. The
+repository-owned runner bounds the scale suite to five minutes in CI and
+`just v`, and its versioned 17-metric contract fails closed on missing,
+renamed, extra, or changed budgets.
+
 ### Mandatory attribution
 
 Use the `agent-perf` skill and pinned dev dependency on the identical 100,000

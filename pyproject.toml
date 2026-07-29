@@ -89,6 +89,9 @@ warn_unused_configs = true
 mypy_path = "src"
 explicit_package_bases = true
 files = [
+  "scripts/aggregate_performance_qualification.py",
+  "scripts/performance_budget_contract.py",
+  "scripts/run_performance_suite.py",
   "scripts/benchmark_agent_outcome.py",
   "scripts/benchmark_kernel.py",
   "scripts/check_agent_kernel_contracts.py",
@@ -109,6 +112,9 @@ files = [
 
 [tool.pyright]
 include = [
+  "scripts/aggregate_performance_qualification.py",
+  "scripts/performance_budget_contract.py",
+  "scripts/run_performance_suite.py",
   "scripts/benchmark_agent_outcome.py",
   "scripts/benchmark_kernel.py",
   "scripts/check_agent_kernel_contracts.py",
