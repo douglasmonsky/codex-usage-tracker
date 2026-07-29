@@ -90,6 +90,9 @@ mypy_path = ["src", "experiments/physical-architecture"]
 explicit_package_bases = true
 files = [
   "experiments/physical-architecture/shared",
+  "experiments/physical-architecture/candidate_a",
+  "experiments/physical-architecture/candidate_c",
+  "experiments/physical-architecture/candidate_d",
   "scripts/benchmark_agent_outcome.py",
   "scripts/benchmark_kernel.py",
   "scripts/check_agent_kernel_contracts.py",
@@ -111,6 +114,9 @@ files = [
 [tool.pyright]
 include = [
   "experiments/physical-architecture/shared",
+  "experiments/physical-architecture/candidate_a",
+  "experiments/physical-architecture/candidate_c",
+  "experiments/physical-architecture/candidate_d",
   "scripts/benchmark_agent_outcome.py",
   "scripts/benchmark_kernel.py",
   "scripts/check_agent_kernel_contracts.py",

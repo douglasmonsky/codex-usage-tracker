@@ -27,6 +27,9 @@ vp:
         src/codex_usage_tracker/kernel \
         src/codex_usage_tracker/release \
         experiments/physical-architecture/shared \
+        experiments/physical-architecture/candidate_a \
+        experiments/physical-architecture/candidate_c \
+        experiments/physical-architecture/candidate_d \
         tests/release \
         tests/agent_kernel \
         tests/experiments/physical-architecture \
