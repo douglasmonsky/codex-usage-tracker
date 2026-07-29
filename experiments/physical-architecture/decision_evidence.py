@@ -530,7 +530,10 @@ def _authenticate_score_evidence(
     summary = _canonical_score_object(bundle.summary_bytes, f"{context} summary")
     _verify_score_digest(invocation, "invocation_digest", f"{context} invocation")
     _verify_score_digest(summary, "summary_digest", f"{context} summary")
-    if invocation.get("schema") != "codex-usage-tracker.physical-bakeoff-invocation.v1":
+    if invocation.get("schema") not in {
+        "codex-usage-tracker.physical-bakeoff-invocation.v1",
+        "codex-usage-tracker.physical-bakeoff-invocation.v2",
+    }:
         raise DecisionEvidenceContractError(f"{context} invocation schema is unsupported")
     if summary.get("schema") != "codex-usage-tracker.physical-bakeoff-summary.v1":
         raise DecisionEvidenceContractError(f"{context} summary schema is unsupported")

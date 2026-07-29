@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib
 import importlib.util
 import json
@@ -353,7 +354,11 @@ def test_completed_run_artifacts_are_discarded_unless_explicitly_retained(
             return super().execute(request)
 
     discarded = qualification.run_qualification(
-        _config(tmp_path, run_id="discarded"),
+        _config(
+            tmp_path,
+            run_id="discarded",
+            case_ids=("build.scale.tiny", "query.q-acc-01.warm_first_page"),
+        ),
         environment=_environment(),
         adapter_loader=lambda _: ArtifactAdapter("A"),
     )
@@ -372,6 +377,75 @@ def test_completed_run_artifacts_are_discarded_unless_explicitly_retained(
 
     assert retained.summary["retain_run_artifacts"] is True
     assert any((retained.invocation_root / "runs").rglob("candidate.sqlite"))
+
+
+def test_candidate_a_reuses_one_scale_build_per_query_repetition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate_a = importlib.import_module("candidate_a.adapter")
+    original_publish = candidate_a.publish_artifact
+    published: list[tuple[int, str, Path]] = []
+
+    def recording_publish(*args: Any, **kwargs: Any) -> Any:
+        artifact = original_publish(*args, **kwargs)
+        published.append(
+            (
+                len(published),
+                hashlib.sha256(artifact.path.read_bytes()).hexdigest(),
+                artifact.path,
+            )
+        )
+        return artifact
+
+    class RecordingAdapter(candidate_a.Adapter):
+        def __init__(self) -> None:
+            super().__init__()
+            self.query_publications: list[tuple[int, str]] = []
+
+        def _query_artifact(self, request: Any) -> Any:
+            artifact = super()._query_artifact(request)
+            self.query_publications.append((request.repetition, artifact.publication_id))
+            return artifact
+
+    monkeypatch.setattr(candidate_a, "publish_artifact", recording_publish)
+    adapter = RecordingAdapter()
+    artifact = qualification.run_qualification(
+        _config(
+            tmp_path,
+            run_id="prepared-query-artifacts",
+            case_ids=(
+                "build.scale.tiny",
+                "query.q-acc-01.warm_first_page",
+                "query.q-acc-02.warm_first_page",
+            ),
+            repetitions=2,
+            retain_run_artifacts=True,
+        ),
+        environment=_environment(),
+        adapter_loader=lambda _: adapter,
+    )
+
+    invocation = json.loads(artifact.invocation_path.read_text(encoding="utf-8"))
+    assert invocation["schema"] == "codex-usage-tracker.physical-bakeoff-invocation.v2"
+    assert invocation["query_artifact_policy"] == {
+        "candidate_ids": ["A"],
+        "mode": "reuse_scale_build_per_repetition",
+        "read_only": True,
+        "source_case_id": "build.scale.tiny",
+    }
+    assert len(published) == 2
+    expected_publications = {
+        repetition: adapter._prepared_query_artifacts[repetition].publication_id
+        for repetition in range(2)
+    }
+    assert adapter.query_publications == [
+        (repetition, expected_publications[repetition])
+        for _case in range(2)
+        for repetition in range(2)
+    ]
+    for _index, before_sha256, path in published:
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == before_sha256
 
 
 def test_fixture_profile_and_research_execution_are_explicit(

@@ -22,7 +22,7 @@ from typing import Any
 
 import shared
 
-INVOCATION_SCHEMA = "codex-usage-tracker.physical-bakeoff-invocation.v1"
+INVOCATION_SCHEMA = "codex-usage-tracker.physical-bakeoff-invocation.v2"
 SUMMARY_SCHEMA = "codex-usage-tracker.physical-bakeoff-summary.v1"
 DETAIL_SCHEMA = "codex-usage-tracker.physical-bakeoff-detail.v1"
 MEASUREMENT_FILE = "measurements.jsonl"
@@ -332,79 +332,95 @@ def run_qualification(
     failure: tuple[str, str, str] | None = None
     optional_skips = 0
     execution_index = 0
-    for candidate_id in prepared.candidates:
-        adapter = adapters[candidate_id]
-        for case in prepared.cases:
-            for repetition in range(config.repetitions):
-                run_root = _create_case_root(
-                    invocation_root,
-                    candidate_id=candidate_id,
-                    case_id=case.case_id,
-                    repetition=repetition,
-                )
-                identity = _measurement_identity(
-                    config,
-                    prepared,
-                    candidate_id=candidate_id,
-                    case=case,
-                    repetition=repetition,
-                )
-                expected_identities.append(identity)
-                request = shared.CandidateRequest(
-                    case=case,
-                    fixture=prepared.fixture,
-                    run_root=run_root,
-                    repetition=repetition,
-                    stop=shared.EarlyStopController(case.case_id, case.early_stop_limits),
-                )
-                measurement_offset = (
-                    measurements_path.stat().st_size if measurements_path.exists() else 0
-                )
-                try:
-                    result = shared.execute_measured_candidate(
-                        adapter,
-                        request,
-                        collector,
-                        identity,
+    query_artifact_policy = _query_artifact_policy(prepared)
+    try:
+        for candidate_id in prepared.candidates:
+            adapter = adapters[candidate_id]
+            for case in prepared.cases:
+                for repetition in range(config.repetitions):
+                    run_root = _create_case_root(
+                        invocation_root,
+                        candidate_id=candidate_id,
+                        case_id=case.case_id,
+                        repetition=repetition,
                     )
-                    measurement_payload = _read_appended_measurement(
-                        measurements_path,
-                        offset=measurement_offset,
-                        expected_identity=identity,
+                    identity = _measurement_identity(
+                        config,
+                        prepared,
+                        candidate_id=candidate_id,
+                        case=case,
+                        repetition=repetition,
                     )
-                    detail = _detail_payload(
-                        invocation=invocation,
-                        execution_index=execution_index,
-                        result=result,
-                        measurement=measurement_payload,
+                    expected_identities.append(identity)
+                    prepared_artifact_root = _prepared_artifact_root(
+                        invocation_root,
+                        policy=query_artifact_policy,
+                        candidate_id=candidate_id,
+                        case=case,
+                        repetition=repetition,
                     )
-                    _append_detail(details_path, detail)
-                    execution_index += 1
-                except shared.CandidateContractError as error:
-                    raise QualificationContractError(
-                        f"candidate {candidate_id} violated {case.case_id}: {error}"
-                    ) from error
-                finally:
-                    if not config.retain_run_artifacts:
-                        shutil.rmtree(run_root)
-                if result.outcome in {shared.RunOutcome.FAILED, shared.RunOutcome.STOPPED}:
-                    failure = (
-                        candidate_id,
-                        case.case_id,
-                        result.detail_code or result.outcome.value,
+                    request = shared.CandidateRequest(
+                        case=case,
+                        fixture=prepared.fixture,
+                        run_root=prepared_artifact_root or run_root,
+                        repetition=repetition,
+                        stop=shared.EarlyStopController(case.case_id, case.early_stop_limits),
                     )
-                    break
-                if result.outcome is shared.RunOutcome.UNSUPPORTED:
-                    if case.candidate_capability is None:
-                        raise QualificationContractError(
-                            f"mandatory case {case.case_id} was unsupported"
+                    measurement_offset = (
+                        measurements_path.stat().st_size if measurements_path.exists() else 0
+                    )
+                    try:
+                        result = shared.execute_measured_candidate(
+                            adapter,
+                            request,
+                            collector,
+                            identity,
                         )
-                    optional_skips += config.repetitions - repetition - 1
+                        measurement_payload = _read_appended_measurement(
+                            measurements_path,
+                            offset=measurement_offset,
+                            expected_identity=identity,
+                        )
+                        detail = _detail_payload(
+                            invocation=invocation,
+                            execution_index=execution_index,
+                            result=result,
+                            measurement=measurement_payload,
+                        )
+                        _append_detail(details_path, detail)
+                        execution_index += 1
+                    except shared.CandidateContractError as error:
+                        raise QualificationContractError(
+                            f"candidate {candidate_id} violated {case.case_id}: {error}"
+                        ) from error
+                    finally:
+                        if not config.retain_run_artifacts and not _is_prepared_artifact_source(
+                            policy=query_artifact_policy,
+                            candidate_id=candidate_id,
+                            case=case,
+                        ):
+                            shutil.rmtree(run_root)
+                    if result.outcome in {shared.RunOutcome.FAILED, shared.RunOutcome.STOPPED}:
+                        failure = (
+                            candidate_id,
+                            case.case_id,
+                            result.detail_code or result.outcome.value,
+                        )
+                        break
+                    if result.outcome is shared.RunOutcome.UNSUPPORTED:
+                        if case.candidate_capability is None:
+                            raise QualificationContractError(
+                                f"mandatory case {case.case_id} was unsupported"
+                            )
+                        optional_skips += config.repetitions - repetition - 1
+                        break
+                if failure is not None:
                     break
             if failure is not None:
                 break
-        if failure is not None:
-            break
+    finally:
+        if not config.retain_run_artifacts:
+            shutil.rmtree(invocation_root / "runs", ignore_errors=True)
 
     records = shared.load_measurements(measurements_path)
     _validate_measurements(
@@ -565,9 +581,74 @@ def _invocation_payload(
         "include_research": config.include_research,
         "qualification_model": config.qualification_model,
         "retain_run_artifacts": config.retain_run_artifacts,
+        "query_artifact_policy": _query_artifact_policy(prepared),
         "completion_marker": SUMMARY_FILE,
     }
     return {**base, "invocation_digest": shared.canonical_sha256(base)}
+
+
+def _query_artifact_policy(prepared: _PreparedRun) -> dict[str, object]:
+    source_case_id = f"build.scale.{prepared.fixture.profile}"
+    case_ids = {case.case_id for case in prepared.cases}
+    enabled = (
+        "A" in prepared.candidates
+        and source_case_id in case_ids
+        and any(case.group is shared.WorkloadGroup.QUERY for case in prepared.cases)
+    )
+    if not enabled:
+        return {"mode": "isolated_per_case"}
+    return {
+        "mode": "reuse_scale_build_per_repetition",
+        "candidate_ids": ("A",),
+        "read_only": True,
+        "source_case_id": source_case_id,
+    }
+
+
+def _is_prepared_artifact_source(
+    *,
+    policy: Mapping[str, object],
+    candidate_id: str,
+    case: shared.WorkloadCase,
+) -> bool:
+    candidate_ids = policy.get("candidate_ids")
+    return (
+        policy.get("mode") == "reuse_scale_build_per_repetition"
+        and isinstance(candidate_ids, (list, tuple))
+        and candidate_id in candidate_ids
+        and case.case_id == policy.get("source_case_id")
+    )
+
+
+def _prepared_artifact_root(
+    invocation_root: Path,
+    *,
+    policy: Mapping[str, object],
+    candidate_id: str,
+    case: shared.WorkloadCase,
+    repetition: int,
+) -> Path | None:
+    candidate_ids = policy.get("candidate_ids")
+    if (
+        policy.get("mode") != "reuse_scale_build_per_repetition"
+        or not isinstance(candidate_ids, (list, tuple))
+        or candidate_id not in candidate_ids
+        or case.group is not shared.WorkloadGroup.QUERY
+    ):
+        return None
+    source_case_id = str(policy["source_case_id"])
+    root = (
+        invocation_root
+        / "runs"
+        / f"candidate-{candidate_id.lower()}"
+        / source_case_id
+        / f"repetition-{repetition:03d}"
+    )
+    if not root.is_dir():
+        raise QualificationContractError(
+            f"prepared artifact source {source_case_id} did not complete before queries"
+        )
+    return root
 
 
 def _measurement_identity(
