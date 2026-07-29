@@ -10,7 +10,16 @@ _CONTRACT_PATH = (
     _REPO_ROOT / "docs" / "architecture" / "AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md"
 )
 _CONTRACT_ID = "codex-usage-tracker.agent-kernel.schema-contract.v1"
-_EXPECTED_DIGEST = "eecff68062a8d0cba0619058a6e660f565d9a96c2575ab0dc93d72b987f31543"
+_EXPECTED_DIGEST = "6ae65b6eb7024486f8fe42e19ab6799a252b721e6a9519f19d70e91f4aae6b77"
+_COPY_STABILITY_VECTOR_ID = "database-v1.multi-producer-copy-stability.v1"
+_COPY_STABILITY_VECTOR_ROWS = (
+    "| `sessions` | `session:shared` | `root:a/file:a#1` | `root:b/file:b#1` | 1 | 2 |",
+    "| `turns` | `turn:shared` | `root:a/file:a#2` | `root:b/file:b#2` | 1 | 2 |",
+    "| `model_calls` | `call:shared` | `root:a/file:a#3` | `root:b/file:b#3` | 1 | 2 |",
+    "| `tool_invocations` | `tool:shared` | `root:a/file:a#4` | `root:b/file:b#4` | 1 | 2 |",
+    "| `allowance_observations` | `allowance-observation:shared` | `root:a/file:a#5` | `root:b/file:b#5` | 1 | 2 |",
+)
+_EXPECTED_OBJECT_COUNTS = (41, 43, 6, 6)
 _ANALYTICAL_TABLES = (
     "metadata",
     "publications",
@@ -18,6 +27,7 @@ _ANALYTICAL_TABLES = (
     "identity_registry",
     "selector_aliases",
     "adapters",
+    "source_producers",
     "sources",
     "source_manifestations",
     "source_cursors",
@@ -54,8 +64,10 @@ _ANALYTICAL_TABLES = (
     "model_call_tail",
 )
 _ANALYTICAL_INDEXES = (
+    "sources_by_producer",
     "source_manifestations_by_occurrence_key",
     "source_manifestations_by_identity",
+    "source_manifestations_by_technical_path",
     "source_manifestations_by_state",
     "source_diagnostics_by_manifestation",
     "source_occurrences_by_logical_id",
@@ -91,6 +103,7 @@ _ANALYTICAL_INDEXES = (
     "allowance_observations_by_compatibility",
     "allowance_intervals_timeline",
     "allowance_intervals_by_cycle",
+    "publication_source_coverage_by_source",
     "publication_delta_samples_by_selector",
     "model_call_tail_timeline",
     "model_call_tail_by_session",
@@ -154,6 +167,46 @@ def _build_database(ddl: str) -> sqlite3.Connection:
     return connection
 
 
+def _primary_key(connection: sqlite3.Connection, table: str) -> tuple[str, ...]:
+    columns = connection.execute(
+        f'PRAGMA table_info("{table}")'  # noqa: S608
+    ).fetchall()
+    return tuple(
+        str(row[1])
+        for row in sorted((row for row in columns if int(row[5])), key=lambda row: row[5])
+    )
+
+
+def _indexes(
+    connection: sqlite3.Connection,
+    table: str,
+) -> dict[tuple[str, ...], bool]:
+    indexes = connection.execute(
+        f'PRAGMA index_list("{table}")'  # noqa: S608
+    ).fetchall()
+    return {
+        tuple(
+            str(column[2])
+            for column in connection.execute(
+                f'PRAGMA index_info("{index[1]}")'  # noqa: S608
+            )
+        ): bool(index[2])
+        for index in indexes
+    }
+
+
+def _foreign_keys(
+    connection: sqlite3.Connection,
+    table: str,
+) -> set[tuple[str, str, str]]:
+    return {
+        (str(row[2]), str(row[3]), str(row[4]))
+        for row in connection.execute(
+            f'PRAGMA foreign_key_list("{table}")'  # noqa: S608
+        )
+    }
+
+
 def test_database_v1_schema_contract_is_executable_exact_and_digest_locked() -> None:
     markdown = _CONTRACT_PATH.read_text(encoding="utf-8")
     analytical = _normalized_ddl(markdown, "analytical")
@@ -162,6 +215,14 @@ def test_database_v1_schema_contract_is_executable_exact_and_digest_locked() -> 
 
     assert f"**Canonical SHA-256:** `{_EXPECTED_DIGEST}`" in markdown
     assert hashlib.sha256(canonical).hexdigest() == _EXPECTED_DIGEST
+    assert f"**Vector:** `{_COPY_STABILITY_VECTOR_ID}`" in markdown
+    assert all(row in markdown for row in _COPY_STABILITY_VECTOR_ROWS)
+    assert (
+        len(_ANALYTICAL_TABLES),
+        len(_ANALYTICAL_INDEXES),
+        len(_OPERATIONAL_TABLES),
+        len(_OPERATIONAL_INDEXES),
+    ) == _EXPECTED_OBJECT_COUNTS
 
     analytical_db = _build_database(analytical)
     operational_db = _build_database(operational)
@@ -185,6 +246,83 @@ def test_database_v1_schema_contract_is_executable_exact_and_digest_locked() -> 
                 if row[2] == "table" and row[1] not in {"sqlite_schema", "sqlite_temp_schema"}
             ]
             assert all(row[4] == 1 and row[5] == 1 for row in owned_tables)
+    finally:
+        analytical_db.close()
+        operational_db.close()
+
+
+def test_database_v1_multi_producer_identity_seams_are_structurally_locked() -> None:
+    markdown = _CONTRACT_PATH.read_text(encoding="utf-8")
+    analytical_db = _build_database(_normalized_ddl(markdown, "analytical"))
+    operational_db = _build_database(_normalized_ddl(markdown, "operational"))
+    try:
+        producer_indexes = _indexes(analytical_db, "source_producers")
+        source_indexes = _indexes(analytical_db, "sources")
+        manifestation_indexes = _indexes(analytical_db, "source_manifestations")
+        occurrence_indexes = _indexes(analytical_db, "source_occurrences")
+
+        assert producer_indexes[("configured_producer_key",)]
+        assert source_indexes[
+            (
+                "adapter_id",
+                "producer_id",
+                "source_kind",
+                "adapter_native_source_key",
+            )
+        ]
+        assert manifestation_indexes[("source_id", "adapter_native_file_key")]
+        assert (
+            manifestation_indexes[("source_id", "technical_path_key", "state", "manifestation_id")]
+            is False
+        )
+        assert (
+            occurrence_indexes[
+                (
+                    "semantic_logical_id",
+                    "manifestation_key",
+                    "source_revision",
+                    "record_ordinal",
+                    "byte_start",
+                    "occurrence_id",
+                )
+            ]
+            is False
+        )
+
+        assert (
+            "source_producers",
+            "producer_id",
+            "producer_id",
+        ) in _foreign_keys(analytical_db, "sources")
+        assert (
+            "sources",
+            "source_id",
+            "source_id",
+        ) in _foreign_keys(analytical_db, "source_manifestations")
+        assert _primary_key(analytical_db, "publication_source_coverage") == (
+            "publication_id",
+            "source_id",
+        )
+        assert {
+            ("publications", "publication_id", "publication_id"),
+            ("sources", "source_id", "source_id"),
+        } <= _foreign_keys(analytical_db, "publication_source_coverage")
+        assert _primary_key(operational_db, "source_dirty_hints") == (
+            "source_id",
+            "technical_path_key",
+        )
+
+        semantic_primary_keys = {
+            "sessions": ("session_id",),
+            "turns": ("turn_id",),
+            "model_calls": ("call_id",),
+            "tool_invocations": ("tool_id",),
+            "allowance_observations": ("observation_id",),
+            "source_occurrences": ("occurrence_id",),
+        }
+        assert {
+            table: _primary_key(analytical_db, table) for table in semantic_primary_keys
+        } == semantic_primary_keys
     finally:
         analytical_db.close()
         operational_db.close()

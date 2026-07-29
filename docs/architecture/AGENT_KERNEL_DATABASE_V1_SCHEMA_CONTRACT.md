@@ -4,7 +4,7 @@
 **Contract:** `codex-usage-tracker.agent-kernel.schema-contract.v1`
 **Database identity:** `codex-usage-tracker.agent-kernel.v1`
 **Operational-sidecar identity:** `codex-usage-tracker.agent-kernel.operations.v1`
-**Canonical SHA-256:** `eecff68062a8d0cba0619058a6e660f565d9a96c2575ab0dc93d72b987f31543`
+**Canonical SHA-256:** `6ae65b6eb7024486f8fe42e19ab6799a252b721e6a9519f19d70e91f4aae6b77`
 
 This document closes the physical-schema decisions required before CK-05,
 CK-06, and CK-07. It is the implementation contract for those packets.
@@ -35,6 +35,15 @@ private implementation details. Identity collision handling is physical:
 must compare the bytes for an existing logical ID before accepting another
 occurrence. A digest match with different canonical bytes fails the
 publication.
+
+Producer, source-root, source-file, and occurrence coordinates are provenance,
+not semantic usage identity. Canonical identity CBOR for sessions, turns, model
+calls, tool invocations, activities, compactions, state changes, and allowance
+observations MUST NOT include `producer_id`, `source_id`, `manifestation_id`,
+`manifestation_key`, `technical_path_key`, filesystem identity, content
+revision, source rank, record ordinal, or byte offsets. Copies of one logical
+record may therefore add occurrence coordinates without adding another
+accounting entity.
 
 ## Time, intervals, and total order
 
@@ -70,6 +79,19 @@ adapter's nonnegative complete-record order within that source;
 `event_kind_order` is the frozen adapter registry rank; and
 `transition_rank` orders multiple transitions of the same logical entity.
 Arrival order and SQLite row order are never ordering inputs.
+
+Each `producer_id` defines an independent producer clock domain. UTC
+microseconds remain the storage unit, but timestamps from different producer
+clock domains are not assumed synchronized. `source_rank` is assigned from the
+deterministically ordered producer/source/file inventory, so the total order
+above remains a stable pagination order across producers. That cross-producer
+order is a presentation order only: it MUST NOT be described as chronology,
+causality, or happens-before. Per-source-root clock quality and any finite
+uncertainty bound are published in `publication_source_coverage`.
+The inventory rank key is ascending canonical UTF-8 bytes of
+`(producer_id, adapter_id, source_kind, adapter_native_source_key,
+adapter_native_file_key, manifestation_id)`; mutable labels, paths, revisions,
+and arrival order never participate.
 
 ## Analytical artifact DDL
 
@@ -211,9 +233,25 @@ CREATE TABLE adapters (
     REFERENCES publications(publication_id)
 ) STRICT, WITHOUT ROWID;
 
+CREATE TABLE source_producers (
+  producer_id TEXT PRIMARY KEY,
+  configured_producer_key TEXT NOT NULL UNIQUE,
+  display_label TEXT,
+  first_seen_publication_id TEXT NOT NULL,
+  last_seen_publication_id TEXT NOT NULL,
+  CHECK (length(configured_producer_key) > 0),
+  CHECK (display_label IS NULL OR length(display_label) > 0),
+  FOREIGN KEY (producer_id) REFERENCES identity_registry(logical_id),
+  FOREIGN KEY (first_seen_publication_id)
+    REFERENCES publications(publication_id),
+  FOREIGN KEY (last_seen_publication_id)
+    REFERENCES publications(publication_id)
+) STRICT, WITHOUT ROWID;
+
 CREATE TABLE sources (
   source_id TEXT PRIMARY KEY,
   adapter_id TEXT NOT NULL,
+  producer_id TEXT NOT NULL,
   source_kind TEXT NOT NULL,
   adapter_native_source_key TEXT NOT NULL,
   selected_history_preset TEXT NOT NULL
@@ -232,7 +270,13 @@ CREATE TABLE sources (
   selected_through_us INTEGER,
   first_seen_publication_id TEXT NOT NULL,
   last_seen_publication_id TEXT NOT NULL,
-  UNIQUE (adapter_id, adapter_native_source_key),
+  UNIQUE (
+    adapter_id,
+    producer_id,
+    source_kind,
+    adapter_native_source_key
+  ),
+  CHECK (length(adapter_native_source_key) > 0),
   CHECK (
     selected_from_us IS NULL
     OR selected_through_us IS NULL
@@ -240,6 +284,7 @@ CREATE TABLE sources (
   ),
   FOREIGN KEY (source_id) REFERENCES identity_registry(logical_id),
   FOREIGN KEY (adapter_id) REFERENCES adapters(adapter_id),
+  FOREIGN KEY (producer_id) REFERENCES source_producers(producer_id),
   FOREIGN KEY (first_seen_publication_id)
     REFERENCES publications(publication_id),
   FOREIGN KEY (last_seen_publication_id)
@@ -250,6 +295,7 @@ CREATE TABLE source_manifestations (
   manifestation_id TEXT PRIMARY KEY,
   manifestation_key INTEGER NOT NULL CHECK (manifestation_key > 0),
   source_id TEXT NOT NULL,
+  adapter_native_file_key TEXT NOT NULL,
   technical_path_key TEXT NOT NULL,
   display_label TEXT NOT NULL,
   filesystem_identity_json TEXT,
@@ -293,7 +339,23 @@ CREATE TABLE source_manifestations (
   first_seen_publication_id TEXT NOT NULL,
   last_seen_publication_id TEXT NOT NULL,
   ended_publication_id TEXT,
-  UNIQUE (source_id, technical_path_key, content_revision),
+  UNIQUE (source_id, adapter_native_file_key),
+  CHECK (length(adapter_native_file_key) > 0),
+  CHECK (
+    length(technical_path_key) > 0
+    AND substr(technical_path_key, 1, 1) <> '/'
+    AND instr(technical_path_key, char(92)) = 0
+    AND instr(technical_path_key, ':') = 0
+    AND instr(technical_path_key, '//') = 0
+    AND technical_path_key NOT IN ('.', '..')
+    AND substr(technical_path_key, 1, 2) <> './'
+    AND substr(technical_path_key, 1, 3) <> '../'
+    AND instr(technical_path_key, '/./') = 0
+    AND instr(technical_path_key, '/../') = 0
+    AND substr(technical_path_key, -2) <> '/.'
+    AND substr(technical_path_key, -3) <> '/..'
+    AND substr(technical_path_key, -1) <> '/'
+  ),
   CHECK (
     time_range_start_us IS NULL
     OR time_range_end_us IS NULL
@@ -1059,23 +1121,88 @@ CREATE TABLE active_rate_card (
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE publication_source_coverage (
-  publication_id TEXT PRIMARY KEY,
-  selected_source_count INTEGER NOT NULL CHECK (selected_source_count >= 0),
-  selected_source_bytes INTEGER NOT NULL CHECK (selected_source_bytes >= 0),
-  deferred_source_count INTEGER NOT NULL CHECK (deferred_source_count >= 0),
-  deferred_source_bytes INTEGER NOT NULL CHECK (deferred_source_bytes >= 0),
-  uncertain_source_count INTEGER NOT NULL CHECK (uncertain_source_count >= 0),
-  malformed_source_count INTEGER NOT NULL CHECK (malformed_source_count >= 0),
+  publication_id TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  selected_manifestation_count INTEGER NOT NULL
+    CHECK (selected_manifestation_count >= 0),
+  selected_manifestation_bytes INTEGER NOT NULL
+    CHECK (selected_manifestation_bytes >= 0),
+  deferred_manifestation_count INTEGER NOT NULL
+    CHECK (deferred_manifestation_count >= 0),
+  deferred_manifestation_bytes INTEGER NOT NULL
+    CHECK (deferred_manifestation_bytes >= 0),
+  malformed_manifestation_count INTEGER NOT NULL
+    CHECK (malformed_manifestation_count >= 0),
+  malformed_manifestation_bytes INTEGER NOT NULL
+    CHECK (malformed_manifestation_bytes >= 0),
+  missing_manifestation_count INTEGER NOT NULL
+    CHECK (missing_manifestation_count >= 0),
+  missing_manifestation_bytes INTEGER NOT NULL
+    CHECK (missing_manifestation_bytes >= 0),
+  uncertain_manifestation_count INTEGER NOT NULL
+    CHECK (uncertain_manifestation_count >= 0),
+  uncertain_manifestation_bytes INTEGER NOT NULL
+    CHECK (uncertain_manifestation_bytes >= 0),
   malformed_range_count INTEGER NOT NULL CHECK (malformed_range_count >= 0),
   malformed_range_bytes INTEGER NOT NULL CHECK (malformed_range_bytes >= 0),
-  missing_source_count INTEGER NOT NULL CHECK (missing_source_count >= 0),
   selected_complete_record_count INTEGER NOT NULL
     CHECK (selected_complete_record_count >= 0),
   tail_pending INTEGER NOT NULL CHECK (tail_pending IN (0, 1)),
+  indexed_from_us INTEGER,
+  indexed_through_us INTEGER,
+  guaranteed_complete_from_us INTEGER,
+  guaranteed_complete_through_us INTEGER,
+  clock_quality TEXT NOT NULL
+    CHECK (clock_quality IN ('unknown', 'unsynchronized', 'bounded')),
+  clock_uncertainty_us INTEGER
+    CHECK (clock_uncertainty_us IS NULL OR clock_uncertainty_us >= 0),
   inventory_started_at_us INTEGER NOT NULL,
   inventory_completed_at_us INTEGER NOT NULL,
+  PRIMARY KEY (publication_id, source_id),
+  CHECK (
+    (
+      indexed_from_us IS NULL
+      AND indexed_through_us IS NULL
+    )
+    OR (
+      indexed_from_us IS NOT NULL
+      AND indexed_through_us IS NOT NULL
+      AND indexed_from_us <= indexed_through_us
+    )
+  ),
+  CHECK (
+    (
+      guaranteed_complete_from_us IS NULL
+      AND guaranteed_complete_through_us IS NULL
+    )
+    OR (
+      guaranteed_complete_from_us IS NOT NULL
+      AND guaranteed_complete_through_us IS NOT NULL
+      AND guaranteed_complete_from_us <= guaranteed_complete_through_us
+    )
+  ),
+  CHECK (
+    guaranteed_complete_from_us IS NULL
+    OR (
+      indexed_from_us IS NOT NULL
+      AND indexed_through_us IS NOT NULL
+      AND indexed_from_us <= guaranteed_complete_from_us
+      AND guaranteed_complete_through_us <= indexed_through_us
+    )
+  ),
+  CHECK (
+    (
+      clock_quality = 'bounded'
+      AND clock_uncertainty_us IS NOT NULL
+    )
+    OR (
+      clock_quality <> 'bounded'
+      AND clock_uncertainty_us IS NULL
+    )
+  ),
   CHECK (inventory_started_at_us <= inventory_completed_at_us),
-  FOREIGN KEY (publication_id) REFERENCES publications(publication_id)
+  FOREIGN KEY (publication_id) REFERENCES publications(publication_id),
+  FOREIGN KEY (source_id) REFERENCES sources(source_id)
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE publication_capability_coverage (
@@ -1291,10 +1418,25 @@ SELECT
   last_seen_publication_id
 FROM model_call_tail;
 
+CREATE INDEX sources_by_producer
+  ON sources(
+    producer_id ASC,
+    adapter_id ASC,
+    source_kind ASC,
+    adapter_native_source_key ASC,
+    source_id ASC
+  );
 CREATE UNIQUE INDEX source_manifestations_by_occurrence_key
   ON source_manifestations(manifestation_key ASC);
 CREATE INDEX source_manifestations_by_identity
   ON source_manifestations(manifestation_id ASC, content_revision ASC);
+CREATE INDEX source_manifestations_by_technical_path
+  ON source_manifestations(
+    source_id ASC,
+    technical_path_key ASC,
+    state ASC,
+    manifestation_id ASC
+  );
 CREATE INDEX source_manifestations_by_state
   ON source_manifestations(state ASC, selected ASC, source_rank ASC);
 CREATE INDEX source_diagnostics_by_manifestation
@@ -1519,6 +1661,8 @@ CREATE INDEX allowance_intervals_timeline
   );
 CREATE INDEX allowance_intervals_by_cycle
   ON allowance_intervals(cycle_id ASC, start_us ASC, interval_id ASC);
+CREATE INDEX publication_source_coverage_by_source
+  ON publication_source_coverage(source_id ASC, publication_id ASC);
 CREATE INDEX publication_delta_samples_by_selector
   ON publication_delta_samples(
     selector ASC,
@@ -1588,19 +1732,86 @@ with `wal_checkpoint(TRUNCATE)`, close, validate, file-sync, and directory-sync.
 
 Prepublication validation includes the contract digest, required metadata,
 `quick_check`, `foreign_key_check`, publication-head/committed-state agreement,
-identity collision comparison, occurrence ownership, lifecycle-fold
+identity collision comparison, configured-producer uniqueness, source-root and
+stable-file-lineage ownership, occurrence ownership, lifecycle-fold
 reconciliation, cross-table model-call uniqueness, tail-state reconciliation,
-coverage totals, and publication-delta reconciliation. Release qualification
-also runs `integrity_check`.
+per-source-root coverage totals and clock-bound validity, and publication-delta
+reconciliation. Release qualification also runs `integrity_check`.
 
 ## Source cursor, occurrence, and lifecycle ownership
 
-`sources` is stable semantic identity. `source_manifestations` is one physical
-path/revision manifestation and owns its current state. `source_cursors` is the
-only committed resume cursor and always points immediately after a complete
-JSONL record. A partial final line never advances it. Prefix-through-cursor,
-suffix, source size, parser version, and adapter version must all match before
-an append is classified safe.
+`source_producers.producer_id` is an opaque stable logical ID.
+`configured_producer_key` is the required, explicitly configured stable key
+from which the producer identity is canonicalized. Neither value is inferred
+from a hostname, absolute path, hardware identifier, account, network address,
+or mutable display label. `display_label` is optional presentation metadata
+and never identity input. This table is a provenance seam only; it does not
+admit collectors, networking, authentication, synchronization, services, UI,
+or Candidate A remote behavior.
+
+`sources.source_id` is the stable source-root identity (the
+`source_root_id`). Its canonical identity tuple is exactly
+`(adapter_id, producer_id, source_kind, adapter_native_source_key)`, matching
+the declared uniqueness constraint. `source_manifestations.manifestation_id`
+is a stable source-file lineage identity whose tuple is exactly
+`(source_id, adapter_native_file_key)`. `technical_path_key` is only the
+adapter's canonical nonempty root-relative technical provenance: it uses `/`
+separators, has no `.` or `..` segment, and never contains an absolute host
+path. A replacement at the same technical path receives a new
+`adapter_native_file_key` and `manifestation_id`; content revisions of the same
+file lineage retain the existing manifestation identity.
+
+`publication_source_coverage` owns exactly one coverage row for every
+`(publication_id, source_id)` source root in the publication inventory.
+Selected, deferred, malformed, missing, and uncertain counts and bytes are
+root-local manifestation totals; missing bytes use the last known size or zero
+when no size was ever observed. Indexed and guaranteed-complete bounds are
+half-open UTC-microsecond coverage bounds for that root. `clock_quality`
+`unknown` means no clock relation is known, `unsynchronized` means the
+producer clock is known to be independent but has no finite bound, and
+`bounded` requires `clock_uncertainty_us` as the maximum absolute UTC error.
+The latter two columns describe measurement quality and never change semantic
+IDs.
+
+Allowance-observation identity is copy-stable. Its canonical tuple is exactly
+`(limit_id, cycle_id, plan_identity, window_kind, reset_identity,
+observation_ordinal, used_percent, remaining_percent, absolute_fields_json,
+reset_time_us, observed_at_us, measurement_mask)`. `observation_ordinal` is the
+adapter-native semantic ordinal within a cycle, not a file record ordinal.
+Repeated observations remain distinct when their semantic ordinal or observed
+instant differs; copied occurrences with the same tuple share one
+`observation_id`.
+
+### Multi-producer copy-stability vector
+
+**Vector:** `database-v1.multi-producer-copy-stability.v1`
+
+Two configured producers (`producer-a`, `producer-b`) expose distinct source
+roots and stable file manifestations but contain byte-identical logical
+session, turn, model-call, tool, and allowance-observation records:
+
+| Entity table | Shared semantic ID | Producer A coordinate | Producer B coordinate | Canonical rows | Occurrence coordinates |
+| --- | --- | --- | --- | ---: | ---: |
+| `sessions` | `session:shared` | `root:a/file:a#1` | `root:b/file:b#1` | 1 | 2 |
+| `turns` | `turn:shared` | `root:a/file:a#2` | `root:b/file:b#2` | 1 | 2 |
+| `model_calls` | `call:shared` | `root:a/file:a#3` | `root:b/file:b#3` | 1 | 2 |
+| `tool_invocations` | `tool:shared` | `root:a/file:a#4` | `root:b/file:b#4` | 1 | 2 |
+| `allowance_observations` | `allowance-observation:shared` | `root:a/file:a#5` | `root:b/file:b#5` | 1 | 2 |
+
+The schema contract test freezes the structural preconditions for this vector:
+semantic entity primary keys remain producer-independent while
+`source_occurrences.semantic_logical_id` remains non-unique. CK-05 repository
+qualification must prove canonical typed writes coalesce the copies; CK-06
+ingestion qualification must prove both physical coordinates survive as
+distinct `source_occurrences`. Those executable writer qualifications, not this
+DDL-only test, own the one-row/two-occurrence assertion and prove producer,
+root, and file IDs cannot inflate exact accounting.
+
+`source_manifestations` owns the mutable state of the stable file lineage
+described above. `source_cursors` is the only committed resume cursor and
+always points immediately after a complete JSONL record. A partial final line
+never advances it. Prefix-through-cursor, suffix, source size, parser version,
+and adapter version must all match before an append is classified safe.
 
 `source_occurrences` preserves every valid physical occurrence, including
 copies and archived/replacement manifestations. Canonical typed rows reference
@@ -1861,12 +2072,13 @@ CREATE TABLE recovery_intents (
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE source_dirty_hints (
-  technical_path_key TEXT PRIMARY KEY,
-  source_id TEXT,
+  source_id TEXT NOT NULL,
+  technical_path_key TEXT NOT NULL,
   first_observed_at_us INTEGER NOT NULL,
   last_observed_at_us INTEGER NOT NULL,
   observation_count INTEGER NOT NULL CHECK (observation_count > 0),
   reason_mask INTEGER NOT NULL CHECK (reason_mask > 0),
+  PRIMARY KEY (source_id, technical_path_key),
   CHECK (first_observed_at_us <= last_observed_at_us)
 ) STRICT, WITHOUT ROWID;
 
@@ -1897,13 +2109,24 @@ CREATE INDEX artifact_pointers_by_role
 CREATE INDEX recovery_intents_by_state
   ON recovery_intents(state ASC, updated_at_us ASC, recovery_id ASC);
 CREATE INDEX source_dirty_hints_by_observed
-  ON source_dirty_hints(last_observed_at_us ASC, technical_path_key ASC);
+  ON source_dirty_hints(
+    last_observed_at_us ASC,
+    source_id ASC,
+    technical_path_key ASC
+  );
 ```
 <!-- operational-ddl:end -->
 
 `operational_metadata` contains
 `database_identity=codex-usage-tracker.agent-kernel.operations.v1`,
 `schema_contract_id`, `schema_contract_sha256`, and `schema_version=1`.
+
+`source_dirty_hints` is keyed exactly by
+`(source_id, technical_path_key)`. The sidecar cannot declare a cross-database
+foreign key, so CK-07 validates `source_id` against the selected analytical
+publication before consuming a hint. A hint identifies root-relative technical
+provenance, not a stable file identity; discovery resolves the current file
+lineage and may create a replacement manifestation at the same path.
 
 ## Active pointer and rollback protocol
 
@@ -1969,19 +2192,22 @@ artifact unavailable.
 ## CK-05 through CK-07 responsibility split
 
 - CK-05 implements the analytical database connection modes, canonical
-  identity registry, typed repositories, source-occurrence repository,
+  identity registry, configured-producer/source-root/stable-file repositories,
+  typed repositories, source-occurrence repository,
   lifecycle fold/transition repository, exact DDL inventory, and digest
   validation. It creates no projection tables and imports no experiment or
   spike module.
-- CK-06 implements bounded discovery, deterministic source ranking, complete
-  record cursors, proposed observations, occurrence preservation, diagnostics,
-  and canonical writes through CK-05 repositories. It cannot promote or mutate
-  the sidecar state machine.
+- CK-06 implements bounded discovery, configured producer inventory,
+  deterministic producer/source/file ranking, complete-record cursors,
+  per-source-root coverage and clock-quality proposals, occurrence
+  preservation, diagnostics, and canonical writes through CK-05 repositories.
+  It cannot promote or mutate the sidecar state machine.
 - CK-07 implements operation planning, no-change behavior, the 32,000-row call
-  overlay and fold threshold, short `BEGIN IMMEDIATE` publication, coverage and
-  delta writes, isolated artifact validation, file/directory durability,
-  pointer promotion, leases, recovery intents, read-first startup recovery, and
-  protected cleanup.
+  overlay and fold threshold, short `BEGIN IMMEDIATE` publication,
+  per-source-root coverage/clock-bound and delta writes, composite
+  source-root/path dirty hints, isolated artifact validation, file/directory
+  durability, pointer promotion, leases, recovery intents, read-first startup
+  recovery, and protected cleanup.
 
 Candidate A's experimental `question_cases`,
 `source_phase_occurrences`, fixture digests, direct `os.replace()` promotion,
