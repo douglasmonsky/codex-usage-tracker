@@ -260,48 +260,62 @@ def _integer(value: object, field: str) -> int:
 def project_query_rows(
     bundles: Sequence[QualificationBundle],
 ) -> tuple[dict[str, object], ...]:
-    """Derive exactly one authenticated five-sample row per query case."""
+    """Derive the standard query projection while admitting score-only scales."""
 
-    grouped: dict[str, list[Mapping[str, Any]]] = {}
-    run_ids: dict[str, str] = {}
+    grouped: dict[str, dict[str, list[Mapping[str, Any]]]] = {}
+    run_ids: dict[tuple[str, str], str] = {}
     for bundle in bundles:
         for measurement in bundle.measurements:
             identity = measurement["identity"]
             case_id = identity["case_id"]
             if not str(case_id).startswith("query."):
                 continue
+            profile = identity["fixture_profile"]
             if (
                 identity["candidate_id"] != "A"
+                or profile not in {"standard", "production", "growth"}
                 or identity["profiled"] is not False
                 or measurement["outcome"] != "passed"
                 or measurement["partial"] is not False
             ):
                 raise AggregateEvidenceError(f"query case {case_id} is not passed A evidence")
-            grouped.setdefault(case_id, []).append(measurement)
-            run_ids[case_id] = str(bundle.invocation["run_id"])
+            grouped.setdefault(profile, {}).setdefault(case_id, []).append(measurement)
+            run_ids[(profile, case_id)] = str(bundle.invocation["run_id"])
     matrix = shared.build_workload_matrix(physical_cores=1)
     contracts = {
         case.case_id: case for case in matrix.cases if case.group is shared.WorkloadGroup.QUERY
     }
+    for profile, cases in grouped.items():
+        for case_id, samples in cases.items():
+            if len(samples) != 5:
+                raise AggregateEvidenceError(
+                    f"query case {case_id} requires exactly five repetitions"
+                )
+            repetitions = {sample["identity"]["repetition"] for sample in samples}
+            if repetitions != set(range(5)):
+                raise AggregateEvidenceError(
+                    f"query case {case_id} repetition coverage is incomplete"
+                )
+            if case_id not in contracts:
+                raise AggregateEvidenceError(f"query case {case_id} is absent from workload matrix")
+            if any(
+                sample["values"].get("answer_correct") is not True
+                or sample["values"].get("oracle_equivalent") is not True
+                or sample["values"].get("selector_pages_gap_free") is not True
+                for sample in samples
+            ):
+                raise AggregateEvidenceError(f"query case {case_id} correctness is not proven")
+        if set(cases) != set(contracts):
+            raise AggregateEvidenceError(f"{profile} query coverage is incomplete")
+
+    standard = grouped.get("standard")
+    if standard is None:
+        raise AggregateEvidenceError("standard query coverage is absent")
     rows: list[dict[str, object]] = []
-    for case_id in sorted(grouped):
-        samples = grouped[case_id]
-        if len(samples) != 5:
-            raise AggregateEvidenceError(f"query case {case_id} requires exactly five repetitions")
-        repetitions = {sample["identity"]["repetition"] for sample in samples}
-        if repetitions != set(range(5)):
-            raise AggregateEvidenceError(f"query case {case_id} repetition coverage is incomplete")
-        contract = contracts.get(case_id)
-        if contract is None:
-            raise AggregateEvidenceError(f"query case {case_id} is absent from workload matrix")
+    for case_id in sorted(standard):
+        samples = standard[case_id]
+        contract = contracts[case_id]
         values = [sample["values"] for sample in samples]
-        if any(
-            value.get("answer_correct") is not True
-            or value.get("oracle_equivalent") is not True
-            or value.get("selector_pages_gap_free") is not True
-            for value in values
-        ):
-            raise AggregateEvidenceError(f"query case {case_id} correctness is not proven")
         sql_latencies = [
             _integer(latency, f"{case_id}.sql_latencies_ns")
             for value in values
@@ -340,7 +354,7 @@ def project_query_rows(
                 "oracle_equivalent": True,
                 "performance_class": str(contract.parameter("performance_class")),
                 "plan_id": str(contract.parameter("plan_id")),
-                "qualification_run_id": run_ids[case_id],
+                "qualification_run_id": run_ids[("standard", case_id)],
                 "query_case_id": case_id,
                 "question_id": contract.parameter("question_id"),
                 "repetitions": 5,

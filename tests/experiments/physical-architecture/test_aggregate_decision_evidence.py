@@ -179,9 +179,41 @@ def _write_bundle(
     return root
 
 
-def test_authenticates_bundle_and_projects_exact_query_row(tmp_path: Path) -> None:
-    bundle = aggregate.authenticate_qualification_bundle(_write_bundle(tmp_path / "run"))
-    row = aggregate.project_query_rows([bundle])[0]
+def _query_bundles(
+    root: Path,
+    *,
+    profiles: tuple[str, ...],
+) -> list[Any]:
+    case_ids = sorted(
+        case.case_id
+        for case in shared.build_workload_matrix(physical_cores=1).cases
+        if case.group is shared.WorkloadGroup.QUERY
+    )
+    return [
+        aggregate.authenticate_qualification_bundle(
+            _write_bundle(
+                root / f"{profile}-{index:03d}",
+                case_id=case_id,
+                profile=profile,
+                run_id=f"run.{profile}.{index:03d}",
+            )
+        )
+        for profile in profiles
+        for index, case_id in enumerate(case_ids)
+    ]
+
+
+def test_projects_standard_queries_and_accepts_nonstandard_score_evidence(
+    tmp_path: Path,
+) -> None:
+    bundles = _query_bundles(
+        tmp_path,
+        profiles=("standard", "production", "growth"),
+    )
+    rows = aggregate.project_query_rows(bundles)
+    assert len(rows) == 69
+    row = next(row for row in rows if row["query_case_id"] == "query.feature.bounded_full_sort")
+    assert row["fixture_id"] == "standard"
     assert row["query_case_id"] == "query.feature.bounded_full_sort"
     assert row["repetitions"] == 5
     assert row["sql_latency_p95_ns"] == 14
@@ -193,6 +225,11 @@ def test_authenticates_bundle_and_projects_exact_query_row(tmp_path: Path) -> No
         "sql_statements": 2,
         "temporary_sorts": 6,
     }
+
+    with pytest.raises(aggregate.AggregateEvidenceError, match="standard.*coverage"):
+        aggregate.project_query_rows(
+            [bundle for bundle in bundles if bundle.invocation["fixture"]["profile"] != "standard"]
+        )
 
 
 @pytest.mark.parametrize(
