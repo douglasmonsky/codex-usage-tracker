@@ -36,6 +36,10 @@ _GITNEXUS_LOCK_FILENAME = "codex-usage-tracker-gitnexus-analyze.lock"
 _GITNEXUS_LOCK_TIMEOUT_SECONDS = 600.0
 _GITNEXUS_COMPARE_BASE = "origin/main"
 _GITNEXUS_CHANGED_FILES_PATTERN = re.compile(r"^Changes:\s+(\d+)\s+files\b", re.MULTILINE)
+_GITNEXUS_FTS_CORRUPTION_PATTERN = re.compile(
+    r"FTS index 'file_fts' inconsistent: node offset \d+ missing during delete\. "
+    r"Drop and recreate FTS index\."
+)
 
 
 class BootstrapError(RuntimeError):
@@ -868,6 +872,11 @@ def _gitnexus_analyze_command(root: Path, node: str) -> list[str]:
     return [node, str(runner), "analyze", "--index-only"]
 
 
+def _is_recognized_gitnexus_fts_corruption(result: CommandResult) -> bool:
+    output = f"{result.stdout}\n{result.stderr}"
+    return _GITNEXUS_FTS_CORRUPTION_PATTERN.search(output) is not None
+
+
 def _cache_root() -> Path:
     configured = os.environ.get("XDG_CACHE_HOME")
     if configured:
@@ -968,10 +977,41 @@ def _analyze_gitnexus_if_needed(
         if inspection.state == "error":
             raise BootstrapError(inspection.detail)
         analyze_command = _gitnexus_analyze_command(root, node)
-        analyze_result = _run(analyze_command, cwd=root, stream=True)
-        if analyze_result.returncode != 0:
+        analyze_result = _run(analyze_command, cwd=root)
+        if analyze_result.returncode == 0:
+            return True
+        exact_worktree_identified = (
+            inspection.repository == root.resolve() and inspection.branch is not None
+        )
+        if (
+            not exact_worktree_identified
+            or not _is_recognized_gitnexus_fts_corruption(analyze_result)
+        ):
             raise BootstrapError(_command_failure(analyze_command, analyze_result))
-    return True
+
+        clean_command = [
+            node,
+            str(_gitnexus_runner(root)),
+            "clean",
+            "--force",
+        ]
+        clean_result = _run(clean_command, cwd=root)
+        if clean_result.returncode != 0:
+            raise BootstrapError(
+                "GitNexus recognized file_fts corruption for the exact worktree, "
+                "but automatic clean failed; analysis was not retried. "
+                f"{_command_failure(clean_command, clean_result)} "
+                f"Original analysis: {_command_failure(analyze_command, analyze_result)}"
+            )
+
+        retry_result = _run(analyze_command, cwd=root)
+        if retry_result.returncode != 0:
+            raise BootstrapError(
+                "GitNexus automatic clean succeeded after recognized file_fts "
+                "corruption, but the one allowed index-only retry failed; "
+                f"{_command_failure(analyze_command, retry_result)}"
+            )
+        return True
 
 
 def _repair_gitnexus_tool(root: Path, node: str) -> str:

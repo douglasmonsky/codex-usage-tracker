@@ -526,6 +526,54 @@ class _GitNexusEnvironment:
         raise AssertionError(f"unexpected command: {argv}")
 
 
+_GITNEXUS_FTS_CORRUPTION = (
+    "FTS index 'file_fts' inconsistent: node offset 42 missing during delete. "
+    "Drop and recreate FTS index."
+)
+
+
+class _FailingGitNexusEnvironment(_GitNexusEnvironment):
+    def __init__(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        root: Path,
+        *,
+        analysis_results: list[bootstrap.CommandResult],
+        clean_result: bootstrap.CommandResult | None = None,
+        indexed: bool = True,
+        stale: bool = True,
+    ) -> None:
+        self.analysis_results = analysis_results.copy()
+        self.clean_result = clean_result or bootstrap.CommandResult(0, "", "")
+        super().__init__(monkeypatch, root, indexed=indexed, stale=stale)
+
+    def run(
+        self,
+        command: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str] | None = None,
+        stream: bool = False,
+    ) -> bootstrap.CommandResult:
+        argv = tuple(str(part) for part in command)
+        if "analyze" in argv:
+            self.commands.append(argv)
+            if not self.analysis_results:
+                raise AssertionError("unexpected extra GitNexus analysis")
+            result = self.analysis_results.pop(0)
+            if result.returncode == 0:
+                self.indexed = True
+                self.stale = False
+            return result
+        if argv[-2:] == ("clean", "--force"):
+            self.commands.append(argv)
+            if self.clean_result.returncode == 0:
+                self.indexed = False
+                self.stale = False
+            return self.clean_result
+        return super().run(command, cwd=cwd, env=env, stream=stream)
+
+
 def test_ready_gitnexus_index_is_not_reanalyzed(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -640,6 +688,140 @@ def test_stale_gitnexus_index_is_reanalyzed_once_under_index_only_mode(
     assert analyzes[0][-2:] == ("analyze", "--index-only")
     assert "--embeddings" not in analyzes[0]
     assert "--force" not in analyzes[0]
+
+
+def test_recognized_gitnexus_fts_corruption_cleans_and_retries_once(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    fake = _FailingGitNexusEnvironment(
+        monkeypatch,
+        root,
+        analysis_results=[
+            bootstrap.CommandResult(1, "", _GITNEXUS_FTS_CORRUPTION),
+            bootstrap.CommandResult(0, "", ""),
+        ],
+    )
+
+    result = bootstrap.prepare_gitnexus(root, check_only=False)
+
+    recovery_commands = [
+        command
+        for command in fake.commands
+        if "analyze" in command or "clean" in command
+    ]
+    assert result.changed is True
+    assert result.state == "up_to_date"
+    assert [command[-2:] for command in recovery_commands] == [
+        ("analyze", "--index-only"),
+        ("clean", "--force"),
+        ("analyze", "--index-only"),
+    ]
+    assert recovery_commands[1] == (
+        fake.node,
+        str(fake.entrypoint),
+        "clean",
+        "--force",
+    )
+
+
+def test_unrelated_gitnexus_analysis_failure_does_not_clean_or_retry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    fake = _FailingGitNexusEnvironment(
+        monkeypatch,
+        root,
+        analysis_results=[
+            bootstrap.CommandResult(1, "", "unrelated analyzer failure"),
+        ],
+    )
+
+    with pytest.raises(bootstrap.BootstrapError, match="unrelated analyzer failure"):
+        bootstrap.prepare_gitnexus(root, check_only=False)
+
+    assert sum("analyze" in command for command in fake.commands) == 1
+    assert not any("clean" in command for command in fake.commands)
+
+
+def test_gitnexus_fts_corruption_without_exact_identity_does_not_clean_or_retry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    fake = _FailingGitNexusEnvironment(
+        monkeypatch,
+        root,
+        analysis_results=[
+            bootstrap.CommandResult(1, "", _GITNEXUS_FTS_CORRUPTION),
+        ],
+        indexed=False,
+        stale=False,
+    )
+
+    with pytest.raises(
+        bootstrap.BootstrapError,
+        match="FTS index 'file_fts' inconsistent",
+    ):
+        bootstrap.prepare_gitnexus(root, check_only=False)
+
+    assert sum("analyze" in command for command in fake.commands) == 1
+    assert not any("clean" in command for command in fake.commands)
+
+
+def test_gitnexus_fts_recovery_clean_failure_is_actionable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    fake = _FailingGitNexusEnvironment(
+        monkeypatch,
+        root,
+        analysis_results=[
+            bootstrap.CommandResult(1, "", _GITNEXUS_FTS_CORRUPTION),
+        ],
+        clean_result=bootstrap.CommandResult(1, "", "synthetic clean failure"),
+    )
+
+    with pytest.raises(
+        bootstrap.BootstrapError,
+        match="automatic clean failed.*synthetic clean failure",
+    ):
+        bootstrap.prepare_gitnexus(root, check_only=False)
+
+    assert sum("analyze" in command for command in fake.commands) == 1
+    assert sum("clean" in command for command in fake.commands) == 1
+
+
+def test_gitnexus_fts_recovery_retry_failure_is_actionable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    fake = _FailingGitNexusEnvironment(
+        monkeypatch,
+        root,
+        analysis_results=[
+            bootstrap.CommandResult(1, "", _GITNEXUS_FTS_CORRUPTION),
+            bootstrap.CommandResult(1, "", "synthetic retry failure"),
+        ],
+    )
+
+    with pytest.raises(
+        bootstrap.BootstrapError,
+        match="one allowed index-only retry failed.*synthetic retry failure",
+    ):
+        bootstrap.prepare_gitnexus(root, check_only=False)
+
+    assert sum("analyze" in command for command in fake.commands) == 2
+    assert sum("clean" in command for command in fake.commands) == 1
 
 
 def test_gitnexus_rechecks_after_lock_and_skips_duplicate_analysis(
