@@ -392,6 +392,8 @@ DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS = frozenset(
 CK04_PHYSICAL_BAKEOFF_ADDITIONS = frozenset(
     {
         "experiments/physical-architecture/README.md",
+        "experiments/physical-architecture/qualification.py",
+        "experiments/physical-architecture/run_bakeoff.py",
         "experiments/physical-architecture/shared/__init__.py",
         "experiments/physical-architecture/shared/adapter.py",
         "experiments/physical-architecture/shared/agent-perf-workload-v1.schema.json",
@@ -434,6 +436,7 @@ CK04_PHYSICAL_BAKEOFF_ADDITIONS = frozenset(
         "tests/experiments/physical-architecture/candidate_a/test_candidate_a.py",
         "tests/experiments/physical-architecture/candidate_c/test_candidate_c.py",
         "tests/experiments/physical-architecture/candidate_d/test_candidate_d.py",
+        "tests/experiments/physical-architecture/test_bakeoff_runner.py",
         "tests/experiments/physical-architecture/test_shared_harness.py",
     }
 )

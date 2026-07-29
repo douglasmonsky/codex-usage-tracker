@@ -89,6 +89,8 @@ warn_unused_configs = true
 mypy_path = ["src", "experiments/physical-architecture"]
 explicit_package_bases = true
 files = [
+  "experiments/physical-architecture/qualification.py",
+  "experiments/physical-architecture/run_bakeoff.py",
   "experiments/physical-architecture/shared",
   "experiments/physical-architecture/candidate_a",
   "experiments/physical-architecture/candidate_c",
@@ -113,6 +115,8 @@ files = [
 
 [tool.pyright]
 include = [
+  "experiments/physical-architecture/qualification.py",
+  "experiments/physical-architecture/run_bakeoff.py",
   "experiments/physical-architecture/shared",
   "experiments/physical-architecture/candidate_a",
   "experiments/physical-architecture/candidate_c",

@@ -26,6 +26,8 @@ vp:
         scripts/generate_kernel_manifests.py \
         src/codex_usage_tracker/kernel \
         src/codex_usage_tracker/release \
+        experiments/physical-architecture/qualification.py \
+        experiments/physical-architecture/run_bakeoff.py \
         experiments/physical-architecture/shared \
         experiments/physical-architecture/candidate_a \
         experiments/physical-architecture/candidate_c \
