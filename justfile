@@ -26,8 +26,10 @@ vp:
         scripts/generate_kernel_manifests.py \
         src/codex_usage_tracker/kernel \
         src/codex_usage_tracker/release \
+        experiments/physical-architecture/shared \
         tests/release \
         tests/agent_kernel \
+        tests/experiments/physical-architecture \
         tests/kernel/allowance \
         tests/kernel/console \
         tests/kernel/content \
@@ -99,6 +101,7 @@ v:
         tests/kernel/test_stable_contract_028.py \
         tests/kernel/test_watcher.py \
         tests/agent_kernel \
+        tests/experiments/physical-architecture \
         tests/kernel/allowance \
         tests/kernel/console \
         tests/kernel/content \

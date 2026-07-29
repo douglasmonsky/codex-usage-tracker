@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "codex-usage-tracker.agent-perf-workload.v1",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {
+      "enum": [
+        "A",
+        "C",
+        "D"
+      ]
+    },
+    "command_argv": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "environment": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "type": "object"
+    },
+    "fixture_profile": {
+      "const": "standard"
+    },
+    "fixture_revision": {
+      "const": "agent-kernel-structural-v1"
+    },
+    "fixture_manifest_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "fixture_oracle_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "minimum_unprofiled_runs": {
+      "minimum": 5,
+      "type": "integer"
+    },
+    "profile_is_attribution_only": {
+      "const": true
+    },
+    "schema": {
+      "const": "codex-usage-tracker.agent-perf-workload.v1"
+    },
+    "synthetic_only": {
+      "const": true
+    },
+    "version": {
+      "const": 1
+    },
+    "workload_matrix_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "workload_id": {
+      "const": "build.scale.standard"
+    }
+  },
+  "required": [
+    "schema",
+    "version",
+    "candidate_id",
+    "fixture_profile",
+    "fixture_revision",
+    "fixture_manifest_digest",
+    "fixture_oracle_digest",
+    "workload_matrix_digest",
+    "synthetic_only",
+    "workload_id",
+    "command_argv",
+    "environment",
+    "minimum_unprofiled_runs",
+    "profile_is_attribution_only"
+  ],
+  "title": "CK-04 Agent Perf Workload",
+  "type": "object"
+}

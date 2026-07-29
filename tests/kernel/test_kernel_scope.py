@@ -8,6 +8,7 @@ from scripts.check_kernel_scope import (
     CK01_AGENT_KERNEL_CONTRACT_ADDITIONS,
     CK02_LOGICAL_CONTRACT_ADDITIONS,
     CK03_SYNTHETIC_ORACLE_ADDITIONS,
+    CK04_PHYSICAL_BAKEOFF_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS,
     INTEGRATION_ADDITIONS,
@@ -352,6 +353,24 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tools/gitnexus/package-lock.json",
         "tools/gitnexus/package.json",
     } == DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
+    assert {
+        "experiments/physical-architecture/README.md",
+        "experiments/physical-architecture/shared/__init__.py",
+        "experiments/physical-architecture/shared/adapter.py",
+        "experiments/physical-architecture/shared/agent-perf-workload-v1.schema.json",
+        "experiments/physical-architecture/shared/agent_perf.py",
+        "experiments/physical-architecture/shared/canonical.py",
+        "experiments/physical-architecture/shared/crash.py",
+        "experiments/physical-architecture/shared/dbhub-v0.24.0.contract.json",
+        "experiments/physical-architecture/shared/dbhub.py",
+        "experiments/physical-architecture/shared/fixture.py",
+        "experiments/physical-architecture/shared/measurement.py",
+        "experiments/physical-architecture/shared/outcomes.py",
+        "experiments/physical-architecture/shared/scoring.py",
+        "experiments/physical-architecture/shared/stop.py",
+        "experiments/physical-architecture/shared/workload.py",
+        "tests/experiments/physical-architecture/test_shared_harness.py",
+    } == CK04_PHYSICAL_BAKEOFF_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -378,6 +397,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK02_LOGICAL_CONTRACT_ADDITIONS
         | CK03_SYNTHETIC_ORACLE_ADDITIONS
         | DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
+        | CK04_PHYSICAL_BAKEOFF_ADDITIONS
     )
 
 

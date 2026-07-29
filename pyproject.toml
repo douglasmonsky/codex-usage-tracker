@@ -71,7 +71,7 @@ namespaces = true
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/agent_kernel", "tests/kernel", "tests/release"]
+testpaths = ["tests/agent_kernel", "tests/experiments", "tests/kernel", "tests/release"]
 pythonpath = [".", "src"]
 addopts = ["--import-mode=importlib"]
 
@@ -86,9 +86,10 @@ ignore = ["E501", "SIM300"]
 [tool.mypy]
 python_version = "3.10"
 warn_unused_configs = true
-mypy_path = "src"
+mypy_path = ["src", "experiments/physical-architecture"]
 explicit_package_bases = true
 files = [
+  "experiments/physical-architecture/shared",
   "scripts/benchmark_agent_outcome.py",
   "scripts/benchmark_kernel.py",
   "scripts/check_agent_kernel_contracts.py",
@@ -109,6 +110,7 @@ files = [
 
 [tool.pyright]
 include = [
+  "experiments/physical-architecture/shared",
   "scripts/benchmark_agent_outcome.py",
   "scripts/benchmark_kernel.py",
   "scripts/check_agent_kernel_contracts.py",
@@ -123,5 +125,6 @@ include = [
   "tests/agent_kernel/contracts/reference",
   "tests/agent_kernel/fixtures",
 ]
+extraPaths = ["src", "experiments/physical-architecture"]
 pythonVersion = "3.10"
 typeCheckingMode = "standard"
