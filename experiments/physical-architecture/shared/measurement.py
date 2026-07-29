@@ -187,16 +187,20 @@ class MeasurementValues:
 
     def __post_init__(self) -> None:
         for value_name, basis_name, expected in (
-            ("ordinary_tail_latency_ns", "ordinary_tail_latency_basis", _ORDINARY_TAIL_LATENCY_BASIS),
+            (
+                "ordinary_tail_latency_ns",
+                "ordinary_tail_latency_basis",
+                _ORDINARY_TAIL_LATENCY_BASIS,
+            ),
             ("pages_written", "pages_written_basis", _PAGES_WRITTEN_BASIS),
             ("writer_transactions", "writer_transactions_basis", _WRITER_TRANSACTIONS_BASIS),
         ):
             value = getattr(self, value_name)
             basis = getattr(self, basis_name)
-            # Candidate C/D elimination runs remain projectable.  Their legacy
-            # measurements leave these Candidate-A-only write metrics unavailable.
-            if value is None and basis is not None:
-                raise MeasurementContractError(f"measurement {value_name} and {basis_name} must be paired")
+            if (value is None) != (basis is None):
+                raise MeasurementContractError(
+                    f"measurement {value_name} and {basis_name} must be paired"
+                )
             if basis is not None and basis != expected:
                 raise MeasurementContractError(f"measurement {basis_name} is unsupported")
         for field in fields(self):
@@ -263,7 +267,9 @@ class MeasurementRecord:
             raise MeasurementContractError("measurement clocks moved backwards")
         latency = self.values.ordinary_tail_latency_ns
         if latency is not None and self.wall_time_ns < latency:
-            raise MeasurementContractError("measurement wall time cannot be shorter than ordinary latency")
+            raise MeasurementContractError(
+                "measurement wall time cannot be shorter than ordinary latency"
+            )
         if (self.outcome is RunOutcome.STOPPED) != (self.stop_decision is not None):
             raise MeasurementContractError("stopped measurement requires one stop decision")
         if self.outcome in {RunOutcome.FAILED, RunOutcome.UNSUPPORTED} and not self.detail_code:

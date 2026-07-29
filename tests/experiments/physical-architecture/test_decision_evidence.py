@@ -287,6 +287,23 @@ def _score_evidence_bundle(
         "include_research": False,
         "qualification_model": None,
         "retain_run_artifacts": False,
+        "prepared_scale_artifact_policy": {
+            "candidate_ids": ["A"],
+            "mode": "reuse_scale_build_per_repetition",
+            "source_case_id": f"build.scale.{profile}",
+            "query": {"mode": "read_only_reuse"},
+            "ordinary_change": {
+                "clone_command": ["/bin/cp", "-c"],
+                "copy_sidecars": False,
+                "mode": "prepared_scale_clone",
+                "source_validation": [
+                    "regular_file",
+                    "no_journal",
+                    "empty_or_absent_wal",
+                    "no_active_lease",
+                ],
+            },
+        },
         "completion_marker": "summary.json",
     }
     invocation = {
@@ -345,9 +362,13 @@ def _score_evidence_bundle(
                 values.update(
                     {
                         "facts_inserted": 0,
+                        "facts_recanonicalized": 0,
                         "dirty_keys": 0,
                         "pages_written": 0,
+                        "projection_rows_read": 0,
                         "projection_rows_written": 0,
+                        "source_files_rescanned": 0,
+                        "source_bytes_rescanned": 0,
                         "writer_transactions": 0,
                     }
                 )
@@ -385,6 +406,14 @@ def _score_evidence_bundle(
                         "preparation": {
                             "clone_method": "cp_clone",
                             "copy_sidecars": False,
+                            "mode": "prepared_scale_clone",
+                            "preparation_wall_time_ns": 0,
+                            "destination_distinct_inode": True,
+                            "source_unchanged": True,
+                            "source_case_id": f"build.scale.{profile}",
+                            "source_bytes": 1,
+                            "source_publication_id": "publication:synthetic",
+                            "destination_publication_id": "publication:synthetic",
                         }
                     }
                     if case_id.startswith("ordinary.")

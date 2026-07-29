@@ -594,12 +594,12 @@ def _prepared_scale_artifact_policy(
 ) -> dict[str, object]:
     source_case_id = f"build.scale.{prepared.fixture.profile}"
     case_ids = {case.case_id for case in prepared.cases}
-    has_ordinary = any(case.group is shared.WorkloadGroup.ORDINARY_CHANGE for case in prepared.cases)
+    has_ordinary = any(
+        case.group is shared.WorkloadGroup.ORDINARY_CHANGE for case in prepared.cases
+    )
     has_query = any(case.group is shared.WorkloadGroup.QUERY for case in prepared.cases)
     enabled = (
-        "A" in prepared.candidates
-        and source_case_id in case_ids
-        and (has_query or has_ordinary)
+        "A" in prepared.candidates and source_case_id in case_ids and (has_query or has_ordinary)
     )
     if config.speed_claim and "A" in prepared.candidates and has_ordinary and not enabled:
         raise QualificationContractError(

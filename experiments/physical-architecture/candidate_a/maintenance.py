@@ -491,9 +491,10 @@ def _insert_tool(
     include_state_change: bool,
 ) -> tuple[int, int, _ToolStartDelta]:
     session_id, turn_id, source = _tail_identity(connection)
-    event_at = int(
-        connection.execute(
-            """
+    event_at = (
+        int(
+            connection.execute(
+                """
             SELECT max(value) FROM (
                 SELECT maximum_event_at_us AS value
                 FROM model_call_tail_state
@@ -502,11 +503,11 @@ def _insert_tool(
                 UNION ALL SELECT max(event_at_us) FROM state_changes
             )
             """
-        ).fetchone()[0]
-    ) + 1
-    digest = shared.canonical_sha256(
-        {"candidate": "A", "change": "tool", "event_at_us": event_at}
+            ).fetchone()[0]
+        )
+        + 1
     )
+    digest = shared.canonical_sha256({"candidate": "A", "change": "tool", "event_at_us": event_at})
     tool_id = f"tool:candidate-a:{digest}"
     resource_id = f"resource:candidate-a:{digest}"
     connection.execute(
@@ -653,8 +654,9 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
     try:
         _require_clean_wal_epoch(connection, "before ordinary operation")
         if change == "no_source_change":
+            started = time.perf_counter_ns()
             connection.execute(
-                    """
+                """
                     SELECT
                         (
                             SELECT calls
@@ -666,10 +668,11 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
                             FROM tool_family_current
                         )
                     """
-                ).fetchone()[0]
+            ).fetchone()[0]
+            latency = time.perf_counter_ns() - started
             _require_checkpointed_wal(connection, "after no-source-change read")
             _require_clean_wal_epoch(connection, "after no-source-change read")
-            return MaintenanceStats()
+            return MaintenanceStats(ordinary_tail_latency_ns=max(1, latency))
         started = time.perf_counter_ns()
         connection.execute("BEGIN IMMEDIATE")
         if change in {"one_model_call", "32_call_tail", "2000_call_tail", "late_event"}:
@@ -776,7 +779,9 @@ def _require_clean_wal_epoch(connection: sqlite3.Connection, stage: str) -> None
 def _require_checkpointed_wal(connection: sqlite3.Connection, stage: str) -> int:
     busy, log_frames, checkpointed = _checkpoint(connection, "PASSIVE")
     if busy != 0 or log_frames != checkpointed:
-        raise RuntimeError(f"SQLite WAL checkpoint is ambiguous {stage}: {(busy, log_frames, checkpointed)!r}")
+        raise RuntimeError(
+            f"SQLite WAL checkpoint is ambiguous {stage}: {(busy, log_frames, checkpointed)!r}"
+        )
     return log_frames
 
 

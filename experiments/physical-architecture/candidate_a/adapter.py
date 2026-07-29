@@ -40,7 +40,9 @@ class Adapter:
 
     def __init__(self) -> None:
         self._prepared_scale_artifacts: dict[int, BuildArtifact] = {}
-        self._prepared_ordinary_artifacts: dict[tuple[str, int], tuple[BuildArtifact, PreparationEvidence]] = {}
+        self._prepared_ordinary_artifacts: dict[
+            tuple[str, int], tuple[BuildArtifact, PreparationEvidence]
+        ] = {}
 
     def execute(self, request: shared.CandidateRequest) -> shared.CandidateResult:
         group = request.case.group
@@ -221,6 +223,7 @@ class Adapter:
             artifact,
             storage,
             maintenance=maintenance,
+            ordinary_metrics=True,
             sql_latencies_ns=(elapsed,) if elapsed else (),
         )
         if self._observe_stop(
@@ -598,6 +601,7 @@ class Adapter:
         storage: ArtifactMetrics,
         *,
         maintenance: MaintenanceStats | None = None,
+        ordinary_metrics: bool = False,
         query: QueryResult | None = None,
         parser_worker_time_ns: int = 0,
         parallel_efficiency_ppm: int = 0,
@@ -647,18 +651,16 @@ class Adapter:
             wal_bytes=storage.wal_bytes,
             journal_bytes=storage.journal_bytes,
             ordinary_tail_latency_ns=(
-                update.ordinary_tail_latency_ns if maintenance is not None else None
+                update.ordinary_tail_latency_ns if ordinary_metrics else None
             ),
             ordinary_tail_latency_basis=(
-                "ordinary_operation_after_preparation.v1" if maintenance is not None else None
+                "ordinary_operation_after_preparation.v1" if ordinary_metrics else None
             ),
-            pages_written=(update.pages_written if maintenance is not None else None),
-            pages_written_basis=(
-                "sqlite_wal_frames_clean_epoch.v1" if maintenance is not None else None
-            ),
-            writer_transactions=(update.writer_transactions if maintenance is not None else None),
+            pages_written=(update.pages_written if ordinary_metrics else None),
+            pages_written_basis=("sqlite_wal_frames_clean_epoch.v1" if ordinary_metrics else None),
+            writer_transactions=(update.writer_transactions if ordinary_metrics else None),
             writer_transactions_basis=(
-                "explicit_committed_analytical_transactions.v1" if maintenance is not None else None
+                "explicit_committed_analytical_transactions.v1" if ordinary_metrics else None
             ),
             source_files_inventoried=ingest.source_files_inventoried,
             source_files_selected=ingest.source_files_selected,

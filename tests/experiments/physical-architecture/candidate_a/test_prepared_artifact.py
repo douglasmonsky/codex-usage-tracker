@@ -38,8 +38,15 @@ def test_cp_clone_is_isolated_and_has_fresh_ordinary_stats(
     source_path = tmp_path / "scale" / "publication.sqlite"
     source_path.parent.mkdir(parents=True)
     source = _artifact(source_path)
+
     def clone(argv: tuple[str, ...], *, check: bool) -> None:
-        assert argv == ("/bin/cp", "-c", "--", str(source.path), str(tmp_path / "ordinary" / "ordinary.sqlite"))
+        assert argv == (
+            "/bin/cp",
+            "-c",
+            "--",
+            str(source.path),
+            str(tmp_path / "ordinary" / "ordinary.sqlite"),
+        )
         assert check is True
         (tmp_path / "ordinary" / "ordinary.sqlite").write_bytes(source.path.read_bytes())
 
@@ -72,7 +79,13 @@ def test_cp_clone_failure_fails_closed_without_copy_fallback(
     source_path.parent.mkdir(parents=True)
     source = _artifact(source_path)
     destination = tmp_path / "ordinary.sqlite"
-    monkeypatch.setattr(prepared_artifact.subprocess, "run", lambda *_args, **_kwargs: (_ for _ in ()).throw(subprocess.CalledProcessError(1, "/bin/cp")))
+    monkeypatch.setattr(
+        prepared_artifact.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            subprocess.CalledProcessError(1, "/bin/cp")
+        ),
+    )
 
     with pytest.raises(prepared_artifact.PreparedArtifactError, match="clone is unavailable"):
         prepared_artifact.clone_prepared_artifact(

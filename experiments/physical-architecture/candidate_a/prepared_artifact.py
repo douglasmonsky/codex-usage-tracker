@@ -18,6 +18,9 @@ class PreparationEvidence:
     clone_method: str
     source_bytes: int
     preparation_wall_time_ns: int
+    source_unchanged: bool
+    source_publication_id: str
+    destination_publication_id: str
 
     def as_oracle_result(self, *, source_case_id: str) -> dict[str, object]:
         return {
@@ -26,8 +29,11 @@ class PreparationEvidence:
             "preparation_wall_time_ns": self.preparation_wall_time_ns,
             "copy_sidecars": False,
             "destination_distinct_inode": True,
+            "source_unchanged": self.source_unchanged,
             "source_case_id": source_case_id,
             "source_bytes": self.source_bytes,
+            "source_publication_id": self.source_publication_id,
+            "destination_publication_id": self.destination_publication_id,
         }
 
 
@@ -43,6 +49,7 @@ def clone_prepared_artifact(
     if not source.is_relative_to(retained):
         raise PreparedArtifactError("prepared source escapes its retained scale root")
     source_stat = source.stat()
+    source_identity = (source_stat.st_ino, source_stat.st_size, source_stat.st_mtime_ns)
     if not stat.S_ISREG(source_stat.st_mode):
         raise PreparedArtifactError("prepared source must be a regular file")
     _validate_source_sidecars(source, retained)
@@ -63,6 +70,10 @@ def clone_prepared_artifact(
             raise PreparedArtifactError("prepared destination must have a distinct inode")
         if destination_stat.st_size != source_stat.st_size:
             raise PreparedArtifactError("prepared destination size differs from source")
+        after = source.stat()
+        source_unchanged = (after.st_ino, after.st_size, after.st_mtime_ns) == source_identity
+        if not source_unchanged:
+            raise PreparedArtifactError("prepared source changed while cloning")
     except BaseException:
         destination.unlink(missing_ok=True)
         raise
@@ -77,6 +88,9 @@ def clone_prepared_artifact(
             clone_method=method,
             source_bytes=source_stat.st_size,
             preparation_wall_time_ns=preparation_wall_time_ns,
+            source_unchanged=source_unchanged,
+            source_publication_id=artifact.publication_id,
+            destination_publication_id=artifact.publication_id,
         ),
     )
 

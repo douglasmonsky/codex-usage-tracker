@@ -23,7 +23,6 @@ class ArtifactMetrics:
     free_list_bytes: int
     wal_bytes: int
     journal_bytes: int
-    pages_written: int
 
 
 def _peak_rss_bytes() -> int:
@@ -66,7 +65,6 @@ def _dbstat_bytes(
 def artifact_metrics(path: Path, *, occurrence_rows: int) -> ArtifactMetrics:
     with database(path, read_only=True) as connection:
         page_size = int(connection.execute("PRAGMA page_size").fetchone()[0])
-        page_count = int(connection.execute("PRAGMA page_count").fetchone()[0])
         free_pages = int(connection.execute("PRAGMA freelist_count").fetchone()[0])
         table_bytes, index_bytes = _dbstat_bytes(connection)
         fact_rows = int(
@@ -124,5 +122,4 @@ def artifact_metrics(path: Path, *, occurrence_rows: int) -> ArtifactMetrics:
         free_list_bytes=free_pages * page_size,
         wal_bytes=wal_path.stat().st_size if wal_path.exists() else 0,
         journal_bytes=journal_path.stat().st_size if journal_path.exists() else 0,
-        pages_written=page_count,
     )

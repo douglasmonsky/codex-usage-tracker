@@ -661,7 +661,7 @@ def _authenticate_score_evidence(
             raise DecisionEvidenceContractError(f"{item_context} must be complete and passed")
         if candidate_id == "A":
             _validate_candidate_a_score_measurement(
-                measurement, detail, context=item_context
+                measurement, detail, invocation=invocation, context=item_context
             )
         repetition_coverage[str(case_id)].append(repetition)
         rows.append(
@@ -703,12 +703,17 @@ def _authenticate_score_evidence(
 
 
 def _validate_candidate_a_score_measurement(
-    measurement: Mapping[str, Any], detail: Mapping[str, Any], *, context: str
+    measurement: Mapping[str, Any],
+    detail: Mapping[str, Any],
+    *,
+    invocation: Mapping[str, Any],
+    context: str,
 ) -> None:
     values = _object_mapping(measurement.get("values"), f"{context}.values")
     case_id = _text(
         _object_mapping(measurement.get("identity"), f"{context}.identity").get("case_id"),
-        f"{context}.case_id", maximum=256
+        f"{context}.case_id",
+        maximum=256,
     )
     if not case_id.startswith("ordinary."):
         return
@@ -720,21 +725,82 @@ def _validate_candidate_a_score_measurement(
     for field, value in expected.items():
         if values.get(field) != value:
             raise DecisionEvidenceContractError(f"{context} {field} is not authenticated")
-    for field in ("ordinary_tail_latency_ns", "pages_written", "writer_transactions"):
+    if (
+        _integer(
+            values.get("ordinary_tail_latency_ns"),
+            f"{context} values.ordinary_tail_latency_ns",
+            minimum=1,
+        )
+        < 1
+    ):
+        raise DecisionEvidenceContractError(f"{context} ordinary latency is not positive")
+    for field in ("pages_written", "writer_transactions"):
         _integer(values.get(field), f"{context} values.{field}", minimum=0)
-    if _integer(measurement.get("wall_time_ns"), f"{context}.wall_time_ns", minimum=0) < int(values["ordinary_tail_latency_ns"]):
+    if _integer(measurement.get("wall_time_ns"), f"{context}.wall_time_ns", minimum=0) < int(
+        values["ordinary_tail_latency_ns"]
+    ):
         raise DecisionEvidenceContractError(f"{context} wall time is shorter than ordinary latency")
     oracle = _object_mapping(detail.get("oracle_results"), f"{context}.oracle_results")
     preparation = _object_mapping(oracle.get("preparation"), f"{context}.preparation")
-    if preparation.get("clone_method") != "cp_clone" or preparation.get("copy_sidecars") is not False:
+    fixture = _object_mapping(invocation.get("fixture"), f"{context}.fixture")
+    expected_policy = {
+        "candidate_ids": ["A"],
+        "mode": "reuse_scale_build_per_repetition",
+        "source_case_id": f"build.scale.{fixture.get('profile')}",
+        "query": {"mode": "read_only_reuse"},
+        "ordinary_change": {
+            "clone_command": ["/bin/cp", "-c"],
+            "copy_sidecars": False,
+            "mode": "prepared_scale_clone",
+            "source_validation": [
+                "regular_file",
+                "no_journal",
+                "empty_or_absent_wal",
+                "no_active_lease",
+            ],
+        },
+    }
+    if invocation.get("prepared_scale_artifact_policy") != expected_policy:
+        raise DecisionEvidenceContractError(f"{context} prepared-scale policy is not exact")
+    if (
+        preparation.get("clone_method") != "cp_clone"
+        or preparation.get("mode") != "prepared_scale_clone"
+        or preparation.get("copy_sidecars") is not False
+        or preparation.get("destination_distinct_inode") is not True
+        or preparation.get("source_unchanged") is not True
+        or preparation.get("source_case_id") != f"build.scale.{fixture.get('profile')}"
+        or _integer(
+            preparation.get("preparation_wall_time_ns"),
+            f"{context}.preparation_wall_time_ns",
+            minimum=0,
+        )
+        < 0
+        or _integer(preparation.get("source_bytes"), f"{context}.source_bytes", minimum=1) < 1
+        or preparation.get("source_publication_id") != preparation.get("destination_publication_id")
+    ):
         raise DecisionEvidenceContractError(f"{context} preparation evidence is not exact")
     if case_id == "ordinary.no_source_change":
-        for field in ("pages_written", "writer_transactions", "facts_inserted", "facts_updated", "dirty_keys", "projection_rows_written"):
+        for field in (
+            "pages_written",
+            "writer_transactions",
+            "facts_inserted",
+            "facts_updated",
+            "facts_recanonicalized",
+            "dirty_keys",
+            "projection_rows_read",
+            "projection_rows_written",
+            "source_files_rescanned",
+            "source_bytes_rescanned",
+        ):
             if _integer(values.get(field), f"{context} values.{field}", minimum=0) != 0:
-                raise DecisionEvidenceContractError(f"{context} no-change operation is not zero-write")
+                raise DecisionEvidenceContractError(
+                    f"{context} no-change operation is not zero-write"
+                )
     else:
         if int(values["writer_transactions"]) != 1 or int(values["pages_written"]) < 1:
-            raise DecisionEvidenceContractError(f"{context} mutation lacks one committed WAL transaction")
+            raise DecisionEvidenceContractError(
+                f"{context} mutation lacks one committed WAL transaction"
+            )
 
 
 def _canonical_score_object(payload: bytes, artifact: str) -> dict[str, Any]:

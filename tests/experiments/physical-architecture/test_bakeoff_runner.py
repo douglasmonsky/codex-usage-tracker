@@ -421,21 +421,23 @@ def test_candidate_a_reuses_scale_build_for_query_and_cloned_ordinary_repetition
             assert (request.run_root / "ordinary.sqlite").is_file()
         return original_execute_measured(*args, **kwargs)
 
-    monkeypatch.setattr(qualification.shared, "execute_measured_candidate", recording_execute_measured)
+    monkeypatch.setattr(
+        qualification.shared, "execute_measured_candidate", recording_execute_measured
+    )
     adapter = RecordingAdapter()
     artifact = qualification.run_qualification(
         replace(
             _config(
-            tmp_path,
-            run_id="prepared-query-artifacts",
-            case_ids=(
-                "build.scale.production",
-                "ordinary.one_model_call",
-                "query.q-acc-01.warm_first_page",
-                "query.q-acc-02.warm_first_page",
-            ),
-            repetitions=2,
-            retain_run_artifacts=True,
+                tmp_path,
+                run_id="prepared-query-artifacts",
+                case_ids=(
+                    "build.scale.production",
+                    "ordinary.one_model_call",
+                    "query.q-acc-01.warm_first_page",
+                    "query.q-acc-02.warm_first_page",
+                ),
+                repetitions=2,
+                retain_run_artifacts=True,
             ),
             allow_large_fixture=True,
         ),
@@ -448,10 +450,10 @@ def test_candidate_a_reuses_scale_build_for_query_and_cloned_ordinary_repetition
     assert invocation["prepared_scale_artifact_policy"] == {
         "candidate_ids": ["A"],
         "mode": "reuse_scale_build_per_repetition",
-            "ordinary_change": {
-                "clone_command": ["/bin/cp", "-c"],
-                "copy_sidecars": False,
-                "mode": "prepared_scale_clone",
+        "ordinary_change": {
+            "clone_command": ["/bin/cp", "-c"],
+            "copy_sidecars": False,
+            "mode": "prepared_scale_clone",
             "source_validation": [
                 "regular_file",
                 "no_journal",
@@ -475,7 +477,11 @@ def test_candidate_a_reuses_scale_build_for_query_and_cloned_ordinary_repetition
     for _index, before_sha256, path in published:
         assert hashlib.sha256(path.read_bytes()).hexdigest() == before_sha256
     assert len(prepared_before_measurement) == 2
-    ordinary = [record for record in artifact.records if record.identity.case_id == "ordinary.one_model_call"]
+    ordinary = [
+        record
+        for record in artifact.records
+        if record.identity.case_id == "ordinary.one_model_call"
+    ]
     assert all(record.values.source_files_parsed == 0 for record in ordinary)
     assert all(record.values.writer_transactions == 1 for record in ordinary)
 
@@ -493,11 +499,11 @@ def test_speed_claim_ordinary_cases_require_a_matching_scale_source(
         qualification.run_qualification(
             replace(
                 _config(
-                tmp_path,
-                run_id="ordinary-needs-scale",
-                case_ids=("ordinary.one_model_call",),
-                repetitions=5,
-                speed_claim=True,
+                    tmp_path,
+                    run_id="ordinary-needs-scale",
+                    case_ids=("ordinary.one_model_call",),
+                    repetitions=5,
+                    speed_claim=True,
                 ),
                 allow_large_fixture=True,
             ),
