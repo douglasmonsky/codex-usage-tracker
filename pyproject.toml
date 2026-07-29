@@ -104,6 +104,7 @@ files = [
   "src/codex_usage_tracker/release/artifact_manifest.py",
   "src/codex_usage_tracker/kernel",
   "tests/agent_kernel/contracts/reference",
+  "tests/agent_kernel/fixtures",
 ]
 
 [tool.pyright]
@@ -120,6 +121,7 @@ include = [
   "scripts/smoke_installed_catalog.py",
   "src/codex_usage_tracker/kernel",
   "tests/agent_kernel/contracts/reference",
+  "tests/agent_kernel/fixtures",
 ]
 pythonVersion = "3.10"
 typeCheckingMode = "standard"

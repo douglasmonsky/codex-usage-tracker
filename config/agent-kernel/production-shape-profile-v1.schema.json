@@ -1,0 +1,456 @@
+{
+  "$id": "https://github.com/douglasmonsky/codex-usage-tracker/config/agent-kernel/production-shape-profile-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "allowance_shape": {
+      "$ref": "#/$defs/countMap"
+    },
+    "authorized_capability_counts": {
+      "additionalProperties": false,
+      "properties": {
+        "allowance_observation": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "model_call_usage": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "session_hierarchy": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "source_occurrence": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "state_change_observation": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "tool_lifecycle": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "valuation": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        }
+      },
+      "required": [
+        "allowance_observation",
+        "model_call_usage",
+        "session_hierarchy",
+        "source_occurrence",
+        "state_change_observation",
+        "tool_lifecycle",
+        "valuation"
+      ],
+      "type": "object"
+    },
+    "cardinality": {
+      "$ref": "#/$defs/countMap"
+    },
+    "cardinality_histograms": {
+      "additionalProperties": false,
+      "properties": {
+        "calls_per_session": {
+          "$ref": "#/$defs/exactHistogram"
+        },
+        "resources_per_project": {
+          "$ref": "#/$defs/exactHistogram"
+        },
+        "tools_per_session": {
+          "$ref": "#/$defs/exactHistogram"
+        }
+      },
+      "required": [
+        "calls_per_session",
+        "resources_per_project",
+        "tools_per_session"
+      ],
+      "type": "object"
+    },
+    "generation_contract": {
+      "additionalProperties": false,
+      "properties": {
+        "distribution": {
+          "$ref": "#/$defs/distribution"
+        },
+        "expected_stream_aggregates": {
+          "$ref": "#/$defs/streamAggregates"
+        },
+        "model_calls": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "source_manifestations": {
+          "$ref": "#/$defs/positiveInteger"
+        }
+      },
+      "required": [
+        "distribution",
+        "expected_stream_aggregates",
+        "model_calls",
+        "source_manifestations"
+      ],
+      "type": "object"
+    },
+    "phase_timings_us": {
+      "additionalProperties": false,
+      "properties": {
+        "discovery": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "oracle_validation": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "parsing": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "publication": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "total": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        }
+      },
+      "required": [
+        "discovery",
+        "oracle_validation",
+        "parsing",
+        "publication",
+        "total"
+      ],
+      "type": "object"
+    },
+    "record_shape": {
+      "additionalProperties": false,
+      "properties": {
+        "event_kind_counts": {
+          "$ref": "#/$defs/countMap"
+        },
+        "lifecycle_transition_counts": {
+          "$ref": "#/$defs/countMap"
+        },
+        "missing_field_counts": {
+          "$ref": "#/$defs/countMap"
+        },
+        "record_size_histogram": {
+          "$ref": "#/$defs/rangeHistogram"
+        }
+      },
+      "required": [
+        "event_kind_counts",
+        "lifecycle_transition_counts",
+        "missing_field_counts",
+        "record_size_histogram"
+      ],
+      "type": "object"
+    },
+    "schema": {
+      "const": "codex-usage-tracker.production-shape-profile.v1"
+    },
+    "source_shape": {
+      "additionalProperties": false,
+      "properties": {
+        "age_buckets": {
+          "$ref": "#/$defs/rangeHistogram"
+        },
+        "source_kind_counts": {
+          "$ref": "#/$defs/countMap"
+        },
+        "total_bytes": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "total_files": {
+          "$ref": "#/$defs/positiveInteger"
+        }
+      },
+      "required": [
+        "age_buckets",
+        "source_kind_counts",
+        "total_bytes",
+        "total_files"
+      ],
+      "type": "object"
+    },
+    "storage_shape": {
+      "additionalProperties": false,
+      "properties": {
+        "database_bytes": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "index_bytes": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "table_bytes": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "wal_bytes": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        }
+      },
+      "required": [
+        "database_bytes",
+        "index_bytes",
+        "table_bytes",
+        "wal_bytes"
+      ],
+      "type": "object"
+    },
+    "timestamp_shape": {
+      "additionalProperties": false,
+      "properties": {
+        "equal_timestamp_count": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "history_days": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "late_event_count": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "uncertain_source_count": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        }
+      },
+      "required": [
+        "equal_timestamp_count",
+        "history_days",
+        "late_event_count",
+        "uncertain_source_count"
+      ],
+      "type": "object"
+    },
+    "token_shape": {
+      "additionalProperties": false,
+      "properties": {
+        "cached_input_histogram": {
+          "$ref": "#/$defs/rangeHistogram"
+        },
+        "output_histogram": {
+          "$ref": "#/$defs/rangeHistogram"
+        },
+        "presence_counts": {
+          "$ref": "#/$defs/countMap"
+        },
+        "reasoning_histogram": {
+          "$ref": "#/$defs/rangeHistogram"
+        },
+        "uncached_input_histogram": {
+          "$ref": "#/$defs/rangeHistogram"
+        }
+      },
+      "required": [
+        "cached_input_histogram",
+        "output_histogram",
+        "presence_counts",
+        "reasoning_histogram",
+        "uncached_input_histogram"
+      ],
+      "type": "object"
+    },
+    "version": {
+      "const": 1
+    }
+  },
+  "required": [
+    "allowance_shape",
+    "authorized_capability_counts",
+    "cardinality",
+    "cardinality_histograms",
+    "generation_contract",
+    "phase_timings_us",
+    "record_shape",
+    "schema",
+    "source_shape",
+    "storage_shape",
+    "timestamp_shape",
+    "token_shape",
+    "version"
+  ],
+  "title": "Aggregate-only production-shape profile",
+  "type": "object",
+  "$defs": {
+    "countMap": {
+      "additionalProperties": {
+        "$ref": "#/$defs/nonnegativeInteger"
+      },
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "type": "object"
+    },
+    "distribution": {
+      "additionalProperties": false,
+      "properties": {
+        "activities": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "allowance_observations": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "compaction_boundaries": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "duplicate_call_occurrences": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "late_events": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "missing_cached_input_calls": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "model_calls": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "sessions": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "state_changes": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "tool_invocations": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "turns": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "unpriced_calls": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        }
+      },
+      "required": [
+        "activities",
+        "allowance_observations",
+        "compaction_boundaries",
+        "duplicate_call_occurrences",
+        "late_events",
+        "missing_cached_input_calls",
+        "model_calls",
+        "sessions",
+        "state_changes",
+        "tool_invocations",
+        "turns",
+        "unpriced_calls"
+      ],
+      "type": "object"
+    },
+    "exactHistogram": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "$ref": "#/$defs/positiveInteger"
+          },
+          "value": {
+            "$ref": "#/$defs/nonnegativeInteger"
+          }
+        },
+        "required": [
+          "count",
+          "value"
+        ],
+        "type": "object"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "type": "array"
+    },
+    "nonnegativeInteger": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "positiveInteger": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "rangeHistogram": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "$ref": "#/$defs/nonnegativeInteger"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/nonnegativeInteger"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "minimum": {
+            "$ref": "#/$defs/nonnegativeInteger"
+          }
+        },
+        "required": [
+          "count",
+          "maximum",
+          "minimum"
+        ],
+        "type": "object"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "type": "array"
+    },
+    "streamAggregates": {
+      "additionalProperties": false,
+      "properties": {
+        "allowance_observations": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "allowance_repeated_observations": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "allowance_reset_boundaries": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "canonical_model_calls": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "model_call_occurrences": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "open_tool_invocations": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "oracle_cases": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "publications": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "rate_cards": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "resources": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "selector_anchors": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "source_manifestations": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "tool_invocations": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        }
+      },
+      "required": [
+        "allowance_observations",
+        "allowance_repeated_observations",
+        "allowance_reset_boundaries",
+        "canonical_model_calls",
+        "model_call_occurrences",
+        "open_tool_invocations",
+        "oracle_cases",
+        "publications",
+        "rate_cards",
+        "resources",
+        "selector_anchors",
+        "source_manifestations",
+        "tool_invocations"
+      ],
+      "type": "object"
+    }
+  }
+}

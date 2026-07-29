@@ -1,0 +1,29 @@
+{
+  "history_days": 1095,
+  "model_calls": 2500000,
+  "name": "growth",
+  "ratios_basis_points": {
+    "activities": 500,
+    "allowance_observations": 10,
+    "compaction_boundaries": 100,
+    "duplicate_call_occurrences": 100,
+    "late_events": 100,
+    "missing_cached_input_calls": 500,
+    "state_changes": 500,
+    "tool_invocations": 2500,
+    "unpriced_calls": 1000
+  },
+  "schema": "codex-usage-tracker.synthetic-fixture-profile.v1",
+  "seed": 20260728,
+  "semantic_cases": [
+    "context_deterioration",
+    "workflow_sequence_first_mutation",
+    "allowance_interval_accounting",
+    "parent_subagent_aggregation",
+    "evidence_source_lifecycle"
+  ],
+  "source_manifestations": 768,
+  "start_at_us": 1767225600000000,
+  "timezone": "UTC",
+  "version": 1
+}
