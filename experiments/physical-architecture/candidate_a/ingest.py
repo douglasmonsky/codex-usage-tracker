@@ -843,7 +843,7 @@ def _refresh_projections(
             coalesce(sum(cached_input_tokens), 0),
             coalesce(sum(reasoning_tokens), 0),
             coalesce(sum(output_tokens), 0)
-        FROM model_calls
+        FROM model_calls_visible
         GROUP BY session_id
         """
     )
@@ -892,7 +892,7 @@ def _refresh_projections(
         aggregate.calls for aggregate in model_effort_accumulator.values()
     )
     canonical_calls = int(
-        connection.execute("SELECT count(*) FROM model_calls").fetchone()[0]
+        connection.execute("SELECT count(*) FROM model_calls_visible").fetchone()[0]
     )
     if accumulated_calls != canonical_calls:
         raise ValueError("candidate A model-effort accumulator diverged from canonical calls")
@@ -1182,9 +1182,31 @@ def build_artifact(
             history_selection,
             parent_publication_id,
         )
-        observed_through = connection.execute(
-            "SELECT max(event_at_us) FROM model_calls"
-        ).fetchone()[0]
+        model_call_cursor = connection.execute(
+            """
+            SELECT
+                min(event_at_us) AS minimum_event_at_us,
+                max(event_at_us) AS maximum_event_at_us,
+                max(source_order) AS maximum_source_order
+            FROM model_calls
+            """
+        ).fetchone()
+        connection.execute(
+            """
+            UPDATE model_call_tail_state
+            SET
+                minimum_event_at_us=?,
+                maximum_event_at_us=?,
+                maximum_source_order=?
+            WHERE singleton=1
+            """,
+            (
+                model_call_cursor["minimum_event_at_us"],
+                model_call_cursor["maximum_event_at_us"],
+                model_call_cursor["maximum_source_order"],
+            ),
+        )
+        observed_through = model_call_cursor["maximum_event_at_us"]
         connection.execute(
             """
             INSERT INTO publications(

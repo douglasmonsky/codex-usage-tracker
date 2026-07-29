@@ -73,7 +73,7 @@ def artifact_metrics(path: Path, *, occurrence_rows: int) -> ArtifactMetrics:
             connection.execute(
                 """
                 SELECT
-                    (SELECT count(*) FROM model_calls) +
+                    (SELECT count(*) FROM model_calls_visible) +
                     (SELECT count(*) FROM state_changes) +
                     (SELECT count(*) FROM compaction_boundaries) +
                     (SELECT count(*) FROM allowance_observations) +

@@ -140,7 +140,9 @@ def test_schema_is_typed_compact_and_deduplicated(
         }.intersection(tool_columns)
 
         assert (
-            connection.execute("SELECT count(*) FROM model_calls").fetchone()[0]
+            connection.execute(
+                "SELECT count(*) FROM model_calls_visible"
+            ).fetchone()[0]
             == expected_counts["model_calls"]
             == 100
         )
@@ -225,7 +227,9 @@ def test_recent_history_prunes_only_nonoverlapping_trusted_sources(
 
     with database(artifact.path, read_only=True) as connection:
         assert (
-            connection.execute("SELECT count(*) FROM model_calls").fetchone()[0]
+            connection.execute(
+                "SELECT count(*) FROM model_calls_visible"
+            ).fetchone()[0]
             == fixture.manifest["history"]["selections"]["30_days"]["calls"]
             == 4
         )
@@ -784,11 +788,13 @@ def test_ordinary_changes_are_incremental_and_preserve_lifecycle_semantics(
     )
     with database(artifact.path, read_only=True) as connection:
         call_count_before = int(
-            connection.execute("SELECT count(*) FROM model_calls").fetchone()[0]
+            connection.execute(
+                "SELECT count(*) FROM model_calls_visible"
+            ).fetchone()[0]
         )
         minimum_event_before = int(
             connection.execute(
-                "SELECT min(event_at_us) FROM model_calls"
+                "SELECT min(event_at_us) FROM model_calls_visible"
             ).fetchone()[0]
         )
         tool_count_before = int(
@@ -841,7 +847,9 @@ def test_ordinary_changes_are_incremental_and_preserve_lifecycle_semantics(
             assert row["causal_attribution"] is None
         elif change == "2000_call_tail":
             assert (
-                connection.execute("SELECT count(*) FROM model_calls").fetchone()[0]
+                connection.execute(
+                    "SELECT count(*) FROM model_calls_visible"
+                ).fetchone()[0]
                 == call_count_before + 2_000
             )
             assert stats.facts_inserted == 2_000
@@ -849,7 +857,7 @@ def test_ordinary_changes_are_incremental_and_preserve_lifecycle_semantics(
         elif change == "late_event":
             assert (
                 connection.execute(
-                    "SELECT min(event_at_us) FROM model_calls"
+                    "SELECT min(event_at_us) FROM model_calls_visible"
                 ).fetchone()[0]
                 == minimum_event_before - 1
             )

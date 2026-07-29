@@ -141,7 +141,7 @@ class CandidateACrashDriver:
         with database(case_root / "prior.sqlite", read_only=True) as connection:
             validate_database(connection)
             prior_queryable = connection.execute(
-                "SELECT count(*) FROM model_calls"
+                "SELECT count(*) FROM model_calls_visible"
             ).fetchone()[0] > 0
         current_id = _publication_id(case_root / "publication.sqlite")
         committed = current_id != prior.publication_id

@@ -9,13 +9,14 @@ from typing import Literal
 
 SCHEMA_ID = "codex-usage-tracker.physical-bakeoff.candidate-a.v1"
 SCHEMA_VERSION = 1
+MODEL_CALL_TAIL_MAX_ROWS = 32_000
 ValidationMode = Literal["prepublication", "exhaustive"]
 PREPUBLICATION_VALIDATION = "quick_check+foreign_key_check+schema_metadata"
 
 # Digest of ordered, non-SQLite-owned sqlite_schema rows. An intentional DDL
 # change must update this only alongside schema-contract and corruption tests.
 _EXPECTED_SCHEMA_DIGEST = (
-    "4a9076e6255867c0bb8806f1f35ea7d16f92973fda5ca8567d41ba727d8ede65"
+    "2786b0bc712402ead853140f4670f780e59dd193fc8ce6b7584375fb39334e34"
 )
 _HISTORY_SELECTIONS = frozenset(
     {
@@ -209,10 +210,118 @@ CREATE INDEX model_calls_by_session
         session_id, event_at_us, source_rank, source_order,
         event_kind_order, call_id
     );
-CREATE INDEX model_calls_by_turn
-    ON model_calls(turn_id, event_at_us, call_id);
-CREATE INDEX model_calls_by_model_effort
-    ON model_calls(model, reasoning_effort, event_at_us, call_id);
+
+CREATE TABLE model_call_tail_state (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    row_count INTEGER NOT NULL CHECK (row_count BETWEEN 0 AND 32000),
+    minimum_event_at_us INTEGER,
+    maximum_event_at_us INTEGER,
+    maximum_source_order INTEGER
+) STRICT, WITHOUT ROWID;
+INSERT INTO model_call_tail_state(
+    singleton, row_count, minimum_event_at_us,
+    maximum_event_at_us, maximum_source_order
+) VALUES (1, 0, NULL, NULL, NULL);
+
+CREATE TABLE model_call_tail (
+    call_id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    turn_id TEXT NOT NULL,
+    model TEXT NOT NULL,
+    reasoning_effort TEXT,
+    context_window_tokens INTEGER,
+    uncached_input_tokens INTEGER,
+    cached_input_tokens INTEGER,
+    reasoning_tokens INTEGER,
+    output_tokens INTEGER,
+    event_at_us INTEGER NOT NULL,
+    source_rank INTEGER NOT NULL,
+    occurrence_source_key INTEGER NOT NULL,
+    source_order INTEGER NOT NULL,
+    event_kind_order INTEGER NOT NULL,
+    record_ordinal INTEGER NOT NULL,
+    byte_start INTEGER NOT NULL,
+    byte_end INTEGER NOT NULL,
+    FOREIGN KEY (source_rank, occurrence_source_key)
+        REFERENCES source_manifestations(source_rank, occurrence_source_key)
+) STRICT, WITHOUT ROWID;
+CREATE INDEX model_call_tail_timeline
+    ON model_call_tail(
+        event_at_us, source_rank, source_order, event_kind_order, call_id
+    );
+CREATE INDEX model_call_tail_by_session
+    ON model_call_tail(
+        session_id, event_at_us, source_rank, source_order,
+        event_kind_order, call_id
+    );
+CREATE TRIGGER model_call_tail_before_insert
+BEFORE INSERT ON model_call_tail
+BEGIN
+    SELECT CASE
+        WHEN (
+            SELECT row_count
+            FROM model_call_tail_state
+            WHERE singleton = 1
+        ) >= 32000
+        THEN RAISE(
+            ABORT,
+            'candidate A model-call tail ceiling reached; isolated artifact fold required'
+        )
+    END;
+    SELECT CASE
+        WHEN EXISTS (
+            SELECT 1 FROM model_calls WHERE call_id = NEW.call_id
+        )
+        THEN RAISE(ABORT, 'candidate A cross-table model-call duplicate')
+    END;
+END;
+CREATE TRIGGER model_call_tail_after_insert
+AFTER INSERT ON model_call_tail
+BEGIN
+    UPDATE model_call_tail_state
+    SET
+        row_count = row_count + 1,
+        minimum_event_at_us = CASE
+            WHEN minimum_event_at_us IS NULL THEN NEW.event_at_us
+            ELSE min(minimum_event_at_us, NEW.event_at_us)
+        END,
+        maximum_event_at_us = CASE
+            WHEN maximum_event_at_us IS NULL THEN NEW.event_at_us
+            ELSE max(maximum_event_at_us, NEW.event_at_us)
+        END,
+        maximum_source_order = CASE
+            WHEN maximum_source_order IS NULL THEN NEW.source_order
+            ELSE max(maximum_source_order, NEW.source_order)
+        END
+    WHERE singleton = 1;
+END;
+CREATE TRIGGER model_call_tail_no_update
+BEFORE UPDATE ON model_call_tail
+BEGIN
+    SELECT RAISE(ABORT, 'candidate A model-call tail is append-only');
+END;
+CREATE TRIGGER model_call_tail_no_delete
+BEFORE DELETE ON model_call_tail
+BEGIN
+    SELECT RAISE(ABORT, 'candidate A model-call tail is append-only');
+END;
+
+CREATE VIEW model_calls_visible AS
+SELECT
+    call_id, session_id, turn_id, model, reasoning_effort,
+    context_window_tokens, uncached_input_tokens, cached_input_tokens,
+    reasoning_tokens, output_tokens, event_at_us, source_rank,
+    occurrence_source_key, source_order, event_kind_order,
+    record_ordinal, byte_start, byte_end
+FROM model_calls
+UNION ALL
+SELECT
+    call_id, session_id, turn_id, model, reasoning_effort,
+    context_window_tokens, uncached_input_tokens, cached_input_tokens,
+    reasoning_tokens, output_tokens, event_at_us, source_rank,
+    occurrence_source_key, source_order, event_kind_order,
+    record_ordinal, byte_start, byte_end
+FROM model_call_tail;
 
 CREATE TABLE tool_invocations (
     tool_id TEXT PRIMARY KEY,
@@ -251,6 +360,11 @@ CREATE INDEX tools_start_timeline
         start_at_us, start_source_rank, start_source_order,
         start_event_kind_order, tool_id
     );
+CREATE INDEX tools_pending_start
+    ON tool_invocations(
+        start_at_us, start_source_rank, start_source_order,
+        start_event_kind_order, tool_id
+    ) WHERE terminal_at_us IS NULL;
 CREATE INDEX tools_terminal_timeline
     ON tool_invocations(
         terminal_at_us, terminal_source_rank, terminal_source_order,
@@ -707,6 +821,36 @@ def _validate_metadata_contract(connection: sqlite3.Connection) -> None:
         raise ValueError("candidate A projection-row metadata is invalid") from error
     if projection_rows < 0:
         raise ValueError("candidate A projection-row metadata is invalid")
+    tail_state = connection.execute(
+        """
+        SELECT
+            row_count,
+            minimum_event_at_us,
+            maximum_event_at_us,
+            maximum_source_order,
+            (SELECT count(*) FROM model_call_tail) AS actual_rows,
+            (SELECT min(event_at_us) FROM model_calls_visible)
+                AS actual_minimum_event_at_us,
+            (SELECT max(event_at_us) FROM model_calls_visible)
+                AS actual_maximum_event_at_us,
+            (SELECT max(source_order) FROM model_calls_visible)
+                AS actual_maximum_source_order
+        FROM model_call_tail_state
+        WHERE singleton = 1
+        """
+    ).fetchone()
+    if (
+        tail_state is None
+        or int(tail_state["row_count"]) != int(tail_state["actual_rows"])
+        or not 0 <= int(tail_state["row_count"]) <= MODEL_CALL_TAIL_MAX_ROWS
+        or tail_state["minimum_event_at_us"]
+        != tail_state["actual_minimum_event_at_us"]
+        or tail_state["maximum_event_at_us"]
+        != tail_state["actual_maximum_event_at_us"]
+        or tail_state["maximum_source_order"]
+        != tail_state["actual_maximum_source_order"]
+    ):
+        raise ValueError("candidate A model-call tail state is invalid")
     publications = connection.execute(
         """
         SELECT publication_id, fixture_manifest_digest, fixture_oracle_digest

@@ -35,7 +35,7 @@ _FACT_SQL = {
             coalesce(sum(cached_input_tokens), 0) AS cached_input_tokens,
             coalesce(sum(reasoning_tokens), 0) AS reasoning_tokens,
             coalesce(sum(output_tokens), 0) AS output_tokens
-        FROM model_calls
+        FROM model_calls_visible
     """,
     "model_effort_mix": """
         SELECT
@@ -44,7 +44,7 @@ _FACT_SQL = {
             coalesce(sum(cached_input_tokens), 0) AS cached_input_tokens,
             coalesce(sum(reasoning_tokens), 0) AS reasoning_tokens,
             coalesce(sum(output_tokens), 0) AS output_tokens
-        FROM model_calls
+        FROM model_calls_visible
         GROUP BY model, reasoning_effort
         ORDER BY uncached_input_tokens DESC, model, reasoning_effort
         LIMIT 25
@@ -80,7 +80,7 @@ _FACT_SQL = {
             count(*) AS calls,
             sum(CASE WHEN model = 'synthetic-unpriced' THEN 0 ELSE 1 END)
                 AS rated_calls
-        FROM model_calls
+        FROM model_calls_visible
         GROUP BY model
         ORDER BY calls DESC, model
     """,

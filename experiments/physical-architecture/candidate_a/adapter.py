@@ -9,7 +9,12 @@ from typing import Any
 import shared
 
 from .ingest import BuildArtifact, IngestStats, build_artifact
-from .maintenance import MaintenanceStats, apply_ordinary_change, apply_source_phase
+from .maintenance import (
+    MaintenanceStats,
+    TailFoldRequired,
+    apply_ordinary_change,
+    apply_source_phase,
+)
 from .metrics import ArtifactMetrics, artifact_metrics
 from .publication import CandidateACrashDriver, publish_artifact
 from .queries import (
@@ -157,7 +162,34 @@ class Adapter:
         artifact = publish_artifact(request.fixture, request.run_root)
         change = str(request.case.parameter("change"))
         started = time.perf_counter_ns()
-        maintenance = apply_ordinary_change(artifact.path, change)
+        try:
+            maintenance = apply_ordinary_change(artifact.path, change)
+        except TailFoldRequired as fold:
+            elapsed = time.perf_counter_ns() - started
+            storage = artifact_metrics(
+                artifact.path,
+                occurrence_rows=artifact.stats.occurrence_rows,
+            )
+            return shared.CandidateResult(
+                candidate_id=self.candidate_id,
+                case_id=request.case.case_id,
+                outcome=shared.RunOutcome.FAILED,
+                measurements=self._values(
+                    artifact,
+                    storage,
+                    sql_latencies_ns=(elapsed,),
+                ),
+                publication=self._publication(artifact, prior_queryable=True),
+                oracle_results={
+                    "change": change,
+                    "tail_fold_required": True,
+                    "tail_rows": fold.current_rows,
+                    "requested_rows": fold.requested_rows,
+                    "maximum_rows": fold.maximum_rows,
+                    "fold_mode": "isolated_artifact",
+                },
+                detail_code="candidate_a.tail_fold_required",
+            )
         elapsed = time.perf_counter_ns() - started
         storage = artifact_metrics(
             artifact.path,

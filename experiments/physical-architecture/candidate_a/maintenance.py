@@ -7,7 +7,7 @@ from pathlib import Path
 
 import shared
 
-from .schema import open_database
+from .schema import MODEL_CALL_TAIL_MAX_ROWS, open_database
 
 
 @dataclass(frozen=True)
@@ -24,6 +24,19 @@ class MaintenanceStats:
     source_bytes_rescanned: int = 0
 
 
+class TailFoldRequired(RuntimeError):
+    def __init__(self, *, current_rows: int, requested_rows: int) -> None:
+        self.current_rows = current_rows
+        self.requested_rows = requested_rows
+        self.maximum_rows = MODEL_CALL_TAIL_MAX_ROWS
+        super().__init__(
+            "candidate A model-call tail would exceed "
+            f"{self.maximum_rows} rows "
+            f"({self.current_rows} current + {self.requested_rows} requested); "
+            "isolated artifact fold required"
+        )
+
+
 @dataclass(frozen=True)
 class _UsageDelta:
     session_id: str
@@ -36,12 +49,58 @@ class _UsageDelta:
     output_tokens: int
 
 
+@dataclass(frozen=True)
+class _ToolStartDelta:
+    transport_name: str
+    semantic_operation: str
+    turn_id: str
+    resource_id: str
+    start_at_us: int
+    mutation_at_us: int | None
+
+
+@dataclass(frozen=True)
+class _ToolTerminalDelta:
+    transport_name: str
+    semantic_operation: str
+    turn_id: str
+    terminal_at_us: int
+    duration_us: int
+    output_bytes: int
+
+
 def _tail_identity(connection: sqlite3.Connection) -> tuple[str, str, sqlite3.Row]:
     call = connection.execute(
         """
+        WITH latest_base AS (
+            SELECT
+                session_id, turn_id, event_at_us, source_rank,
+                source_order, event_kind_order, call_id
+            FROM model_calls INDEXED BY model_calls_timeline
+            ORDER BY
+                event_at_us DESC, source_rank DESC, source_order DESC,
+                event_kind_order DESC, call_id DESC
+            LIMIT 1
+        ),
+        latest_tail AS (
+            SELECT
+                session_id, turn_id, event_at_us, source_rank,
+                source_order, event_kind_order, call_id
+            FROM model_call_tail INDEXED BY model_call_tail_timeline
+            ORDER BY
+                event_at_us DESC, source_rank DESC, source_order DESC,
+                event_kind_order DESC, call_id DESC
+            LIMIT 1
+        )
         SELECT session_id, turn_id
-        FROM model_calls
-        ORDER BY event_at_us DESC, source_rank DESC, source_order DESC, call_id DESC
+        FROM (
+            SELECT * FROM latest_base
+            UNION ALL
+            SELECT * FROM latest_tail
+        )
+        ORDER BY
+            event_at_us DESC, source_rank DESC, source_order DESC,
+            event_kind_order DESC, call_id DESC
         LIMIT 1
         """
     ).fetchone()
@@ -203,42 +262,56 @@ def _increment_call_projections(
     return reads + 4, writes + 4
 
 
-def _refresh_turn_action(
+def _increment_turn_action_start(
     connection: sqlite3.Connection,
-    turn_id: str,
+    delta: _ToolStartDelta,
 ) -> tuple[int, int]:
-    connection.execute(
+    updated = connection.execute(
         """
-        INSERT INTO turn_action_current(
-            turn_id, first_action_at_us,
-            first_success_at_us, first_mutation_at_us
-        )
-        SELECT
-            turn_id,
-            (
-                SELECT min(start_at_us)
-                FROM tool_invocations
-                WHERE turn_id = turn.turn_id
-            ),
-            (
-                SELECT min(terminal_at_us)
-                FROM tool_invocations
-                WHERE turn_id = turn.turn_id AND state = 'succeeded'
-            ),
-            (
-                SELECT min(event_at_us)
-                FROM state_changes
-                WHERE turn_id = turn.turn_id
-            )
-        FROM turns AS turn
+        UPDATE turn_action_current
+        SET
+            first_action_at_us = CASE
+                WHEN first_action_at_us IS NULL THEN ?
+                ELSE min(first_action_at_us, ?)
+            END,
+            first_mutation_at_us = CASE
+                WHEN ? IS NULL THEN first_mutation_at_us
+                WHEN first_mutation_at_us IS NULL THEN ?
+                ELSE min(first_mutation_at_us, ?)
+            END
         WHERE turn_id = ?
-        ON CONFLICT(turn_id) DO UPDATE SET
-            first_action_at_us=excluded.first_action_at_us,
-            first_success_at_us=excluded.first_success_at_us,
-            first_mutation_at_us=excluded.first_mutation_at_us
         """,
-        (turn_id,),
-    )
+        (
+            delta.start_at_us,
+            delta.start_at_us,
+            delta.mutation_at_us,
+            delta.mutation_at_us,
+            delta.mutation_at_us,
+            delta.turn_id,
+        ),
+    ).rowcount
+    if updated != 1:
+        raise ValueError("candidate A tool start has no current turn projection")
+    return 1, 1
+
+
+def _increment_turn_action_terminal(
+    connection: sqlite3.Connection,
+    delta: _ToolTerminalDelta,
+) -> tuple[int, int]:
+    updated = connection.execute(
+        """
+        UPDATE turn_action_current
+        SET first_success_at_us = CASE
+            WHEN first_success_at_us IS NULL THEN ?
+            ELSE min(first_success_at_us, ?)
+        END
+        WHERE turn_id = ?
+        """,
+        (delta.terminal_at_us, delta.terminal_at_us, delta.turn_id),
+    ).rowcount
+    if updated != 1:
+        raise ValueError("candidate A tool terminal has no current turn projection")
     return 1, 1
 
 
@@ -275,42 +348,47 @@ def _invalidate_evidence_anchors(connection: sqlite3.Connection) -> tuple[int, i
     return 1, 1
 
 
-def _refresh_tool_family(
+def _increment_tool_family_start(
     connection: sqlite3.Connection,
-    transport_name: str,
-    semantic_operation: str,
+    delta: _ToolStartDelta,
 ) -> tuple[int, int]:
-    before = int(
-        connection.execute(
-            """
-            SELECT count(*) FROM tool_family_current
-            WHERE transport_name=? AND semantic_operation=?
-            """,
-            (transport_name, semantic_operation),
-        ).fetchone()[0]
-    )
     connection.execute(
         """
         INSERT INTO tool_family_current(
             transport_name, semantic_operation, calls, failures,
             duration_us, output_bytes
         )
-        SELECT
-            transport_name, semantic_operation, count(*),
-            sum(CASE WHEN state='failed' THEN 1 ELSE 0 END),
-            sum(duration_us), sum(output_bytes)
-        FROM tool_invocations
-        WHERE transport_name=? AND semantic_operation=?
-        GROUP BY transport_name, semantic_operation
+        VALUES (?, ?, 1, 0, NULL, NULL)
         ON CONFLICT(transport_name, semantic_operation) DO UPDATE SET
-            calls=excluded.calls,
-            failures=excluded.failures,
-            duration_us=excluded.duration_us,
-            output_bytes=excluded.output_bytes
+            calls=tool_family_current.calls + 1
         """,
-        (transport_name, semantic_operation),
+        (delta.transport_name, delta.semantic_operation),
     )
-    return before, 1
+    return 1, 1
+
+
+def _increment_tool_family_terminal(
+    connection: sqlite3.Connection,
+    delta: _ToolTerminalDelta,
+) -> tuple[int, int]:
+    updated = connection.execute(
+        """
+        UPDATE tool_family_current
+        SET
+            duration_us=coalesce(duration_us, 0) + ?,
+            output_bytes=coalesce(output_bytes, 0) + ?
+        WHERE transport_name=? AND semantic_operation=?
+        """,
+        (
+            delta.duration_us,
+            delta.output_bytes,
+            delta.transport_name,
+            delta.semantic_operation,
+        ),
+    ).rowcount
+    if updated != 1:
+        raise ValueError("candidate A tool terminal has no current family projection")
+    return 1, 1
 
 
 def _insert_calls(
@@ -320,17 +398,29 @@ def _insert_calls(
     late: bool = False,
 ) -> tuple[int, _UsageDelta]:
     session_id, turn_id, source = _tail_identity(connection)
+    tail_state = connection.execute(
+        """
+        SELECT
+            row_count, minimum_event_at_us,
+            maximum_event_at_us, maximum_source_order
+        FROM model_call_tail_state
+        WHERE singleton = 1
+        """
+    ).fetchone()
+    if tail_state is None or tail_state["maximum_event_at_us"] is None:
+        raise ValueError("candidate A model-call tail cursor is unavailable")
+    tail_rows = int(tail_state["row_count"])
+    if tail_state["maximum_source_order"] is None:
+        raise ValueError("candidate A model-call source-order cursor is unavailable")
+    if tail_state["minimum_event_at_us"] is None:
+        raise ValueError("candidate A model-call minimum cursor is unavailable")
+    if tail_rows + count > MODEL_CALL_TAIL_MAX_ROWS:
+        raise TailFoldRequired(current_rows=tail_rows, requested_rows=count)
     if late:
-        event_at = int(
-            connection.execute("SELECT min(event_at_us) FROM model_calls").fetchone()[0]
-        ) - 1
+        event_at = int(tail_state["minimum_event_at_us"]) - 1
     else:
-        event_at = int(
-            connection.execute("SELECT max(event_at_us) FROM model_calls").fetchone()[0]
-        ) + 1
-    source_order = int(
-        connection.execute("SELECT max(source_order) FROM model_calls").fetchone()[0]
-    ) + 1
+        event_at = int(tail_state["maximum_event_at_us"]) + 1
+    source_order = int(tail_state["maximum_source_order"]) + 1
     rows = []
     for ordinal in range(count):
         digest = shared.canonical_sha256(
@@ -364,17 +454,18 @@ def _insert_calls(
                 int(source["byte_count"]),
             )
         )
-    connection.executemany(
-        """
-        INSERT INTO model_calls(
+    row_placeholders = "(" + ", ".join("?" for _ in rows[0]) + ")"
+    connection.execute(
+        f"""
+        INSERT INTO model_call_tail(
             call_id, session_id, turn_id, model, reasoning_effort,
             context_window_tokens, uncached_input_tokens, cached_input_tokens,
             reasoning_tokens, output_tokens, event_at_us, source_rank,
             occurrence_source_key, source_order, event_kind_order,
             record_ordinal, byte_start, byte_end
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES {", ".join(row_placeholders for _ in rows)}
         """,
-        rows,
+        tuple(value for row in rows for value in row),
     )
     return (
         len(rows),
@@ -395,13 +486,15 @@ def _insert_tool(
     connection: sqlite3.Connection,
     *,
     include_state_change: bool,
-) -> tuple[int, int, str, str, str, str]:
+) -> tuple[int, int, _ToolStartDelta]:
     session_id, turn_id, source = _tail_identity(connection)
     event_at = int(
         connection.execute(
             """
             SELECT max(value) FROM (
-                SELECT max(event_at_us) AS value FROM model_calls
+                SELECT maximum_event_at_us AS value
+                FROM model_call_tail_state
+                WHERE singleton=1
                 UNION ALL SELECT max(start_at_us) FROM tool_invocations
                 UNION ALL SELECT max(event_at_us) FROM state_changes
             )
@@ -473,30 +566,39 @@ def _insert_tool(
     return (
         inserted,
         0,
-        "synthetic_write",
-        "write",
-        turn_id,
-        resource_id,
+        _ToolStartDelta(
+            transport_name="synthetic_write",
+            semantic_operation="write",
+            turn_id=turn_id,
+            resource_id=resource_id,
+            start_at_us=event_at,
+            mutation_at_us=event_at + 1 if include_state_change else None,
+        ),
     )
+
+
+_PENDING_TOOL_SQL = """
+    SELECT
+        tool_id, turn_id, transport_name, semantic_operation, start_at_us,
+        start_source_rank, start_source_order, start_event_kind_order,
+        start_occurrence_source_key,
+        start_record_ordinal, start_byte_start, start_byte_end
+    FROM tool_invocations
+    WHERE terminal_at_us IS NULL
+    ORDER BY
+        start_at_us, start_source_rank, start_source_order,
+        start_event_kind_order, tool_id
+    LIMIT 1
+"""
 
 
 def _terminal_transition(
     connection: sqlite3.Connection,
-) -> tuple[int, str, str, str]:
-    tool = connection.execute(
-        """
-        SELECT tool_id, turn_id, transport_name, semantic_operation, start_at_us,
-            start_source_rank, start_source_order, start_event_kind_order,
-            start_occurrence_source_key,
-            start_record_ordinal, start_byte_start, start_byte_end
-        FROM tool_invocations
-        WHERE terminal_at_us IS NULL
-        ORDER BY start_at_us, start_source_rank, start_source_order, tool_id
-        LIMIT 1
-        """
-    ).fetchone()
+) -> tuple[int, _ToolTerminalDelta]:
+    tool = connection.execute(_PENDING_TOOL_SQL).fetchone()
     if tool is None:
         raise ValueError("candidate A fixture has no open tool lifecycle")
+    terminal_at_us = int(tool["start_at_us"]) + 1
     connection.execute(
         """
         UPDATE tool_invocations SET
@@ -514,7 +616,7 @@ def _terminal_transition(
         WHERE tool_id=?
         """,
         (
-            int(tool["start_at_us"]) + 1,
+            terminal_at_us,
             int(tool["start_source_rank"]),
             int(tool["start_occurrence_source_key"]),
             int(tool["start_source_order"]) + 1,
@@ -526,9 +628,14 @@ def _terminal_transition(
     )
     return (
         1,
-        str(tool["transport_name"]),
-        str(tool["semantic_operation"]),
-        str(tool["turn_id"]),
+        _ToolTerminalDelta(
+            transport_name=str(tool["transport_name"]),
+            semantic_operation=str(tool["semantic_operation"]),
+            turn_id=str(tool["turn_id"]),
+            terminal_at_us=terminal_at_us,
+            duration_us=1,
+            output_bytes=0,
+        ),
     )
 
 
@@ -547,8 +654,15 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
                 connection.execute(
                     """
                     SELECT
-                        (SELECT count(*) FROM model_calls) +
-                        (SELECT count(*) FROM tool_invocations)
+                        (
+                            SELECT calls
+                            FROM usage_total_current
+                            WHERE singleton=1
+                        ) +
+                        (
+                            SELECT coalesce(sum(calls), 0)
+                            FROM tool_family_current
+                        )
                     """
                 ).fetchone()[0]
             )
@@ -559,53 +673,50 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
                 "2000_call_tail": 2_000,
                 "late_event": 1,
             }[change]
-            inserted, delta = _insert_calls(
+            inserted, usage_delta = _insert_calls(
                 connection,
                 count=count,
                 late=change == "late_event",
             )
             projection_read, projection_written = _increment_call_projections(
                 connection,
-                delta,
+                usage_delta,
             )
             anchor_read, anchor_written = _invalidate_evidence_anchors(connection)
             projection_read += anchor_read
             projection_written += anchor_written
             dirty_keys = projection_written
         elif change in {"one_tool_start", "tool_plus_state_change"}:
-            (
-                inserted,
-                updated,
-                transport,
-                operation,
-                turn_id,
-                resource_id,
-            ) = _insert_tool(
+            inserted, updated, tool_start_delta = _insert_tool(
                 connection,
                 include_state_change=change == "tool_plus_state_change",
             )
-            projection_read, projection_written = _refresh_tool_family(
+            projection_read, projection_written = _increment_tool_family_start(
                 connection,
-                transport,
-                operation,
+                tool_start_delta,
             )
-            turn_read, turn_written = _refresh_turn_action(connection, turn_id)
+            turn_read, turn_written = _increment_turn_action_start(
+                connection,
+                tool_start_delta,
+            )
             resource_read, resource_written = _refresh_resource_operation(
                 connection,
-                resource_id,
+                tool_start_delta.resource_id,
             )
             anchor_read, anchor_written = _invalidate_evidence_anchors(connection)
             projection_read += turn_read + resource_read + anchor_read
             projection_written += turn_written + resource_written + anchor_written
             dirty_keys = projection_written
         elif change == "tool_terminal_transition":
-            updated, transport, operation, turn_id = _terminal_transition(connection)
-            projection_read, projection_written = _refresh_tool_family(
+            updated, tool_terminal_delta = _terminal_transition(connection)
+            projection_read, projection_written = _increment_tool_family_terminal(
                 connection,
-                transport,
-                operation,
+                tool_terminal_delta,
             )
-            turn_read, turn_written = _refresh_turn_action(connection, turn_id)
+            turn_read, turn_written = _increment_turn_action_terminal(
+                connection,
+                tool_terminal_delta,
+            )
             anchor_read, anchor_written = _invalidate_evidence_anchors(connection)
             projection_read += turn_read + anchor_read
             projection_written += turn_written + anchor_written

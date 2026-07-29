@@ -122,18 +122,38 @@ _PLAN_SQL = {
         SELECT
             session_id, call_id, event_at_us, context_window_tokens,
             uncached_input_tokens, cached_input_tokens,
-            reasoning_tokens, output_tokens
-        FROM model_calls
+            reasoning_tokens, output_tokens,
+            source_rank, source_order, event_kind_order
+        FROM model_calls INDEXED BY model_calls_by_session
         WHERE context_window_tokens IS NOT NULL
-        ORDER BY session_id, event_at_us, source_rank, source_order, call_id
+        UNION ALL
+        SELECT
+            session_id, call_id, event_at_us, context_window_tokens,
+            uncached_input_tokens, cached_input_tokens,
+            reasoning_tokens, output_tokens,
+            source_rank, source_order, event_kind_order
+        FROM model_call_tail INDEXED BY model_call_tail_by_session
+        WHERE context_window_tokens IS NOT NULL
+        ORDER BY
+            session_id, event_at_us, source_rank, source_order,
+            event_kind_order, call_id
         LIMIT 100
     """,
     "uncached_input_jumps": """
         SELECT
-            session_id, call_id, event_at_us, uncached_input_tokens
-        FROM model_calls
+            session_id, call_id, event_at_us, uncached_input_tokens,
+            source_rank, source_order, event_kind_order
+        FROM model_calls INDEXED BY model_calls_by_session
         WHERE uncached_input_tokens IS NOT NULL
-        ORDER BY session_id, event_at_us, source_rank, source_order, call_id
+        UNION ALL
+        SELECT
+            session_id, call_id, event_at_us, uncached_input_tokens,
+            source_rank, source_order, event_kind_order
+        FROM model_call_tail INDEXED BY model_call_tail_by_session
+        WHERE uncached_input_tokens IS NOT NULL
+        ORDER BY
+            session_id, event_at_us, source_rank, source_order,
+            event_kind_order, call_id
         LIMIT 100
     """,
     "parent_subagent_usage": """
@@ -202,6 +222,15 @@ _PLAN_SQL = {
     """,
 }
 
+_PLAN_INTERNAL_COLUMNS = {
+    "context_pressure_trajectory": frozenset(
+        {"source_rank", "source_order", "event_kind_order"}
+    ),
+    "uncached_input_jumps": frozenset(
+        {"source_rank", "source_order", "event_kind_order"}
+    ),
+}
+
 
 def _thaw(value: Any) -> Any:
     if isinstance(value, Mapping):
@@ -222,6 +251,23 @@ def _plan_counts(plans: tuple[str, ...]) -> tuple[int, int]:
     )
     temporary_sorts = sum("USE TEMP B-TREE" in plan for plan in plans)
     return full_scans, temporary_sorts
+
+
+def _bounded_plan_rows(
+    connection: sqlite3.Connection,
+    *,
+    plan_id: str,
+    sql: str,
+) -> tuple[dict[str, Any], ...]:
+    internal = _PLAN_INTERNAL_COLUMNS.get(plan_id, frozenset())
+    return tuple(
+        {
+            str(column): value
+            for column, value in dict(row).items()
+            if column not in internal
+        }
+        for row in connection.execute(sql)
+    )
 
 
 def _publication(connection: sqlite3.Connection) -> dict[str, Any]:
@@ -337,7 +383,13 @@ def run_question(
     if probe_sql is not None:
         probe_plans = _plan(connection, probe_sql)
         probe_started = time.perf_counter_ns()
-        probe_rows = len(tuple(connection.execute(probe_sql)))
+        probe_rows = len(
+            _bounded_plan_rows(
+                connection,
+                plan_id=plan_id,
+                sql=probe_sql,
+            )
+        )
         probe_latency = time.perf_counter_ns() - probe_started
         plans += probe_plans
     publication = _publication(connection)
@@ -526,7 +578,7 @@ def run_evidence_feature(
                 (SELECT count(*) FROM sessions) +
                 (SELECT count(*) FROM sessions WHERE terminal_at_us IS NOT NULL) +
                 (SELECT count(*) FROM turns) +
-                (SELECT count(*) FROM model_calls) +
+                (SELECT count(*) FROM model_calls_visible) +
                 (SELECT count(*) FROM tool_invocations) +
                 (SELECT count(*) FROM tool_invocations WHERE terminal_at_us IS NOT NULL) +
                 (SELECT count(*) FROM activities) +

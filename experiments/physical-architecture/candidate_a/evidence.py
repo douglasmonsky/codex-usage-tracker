@@ -94,6 +94,7 @@ def _decode_cursor(cursor: str, publication_id: str) -> OrderKey:
 def _select(
     *,
     table: str,
+    index: str | None = None,
     occurrence_source_key: str | None = None,
     event_at: str,
     source_rank: str,
@@ -128,8 +129,11 @@ def _select(
     limit: int,
 ) -> _Stream | None:
     if occurrence_source_key is not None:
+        table_reference = f"{table} AS event"
+        if index is not None:
+            table_reference += f" INDEXED BY {index}"
         table = (
-            f"{table} AS event "
+            f"{table_reference} "
             "JOIN source_manifestations AS occurrence_source "
             "ON occurrence_source.occurrence_source_key="
             f"event.{occurrence_source_key}"
@@ -168,6 +172,8 @@ def _select(
             session_filter_column = fact(session_filter_column)
         if required is not None:
             required = f"event.{required}"
+    elif index is not None:
+        table = f"{table} INDEXED BY {index}"
 
     if selected_session_id is not None and session_filter_column is None:
         return None
@@ -326,6 +332,40 @@ def _streams(
         ),
         _select(
             table="model_calls",
+            occurrence_source_key="occurrence_source_key",
+            event_at="event_at_us",
+            source_rank="source_rank",
+            source_order="source_order",
+            event_kind_order="event_kind_order",
+            logical_id="call_id",
+            transition_rank=0,
+            event_kind="model_call",
+            session_id="session_id",
+            turn_id="turn_id",
+            state="'observed'",
+            uncached_input_tokens="uncached_input_tokens",
+            cached_input_tokens="cached_input_tokens",
+            reasoning_tokens="reasoning_tokens",
+            output_tokens="output_tokens",
+            manifestation_id="manifestation_id",
+            source_revision="source_revision",
+            adapter_version="adapter_version",
+            source_path="source_path",
+            record_ordinal="record_ordinal",
+            byte_start="byte_start",
+            byte_end="byte_end",
+            selected_session_id=selected_session_id,
+            session_filter_column="session_id",
+            after=after,
+            limit=limit,
+        ),
+        _select(
+            table="model_call_tail",
+            index=(
+                "model_call_tail_by_session"
+                if selected_session_id is not None
+                else "model_call_tail_timeline"
+            ),
             occurrence_source_key="occurrence_source_key",
             event_at="event_at_us",
             source_rank="source_rank",

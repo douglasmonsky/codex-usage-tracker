@@ -9,13 +9,25 @@ from .evidence import (
     resolve_selector,
 )
 from .ingest import BuildArtifact, IngestStats, build_artifact
-from .maintenance import MaintenanceStats, apply_ordinary_change, apply_source_phase
+from .maintenance import (
+    MaintenanceStats,
+    TailFoldRequired,
+    apply_ordinary_change,
+    apply_source_phase,
+)
 from .publication import CandidateACrashDriver, publish_artifact
-from .schema import SCHEMA_ID, SCHEMA_VERSION, database, open_database
+from .schema import (
+    MODEL_CALL_TAIL_MAX_ROWS,
+    SCHEMA_ID,
+    SCHEMA_VERSION,
+    database,
+    open_database,
+)
 
 __all__ = [
     "SCHEMA_ID",
     "SCHEMA_VERSION",
+    "MODEL_CALL_TAIL_MAX_ROWS",
     "Adapter",
     "BuildArtifact",
     "CandidateACrashDriver",
@@ -23,6 +35,7 @@ __all__ = [
     "EvidencePage",
     "IngestStats",
     "MaintenanceStats",
+    "TailFoldRequired",
     "all_evidence_rows",
     "apply_ordinary_change",
     "apply_source_phase",
