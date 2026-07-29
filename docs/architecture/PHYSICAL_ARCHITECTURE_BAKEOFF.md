@@ -393,7 +393,9 @@ The experiment:
 
 - runs local stdio only;
 - connects only to a disposable synthetic SQLite snapshot;
-- uses an engine-level read-only connection and a strict row cap;
+- uses per-tool read-only mode and a strict row cap;
+- records that DBHub 0.24.0 opens SQLite read-write, so the disposable copy
+  must be made owner-writable only for the process and digest-verified after;
 - exposes only schema search, read SQL, and a small parameterized custom-tool
   registry;
 - compares generic exploration with our named preset tools;

@@ -69,13 +69,15 @@ candidate's assertion are not substitutes.
 
 ## DBHub research
 
-`build_dbhub_run()` creates a new disposable copy of a synthetic SQLite snapshot, removes
-all write bits, records its digest, writes one TOML configuration, and returns a shell-free
-stdio argv pinned to `@bytebase/dbhub@0.24.0` and its npm integrity. The generic SQL tool has
-DBHub read-only execution enabled, which applies SQLite `PRAGMA query_only`; the filesystem
-mode and post-run digest are independent backstops. The row cap is at most 100. Only schema
-search, generic read SQL, and one to four single-statement parameterized read tools are
-admitted. `verify_unchanged()` is mandatory after the MCP process exits.
+`build_dbhub_run()` creates a disposable copy of a synthetic SQLite snapshot, removes all
+write bits, records its digest, writes one TOML configuration, and returns shell-free stdio
+argv pinned to `@bytebase/dbhub@0.24.0` and its npm integrity. The live 0.24.0 connector opens
+SQLite read-write before its tools apply `PRAGMA query_only`, so this lane cannot truthfully
+claim an engine-level read-only connection. `DbhubRun.runtime_access()` grants owner-write
+permission only for the MCP process, then restores mode `0444` and fails if the digest
+changed. The row cap is at most 100. Only schema search, generic read SQL, and one to four
+single-statement parameterized read tools are admitted. `verify_unchanged()` is mandatory
+after the MCP process exits.
 
 DBHub is dev-only comparison infrastructure, never a candidate, runtime dependency, plugin,
 or user workflow.

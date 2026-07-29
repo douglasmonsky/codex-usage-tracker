@@ -6,6 +6,8 @@ import os
 import re
 import shutil
 import stat
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -87,6 +89,34 @@ class DbhubRun:
         if mode & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH):
             raise DbhubContractError("disposable DBHub snapshot is no longer read-only")
 
+    @contextmanager
+    def runtime_access(self) -> Iterator[None]:
+        """Permit DBHub 0.24 to open its disposable copy, then fail closed."""
+
+        self.verify_unchanged()
+        try:
+            os.chmod(
+                self.snapshot_path,
+                stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH,
+            )
+        except OSError as error:
+            raise DbhubContractError(
+                "disposable DBHub snapshot cannot enter runtime mode"
+            ) from error
+        try:
+            yield
+        finally:
+            try:
+                os.chmod(
+                    self.snapshot_path,
+                    stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH,
+                )
+            except OSError as error:
+                raise DbhubContractError(
+                    "disposable DBHub snapshot cannot restore read-only mode"
+                ) from error
+            self.verify_unchanged()
+
 
 def _validate_read_statement(statement: str) -> None:
     normalized = statement.strip()
@@ -121,8 +151,7 @@ def _render_config(
         "# Generated CK-04 disposable DBHub research configuration.",
         "[[sources]]",
         'id = "ck04_synthetic_snapshot"',
-        'type = "sqlite"',
-        f"database = {_toml_string(str(snapshot_path))}",
+        f"dsn = {_toml_string(f'sqlite://{snapshot_path}')}",
         "",
         "[[tools]]",
         'name = "search_objects"',
@@ -188,7 +217,7 @@ def build_dbhub_run(
         run_root.mkdir(parents=True, exist_ok=False)
     except FileExistsError as error:
         raise DbhubContractError("DBHub run root already exists") from error
-    snapshot_path = run_root / "synthetic-snapshot.sqlite"
+    snapshot_path = (run_root / "synthetic-snapshot.sqlite").resolve()
     shutil.copyfile(source_snapshot, snapshot_path)
     os.chmod(snapshot_path, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
     snapshot_digest = _sha256_file(snapshot_path)

@@ -541,7 +541,7 @@ def test_dbhub_runner_is_pinned_disposable_and_read_only(
         "--transport",
     )
     assert run.argv[4] == "stdio"
-    assert config["sources"][0]["database"] == str(run.snapshot_path)
+    assert config["sources"][0]["dsn"] == f"sqlite://{run.snapshot_path}"
     assert {tool["name"] for tool in config["tools"]} == {
         "search_objects",
         "execute_sql",
@@ -551,6 +551,12 @@ def test_dbhub_runner_is_pinned_disposable_and_read_only(
     assert all(tool.get("max_rows", 50) <= 50 for tool in config["tools"])
     assert not os.stat(run.snapshot_path).st_mode & 0o222
     run.verify_unchanged()
+    with run.runtime_access():
+        assert os.stat(run.snapshot_path).st_mode & 0o200
+        connection = sqlite3.connect(run.snapshot_path)
+        assert connection.execute("SELECT value FROM facts").fetchone()[0] == 1
+        connection.close()
+    run.verify_unchanged()
     pinned = json.loads(
         (_EXPERIMENT_ROOT / "shared" / "dbhub-v0.24.0.contract.json").read_text(encoding="utf-8")
     )
@@ -558,7 +564,10 @@ def test_dbhub_runner_is_pinned_disposable_and_read_only(
     assert pinned["version"] == run.version
     assert pinned["npm_integrity"] == run.package_integrity
     assert pinned["transport"] == "stdio"
-    assert pinned["engine_read_only"] is True
+    assert pinned["engine_read_only"] is False
+    assert pinned["tool_read_only"] is True
+    assert pinned["runtime_snapshot_owner_write_required"] is True
+    assert pinned["post_run_digest_required"] is True
     assert pinned["max_rows"] == shared.DBHUB_MAX_ROW_CAP
 
     with pytest.raises(DbhubContractError, match="read-only SELECT"):
@@ -569,6 +578,15 @@ def test_dbhub_runner_is_pinned_disposable_and_read_only(
                 replace(custom_tool, statement="DELETE FROM facts WHERE logical_id = ?"),
             ),
         )
+
+    with pytest.raises(
+        DbhubContractError, match="changed during research run"
+    ), run.runtime_access():
+        connection = sqlite3.connect(run.snapshot_path)
+        connection.execute("UPDATE facts SET value = 2")
+        connection.commit()
+        connection.close()
+    assert not os.stat(run.snapshot_path).st_mode & 0o222
 
 
 def test_agent_perf_workload_is_file_based_synthetic_and_same_workload(
