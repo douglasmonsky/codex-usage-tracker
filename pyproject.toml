@@ -38,6 +38,7 @@ dev = [
   "build>=1.2",
   "jsonschema>=4.23",
   "mypy>=1.10",
+  "psutil==7.2.2",
   "pytest>=8.0",
   "pyright>=1.1.405",
   "ruff>=0.8",
