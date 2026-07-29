@@ -1,6 +1,6 @@
 # CK-03 — Build shared synthetic fixtures and truth oracles
 
-**Status:** Not started
+**Status:** Completed
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -43,6 +43,76 @@ distributions; fixture generation is excluded from product timing.
 patch candidates around an oracle error; fix and rerun all candidates.
 
 **Cleanup/docs:** Record fixture revision/digest policy in qualification docs.
+
+## Implementation evidence
+
+- Fixture revision `agent-kernel-structural-v1` generates deterministic
+  structural-only JSONL for tiny, small, standard, production, and growth
+  profiles. The checked-in tiny corpus contains 100 canonical calls, 339 source
+  records, and 244,657 exact source bytes.
+- The tiny manifest, oracle, and complete-tree SHA-256 digests are
+  `a599cf149783af04d861699b0ff587a169f20dec4d372e4ffbe3f21c51995817`,
+  `9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b`,
+  and `a5bd281d7553836d952b1930196a3ddfadceae00b8ff0425695bb26c433b20cd`.
+  Python 3.13 and 3.14 independently reproduce those exact bytes.
+- The oracle bundle covers all five bake-off slices, all 80 CK-01 oracle IDs,
+  four-class token accounting and missingness, lifecycle ordering, evidence
+  pagination/selectors, source replacement/truncation/copy behavior, and nine
+  publication crash boundaries.
+- Every question variant is an emitted source record with distinct inputs,
+  explicit expected rows, plan/compiler/projection metadata, caveats, and
+  selectors. Independent reconciliation re-derives its formulas and verifies
+  every selector against an exact manifestation, revision, record ordinal,
+  adapter version, and byte range.
+- Emitted control records cover the CK-02 allowance compatibility tuple,
+  rate-card/publication facts, late-parent hierarchy, real tool identity, and
+  every vertical slice. Archive-copy, replacement, truncation, and moving-tail
+  transitions are materialized as before/after byte streams with occurrence
+  mappings, while named history selections are counted from emitted integer
+  timestamps.
+- The production-shaped profile validates its schema, capability counts,
+  cardinality histograms, storage/WAL attribution, phase timings, and declared
+  stream aggregates. Atomic publication uses same-filesystem sibling staging
+  with macOS `renamex_np(RENAME_EXCL)`, Linux
+  `renameat2(RENAME_NOREPLACE)`, and Windows no-replace `os.rename`; unsupported
+  platforms fail closed. Adversarial tests prove lock ownership, late
+  destination preservation, exactly one winning writer, and leak-free failure.
+- A persisted 100,000-call standard fixture generated 232,201 records and
+  105,606,168 source bytes in 8.493 seconds. The exact manifest-only
+  production profile streamed 1,316,864 calls, 3,056,541 records, and
+  1,392,996,507 source bytes in 97.798 seconds without persisting the
+  approximately 1.4 GB corpus.
+- Agent Perf run `20260728T233155Z-630dbb79` identified source-handle churn as
+  the largest application hotspot in one profiled standard workload. This is
+  diagnostic attribution only; CK-03 makes no comparative speedup claim because
+  the change was not measured with the required repeated median, p95, maximum,
+  and coefficient-of-variation protocol.
+- Post-R7 adversarial qualification passed 14 reconciliation tests in 0.30
+  seconds; the combined generator and reconciliation qualification passed 19
+  tests in 0.69 seconds.
+- Qualification on `origin/main` `c90da147b7779590a8885e33d561957aba38c6c9`
+  passed 82 focused tests in 1.70 seconds and the broad `just v` gate with
+  528 tests in 64.93 seconds, plus Ruff, MyPy, Pyright, scope, deterministic
+  assets, frontend, maintainability, and release-safety checks.
+
+## Deviations and residual risks
+
+- The 2.5-million-call growth profile remains generated on demand. Its exact
+  distribution is validated algebraically, but it was not materialized after
+  the standard-profile slope showed it would exceed the bounded interactive
+  wait.
+- Production qualification used exact streaming serialization and hashing in
+  manifest-only mode; it did not persist the approximately 1.4 GB source tree.
+  The standard profile proves persisted and manifest-only generation share the
+  same serialization path.
+- CK-03 freezes candidate-independent expected rows and formula metadata.
+  CK-04 must additionally prove each physical candidate reconciles every
+  formula and selector against the generated source records; these fixtures do
+  not admit candidate SQL or a physical schema.
+- Final review produced **9 findings; 9 accepted and resolved**.
+  Reviewer-token attribution is **pending** because the required `strict` usage
+  command was unavailable; tokens per accepted finding remain pending. The
+  measurement was not retried.
 
 **Suggested commits:**
 

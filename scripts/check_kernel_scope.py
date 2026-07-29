@@ -324,6 +324,71 @@ CK02_LOGICAL_CONTRACT_ADDITIONS = frozenset(
     }
 )
 
+CK03_SYNTHETIC_ORACLE_ADDITIONS = frozenset(
+    {
+        "config/agent-kernel/production-shape-profile-v1.schema.json",
+        "tests/agent_kernel/fixtures/README.md",
+        "tests/agent_kernel/fixtures/__init__.py",
+        "tests/agent_kernel/fixtures/generator/__init__.py",
+        "tests/agent_kernel/fixtures/generator/cases.py",
+        "tests/agent_kernel/fixtures/generator/cli.py",
+        "tests/agent_kernel/fixtures/generator/generate.py",
+        "tests/agent_kernel/fixtures/generator/profile.py",
+        "tests/agent_kernel/fixtures/generator/semantic.py",
+        "tests/agent_kernel/fixtures/generator/sources.py",
+        "tests/agent_kernel/fixtures/oracles/__init__.py",
+        "tests/agent_kernel/fixtures/oracles/accounting.py",
+        "tests/agent_kernel/fixtures/oracles/bundle.py",
+        "tests/agent_kernel/fixtures/oracles/common.py",
+        "tests/agent_kernel/fixtures/oracles/crash.py",
+        "tests/agent_kernel/fixtures/oracles/evidence.py",
+        "tests/agent_kernel/fixtures/oracles/lifecycle.py",
+        "tests/agent_kernel/fixtures/oracles/questions.py",
+        "tests/agent_kernel/fixtures/oracles/source_ledger.py",
+        "tests/agent_kernel/fixtures/oracles/source_lifecycle.py",
+        "tests/agent_kernel/fixtures/profiles/growth-v1.json",
+        "tests/agent_kernel/fixtures/profiles/production-shape-v1.json",
+        "tests/agent_kernel/fixtures/profiles/production-v1.json",
+        "tests/agent_kernel/fixtures/profiles/small-v1.json",
+        "tests/agent_kernel/fixtures/profiles/standard-v1.json",
+        "tests/agent_kernel/fixtures/profiles/tiny-v1.json",
+        "tests/agent_kernel/fixtures/tiny-v1/manifest.json",
+        "tests/agent_kernel/fixtures/tiny-v1/oracle-bundle.json",
+        "tests/agent_kernel/fixtures/tiny-v1/phases/archive/copy.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/phases/archive/original.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/phases/moving_tail/after.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/phases/moving_tail/before.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/phases/replacement/after.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/phases/replacement/before.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/phases/truncation/after.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/phases/truncation/before.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0000.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0001.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0002.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0003.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0004.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0005.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0006.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/sources/archived/exact-copy.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/sources/malformed/malformed.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/sources/replaced/revision-1.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v1/sources/truncated/truncated.jsonl",
+        "tests/agent_kernel/test_fixture_generator.py",
+        "tests/agent_kernel/test_fixture_oracles.py",
+        "tests/agent_kernel/test_fixture_profiles.py",
+        "tests/agent_kernel/test_fixture_reconciliation.py",
+    }
+)
+
+DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS = frozenset(
+    {
+        "scripts/bootstrap_dev_environment.py",
+        "tests/agent_kernel/test_dev_environment_bootstrap.py",
+        "tools/gitnexus/package-lock.json",
+        "tools/gitnexus/package.json",
+    }
+)
+
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
     | K2_ADDITIONS
@@ -348,6 +413,8 @@ INTEGRATION_ADDITIONS = (
     | R5_ADDITIONS
     | CK01_AGENT_KERNEL_CONTRACT_ADDITIONS
     | CK02_LOGICAL_CONTRACT_ADDITIONS
+    | CK03_SYNTHETIC_ORACLE_ADDITIONS
+    | DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))")
 

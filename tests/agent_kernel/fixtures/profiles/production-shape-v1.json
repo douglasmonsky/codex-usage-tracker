@@ -1,0 +1,232 @@
+{
+  "allowance_shape": {
+    "cycles": 14,
+    "observations": 1316,
+    "repeated_observations": 315,
+    "reset_boundaries": 13
+  },
+  "authorized_capability_counts": {
+    "allowance_observation": 1316,
+    "model_call_usage": 1316864,
+    "session_hierarchy": 131687,
+    "source_occurrence": 2132574,
+    "state_change_observation": 65843,
+    "tool_lifecycle": 329216,
+    "valuation": 1185178
+  },
+  "cardinality": {
+    "activities": 65843,
+    "model_calls": 1316864,
+    "resources": 31,
+    "sessions": 131687,
+    "state_changes": 65843,
+    "tools": 329216,
+    "turns": 658432
+  },
+  "cardinality_histograms": {
+    "calls_per_session": [
+      {
+        "count": 1,
+        "value": 4
+      },
+      {
+        "count": 131686,
+        "value": 10
+      }
+    ],
+    "resources_per_project": [
+      {
+        "count": 1,
+        "value": 31
+      }
+    ],
+    "tools_per_session": [
+      {
+        "count": 1,
+        "value": 1
+      },
+      {
+        "count": 65843,
+        "value": 2
+      },
+      {
+        "count": 65843,
+        "value": 3
+      }
+    ]
+  },
+  "generation_contract": {
+    "distribution": {
+      "activities": 65843,
+      "allowance_observations": 1316,
+      "compaction_boundaries": 13168,
+      "duplicate_call_occurrences": 13168,
+      "late_events": 13168,
+      "missing_cached_input_calls": 65843,
+      "model_calls": 1316864,
+      "sessions": 131687,
+      "state_changes": 65843,
+      "tool_invocations": 329216,
+      "turns": 658432,
+      "unpriced_calls": 131686
+    },
+    "expected_stream_aggregates": {
+      "allowance_observations": 1316,
+      "allowance_repeated_observations": 315,
+      "allowance_reset_boundaries": 13,
+      "canonical_model_calls": 1316864,
+      "model_call_occurrences": 1330032,
+      "open_tool_invocations": 1,
+      "oracle_cases": 80,
+      "publications": 1,
+      "rate_cards": 1,
+      "resources": 31,
+      "selector_anchors": 14,
+      "source_manifestations": 643,
+      "tool_invocations": 329216
+    },
+    "model_calls": 1316864,
+    "source_manifestations": 643
+  },
+  "phase_timings_us": {
+    "discovery": 1000000,
+    "oracle_validation": 5000000,
+    "parsing": 60000000,
+    "publication": 2000000,
+    "total": 68000000
+  },
+  "record_shape": {
+    "event_kind_counts": {
+      "activity": 65843,
+      "allowance_observation": 1316,
+      "compaction_boundary": 13168,
+      "model_call": 1330032,
+      "state_change": 65843,
+      "tool_start": 329216,
+      "tool_terminal": 329215
+    },
+    "lifecycle_transition_counts": {
+      "failed": 32921,
+      "open": 1,
+      "running": 329216,
+      "succeeded": 296294
+    },
+    "missing_field_counts": {
+      "cached_input_tokens": 65843,
+      "context_window_tokens": 13168,
+      "duration_us": 32921,
+      "rate_card_match": 131686
+    },
+    "record_size_histogram": [
+      {
+        "count": 1975296,
+        "maximum": 511,
+        "minimum": 0
+      },
+      {
+        "count": 144110,
+        "maximum": 1023,
+        "minimum": 512
+      },
+      {
+        "count": 13168,
+        "maximum": null,
+        "minimum": 1024
+      }
+    ]
+  },
+  "schema": "codex-usage-tracker.production-shape-profile.v1",
+  "source_shape": {
+    "age_buckets": [
+      {
+        "count": 31,
+        "maximum": 7,
+        "minimum": 0
+      },
+      {
+        "count": 68,
+        "maximum": 30,
+        "minimum": 8
+      },
+      {
+        "count": 93,
+        "maximum": 90,
+        "minimum": 31
+      },
+      {
+        "count": 215,
+        "maximum": 365,
+        "minimum": 91
+      },
+      {
+        "count": 236,
+        "maximum": 1095,
+        "minimum": 366
+      }
+    ],
+    "source_kind_counts": {
+      "active": 638,
+      "archived": 1,
+      "deferred": 1,
+      "malformed": 1,
+      "replaced": 1,
+      "truncated": 1
+    },
+    "total_bytes": 723517440,
+    "total_files": 643
+  },
+  "storage_shape": {
+    "database_bytes": 1100000000,
+    "index_bytes": 300000000,
+    "table_bytes": 800000000,
+    "wal_bytes": 50000000
+  },
+  "timestamp_shape": {
+    "equal_timestamp_count": 658432,
+    "history_days": 1095,
+    "late_event_count": 13168,
+    "uncertain_source_count": 1
+  },
+  "token_shape": {
+    "cached_input_histogram": [
+      {
+        "count": 625510,
+        "maximum": 2047,
+        "minimum": 0
+      },
+      {
+        "count": 625511,
+        "maximum": null,
+        "minimum": 2048
+      }
+    ],
+    "output_histogram": [
+      {
+        "count": 1316864,
+        "maximum": 4095,
+        "minimum": 0
+      }
+    ],
+    "presence_counts": {
+      "cached_input_tokens": 1251021,
+      "output_tokens": 1316864,
+      "reasoning_tokens": 1316864,
+      "uncached_input_tokens": 1316864
+    },
+    "reasoning_histogram": [
+      {
+        "count": 1316864,
+        "maximum": 4095,
+        "minimum": 0
+      }
+    ],
+    "uncached_input_histogram": [
+      {
+        "count": 1316864,
+        "maximum": 4095,
+        "minimum": 0
+      }
+    ]
+  },
+  "version": 1
+}

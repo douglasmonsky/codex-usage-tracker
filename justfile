@@ -2,6 +2,7 @@ set shell := ["bash", "-uc"]
 
 scope:
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_agent_kernel_contracts.py
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m tests.agent_kernel.fixtures.generator.cli --profile tiny --check-committed
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_kernel_scope.py
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/generate_kernel_manifests.py --check
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; PYTHONPATH=src "$PY" scripts/generate_kernel_interfaces.py --check
@@ -26,7 +27,7 @@ vp:
         src/codex_usage_tracker/kernel \
         src/codex_usage_tracker/release \
         tests/release \
-        tests/agent_kernel/contracts \
+        tests/agent_kernel \
         tests/kernel/allowance \
         tests/kernel/console \
         tests/kernel/content \
@@ -97,7 +98,7 @@ v:
         tests/kernel/test_source_lifecycle_oracle.py \
         tests/kernel/test_stable_contract_028.py \
         tests/kernel/test_watcher.py \
-        tests/agent_kernel/contracts \
+        tests/agent_kernel \
         tests/kernel/allowance \
         tests/kernel/console \
         tests/kernel/content \
