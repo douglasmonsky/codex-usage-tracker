@@ -15,6 +15,7 @@ shared = importlib.import_module("shared")
 candidate_a = importlib.import_module("candidate_a")
 evidence_module = importlib.import_module("candidate_a.evidence")
 maintenance_module = importlib.import_module("candidate_a.maintenance")
+metrics_module = importlib.import_module("candidate_a.metrics")
 queries_module = importlib.import_module("candidate_a.queries")
 schema_module = importlib.import_module("candidate_a.schema")
 
@@ -178,6 +179,15 @@ def test_growth_sensitive_question_plans_use_exact_current_projections(
             full_scans, temporary_sorts = queries_module._plan_counts(plans)  # noqa: SLF001
             assert full_scans == 0, (plan_id, plans)
             assert temporary_sorts == 0, (plan_id, plans)
+
+    metrics = metrics_module.artifact_metrics(artifact.path, occurrence_rows=0)
+    with database(artifact.path, read_only=True) as connection:
+        recorded_projection_rows = int(
+            connection.execute(
+                "SELECT value FROM metadata WHERE key='projection_rows'"
+            ).fetchone()[0]
+        )
+    assert metrics.projection_rows == recorded_projection_rows
 
 
 @pytest.mark.parametrize(

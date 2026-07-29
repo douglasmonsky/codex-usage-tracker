@@ -98,6 +98,13 @@ def artifact_metrics(path: Path, *, occurrence_rows: int) -> ArtifactMetrics:
                 """
                 SELECT
                     (SELECT count(*) FROM session_usage_current) +
+                    (SELECT count(*) FROM usage_total_current) +
+                    (SELECT count(*) FROM model_effort_usage_current) +
+                    (SELECT count(*) FROM project_family_usage_current) +
+                    (SELECT count(*) FROM model_usage_current) +
+                    (SELECT count(*) FROM turn_action_current) +
+                    (SELECT count(*) FROM resource_operation_current) +
+                    (SELECT count(*) FROM evidence_page_anchor_current) +
                     (SELECT count(*) FROM tool_family_current)
                 """
             ).fetchone()[0]
