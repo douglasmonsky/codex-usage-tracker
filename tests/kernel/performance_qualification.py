@@ -11,7 +11,7 @@ import tempfile
 import time
 from contextlib import closing
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 from pathlib import Path
 
 import pytest
@@ -28,12 +28,14 @@ _REPORT_ENV = "CODEX_USAGE_PERFORMANCE_REPORT"
 _REPORT_SCHEMA = "codex-usage-tracker.ci-performance-qualification.v1"
 
 
-class PerformanceLane(StrEnum):
+class PerformanceLane(str, Enum):
+    INVARIANTS = "invariants"
     STRICT = "strict"
     GITHUB_HOSTED_QUALIFIED = "github_hosted_qualified"
 
 
-class PerformanceOutcome(StrEnum):
+class PerformanceOutcome(str, Enum):
+    INVARIANTS_ONLY = "invariants_only"
     PASS = "pass"
     PRODUCT_REGRESSION = "product_regression"
     RUNNER_UNQUALIFIED = "runner_unqualified"
@@ -138,6 +140,16 @@ def classify_performance(
     observations: tuple[BudgetObservation, ...],
 ) -> PerformanceAssessment:
     breaches = tuple(item for item in observations if item.observed > item.budget)
+    if lane is PerformanceLane.INVARIANTS:
+        return PerformanceAssessment(
+            lane=lane,
+            outcome=PerformanceOutcome.INVARIANTS_ONLY,
+            runner_qualified=None,
+            observations=observations,
+            breaches=breaches,
+            before=before,
+            after=after,
+        )
     if lane is PerformanceLane.STRICT:
         return PerformanceAssessment(
             lane=lane,
@@ -265,7 +277,9 @@ def pytest_sessionfinish(
         after=after,
         observations=tuple(_OBSERVATIONS),
     )
-    payload = json.dumps(assessment.to_dict(), separators=(",", ":"), sort_keys=True)
+    report = assessment.to_dict()
+    report["pytest_exit_status"] = int(exitstatus)
+    payload = json.dumps(report, separators=(",", ":"), sort_keys=True)
     print(f"CI_PERFORMANCE_QUALIFICATION={payload}")
     report_path = os.environ.get(_REPORT_ENV)
     if report_path:

@@ -389,6 +389,16 @@ DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS = frozenset(
     }
 )
 
+CI_PERFORMANCE_QUALIFICATION_ADDITIONS = frozenset(
+    {
+        ".github/workflows/performance-qualification.yml",
+        "docs/quality/CI_PERFORMANCE_QUALIFICATION.md",
+        "scripts/aggregate_performance_qualification.py",
+        "tests/kernel/performance_qualification.py",
+        "tests/kernel/test_ci_performance_qualification.py",
+    }
+)
+
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
     | K2_ADDITIONS
@@ -415,6 +425,7 @@ INTEGRATION_ADDITIONS = (
     | CK02_LOGICAL_CONTRACT_ADDITIONS
     | CK03_SYNTHETIC_ORACLE_ADDITIONS
     | DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
+    | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))")
 

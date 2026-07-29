@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.check_kernel_scope import (
+    CI_PERFORMANCE_QUALIFICATION_ADDITIONS,
     CK01_AGENT_KERNEL_CONTRACT_ADDITIONS,
     CK02_LOGICAL_CONTRACT_ADDITIONS,
     CK03_SYNTHETIC_ORACLE_ADDITIONS,
@@ -352,6 +353,13 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tools/gitnexus/package-lock.json",
         "tools/gitnexus/package.json",
     } == DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
+    assert {
+        ".github/workflows/performance-qualification.yml",
+        "docs/quality/CI_PERFORMANCE_QUALIFICATION.md",
+        "scripts/aggregate_performance_qualification.py",
+        "tests/kernel/performance_qualification.py",
+        "tests/kernel/test_ci_performance_qualification.py",
+    } == CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -378,6 +386,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK02_LOGICAL_CONTRACT_ADDITIONS
         | CK03_SYNTHETIC_ORACLE_ADDITIONS
         | DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
+        | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )
 
 

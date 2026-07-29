@@ -15,6 +15,7 @@ vp:
         scripts/benchmark_agent_outcome.py \
         scripts/benchmark_kernel.py \
         scripts/check_agent_kernel_contracts.py \
+        scripts/aggregate_performance_qualification.py \
         scripts/check_kernel_scope.py \
         scripts/check_release.py \
         scripts/check_kernel_release_candidate.py \
@@ -36,6 +37,7 @@ vp:
         tests/kernel/live \
         tests/kernel/query \
         tests/kernel/test_code_disposition_manifest.py \
+        tests/kernel/test_ci_performance_qualification.py \
         tests/kernel/test_cutover_control.py \
         tests/kernel/test_database_lifecycle.py \
         tests/kernel/test_development_efficiency_policy.py \
@@ -48,6 +50,7 @@ vp:
         tests/kernel/test_agent_outcome_baseline.py \
         tests/kernel/test_kernel_scope.py \
         tests/kernel/test_repository_quality_policy.py \
+        tests/kernel/performance_qualification.py \
         tests/kernel/test_release_candidate.py \
         tests/kernel/test_release_028_qualification.py \
         tests/kernel/test_release_cutover.py \
@@ -72,8 +75,9 @@ verify-precommit:
 
 v:
     just vp
-    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pytest -p no:tach \
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; CODEX_USAGE_PERFORMANCE_LANE=invariants "$PY" -m pytest -p no:tach \
         tests/kernel/test_agent_outcome_baseline.py \
+        tests/kernel/test_ci_performance_qualification.py \
         tests/kernel/test_kernel_scope.py \
         tests/kernel/test_code_disposition_manifest.py \
         tests/kernel/test_retired_surface_manifest.py \

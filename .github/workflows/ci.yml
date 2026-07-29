@@ -65,40 +65,25 @@ jobs:
             --ignore=tests/kernel/query/test_performance.py
           python -m pyright --pythonpath "$(command -v python)"
           python scripts/check_release.py
-      - name: Run synthetic performance contracts
+      - name: Run synthetic scale invariants
         if: matrix.python-version == '3.14'
         env:
-          CODEX_USAGE_PERFORMANCE_LANE: github_hosted_qualified
-          CODEX_USAGE_PERFORMANCE_REPORT: performance-qualification.json
+          CODEX_USAGE_PERFORMANCE_LANE: invariants
         run: |
-          python -m pytest -p no:tach -p tests.kernel.performance_qualification \
+          set +e
+          timeout --signal=TERM --kill-after=30s 5m \
+            python -m pytest -p no:tach \
             tests/kernel/test_ingest_performance.py \
             tests/kernel/allowance/test_performance.py \
             tests/kernel/evidence/test_performance.py \
             tests/kernel/interfaces/test_performance.py \
             tests/kernel/query/test_performance.py
-      - name: Summarize performance qualification
-        if: matrix.python-version == '3.14' && always()
-        run: |
-          if test -f performance-qualification.json; then
-            {
-              echo '### Performance qualification'
-              echo '```json'
-              cat performance-qualification.json
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo 'Performance qualification report was not produced.' \
-              >> "$GITHUB_STEP_SUMMARY"
+          status=$?
+          set -e
+          if test "$status" -eq 124 || test "$status" -eq 137; then
+            echo "::error::scale invariant suite timed out; this is bounded non-completion, not an absolute-latency regression"
           fi
-      - name: Upload performance qualification telemetry
-        if: matrix.python-version == '3.14' && always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: performance-qualification-${{ github.run_id }}-${{ github.run_attempt }}
-          path: performance-qualification.json
-          if-no-files-found: warn
-          retention-days: 14
+          exit "$status"
       - name: Build isolated development package
         if: matrix.python-version == '3.14'
         run: |

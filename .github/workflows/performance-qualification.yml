@@ -1,4 +1,4 @@
-name: Qualified hosted performance
+name: Repeated hosted performance qualification
 
 on:
   workflow_dispatch:
@@ -14,8 +14,11 @@ concurrency:
 
 jobs:
   qualification:
-    name: Calibration-qualified hosted performance
+    name: Five-run calibrated qualification
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CODEX_USAGE_PERFORMANCE_LANE: github_hosted_qualified
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -27,25 +30,41 @@ jobs:
           cache-dependency-path: pyproject.toml
       - name: Install kernel tooling
         run: python -m pip install ".[dev]"
-      - name: Run calibration-qualified performance contracts
-        env:
-          CODEX_USAGE_PERFORMANCE_LANE: github_hosted_qualified
-          CODEX_USAGE_PERFORMANCE_REPORT: performance-qualification.json
+      - name: Capture five calibration-qualified repetitions
         run: |
-          python -m pytest -p no:tach -p tests.kernel.performance_qualification \
-            tests/kernel/test_ingest_performance.py \
-            tests/kernel/allowance/test_performance.py \
-            tests/kernel/evidence/test_performance.py \
-            tests/kernel/interfaces/test_performance.py \
-            tests/kernel/query/test_performance.py
+          mkdir -p performance-runs
+          for repetition in 1 2 3 4 5; do
+            export CODEX_USAGE_PERFORMANCE_REPORT="performance-runs/repetition-${repetition}.json"
+            set +e
+            timeout --signal=TERM --kill-after=30s 5m \
+              python -m pytest -p no:tach -p tests.kernel.performance_qualification \
+              tests/kernel/test_ingest_performance.py \
+              tests/kernel/allowance/test_performance.py \
+              tests/kernel/evidence/test_performance.py \
+              tests/kernel/interfaces/test_performance.py \
+              tests/kernel/query/test_performance.py
+            status=$?
+            set -e
+            if test "$status" -eq 124 || test "$status" -eq 137; then
+              printf '%s\n' \
+                '{"lane":"github_hosted_qualified","outcome":"suite_timeout","schema":"codex-usage-tracker.ci-performance-qualification.v1","timeout_seconds":300}' \
+                > "$CODEX_USAGE_PERFORMANCE_REPORT"
+            fi
+            echo "repetition=${repetition} process_status=${status}"
+          done
+      - name: Aggregate sustained performance evidence
+        run: |
+          python scripts/aggregate_performance_qualification.py \
+            --output performance-qualification-summary.json \
+            performance-runs/repetition-{1..5}.json
       - name: Summarize qualification
         if: always()
         run: |
-          if test -f performance-qualification.json; then
+          if test -f performance-qualification-summary.json; then
             {
-              echo '### Calibration-qualified hosted performance'
+              echo '### Five-run hosted performance qualification'
               echo '```json'
-              cat performance-qualification.json
+              cat performance-qualification-summary.json
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           else
@@ -57,6 +76,8 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: qualified-hosted-performance-${{ github.run_id }}-${{ github.run_attempt }}
-          path: performance-qualification.json
+          path: |
+            performance-runs/*.json
+            performance-qualification-summary.json
           if-no-files-found: warn
           retention-days: 30

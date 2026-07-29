@@ -72,10 +72,11 @@ def test_repository_verification_wrappers_do_not_use_generic_maintainer_profiles
         assert retired_command not in justfile
 
 
-def test_ci_runs_performance_contracts_only_in_the_dedicated_step() -> None:
+def test_ci_runs_scale_invariants_without_a_host_wall_clock_gate() -> None:
     workflow = (
         _REPO_ROOT / ".github" / "workflows" / "ci.yml"
     ).read_text(encoding="utf-8")
+    justfile = (_REPO_ROOT / "justfile").read_text(encoding="utf-8")
 
     assert "tests/kernel/test_ingest_*.py" not in workflow
     for path in (
@@ -88,15 +89,21 @@ def test_ci_runs_performance_contracts_only_in_the_dedicated_step() -> None:
         assert workflow.count(path) == 2
         assert f"--ignore={path}" in workflow
     assert 'if [ "$MATRIX_PYTHON" = "3.14" ]; then' not in workflow
-    assert "CODEX_USAGE_PERFORMANCE_LANE: github_hosted_qualified" in workflow
-    assert "CODEX_USAGE_PERFORMANCE_REPORT: performance-qualification.json" in workflow
-    assert "-p tests.kernel.performance_qualification" in workflow
+    assert "Run synthetic scale invariants" in workflow
+    assert "CODEX_USAGE_PERFORMANCE_LANE: invariants" in workflow
+    assert "github_hosted_qualified" not in workflow
+    assert "CODEX_USAGE_PERFORMANCE_REPORT" not in workflow
+    assert "-p tests.kernel.performance_qualification" not in workflow
+    assert "timeout --signal=TERM --kill-after=30s 5m" in workflow
+    assert "scale invariant suite timed out" in workflow
     assert "continue-on-error:" not in workflow
-    assert "Summarize performance qualification" in workflow
-    assert "Upload performance qualification telemetry" in workflow
+    assert "Summarize performance qualification" not in workflow
+    assert "Upload performance qualification telemetry" not in workflow
+    assert "CODEX_USAGE_PERFORMANCE_LANE=invariants" in justfile
+    assert "tests/kernel/test_ci_performance_qualification.py" in justfile
 
 
-def test_hosted_performance_workflow_is_truthfully_qualified_not_controlled() -> None:
+def test_hosted_performance_workflow_repeats_pinned_image_qualification() -> None:
     workflow = (
         _REPO_ROOT / ".github" / "workflows" / "performance-qualification.yml"
     ).read_text(encoding="utf-8")
@@ -104,14 +111,22 @@ def test_hosted_performance_workflow_is_truthfully_qualified_not_controlled() ->
         _REPO_ROOT / "docs" / "quality" / "CI_PERFORMANCE_QUALIFICATION.md"
     ).read_text(encoding="utf-8")
 
-    assert "name: Qualified hosted performance" in workflow
+    assert "name: Repeated hosted performance qualification" in workflow
     assert "workflow_dispatch:" in workflow
     assert "schedule:" in workflow
     assert "runs-on: ubuntu-24.04" in workflow
+    assert "for repetition in 1 2 3 4 5" in workflow
     assert "CODEX_USAGE_PERFORMANCE_LANE: github_hosted_qualified" in workflow
     assert "-p tests.kernel.performance_qualification" in workflow
+    assert "timeout --signal=TERM --kill-after=30s 5m" in workflow
+    assert '"outcome":"suite_timeout"' in workflow
+    assert "scripts/aggregate_performance_qualification.py" in workflow
+    assert "performance-qualification-summary.json" in workflow
     assert "continue-on-error:" not in workflow
     assert "self-hosted" not in workflow
     assert "controlled" not in workflow.lower()
     assert "CODEX_USAGE_PERFORMANCE_LANE=strict" in qualification
     assert "Strict mode has no runner escape" in qualification
+    assert "five independent unprofiled repetitions" in qualification
+    assert "median" in qualification
+    assert "`suite_timeout`" in qualification
