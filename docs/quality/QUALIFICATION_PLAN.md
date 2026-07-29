@@ -53,6 +53,18 @@ question oracle IDs
 Tiny fixtures are hand-auditable. Scale fixtures are generated from the same
 semantic case library, not a separate simplified benchmark model.
 
+CK-03 freezes the source revision as `agent-kernel-structural-v1`. Source
+records are compact canonical JSON Lines; manifests and oracle bundles use
+canonical JSON. Every artifact digest is SHA-256: exact source bytes, the
+complete oracle bundle, and the manifest with its own digest field omitted.
+Only the tiny fixture is checked in. Small, standard, production-shaped, and
+growth fixtures are generated on demand from versioned profiles. The exact
+format, atomic CLI, digest ratchets, and measured generation evidence are
+recorded in
+[`tests/agent_kernel/fixtures/README.md`](../../tests/agent_kernel/fixtures/README.md).
+Manifest-only generation still serializes and hashes every source byte; it
+does not substitute an estimate.
+
 ## Production-shape profiler
 
 A local opt-in profiler may inspect aggregate structure of a user-owned source

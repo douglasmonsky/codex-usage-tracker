@@ -1,0 +1,2 @@
+{"event_at_us":1767225600000004,"event_kind_order":1,"payload":{"occurrence_id":"call:v1:hi6de4yqy5d2guaeki5iswsrpsc5euocj4lsjzxnpqehe56wst5q","revision":"revision-1","structural_case":"truncation-preserved"},"source_order":4,"type":"source_phase_occurrence"}
+{"event_at_us":1767225600000005,"event_kind_order":1,"payload":{"occurrence_id":"call:v1:gu2ebhiczdmq7twvtxmrdxna6jcur4uqofzpqzy4ldiar57ps54q","revision":"revision-1","structural_case":"truncation-removed"},"source_order":5,"type":"source_phase_occurrence"}

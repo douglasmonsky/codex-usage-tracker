@@ -7,10 +7,10 @@ in the linked files under [`docs/roadmap/tasks/`](tasks/).
 
 ## Overall
 
-- Completed packets: **3 / 17**
+- Completed packets: **4 / 17**
 - In progress: **None**
-- Not started: **14**
-- Critical-path completion: **3 / 16**
+- Not started: **13**
+- Critical-path completion: **4 / 16**
 - Optional packets: **CK-15**
 
 A packet may be checked only after its acceptance criteria and required checks
@@ -21,8 +21,8 @@ line and the milestone accounting below.
 ## Milestones
 
 - [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
-- [ ] **M1 — Architecture Selected** · 2 / 4 · CK-01–CK-02 complete;
-  CK-03–CK-04 not started
+- [ ] **M1 — Architecture Selected** · 3 / 4 · CK-01–CK-03 complete;
+  CK-04 not started
 - [ ] **M2 — Kernel Alpha** · 0 / 5 · CK-05–CK-09 not started
 - [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
 - [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
@@ -45,7 +45,7 @@ line and the milestone accounting below.
 - [x] **CK-02 — Freeze logical contract vectors** · **Completed** ·
   depends on CK-01
   · [packet](tasks/ck-02-freeze-logical-contract-vectors.md)
-- [ ] **CK-03 — Build synthetic fixtures and oracles** · Not started ·
+- [x] **CK-03 — Build synthetic fixtures and oracles** · **Completed** ·
   depends on CK-02
   · [packet](tasks/ck-03-build-synthetic-fixtures-and-oracles.md)
 - [ ] **CK-04 — Run the physical-architecture bakeoff** · Not started ·
