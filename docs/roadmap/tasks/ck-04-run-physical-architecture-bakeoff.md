@@ -145,9 +145,6 @@ decision, and the database-v1 schema contract before resuming.
 - Use synthetic fixtures only. Never inspect or commit real Codex logs or raw
   prompts, responses, reasoning, commands, patches, or tool-output bodies.
 - Query never refreshes. Long work is host-waited; the model never polls.
-- The three paused workers were spawned without model/reasoning overrides and
-  inherited the parent Ultra task because global subagent defaults were unset.
-  The new task may use configured defaults or explicit overrides.
 
 ### Integrated commits
 
