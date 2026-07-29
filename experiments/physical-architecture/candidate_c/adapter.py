@@ -61,8 +61,6 @@ class Adapter:
             free_list_bytes=storage.free_list_bytes,
             wal_bytes=storage.wal_bytes,
             journal_bytes=storage.journal_bytes,
-            pages_written=storage.page_count,
-            writer_transactions=1,
             source_files_inventoried=len(request.fixture.sources),
             source_files_selected=len(request.fixture.sources),
             source_files_parsed=stats.source_files_parsed,

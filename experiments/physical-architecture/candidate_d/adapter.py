@@ -444,8 +444,6 @@ class Adapter:
             wal_bytes=storage.wal_bytes,
             journal_bytes=storage.journal_bytes,
             pages_read=storage.page_count if query is not None else 0,
-            pages_written=storage.page_count if execution.stats.writer_transactions else 0,
-            writer_transactions=execution.stats.writer_transactions,
             source_files_inventoried=execution.stats.source_files_inventoried,
             source_files_selected=execution.stats.source_files_selected,
             source_files_parsed=execution.stats.source_files_parsed,

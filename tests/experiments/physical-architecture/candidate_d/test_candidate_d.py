@@ -726,13 +726,22 @@ def test_only_declared_optional_case_is_unsupported(
     assert result.outcome is shared.RunOutcome.UNSUPPORTED
 
 
+@pytest.mark.parametrize(
+    "case_id",
+    (
+        "build.scale.tiny",
+        "ordinary.one_model_call",
+        "crash.terminate.before_staging",
+    ),
+)
 def test_measured_adapter_writes_a_valid_shared_result_envelope(
     tmp_path: Path,
     fixture: shared.FixtureBundle,
+    case_id: str,
 ) -> None:
     matrix = shared.build_workload_matrix(physical_cores=12)
     request = _request(
-        case_id="query.q-ops-04.warm_first_page",
+        case_id=case_id,
         fixture=fixture,
         run_root=tmp_path / "run",
     )
@@ -788,9 +797,26 @@ def test_measured_adapter_writes_a_valid_shared_result_envelope(
     assert record.values.response_bytes <= 16_384
     assert record.values.fact_rows > 0
     assert record.values.sequence_rows > 0
-    assert json.loads(collector.output_path.read_text(encoding="utf-8"))["schema"] == (
-        shared.MEASUREMENT_SCHEMA
-    )
+    payload = json.loads(collector.output_path.read_text(encoding="utf-8"))
+    assert payload["schema"] == shared.MEASUREMENT_SCHEMA
+    assert {
+        field: payload["values"][field]
+        for field in (
+            "ordinary_tail_latency_ns",
+            "ordinary_tail_latency_basis",
+            "pages_written",
+            "pages_written_basis",
+            "writer_transactions",
+            "writer_transactions_basis",
+        )
+    } == {
+        "ordinary_tail_latency_ns": None,
+        "ordinary_tail_latency_basis": None,
+        "pages_written": None,
+        "pages_written_basis": None,
+        "writer_transactions": None,
+        "writer_transactions_basis": None,
+    }
 
 
 def test_agent_perf_workload_is_the_frozen_standard_fixture_command() -> None:
