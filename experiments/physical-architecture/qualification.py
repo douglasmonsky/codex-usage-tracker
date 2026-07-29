@@ -154,6 +154,7 @@ class QualificationConfig:
     code_commit: str
     candidates: tuple[str, ...] = CANDIDATE_IDS
     case_ids: tuple[str, ...] = ()
+    group_ids: tuple[shared.WorkloadGroup, ...] = ()
     repetitions: int = 1
     speed_claim: bool = False
     profiled: bool = False
@@ -177,6 +178,14 @@ class QualificationConfig:
             raise QualificationContractError("case selection must be unique")
         if any(not _CASE_ID.fullmatch(case_id) for case_id in self.case_ids):
             raise QualificationContractError("case IDs must be safe relative path components")
+        if len(set(self.group_ids)) != len(self.group_ids):
+            raise QualificationContractError("group selection must be unique")
+        if any(not isinstance(group, shared.WorkloadGroup) for group in self.group_ids):
+            raise QualificationContractError("group selection contains an unknown workload group")
+        if self.group_ids and (self.case_ids or self.all_compatible_cases):
+            raise QualificationContractError(
+                "group selection cannot be combined with explicit cases or all-compatible selection"
+            )
         if self.all_compatible_cases and self.case_ids:
             raise QualificationContractError(
                 "all-compatible selection cannot be combined with explicit cases"
@@ -448,7 +457,9 @@ def _prepare_run(
         raise QualificationContractError(
             "non-tiny fixture requires the explicit allow-large-fixture gate"
         )
-    if fixture.profile != "tiny" and not (config.case_ids or config.all_compatible_cases):
+    if fixture.profile != "tiny" and not (
+        config.case_ids or config.group_ids or config.all_compatible_cases
+    ):
         raise QualificationContractError(
             "non-tiny fixture requires explicit cases or all-compatible selection"
         )
@@ -484,6 +495,13 @@ def _select_cases(
         if unknown:
             raise QualificationContractError(f"unknown workload cases: {sorted(unknown)!r}")
         cases = tuple(case for case in matrix.cases if case.case_id in requested)
+    elif config.group_ids:
+        selected_groups = frozenset(config.group_ids)
+        cases = tuple(
+            case
+            for case in matrix.cases
+            if case.group in selected_groups and _case_matches_fixture(case, fixture.profile)
+        )
     elif config.all_compatible_cases:
         cases = tuple(
             case
@@ -540,6 +558,7 @@ def _invocation_payload(
         "environment_digest": shared.canonical_sha256(asdict(prepared.environment)),
         "candidate_ids": prepared.candidates,
         "case_ids": tuple(case.case_id for case in prepared.cases),
+        "group_ids": tuple(group.value for group in config.group_ids),
         "repetitions": config.repetitions,
         "speed_claim": config.speed_claim,
         "profiled": config.profiled,

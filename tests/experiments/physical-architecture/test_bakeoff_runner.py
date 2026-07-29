@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import importlib
+import importlib.util
 import json
 import sys
 from dataclasses import replace
@@ -418,6 +419,170 @@ def test_fixture_profile_and_research_execution_are_explicit(
         )
 
 
+def test_query_and_crash_groups_preserve_matrix_order(
+    tmp_path: Path,
+) -> None:
+    config = qualification.QualificationConfig(
+        fixture_root=_TINY,
+        output_root=tmp_path,
+        run_id="groups",
+        code_commit="c" * 40,
+        candidates=("A",),
+        group_ids=(shared.WorkloadGroup.CRASH, shared.WorkloadGroup.QUERY),
+    )
+    fixture = shared.load_fixture_bundle(_TINY)
+    matrix = shared.build_workload_matrix(physical_cores=8)
+
+    cases = qualification._select_cases(config, fixture=fixture, matrix=matrix)
+
+    assert tuple(case.case_id for case in cases) == tuple(
+        case.case_id
+        for case in matrix.cases
+        if case.group in {shared.WorkloadGroup.QUERY, shared.WorkloadGroup.CRASH}
+        and qualification._case_matches_fixture(case, fixture.profile)
+    )
+
+
+def test_group_union_cannot_duplicate_cases(tmp_path: Path) -> None:
+    config = qualification.QualificationConfig(
+        fixture_root=_TINY,
+        output_root=tmp_path,
+        run_id="group-union",
+        code_commit="c" * 40,
+        candidates=("A",),
+        group_ids=(shared.WorkloadGroup.QUERY, shared.WorkloadGroup.CRASH),
+    )
+    fixture = shared.load_fixture_bundle(_TINY)
+    matrix = shared.build_workload_matrix(physical_cores=8)
+
+    selected = qualification._select_cases(config, fixture=fixture, matrix=matrix)
+
+    assert len(selected) == len({case.case_id for case in selected})
+
+
+@pytest.mark.parametrize(
+    ("case_ids", "all_compatible_cases"),
+    [
+        (("build.scale.tiny",), False),
+        ((), True),
+    ],
+)
+def test_group_selection_conflicts_with_other_selection_modes(
+    tmp_path: Path,
+    case_ids: tuple[str, ...],
+    all_compatible_cases: bool,
+) -> None:
+    with pytest.raises(qualification.QualificationContractError, match="group selection"):
+        qualification.QualificationConfig(
+            fixture_root=_TINY,
+            output_root=tmp_path,
+            run_id="group-conflict",
+            code_commit="c" * 40,
+            candidates=("A",),
+            case_ids=case_ids,
+            group_ids=(shared.WorkloadGroup.QUERY,),
+            all_compatible_cases=all_compatible_cases,
+        )
+
+
+def test_duplicate_groups_are_rejected(tmp_path: Path) -> None:
+    with pytest.raises(qualification.QualificationContractError, match="group selection"):
+        qualification.QualificationConfig(
+            fixture_root=_TINY,
+            output_root=tmp_path,
+            run_id="duplicate-groups",
+            code_commit="c" * 40,
+            candidates=("A",),
+            group_ids=(shared.WorkloadGroup.QUERY, shared.WorkloadGroup.QUERY),
+        )
+
+
+def test_research_group_keeps_explicit_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = shared.load_fixture_bundle(_TINY)
+    monkeypatch.setattr(
+        shared, "load_fixture_bundle", lambda _: replace(fixture, profile="standard")
+    )
+    config = qualification.QualificationConfig(
+        fixture_root=_TINY,
+        output_root=tmp_path,
+        run_id="research-group",
+        code_commit="c" * 40,
+        candidates=("A",),
+        group_ids=(shared.WorkloadGroup.DBHUB,),
+        allow_large_fixture=True,
+    )
+
+    with pytest.raises(
+        qualification.QualificationContractError,
+        match="requires include-research",
+    ):
+        qualification.run_qualification(
+            config,
+            environment=_environment(),
+            adapter_loader=lambda _: _FakeAdapter("A"),
+        )
+
+
+def test_group_selection_is_recorded_in_invocation(tmp_path: Path) -> None:
+    artifact = qualification.run_qualification(
+        qualification.QualificationConfig(
+            fixture_root=_TINY,
+            output_root=tmp_path,
+            run_id="group-invocation",
+            code_commit="c" * 40,
+            candidates=("A",),
+            group_ids=(shared.WorkloadGroup.BUILD,),
+        ),
+        environment=_environment(),
+        adapter_loader=lambda _: _FakeAdapter("A"),
+    )
+
+    invocation = json.loads(artifact.invocation_path.read_text(encoding="utf-8"))
+    assert invocation["group_ids"] == ["build"]
+
+
+def test_explicit_case_cli_invocation_is_unchanged(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = _EXPERIMENT_ROOT / "run_bakeoff.py"
+    spec = importlib.util.spec_from_file_location("run_bakeoff_test", path)
+    assert spec is not None and spec.loader is not None
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    captured: list[Any] = []
+    monkeypatch.setattr(runner.qualification, "discover_code_commit", lambda _: "c" * 40)
+    monkeypatch.setattr(
+        runner.qualification,
+        "run_qualification",
+        lambda config: (
+            captured.append(config)
+            or type("Artifact", (), {"summary_path": tmp_path / "summary.json"})()
+        ),
+    )
+
+    assert (
+        runner.main(
+            [
+                "--fixture",
+                str(_TINY),
+                "--output",
+                str(tmp_path),
+                "--candidate",
+                "A",
+                "--case",
+                "build.scale.tiny",
+            ]
+        )
+        == 0
+    )
+    assert captured[0].case_ids == ("build.scale.tiny",)
+    assert captured[0].group_ids == ()
+
+
 def test_artifacts_are_canonical_bounded_and_have_current_digests(
     tmp_path: Path,
 ) -> None:
@@ -698,6 +863,7 @@ def test_runner_has_no_production_imports() -> None:
     for path in (
         _EXPERIMENT_ROOT / "qualification.py",
         _EXPERIMENT_ROOT / "run_bakeoff.py",
+        _EXPERIMENT_ROOT / "run_ck04_qualification.py",
     ):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         imports = {

@@ -28,6 +28,12 @@ def _parser() -> argparse.ArgumentParser:
         dest="candidates",
     )
     parser.add_argument("--case", action="append", dest="case_ids")
+    parser.add_argument(
+        "--group",
+        action="append",
+        choices=tuple(group.value for group in qualification.shared.WorkloadGroup),
+        dest="group_ids",
+    )
     parser.add_argument("--all-compatible-cases", action="store_true")
     parser.add_argument("--repetitions", type=int, default=1)
     parser.add_argument("--speed-claim", action="store_true")
@@ -59,6 +65,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             code_commit=qualification.discover_code_commit(_REPOSITORY_ROOT),
             candidates=tuple(arguments.candidates or qualification.CANDIDATE_IDS),
             case_ids=tuple(arguments.case_ids or ()),
+            group_ids=tuple(
+                qualification.shared.WorkloadGroup(group) for group in (arguments.group_ids or ())
+            ),
             repetitions=arguments.repetitions,
             speed_claim=arguments.speed_claim,
             profiled=arguments.profiled,
