@@ -572,4 +572,11 @@ def test_agent_perf_workload_is_the_frozen_standard_fixture_command() -> None:
     assert workload.workload_id == "build.scale.standard"
     assert workload.minimum_unprofiled_runs == 5
     assert workload.profile_is_attribution_only is True
-    assert workload.environment == {"PYTHONPATH": "experiments/physical-architecture"}
+    assert workload.workload_matrix_digest == (
+        shared.build_workload_matrix(physical_cores=10).digest
+    )
+    assert workload.command_argv[-2:] == ("--physical-cores", "10")
+    assert workload.environment == {
+        "PYTHONHASHSEED": "0",
+        "PYTHONPATH": "experiments/physical-architecture",
+    }
