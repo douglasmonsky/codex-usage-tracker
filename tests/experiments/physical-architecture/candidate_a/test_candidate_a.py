@@ -288,6 +288,129 @@ def test_source_hint_half_open_interval_against_closed_history_window(
     assert is_selected(hint=None, confidence="unavailable")
 
 
+def test_default_initial_build_defers_and_restores_indexes_before_publication(
+    fixture: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, int]] = []
+    original_drop = ingest_module._drop_secondary_indexes
+    original_restore = ingest_module._restore_secondary_indexes
+
+    def observed_drop(connection: Any) -> tuple[str, ...]:
+        statements = original_drop(connection)
+        events.append(("drop", len(statements)))
+        return statements
+
+    def observed_restore(
+        connection: Any,
+        statements: tuple[str, ...],
+    ) -> int:
+        assert connection.execute(
+            "SELECT count(*) FROM publications"
+        ).fetchone()[0] == 0
+        elapsed_ns = original_restore(connection, statements)
+        events.append(("restore", len(statements)))
+        return elapsed_ns
+
+    monkeypatch.setattr(
+        ingest_module,
+        "_drop_secondary_indexes",
+        observed_drop,
+    )
+    monkeypatch.setattr(
+        ingest_module,
+        "_restore_secondary_indexes",
+        observed_restore,
+    )
+    artifact = candidate_a.build_artifact(
+        fixture,
+        tmp_path / "default-deferred.sqlite",
+    )
+
+    assert events[0][0] == "drop"
+    assert events[1][0] == "restore"
+    assert events[0][1] == events[1][1]
+    assert events[0][1] > 0
+    assert artifact.stats.secondary_indexes_deferred == events[0][1]
+    assert artifact.stats.secondary_indexes_restored == events[1][1]
+    assert artifact.stats.index_maintenance_ns > 0
+    with database(artifact.path, read_only=True) as connection:
+        schema_module.validate_database(connection)
+        assert connection.execute(
+            """
+            SELECT count(*)
+            FROM sqlite_schema
+            WHERE type = 'index' AND sql IS NOT NULL
+            """
+        ).fetchone()[0] == events[1][1]
+
+
+def test_explicit_present_build_keeps_secondary_indexes_present(
+    fixture: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unexpected_drop(_connection: Any) -> tuple[str, ...]:
+        raise AssertionError("explicit present mode dropped secondary indexes")
+
+    monkeypatch.setattr(
+        ingest_module,
+        "_drop_secondary_indexes",
+        unexpected_drop,
+    )
+    artifact = candidate_a.build_artifact(
+        fixture,
+        tmp_path / "explicit-present.sqlite",
+        defer_secondary_indexes=False,
+    )
+
+    assert artifact.stats.secondary_indexes_deferred == 0
+    assert artifact.stats.secondary_indexes_restored == 0
+    assert artifact.stats.index_maintenance_ns == 0
+    with database(artifact.path, read_only=True) as connection:
+        schema_module.validate_database(connection)
+
+
+def test_deferred_default_is_deterministic_and_oracle_equivalent_to_present(
+    fixture: Any,
+    tmp_path: Path,
+) -> None:
+    default_first = candidate_a.build_artifact(
+        fixture,
+        tmp_path / "default-first.sqlite",
+    )
+    default_second = candidate_a.build_artifact(
+        fixture,
+        tmp_path / "default-second.sqlite",
+    )
+    present = candidate_a.build_artifact(
+        fixture,
+        tmp_path / "present.sqlite",
+        defer_secondary_indexes=False,
+    )
+
+    assert ingest_module.file_sha256(
+        default_first.path
+    ) == ingest_module.file_sha256(default_second.path)
+    with (
+        database(default_first.path, read_only=True) as default_connection,
+        database(present.path, read_only=True) as present_connection,
+    ):
+        for table, expected in fixture.oracle["accounting"][
+            "canonical_counts"
+        ].items():
+            assert default_connection.execute(
+                f'SELECT count(*) FROM "{table}"'
+            ).fetchone()[0] == present_connection.execute(
+                f'SELECT count(*) FROM "{table}"'
+            ).fetchone()[0]
+            if table in {"model_calls", "tool_invocations", "turns"}:
+                assert default_connection.execute(
+                    f'SELECT count(*) FROM "{table}"'
+                ).fetchone()[0] == expected
+
+
 def test_evidence_merge_is_gap_free_stable_and_keyset_paginated(
     built: tuple[Any, Any],
 ) -> None:
@@ -506,6 +629,18 @@ def test_all_mandatory_workloads_pass_with_only_optional_writer_unsupported(
     assert results["build.index.present"].measurements.merge_time_ns == 0
     assert results["build.index.deferred"].measurements.merge_time_ns > 0
     assert results["build.index.rebuilt"].measurements.merge_time_ns > 0
+    default_build = results["build.scale.tiny"]
+    assert default_build.oracle_results["index_mode"] == "deferred"
+    assert default_build.measurements.merge_time_ns > 0
+    assert (
+        default_build.oracle_results["secondary_indexes_deferred"]
+        == default_build.oracle_results["secondary_indexes_restored"]
+        > 0
+    )
+    present_build = results["build.index.present"]
+    assert present_build.oracle_results["index_mode"] == "present"
+    assert present_build.oracle_results["secondary_indexes_deferred"] == 0
+    assert present_build.oracle_results["secondary_indexes_restored"] == 0
 
 
 def test_agent_perf_contract_is_pinned_to_standard_fixture_and_matrix() -> None:

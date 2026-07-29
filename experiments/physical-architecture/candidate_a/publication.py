@@ -32,7 +32,7 @@ def publish_artifact(
     history_selection: str = "all_time",
     parent_publication_id: str | None = None,
     hook: Callable[[str], None] | None = None,
-    defer_secondary_indexes: bool = False,
+    defer_secondary_indexes: bool = True,
 ) -> BuildArtifact:
     run_root.mkdir(parents=True, exist_ok=True)
     staging = run_root / "candidate.sqlite"

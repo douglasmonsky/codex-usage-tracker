@@ -99,6 +99,8 @@ class IngestStats:
     occurrence_rows: int = 0
     diagnostic_rows: int = 0
     writer_transactions: int = 0
+    secondary_indexes_deferred: int = 0
+    secondary_indexes_restored: int = 0
     index_maintenance_ns: int = 0
 
 
@@ -795,16 +797,20 @@ def build_artifact(
     history_selection: str = "all_time",
     parent_publication_id: str | None = None,
     hook: Callable[[str], None] | None = None,
-    defer_secondary_indexes: bool = False,
+    defer_secondary_indexes: bool = True,
 ) -> BuildArtifact:
     connection = create_database(path)
     stats = IngestStats()
     try:
-        deferred_index_sql = (
-            _drop_secondary_indexes(connection)
-            if defer_secondary_indexes
-            else ()
-        )
+        if defer_secondary_indexes:
+            index_drop_started = time.perf_counter_ns()
+            deferred_index_sql = _drop_secondary_indexes(connection)
+            stats.index_maintenance_ns += (
+                time.perf_counter_ns() - index_drop_started
+            )
+            stats.secondary_indexes_deferred = len(deferred_index_sql)
+        else:
+            deferred_index_sql = ()
         start_us, end_us, selected_session_id = _window(fixture, history_selection)
         selected_sources = _selected_sources(
             fixture,
@@ -898,10 +904,11 @@ def build_artifact(
             hook("after_facts_before_projections")
         projection_rows = _refresh_projections(connection, hook)
         if deferred_index_sql:
-            stats.index_maintenance_ns = _restore_secondary_indexes(
+            stats.index_maintenance_ns += _restore_secondary_indexes(
                 connection,
                 deferred_index_sql,
             )
+            stats.secondary_indexes_restored = len(deferred_index_sql)
         publication_id = _publication_id(
             fixture,
             history_selection,

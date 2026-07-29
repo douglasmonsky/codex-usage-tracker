@@ -64,7 +64,7 @@ class Adapter:
             or request.case.parameter("history_selection")
             or "all_time"
         )
-        index_mode = str(request.case.parameter("index_mode") or "present")
+        index_mode = str(request.case.parameter("index_mode") or "deferred")
         defer_secondary_indexes = index_mode == "deferred"
         started = time.perf_counter_ns()
         if request.case.case_id.startswith("build.expand."):
@@ -133,6 +133,12 @@ class Adapter:
                 "schema_id": "codex-usage-tracker.physical-bakeoff.candidate-a.v1",
                 "history_selection": history,
                 "index_mode": index_mode,
+                "secondary_indexes_deferred": (
+                    artifact.stats.secondary_indexes_deferred
+                ),
+                "secondary_indexes_restored": (
+                    artifact.stats.secondary_indexes_restored
+                ),
                 "parser_workers": request.case.parameter("parser_workers") or 1,
                 "writer_mode": request.case.parameter("writer_mode") or "single",
             },
