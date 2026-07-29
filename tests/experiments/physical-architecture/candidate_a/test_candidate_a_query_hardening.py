@@ -285,6 +285,24 @@ def test_deep_page_uses_persisted_keyset_anchor_without_gaps(
         assert any("evidence_page_anchor_current" in plan for plan in result.query_plans)
 
 
+def test_selected_session_timeline_records_sql_latency(
+    built: tuple[Any, Any],
+) -> None:
+    fixture, artifact = built
+    selected_session_id = str(
+        fixture.manifest["history"]["windows"]["current_session"]["session_id"]
+    )
+    with database(artifact.path, read_only=True) as connection:
+        result = run_evidence_feature(
+            connection,
+            publication_id=artifact.publication_id,
+            selected_session_id=selected_session_id,
+        )
+
+    assert len(result.sql_latencies_ns) == 1
+    assert result.sql_latencies_ns[0] > 0
+
+
 def test_bounded_sort_is_complete_for_explicit_admission_and_compact(
     built: tuple[Any, Any],
 ) -> None:

@@ -597,6 +597,7 @@ def run_evidence_feature(
         )
         plans += anchor_plans
         latencies.append(anchor_latency)
+    page_started = time.perf_counter_ns()
     page = evidence_page(
         connection,
         publication_id=publication_id,
@@ -604,12 +605,14 @@ def run_evidence_feature(
         cursor=cursor,
         selected_session_id=selected_session_id,
     )
+    latencies.append(time.perf_counter_ns() - page_started)
     plans += page.query_plans
     while current_page < target_page and page.has_more:
         cursor = page.next_cursor
         if cursor is None:
             break
         current_page += 1
+        page_started = time.perf_counter_ns()
         page = evidence_page(
             connection,
             publication_id=publication_id,
@@ -617,6 +620,7 @@ def run_evidence_feature(
             cursor=cursor,
             selected_session_id=selected_session_id,
         )
+        latencies.append(time.perf_counter_ns() - page_started)
         plans += page.query_plans
     exact: int | None = None
     if exact_count:
