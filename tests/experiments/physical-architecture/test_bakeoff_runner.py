@@ -379,10 +379,12 @@ def test_completed_run_artifacts_are_discarded_unless_explicitly_retained(
     assert any((retained.invocation_root / "runs").rglob("candidate.sqlite"))
 
 
-def test_candidate_a_reuses_one_scale_build_per_query_repetition(
+def test_candidate_a_reuses_scale_build_for_query_and_cloned_ordinary_repetitions(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    production_fixture = replace(shared.load_fixture_bundle(_TINY), profile="production")
+    monkeypatch.setattr(shared, "load_fixture_bundle", lambda _: production_fixture)
     candidate_a = importlib.import_module("candidate_a.adapter")
     original_publish = candidate_a.publish_artifact
     published: list[tuple[int, str, Path]] = []
@@ -409,34 +411,59 @@ def test_candidate_a_reuses_one_scale_build_per_query_repetition(
             return artifact
 
     monkeypatch.setattr(candidate_a, "publish_artifact", recording_publish)
+    original_execute_measured = shared.execute_measured_candidate
+    prepared_before_measurement: list[Path] = []
+
+    def recording_execute_measured(*args: Any, **kwargs: Any) -> Any:
+        request = args[1]
+        if request.case.group is shared.WorkloadGroup.ORDINARY_CHANGE:
+            prepared_before_measurement.append(request.run_root / "ordinary.sqlite")
+            assert (request.run_root / "ordinary.sqlite").is_file()
+        return original_execute_measured(*args, **kwargs)
+
+    monkeypatch.setattr(qualification.shared, "execute_measured_candidate", recording_execute_measured)
     adapter = RecordingAdapter()
     artifact = qualification.run_qualification(
-        _config(
+        replace(
+            _config(
             tmp_path,
             run_id="prepared-query-artifacts",
             case_ids=(
-                "build.scale.tiny",
+                "build.scale.production",
+                "ordinary.one_model_call",
                 "query.q-acc-01.warm_first_page",
                 "query.q-acc-02.warm_first_page",
             ),
             repetitions=2,
             retain_run_artifacts=True,
+            ),
+            allow_large_fixture=True,
         ),
         environment=_environment(),
         adapter_loader=lambda _: adapter,
     )
 
     invocation = json.loads(artifact.invocation_path.read_text(encoding="utf-8"))
-    assert invocation["schema"] == "codex-usage-tracker.physical-bakeoff-invocation.v2"
-    assert invocation["query_artifact_policy"] == {
+    assert invocation["schema"] == "codex-usage-tracker.physical-bakeoff-invocation.v3"
+    assert invocation["prepared_scale_artifact_policy"] == {
         "candidate_ids": ["A"],
         "mode": "reuse_scale_build_per_repetition",
-        "read_only": True,
-        "source_case_id": "build.scale.tiny",
+        "ordinary_change": {
+            "copy_sidecars": False,
+            "mode": "clone_before_measurement",
+            "source_validation": [
+                "regular_file",
+                "no_journal",
+                "empty_or_absent_wal",
+                "no_active_lease",
+            ],
+        },
+        "query": {"mode": "read_only_reuse"},
+        "source_case_id": "build.scale.production",
     }
     assert len(published) == 2
     expected_publications = {
-        repetition: adapter._prepared_query_artifacts[repetition].publication_id
+        repetition: adapter._prepared_scale_artifacts[repetition].publication_id
         for repetition in range(2)
     }
     assert adapter.query_publications == [
@@ -446,6 +473,36 @@ def test_candidate_a_reuses_one_scale_build_per_query_repetition(
     ]
     for _index, before_sha256, path in published:
         assert hashlib.sha256(path.read_bytes()).hexdigest() == before_sha256
+    assert len(prepared_before_measurement) == 2
+    ordinary = [record for record in artifact.records if record.identity.case_id == "ordinary.one_model_call"]
+    assert all(record.values.source_files_parsed == 0 for record in ordinary)
+    assert all(record.values.writer_transactions == 1 for record in ordinary)
+
+
+def test_speed_claim_ordinary_cases_require_a_matching_scale_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    production_fixture = replace(shared.load_fixture_bundle(_TINY), profile="production")
+    monkeypatch.setattr(shared, "load_fixture_bundle", lambda _: production_fixture)
+    with pytest.raises(
+        qualification.QualificationContractError,
+        match="require matching scale source build.scale.production",
+    ):
+        qualification.run_qualification(
+            replace(
+                _config(
+                tmp_path,
+                run_id="ordinary-needs-scale",
+                case_ids=("ordinary.one_model_call",),
+                repetitions=5,
+                speed_claim=True,
+                ),
+                allow_large_fixture=True,
+            ),
+            environment=_environment(),
+            adapter_loader=lambda _: _FakeAdapter("A"),
+        )
 
 
 def test_fixture_profile_and_research_execution_are_explicit(

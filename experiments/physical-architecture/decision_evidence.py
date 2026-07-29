@@ -533,6 +533,7 @@ def _authenticate_score_evidence(
     if invocation.get("schema") not in {
         "codex-usage-tracker.physical-bakeoff-invocation.v1",
         "codex-usage-tracker.physical-bakeoff-invocation.v2",
+        "codex-usage-tracker.physical-bakeoff-invocation.v3",
     }:
         raise DecisionEvidenceContractError(f"{context} invocation schema is unsupported")
     if summary.get("schema") != "codex-usage-tracker.physical-bakeoff-summary.v1":

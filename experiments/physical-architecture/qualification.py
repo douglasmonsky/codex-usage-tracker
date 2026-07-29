@@ -22,7 +22,7 @@ from typing import Any
 
 import shared
 
-INVOCATION_SCHEMA = "codex-usage-tracker.physical-bakeoff-invocation.v2"
+INVOCATION_SCHEMA = "codex-usage-tracker.physical-bakeoff-invocation.v3"
 SUMMARY_SCHEMA = "codex-usage-tracker.physical-bakeoff-summary.v1"
 DETAIL_SCHEMA = "codex-usage-tracker.physical-bakeoff-detail.v1"
 MEASUREMENT_FILE = "measurements.jsonl"
@@ -332,7 +332,7 @@ def run_qualification(
     failure: tuple[str, str, str] | None = None
     optional_skips = 0
     execution_index = 0
-    query_artifact_policy = _query_artifact_policy(prepared)
+    prepared_artifact_policy = _prepared_scale_artifact_policy(config, prepared)
     try:
         for candidate_id in prepared.candidates:
             adapter = adapters[candidate_id]
@@ -354,7 +354,7 @@ def run_qualification(
                     expected_identities.append(identity)
                     prepared_artifact_root = _prepared_artifact_root(
                         invocation_root,
-                        policy=query_artifact_policy,
+                        policy=prepared_artifact_policy,
                         candidate_id=candidate_id,
                         case=case,
                         repetition=repetition,
@@ -370,6 +370,7 @@ def run_qualification(
                         measurements_path.stat().st_size if measurements_path.exists() else 0
                     )
                     try:
+                        _prepare_unmeasured_case(adapter, request)
                         result = shared.execute_measured_candidate(
                             adapter,
                             request,
@@ -395,7 +396,7 @@ def run_qualification(
                         ) from error
                     finally:
                         if not config.retain_run_artifacts and not _is_prepared_artifact_source(
-                            policy=query_artifact_policy,
+                            policy=prepared_artifact_policy,
                             candidate_id=candidate_id,
                             case=case,
                         ):
@@ -581,28 +582,56 @@ def _invocation_payload(
         "include_research": config.include_research,
         "qualification_model": config.qualification_model,
         "retain_run_artifacts": config.retain_run_artifacts,
-        "query_artifact_policy": _query_artifact_policy(prepared),
+        "prepared_scale_artifact_policy": _prepared_scale_artifact_policy(config, prepared),
         "completion_marker": SUMMARY_FILE,
     }
     return {**base, "invocation_digest": shared.canonical_sha256(base)}
 
 
-def _query_artifact_policy(prepared: _PreparedRun) -> dict[str, object]:
+def _prepared_scale_artifact_policy(
+    config: QualificationConfig,
+    prepared: _PreparedRun,
+) -> dict[str, object]:
     source_case_id = f"build.scale.{prepared.fixture.profile}"
     case_ids = {case.case_id for case in prepared.cases}
+    has_ordinary = any(case.group is shared.WorkloadGroup.ORDINARY_CHANGE for case in prepared.cases)
+    has_query = any(case.group is shared.WorkloadGroup.QUERY for case in prepared.cases)
     enabled = (
         "A" in prepared.candidates
         and source_case_id in case_ids
-        and any(case.group is shared.WorkloadGroup.QUERY for case in prepared.cases)
+        and (has_query or has_ordinary)
     )
+    if config.speed_claim and "A" in prepared.candidates and has_ordinary and not enabled:
+        raise QualificationContractError(
+            f"speed-claim ordinary cases require matching scale source {source_case_id}"
+        )
     if not enabled:
         return {"mode": "isolated_per_case"}
     return {
         "mode": "reuse_scale_build_per_repetition",
         "candidate_ids": ("A",),
-        "read_only": True,
         "source_case_id": source_case_id,
+        "query": {"mode": "read_only_reuse"},
+        "ordinary_change": {
+            "copy_sidecars": False,
+            "mode": "clone_before_measurement",
+            "source_validation": (
+                "regular_file",
+                "no_journal",
+                "empty_or_absent_wal",
+                "no_active_lease",
+            ),
+        },
     }
+
+
+def _prepare_unmeasured_case(
+    adapter: shared.CandidateAdapter,
+    request: shared.CandidateRequest,
+) -> None:
+    prepare = getattr(adapter, "prepare_unmeasured_case", None)
+    if prepare is not None:
+        prepare(request)
 
 
 def _is_prepared_artifact_source(

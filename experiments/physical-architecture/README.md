@@ -62,12 +62,15 @@ fixture digests and scale. Profile output is attribution evidence only.
 
 The qualification runner retains canonical invocation, measurement, and summary files but
 discards candidate run roots by default. When Candidate A's matching `build.scale.<profile>`
-case and query cases share an invocation, invocation schema v2 records
-`reuse_scale_build_per_repetition`: each query repetition opens that repetition's completed
-scale artifact read-only. Build timing remains isolated in the scale case, query timing
-still begins after artifact selection, and the runner deletes the temporarily retained
-scale roots after all queries finish. This avoids rebuilding an identical multi-gigabyte
-fixture before every read-only query without changing either score input. Pass
+case, query cases, and ordinary changes share an invocation, invocation schema v3 records
+`prepared_scale_artifact_policy`: each query repetition opens that repetition's completed
+scale artifact read-only, while each ordinary change receives an independent clone before
+measured execution. The clone validates a regular retained database, no rollback journal,
+an absent or empty WAL, and no Candidate A publication lease; it never copies sidecars.
+Build timing remains isolated in the scale case, ordinary timing begins after cloning, query
+timing begins after artifact selection, and the runner deletes the temporarily retained
+scale roots after all consumers finish. This avoids rebuilding an identical multi-gigabyte
+fixture without changing either score input. Pass
 `--retain-run-artifacts` only for a bounded diagnostic that genuinely needs the generated
 candidate database; the retention choice is recorded in both invocation and summary
 artifacts.

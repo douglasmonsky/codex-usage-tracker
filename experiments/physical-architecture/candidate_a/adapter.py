@@ -16,6 +16,7 @@ from .maintenance import (
     apply_source_phase,
 )
 from .metrics import ArtifactMetrics, artifact_metrics
+from .prepared_artifact import PreparationEvidence, clone_prepared_artifact
 from .publication import CandidateACrashDriver, publish_artifact
 from .queries import (
     QueryResult,
@@ -38,7 +39,8 @@ class Adapter:
     contract_version = shared.CANDIDATE_ADAPTER_CONTRACT_VERSION
 
     def __init__(self) -> None:
-        self._prepared_query_artifacts: dict[int, BuildArtifact] = {}
+        self._prepared_scale_artifacts: dict[int, BuildArtifact] = {}
+        self._prepared_ordinary_artifacts: dict[tuple[str, int], tuple[BuildArtifact, PreparationEvidence]] = {}
 
     def execute(self, request: shared.CandidateRequest) -> shared.CandidateResult:
         group = request.case.group
@@ -109,7 +111,7 @@ class Adapter:
                 parser_workers=parser_workers,
             )
         if request.case.case_id == f"build.scale.{request.fixture.profile}":
-            self._prepared_query_artifacts[request.repetition] = artifact
+            self._prepared_scale_artifacts[request.repetition] = artifact
         index_maintenance_ns = artifact.stats.index_maintenance_ns
         if index_mode == "rebuilt":
             rebuild_started = time.perf_counter_ns()
@@ -180,7 +182,7 @@ class Adapter:
         return 1
 
     def _ordinary(self, request: shared.CandidateRequest) -> shared.CandidateResult:
-        artifact = publish_artifact(request.fixture, request.run_root)
+        artifact, preparation = self._ordinary_artifact(request)
         change = str(request.case.parameter("change"))
         started = time.perf_counter_ns()
         try:
@@ -244,8 +246,44 @@ class Adapter:
                 "incremental": True,
                 "source_files_rescanned": 0,
                 "dirty_keys": maintenance.dirty_keys,
+                "preparation": (
+                    preparation.as_oracle_result(
+                        source_case_id=f"build.scale.{request.fixture.profile}"
+                    )
+                    if preparation is not None
+                    else {"mode": "isolated_build"}
+                ),
             },
         )
+
+    def prepare_unmeasured_case(self, request: shared.CandidateRequest) -> None:
+        """Prepare a mutable ordinary snapshot before the measurement context opens."""
+        if request.case.group is not shared.WorkloadGroup.ORDINARY_CHANGE:
+            return
+        scale = self._prepared_scale_artifacts.get(request.repetition)
+        if scale is None:
+            return
+        key = (request.case.case_id, request.repetition)
+        if key in self._prepared_ordinary_artifacts:
+            raise ValueError("ordinary artifact was prepared more than once")
+        prepared, evidence = clone_prepared_artifact(
+            scale,
+            retained_root=scale.path.parent,
+            destination=request.run_root / "ordinary.sqlite",
+        )
+        self._prepared_ordinary_artifacts[key] = (prepared, evidence)
+
+    def _ordinary_artifact(
+        self,
+        request: shared.CandidateRequest,
+    ) -> tuple[BuildArtifact, PreparationEvidence | None]:
+        prepared = self._prepared_ordinary_artifacts.pop(
+            (request.case.case_id, request.repetition),
+            None,
+        )
+        if prepared is not None:
+            return prepared
+        return publish_artifact(request.fixture, request.run_root), None
 
     def _unsafe(self, request: shared.CandidateRequest) -> shared.CandidateResult:
         change = str(request.case.parameter("change"))
@@ -378,7 +416,7 @@ class Adapter:
         )
 
     def _query_artifact(self, request: shared.CandidateRequest) -> BuildArtifact:
-        artifact = self._prepared_query_artifacts.get(request.repetition)
+        artifact = self._prepared_scale_artifacts.get(request.repetition)
         if artifact is not None and artifact.path.resolve().is_relative_to(
             request.run_root.resolve()
         ):
