@@ -46,7 +46,7 @@ _GITNEXUS_ANALYZER_TRUNCATION_NOTICE = (
 )
 _GITNEXUS_FTS_CORRUPTION_PATTERN = re.compile(
     r"FTS\s+index\s+'file_fts'\s+(?:is\s+)?inconsistent\s*:\s*"
-    r"node\s+offset\s+\d+\s+missing\s+during\s+delete\.\s*"
+    r"(?:document\s+)?node\s+offset\s+\d+\s+missing\s+during\s+delete\.\s*"
     r"Drop\s+and\s+recreate\s+FTS\s+index\."
 )
 

@@ -545,7 +545,7 @@ _GITNEXUS_FTS_CORRUPTION_WITH_IS = (
     "[gitnexus diagnostic]\n"
     "FTS  index  'file_fts'\n"
     "is inconsistent :\n"
-    "node offset 314 missing during delete.\n"
+    "document node offset 314 missing during delete.\n"
     "Drop and recreate FTS index.\n"
     "[diagnostic end]"
 )
@@ -660,6 +660,10 @@ def test_gitnexus_fts_corruption_signature_accepts_supported_variants(
     [
         _GITNEXUS_FTS_CORRUPTION.replace("file_fts", "symbol_fts"),
         _GITNEXUS_FTS_CORRUPTION.replace("node offset 42", "node offset unknown"),
+        _GITNEXUS_FTS_CORRUPTION.replace(
+            "node offset 42",
+            "record node offset 42",
+        ),
         _GITNEXUS_FTS_CORRUPTION.replace("missing during delete", "missing during insert"),
         _GITNEXUS_FTS_CORRUPTION.replace(
             "Drop and recreate FTS index.",
