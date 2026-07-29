@@ -8,6 +8,8 @@ repair a missing or stale project virtual environment.
 from __future__ import annotations
 
 import argparse
+import codecs
+import io
 import json
 import os
 import re
@@ -15,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import time
+from collections import deque
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -36,9 +39,15 @@ _GITNEXUS_LOCK_FILENAME = "codex-usage-tracker-gitnexus-analyze.lock"
 _GITNEXUS_LOCK_TIMEOUT_SECONDS = 600.0
 _GITNEXUS_COMPARE_BASE = "origin/main"
 _GITNEXUS_CHANGED_FILES_PATTERN = re.compile(r"^Changes:\s+(\d+)\s+files\b", re.MULTILINE)
+_GITNEXUS_ANALYZER_READ_BYTES = 4096
+_GITNEXUS_ANALYZER_TAIL_CHARS = 65_536
+_GITNEXUS_ANALYZER_TRUNCATION_NOTICE = (
+    f"[GitNexus output truncated; last {_GITNEXUS_ANALYZER_TAIL_CHARS} characters retained]\n"
+)
 _GITNEXUS_FTS_CORRUPTION_PATTERN = re.compile(
-    r"FTS index 'file_fts' inconsistent: node offset \d+ missing during delete\. "
-    r"Drop and recreate FTS index\."
+    r"FTS\s+index\s+'file_fts'\s+(?:is\s+)?inconsistent\s*:\s*"
+    r"node\s+offset\s+\d+\s+missing\s+during\s+delete\.\s*"
+    r"Drop\s+and\s+recreate\s+FTS\s+index\."
 )
 
 
@@ -872,6 +881,48 @@ def _gitnexus_analyze_command(root: Path, node: str) -> list[str]:
     return [node, str(runner), "analyze", "--index-only"]
 
 
+def _run_gitnexus_analyzer(
+    command: list[str],
+    *,
+    cwd: Path,
+) -> CommandResult:
+    tail: deque[str] = deque(maxlen=_GITNEXUS_ANALYZER_TAIL_CHARS)
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    captured_characters = 0
+    try:
+        with subprocess.Popen(
+            command,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        ) as process:
+            output = process.stdout
+            if not isinstance(output, io.BufferedReader):
+                raise BootstrapError("Could not capture GitNexus analyzer output.")
+            while chunk := output.read1(_GITNEXUS_ANALYZER_READ_BYTES):
+                text = decoder.decode(chunk)
+                if not text:
+                    continue
+                sys.stdout.write(text)
+                sys.stdout.flush()
+                tail.extend(text)
+                captured_characters += len(text)
+            final_text = decoder.decode(b"", final=True)
+            if final_text:
+                sys.stdout.write(final_text)
+                sys.stdout.flush()
+                tail.extend(final_text)
+                captured_characters += len(final_text)
+            returncode = process.wait()
+    except OSError as exc:
+        raise BootstrapError(f"Could not execute {command[0]!r}: {exc}") from exc
+
+    captured = "".join(tail)
+    if captured_characters > _GITNEXUS_ANALYZER_TAIL_CHARS:
+        captured = f"{_GITNEXUS_ANALYZER_TRUNCATION_NOTICE}{captured}"
+    return CommandResult(returncode, captured, "")
+
+
 def _is_recognized_gitnexus_fts_corruption(result: CommandResult) -> bool:
     output = f"{result.stdout}\n{result.stderr}"
     return _GITNEXUS_FTS_CORRUPTION_PATTERN.search(output) is not None
@@ -977,7 +1028,7 @@ def _analyze_gitnexus_if_needed(
         if inspection.state == "error":
             raise BootstrapError(inspection.detail)
         analyze_command = _gitnexus_analyze_command(root, node)
-        analyze_result = _run(analyze_command, cwd=root)
+        analyze_result = _run_gitnexus_analyzer(analyze_command, cwd=root)
         if analyze_result.returncode == 0:
             return True
         exact_worktree_identified = (
@@ -1004,7 +1055,7 @@ def _analyze_gitnexus_if_needed(
                 f"Original analysis: {_command_failure(analyze_command, analyze_result)}"
             )
 
-        retry_result = _run(analyze_command, cwd=root)
+        retry_result = _run_gitnexus_analyzer(analyze_command, cwd=root)
         if retry_result.returncode != 0:
             raise BootstrapError(
                 "GitNexus automatic clean succeeded after recognized file_fts "

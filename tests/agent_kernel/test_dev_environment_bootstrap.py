@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
 
@@ -436,6 +437,7 @@ class _GitNexusEnvironment:
         paths = {"git": self.git, "node": self.node, "npm": self.npm}
         monkeypatch.setattr(bootstrap, "_which", lambda executable: paths.get(executable))
         monkeypatch.setattr(bootstrap, "_run", self.run)
+        monkeypatch.setattr(bootstrap, "_run_gitnexus_analyzer", self.run_analyzer)
         monkeypatch.setenv("XDG_CACHE_HOME", str(root / ".cache"))
 
     @property
@@ -519,16 +521,33 @@ class _GitNexusEnvironment:
                 ),
                 "",
             )
-        if "analyze" in argv:
-            self.indexed = True
-            self.stale = False
-            return bootstrap.CommandResult(0, "", "")
         raise AssertionError(f"unexpected command: {argv}")
+
+    def run_analyzer(
+        self,
+        command: list[str],
+        *,
+        cwd: Path,
+    ) -> bootstrap.CommandResult:
+        del cwd
+        argv = tuple(str(part) for part in command)
+        self.commands.append(argv)
+        self.indexed = True
+        self.stale = False
+        return bootstrap.CommandResult(0, "", "")
 
 
 _GITNEXUS_FTS_CORRUPTION = (
     "FTS index 'file_fts' inconsistent: node offset 42 missing during delete. "
     "Drop and recreate FTS index."
+)
+_GITNEXUS_FTS_CORRUPTION_WITH_IS = (
+    "[gitnexus diagnostic]\n"
+    "FTS  index  'file_fts'\n"
+    "is inconsistent :\n"
+    "node offset 314 missing during delete.\n"
+    "Drop and recreate FTS index.\n"
+    "[diagnostic end]"
 )
 
 
@@ -556,15 +575,6 @@ class _FailingGitNexusEnvironment(_GitNexusEnvironment):
         stream: bool = False,
     ) -> bootstrap.CommandResult:
         argv = tuple(str(part) for part in command)
-        if "analyze" in argv:
-            self.commands.append(argv)
-            if not self.analysis_results:
-                raise AssertionError("unexpected extra GitNexus analysis")
-            result = self.analysis_results.pop(0)
-            if result.returncode == 0:
-                self.indexed = True
-                self.stale = False
-            return result
         if argv[-2:] == ("clean", "--force"):
             self.commands.append(argv)
             if self.clean_result.returncode == 0:
@@ -572,6 +582,149 @@ class _FailingGitNexusEnvironment(_GitNexusEnvironment):
                 self.stale = False
             return self.clean_result
         return super().run(command, cwd=cwd, env=env, stream=stream)
+
+    def run_analyzer(
+        self,
+        command: list[str],
+        *,
+        cwd: Path,
+    ) -> bootstrap.CommandResult:
+        del cwd
+        argv = tuple(str(part) for part in command)
+        self.commands.append(argv)
+        if not self.analysis_results:
+            raise AssertionError("unexpected extra GitNexus analysis")
+        result = self.analysis_results.pop(0)
+        if result.returncode == 0:
+            self.indexed = True
+            self.stale = False
+        return result
+
+
+class _AnalyzerProcess:
+    def __init__(
+        self,
+        payload: bytes,
+        *,
+        returncode: int,
+        events: list[str],
+    ) -> None:
+        self.stdout = io.BufferedReader(io.BytesIO(payload))
+        self.returncode = returncode
+        self.events = events
+
+    def __enter__(self) -> _AnalyzerProcess:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: object,
+        exc: object,
+        traceback: object,
+    ) -> None:
+        del exc_type, exc, traceback
+        self.stdout.close()
+
+    def wait(self) -> int:
+        self.events.append("wait")
+        return self.returncode
+
+
+class _AnalyzerProgressSink(io.StringIO):
+    def __init__(self, events: list[str]) -> None:
+        super().__init__()
+        self.events = events
+
+    def write(self, text: str) -> int:
+        self.events.append("write")
+        return super().write(text)
+
+
+@pytest.mark.parametrize(
+    "diagnostic",
+    [
+        _GITNEXUS_FTS_CORRUPTION,
+        _GITNEXUS_FTS_CORRUPTION_WITH_IS,
+    ],
+)
+def test_gitnexus_fts_corruption_signature_accepts_supported_variants(
+    diagnostic: str,
+) -> None:
+    result = bootstrap.CommandResult(1, "", diagnostic)
+
+    assert bootstrap._is_recognized_gitnexus_fts_corruption(result) is True
+
+
+@pytest.mark.parametrize(
+    "diagnostic",
+    [
+        _GITNEXUS_FTS_CORRUPTION.replace("file_fts", "symbol_fts"),
+        _GITNEXUS_FTS_CORRUPTION.replace("node offset 42", "node offset unknown"),
+        _GITNEXUS_FTS_CORRUPTION.replace("missing during delete", "missing during insert"),
+        _GITNEXUS_FTS_CORRUPTION.replace(
+            "Drop and recreate FTS index.",
+            "Rebuild the index.",
+        ),
+    ],
+)
+def test_gitnexus_fts_corruption_signature_rejects_near_misses(
+    diagnostic: str,
+) -> None:
+    result = bootstrap.CommandResult(1, diagnostic, "")
+
+    assert bootstrap._is_recognized_gitnexus_fts_corruption(result) is False
+
+
+def test_gitnexus_analyzer_runner_streams_and_keeps_a_bounded_diagnostic_tail(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    progress = "GitNexus indexing started\n"
+    diagnostic = f"\n{_GITNEXUS_FTS_CORRUPTION_WITH_IS}\n"
+    emitted = (
+        progress
+        + ("x" * (bootstrap._GITNEXUS_ANALYZER_TAIL_CHARS + 128))
+        + diagnostic
+    )
+    events: list[str] = []
+    process = _AnalyzerProcess(
+        emitted.encode(),
+        returncode=9,
+        events=events,
+    )
+    command = ["/synthetic/bin/node", "gitnexus.js", "analyze", "--index-only"]
+
+    def open_process(
+        received_command: list[str],
+        *,
+        cwd: Path,
+        stdout: int,
+        stderr: int,
+    ) -> _AnalyzerProcess:
+        assert received_command == command
+        assert cwd == tmp_path
+        assert stdout == bootstrap.subprocess.PIPE
+        assert stderr == bootstrap.subprocess.STDOUT
+        return process
+
+    sink = _AnalyzerProgressSink(events)
+    monkeypatch.setattr(bootstrap.subprocess, "Popen", open_process)
+    monkeypatch.setattr(bootstrap.sys, "stdout", sink)
+
+    result = bootstrap._run_gitnexus_analyzer(command, cwd=tmp_path)
+
+    assert sink.getvalue() == emitted
+    assert events.index("write") < events.index("wait")
+    assert result.returncode == 9
+    assert result.stderr == ""
+    assert result.stdout.startswith(bootstrap._GITNEXUS_ANALYZER_TRUNCATION_NOTICE)
+    assert len(result.stdout) <= (
+        bootstrap._GITNEXUS_ANALYZER_TAIL_CHARS
+        + len(bootstrap._GITNEXUS_ANALYZER_TRUNCATION_NOTICE)
+    )
+    assert progress not in result.stdout
+    assert diagnostic.strip() in result.stdout
+    assert bootstrap._is_recognized_gitnexus_fts_corruption(result) is True
 
 
 def test_ready_gitnexus_index_is_not_reanalyzed(
