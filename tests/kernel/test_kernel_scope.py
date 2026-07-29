@@ -9,6 +9,7 @@ from scripts.check_kernel_scope import (
     CK02_LOGICAL_CONTRACT_ADDITIONS,
     CK03_SYNTHETIC_ORACLE_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
+    DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS,
     INTEGRATION_ADDITIONS,
     K1A_ADDITIONS,
     K2_ADDITIONS,
@@ -345,6 +346,12 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/agent_kernel/test_fixture_profiles.py",
         "tests/agent_kernel/test_fixture_reconciliation.py",
     } == CK03_SYNTHETIC_ORACLE_ADDITIONS
+    assert {
+        "scripts/bootstrap_dev_environment.py",
+        "tests/agent_kernel/test_dev_environment_bootstrap.py",
+        "tools/gitnexus/package-lock.json",
+        "tools/gitnexus/package.json",
+    } == DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -370,6 +377,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK01_AGENT_KERNEL_CONTRACT_ADDITIONS
         | CK02_LOGICAL_CONTRACT_ADDITIONS
         | CK03_SYNTHETIC_ORACLE_ADDITIONS
+        | DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
     )
 
 

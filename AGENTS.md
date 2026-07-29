@@ -98,6 +98,28 @@ available for doctor, context, change plans, guidance, and host-side waiting.
 
 The maintainer authorizes execution subagents for this roadmap:
 
+- Before spawning a writing agent into a fresh or reused worktree, the root
+  integrator runs `python3 scripts/bootstrap_dev_environment.py` from that exact
+  root. The command repairs `.venv` from the repository `dev` extra, verifies
+  every active PEP 508 requirement, the exact editable worktree source, and the
+  declared Scalene pin. It installs integrity-locked GitNexus 1.6.9 under
+  `tools/gitnexus/node_modules/` and creates or refreshes that worktree's index.
+  It never installs a global or transient GitNexus CLI. It serializes GitNexus
+  analysis across worktrees; let the host wait for the command instead of
+  assigning model-driven polling.
+- On entry, the execution agent runs
+  `python3 scripts/bootstrap_dev_environment.py --check` once before tests,
+  profiling, or semantic work. The check verifies the GitNexus registry's
+  physical worktree, branch, commit, and bounded compare result against
+  `origin/main`; a merely "up-to-date" status is insufficient. If a later
+  branch transition makes GitNexus stale, rerun the bootstrap in that exact
+  worktree. Never install Scalene or another declared dev tool ad hoc with pip.
+  Generated `.venv/` and `.gitnexus/` state stays untracked.
+- Invoke Python profiling as
+  `PATH="$PWD/.venv/bin:$PATH" agent-perf run ...`; agent-perf resolves the
+  pinned `scalene` console entry point from `PATH`, not from the workload
+  interpreter argument. Keep Python 3.14 test qualification separate from any
+  profiling-interpreter compatibility claim.
 - Assign each CK packet to a dedicated execution subagent with a focused
   branch, worktree, and file allowlist.
 - Treat the roadmap, design documents, and packet contracts as the authority
@@ -122,8 +144,13 @@ diagnostics, and symbol-level edits. Do not repeat the same lookup across all
 three tools without a concrete uncertainty.
 
 Before editing a function, class, or method, run upstream GitNexus impact and
-report any HIGH or CRITICAL blast radius. Before committing, run GitNexus
-`detect_changes` against `main`.
+report any HIGH or CRITICAL blast radius. Before committing, rerun
+`python3 scripts/bootstrap_dev_environment.py --component gitnexus --check`,
+then run GitNexus `detect_changes` against `origin/main` with the exact physical
+root and branch:
+`node tools/gitnexus/node_modules/gitnexus/dist/cli/index.js detect_changes --scope compare --base-ref origin/main --repo "$(pwd -P)" --branch "$(git branch --show-current)"`.
+Never target the ambiguous repository alias or a potentially stale local
+`main` branch.
 
 Use `agent-perf` for every CPU or speed claim. Profile a deterministic synthetic
 workload, also run the identical workload without a profiler, and compare one
@@ -192,12 +219,12 @@ smoke.
 
 This project is indexed by GitNexus as **codex-usage-tracker** (2777 symbols, 5498 relationships, 236 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+> Index stale or pinned tool missing? Run `python3 scripts/bootstrap_dev_environment.py` from the exact project root. It uses only the integrity-locked repository-private GitNexus 1.6.9 tool; never use `npx`, `latest`, or a global install.
 
 ## Always Do
 
 - **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
+- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, use the exact physical worktree, current branch, and remote base `origin/main`; never use an ambiguous repository alias or stale local `main`.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
 - When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.

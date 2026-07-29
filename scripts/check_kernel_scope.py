@@ -380,6 +380,15 @@ CK03_SYNTHETIC_ORACLE_ADDITIONS = frozenset(
     }
 )
 
+DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS = frozenset(
+    {
+        "scripts/bootstrap_dev_environment.py",
+        "tests/agent_kernel/test_dev_environment_bootstrap.py",
+        "tools/gitnexus/package-lock.json",
+        "tools/gitnexus/package.json",
+    }
+)
+
 INTEGRATION_ADDITIONS = (
     K1A_ADDITIONS
     | K2_ADDITIONS
@@ -405,6 +414,7 @@ INTEGRATION_ADDITIONS = (
     | CK01_AGENT_KERNEL_CONTRACT_ADDITIONS
     | CK02_LOGICAL_CONTRACT_ADDITIONS
     | CK03_SYNTHETIC_ORACLE_ADDITIONS
+    | DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))")
 
