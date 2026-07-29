@@ -86,6 +86,7 @@ def _config(
     repetitions: int = 1,
     speed_claim: bool = False,
     profiled: bool = False,
+    retain_run_artifacts: bool = False,
 ) -> Any:
     return qualification.QualificationConfig(
         fixture_root=_TINY,
@@ -97,6 +98,7 @@ def _config(
         repetitions=repetitions,
         speed_claim=speed_claim,
         profiled=profiled,
+        retain_run_artifacts=retain_run_artifacts,
     )
 
 
@@ -323,6 +325,36 @@ def test_existing_run_root_is_never_reused_as_current_output(
             environment=_environment(),
             adapter_loader=lambda _: _FakeAdapter("A"),
         )
+
+
+def test_completed_run_artifacts_are_discarded_unless_explicitly_retained(
+    tmp_path: Path,
+) -> None:
+    class ArtifactAdapter(_FakeAdapter):
+        def execute(self, request: Any) -> Any:
+            (request.run_root / "candidate.sqlite").write_bytes(b"synthetic")
+            return super().execute(request)
+
+    discarded = qualification.run_qualification(
+        _config(tmp_path, run_id="discarded"),
+        environment=_environment(),
+        adapter_loader=lambda _: ArtifactAdapter("A"),
+    )
+
+    discarded_runs = discarded.invocation_root / "runs"
+    assert discarded.summary["retain_run_artifacts"] is False
+    assert not discarded_runs.exists() or not any(
+        path.is_file() for path in discarded_runs.rglob("*")
+    )
+
+    retained = qualification.run_qualification(
+        _config(tmp_path, run_id="retained", retain_run_artifacts=True),
+        environment=_environment(),
+        adapter_loader=lambda _: ArtifactAdapter("A"),
+    )
+
+    assert retained.summary["retain_run_artifacts"] is True
+    assert any((retained.invocation_root / "runs").rglob("candidate.sqlite"))
 
 
 def test_fixture_profile_and_research_execution_are_explicit(

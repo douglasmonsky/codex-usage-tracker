@@ -7,6 +7,7 @@ import os
 import platform
 import re
 import secrets
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -84,6 +85,7 @@ class QualificationConfig:
     include_research: bool = False
     qualification_model: str | None = None
     filesystem_cache_state: str = "uncontrolled"
+    retain_run_artifacts: bool = False
 
     def __post_init__(self) -> None:
         if not _RUN_ID.fullmatch(self.run_id):
@@ -273,6 +275,8 @@ def run_qualification(
                     raise QualificationContractError(
                         f"candidate {candidate_id} violated {case.case_id}: {error}"
                     ) from error
+                if not config.retain_run_artifacts:
+                    shutil.rmtree(run_root)
                 if result.outcome in {shared.RunOutcome.FAILED, shared.RunOutcome.STOPPED}:
                     failure = (
                         candidate_id,
@@ -432,6 +436,7 @@ def _invocation_payload(
         "profiled": config.profiled,
         "include_research": config.include_research,
         "qualification_model": config.qualification_model,
+        "retain_run_artifacts": config.retain_run_artifacts,
         "completion_marker": SUMMARY_FILE,
     }
     return {**base, "invocation_digest": shared.canonical_sha256(base)}
@@ -551,6 +556,7 @@ def _summary_payload(
         "records": len(records),
         "planned_executions": (len(prepared.candidates) * len(prepared.cases) * config.repetitions),
         "optional_repetitions_skipped": optional_skips,
+        "retain_run_artifacts": config.retain_run_artifacts,
         "failure": (
             {
                 "candidate_id": failure[0],

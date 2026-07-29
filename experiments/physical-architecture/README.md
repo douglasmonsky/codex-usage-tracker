@@ -59,6 +59,13 @@ nearest-rank p95, maximum, and population coefficient of variation. `rank_candid
 the seven documented weights and deterministic lower-cost normalization over identical
 fixture digests and scale. Profile output is attribution evidence only.
 
+The qualification runner retains canonical invocation, measurement, and summary files but
+discards each completed candidate run root by default. This keeps repeated production-scale
+measurements from filling the qualification filesystem and distorting later write timings.
+Pass `--retain-run-artifacts` only for a bounded diagnostic that genuinely needs the
+generated candidate database; the retention choice is recorded in both invocation and
+summary artifacts.
+
 ## Publication failures
 
 `PublicationCrashDriver` is the process-control seam. The driver launches and terminates its

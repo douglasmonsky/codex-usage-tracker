@@ -36,6 +36,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--include-research", action="store_true")
     parser.add_argument("--qualification-model")
     parser.add_argument(
+        "--retain-run-artifacts",
+        action="store_true",
+        help="retain generated candidate databases after measurements are recorded",
+    )
+    parser.add_argument(
         "--filesystem-cache-state",
         choices=("cold", "warm", "uncontrolled"),
         default="uncontrolled",
@@ -62,6 +67,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             include_research=arguments.include_research,
             qualification_model=arguments.qualification_model,
             filesystem_cache_state=arguments.filesystem_cache_state,
+            retain_run_artifacts=arguments.retain_run_artifacts,
         )
         artifact = qualification.run_qualification(config)
     except qualification.QualificationRunFailed as error:
