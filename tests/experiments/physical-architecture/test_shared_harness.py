@@ -6,7 +6,7 @@ import os
 import shutil
 import sqlite3
 import sys
-from dataclasses import replace
+from dataclasses import asdict, replace
 from decimal import Decimal
 from pathlib import Path
 
@@ -336,9 +336,7 @@ def test_workload_matrix_is_complete_unique_and_deterministic() -> None:
         if case.group in {WorkloadGroup.UNSAFE_CHANGE, WorkloadGroup.CRASH}
     )
     assert all(
-        case.minimum_repetitions == 5
-        for case in first.cases
-        if case.group is WorkloadGroup.DBHUB
+        case.minimum_repetitions == 5 for case in first.cases if case.group is WorkloadGroup.DBHUB
     )
     assert first.ids(WorkloadGroup.DBHUB) == (
         "dbhub.generic",
@@ -648,9 +646,10 @@ def test_dbhub_runner_is_pinned_disposable_and_read_only(
             ),
         )
 
-    with pytest.raises(
-        DbhubContractError, match="changed during research run"
-    ), run.runtime_access():
+    with (
+        pytest.raises(DbhubContractError, match="changed during research run"),
+        run.runtime_access(),
+    ):
         connection = sqlite3.connect(run.snapshot_path)
         connection.execute("UPDATE facts SET value = 2")
         connection.commit()
@@ -732,3 +731,44 @@ def test_all_shared_test_data_is_synthetic_and_paths_are_allowlisted() -> None:
         if path.suffix in {".py", ".md", ".json", ".toml"}:
             text = path.read_text(encoding="utf-8")
             assert not any(value in text for value in forbidden)
+
+
+@pytest.mark.parametrize(
+    ("values", "match"),
+    [
+        (dict(pages_written=1), "paired"),
+        (dict(pages_written_basis="sqlite_wal_frames_clean_epoch.v1"), "paired"),
+        (dict(pages_written=1, pages_written_basis="wrong.v1"), "unsupported"),
+        (dict(ordinary_tail_latency_ns=1), "paired"),
+        (dict(writer_transactions_basis="explicit_committed_analytical_transactions.v1"), "paired"),
+    ],
+)
+def test_ordinary_metric_value_basis_pairs_are_exact(values: dict[str, object], match: str) -> None:
+    with pytest.raises(shared.MeasurementContractError, match=match):
+        MeasurementValues(**values)
+
+
+def test_nullable_ordinary_metric_pairs_round_trip_as_json_null() -> None:
+    values = MeasurementValues()
+    payload = json.loads(json.dumps(asdict(values)))
+    assert payload["ordinary_tail_latency_ns"] is None
+    assert payload["ordinary_tail_latency_basis"] is None
+    assert payload["pages_written"] is None
+    assert payload["pages_written_basis"] is None
+    assert payload["writer_transactions"] is None
+    assert payload["writer_transactions_basis"] is None
+    restored = {
+        **payload,
+        "projection_consumers": tuple(tuple(item) for item in payload["projection_consumers"]),
+        "sql_latencies_ns": tuple(payload["sql_latencies_ns"]),
+        "explain_query_plans": tuple(payload["explain_query_plans"]),
+    }
+    assert MeasurementValues(**restored) == values
+    assert MeasurementValues(
+        ordinary_tail_latency_ns=1,
+        ordinary_tail_latency_basis="ordinary_operation_after_preparation.v1",
+        pages_written=0,
+        pages_written_basis="sqlite_wal_frames_clean_epoch.v1",
+        writer_transactions=0,
+        writer_transactions_basis="explicit_committed_analytical_transactions.v1",
+    )

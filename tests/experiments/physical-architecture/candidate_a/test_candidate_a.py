@@ -1015,3 +1015,45 @@ def test_agent_perf_contract_is_pinned_to_standard_fixture_and_matrix() -> None:
         "--output",
         "{output_root}",
     )
+
+
+def test_ordinary_write_metrics_use_clean_wal_frames_not_allocated_pages(
+    fixture: Any, tmp_path: Path
+) -> None:
+    artifact = candidate_a.build_artifact(fixture, tmp_path / "ordinary.sqlite")
+    before = artifact.path.read_bytes()
+    with database(artifact.path, read_only=True) as connection:
+        allocated_pages = int(connection.execute("PRAGMA page_count").fetchone()[0])
+    no_change = apply_ordinary_change(artifact.path, "no_source_change")
+    assert no_change.ordinary_tail_latency_ns > 0
+    assert no_change.pages_written == no_change.writer_transactions == 0
+    assert no_change.facts_inserted == no_change.facts_updated == 0
+    assert (
+        no_change.dirty_keys
+        == no_change.projection_rows_read
+        == no_change.projection_rows_written
+        == 0
+    )
+    assert no_change.source_files_rescanned == no_change.source_bytes_rescanned == 0
+    assert artifact.path.read_bytes() == before
+    mutation = apply_ordinary_change(artifact.path, "one_model_call")
+    assert 0 < mutation.pages_written < allocated_pages
+    assert mutation.writer_transactions == 1
+    with database(artifact.path) as connection:
+        assert tuple(connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()) == (0, 0, 0)
+
+
+def test_ordinary_change_fails_closed_on_ambiguous_clean_epoch(
+    fixture: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    artifact = candidate_a.build_artifact(fixture, tmp_path / "ambiguous.sqlite")
+    with database(artifact.path, read_only=True) as connection:
+        before = int(connection.execute("SELECT count(*) FROM model_calls_visible").fetchone()[0])
+    monkeypatch.setattr(maintenance_module, "_checkpoint", lambda *_: (1, 1, 0))
+    with pytest.raises(RuntimeError, match="not clean"):
+        apply_ordinary_change(artifact.path, "one_model_call")
+    with database(artifact.path, read_only=True) as connection:
+        assert (
+            int(connection.execute("SELECT count(*) FROM model_calls_visible").fetchone()[0])
+            == before
+        )

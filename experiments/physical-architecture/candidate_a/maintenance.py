@@ -670,9 +670,12 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
                     """
             ).fetchone()[0]
             latency = time.perf_counter_ns() - started
-            _require_checkpointed_wal(connection, "after no-source-change read")
+            if latency <= 0:
+                raise RuntimeError("ordinary no-source-change latency is not positive")
+            if _require_checkpointed_wal(connection, "after no-source-change read") != 0:
+                raise RuntimeError("no-source-change read wrote WAL frames")
             _require_clean_wal_epoch(connection, "after no-source-change read")
-            return MaintenanceStats(ordinary_tail_latency_ns=max(1, latency))
+            return MaintenanceStats(ordinary_tail_latency_ns=latency)
         started = time.perf_counter_ns()
         connection.execute("BEGIN IMMEDIATE")
         if change in {"one_model_call", "32_call_tail", "2000_call_tail", "late_event"}:
