@@ -165,12 +165,9 @@ def _insert_calls(
                 50 + ordinal % 11,
                 event_at + ordinal,
                 int(source["source_rank"]),
+                int(source["occurrence_source_key"]),
                 source_order + ordinal,
                 30,
-                str(source["manifestation_id"]),
-                str(source["revision"]),
-                str(source["adapter_version"]),
-                str(source["source_path"]),
                 int(source["record_count"]) + ordinal,
                 int(source["byte_count"]),
                 int(source["byte_count"]),
@@ -182,9 +179,9 @@ def _insert_calls(
             call_id, session_id, turn_id, model, reasoning_effort,
             context_window_tokens, uncached_input_tokens, cached_input_tokens,
             reasoning_tokens, output_tokens, event_at_us, source_rank,
-            source_order, event_kind_order, manifestation_id, source_revision,
-            adapter_version, source_path, record_ordinal, byte_start, byte_end
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            occurrence_source_key, source_order, event_kind_order,
+            record_ordinal, byte_start, byte_end
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         rows,
     )
@@ -218,12 +215,11 @@ def _insert_tool(
         INSERT INTO tool_invocations(
             tool_id, session_id, turn_id, transport_name,
             semantic_operation, resource_id, write_intent, state,
-            start_at_us, start_source_rank, start_source_order,
-            start_event_kind_order, start_manifestation_id,
-            start_source_revision, start_adapter_version, start_source_path,
+            start_at_us, start_source_rank, start_occurrence_source_key,
+            start_source_order, start_event_kind_order,
             start_record_ordinal, start_byte_start, start_byte_end
         ) VALUES (?, ?, ?, 'synthetic_write', 'write', ?, 1, 'running',
-                  ?, ?, ?, 40, ?, ?, ?, ?, ?, ?, ?)
+                  ?, ?, ?, ?, 40, ?, ?, ?)
         """,
         (
             tool_id,
@@ -232,11 +228,8 @@ def _insert_tool(
             resource_id,
             event_at,
             int(source["source_rank"]),
+            int(source["occurrence_source_key"]),
             int(source["record_count"]) + 1,
-            str(source["manifestation_id"]),
-            str(source["revision"]),
-            str(source["adapter_version"]),
-            str(source["source_path"]),
             int(source["record_count"]) + 1,
             int(source["byte_count"]),
             int(source["byte_count"]),
@@ -281,10 +274,9 @@ def _terminal_transition(connection: sqlite3.Connection) -> tuple[int, str, str]
     tool = connection.execute(
         """
         SELECT tool_id, transport_name, semantic_operation, start_at_us,
-               start_source_rank, start_source_order, start_event_kind_order,
-               start_manifestation_id, start_source_revision,
-               start_adapter_version, start_source_path,
-               start_record_ordinal, start_byte_start, start_byte_end
+            start_source_rank, start_source_order, start_event_kind_order,
+            start_occurrence_source_key,
+            start_record_ordinal, start_byte_start, start_byte_end
         FROM tool_invocations
         WHERE terminal_at_us IS NULL
         ORDER BY start_at_us, start_source_rank, start_source_order, tool_id
@@ -299,12 +291,9 @@ def _terminal_transition(connection: sqlite3.Connection) -> tuple[int, str, str]
             state='succeeded',
             terminal_at_us=?,
             terminal_source_rank=?,
+            terminal_occurrence_source_key=?,
             terminal_source_order=?,
             terminal_event_kind_order=50,
-            terminal_manifestation_id=?,
-            terminal_source_revision=?,
-            terminal_adapter_version=?,
-            terminal_source_path=?,
             terminal_record_ordinal=?,
             terminal_byte_start=?,
             terminal_byte_end=?,
@@ -315,11 +304,8 @@ def _terminal_transition(connection: sqlite3.Connection) -> tuple[int, str, str]
         (
             int(tool["start_at_us"]) + 1,
             int(tool["start_source_rank"]),
+            int(tool["start_occurrence_source_key"]),
             int(tool["start_source_order"]) + 1,
-            str(tool["start_manifestation_id"]),
-            str(tool["start_source_revision"]),
-            str(tool["start_adapter_version"]),
-            str(tool["start_source_path"]),
             int(tool["start_record_ordinal"]) + 1,
             int(tool["start_byte_end"]),
             int(tool["start_byte_end"]),

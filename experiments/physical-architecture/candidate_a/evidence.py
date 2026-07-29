@@ -87,6 +87,7 @@ def _decode_cursor(cursor: str, publication_id: str) -> OrderKey:
 def _select(
     *,
     table: str,
+    occurrence_source_key: str | None = None,
     event_at: str,
     source_rank: str,
     source_order: str,
@@ -119,6 +120,48 @@ def _select(
     after: OrderKey | None,
     limit: int,
 ) -> _Stream | None:
+    if occurrence_source_key is not None:
+        table = (
+            f"{table} AS event "
+            "JOIN source_manifestations AS occurrence_source "
+            "ON occurrence_source.occurrence_source_key="
+            f"event.{occurrence_source_key}"
+        )
+
+        def fact(expression: str) -> str:
+            if expression == "NULL" or expression.startswith("'"):
+                return expression
+            return f"event.{expression}"
+
+        event_at = fact(event_at)
+        source_rank = fact(source_rank)
+        source_order = fact(source_order)
+        event_kind_order = fact(event_kind_order)
+        logical_id = fact(logical_id)
+        session_id = fact(session_id)
+        turn_id = fact(turn_id)
+        transport_name = fact(transport_name)
+        semantic_operation = fact(semantic_operation)
+        resource_id = fact(resource_id)
+        state = fact(state)
+        uncached_input_tokens = fact(uncached_input_tokens)
+        cached_input_tokens = fact(cached_input_tokens)
+        reasoning_tokens = fact(reasoning_tokens)
+        output_tokens = fact(output_tokens)
+        duration_us = fact(duration_us)
+        output_bytes = fact(output_bytes)
+        record_ordinal = fact(record_ordinal)
+        byte_start = fact(byte_start)
+        byte_end = fact(byte_end)
+        manifestation_id = "occurrence_source.manifestation_id"
+        source_revision = "occurrence_source.revision"
+        adapter_version = "occurrence_source.adapter_version"
+        source_path = "occurrence_source.source_path"
+        if session_filter_column is not None:
+            session_filter_column = fact(session_filter_column)
+        if required is not None:
+            required = f"event.{required}"
+
     if selected_session_id is not None and session_filter_column is None:
         return None
     parameters: list[object] = []
@@ -251,6 +294,7 @@ def _streams(
         ),
         _select(
             table="turns",
+            occurrence_source_key="occurrence_source_key",
             event_at="start_at_us",
             source_rank="source_rank",
             source_order="source_order",
@@ -275,6 +319,7 @@ def _streams(
         ),
         _select(
             table="model_calls",
+            occurrence_source_key="occurrence_source_key",
             event_at="event_at_us",
             source_rank="source_rank",
             source_order="source_order",
@@ -303,6 +348,7 @@ def _streams(
         ),
         _select(
             table="tool_invocations",
+            occurrence_source_key="start_occurrence_source_key",
             event_at="start_at_us",
             source_rank="start_source_rank",
             source_order="start_source_order",
@@ -330,6 +376,7 @@ def _streams(
         ),
         _select(
             table="tool_invocations",
+            occurrence_source_key="terminal_occurrence_source_key",
             event_at="terminal_at_us",
             source_rank="terminal_source_rank",
             source_order="terminal_source_order",

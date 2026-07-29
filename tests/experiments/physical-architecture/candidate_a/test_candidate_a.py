@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import sqlite3
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -116,6 +117,27 @@ def test_schema_is_typed_compact_and_deduplicated(
             for name, declared_type in columns.items():
                 if name.endswith("_at_us") or name == "event_at_us":
                     assert declared_type == "INTEGER"
+
+        compact_coordinate_columns = {
+            "adapter_version",
+            "manifestation_id",
+            "source_path",
+            "source_revision",
+        }
+        for table in ("model_calls", "turns"):
+            columns = _table_columns(connection, table)
+            assert "occurrence_source_key" in columns
+            assert not compact_coordinate_columns.intersection(columns)
+        tool_columns = _table_columns(connection, "tool_invocations")
+        assert {
+            "start_occurrence_source_key",
+            "terminal_occurrence_source_key",
+        }.issubset(tool_columns)
+        assert not {
+            f"{transition}_{column}"
+            for transition in ("start", "terminal")
+            for column in compact_coordinate_columns
+        }.intersection(tool_columns)
 
         assert (
             connection.execute("SELECT count(*) FROM model_calls").fetchone()[0]
@@ -473,6 +495,115 @@ def test_prepublication_validation_rejects_foreign_key_violations(
             )
 
 
+@pytest.mark.parametrize("mutation", ["mismatch", "orphan"])
+def test_prepublication_validation_rejects_compact_source_key_corruption(
+    built: tuple[Any, Any],
+    mutation: str,
+) -> None:
+    _, artifact = built
+    with database(artifact.path) as connection:
+        call = connection.execute(
+            """
+            SELECT source_rank, occurrence_source_key
+            FROM model_calls
+            ORDER BY call_id
+            LIMIT 1
+            """
+        ).fetchone()
+        assert call is not None
+        if mutation == "mismatch":
+            corrupt_key = connection.execute(
+                """
+                SELECT occurrence_source_key
+                FROM source_manifestations
+                WHERE source_rank <> ?
+                ORDER BY source_rank
+                LIMIT 1
+                """,
+                (int(call["source_rank"]),),
+            ).fetchone()[0]
+        else:
+            corrupt_key = -1
+        connection.execute("PRAGMA foreign_keys=OFF")
+        connection.execute(
+            """
+            UPDATE model_calls
+            SET occurrence_source_key=?
+            WHERE call_id=(
+                SELECT call_id
+                FROM model_calls
+                ORDER BY call_id
+                LIMIT 1
+            )
+            """,
+            (int(corrupt_key),),
+        )
+        connection.commit()
+        assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+        with pytest.raises(ValueError, match="foreign-key"):
+            schema_module.validate_database(connection, mode="prepublication")
+
+
+def test_occurrence_source_key_is_deterministic_and_revision_specific() -> None:
+    coordinate = {
+        "manifestation_id": "source-manifestation:v1:stable",
+        "source_revision": "revision-1",
+        "adapter_version": "synthetic-jsonl-v1",
+        "source_path": "sources/active/source-0000.jsonl",
+    }
+    first = ingest_module._occurrence_source_key(**coordinate)
+    assert first == ingest_module._occurrence_source_key(**coordinate)
+    assert first != ingest_module._occurrence_source_key(
+        **{**coordinate, "source_revision": "revision-2"}
+    )
+    assert first != ingest_module._occurrence_source_key(
+        **{**coordinate, "source_path": "sources/archive/source-0000.jsonl"}
+    )
+    assert 0 < first < 2**63
+
+
+def test_occurrence_source_key_collision_fails_closed(
+    built: tuple[Any, Any],
+) -> None:
+    _, artifact = built
+    with database(artifact.path) as connection:
+        source = connection.execute(
+            """
+            SELECT *
+            FROM source_manifestations
+            ORDER BY source_rank
+            LIMIT 1
+            """
+        ).fetchone()
+        assert source is not None
+        with pytest.raises(sqlite3.IntegrityError, match="UNIQUE constraint failed"):
+            connection.execute(
+                """
+                INSERT INTO source_manifestations(
+                    source_path, occurrence_source_key, manifestation_id,
+                    revision, adapter_version, source_rank, state, byte_count,
+                    record_count, content_sha256, logical_source, duplicate_of,
+                    selected
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "sources/collision/source.jsonl",
+                    int(source["occurrence_source_key"]),
+                    "source-manifestation:v1:different",
+                    "revision-different",
+                    "adapter-different",
+                    int(source["source_rank"]) + 10_000,
+                    "active",
+                    0,
+                    0,
+                    "0" * 64,
+                    "sources/collision/source.jsonl",
+                    None,
+                    1,
+                ),
+            )
+
+
 def test_prepublication_validation_rejects_metadata_drift(
     built: tuple[Any, Any],
 ) -> None:
@@ -538,6 +669,19 @@ def test_deferred_default_is_deterministic_and_oracle_equivalent_to_present(
         default_first.path
     ) == ingest_module.file_sha256(default_second.path)
     with (
+        database(default_first.path, read_only=True) as first_connection,
+        database(default_second.path, read_only=True) as second_connection,
+    ):
+        source_key_sql = """
+            SELECT occurrence_source_key, manifestation_id, revision,
+                adapter_version, source_path
+            FROM source_manifestations
+            ORDER BY source_path
+        """
+        assert first_connection.execute(source_key_sql).fetchall() == (
+            second_connection.execute(source_key_sql).fetchall()
+        )
+    with (
         database(default_first.path, read_only=True) as default_connection,
         database(present.path, read_only=True) as present_connection,
     ):
@@ -588,6 +732,14 @@ def test_evidence_merge_is_gap_free_stable_and_keyset_paginated(
         assert page.full_scan_count == 0
         assert page.temporary_sort_count == 0
         assert page.query_plans
+        assert any(
+            "source_manifestations_by_occurrence_key" in plan
+            for plan in page.query_plans
+        )
+        assert not any(
+            plan.startswith("SCAN source_manifestations")
+            for plan in page.query_plans
+        )
 
         tampered = ("A" if page.next_cursor[0] != "A" else "B") + page.next_cursor[1:]
         with pytest.raises(EvidenceContractError, match="signature"):

@@ -6,6 +6,7 @@ import sqlite3
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -46,10 +47,31 @@ _SELECTOR_PREFIXES = {
 }
 
 
+@cache
+def _occurrence_source_key(
+    *,
+    manifestation_id: str,
+    source_revision: str,
+    adapter_version: str,
+    source_path: str,
+) -> int:
+    digest = shared.canonical_sha256(
+        {
+            "adapter_version": adapter_version,
+            "manifestation_id": manifestation_id,
+            "source_path": source_path,
+            "source_revision": source_revision,
+        }
+    )
+    key = int(digest[:16], 16) & ((1 << 63) - 1)
+    return key or 1
+
+
 @dataclass(frozen=True)
 class Coordinate:
     event_at_us: int
     source_rank: int
+    occurrence_source_key: int
     source_order: int
     event_kind_order: int
     manifestation_id: str
@@ -70,6 +92,18 @@ class Coordinate:
             self.source_revision,
             self.adapter_version,
             self.source_path,
+            self.record_ordinal,
+            self.byte_start,
+            self.byte_end,
+        )
+
+    def compact_values(self) -> tuple[int, ...]:
+        return (
+            self.event_at_us,
+            self.source_rank,
+            self.occurrence_source_key,
+            self.source_order,
+            self.event_kind_order,
             self.record_ordinal,
             self.byte_start,
             self.byte_end,
@@ -273,13 +307,19 @@ def _insert_manifestations(
         connection.execute(
             """
             INSERT INTO source_manifestations(
-                source_path, manifestation_id, revision, adapter_version,
-                source_rank, state, byte_count, record_count, content_sha256,
-                logical_source, duplicate_of, selected
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                source_path, occurrence_source_key, manifestation_id, revision,
+                adapter_version, source_rank, state, byte_count, record_count,
+                content_sha256, logical_source, duplicate_of, selected
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 source_path,
+                _occurrence_source_key(
+                    manifestation_id=str(source["manifestation_id"]),
+                    source_revision=str(source["revision"]),
+                    adapter_version=str(source["adapter_version"]),
+                    source_path=source_path,
+                ),
                 str(source["manifestation_id"]),
                 str(source["revision"]),
                 str(source["adapter_version"]),
@@ -308,6 +348,12 @@ def _record_coordinate(
     return Coordinate(
         event_at_us=int(record["event_at_us"]),
         source_rank=source_rank,
+        occurrence_source_key=_occurrence_source_key(
+            manifestation_id=source.manifestation_id,
+            source_revision=source.revision,
+            adapter_version=source.adapter_version,
+            source_path=source.relative_path.as_posix(),
+        ),
         source_order=int(record["source_order"]),
         event_kind_order=int(record["event_kind_order"]),
         manifestation_id=source.manifestation_id,
@@ -442,16 +488,15 @@ def _insert_record(
             """
             INSERT OR IGNORE INTO turns(
                 turn_id, session_id, state, start_at_us, source_rank,
-                source_order, event_kind_order, manifestation_id,
-                source_revision, adapter_version, source_path, record_ordinal,
-                byte_start, byte_end
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                occurrence_source_key, source_order, event_kind_order,
+                record_ordinal, byte_start, byte_end
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(payload["turn_id"]),
                 str(payload["session_id"]),
                 str(payload["state"]),
-                *coordinate.values(),
+                *coordinate.compact_values(),
             ),
         ).rowcount
     elif record_type == "model_call":
@@ -462,10 +507,9 @@ def _insert_record(
                 call_id, session_id, turn_id, model, reasoning_effort,
                 context_window_tokens, uncached_input_tokens,
                 cached_input_tokens, reasoning_tokens, output_tokens,
-                event_at_us, source_rank, source_order, event_kind_order,
-                manifestation_id, source_revision, adapter_version, source_path,
-                record_ordinal, byte_start, byte_end
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                event_at_us, source_rank, occurrence_source_key, source_order,
+                event_kind_order, record_ordinal, byte_start, byte_end
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(payload["call_id"]),
@@ -502,7 +546,7 @@ def _insert_record(
                     if tokens.get("output_tokens") is not None
                     else None
                 ),
-                *coordinate.values(),
+                *coordinate.compact_values(),
             ),
         ).rowcount
     elif record_type == "tool_start":
@@ -511,11 +555,10 @@ def _insert_record(
             INSERT OR IGNORE INTO tool_invocations(
                 tool_id, session_id, turn_id, transport_name,
                 semantic_operation, resource_id, write_intent, state,
-                start_at_us, start_source_rank, start_source_order,
-                start_event_kind_order, start_manifestation_id,
-                start_source_revision, start_adapter_version, start_source_path,
+                start_at_us, start_source_rank, start_occurrence_source_key,
+                start_source_order, start_event_kind_order,
                 start_record_ordinal, start_byte_start, start_byte_end
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(payload["tool_id"]),
@@ -526,7 +569,7 @@ def _insert_record(
                 str(payload["resource_id"]) if payload.get("resource_id") is not None else None,
                 int(bool(payload["write_intent"])),
                 str(payload["state"]),
-                *coordinate.values(),
+                *coordinate.compact_values(),
             ),
         ).rowcount
     elif record_type == "tool_terminal":
@@ -535,10 +578,9 @@ def _insert_record(
             UPDATE tool_invocations SET
                 transport_name=?, semantic_operation=?, resource_id=?,
                 write_intent=?, state=?, terminal_at_us=?,
-                terminal_source_rank=?, terminal_source_order=?,
-                terminal_event_kind_order=?, terminal_manifestation_id=?,
-                terminal_source_revision=?, terminal_adapter_version=?,
-                terminal_source_path=?, terminal_record_ordinal=?,
+                terminal_source_rank=?, terminal_occurrence_source_key=?,
+                terminal_source_order=?, terminal_event_kind_order=?,
+                terminal_record_ordinal=?,
                 terminal_byte_start=?, terminal_byte_end=?, duration_us=?,
                 output_bytes=?
             WHERE tool_id=?
@@ -549,7 +591,7 @@ def _insert_record(
                 str(payload["resource_id"]) if payload.get("resource_id") is not None else None,
                 int(bool(payload["write_intent"])),
                 str(payload["state"]),
-                *coordinate.values(),
+                *coordinate.compact_values(),
                 int(payload["duration_us"]) if payload.get("duration_us") is not None else None,
                 int(payload["output_bytes"]) if payload.get("output_bytes") is not None else None,
                 str(payload["tool_id"]),

@@ -15,7 +15,7 @@ PREPUBLICATION_VALIDATION = "quick_check+foreign_key_check+schema_metadata"
 # Digest of ordered, non-SQLite-owned sqlite_schema rows. An intentional DDL
 # change must update this only alongside schema-contract and corruption tests.
 _EXPECTED_SCHEMA_DIGEST = (
-    "eeb45b56062ab77930da82fbc5a16f5b5f1e552f7bc2815309de4e1f8188b069"
+    "19b341b7c1d91c16d6ffeda9216eac7f8d95682ab45bea97ab135bb0d79146ee"
 )
 _HISTORY_SELECTIONS = frozenset(
     {
@@ -66,6 +66,7 @@ CREATE TABLE publications (
 
 CREATE TABLE source_manifestations (
     source_path TEXT PRIMARY KEY,
+    occurrence_source_key INTEGER NOT NULL,
     manifestation_id TEXT NOT NULL,
     revision TEXT NOT NULL,
     adapter_version TEXT NOT NULL,
@@ -76,8 +77,11 @@ CREATE TABLE source_manifestations (
     content_sha256 TEXT NOT NULL,
     logical_source TEXT NOT NULL,
     duplicate_of TEXT,
-    selected INTEGER NOT NULL CHECK (selected IN (0, 1))
+    selected INTEGER NOT NULL CHECK (selected IN (0, 1)),
+    UNIQUE (source_rank, occurrence_source_key)
 ) STRICT, WITHOUT ROWID;
+CREATE UNIQUE INDEX source_manifestations_by_occurrence_key
+    ON source_manifestations(occurrence_source_key);
 CREATE INDEX source_manifestations_by_identity
     ON source_manifestations(manifestation_id, revision, source_path);
 
@@ -160,15 +164,14 @@ CREATE TABLE turns (
     state TEXT NOT NULL,
     start_at_us INTEGER NOT NULL,
     source_rank INTEGER NOT NULL,
+    occurrence_source_key INTEGER NOT NULL,
     source_order INTEGER NOT NULL,
     event_kind_order INTEGER NOT NULL,
-    manifestation_id TEXT NOT NULL,
-    source_revision TEXT NOT NULL,
-    adapter_version TEXT NOT NULL,
-    source_path TEXT NOT NULL,
     record_ordinal INTEGER NOT NULL,
     byte_start INTEGER NOT NULL,
-    byte_end INTEGER NOT NULL
+    byte_end INTEGER NOT NULL,
+    FOREIGN KEY (source_rank, occurrence_source_key)
+        REFERENCES source_manifestations(source_rank, occurrence_source_key)
 ) STRICT, WITHOUT ROWID;
 CREATE INDEX turns_timeline
     ON turns(start_at_us, source_rank, source_order, event_kind_order, turn_id);
@@ -188,15 +191,14 @@ CREATE TABLE model_calls (
     output_tokens INTEGER,
     event_at_us INTEGER NOT NULL,
     source_rank INTEGER NOT NULL,
+    occurrence_source_key INTEGER NOT NULL,
     source_order INTEGER NOT NULL,
     event_kind_order INTEGER NOT NULL,
-    manifestation_id TEXT NOT NULL,
-    source_revision TEXT NOT NULL,
-    adapter_version TEXT NOT NULL,
-    source_path TEXT NOT NULL,
     record_ordinal INTEGER NOT NULL,
     byte_start INTEGER NOT NULL,
-    byte_end INTEGER NOT NULL
+    byte_end INTEGER NOT NULL,
+    FOREIGN KEY (source_rank, occurrence_source_key)
+        REFERENCES source_manifestations(source_rank, occurrence_source_key)
 ) STRICT, WITHOUT ROWID;
 CREATE INDEX model_calls_timeline
     ON model_calls(
@@ -223,28 +225,26 @@ CREATE TABLE tool_invocations (
     state TEXT NOT NULL,
     start_at_us INTEGER NOT NULL,
     start_source_rank INTEGER NOT NULL,
+    start_occurrence_source_key INTEGER NOT NULL,
     start_source_order INTEGER NOT NULL,
     start_event_kind_order INTEGER NOT NULL,
-    start_manifestation_id TEXT NOT NULL,
-    start_source_revision TEXT NOT NULL,
-    start_adapter_version TEXT NOT NULL,
-    start_source_path TEXT NOT NULL,
     start_record_ordinal INTEGER NOT NULL,
     start_byte_start INTEGER NOT NULL,
     start_byte_end INTEGER NOT NULL,
     terminal_at_us INTEGER,
     terminal_source_rank INTEGER,
+    terminal_occurrence_source_key INTEGER,
     terminal_source_order INTEGER,
     terminal_event_kind_order INTEGER,
-    terminal_manifestation_id TEXT,
-    terminal_source_revision TEXT,
-    terminal_adapter_version TEXT,
-    terminal_source_path TEXT,
     terminal_record_ordinal INTEGER,
     terminal_byte_start INTEGER,
     terminal_byte_end INTEGER,
     duration_us INTEGER,
-    output_bytes INTEGER
+    output_bytes INTEGER,
+    FOREIGN KEY (start_source_rank, start_occurrence_source_key)
+        REFERENCES source_manifestations(source_rank, occurrence_source_key),
+    FOREIGN KEY (terminal_source_rank, terminal_occurrence_source_key)
+        REFERENCES source_manifestations(source_rank, occurrence_source_key)
 ) STRICT, WITHOUT ROWID;
 CREATE INDEX tools_start_timeline
     ON tool_invocations(
