@@ -164,9 +164,7 @@ def test_growth_sensitive_question_plans_use_exact_current_projections(
         }
         tables = {
             str(row[0])
-            for row in connection.execute(
-                "SELECT name FROM sqlite_schema WHERE type='table'"
-            )
+            for row in connection.execute("SELECT name FROM sqlite_schema WHERE type='table'")
         }
         assert expected_tables <= tables
         _assert_projection_equivalence(connection)
@@ -176,16 +174,21 @@ def test_growth_sensitive_question_plans_use_exact_current_projections(
                 connection,
                 queries_module._PLAN_SQL[plan_id],  # noqa: SLF001
             )
-            full_scans, temporary_sorts = queries_module._plan_counts(plans)  # noqa: SLF001
+            (
+                full_scans,
+                automatic_indexes,
+                temporary_sorts,
+            ) = queries_module._plan_counts(plans)  # noqa: SLF001
             assert full_scans == 0, (plan_id, plans)
+            assert automatic_indexes == 0, (plan_id, plans)
             assert temporary_sorts == 0, (plan_id, plans)
 
     metrics = metrics_module.artifact_metrics(artifact.path, occurrence_rows=0)
     with database(artifact.path, read_only=True) as connection:
         recorded_projection_rows = int(
-            connection.execute(
-                "SELECT value FROM metadata WHERE key='projection_rows'"
-            ).fetchone()[0]
+            connection.execute("SELECT value FROM metadata WHERE key='projection_rows'").fetchone()[
+                0
+            ]
         )
     assert metrics.projection_rows == recorded_projection_rows
 
@@ -228,10 +231,7 @@ def test_ordinary_changes_keep_current_projections_exact_with_bounded_fanout(
             publication_id=artifact.publication_id,
             page_position=2,
         )
-        assert (
-            fallback.payload["page"]["anchor_basis"]
-            == "exact_keyset_fallback_anchors_invalid"
-        )
+        assert fallback.payload["page"]["anchor_basis"] == "exact_keyset_fallback_anchors_invalid"
 
 
 def test_source_phase_mutation_invalidates_evidence_anchors(
@@ -282,10 +282,7 @@ def test_deep_page_uses_persisted_keyset_anchor_without_gaps(
         assert result.payload["rows"] == list(expected[100:110])
         assert result.selector_pages_gap_free
         assert all("OFFSET" not in plan.upper() for plan in result.query_plans)
-        assert any(
-            "evidence_page_anchor_current" in plan
-            for plan in result.query_plans
-        )
+        assert any("evidence_page_anchor_current" in plan for plan in result.query_plans)
 
 
 def test_bounded_sort_is_complete_for_explicit_admission_and_compact(
@@ -339,8 +336,7 @@ def test_bounded_sort_is_complete_for_explicit_admission_and_compact(
 
     columns = list(result.payload["results"][0]["columns"])
     observed = [
-        dict(zip(columns, row, strict=True))
-        for row in result.payload["results"][0]["rows"]
+        dict(zip(columns, row, strict=True)) for row in result.payload["results"][0]["rows"]
     ]
     admission = result.payload["results"][0]["admission"]
     assert observed == expected

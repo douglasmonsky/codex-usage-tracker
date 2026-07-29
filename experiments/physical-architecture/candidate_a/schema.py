@@ -15,9 +15,7 @@ PREPUBLICATION_VALIDATION = "quick_check+foreign_key_check+schema_metadata"
 
 # Digest of ordered, non-SQLite-owned sqlite_schema rows. An intentional DDL
 # change must update this only alongside schema-contract and corruption tests.
-_EXPECTED_SCHEMA_DIGEST = (
-    "2786b0bc712402ead853140f4670f780e59dd193fc8ce6b7584375fb39334e34"
-)
+_EXPECTED_SCHEMA_DIGEST = "31b33e9efe24c458a528f2cc6930379028cd3bf40e9df0b79825290d61d85f09"
 _HISTORY_SELECTIONS = frozenset(
     {
         "current_session",
@@ -64,6 +62,8 @@ CREATE TABLE publications (
     observed_through_us INTEGER,
     status TEXT NOT NULL CHECK (status IN ('committed', 'rolled_back'))
 ) STRICT, WITHOUT ROWID;
+CREATE INDEX publications_committed_timeline
+    ON publications(committed_at_us DESC, publication_id DESC);
 
 CREATE TABLE source_manifestations (
     source_path TEXT PRIMARY KEY,
@@ -544,6 +544,11 @@ CREATE TABLE question_cases (
     oracle_id TEXT PRIMARY KEY,
     question_id TEXT NOT NULL,
     variant TEXT NOT NULL,
+    plan_id TEXT NOT NULL,
+    observed_facts_json TEXT NOT NULL,
+    answer_grades_json TEXT NOT NULL,
+    selector_ids_json TEXT NOT NULL,
+    caveats_json TEXT NOT NULL,
     expected_digest TEXT NOT NULL,
     event_at_us INTEGER NOT NULL,
     source_rank INTEGER NOT NULL,
@@ -779,10 +784,7 @@ def _validate_schema_contract(connection: sqlite3.Connection) -> None:
         ORDER BY type, name
         """
     ).fetchall()
-    encoded = "\n".join(
-        "\x1f".join(str(value) for value in row)
-        for row in rows
-    ).encode()
+    encoded = "\n".join("\x1f".join(str(value) for value in row) for row in rows).encode()
     if hashlib.sha256(encoded).hexdigest() != _EXPECTED_SCHEMA_DIGEST:
         raise ValueError("candidate A schema contract mismatch")
 
@@ -843,12 +845,9 @@ def _validate_metadata_contract(connection: sqlite3.Connection) -> None:
         tail_state is None
         or int(tail_state["row_count"]) != int(tail_state["actual_rows"])
         or not 0 <= int(tail_state["row_count"]) <= MODEL_CALL_TAIL_MAX_ROWS
-        or tail_state["minimum_event_at_us"]
-        != tail_state["actual_minimum_event_at_us"]
-        or tail_state["maximum_event_at_us"]
-        != tail_state["actual_maximum_event_at_us"]
-        or tail_state["maximum_source_order"]
-        != tail_state["actual_maximum_source_order"]
+        or tail_state["minimum_event_at_us"] != tail_state["actual_minimum_event_at_us"]
+        or tail_state["maximum_event_at_us"] != tail_state["actual_maximum_event_at_us"]
+        or tail_state["maximum_source_order"] != tail_state["actual_maximum_source_order"]
     ):
         raise ValueError("candidate A model-call tail state is invalid")
     publications = connection.execute(

@@ -124,25 +124,29 @@ artifacts use synthetic data only.
 
 ## Physical direction
 
-Candidate C is the leading hypothesis:
+Candidate A's physical mechanisms are the provisional direction pending the
+clean CK-04 requalification:
 
-- an immutable canonical event backbone;
-- lifecycle entities;
-- typed point-event facts;
-- source occurrences;
-- current state;
-- dirty-key current projections.
+- typed canonical facts and lifecycle rows;
+- physical source occurrences distinct from canonical entities;
+- a bounded ordinary-tail overlay;
+- indexed keyset merging of typed evidence streams;
+- current-only dirty-key projections;
+- short WAL transactions for proven-small safe changes;
+- isolated artifacts and an atomic active pointer for large or unsafe work.
 
-It is not preselected. A bounded bake-off compares it with:
+Candidate C was eliminated because its crash driver did not terminate a
+process. Candidate D was eliminated after its production 30-day build exceeded
+the `5 s` hard gate. Candidate A's recovery, SQL-derived-answer, planner,
+parallel-parser, CPU-attribution, production-schema, and evidence-manifest
+proofs have been hardened after final review. The decision becomes accepted
+only after those exact changes pass the clean canonical rerun.
 
-- Candidate A: typed canonical facts with indexed timeline merging;
-- Candidate D: typed canonical facts plus a compact ordered sequence index.
-
-All candidates implement the same logical contract, vertical slices, fixtures,
-queries, evidence, and recovery tests. The winner is selected by a weighted
-gate that first requires correctness, then uses build, tail, query, evidence,
-storage, write amplification, response size, tracker calls, and model-token
-evidence. A broad generation-copy design is not a candidate.
+The complete selection, exact CK-05 table/index inventory, measured projection
+candidates, publication mechanism, limitations, and follow-up risks are in
+[`PHYSICAL_ARCHITECTURE_DECISION.md`](PHYSICAL_ARCHITECTURE_DECISION.md).
+Production code is a clean implementation of that decision, not a copy of the
+experimental adapter.
 
 ## Non-goals
 
@@ -188,8 +192,9 @@ product-level gates:
 
 Only the following material decisions remain open:
 
-1. Which of A, C, or D wins the physical bake-off.
-2. The exact projection set admitted by measured Tier 1 consumers.
+1. Final CK-04 acceptance of Candidate A after clean requalification.
+2. The exact projection subset admitted by measured Tier 1 consumers from the
+   CK-04 candidate set.
 3. The final public tool grouping and payload shape after installed-agent
    qualification.
 4. Whether optional structural context composition earns a post-MVP capability.

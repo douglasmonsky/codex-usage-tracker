@@ -25,6 +25,7 @@ class QueryResult:
     query_plans: tuple[str, ...]
     rows_scanned: int
     full_scan_count: int
+    automatic_index_count: int
     temporary_sort_count: int
     oracle_equivalent: bool
     selector_pages_gap_free: bool
@@ -167,7 +168,7 @@ _PLAN_SQL = {
             usage.output_tokens
         FROM session_usage_current AS usage
         JOIN sessions AS session USING (session_id)
-        ORDER BY session.parent_session_id, usage.session_id
+        ORDER BY session.parent_session_id, session.session_id
         LIMIT 100
     """,
     "latest_publication_delta": """
@@ -223,13 +224,55 @@ _PLAN_SQL = {
 }
 
 _PLAN_INTERNAL_COLUMNS = {
-    "context_pressure_trajectory": frozenset(
-        {"source_rank", "source_order", "event_kind_order"}
-    ),
-    "uncached_input_jumps": frozenset(
-        {"source_rank", "source_order", "event_kind_order"}
-    ),
+    "context_pressure_trajectory": frozenset({"source_rank", "source_order", "event_kind_order"}),
+    "uncached_input_jumps": frozenset({"source_rank", "source_order", "event_kind_order"}),
 }
+
+_QUESTION_SQL = """
+    SELECT
+        question.oracle_id,
+        question.variant,
+        question.expected_digest,
+        CASE
+            WHEN json_type(
+                question.observed_facts_json,
+                '$.occurrence_coordinates'
+            ) IS NULL
+            THEN json(question.observed_facts_json)
+            ELSE json_set(
+                question.observed_facts_json,
+                '$.occurrence_coordinates',
+                json_array(
+                    json_object(
+                        'adapter_version', question.adapter_version,
+                        'byte_end', question.byte_end,
+                        'byte_start', question.byte_start,
+                        'manifestation_id', question.manifestation_id,
+                        'record_ordinal', question.record_ordinal,
+                        'record_range', json_array(
+                            question.record_ordinal,
+                            question.record_ordinal
+                        ),
+                        'revision', question.source_revision,
+                        'source_path', question.source_path
+                    )
+                )
+            )
+        END AS metrics_json,
+        json(question.answer_grades_json) AS grades_json,
+        (
+            SELECT json_group_array(
+                replace(selector.key, '_', '-') || ':' || selector.value
+            )
+            FROM json_each(question.selector_ids_json) AS selector
+        ) AS evidence_selectors_json,
+        json(question.caveats_json) AS caveats_json
+    FROM question_cases AS question
+        INDEXED BY question_cases_by_question
+    WHERE question.question_id = ?
+      AND question.plan_id = ?
+    ORDER BY question.oracle_id
+"""
 
 
 def _thaw(value: Any) -> Any:
@@ -244,13 +287,17 @@ def _plan(connection: sqlite3.Connection, sql: str) -> tuple[str, ...]:
     return tuple(str(row[3]) for row in connection.execute("EXPLAIN QUERY PLAN " + sql))
 
 
-def _plan_counts(plans: tuple[str, ...]) -> tuple[int, int]:
+def _plan_counts(plans: tuple[str, ...]) -> tuple[int, int, int]:
     full_scans = sum(
-        "SCAN " in plan and "USING INDEX" not in plan and "USING COVERING INDEX" not in plan
+        "SCAN " in plan
+        and "USING INDEX" not in plan
+        and "USING COVERING INDEX" not in plan
+        and "VIRTUAL TABLE" not in plan
         for plan in plans
     )
+    automatic_indexes = sum("AUTOMATIC" in plan for plan in plans)
     temporary_sorts = sum("USE TEMP B-TREE" in plan for plan in plans)
-    return full_scans, temporary_sorts
+    return full_scans, automatic_indexes, temporary_sorts
 
 
 def _bounded_plan_rows(
@@ -261,11 +308,7 @@ def _bounded_plan_rows(
 ) -> tuple[dict[str, Any], ...]:
     internal = _PLAN_INTERNAL_COLUMNS.get(plan_id, frozenset())
     return tuple(
-        {
-            str(column): value
-            for column, value in dict(row).items()
-            if column not in internal
-        }
+        {str(column): value for column, value in dict(row).items() if column not in internal}
         for row in connection.execute(sql)
     )
 
@@ -286,11 +329,83 @@ def _publication(connection: sqlite3.Connection) -> dict[str, Any]:
         "id": str(row["publication_id"]),
         "committed_at_us": int(row["committed_at_us"]),
         "observed_through_us": (
-            int(row["observed_through_us"])
-            if row["observed_through_us"] is not None
-            else None
+            int(row["observed_through_us"]) if row["observed_through_us"] is not None else None
         ),
     }
+
+
+def _decoded_question_rows(
+    indexed: tuple[sqlite3.Row, ...],
+) -> tuple[dict[str, Any], ...]:
+    rows: list[dict[str, Any]] = []
+    for indexed_row in indexed:
+        metrics = json.loads(str(indexed_row["metrics_json"]))
+        grades = json.loads(str(indexed_row["grades_json"]))
+        selectors = json.loads(str(indexed_row["evidence_selectors_json"]))
+        caveats = json.loads(str(indexed_row["caveats_json"]))
+        if not isinstance(metrics, dict):
+            raise ValueError("candidate A question metrics must be a JSON object")
+        if not isinstance(grades, dict):
+            raise ValueError("candidate A question grades must be a JSON object")
+        if not isinstance(selectors, list) or not all(
+            isinstance(selector, str) for selector in selectors
+        ):
+            raise ValueError("candidate A question selectors must be a JSON string list")
+        if not isinstance(caveats, list) or not all(isinstance(caveat, str) for caveat in caveats):
+            raise ValueError("candidate A question caveats must be a JSON string list")
+        rows.append(
+            {
+                "oracle_id": str(indexed_row["oracle_id"]),
+                "variant": str(indexed_row["variant"]),
+                "metrics": metrics,
+                "grades": grades,
+                "evidence_selectors": selectors,
+                "caveats": caveats,
+            }
+        )
+    return tuple(rows)
+
+
+def _question_oracle_equivalent(
+    fixture: shared.FixtureBundle,
+    *,
+    question_id: str,
+    indexed: tuple[sqlite3.Row, ...],
+    rows: tuple[dict[str, Any], ...],
+) -> bool:
+    questions = fixture.oracle.get("questions")
+    if not isinstance(questions, Mapping) or not rows or len(indexed) != len(rows):
+        return False
+    expected_rows = tuple(
+        (str(oracle_id), question)
+        for oracle_id, question in sorted(questions.items())
+        if isinstance(question, Mapping) and question.get("question_id") == question_id
+    )
+    if tuple(row["oracle_id"] for row in rows) != tuple(
+        oracle_id for oracle_id, _ in expected_rows
+    ):
+        return False
+    for indexed_row, row, (_, question) in zip(
+        indexed,
+        rows,
+        expected_rows,
+        strict=True,
+    ):
+        expected = question.get("expected")
+        selectors = question.get("selectors")
+        if not isinstance(expected, Mapping) or not isinstance(selectors, Mapping):
+            return False
+        if row["metrics"] != _thaw(expected.get("row")):
+            return False
+        if row["grades"] != _thaw(expected.get("field_grades", {})):
+            return False
+        if row["evidence_selectors"] != sorted(str(selector) for selector in selectors):
+            return False
+        if row["caveats"] != _thaw(question.get("caveats", ())):
+            return False
+        if shared.canonical_sha256(row["metrics"]) != str(indexed_row["expected_digest"]):
+            return False
+    return True
 
 
 def run_question(
@@ -300,84 +415,24 @@ def run_question(
     question_id: str,
     plan_id: str,
 ) -> QueryResult:
-    question_sql = """
-        SELECT oracle_id, variant, expected_digest
-        FROM question_cases
-        WHERE question_id=?
-        ORDER BY oracle_id
-    """
     started = time.perf_counter_ns()
-    indexed = tuple(connection.execute(question_sql, (question_id,)))
+    indexed = tuple(connection.execute(_QUESTION_SQL, (question_id, plan_id)))
     index_latency = time.perf_counter_ns() - started
-    questions = fixture.oracle.get("questions")
-    if not isinstance(questions, Mapping):
-        raise ValueError("fixture question oracle is missing")
-    rows: list[dict[str, Any]] = []
-    equivalent = bool(indexed)
-    for indexed_row in indexed:
-        oracle_id = str(indexed_row["oracle_id"])
-        question = questions.get(oracle_id)
-        if not isinstance(question, Mapping):
-            equivalent = False
-            continue
-        expected = question.get("expected")
-        if not isinstance(expected, Mapping):
-            equivalent = False
-            continue
-        metrics = _thaw(expected.get("row"))
-        if isinstance(metrics, dict) and "occurrence_coordinates" in metrics:
-            source = connection.execute(
-                """
-                SELECT
-                    manifestation_id, source_revision, adapter_version,
-                    source_path, record_ordinal, byte_start, byte_end
-                FROM question_cases WHERE oracle_id=?
-                """,
-                (oracle_id,),
-            ).fetchone()
-            if source is None:
-                equivalent = False
-                continue
-            metrics["occurrence_coordinates"] = [
-                {
-                    "adapter_version": str(source["adapter_version"]),
-                    "byte_end": int(source["byte_end"]),
-                    "byte_start": int(source["byte_start"]),
-                    "manifestation_id": str(source["manifestation_id"]),
-                    "record_ordinal": int(source["record_ordinal"]),
-                    "record_range": [
-                        int(source["record_ordinal"]),
-                        int(source["record_ordinal"]),
-                    ],
-                    "revision": str(source["source_revision"]),
-                    "source_path": str(source["source_path"]),
-                }
-            ]
-        if shared.canonical_sha256(metrics) != str(indexed_row["expected_digest"]):
-            equivalent = False
-        selectors = question.get("selectors")
-        rows.append(
-            {
-                "oracle_id": oracle_id,
-                "variant": str(indexed_row["variant"]),
-                "metrics": metrics,
-                "grades": _thaw(expected.get("field_grades", {})),
-                "evidence_selectors": (
-                    sorted(str(selector) for selector in selectors)
-                    if isinstance(selectors, Mapping)
-                    else []
-                ),
-                "caveats": _thaw(question.get("caveats", ())),
-            }
-        )
+    rows = _decoded_question_rows(indexed)
+    equivalent = _question_oracle_equivalent(
+        fixture,
+        question_id=question_id,
+        indexed=indexed,
+        rows=rows,
+    )
     probe_sql = _PLAN_SQL.get(plan_id)
     probe_rows = 0
     probe_latency = 0
     plans = tuple(
         str(row[3])
         for row in connection.execute(
-            "EXPLAIN QUERY PLAN " + question_sql,
-            (question_id,),
+            "EXPLAIN QUERY PLAN " + _QUESTION_SQL,
+            (question_id, plan_id),
         )
     )
     if probe_sql is not None:
@@ -401,7 +456,7 @@ def run_question(
                 "question_id": question_id,
                 "plan_id": plan_id,
                 "plan_version": 1,
-                "rows": rows,
+                "rows": list(rows),
                 "page": {
                     "returned_rows": len(rows),
                     "has_more": False,
@@ -411,14 +466,17 @@ def run_question(
         ],
     }
     encoded = shared.canonical_json_bytes(payload)
-    full_scans, temporary_sorts = _plan_counts(plans)
+    full_scans, automatic_indexes, temporary_sorts = _plan_counts(plans)
     return QueryResult(
         payload=payload,
         encoded=encoded,
-        sql_latencies_ns=(index_latency, probe_latency) if probe_sql is not None else (index_latency,),
+        sql_latencies_ns=(index_latency, probe_latency)
+        if probe_sql is not None
+        else (index_latency,),
         query_plans=plans,
         rows_scanned=len(indexed) + probe_rows,
         full_scan_count=full_scans,
+        automatic_index_count=automatic_indexes,
         temporary_sort_count=temporary_sorts,
         oracle_equivalent=equivalent,
         selector_pages_gap_free=True,
@@ -523,14 +581,8 @@ def run_evidence_feature(
     current_page = 1
     cursor: str | None = None
     plans: tuple[str, ...] = ()
-    full_scans = 0
-    temporary_sorts = 0
     latencies: list[int] = []
-    anchor_basis = (
-        "selected_session_keyset"
-        if selected_session_id is not None
-        else "first_page"
-    )
+    anchor_basis = "selected_session_keyset" if selected_session_id is not None else "first_page"
     if selected_session_id is None and target_page > 1:
         (
             current_page,
@@ -553,8 +605,6 @@ def run_evidence_feature(
         selected_session_id=selected_session_id,
     )
     plans += page.query_plans
-    full_scans += page.full_scan_count
-    temporary_sorts += page.temporary_sort_count
     while current_page < target_page and page.has_more:
         cursor = page.next_cursor
         if cursor is None:
@@ -568,8 +618,6 @@ def run_evidence_feature(
             selected_session_id=selected_session_id,
         )
         plans += page.query_plans
-        full_scans += page.full_scan_count
-        temporary_sorts += page.temporary_sort_count
     exact: int | None = None
     if exact_count:
         count_sql = """
@@ -599,6 +647,7 @@ def run_evidence_feature(
         anchor_basis=anchor_basis,
     )
     encoded = shared.canonical_json_bytes(payload)
+    full_scans, automatic_indexes, temporary_sorts = _plan_counts(plans)
     return QueryResult(
         payload=payload,
         encoded=encoded,
@@ -606,6 +655,7 @@ def run_evidence_feature(
         query_plans=plans,
         rows_scanned=len(page.rows),
         full_scan_count=full_scans,
+        automatic_index_count=automatic_indexes,
         temporary_sort_count=temporary_sorts,
         oracle_equivalent=True,
         selector_pages_gap_free=True,
@@ -650,9 +700,7 @@ def run_bounded_sort(connection: sqlite3.Connection) -> QueryResult:
         )
     )
     remainder_started = time.perf_counter_ns()
-    source_has_more = (
-        connection.execute(remainder_sql, (boundary,)).fetchone() is not None
-    )
+    source_has_more = connection.execute(remainder_sql, (boundary,)).fetchone() is not None
     remainder_latency = time.perf_counter_ns() - remainder_started
     publication = _publication(connection)
     columns = (
@@ -670,10 +718,7 @@ def run_bounded_sort(connection: sqlite3.Connection) -> QueryResult:
             {
                 "plan_id": "all_admitted_bounded_domains",
                 "columns": list(columns),
-                "rows": [
-                    [row[column] for column in columns]
-                    for row in rows
-                ],
+                "rows": [[row[column] for column in columns] for row in rows],
                 "admission": {
                     "admitted_order": ["session_id", "ascending"],
                     "maximum_rows": 100,
@@ -683,7 +728,7 @@ def run_bounded_sort(connection: sqlite3.Connection) -> QueryResult:
         ],
     }
     encoded = shared.canonical_json_bytes(payload)
-    full_scans, temporary_sorts = _plan_counts(plans)
+    full_scans, automatic_indexes, temporary_sorts = _plan_counts(plans)
     return QueryResult(
         payload=payload,
         encoded=encoded,
@@ -691,6 +736,7 @@ def run_bounded_sort(connection: sqlite3.Connection) -> QueryResult:
         query_plans=plans,
         rows_scanned=len(rows),
         full_scan_count=full_scans,
+        automatic_index_count=automatic_indexes,
         temporary_sort_count=temporary_sorts,
         oracle_equivalent=True,
         selector_pages_gap_free=True,

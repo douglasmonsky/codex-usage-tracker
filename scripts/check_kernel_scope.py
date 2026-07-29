@@ -217,6 +217,7 @@ CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS = frozenset(
     {
         "docs/INDEX.md",
         "docs/architecture/ADAPTER_CONTRACT.md",
+        "docs/architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md",
         "docs/architecture/LOGICAL_KERNEL_CONTRACT.md",
         "docs/architecture/PHYSICAL_ARCHITECTURE_BAKEOFF.md",
         "docs/architecture/PUBLICATION_REFRESH_RECOVERY.md",
@@ -227,7 +228,9 @@ CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS = frozenset(
         "docs/archive/spike/ALLOWANCE_EFFICIENCY_FINDINGS.md",
         "docs/archive/spike/KERNEL_STABLE_CONTRACT_0_28.md",
         "docs/archive/spike/OVERLAY_ADAPTER_CONTRACT_0_28.md",
+        "docs/decisions/PHYSICAL_ARCHITECTURE_DECISION.md",
         "docs/decisions/PRODUCT_DIRECTION.md",
+        "docs/decisions/evidence/ck04/aggregate-evidence.json",
         "docs/product/AGENT_SETUP_AND_MCP_EXPERIENCE.md",
         "docs/product/SUPPORTED_QUESTION_CONTRACTS.md",
         "docs/quality/QUALIFICATION_PLAN.md",
@@ -391,7 +394,9 @@ DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS = frozenset(
 
 CK04_PHYSICAL_BAKEOFF_ADDITIONS = frozenset(
     {
+        ".gitignore",
         "experiments/physical-architecture/README.md",
+        "experiments/physical-architecture/decision_evidence.py",
         "experiments/physical-architecture/qualification.py",
         "experiments/physical-architecture/run_bakeoff.py",
         "experiments/physical-architecture/shared/__init__.py",
@@ -434,12 +439,17 @@ CK04_PHYSICAL_BAKEOFF_ADDITIONS = frozenset(
         "experiments/physical-architecture/candidate_d/store.py",
         "experiments/physical-architecture/candidate_d/workload.py",
         "tests/experiments/physical-architecture/candidate_a/test_candidate_a.py",
+        "tests/experiments/physical-architecture/candidate_a/test_candidate_a_parser_workers.py",
+        "tests/experiments/physical-architecture/candidate_a/test_candidate_a_query_eligibility.py",
         "tests/experiments/physical-architecture/candidate_a/test_candidate_a_query_hardening.py",
+        "tests/experiments/physical-architecture/candidate_a/test_candidate_a_recovery.py",
         "tests/experiments/physical-architecture/candidate_a/test_candidate_a_tail_hardening.py",
         "tests/experiments/physical-architecture/candidate_c/test_candidate_c.py",
         "tests/experiments/physical-architecture/candidate_d/test_candidate_d.py",
+        "tests/experiments/physical-architecture/test_decision_evidence.py",
         "tests/experiments/physical-architecture/test_bakeoff_runner.py",
         "tests/experiments/physical-architecture/test_shared_harness.py",
+        "tests/agent_kernel/contracts/test_database_v1_schema_contract.py",
     }
 )
 

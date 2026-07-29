@@ -71,6 +71,7 @@ class Adapter:
         )
         index_mode = str(request.case.parameter("index_mode") or "deferred")
         defer_secondary_indexes = index_mode == "deferred"
+        parser_workers = int(request.case.parameter("parser_workers") or 1)
         started = time.perf_counter_ns()
         if request.case.case_id.startswith("build.expand."):
             prior_history = str(request.case.parameter("from_history"))
@@ -78,6 +79,7 @@ class Adapter:
                 request.fixture,
                 request.run_root / "prior.sqlite",
                 history_selection=prior_history,
+                parser_workers=parser_workers,
             )
             artifact = publish_artifact(
                 request.fixture,
@@ -85,6 +87,7 @@ class Adapter:
                 history_selection=history,
                 parent_publication_id=prior.publication_id,
                 defer_secondary_indexes=defer_secondary_indexes,
+                parser_workers=parser_workers,
             )
         elif request.case.case_id == "build.schema_upgrade.unpublished":
             artifact = build_artifact(
@@ -92,6 +95,7 @@ class Adapter:
                 request.run_root / "unpublished.sqlite",
                 history_selection=history,
                 defer_secondary_indexes=defer_secondary_indexes,
+                parser_workers=parser_workers,
             )
         else:
             artifact = publish_artifact(
@@ -99,6 +103,7 @@ class Adapter:
                 request.run_root,
                 history_selection=history,
                 defer_secondary_indexes=defer_secondary_indexes,
+                parser_workers=parser_workers,
             )
         index_maintenance_ns = artifact.stats.index_maintenance_ns
         if index_mode == "rebuilt":
@@ -129,8 +134,10 @@ class Adapter:
             measurements=self._values(
                 artifact,
                 storage,
-                parser_worker_time_ns=elapsed,
-                merge_time_ns=index_maintenance_ns,
+                parser_worker_time_ns=artifact.stats.parser_worker_time_ns,
+                parallel_efficiency_ppm=(artifact.stats.parser_parallel_efficiency_ppm),
+                queue_wait_ns=artifact.stats.parser_queue_wait_ns,
+                merge_time_ns=(artifact.stats.parser_merge_time_ns + index_maintenance_ns),
                 writer_utilization_ppm=1_000_000,
             ),
             publication=self._publication(artifact, prior_queryable=True),
@@ -138,22 +145,19 @@ class Adapter:
                 "schema_id": "codex-usage-tracker.physical-bakeoff.candidate-a.v1",
                 "history_selection": history,
                 "index_mode": index_mode,
-                "secondary_indexes_deferred": (
-                    artifact.stats.secondary_indexes_deferred
-                ),
-                "secondary_indexes_restored": (
-                    artifact.stats.secondary_indexes_restored
-                ),
+                "secondary_indexes_deferred": (artifact.stats.secondary_indexes_deferred),
+                "secondary_indexes_restored": (artifact.stats.secondary_indexes_restored),
                 "staging_journal_mode": artifact.stats.staging_journal_mode,
                 "staging_synchronous": artifact.stats.staging_synchronous,
                 "final_journal_mode": artifact.stats.final_journal_mode,
                 "final_synchronous": artifact.stats.final_synchronous,
-                "durability_transition_ns": (
-                    artifact.stats.durability_transition_ns
-                ),
+                "durability_transition_ns": (artifact.stats.durability_transition_ns),
                 "validation_mode": artifact.stats.validation_mode,
                 "validation_ns": artifact.stats.validation_ns,
-                "parser_workers": request.case.parameter("parser_workers") or 1,
+                "parser_workers": artifact.stats.parser_workers,
+                "parser_tasks_submitted": artifact.stats.parser_tasks_submitted,
+                "parser_queue_capacity": artifact.stats.parser_queue_capacity,
+                "parser_peak_pending": artifact.stats.parser_peak_pending,
                 "writer_mode": request.case.parameter("writer_mode") or "single",
             },
         )
@@ -289,9 +293,14 @@ class Adapter:
     def _query(self, request: shared.CandidateRequest) -> shared.CandidateResult:
         artifact = publish_artifact(request.fixture, request.run_root)
         started = time.perf_counter_ns()
+        plan_stopped = False
         with database(artifact.path, read_only=True) as connection:
             result = self._execute_query_case(connection, request, artifact)
-            if request.case.parameter("repeat") == 2:
+            plan_stopped = self._observe_stop(
+                request,
+                self._query_plan_observations(result),
+            )
+            if not plan_stopped and request.case.parameter("repeat") == 2:
                 repeated = self._execute_query_case(connection, request, artifact)
                 if repeated.encoded != result.encoded:
                     raise ValueError("candidate A repeated query is not deterministic")
@@ -302,16 +311,20 @@ class Adapter:
                     query_plans=result.query_plans + repeated.query_plans,
                     rows_scanned=result.rows_scanned + repeated.rows_scanned,
                     full_scan_count=result.full_scan_count + repeated.full_scan_count,
+                    automatic_index_count=(
+                        result.automatic_index_count + repeated.automatic_index_count
+                    ),
                     temporary_sort_count=(
                         result.temporary_sort_count + repeated.temporary_sort_count
                     ),
-                    oracle_equivalent=(
-                        result.oracle_equivalent and repeated.oracle_equivalent
-                    ),
+                    oracle_equivalent=(result.oracle_equivalent and repeated.oracle_equivalent),
                     selector_pages_gap_free=(
-                        result.selector_pages_gap_free
-                        and repeated.selector_pages_gap_free
+                        result.selector_pages_gap_free and repeated.selector_pages_gap_free
                     ),
+                )
+                plan_stopped = self._observe_stop(
+                    request,
+                    self._query_plan_observations(result),
                 )
         elapsed = time.perf_counter_ns() - started
         storage = artifact_metrics(
@@ -325,6 +338,8 @@ class Adapter:
             server_latency_ns=elapsed,
             mcp_latency_ns=elapsed,
         )
+        if plan_stopped:
+            return self._stopped(request, values)
         maximum_sql_ns = max(result.sql_latencies_ns, default=0)
         if self._observe_stop(
             request,
@@ -343,6 +358,19 @@ class Adapter:
             measurements=values,
             publication=self._publication(artifact, prior_queryable=True),
             oracle_results=result.payload,
+        )
+
+    @staticmethod
+    def _query_plan_observations(
+        result: QueryResult,
+    ) -> tuple[tuple[shared.StopMetric, int], ...]:
+        return (
+            (shared.StopMetric.FULL_SCAN_COUNT, result.full_scan_count),
+            (
+                shared.StopMetric.AUTOMATIC_INDEX_COUNT,
+                result.automatic_index_count,
+            ),
+            (shared.StopMetric.TEMPORARY_SORT_COUNT, result.temporary_sort_count),
         )
 
     def _execute_query_case(
@@ -506,6 +534,8 @@ class Adapter:
         maintenance: MaintenanceStats | None = None,
         query: QueryResult | None = None,
         parser_worker_time_ns: int = 0,
+        parallel_efficiency_ppm: int = 0,
+        queue_wait_ns: int = 0,
         merge_time_ns: int = 0,
         writer_utilization_ppm: int = 0,
         server_latency_ns: int = 0,
@@ -535,7 +565,8 @@ class Adapter:
         return shared.MeasurementValues(
             peak_rss_bytes=storage.peak_rss_bytes,
             parser_worker_time_ns=parser_worker_time_ns,
-            parallel_efficiency_ppm=0,
+            parallel_efficiency_ppm=parallel_efficiency_ppm,
+            queue_wait_ns=queue_wait_ns,
             merge_time_ns=merge_time_ns,
             writer_utilization_ppm=writer_utilization_ppm,
             fact_rows=storage.fact_rows,
@@ -570,9 +601,7 @@ class Adapter:
             projection_rows_written=update.projection_rows_written,
             projection_consumers=projection_consumers,
             sql_latencies_ns=(
-                query_result.sql_latencies_ns
-                if query_result is not None
-                else sql_latencies_ns
+                query_result.sql_latencies_ns if query_result is not None else sql_latencies_ns
             ),
             sql_statements=(
                 len(query_result.sql_latencies_ns)
@@ -580,11 +609,10 @@ class Adapter:
                 else len(sql_latencies_ns)
             ),
             rows_scanned=query_result.rows_scanned if query_result is not None else 0,
-            explain_query_plans=(
-                query_result.query_plans if query_result is not None else ()
-            ),
-            full_scan_count=(
-                query_result.full_scan_count if query_result is not None else 0
+            explain_query_plans=(query_result.query_plans if query_result is not None else ()),
+            full_scan_count=(query_result.full_scan_count if query_result is not None else 0),
+            automatic_index_count=(
+                query_result.automatic_index_count if query_result is not None else 0
             ),
             temporary_sort_count=(
                 query_result.temporary_sort_count if query_result is not None else 0
@@ -592,34 +620,22 @@ class Adapter:
             server_latency_ns=server_latency_ns,
             mcp_latency_ns=mcp_latency_ns,
             response_bytes=(
-                len(query_result.encoded)
-                if query_result is not None
-                else response_bytes or 0
+                len(query_result.encoded) if query_result is not None else response_bytes or 0
             ),
             duplicated_representation_bytes=0,
-            tracker_calls=(
-                1 if query_result is not None else tracker_calls or 0
-            ),
+            tracker_calls=(1 if query_result is not None else tracker_calls or 0),
             tracker_batches=1 if query_result is not None else 0,
             tracker_polls=0,
             tracker_retries=0,
             refresh_jobs=0,
             oracle_equivalent=(
-                query_result.oracle_equivalent
-                if query_result is not None
-                else True
+                query_result.oracle_equivalent if query_result is not None else True
             ),
             selector_pages_gap_free=(
-                query_result.selector_pages_gap_free
-                if query_result is not None
-                else True
+                query_result.selector_pages_gap_free if query_result is not None else True
             ),
             prior_publication_survived=prior_publication_survived,
-            answer_correct=(
-                query_result.oracle_equivalent
-                if query_result is not None
-                else True
-            ),
+            answer_correct=(query_result.oracle_equivalent if query_result is not None else True),
         )
 
 

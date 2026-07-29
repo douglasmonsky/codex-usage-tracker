@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import multiprocessing
 import sqlite3
 import time
-from collections.abc import Callable, Mapping
+from collections import deque
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from concurrent.futures import Future, ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -46,6 +49,8 @@ _SELECTOR_PREFIXES = {
     "turn": "turn",
     "window": "window",
 }
+_MAX_PARSER_WORKERS = 8
+_PENDING_TASKS_PER_WORKER = 2
 
 
 @cache
@@ -140,9 +145,7 @@ def _accumulate_model_effort(
     payload: Mapping[str, Any],
 ) -> None:
     effort = (
-        str(payload["reasoning_effort"])
-        if payload.get("reasoning_effort") is not None
-        else None
+        str(payload["reasoning_effort"]) if payload.get("reasoning_effort") is not None else None
     )
     key = (str(payload["model"]), int(effort is None), effort or "")
     aggregate = accumulator.setdefault(key, _ModelEffortAggregate())
@@ -180,6 +183,15 @@ class IngestStats:
     durability_transition_ns: int = 0
     validation_mode: str = ""
     validation_ns: int = 0
+    parser_workers: int = 1
+    parser_tasks_submitted: int = 0
+    parser_queue_capacity: int = 1
+    parser_peak_pending: int = 0
+    parser_worker_time_ns: int = 0
+    parser_pipeline_time_ns: int = 0
+    parser_queue_wait_ns: int = 0
+    parser_merge_time_ns: int = 0
+    parser_parallel_efficiency_ppm: int = 0
 
 
 @dataclass(frozen=True)
@@ -188,6 +200,25 @@ class BuildArtifact:
     publication_id: str
     observed_through_us: int | None
     stats: IngestStats
+
+
+@dataclass(frozen=True)
+class _ParsedLine:
+    record_type: str | None
+    payload: dict[str, Any] | None
+    coordinate: Coordinate | None
+    record_ordinal: int
+    byte_start: int
+    byte_end: int
+    diagnostic_code: str | None = None
+
+
+@dataclass(frozen=True)
+class _ParsedSource:
+    source_path: str
+    source_bytes: int
+    lines: tuple[_ParsedLine, ...]
+    worker_time_ns: int
 
 
 def _drop_secondary_indexes(connection: sqlite3.Connection) -> tuple[str, ...]:
@@ -289,10 +320,7 @@ def _selected_sources(
     start_us: int,
     end_us: int,
 ) -> tuple[shared.SourceArtifact, ...]:
-    entries = {
-        str(entry["path"]): entry
-        for entry in _source_entries(fixture)
-    }
+    entries = {str(entry["path"]): entry for entry in _source_entries(fixture)}
     selected: list[shared.SourceArtifact] = []
     for source in fixture.sources:
         source_path = source.relative_path.as_posix()
@@ -304,10 +332,7 @@ def _selected_sources(
         if history_selection == "all_time":
             selected.append(source)
             continue
-        if (
-            source.time_range_confidence != "trusted"
-            or source.time_range_hint is None
-        ):
+        if source.time_range_confidence != "trusted" or source.time_range_hint is None:
             selected.append(source)
             continue
         hint_start_us, hint_end_us = source.time_range_hint
@@ -398,6 +423,135 @@ def _record_coordinate(
     )
 
 
+def _validate_parser_workers(parser_workers: int) -> None:
+    if isinstance(parser_workers, bool) or not 1 <= parser_workers <= _MAX_PARSER_WORKERS:
+        raise ValueError(f"candidate A parser_workers must be between 1 and {_MAX_PARSER_WORKERS}")
+
+
+def _parse_source(
+    source: shared.SourceArtifact,
+    source_rank: int,
+) -> _ParsedSource:
+    started = time.process_time_ns()
+    source_path = source.relative_path.as_posix()
+    body = source.absolute_path.read_bytes()
+    parsed_lines: list[_ParsedLine] = []
+    byte_start = 0
+    for ordinal, line in enumerate(body.splitlines(keepends=True)):
+        byte_end = byte_start + len(line)
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            parsed_lines.append(
+                _ParsedLine(
+                    record_type=None,
+                    payload=None,
+                    coordinate=None,
+                    record_ordinal=ordinal,
+                    byte_start=byte_start,
+                    byte_end=byte_end,
+                    diagnostic_code="malformed_json",
+                )
+            )
+            byte_start = byte_end
+            continue
+        if not isinstance(record, dict) or not isinstance(record.get("payload"), dict):
+            raise ValueError(f"candidate A source record is invalid: {source_path}")
+        parsed_lines.append(
+            _ParsedLine(
+                record_type=str(record["type"]),
+                payload=record["payload"],
+                coordinate=_record_coordinate(
+                    source=source,
+                    source_rank=source_rank,
+                    record=record,
+                    ordinal=ordinal,
+                    byte_start=byte_start,
+                    byte_end=byte_end,
+                ),
+                record_ordinal=ordinal,
+                byte_start=byte_start,
+                byte_end=byte_end,
+            )
+        )
+        byte_start = byte_end
+    return _ParsedSource(
+        source_path=source_path,
+        source_bytes=source.byte_count,
+        lines=tuple(parsed_lines),
+        worker_time_ns=time.process_time_ns() - started,
+    )
+
+
+def _submit_parse_task(
+    executor: ProcessPoolExecutor,
+    source: shared.SourceArtifact,
+    ranks: Mapping[str, int],
+    stats: IngestStats,
+) -> Future[_ParsedSource]:
+    source_path = source.relative_path.as_posix()
+    stats.parser_tasks_submitted += 1
+    return executor.submit(_parse_source, source, ranks[source_path])
+
+
+def _iter_parsed_sources(
+    sources: Sequence[shared.SourceArtifact],
+    ranks: Mapping[str, int],
+    *,
+    parser_workers: int,
+    stats: IngestStats,
+) -> Iterator[_ParsedSource]:
+    stats.parser_workers = parser_workers
+    if not sources:
+        stats.parser_queue_capacity = 0
+        return
+    if parser_workers == 1:
+        stats.parser_queue_capacity = 1
+        for source in sources:
+            stats.parser_tasks_submitted += 1
+            stats.parser_peak_pending = 1
+            parsed = _parse_source(
+                source,
+                ranks[source.relative_path.as_posix()],
+            )
+            stats.parser_worker_time_ns += parsed.worker_time_ns
+            yield parsed
+        return
+
+    queue_capacity = min(
+        len(sources),
+        parser_workers * _PENDING_TASKS_PER_WORKER,
+    )
+    stats.parser_queue_capacity = queue_capacity
+    source_iterator = iter(sources)
+    spawn_context = multiprocessing.get_context("spawn")
+    with ProcessPoolExecutor(
+        max_workers=parser_workers,
+        mp_context=spawn_context,
+    ) as executor:
+        pending: deque[Future[_ParsedSource]] = deque()
+        for _ in range(queue_capacity):
+            source = next(source_iterator, None)
+            if source is None:
+                break
+            pending.append(_submit_parse_task(executor, source, ranks, stats))
+        stats.parser_peak_pending = len(pending)
+        while pending:
+            future = pending.popleft()
+            wait_started = time.perf_counter_ns()
+            parsed = future.result()
+            stats.parser_queue_wait_ns += time.perf_counter_ns() - wait_started
+            stats.parser_worker_time_ns += parsed.worker_time_ns
+            replacement = next(source_iterator, None)
+            if replacement is not None:
+                pending.append(_submit_parse_task(executor, replacement, ranks, stats))
+                stats.parser_peak_pending = max(
+                    stats.parser_peak_pending,
+                    len(pending),
+                )
+            yield parsed
+
+
 def _selector(payload: Mapping[str, Any]) -> str:
     selector_kind = str(payload["selector_kind"])
     try:
@@ -423,28 +577,33 @@ def _observation_id(payload: Mapping[str, Any], coordinate: Coordinate) -> str:
     return f"allowance-observation:observed:{digest}"
 
 
-def _question_expected(
+def _question_expected_digest(
     fixture: shared.FixtureBundle,
     oracle_id: str,
     coordinate: Coordinate,
-) -> tuple[str, str, str]:
+    *,
+    question_id: str,
+    variant: str,
+) -> str:
     questions = fixture.oracle.get("questions")
     if not isinstance(questions, Mapping):
         raise ValueError("fixture question oracle is missing")
     question = questions.get(oracle_id)
     if not isinstance(question, Mapping):
         raise ValueError(f"fixture question oracle is missing {oracle_id}")
+    if question.get("question_id") != question_id or question.get("variant") != variant:
+        raise ValueError(f"candidate A source/oracle identity mismatch: {oracle_id}")
     expected = question.get("expected")
     if not isinstance(expected, Mapping):
         raise ValueError(f"fixture expected result is missing {oracle_id}")
     expected_row = _thaw(expected.get("row"))
     if isinstance(expected_row, dict) and "occurrence_coordinates" in expected_row:
         expected_row["occurrence_coordinates"] = [coordinate.oracle_coordinate()]
-    return (
-        str(question["question_id"]),
-        str(question["variant"]),
-        shared.canonical_sha256(expected_row),
-    )
+    return shared.canonical_sha256(expected_row)
+
+
+def _canonical_json_text(value: object) -> str:
+    return shared.canonical_json_bytes(value).decode("utf-8").removesuffix("\n")
 
 
 def _insert_record(
@@ -574,11 +733,7 @@ def _insert_record(
                     if tokens.get("reasoning_tokens") is not None
                     else None
                 ),
-                (
-                    int(tokens["output_tokens"])
-                    if tokens.get("output_tokens") is not None
-                    else None
-                ),
+                (int(tokens["output_tokens"]) if tokens.get("output_tokens") is not None else None),
                 *coordinate.compact_values(),
             ),
         ).rowcount
@@ -730,15 +885,12 @@ def _insert_record(
         ).rowcount
     elif record_type == "allowance_compatibility":
         compatibility = payload["compatibility_tuple"]
-        compatibility_id = (
-            "allowance-compatibility:"
-            + shared.canonical_sha256(
-                {
-                    "start": payload["start_observation_id"],
-                    "end": payload["end_observation_id"],
-                    "tuple": _thaw(compatibility),
-                }
-            )
+        compatibility_id = "allowance-compatibility:" + shared.canonical_sha256(
+            {
+                "start": payload["start_observation_id"],
+                "end": payload["end_observation_id"],
+                "tuple": _thaw(compatibility),
+            }
         )
         inserted += connection.execute(
             """
@@ -787,26 +939,60 @@ def _insert_record(
         ).rowcount
     elif record_type == "oracle_case":
         oracle_id = str(payload["oracle_id"])
-        question_id, variant, expected_digest = _question_expected(
+        question_id = str(payload["question_id"])
+        variant = str(payload["variant"])
+        contract = payload.get("contract")
+        answer_grades = contract.get("answer_grades") if isinstance(contract, Mapping) else None
+        selector_ids = payload.get("selector_ids")
+        caveats = payload.get("caveats")
+        if (
+            not isinstance(contract, Mapping)
+            or not isinstance(answer_grades, Mapping)
+            or not isinstance(selector_ids, Mapping)
+            or not isinstance(caveats, Sequence)
+            or isinstance(caveats, (str, bytes))
+        ):
+            raise ValueError(f"candidate A question source contract is invalid: {oracle_id}")
+        expected_digest = _question_expected_digest(
             fixture,
             oracle_id,
             coordinate,
+            question_id=question_id,
+            variant=variant,
         )
-        observed = _thaw(payload["observed_facts"])
-        if isinstance(observed, dict) and "occurrence_coordinates" in observed:
-            observed["occurrence_coordinates"] = [coordinate.oracle_coordinate()]
-        if shared.canonical_sha256(observed) != expected_digest:
+        source_observed = _thaw(payload["observed_facts"])
+        if not isinstance(source_observed, dict):
+            raise ValueError(f"candidate A question facts are invalid: {oracle_id}")
+        compared_observed = dict(source_observed)
+        if "occurrence_coordinates" in compared_observed:
+            compared_observed["occurrence_coordinates"] = [coordinate.oracle_coordinate()]
+        if shared.canonical_sha256(compared_observed) != expected_digest:
             raise ValueError(f"candidate A source/oracle mismatch: {oracle_id}")
         inserted += connection.execute(
             """
             INSERT OR IGNORE INTO question_cases(
-                oracle_id, question_id, variant, expected_digest, event_at_us,
-                source_rank, source_order, event_kind_order, manifestation_id,
+                oracle_id, question_id, variant, plan_id,
+                observed_facts_json, answer_grades_json, selector_ids_json,
+                caveats_json, expected_digest, event_at_us, source_rank,
+                source_order, event_kind_order, manifestation_id,
                 source_revision, adapter_version, source_path, record_ordinal,
                 byte_start, byte_end
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
             """,
-            (oracle_id, question_id, variant, expected_digest, *coordinate.values()),
+            (
+                oracle_id,
+                question_id,
+                variant,
+                str(contract["plan_id"]),
+                _canonical_json_text(source_observed),
+                _canonical_json_text(_thaw(answer_grades)),
+                _canonical_json_text(_thaw(selector_ids)),
+                _canonical_json_text(_thaw(caveats)),
+                expected_digest,
+                *coordinate.values(),
+            ),
         ).rowcount
     return inserted, updated
 
@@ -888,9 +1074,7 @@ def _refresh_projections(
             )
         ),
     )
-    accumulated_calls = sum(
-        aggregate.calls for aggregate in model_effort_accumulator.values()
-    )
+    accumulated_calls = sum(aggregate.calls for aggregate in model_effort_accumulator.values())
     canonical_calls = int(
         connection.execute("SELECT count(*) FROM model_calls_visible").fetchone()[0]
     )
@@ -1023,9 +1207,7 @@ def _refresh_evidence_page_anchors(connection: sqlite3.Connection) -> int:
         iter_evidence_page_anchors(connection),
     )
     return int(
-        connection.execute(
-            "SELECT count(*) FROM evidence_page_anchor_current"
-        ).fetchone()[0]
+        connection.execute("SELECT count(*) FROM evidence_page_anchor_current").fetchone()[0]
     )
 
 
@@ -1053,23 +1235,19 @@ def build_artifact(
     parent_publication_id: str | None = None,
     hook: Callable[[str], None] | None = None,
     defer_secondary_indexes: bool = True,
+    parser_workers: int = 1,
 ) -> BuildArtifact:
+    _validate_parser_workers(parser_workers)
     connection = create_database(path, unpublished_staging=True)
     stats = IngestStats()
     model_effort_accumulator: _ModelEffortAccumulator = {}
-    stats.staging_journal_mode = str(
-        connection.execute("PRAGMA journal_mode").fetchone()[0]
-    )
-    stats.staging_synchronous = int(
-        connection.execute("PRAGMA synchronous").fetchone()[0]
-    )
+    stats.staging_journal_mode = str(connection.execute("PRAGMA journal_mode").fetchone()[0])
+    stats.staging_synchronous = int(connection.execute("PRAGMA synchronous").fetchone()[0])
     try:
         if defer_secondary_indexes:
             index_drop_started = time.perf_counter_ns()
             deferred_index_sql = _drop_secondary_indexes(connection)
-            stats.index_maintenance_ns += (
-                time.perf_counter_ns() - index_drop_started
-            )
+            stats.index_maintenance_ns += time.perf_counter_ns() - index_drop_started
             stats.secondary_indexes_deferred = len(deferred_index_sql)
         else:
             deferred_index_sql = ()
@@ -1080,10 +1258,7 @@ def build_artifact(
             start_us=start_us,
             end_us=end_us,
         )
-        selected_paths = frozenset(
-            source.relative_path.as_posix()
-            for source in selected_sources
-        )
+        selected_paths = frozenset(source.relative_path.as_posix() for source in selected_sources)
         connection.execute("BEGIN IMMEDIATE")
         ranks = _insert_manifestations(
             connection,
@@ -1093,17 +1268,26 @@ def build_artifact(
         )
         parse_hook_called = False
         fact_hook_called = False
-        for source in selected_sources:
+        parser_pipeline_started = time.perf_counter_ns()
+        parsed_sources = _iter_parsed_sources(
+            selected_sources,
+            ranks,
+            parser_workers=parser_workers,
+            stats=stats,
+        )
+        for source, parsed_source in zip(
+            selected_sources,
+            parsed_sources,
+            strict=True,
+        ):
             source_path = source.relative_path.as_posix()
+            if parsed_source.source_path != source_path:
+                raise ValueError("candidate A parser merge order changed")
             stats.source_files_parsed += 1
-            stats.source_bytes_parsed += source.byte_count
-            body = source.absolute_path.read_bytes()
-            byte_start = 0
-            for ordinal, line in enumerate(body.splitlines(keepends=True)):
-                byte_end = byte_start + len(line)
-                try:
-                    record = json.loads(line)
-                except json.JSONDecodeError:
+            stats.source_bytes_parsed += parsed_source.source_bytes
+            merge_started = time.perf_counter_ns()
+            for parsed_line in parsed_source.lines:
+                if parsed_line.diagnostic_code is not None:
                     connection.execute(
                         """
                         INSERT INTO source_diagnostics(
@@ -1113,31 +1297,23 @@ def build_artifact(
                         """,
                         (
                             source_path,
-                            ordinal,
-                            byte_start,
-                            byte_end,
-                            "malformed_json",
+                            parsed_line.record_ordinal,
+                            parsed_line.byte_start,
+                            parsed_line.byte_end,
+                            parsed_line.diagnostic_code,
                         ),
                     )
                     stats.diagnostic_rows += 1
-                    byte_start = byte_end
                     continue
-                if not isinstance(record, dict) or not isinstance(record.get("payload"), dict):
-                    raise ValueError(f"candidate A source record is invalid: {source_path}")
-                coordinate = _record_coordinate(
-                    source=source,
-                    source_rank=ranks[source_path],
-                    record=record,
-                    ordinal=ordinal,
-                    byte_start=byte_start,
-                    byte_end=byte_end,
-                )
+                coordinate = parsed_line.coordinate
+                payload = parsed_line.payload
+                record_type = parsed_line.record_type
+                if coordinate is None or payload is None or record_type is None:
+                    raise ValueError("candidate A parser emitted an incomplete record")
                 if hook is not None and not parse_hook_called:
                     parse_hook_called = True
                     hook("during_parse")
                 stats.occurrence_rows += 1
-                payload = record["payload"]
-                record_type = str(record["type"])
                 canonical = source.state != "archived"
                 if canonical and _selected(
                     record_type,
@@ -1162,7 +1338,19 @@ def build_artifact(
                     stats.facts_updated += updated
                     if inserted == 0 and updated == 0:
                         stats.facts_unchanged += 1
-                byte_start = byte_end
+            stats.parser_merge_time_ns += time.perf_counter_ns() - merge_started
+        stats.parser_pipeline_time_ns = time.perf_counter_ns() - parser_pipeline_started
+        stats.parser_parallel_efficiency_ppm = min(
+            1_000_000,
+            (
+                stats.parser_worker_time_ns
+                * 1_000_000
+                // max(
+                    1,
+                    stats.parser_pipeline_time_ns * stats.parser_workers,
+                )
+            ),
+        )
         if hook is not None:
             hook("after_facts_before_projections")
         projection_rows = _refresh_projections(
@@ -1246,15 +1434,9 @@ def build_artifact(
         connection.execute("PRAGMA optimize")
         durability_started = time.perf_counter_ns()
         finalize_unpublished_database(connection)
-        stats.durability_transition_ns = (
-            time.perf_counter_ns() - durability_started
-        )
-        stats.final_journal_mode = str(
-            connection.execute("PRAGMA journal_mode").fetchone()[0]
-        )
-        stats.final_synchronous = int(
-            connection.execute("PRAGMA synchronous").fetchone()[0]
-        )
+        stats.durability_transition_ns = time.perf_counter_ns() - durability_started
+        stats.final_journal_mode = str(connection.execute("PRAGMA journal_mode").fetchone()[0])
+        stats.final_synchronous = int(connection.execute("PRAGMA synchronous").fetchone()[0])
         stats.validation_mode = "prepublication"
         validation_started = time.perf_counter_ns()
         validate_database(connection, mode="prepublication")

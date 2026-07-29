@@ -10,6 +10,8 @@
     "{output_root}"
   ],
   "environment": {
+    "CANDIDATE_A_PARSER_WORKERS": "1",
+    "CANDIDATE_A_PHYSICAL_CORES": "10",
     "PYTHONHASHSEED": "0",
     "PYTHONPATH": "experiments/physical-architecture"
   },
@@ -23,5 +25,5 @@
   "synthetic_only": true,
   "version": 1,
   "workload_id": "build.scale.standard",
-  "workload_matrix_digest": "b20ee7ca86c53e80b90f6b6093c7412ac3379aa14edcf2d68aac4e3cbd2abe71"
+  "workload_matrix_digest": "d6059274027d4fb9bfe286ef0932142c49f00e4a6a6e7badb6585ebc44edfb11"
 }

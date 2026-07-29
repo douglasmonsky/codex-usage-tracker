@@ -245,10 +245,19 @@ def _unsafe_cases() -> Iterable[WorkloadCase]:
         )
 
 
-def _query_limits(performance_class: str) -> tuple[MetricLimit, ...]:
+def _query_limits(
+    performance_class: str,
+    *,
+    maximum_full_scans: int = 0,
+    maximum_automatic_indexes: int = 0,
+    maximum_temporary_sorts: int = 0,
+) -> tuple[MetricLimit, ...]:
     return (
         MetricLimit(StopMetric.SQL_LATENCY_MS, _SQL_LIMITS_MS[performance_class]),
         MetricLimit(StopMetric.MCP_LATENCY_MS, _MCP_LIMITS_MS[performance_class]),
+        MetricLimit(StopMetric.FULL_SCAN_COUNT, maximum_full_scans),
+        MetricLimit(StopMetric.AUTOMATIC_INDEX_COUNT, maximum_automatic_indexes),
+        MetricLimit(StopMetric.TEMPORARY_SORT_COUNT, maximum_temporary_sorts),
         MetricLimit(StopMetric.RESPONSE_BYTES, 16_384),
         MetricLimit(
             StopMetric.TRACKER_CALLS,
@@ -271,6 +280,9 @@ def _query_cases() -> Iterable[WorkloadCase]:
                 WorkloadGroup.QUERY,
                 _parameters(
                     **mode_parameters,
+                    maximum_automatic_indexes=0,
+                    maximum_full_scans=0,
+                    maximum_temporary_sorts=0,
                     mode=mode,
                     performance_class=performance_class,
                     plan_id=plan_id,
@@ -283,6 +295,10 @@ def _query_cases() -> Iterable[WorkloadCase]:
             "exact_count",
             {
                 "exact_count": True,
+                "maximum_automatic_indexes": 0,
+                "maximum_full_scans": 13,
+                "maximum_temporary_sorts": 0,
+                "plan_allowance_reason": ("explicit_exact_count_across_13_evidence_domains"),
                 "performance_class": "P3",
                 "plan_id": "evidence_timeline",
                 "question_id": "Q-OPS-04",
@@ -291,6 +307,9 @@ def _query_cases() -> Iterable[WorkloadCase]:
         (
             "rate_card_replacement",
             {
+                "maximum_automatic_indexes": 0,
+                "maximum_full_scans": 0,
+                "maximum_temporary_sorts": 0,
                 "performance_class": "P1",
                 "plan_id": "top_valued_entities",
                 "question_id": "Q-ACC-06",
@@ -300,6 +319,10 @@ def _query_cases() -> Iterable[WorkloadCase]:
         (
             "selected_session_timeline",
             {
+                "maximum_automatic_indexes": 0,
+                "maximum_full_scans": 0,
+                "maximum_temporary_sorts": 6,
+                "plan_allowance_reason": ("selector_scoped_merge_over_at_most_11_rows_per_stream"),
                 "performance_class": "P3",
                 "plan_id": "evidence_timeline",
                 "question_id": "Q-OPS-04",
@@ -309,6 +332,9 @@ def _query_cases() -> Iterable[WorkloadCase]:
         (
             "top_n_ties",
             {
+                "maximum_automatic_indexes": 0,
+                "maximum_full_scans": 0,
+                "maximum_temporary_sorts": 0,
                 "performance_class": "P1",
                 "plan_id": "top_sessions",
                 "question_id": "Q-ACC-02",
@@ -318,6 +344,10 @@ def _query_cases() -> Iterable[WorkloadCase]:
         (
             "bounded_full_sort",
             {
+                "maximum_automatic_indexes": 0,
+                "maximum_full_scans": 1,
+                "maximum_temporary_sorts": 1,
+                "plan_allowance_reason": ("scan_and_complete_sort_over_at_most_100_admitted_rows"),
                 "performance_class": "P2",
                 "plan_id": "all_admitted_bounded_domains",
                 "sort": "complete_server_side",
@@ -326,17 +356,28 @@ def _query_cases() -> Iterable[WorkloadCase]:
     )
     for feature, parameters in feature_parameters:
         performance_class = str(parameters["performance_class"])
+        maximum_full_scans = int(parameters["maximum_full_scans"])
+        maximum_automatic_indexes = int(parameters["maximum_automatic_indexes"])
+        maximum_temporary_sorts = int(parameters["maximum_temporary_sorts"])
         yield WorkloadCase(
             f"query.feature.{feature}",
             WorkloadGroup.QUERY,
             _parameters(**parameters),
-            _query_limits(performance_class),
+            _query_limits(
+                performance_class,
+                maximum_full_scans=maximum_full_scans,
+                maximum_automatic_indexes=maximum_automatic_indexes,
+                maximum_temporary_sorts=maximum_temporary_sorts,
+            ),
         )
     for position in (10, 100, 1_000, 10_000):
         yield WorkloadCase(
             f"query.deep_keyset.page_{position}",
             WorkloadGroup.QUERY,
             _parameters(
+                maximum_automatic_indexes=0,
+                maximum_full_scans=0,
+                maximum_temporary_sorts=0,
                 page_position=position,
                 pagination="keyset",
                 performance_class="P3",

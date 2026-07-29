@@ -16,6 +16,7 @@ class StopMetric(str, Enum):
     WAL_BYTES = "wal_bytes"
     PEAK_RSS_BYTES = "peak_rss_bytes"
     FULL_SCAN_COUNT = "full_scan_count"
+    AUTOMATIC_INDEX_COUNT = "automatic_index_count"
     TEMPORARY_SORT_COUNT = "temporary_sort_count"
     WRITER_LOCK_MS = "writer_lock_ms"
     PROJECTION_FANOUT = "projection_fanout"

@@ -66,6 +66,12 @@ Pass `--retain-run-artifacts` only for a bounded diagnostic that genuinely needs
 generated candidate database; the retention choice is recorded in both invocation and
 summary artifacts.
 
+Raw qualification output belongs under
+`experiments/physical-architecture/.measurements/`, which is ignored by Git. The accepted
+decision commits only bounded canonical manifests containing the exact input and output
+hashes, environment identity, score calculation, sensitivity results, approved query-plan
+exceptions, crash observations, and research-lane metrics needed to audit the selection.
+
 ## Publication failures
 
 `PublicationCrashDriver` is the process-control seam. The driver launches and terminates its

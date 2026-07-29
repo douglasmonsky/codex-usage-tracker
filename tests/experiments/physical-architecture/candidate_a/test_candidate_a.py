@@ -89,9 +89,7 @@ def test_schema_is_typed_compact_and_deduplicated(
     with database(artifact.path, read_only=True) as connection:
         tables = {
             str(row["name"])
-            for row in connection.execute(
-                "SELECT name FROM sqlite_schema WHERE type='table'"
-            )
+            for row in connection.execute("SELECT name FROM sqlite_schema WHERE type='table'")
         }
         assert "events" not in tables
         assert "sequence" not in tables
@@ -140,16 +138,12 @@ def test_schema_is_typed_compact_and_deduplicated(
         }.intersection(tool_columns)
 
         assert (
-            connection.execute(
-                "SELECT count(*) FROM model_calls_visible"
-            ).fetchone()[0]
+            connection.execute("SELECT count(*) FROM model_calls_visible").fetchone()[0]
             == expected_counts["model_calls"]
             == 100
         )
         assert (
-            connection.execute(
-                "SELECT count(*) FROM tool_invocations"
-            ).fetchone()[0]
+            connection.execute("SELECT count(*) FROM tool_invocations").fetchone()[0]
             == expected_counts["tool_invocations"]
         )
         model_columns = _table_columns(connection, "model_calls")
@@ -227,9 +221,7 @@ def test_recent_history_prunes_only_nonoverlapping_trusted_sources(
 
     with database(artifact.path, read_only=True) as connection:
         assert (
-            connection.execute(
-                "SELECT count(*) FROM model_calls_visible"
-            ).fetchone()[0]
+            connection.execute("SELECT count(*) FROM model_calls_visible").fetchone()[0]
             == fixture.manifest["history"]["selections"]["30_days"]["calls"]
             == 4
         )
@@ -274,11 +266,7 @@ def test_source_hint_half_open_interval_against_closed_history_window(
     window = fixture.manifest["history"]["windows"]["30_days"]
     start_us = int(window["start_us"])
     end_us = int(window["end_us"])
-    source = next(
-        item
-        for item in fixture.sources
-        if item.time_range_confidence == "trusted"
-    )
+    source = next(item for item in fixture.sources if item.time_range_confidence == "trusted")
 
     def is_selected(
         *,
@@ -332,9 +320,7 @@ def test_default_initial_build_defers_and_restores_indexes_before_publication(
         connection: Any,
         statements: tuple[str, ...],
     ) -> int:
-        assert connection.execute(
-            "SELECT count(*) FROM publications"
-        ).fetchone()[0] == 0
+        assert connection.execute("SELECT count(*) FROM publications").fetchone()[0] == 0
         elapsed_ns = original_restore(connection, statements)
         events.append(("restore", len(statements)))
         return elapsed_ns
@@ -363,13 +349,16 @@ def test_default_initial_build_defers_and_restores_indexes_before_publication(
     assert artifact.stats.index_maintenance_ns > 0
     with database(artifact.path, read_only=True) as connection:
         schema_module.validate_database(connection)
-        assert connection.execute(
-            """
+        assert (
+            connection.execute(
+                """
             SELECT count(*)
             FROM sqlite_schema
             WHERE type = 'index' AND sql IS NOT NULL
             """
-        ).fetchone()[0] == events[1][1]
+            ).fetchone()[0]
+            == events[1][1]
+        )
 
 
 def test_unpublished_build_uses_disposable_io_then_restores_normal_wal(
@@ -420,13 +409,16 @@ def test_unpublished_build_uses_disposable_io_then_restores_normal_wal(
     assert artifact.stats.validation_ns > 0
     with database(artifact.path, read_only=True) as connection:
         assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
-        assert connection.execute(
-            """
+        assert (
+            connection.execute(
+                """
             SELECT value
             FROM metadata
             WHERE key = 'prepublication_validation'
             """
-        ).fetchone()[0] == "quick_check+foreign_key_check+schema_metadata"
+            ).fetchone()[0]
+            == "quick_check+foreign_key_check+schema_metadata"
+        )
         schema_module.validate_database(connection)
     with database(artifact.path) as connection:
         assert connection.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
@@ -613,9 +605,7 @@ def test_prepublication_validation_rejects_metadata_drift(
 ) -> None:
     _, artifact = built
     with database(artifact.path) as connection:
-        connection.execute(
-            "UPDATE metadata SET value='wrong' WHERE key='schema_id'"
-        )
+        connection.execute("UPDATE metadata SET value='wrong' WHERE key='schema_id'")
         connection.commit()
         assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
         with pytest.raises(ValueError, match="schema identity mismatch"):
@@ -669,9 +659,9 @@ def test_deferred_default_is_deterministic_and_oracle_equivalent_to_present(
         defer_secondary_indexes=False,
     )
 
-    assert ingest_module.file_sha256(
-        default_first.path
-    ) == ingest_module.file_sha256(default_second.path)
+    assert ingest_module.file_sha256(default_first.path) == ingest_module.file_sha256(
+        default_second.path
+    )
     with (
         database(default_first.path, read_only=True) as first_connection,
         database(default_second.path, read_only=True) as second_connection,
@@ -689,18 +679,16 @@ def test_deferred_default_is_deterministic_and_oracle_equivalent_to_present(
         database(default_first.path, read_only=True) as default_connection,
         database(present.path, read_only=True) as present_connection,
     ):
-        for table, expected in fixture.oracle["accounting"][
-            "canonical_counts"
-        ].items():
-            assert default_connection.execute(
-                f'SELECT count(*) FROM "{table}"'
-            ).fetchone()[0] == present_connection.execute(
-                f'SELECT count(*) FROM "{table}"'
-            ).fetchone()[0]
+        for table, expected in fixture.oracle["accounting"]["canonical_counts"].items():
+            assert (
+                default_connection.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0]
+                == present_connection.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0]
+            )
             if table in {"model_calls", "tool_invocations", "turns"}:
-                assert default_connection.execute(
-                    f'SELECT count(*) FROM "{table}"'
-                ).fetchone()[0] == expected
+                assert (
+                    default_connection.execute(f'SELECT count(*) FROM "{table}"').fetchone()[0]
+                    == expected
+                )
 
 
 def test_evidence_merge_is_gap_free_stable_and_keyset_paginated(
@@ -736,14 +724,8 @@ def test_evidence_merge_is_gap_free_stable_and_keyset_paginated(
         assert page.full_scan_count == 0
         assert page.temporary_sort_count == 0
         assert page.query_plans
-        assert any(
-            "source_manifestations_by_occurrence_key" in plan
-            for plan in page.query_plans
-        )
-        assert not any(
-            plan.startswith("SCAN source_manifestations")
-            for plan in page.query_plans
-        )
+        assert any("source_manifestations_by_occurrence_key" in plan for plan in page.query_plans)
+        assert not any(plan.startswith("SCAN source_manifestations") for plan in page.query_plans)
 
         tampered = ("A" if page.next_cursor[0] != "A" else "B") + page.next_cursor[1:]
         with pytest.raises(EvidenceContractError, match="signature"):
@@ -788,19 +770,13 @@ def test_ordinary_changes_are_incremental_and_preserve_lifecycle_semantics(
     )
     with database(artifact.path, read_only=True) as connection:
         call_count_before = int(
-            connection.execute(
-                "SELECT count(*) FROM model_calls_visible"
-            ).fetchone()[0]
+            connection.execute("SELECT count(*) FROM model_calls_visible").fetchone()[0]
         )
         minimum_event_before = int(
-            connection.execute(
-                "SELECT min(event_at_us) FROM model_calls_visible"
-            ).fetchone()[0]
+            connection.execute("SELECT min(event_at_us) FROM model_calls_visible").fetchone()[0]
         )
         tool_count_before = int(
-            connection.execute(
-                "SELECT count(*) FROM tool_invocations"
-            ).fetchone()[0]
+            connection.execute("SELECT count(*) FROM tool_invocations").fetchone()[0]
         )
         open_tools_before = int(
             connection.execute(
@@ -816,9 +792,7 @@ def test_ordinary_changes_are_incremental_and_preserve_lifecycle_semantics(
     with database(artifact.path, read_only=True) as connection:
         if change == "tool_terminal_transition":
             assert (
-                connection.execute(
-                    "SELECT count(*) FROM tool_invocations"
-                ).fetchone()[0]
+                connection.execute("SELECT count(*) FROM tool_invocations").fetchone()[0]
                 == tool_count_before
             )
             assert open_tools_before == 1
@@ -847,18 +821,14 @@ def test_ordinary_changes_are_incremental_and_preserve_lifecycle_semantics(
             assert row["causal_attribution"] is None
         elif change == "2000_call_tail":
             assert (
-                connection.execute(
-                    "SELECT count(*) FROM model_calls_visible"
-                ).fetchone()[0]
+                connection.execute("SELECT count(*) FROM model_calls_visible").fetchone()[0]
                 == call_count_before + 2_000
             )
             assert stats.facts_inserted == 2_000
             assert stats.dirty_keys == 6
         elif change == "late_event":
             assert (
-                connection.execute(
-                    "SELECT min(event_at_us) FROM model_calls_visible"
-                ).fetchone()[0]
+                connection.execute("SELECT min(event_at_us) FROM model_calls_visible").fetchone()[0]
                 == minimum_event_before - 1
             )
 
@@ -875,9 +845,7 @@ def test_source_phases_and_selectors_reconcile_on_clean_rebuild(
         for phase_artifact in fixture.phases:
             expected = tuple(
                 str(json.loads(line)["payload"]["occurrence_id"])
-                for line in phase_artifact.absolute_path.read_text(
-                    encoding="utf-8"
-                ).splitlines()
+                for line in phase_artifact.absolute_path.read_text(encoding="utf-8").splitlines()
             )
             actual = apply_source_phase(
                 connection,
@@ -930,7 +898,7 @@ def test_all_mandatory_workloads_pass_with_only_optional_writer_unsupported(
             assert result.measurements.response_bytes <= 16_384
             assert result.measurements.duplicated_representation_bytes == 0
 
-    assert results["build.index.present"].measurements.merge_time_ns == 0
+    assert results["build.index.present"].measurements.merge_time_ns > 0
     assert results["build.index.deferred"].measurements.merge_time_ns > 0
     assert results["build.index.rebuilt"].measurements.merge_time_ns > 0
     default_build = results["build.scale.tiny"]

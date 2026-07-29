@@ -231,11 +231,14 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         for path in CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS
         if path.startswith("docs/roadmap/tasks/")
     }
-    assert len(CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS) == 37
+    assert len(CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS) == 40
     assert len(task_packets) == 17
     assert {
         "docs/INDEX.md",
+        "docs/architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md",
+        "docs/decisions/PHYSICAL_ARCHITECTURE_DECISION.md",
         "docs/decisions/PRODUCT_DIRECTION.md",
+        "docs/decisions/evidence/ck04/aggregate-evidence.json",
         "docs/product/SUPPORTED_QUESTION_CONTRACTS.md",
         "docs/architecture/LOGICAL_KERNEL_CONTRACT.md",
         "docs/quality/QUALIFICATION_PLAN.md",
@@ -355,7 +358,9 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tools/gitnexus/package.json",
     } == DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
     assert {
+        ".gitignore",
         "experiments/physical-architecture/README.md",
+        "experiments/physical-architecture/decision_evidence.py",
         "experiments/physical-architecture/qualification.py",
         "experiments/physical-architecture/run_bakeoff.py",
         "experiments/physical-architecture/shared/__init__.py",
@@ -398,10 +403,17 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "experiments/physical-architecture/candidate_d/store.py",
         "experiments/physical-architecture/candidate_d/workload.py",
         "tests/experiments/physical-architecture/candidate_a/test_candidate_a.py",
+        "tests/experiments/physical-architecture/candidate_a/test_candidate_a_parser_workers.py",
+        "tests/experiments/physical-architecture/candidate_a/test_candidate_a_query_eligibility.py",
+        "tests/experiments/physical-architecture/candidate_a/test_candidate_a_query_hardening.py",
+        "tests/experiments/physical-architecture/candidate_a/test_candidate_a_recovery.py",
+        "tests/experiments/physical-architecture/candidate_a/test_candidate_a_tail_hardening.py",
         "tests/experiments/physical-architecture/candidate_c/test_candidate_c.py",
         "tests/experiments/physical-architecture/candidate_d/test_candidate_d.py",
+        "tests/experiments/physical-architecture/test_decision_evidence.py",
         "tests/experiments/physical-architecture/test_bakeoff_runner.py",
         "tests/experiments/physical-architecture/test_shared_harness.py",
+        "tests/agent_kernel/contracts/test_database_v1_schema_contract.py",
     } == CK04_PHYSICAL_BAKEOFF_ADDITIONS
     assert {
         ".github/workflows/performance-qualification.yml",

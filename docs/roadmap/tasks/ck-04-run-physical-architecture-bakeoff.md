@@ -1,6 +1,6 @@
 # CK-04 — Run A/C/D physical bake-off and decide
 
-**Status:** Not started
+**Status:** In progress
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -58,3 +58,23 @@ shared harness is frozen. One integrator owns shared files and scoring.
 3. `perf: implement candidate c`
 4. `perf: implement candidate d`
 5. `docs: select agent-kernel physical architecture`
+
+## Execution record
+
+**Status:** Remediation implemented; clean requalification pending
+**Provisional direction:** Candidate A mechanisms
+**Decision:** [PHYSICAL_ARCHITECTURE_DECISION.md](../../decisions/PHYSICAL_ARCHITECTURE_DECISION.md)
+**Production schema contract:** [AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md](../../architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md)
+
+The final read-only review identified seven accepted gaps in the first
+qualification pass. Candidate A now has real crash/recovery execution,
+database-derived query answers, per-case planner eligibility gates, real
+1/2/4/8-worker parsing, an exact Agent Perf standard-build workload, a complete
+production database-v1 contract, and a strict canonical decision-evidence
+validator.
+
+The earlier Candidate A speed and eligibility claims are historical only
+because those remediations changed the measured code. CK-04 remains in
+progress until a clean commit completes the required five-run timings,
+69-query matrix, 25-case recovery matrix, growth sensitivity, DBHub comparison,
+canonical v2 aggregate evidence, release-candidate checks, and CI.
