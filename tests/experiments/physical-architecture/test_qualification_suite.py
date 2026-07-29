@@ -158,6 +158,17 @@ def test_timeout_terminates_reaps_and_records_partial_evidence(
     pid_path = tmp_path / "pid"
     monkeypatch.setenv("CK04_TEST_MODE", "hang")
     monkeypatch.setenv("CK04_PID_PATH", str(pid_path))
+    launched_pids: list[int] = []
+    real_popen = qualification_suite.subprocess.Popen
+
+    def recording_popen(*args: Any, **kwargs: Any) -> Any:
+        process = real_popen(*args, **kwargs)
+        command = args[0] if args else kwargs["args"]
+        if str(helper) in command:
+            launched_pids.append(process.pid)
+        return process
+
+    monkeypatch.setattr(qualification_suite.subprocess, "Popen", recording_popen)
     config = _config(
         tmp_path,
         helper=helper,
@@ -177,7 +188,8 @@ def test_timeout_terminates_reaps_and_records_partial_evidence(
     assert timeout["reaped"] is True
     assert timeout["stdout"]["byte_count"] >= 0
     assert len(timeout["stderr"]["sha256"]) == 64
-    pid = int(pid_path.read_text(encoding="utf-8"))
+    assert len(launched_pids) == 1
+    pid = launched_pids[0]
     with pytest.raises(ProcessLookupError):
         os.kill(pid, 0)
     summary = json.loads(artifact.summary_path.read_text(encoding="utf-8"))
