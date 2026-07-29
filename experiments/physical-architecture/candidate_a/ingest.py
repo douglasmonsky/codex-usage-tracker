@@ -202,17 +202,52 @@ def _source_entries(fixture: shared.FixtureBundle) -> list[dict[str, Any]]:
     return result
 
 
+def _selected_sources(
+    fixture: shared.FixtureBundle,
+    *,
+    history_selection: str,
+    start_us: int,
+    end_us: int,
+) -> tuple[shared.SourceArtifact, ...]:
+    entries = {
+        str(entry["path"]): entry
+        for entry in _source_entries(fixture)
+    }
+    selected: list[shared.SourceArtifact] = []
+    for source in fixture.sources:
+        source_path = source.relative_path.as_posix()
+        entry = entries[source_path]
+        persisted = bool(entry["persisted_when_requested"])
+        explicitly_deferred = str(entry["history_selection"]) == "deferred"
+        if not persisted or explicitly_deferred:
+            continue
+        if history_selection == "all_time":
+            selected.append(source)
+            continue
+        if (
+            source.time_range_confidence != "trusted"
+            or source.time_range_hint is None
+        ):
+            selected.append(source)
+            continue
+        hint_start_us, hint_end_us = source.time_range_hint
+        if hint_start_us <= end_us and hint_end_us > start_us:
+            selected.append(source)
+    return tuple(selected)
+
+
 def _insert_manifestations(
     connection: sqlite3.Connection,
     fixture: shared.FixtureBundle,
     stats: IngestStats,
+    *,
+    selected_paths: frozenset[str],
 ) -> dict[str, int]:
     ranks: dict[str, int] = {}
     for rank, source in enumerate(_source_entries(fixture)):
         source_path = str(source["path"])
         ranks[source_path] = rank
-        persisted = bool(source["persisted_when_requested"])
-        deferred = str(source["history_selection"]) == "deferred" or not persisted
+        deferred = source_path not in selected_paths
         stats.source_files_inventoried += 1
         stats.source_bytes_inventoried += int(source["bytes"])
         if deferred:
@@ -771,11 +806,26 @@ def build_artifact(
             else ()
         )
         start_us, end_us, selected_session_id = _window(fixture, history_selection)
+        selected_sources = _selected_sources(
+            fixture,
+            history_selection=history_selection,
+            start_us=start_us,
+            end_us=end_us,
+        )
+        selected_paths = frozenset(
+            source.relative_path.as_posix()
+            for source in selected_sources
+        )
         connection.execute("BEGIN IMMEDIATE")
-        ranks = _insert_manifestations(connection, fixture, stats)
+        ranks = _insert_manifestations(
+            connection,
+            fixture,
+            stats,
+            selected_paths=selected_paths,
+        )
         parse_hook_called = False
         fact_hook_called = False
-        for source in fixture.sources:
+        for source in selected_sources:
             source_path = source.relative_path.as_posix()
             stats.source_files_parsed += 1
             stats.source_bytes_parsed += source.byte_count

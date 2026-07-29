@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ shared = importlib.import_module("shared")
 candidate_a = importlib.import_module("candidate_a")
 adapter_module = importlib.import_module("candidate_a.adapter")
 evidence_module = importlib.import_module("candidate_a.evidence")
+ingest_module = importlib.import_module("candidate_a.ingest")
 maintenance_module = importlib.import_module("candidate_a.maintenance")
 schema_module = importlib.import_module("candidate_a.schema")
 
@@ -158,6 +160,132 @@ def test_schema_is_typed_compact_and_deduplicated(
 
     assert artifact.stats.occurrence_rows > expected_counts["model_calls"]
     assert fixture.oracle["source_lifecycle"]["model_call_occurrences"] == 102
+
+
+def test_recent_history_prunes_only_nonoverlapping_trusted_sources(
+    fixture: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window = fixture.manifest["history"]["windows"]["30_days"]
+    skipped_paths = {
+        source.absolute_path
+        for source in fixture.sources
+        if source.time_range_confidence == "trusted"
+        and source.time_range_hint is not None
+        and not (
+            source.time_range_hint[0] <= int(window["end_us"])
+            and source.time_range_hint[1] > int(window["start_us"])
+        )
+    }
+    original_read_bytes = Path.read_bytes
+
+    def guarded_read_bytes(path: Path) -> bytes:
+        if path in skipped_paths:
+            raise AssertionError(f"skipped source body was opened: {path.name}")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", guarded_read_bytes)
+    artifact = candidate_a.build_artifact(
+        fixture,
+        tmp_path / "recent-30-days.sqlite",
+        history_selection="30_days",
+    )
+
+    assert artifact.stats.source_files_inventoried == 12
+    assert artifact.stats.source_bytes_inventoried == 244_657
+    assert artifact.stats.source_files_selected == 7
+    assert artifact.stats.source_bytes_selected == 184_519
+    assert artifact.stats.source_files_parsed == 7
+    assert artifact.stats.source_bytes_parsed == 184_519
+    assert artifact.stats.source_files_deferred == 5
+    assert artifact.stats.source_bytes_deferred == 60_138
+
+    with database(artifact.path, read_only=True) as connection:
+        assert (
+            connection.execute("SELECT count(*) FROM model_calls").fetchone()[0]
+            == fixture.manifest["history"]["selections"]["30_days"]["calls"]
+            == 4
+        )
+        selected = {
+            str(row["source_path"])
+            for row in connection.execute(
+                """
+                SELECT source_path
+                FROM source_manifestations
+                WHERE selected = 1
+                """
+            )
+        }
+        assert {
+            "sources/active/source-0000.jsonl",
+            "sources/active/source-0001.jsonl",
+            "sources/active/source-0006.jsonl",
+            "sources/archived/exact-copy.jsonl",
+            "sources/replaced/revision-1.jsonl",
+            "sources/truncated/truncated.jsonl",
+            "sources/malformed/malformed.jsonl",
+        } == selected
+
+
+def test_all_time_preserves_every_persisted_source(
+    built: tuple[Any, Any],
+) -> None:
+    _, artifact = built
+    assert artifact.stats.source_files_inventoried == 12
+    assert artifact.stats.source_bytes_inventoried == 244_657
+    assert artifact.stats.source_files_selected == 11
+    assert artifact.stats.source_bytes_selected == 244_657
+    assert artifact.stats.source_files_parsed == 11
+    assert artifact.stats.source_bytes_parsed == 244_657
+    assert artifact.stats.source_files_deferred == 1
+    assert artifact.stats.source_bytes_deferred == 0
+
+
+def test_source_hint_half_open_interval_against_closed_history_window(
+    fixture: Any,
+) -> None:
+    window = fixture.manifest["history"]["windows"]["30_days"]
+    start_us = int(window["start_us"])
+    end_us = int(window["end_us"])
+    source = next(
+        item
+        for item in fixture.sources
+        if item.time_range_confidence == "trusted"
+    )
+
+    def is_selected(
+        *,
+        hint: tuple[int, int] | None,
+        confidence: str,
+    ) -> bool:
+        candidate = replace(
+            source,
+            time_range_hint=hint,
+            time_range_confidence=confidence,
+        )
+        candidate_fixture = replace(fixture, sources=(candidate,))
+        selected = ingest_module._selected_sources(
+            candidate_fixture,
+            history_selection="30_days",
+            start_us=start_us,
+            end_us=end_us,
+        )
+        return bool(selected)
+
+    assert not is_selected(
+        hint=(start_us - 10, start_us),
+        confidence="trusted",
+    )
+    assert is_selected(
+        hint=(end_us, end_us + 10),
+        confidence="trusted",
+    )
+    assert is_selected(
+        hint=(start_us - 10, start_us),
+        confidence="uncertain",
+    )
+    assert is_selected(hint=None, confidence="unavailable")
 
 
 def test_evidence_merge_is_gap_free_stable_and_keyset_paginated(
@@ -387,6 +515,14 @@ def test_agent_perf_contract_is_pinned_to_standard_fixture_and_matrix() -> None:
     assert contract.candidate_id == "A"
     assert contract.fixture_profile == "standard"
     assert contract.fixture_revision == shared.FIXTURE_REVISION
+    assert (
+        contract.fixture_manifest_digest
+        == "b5b938232e199793f49d7ab0bf67d360ea658f332f15e5d53449d4327c821f26"
+    )
+    assert (
+        contract.fixture_oracle_digest
+        == "ca44e370f96923c1b3537f1b18089109e1d609d0fcd78bf995deb71d27353bc2"
+    )
     assert contract.workload_id == "build.scale.standard"
     assert contract.workload_matrix_digest == matrix.digest
     assert contract.minimum_unprofiled_runs == 5

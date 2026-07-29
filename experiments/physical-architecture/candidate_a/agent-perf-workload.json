@@ -13,7 +13,7 @@
     "PYTHONHASHSEED": "0",
     "PYTHONPATH": "experiments/physical-architecture"
   },
-  "fixture_manifest_digest": "c72618751298697f0178633c256cb20bbd9f53917db494a20b712856cacf8e1f",
+  "fixture_manifest_digest": "b5b938232e199793f49d7ab0bf67d360ea658f332f15e5d53449d4327c821f26",
   "fixture_oracle_digest": "ca44e370f96923c1b3537f1b18089109e1d609d0fcd78bf995deb71d27353bc2",
   "fixture_profile": "standard",
   "fixture_revision": "agent-kernel-structural-v1",
