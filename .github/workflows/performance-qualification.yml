@@ -1,0 +1,72 @@
+name: Repeated hosted performance qualification
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qualified-hosted-performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualification:
+    name: Five-run calibrated qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install kernel tooling
+        run: python -m pip install ".[dev]"
+      - name: Capture five calibration-qualified repetitions
+        run: |
+          mkdir -p performance-runs
+          for repetition in 1 2 3 4 5; do
+            report="performance-runs/repetition-${repetition}.json"
+            set +e
+            python scripts/run_performance_suite.py \
+              --lane github_hosted_qualified \
+              --report "$report"
+            status=$?
+            set -e
+            echo "repetition=${repetition} process_status=${status}"
+          done
+      - name: Aggregate sustained performance evidence
+        run: |
+          python scripts/aggregate_performance_qualification.py \
+            --output performance-qualification-summary.json \
+            performance-runs/repetition-{1..5}.json
+      - name: Summarize qualification
+        if: always()
+        run: |
+          if test -f performance-qualification-summary.json; then
+            {
+              echo '### Five-run hosted performance qualification'
+              echo '```json'
+              cat performance-qualification-summary.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Performance qualification report was not produced.' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload qualification telemetry
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qualified-hosted-performance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            performance-runs/*.json
+            performance-qualification-summary.json
+          if-no-files-found: warn
+          retention-days: 30

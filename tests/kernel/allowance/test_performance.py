@@ -9,6 +9,7 @@ from pathlib import Path
 from codex_usage_tracker.kernel.application import KernelApplication, RuntimePaths
 from codex_usage_tracker.kernel.ingest import KernelIngestor, RefreshTrigger
 from codex_usage_tracker.kernel.operational import load_cutover_control
+from tests.kernel.performance_qualification import record_wall_clock_budget
 
 
 def test_bounded_allowance_read_stays_within_common_query_budget(
@@ -120,10 +121,7 @@ def test_bounded_allowance_read_stays_within_common_query_budget(
     p95 = statistics.quantiles(samples, n=100, method="inclusive")[94]
     print(f"allowance_read_p95_ms={p95:.3f}")
     assert result["returned_count"] == 500
-    # Shared CI runners consistently add about 25% over the local 400-430 ms
-    # distribution. Keep a narrow ceiling that still catches a material query
-    # regression without making runner scheduling noise release-blocking.
-    assert p95 <= 550, f"allowance read p95 {p95:.3f} ms exceeded 550 ms"
+    record_wall_clock_budget("allowance_read_p95_ms", p95, 550.0)
 
 
 def _allowance_event(index: int) -> dict[str, object]:

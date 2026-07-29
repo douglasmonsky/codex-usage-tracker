@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from codex_usage_tracker.kernel.application import KernelApplication
+from tests.kernel.performance_qualification import record_wall_clock_budget
 
 from .support import active_runtime, synthetic_sources
 
@@ -71,10 +72,18 @@ def test_warm_status_and_batched_query_adapter_budgets(tmp_path: Path) -> None:
             sort_keys=True,
         )
     )
-    assert status_p95 <= _STATUS_P95_BUDGET_MS
-    assert query_p95 <= _QUERY_P95_BUDGET_MS
-    assert curated_p95 <= _CURATED_AGENT_TEMPLATES_P95_BUDGET_MS
-    assert guidance_p95 <= _GUIDANCE_P95_BUDGET_MS
+    record_wall_clock_budget("status_p95_ms", status_p95, _STATUS_P95_BUDGET_MS)
+    record_wall_clock_budget("query_p95_ms", query_p95, _QUERY_P95_BUDGET_MS)
+    record_wall_clock_budget(
+        "curated_agent_templates_p95_ms",
+        curated_p95,
+        _CURATED_AGENT_TEMPLATES_P95_BUDGET_MS,
+    )
+    record_wall_clock_budget(
+        "guidance_p95_ms",
+        guidance_p95,
+        _GUIDANCE_P95_BUDGET_MS,
+    )
     assert guidance_bytes <= _GUIDANCE_RESPONSE_BUDGET_BYTES
 
 

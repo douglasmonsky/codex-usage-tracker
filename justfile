@@ -15,6 +15,9 @@ vp:
         scripts/benchmark_agent_outcome.py \
         scripts/benchmark_kernel.py \
         scripts/check_agent_kernel_contracts.py \
+        scripts/aggregate_performance_qualification.py \
+        scripts/performance_budget_contract.py \
+        scripts/run_performance_suite.py \
         scripts/check_kernel_scope.py \
         scripts/check_release.py \
         scripts/check_kernel_release_candidate.py \
@@ -43,6 +46,7 @@ vp:
         tests/kernel/live \
         tests/kernel/query \
         tests/kernel/test_code_disposition_manifest.py \
+        tests/kernel/test_ci_performance_qualification.py \
         tests/kernel/test_cutover_control.py \
         tests/kernel/test_database_lifecycle.py \
         tests/kernel/test_development_efficiency_policy.py \
@@ -55,6 +59,7 @@ vp:
         tests/kernel/test_agent_outcome_baseline.py \
         tests/kernel/test_kernel_scope.py \
         tests/kernel/test_repository_quality_policy.py \
+        tests/kernel/performance_qualification.py \
         tests/kernel/test_release_candidate.py \
         tests/kernel/test_release_028_qualification.py \
         tests/kernel/test_release_cutover.py \
@@ -80,7 +85,13 @@ verify-precommit:
 v:
     just vp
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pytest -p no:tach \
+        --ignore=tests/kernel/test_ingest_performance.py \
+        --ignore=tests/kernel/allowance/test_performance.py \
+        --ignore=tests/kernel/evidence/test_performance.py \
+        --ignore=tests/kernel/interfaces/test_performance.py \
+        --ignore=tests/kernel/query/test_performance.py \
         tests/kernel/test_agent_outcome_baseline.py \
+        tests/kernel/test_ci_performance_qualification.py \
         tests/kernel/test_kernel_scope.py \
         tests/kernel/test_code_disposition_manifest.py \
         tests/kernel/test_retired_surface_manifest.py \
@@ -98,7 +109,13 @@ v:
         tests/kernel/test_database_lifecycle.py \
         tests/kernel/test_cutover_control.py \
         tests/kernel/test_source_registry_privacy.py \
-        tests/kernel/test_ingest_*.py \
+        tests/kernel/test_ingest_concurrency.py \
+        tests/kernel/test_ingest_jobs.py \
+        tests/kernel/test_ingest_lifecycle.py \
+        tests/kernel/test_ingest_oracle.py \
+        tests/kernel/test_ingest_pipeline.py \
+        tests/kernel/test_ingest_privacy.py \
+        tests/kernel/test_ingest_reconciliation.py \
         tests/kernel/test_oracle_equivalence.py \
         tests/kernel/test_privacy_oracle.py \
         tests/kernel/test_r5_analytical_primitives.py \
@@ -114,6 +131,7 @@ v:
         tests/kernel/interfaces \
         tests/kernel/live \
         tests/kernel/query tests/release
+    PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/run_performance_suite.py --lane invariants
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" -m pyright --pythonpath "$PY"
     PY=.venv/bin/python; [ -x "$PY" ] || PY=python3; "$PY" scripts/check_release.py
 

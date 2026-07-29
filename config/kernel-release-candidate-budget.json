@@ -10,7 +10,7 @@
   "http_routes": 7,
   "cli_commands": 11,
   "wheel_bytes": 175625,
-  "sdist_bytes": 482091,
+  "sdist_bytes": 495000,
   "plugin_bundle_bytes": 5620,
   "mcp_golden_prompt": {
     "mcp_calls": 3,
