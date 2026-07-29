@@ -427,6 +427,67 @@ def _score_evidence(
     ]
 
 
+def _redigest_score_evidence(
+    bundle: Any,
+    *,
+    mutate_invocation: Any = None,
+    mutate_measurements: Any = None,
+) -> Any:
+    invocation = json.loads(bundle.invocation_bytes)
+    measurements = [json.loads(line) for line in bundle.measurement_bytes.splitlines()]
+    details = [json.loads(line) for line in bundle.detail_bytes.splitlines()]
+    summary = json.loads(bundle.summary_bytes)
+    if mutate_invocation is not None:
+        mutate_invocation(invocation)
+    if mutate_measurements is not None:
+        mutate_measurements(measurements)
+    invocation.pop("invocation_digest")
+    invocation["invocation_digest"] = shared.canonical_sha256(invocation)
+    environment_digest = str(invocation["environment_digest"])
+    redigested_details: list[dict[str, object]] = []
+    for execution_index, (measurement, detail) in enumerate(
+        zip(measurements, details, strict=True)
+    ):
+        projected_identity = {
+            **{
+                key: value for key, value in measurement["identity"].items() if key != "environment"
+            },
+            "environment_digest": environment_digest,
+        }
+        detail.update(
+            {
+                "execution_index": execution_index,
+                "invocation_digest": invocation["invocation_digest"],
+                "measurement_identity": projected_identity,
+                "measurement_identity_digest": shared.canonical_sha256(projected_identity),
+                "measurement_record_digest": shared.canonical_sha256(measurement),
+            }
+        )
+        detail.pop("detail_digest")
+        detail["detail_digest"] = shared.canonical_sha256(detail)
+        redigested_details.append(detail)
+    measurement_bytes = b"".join(shared.canonical_json_bytes(row) for row in measurements)
+    detail_bytes = b"".join(shared.canonical_json_bytes(row) for row in redigested_details)
+    summary.update(
+        {
+            "detail_records": len(redigested_details),
+            "details_sha256": hashlib.sha256(detail_bytes).hexdigest(),
+            "invocation_digest": invocation["invocation_digest"],
+            "measurement_sha256": hashlib.sha256(measurement_bytes).hexdigest(),
+            "planned_executions": (len(invocation["case_ids"]) * int(invocation["repetitions"])),
+            "records": len(measurements),
+        }
+    )
+    summary.pop("summary_digest")
+    summary["summary_digest"] = shared.canonical_sha256(summary)
+    return decision_evidence.QualificationScoreEvidence(
+        invocation_bytes=shared.canonical_json_bytes(invocation),
+        measurement_bytes=measurement_bytes,
+        detail_bytes=detail_bytes,
+        summary_bytes=shared.canonical_json_bytes(summary),
+    )
+
+
 def _candidate_rows(
     fixture_digests: dict[str, tuple[str, str]],
     code_commit: str,
@@ -1479,6 +1540,53 @@ def test_score_extraction_fails_closed_on_missing_wrong_case_profile_or_unit() -
             candidate_id="A",
             scale="standard",
             evidence=wrong_unit,
+        )
+
+
+def test_score_extraction_rejects_truncated_planned_execution_coverage() -> None:
+    _, fixture_digests = _fixture_rows()
+    evidence = _score_evidence(fixture_digests, "a" * 40)
+    evidence[1] = _redigest_score_evidence(
+        evidence[1],
+        mutate_invocation=lambda invocation: invocation.update({"repetitions": 10}),
+    )
+
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="records.*planned executions",
+    ):
+        decision_evidence.extract_score_input(
+            candidate_id="A",
+            scale="standard",
+            evidence=evidence,
+        )
+
+
+def test_score_extraction_rejects_reassigned_repetition_coverage() -> None:
+    _, fixture_digests = _fixture_rows()
+    evidence = _score_evidence(fixture_digests, "a" * 40)
+
+    def reassign_repetition(measurements: list[dict[str, Any]]) -> None:
+        first_case = measurements[0]["identity"]["case_id"]
+        matching = [
+            measurement
+            for measurement in measurements
+            if measurement["identity"]["case_id"] == first_case
+        ]
+        matching[-1]["identity"]["repetition"] = matching[-2]["identity"]["repetition"]
+
+    evidence[1] = _redigest_score_evidence(
+        evidence[1],
+        mutate_measurements=reassign_repetition,
+    )
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="exact repetition coverage",
+    ):
+        decision_evidence.extract_score_input(
+            candidate_id="A",
+            scale="standard",
+            evidence=evidence,
         )
 
 

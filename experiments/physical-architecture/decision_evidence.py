@@ -588,9 +588,11 @@ def _authenticate_score_evidence(
         )
     if summary.get("planned_executions") != len(case_ids) * planned_repetitions:
         raise DecisionEvidenceContractError(f"{context} planned execution count is stale")
+    if len(measurements) != summary.get("planned_executions"):
+        raise DecisionEvidenceContractError(f"{context} records do not match planned executions")
     admitted_cases = set(case_ids)
     rows: list[_ScoreMeasurement] = []
-    identities: set[tuple[str, str, int]] = set()
+    repetition_coverage: dict[str, list[int]] = {str(case_id): [] for case_id in case_ids}
     for index, (measurement, detail) in enumerate(zip(measurements, details, strict=True)):
         item_context = f"{context} record[{index}]"
         _verify_score_digest(detail, "detail_digest", f"{item_context} detail")
@@ -654,10 +656,7 @@ def _authenticate_score_evidence(
             or detail.get("partial") is not False
         ):
             raise DecisionEvidenceContractError(f"{item_context} must be complete and passed")
-        identity_key = (str(identity["run_id"]), str(case_id), repetition)
-        if identity_key in identities:
-            raise DecisionEvidenceContractError(f"{item_context} replays a measurement identity")
-        identities.add(identity_key)
+        repetition_coverage[str(case_id)].append(repetition)
         rows.append(
             _ScoreMeasurement(
                 run_id=str(identity["run_id"]),
@@ -687,6 +686,12 @@ def _authenticate_score_evidence(
                 values=values,
             )
         )
+    expected_repetitions = list(range(planned_repetitions))
+    for case_id, observed_repetitions in repetition_coverage.items():
+        if sorted(observed_repetitions) != expected_repetitions:
+            raise DecisionEvidenceContractError(
+                f"{context} case {case_id} lacks exact repetition coverage"
+            )
     return tuple(rows)
 
 
