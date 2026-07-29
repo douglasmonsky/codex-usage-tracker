@@ -1,0 +1,402 @@
+from __future__ import annotations
+
+import importlib
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_EXPERIMENT_ROOT = _REPO_ROOT / "experiments" / "physical-architecture"
+sys.path.insert(0, str(_EXPERIMENT_ROOT))
+
+shared = importlib.import_module("shared")
+candidate_a = importlib.import_module("candidate_a")
+adapter_module = importlib.import_module("candidate_a.adapter")
+evidence_module = importlib.import_module("candidate_a.evidence")
+maintenance_module = importlib.import_module("candidate_a.maintenance")
+schema_module = importlib.import_module("candidate_a.schema")
+
+Adapter = adapter_module.Adapter
+EvidenceContractError = evidence_module.EvidenceContractError
+all_evidence_rows = evidence_module.all_evidence_rows
+evidence_page = evidence_module.evidence_page
+resolve_selector = evidence_module.resolve_selector
+apply_ordinary_change = maintenance_module.apply_ordinary_change
+apply_source_phase = maintenance_module.apply_source_phase
+database = schema_module.database
+
+_TINY_FIXTURE = _REPO_ROOT / "tests" / "agent_kernel" / "fixtures" / "tiny-v1"
+_AGENT_PERF_CONTRACT = (
+    _REPO_ROOT
+    / "experiments"
+    / "physical-architecture"
+    / "candidate_a"
+    / "agent-perf-workload.json"
+)
+_PHYSICAL_CORES = 10
+
+
+@pytest.fixture
+def fixture() -> Any:
+    return shared.load_fixture_bundle(_TINY_FIXTURE)
+
+
+@pytest.fixture
+def built(
+    fixture: Any,
+    tmp_path: Path,
+) -> tuple[Any, Any]:
+    artifact = candidate_a.build_artifact(fixture, tmp_path / "candidate-a.sqlite")
+    return fixture, artifact
+
+
+def _table_columns(connection: Any, table: str) -> dict[str, str]:
+    return {
+        str(row["name"]): str(row["type"])
+        for row in connection.execute(f'PRAGMA table_info("{table}")')
+    }
+
+
+def _request(
+    *,
+    fixture: Any,
+    case: Any,
+    run_root: Path,
+) -> Any:
+    run_root.mkdir()
+    return shared.CandidateRequest(
+        case=case,
+        fixture=fixture,
+        run_root=run_root,
+        repetition=0,
+        stop=shared.EarlyStopController(case.case_id, case.early_stop_limits),
+    )
+
+
+def test_schema_is_typed_compact_and_deduplicated(
+    built: tuple[Any, Any],
+) -> None:
+    fixture, artifact = built
+    accounting = fixture.oracle["accounting"]
+    expected_counts = accounting["canonical_counts"]
+
+    with database(artifact.path, read_only=True) as connection:
+        tables = {
+            str(row["name"])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_schema WHERE type='table'"
+            )
+        }
+        assert "events" not in tables
+        assert "sequence" not in tables
+        assert "model_calls" in tables
+        assert "tool_invocations" in tables
+        assert "session_usage_current" in tables
+        assert "tool_family_current" in tables
+
+        prohibited_columns = {
+            "body",
+            "content",
+            "event_json",
+            "payload",
+            "raw",
+            "raw_body",
+            "raw_content",
+            "raw_json",
+            "text",
+        }
+        for table in sorted(tables - {"sqlite_stat1", "sqlite_stat4"}):
+            columns = _table_columns(connection, table)
+            assert not prohibited_columns.intersection(columns)
+            for name, declared_type in columns.items():
+                if name.endswith("_at_us") or name == "event_at_us":
+                    assert declared_type == "INTEGER"
+
+        assert (
+            connection.execute("SELECT count(*) FROM model_calls").fetchone()[0]
+            == expected_counts["model_calls"]
+            == 100
+        )
+        assert (
+            connection.execute(
+                "SELECT count(*) FROM tool_invocations"
+            ).fetchone()[0]
+            == expected_counts["tool_invocations"]
+        )
+        model_columns = _table_columns(connection, "model_calls")
+        assert {
+            "uncached_input_tokens",
+            "cached_input_tokens",
+            "reasoning_tokens",
+            "output_tokens",
+        }.issubset(model_columns)
+        assert (
+            connection.execute(
+                "SELECT value FROM metadata WHERE key='raw_content_stored'"
+            ).fetchone()[0]
+            == "false"
+        )
+
+        timeline_indexes = {
+            str(row["name"])
+            for row in connection.execute(
+                """
+                SELECT name
+                FROM sqlite_schema
+                WHERE type='index' AND name LIKE '%timeline%'
+                """
+            )
+        }
+        assert {
+            "model_calls_timeline",
+            "tools_start_timeline",
+            "turns_timeline",
+        }.issubset(timeline_indexes)
+
+    assert artifact.stats.occurrence_rows > expected_counts["model_calls"]
+    assert fixture.oracle["source_lifecycle"]["model_call_occurrences"] == 102
+
+
+def test_evidence_merge_is_gap_free_stable_and_keyset_paginated(
+    built: tuple[Any, Any],
+) -> None:
+    fixture, artifact = built
+    with database(artifact.path, read_only=True) as connection:
+        rows_by_seven = all_evidence_rows(
+            connection,
+            publication_id=artifact.publication_id,
+            page_size=7,
+        )
+        rows_by_thirty_seven = all_evidence_rows(
+            connection,
+            publication_id=artifact.publication_id,
+            page_size=37,
+        )
+        assert rows_by_seven == rows_by_thirty_seven
+        assert len(rows_by_seven) > 100
+
+        order_keys = [tuple(row["order_key"]) for row in rows_by_seven]
+        assert order_keys == sorted(order_keys)
+        assert len(order_keys) == len(set(order_keys))
+        first_timestamp = order_keys[0][0]
+        assert sum(key[0] == first_timestamp for key in order_keys) > 1
+
+        page = evidence_page(
+            connection,
+            publication_id=artifact.publication_id,
+            page_size=7,
+        )
+        assert page.next_cursor is not None
+        assert page.full_scan_count == 0
+        assert page.temporary_sort_count == 0
+        assert page.query_plans
+
+        tampered = ("A" if page.next_cursor[0] != "A" else "B") + page.next_cursor[1:]
+        with pytest.raises(EvidenceContractError, match="signature"):
+            evidence_page(
+                connection,
+                publication_id=artifact.publication_id,
+                page_size=7,
+                cursor=tampered,
+            )
+        with pytest.raises(EvidenceContractError, match="publication differs"):
+            evidence_page(
+                connection,
+                publication_id="publication:candidate-a:different",
+                page_size=7,
+                cursor=page.next_cursor,
+            )
+
+        selector = fixture.oracle["evidence"]["selector_samples"]["session"]
+        resolved = resolve_selector(connection, str(selector))
+        assert resolved is not None
+        assert resolved["selector"] == selector
+        assert "body" not in resolved
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "tool_terminal_transition",
+        "tool_plus_state_change",
+        "2000_call_tail",
+        "late_event",
+    ],
+)
+def test_ordinary_changes_are_incremental_and_preserve_lifecycle_semantics(
+    fixture: Any,
+    tmp_path: Path,
+    change: str,
+) -> None:
+    artifact = candidate_a.build_artifact(
+        fixture,
+        tmp_path / f"{change}.sqlite",
+    )
+    with database(artifact.path, read_only=True) as connection:
+        call_count_before = int(
+            connection.execute("SELECT count(*) FROM model_calls").fetchone()[0]
+        )
+        minimum_event_before = int(
+            connection.execute(
+                "SELECT min(event_at_us) FROM model_calls"
+            ).fetchone()[0]
+        )
+        tool_count_before = int(
+            connection.execute(
+                "SELECT count(*) FROM tool_invocations"
+            ).fetchone()[0]
+        )
+        open_tools_before = int(
+            connection.execute(
+                "SELECT count(*) FROM tool_invocations WHERE terminal_at_us IS NULL"
+            ).fetchone()[0]
+        )
+
+    stats = apply_ordinary_change(artifact.path, change)
+    assert stats.source_files_rescanned == 0
+    assert stats.source_bytes_rescanned == 0
+    assert stats.writer_transactions == 1
+
+    with database(artifact.path, read_only=True) as connection:
+        if change == "tool_terminal_transition":
+            assert (
+                connection.execute(
+                    "SELECT count(*) FROM tool_invocations"
+                ).fetchone()[0]
+                == tool_count_before
+            )
+            assert open_tools_before == 1
+            assert (
+                connection.execute(
+                    """
+                    SELECT count(*)
+                    FROM tool_invocations
+                    WHERE terminal_at_us IS NULL
+                    """
+                ).fetchone()[0]
+                == 0
+            )
+            assert stats.facts_inserted == 0
+            assert stats.facts_updated == 1
+        elif change == "tool_plus_state_change":
+            row = connection.execute(
+                """
+                SELECT preceding_activity_count, causal_attribution
+                FROM state_changes
+                ORDER BY event_at_us DESC, change_id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+            assert row["preceding_activity_count"] == 2
+            assert row["causal_attribution"] is None
+        elif change == "2000_call_tail":
+            assert (
+                connection.execute("SELECT count(*) FROM model_calls").fetchone()[0]
+                == call_count_before + 2_000
+            )
+            assert stats.facts_inserted == 2_000
+            assert stats.dirty_keys == 1
+        elif change == "late_event":
+            assert (
+                connection.execute(
+                    "SELECT min(event_at_us) FROM model_calls"
+                ).fetchone()[0]
+                == minimum_event_before - 1
+            )
+
+
+def test_source_phases_and_selectors_reconcile_on_clean_rebuild(
+    fixture: Any,
+    tmp_path: Path,
+) -> None:
+    first = candidate_a.build_artifact(fixture, tmp_path / "first.sqlite")
+    second = candidate_a.build_artifact(fixture, tmp_path / "second.sqlite")
+    selector = str(fixture.oracle["evidence"]["selector_samples"]["session"])
+
+    with database(first.path) as connection:
+        for phase_artifact in fixture.phases:
+            expected = tuple(
+                str(json.loads(line)["payload"]["occurrence_id"])
+                for line in phase_artifact.absolute_path.read_text(
+                    encoding="utf-8"
+                ).splitlines()
+            )
+            actual = apply_source_phase(
+                connection,
+                fixture,
+                group=phase_artifact.group,
+                phase=phase_artifact.phase,
+            )
+            assert actual == expected
+        connection.commit()
+
+    with (
+        database(first.path, read_only=True) as first_connection,
+        database(second.path, read_only=True) as second_connection,
+    ):
+        assert resolve_selector(first_connection, selector) == resolve_selector(
+            second_connection,
+            selector,
+        )
+
+
+def test_all_mandatory_workloads_pass_with_only_optional_writer_unsupported(
+    fixture: Any,
+    tmp_path: Path,
+) -> None:
+    matrix = shared.build_workload_matrix(physical_cores=_PHYSICAL_CORES)
+    results: dict[str, Any] = {}
+
+    for case in matrix.cases:
+        request = _request(
+            fixture=fixture,
+            case=case,
+            run_root=tmp_path / case.case_id,
+        )
+        result = Adapter().execute(request)
+        results[case.case_id] = result
+        if case.candidate_capability is None:
+            assert result.outcome is shared.RunOutcome.PASSED, case.case_id
+
+    unsupported = {
+        case_id
+        for case_id, result in results.items()
+        if result.outcome is shared.RunOutcome.UNSUPPORTED
+    }
+    assert unsupported == {"build.writer.partitioned_staging"}
+
+    for case_id, result in results.items():
+        if case_id.startswith("query."):
+            assert result.measurements.oracle_equivalent
+            assert result.measurements.selector_pages_gap_free
+            assert result.measurements.response_bytes <= 16_384
+            assert result.measurements.duplicated_representation_bytes == 0
+
+    assert results["build.index.present"].measurements.merge_time_ns == 0
+    assert results["build.index.deferred"].measurements.merge_time_ns > 0
+    assert results["build.index.rebuilt"].measurements.merge_time_ns > 0
+
+
+def test_agent_perf_contract_is_pinned_to_standard_fixture_and_matrix() -> None:
+    contract = shared.load_agent_perf_workload(_AGENT_PERF_CONTRACT)
+    matrix = shared.build_workload_matrix(physical_cores=_PHYSICAL_CORES)
+
+    assert contract.candidate_id == "A"
+    assert contract.fixture_profile == "standard"
+    assert contract.fixture_revision == shared.FIXTURE_REVISION
+    assert contract.workload_id == "build.scale.standard"
+    assert contract.workload_matrix_digest == matrix.digest
+    assert contract.minimum_unprofiled_runs == 5
+    assert contract.profile_is_attribution_only
+    assert contract.command_argv == (
+        "{python}",
+        "-m",
+        "candidate_a.workload",
+        "--fixture",
+        "{fixture_root}",
+        "--output",
+        "{output_root}",
+    )

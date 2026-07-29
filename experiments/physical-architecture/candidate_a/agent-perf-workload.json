@@ -1,0 +1,27 @@
+{
+  "candidate_id": "A",
+  "command_argv": [
+    "{python}",
+    "-m",
+    "candidate_a.workload",
+    "--fixture",
+    "{fixture_root}",
+    "--output",
+    "{output_root}"
+  ],
+  "environment": {
+    "PYTHONHASHSEED": "0",
+    "PYTHONPATH": "experiments/physical-architecture"
+  },
+  "fixture_manifest_digest": "c72618751298697f0178633c256cb20bbd9f53917db494a20b712856cacf8e1f",
+  "fixture_oracle_digest": "ca44e370f96923c1b3537f1b18089109e1d609d0fcd78bf995deb71d27353bc2",
+  "fixture_profile": "standard",
+  "fixture_revision": "agent-kernel-structural-v1",
+  "minimum_unprofiled_runs": 5,
+  "profile_is_attribution_only": true,
+  "schema": "codex-usage-tracker.agent-perf-workload.v1",
+  "synthetic_only": true,
+  "version": 1,
+  "workload_id": "build.scale.standard",
+  "workload_matrix_digest": "b20ee7ca86c53e80b90f6b6093c7412ac3379aa14edcf2d68aac4e3cbd2abe71"
+}
