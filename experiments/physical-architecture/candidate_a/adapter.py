@@ -439,10 +439,16 @@ class Adapter:
                 answer_correct=True,
                 writer_transactions=1,
             ),
-            oracle_results=asdict(observation),
+            oracle_results={
+                **asdict(observation),
+                **driver.execution_evidence,
+            },
         )
 
     def _dbhub(self, request: shared.CandidateRequest) -> shared.CandidateResult:
+        route = request.case.parameter("route")
+        if route not in {"generic", "named_preset"}:
+            raise ValueError("candidate A DBHub readiness route is invalid")
         artifact = publish_artifact(request.fixture, request.run_root)
         storage = artifact_metrics(
             artifact.path,
@@ -460,9 +466,8 @@ class Adapter:
             ),
             publication=self._publication(artifact, prior_queryable=True),
             oracle_results={
-                "candidate_snapshot": artifact.path.name,
-                "model_class": request.case.parameter("model_class"),
-                "tool_mode": request.case.parameter("tool_mode"),
+                "route": route,
+                "tool": ("search_objects+execute_sql" if route == "generic" else "top_sessions"),
                 "ready_for_shared_dbhub_runner": True,
             },
         )

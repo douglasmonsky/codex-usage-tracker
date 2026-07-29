@@ -89,6 +89,19 @@ def _read_json_record(path: Path) -> tuple[dict[str, Any] | None, str]:
     return {str(key): item for key, item in value.items()}, "valid"
 
 
+def _canonical_record_sha256(path: Path) -> str:
+    record, status = _read_json_record(path)
+    if record is None or status != "valid":
+        raise RuntimeError(f"candidate A evidence record is not readable: {path.name}")
+    try:
+        payload = path.read_bytes()
+    except OSError as error:
+        raise RuntimeError(f"candidate A evidence record cannot be read: {path.name}") from error
+    if payload != shared.canonical_json_bytes(record):
+        raise RuntimeError(f"candidate A evidence record is not canonical: {path.name}")
+    return shared.canonical_sha256(record)
+
+
 def _copy_artifact_atomic(source: Path, destination: Path) -> None:
     temporary = destination.with_name(f".{destination.name}.tmp")
     shutil.copyfile(source, temporary)
@@ -362,11 +375,12 @@ def _classify_disposition(
 def _lease_observation(run_root: Path) -> dict[str, object]:
     lease, lease_status = _read_json_record(run_root / _LEASE)
     live_process, _ = _read_json_record(run_root / "live-process.json")
+    lease_pid = int(lease["pid"]) if lease is not None and type(lease.get("pid")) is int else None
     pid_alive = False
     token_matches = False
-    if lease is not None and isinstance(lease.get("pid"), int):
+    if lease_pid is not None and lease is not None:
         try:
-            os.kill(int(lease["pid"]), 0)
+            os.kill(lease_pid, 0)
         except (OSError, OverflowError):
             pid_alive = False
         else:
@@ -378,6 +392,7 @@ def _lease_observation(run_root: Path) -> dict[str, object]:
         )
     return {
         "exists": lease_status != "missing",
+        "pid": lease_pid,
         "pid_alive": pid_alive,
         "status": lease_status,
         "token_matches": token_matches,
@@ -451,6 +466,8 @@ def _recover_publication_state_locked(
         raise RuntimeError("candidate A recovery did not select a queryable active artifact")
     active_changed = active_recovered.publication_id != prior_publication_id
     cleanup_pending = (run_root / _CLEANUP_PENDING).is_file()
+    if stage is None and cleanup_pending:
+        stage = "during_old_artifact_cleanup"
     disposition = _classify_disposition(
         stage=stage,
         staging=staging_before,
@@ -540,8 +557,175 @@ def _recover_publication_state_locked(
     )
 
 
+def _validate_execution_evidence(
+    crash_case: shared.CrashCase,
+    evidence: Mapping[str, Any],
+    *,
+    case_root: Path,
+    expected_worker_pid: int,
+) -> None:
+    process = evidence.get("process")
+    recovery = evidence.get("recovery_evidence")
+    if not isinstance(process, Mapping) or not isinstance(recovery, Mapping):
+        raise RuntimeError("candidate A execution evidence is incomplete")
+
+    worker_pid = process.get("worker_pid")
+    if type(worker_pid) is not int or worker_pid <= 0:
+        raise RuntimeError("candidate A worker PID is missing")
+    if worker_pid != expected_worker_pid:
+        raise RuntimeError("candidate A worker PID differs from the launched process")
+
+    expected_return_code = (
+        _WORKER_CRASH_EXIT if crash_case.boundary is not None else _WORKER_FAULT_EXIT
+    )
+    if (
+        process.get("expected_return_code") != expected_return_code
+        or process.get("actual_return_code") != expected_return_code
+    ):
+        raise RuntimeError("candidate A worker return code does not match the requested case")
+
+    terminal, terminal_status = _read_json_record(case_root / _RECOVERY_TERMINAL)
+    if terminal is None or terminal_status != "valid":
+        raise RuntimeError("candidate A recovery terminal evidence is missing")
+    expected_stage = crash_case.boundary or _fault_boundary(crash_case.fault)
+    if (
+        process.get("requested_boundary") != crash_case.boundary
+        or process.get("observed_stage") != expected_stage
+        or recovery.get("observed_stage") != expected_stage
+        or terminal.get("stage") != expected_stage
+    ):
+        raise RuntimeError("candidate A persisted observed stage differs from the requested case")
+
+    lease = terminal.get("lease")
+    if not isinstance(lease, Mapping):
+        raise RuntimeError("candidate A persisted lease evidence is missing")
+    lease_pid = lease.get("pid")
+    expected_agreement = lease_pid == expected_worker_pid if type(lease_pid) is int else None
+    if (
+        process.get("lease_status") != lease.get("status")
+        or process.get("pid_lease_agreement") is not expected_agreement
+    ):
+        raise RuntimeError("candidate A PID and lease evidence do not agree")
+    if process.get("worker_alive_after_exit") is not False:
+        raise RuntimeError("candidate A retained a nonterminal worker")
+
+    expected_kind = "exit_code" if crash_case.boundary is not None else "injected_fault"
+    lease_liveness_agrees = bool(
+        (
+            crash_case.boundary == "during_old_artifact_cleanup"
+            and lease.get("status") == "missing"
+            and lease_pid is None
+        )
+        or (
+            crash_case.boundary is not None
+            and crash_case.boundary != "during_old_artifact_cleanup"
+            and lease.get("status") == "valid"
+            and expected_agreement is True
+            and lease.get("pid_alive") is False
+        )
+    )
+    termination_observed = bool(
+        crash_case.boundary is not None
+        and process.get("actual_return_code") == process.get("expected_return_code")
+        and process.get("requested_boundary") == process.get("observed_stage")
+        and process.get("worker_alive_after_exit") is False
+        and lease_liveness_agrees
+    )
+    if (
+        process.get("status") != "observed"
+        or process.get("termination_kind") != expected_kind
+        or process.get("termination_observed") is not termination_observed
+    ):
+        raise RuntimeError("candidate A termination evidence is inconsistent")
+
+    if recovery.get("recovery_action") != terminal.get("recovery_action"):
+        raise RuntimeError("candidate A recovery action differs from terminal evidence")
+    if recovery.get("recovery_terminal_sha256") != _canonical_record_sha256(
+        case_root / _RECOVERY_TERMINAL
+    ):
+        raise RuntimeError("candidate A recovery terminal digest is not exact")
+    if recovery.get("subsequent_publication_sha256") != _canonical_record_sha256(
+        case_root / _SUBSEQUENT_PUBLICATION
+    ):
+        raise RuntimeError("candidate A subsequent publication digest is not exact")
+
+
+def _execution_evidence(
+    crash_case: shared.CrashCase,
+    *,
+    case_root: Path,
+    worker_pid: int,
+    actual_return_code: int,
+    expected_return_code: int,
+    worker_alive_after_exit: bool,
+) -> dict[str, dict[str, object]]:
+    terminal, terminal_status = _read_json_record(case_root / _RECOVERY_TERMINAL)
+    if terminal is None or terminal_status != "valid":
+        raise RuntimeError("candidate A recovery terminal evidence is missing")
+    lease = terminal.get("lease")
+    if not isinstance(lease, Mapping):
+        raise RuntimeError("candidate A persisted lease evidence is missing")
+    lease_pid = lease.get("pid")
+    pid_lease_agreement = lease_pid == worker_pid if type(lease_pid) is int else None
+    observed_stage = terminal.get("stage")
+    requested_boundary = crash_case.boundary
+    lease_liveness_agrees = bool(
+        (
+            requested_boundary == "during_old_artifact_cleanup"
+            and lease.get("status") == "missing"
+            and lease_pid is None
+        )
+        or (
+            requested_boundary is not None
+            and requested_boundary != "during_old_artifact_cleanup"
+            and lease.get("status") == "valid"
+            and pid_lease_agreement is True
+            and lease.get("pid_alive") is False
+        )
+    )
+    process = {
+        "actual_return_code": actual_return_code,
+        "expected_return_code": expected_return_code,
+        "lease_status": str(lease.get("status")),
+        "observed_stage": observed_stage,
+        "pid_lease_agreement": pid_lease_agreement,
+        "requested_boundary": requested_boundary,
+        "status": "observed",
+        "termination_kind": ("exit_code" if requested_boundary is not None else "injected_fault"),
+        "termination_observed": bool(
+            requested_boundary is not None
+            and actual_return_code == expected_return_code
+            and requested_boundary == observed_stage
+            and not worker_alive_after_exit
+            and lease_liveness_agrees
+        ),
+        "worker_alive_after_exit": worker_alive_after_exit,
+        "worker_pid": worker_pid,
+    }
+    recovery_evidence = {
+        "observed_stage": observed_stage,
+        "recovery_action": str(terminal.get("recovery_action")),
+        "recovery_terminal_sha256": _canonical_record_sha256(case_root / _RECOVERY_TERMINAL),
+        "subsequent_publication_sha256": _canonical_record_sha256(
+            case_root / _SUBSEQUENT_PUBLICATION
+        ),
+    }
+    evidence = {
+        "process": process,
+        "recovery_evidence": recovery_evidence,
+    }
+    _validate_execution_evidence(
+        crash_case,
+        evidence,
+        case_root=case_root,
+        expected_worker_pid=worker_pid,
+    )
+    return evidence
+
+
 class CandidateACrashDriver:
     candidate_id = "A"
+    _execution_evidence: dict[str, dict[str, object]] | None = None
 
     def __init__(
         self,
@@ -555,6 +739,7 @@ class CandidateACrashDriver:
         self.timeout_seconds = timeout_seconds
 
     def run_crash_case(self, crash_case: shared.CrashCase) -> shared.CrashObservation:
+        self._execution_evidence = None
         case_root = self.run_root / crash_case.case_id.replace(".", "-")
         case_root.mkdir(parents=True, exist_ok=False)
         prior = publish_artifact(self.fixture, case_root)
@@ -603,20 +788,25 @@ class CandidateACrashDriver:
             "PYTHONHASHSEED": "0",
             "PYTHONPATH": str(Path(__file__).resolve().parents[1]),
         }
-        completed = subprocess.run(
+        process = subprocess.Popen(
             command,
-            check=False,
             cwd=case_root,
             env=environment,
             stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=False,
-            timeout=self.timeout_seconds,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
-        if completed.returncode != expected_returncode:
+        try:
+            process.communicate(timeout=self.timeout_seconds)
+        except subprocess.TimeoutExpired as error:
+            process.kill()
+            process.communicate(timeout=self.timeout_seconds)
+            raise TimeoutError("candidate A crash worker timed out") from error
+        worker_alive_after_exit = process.poll() is None
+        if process.returncode != expected_returncode:
             raise RuntimeError(
                 "candidate A crash worker exited "
-                f"{completed.returncode}, expected {expected_returncode}"
+                f"{process.returncode}, expected {expected_returncode}"
             )
         if crash_case.fault is not None:
             fault_record, fault_status = _read_json_record(case_root / _FAULT_OBSERVATION)
@@ -670,6 +860,14 @@ class CandidateACrashDriver:
                 "succeeded": subsequent_succeeds,
             },
         )
+        self._execution_evidence = _execution_evidence(
+            crash_case,
+            case_root=case_root,
+            worker_pid=process.pid,
+            actual_return_code=process.returncode,
+            expected_return_code=expected_returncode,
+            worker_alive_after_exit=worker_alive_after_exit,
+        )
         if crash_case.fault is not None:
             return shared.CrashObservation(
                 boundary=None,
@@ -690,6 +888,12 @@ class CandidateACrashDriver:
             abandoned_artifact_disposition=disposition,
             subsequent_operation_succeeds=subsequent_succeeds,
         )
+
+    @property
+    def execution_evidence(self) -> dict[str, dict[str, object]]:
+        if self._execution_evidence is None:
+            raise RuntimeError("candidate A crash execution evidence is not available")
+        return self._execution_evidence
 
     def _run_simultaneous_recovery(
         self,

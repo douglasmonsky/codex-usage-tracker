@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import hashlib
 import importlib
 import json
 import sys
@@ -78,11 +80,12 @@ def test_crash_boundaries_are_recovered_from_observed_state(
     boundary: str,
 ) -> None:
     case = shared.CrashCase.termination(boundary)
-    observation = CandidateACrashDriver(
+    driver = CandidateACrashDriver(
         fixture,
         tmp_path,
         timeout_seconds=20,
-    ).run_crash_case(case)
+    )
+    observation = driver.run_crash_case(case)
     shared.validate_crash_observation(
         case,
         fixture.crash_expectation(boundary),
@@ -91,6 +94,9 @@ def test_crash_boundaries_are_recovered_from_observed_state(
 
     case_root = _case_root(tmp_path, case)
     terminal = _record(case_root / "recovery-terminal-state.json")
+    subsequent_path = case_root / "subsequent-publication.json"
+    process = driver.execution_evidence["process"]
+    recovery_evidence = driver.execution_evidence["recovery_evidence"]
     assert observation.prior_publication_queryable is terminal["prior_publication_queryable"]
     assert observation.rollback_available is terminal["rollback_available"]
     assert (
@@ -98,6 +104,47 @@ def test_crash_boundaries_are_recovered_from_observed_state(
     )
     assert observation.sidecar_terminal_state == terminal["sidecar_terminal_state"]
     assert observation.abandoned_artifact_disposition == terminal["disposition"]
+    assert set(process) == {
+        "actual_return_code",
+        "expected_return_code",
+        "lease_status",
+        "observed_stage",
+        "pid_lease_agreement",
+        "requested_boundary",
+        "status",
+        "termination_kind",
+        "termination_observed",
+        "worker_alive_after_exit",
+        "worker_pid",
+    }
+    assert process["status"] == "observed"
+    assert process["worker_pid"] > 0
+    assert process["actual_return_code"] == process["expected_return_code"] == 86
+    assert process["termination_kind"] == "exit_code"
+    assert process["requested_boundary"] == process["observed_stage"] == boundary
+    assert process["lease_status"] == terminal["lease"]["status"]
+    assert process["worker_alive_after_exit"] is False
+    assert process["pid_lease_agreement"] is (
+        None
+        if terminal["lease"]["pid"] is None
+        else terminal["lease"]["pid"] == process["worker_pid"]
+    )
+    if boundary == "during_old_artifact_cleanup":
+        assert process["lease_status"] == "missing"
+        assert process["pid_lease_agreement"] is None
+    else:
+        assert process["lease_status"] == "valid"
+        assert process["pid_lease_agreement"] is True
+        assert terminal["lease"]["pid_alive"] is False
+    assert process["termination_observed"] is True
+    assert recovery_evidence == {
+        "observed_stage": boundary,
+        "recovery_action": terminal["recovery_action"],
+        "recovery_terminal_sha256": hashlib.sha256(
+            (case_root / "recovery-terminal-state.json").read_bytes()
+        ).hexdigest(),
+        "subsequent_publication_sha256": hashlib.sha256(subsequent_path.read_bytes()).hexdigest(),
+    }
     assert not (case_root / "candidate.sqlite").exists()
     assert (case_root / "rollback.sqlite").is_file()
     if boundary == "after_validation_before_promotion":
@@ -112,16 +159,19 @@ def test_every_fault_has_a_specific_mechanism_and_real_republication(
     fault: str,
 ) -> None:
     case = shared.CrashCase.injected_fault(fault)
-    observation = CandidateACrashDriver(
+    driver = CandidateACrashDriver(
         fixture,
         tmp_path,
         timeout_seconds=20,
-    ).run_crash_case(case)
+    )
+    observation = driver.run_crash_case(case)
     shared.validate_crash_observation(case, {}, observation)
 
     case_root = _case_root(tmp_path, case)
     fault_record = _record(case_root / "fault-observation.json")
     terminal = _record(case_root / "recovery-terminal-state.json")
+    process = driver.execution_evidence["process"]
+    recovery_evidence = driver.execution_evidence["recovery_evidence"]
     assert fault_record["fault"] == fault
     assert fault_record["mechanism"] == _FAULT_MECHANISMS[fault]
     assert fault_record["stage"] == publication_module._fault_boundary(fault)
@@ -132,6 +182,23 @@ def test_every_fault_has_a_specific_mechanism_and_real_republication(
     )
     assert observation.sidecar_terminal_state == terminal["sidecar_terminal_state"]
     assert observation.abandoned_artifact_disposition == terminal["disposition"]
+    assert process["worker_pid"] > 0
+    assert process["actual_return_code"] == process["expected_return_code"] == 87
+    assert process["termination_kind"] == "injected_fault"
+    assert process["requested_boundary"] is None
+    assert process["observed_stage"] == fault_record["stage"]
+    assert process["worker_alive_after_exit"] is False
+    assert process["termination_observed"] is False
+    assert recovery_evidence["observed_stage"] == fault_record["stage"]
+    assert recovery_evidence["recovery_action"] == terminal["recovery_action"]
+    assert (
+        recovery_evidence["recovery_terminal_sha256"]
+        == hashlib.sha256((case_root / "recovery-terminal-state.json").read_bytes()).hexdigest()
+    )
+    assert (
+        recovery_evidence["subsequent_publication_sha256"]
+        == hashlib.sha256((case_root / "subsequent-publication.json").read_bytes()).hexdigest()
+    )
     if fault == "read_process_open_during_promotion":
         reader = fault_record["observed"]["reader_result"]
         assert reader["same_snapshot"] is True
@@ -162,6 +229,63 @@ def test_every_fault_has_a_specific_mechanism_and_real_republication(
         assert (case_root / "recovery-observation-startup-0.json").is_file()
         assert (case_root / "recovery-observation-startup-1.json").is_file()
     _assert_subsequent_publication(case_root)
+
+
+def test_execution_evidence_rejects_inconsistent_or_nonterminal_process(
+    fixture: Any,
+    tmp_path: Path,
+) -> None:
+    case = shared.CrashCase.termination("before_staging")
+    driver = CandidateACrashDriver(
+        fixture,
+        tmp_path,
+        timeout_seconds=20,
+    )
+    driver.run_crash_case(case)
+    case_root = _case_root(tmp_path, case)
+    evidence = driver.execution_evidence
+    worker_pid = int(evidence["process"]["worker_pid"])
+
+    missing_pid = copy.deepcopy(evidence)
+    missing_pid["process"].pop("worker_pid")
+    with pytest.raises(RuntimeError, match="worker PID"):
+        publication_module._validate_execution_evidence(
+            case,
+            missing_pid,
+            case_root=case_root,
+            expected_worker_pid=worker_pid,
+        )
+
+    invalid_values = (
+        ("worker PID", "process", "worker_pid", worker_pid + 1),
+        ("return code", "process", "actual_return_code", 1),
+        ("return code", "process", "expected_return_code", 1),
+        ("observed stage", "process", "observed_stage", "during_parse"),
+        ("PID and lease", "process", "pid_lease_agreement", False),
+        ("nonterminal worker", "process", "worker_alive_after_exit", True),
+        (
+            "recovery terminal digest",
+            "recovery_evidence",
+            "recovery_terminal_sha256",
+            "0" * 64,
+        ),
+        (
+            "subsequent publication digest",
+            "recovery_evidence",
+            "subsequent_publication_sha256",
+            "0" * 64,
+        ),
+    )
+    for message, section, field, value in invalid_values:
+        invalid = copy.deepcopy(evidence)
+        invalid[section][field] = value
+        with pytest.raises(RuntimeError, match=message):
+            publication_module._validate_execution_evidence(
+                case,
+                invalid,
+                case_root=case_root,
+                expected_worker_pid=worker_pid,
+            )
 
 
 def test_publication_forwards_parser_workers_without_changing_default(

@@ -516,6 +516,91 @@ def test_detail_stream_preserves_bounded_oracle_and_process_evidence_before_clea
     assert not runs.exists() or not any(path.is_file() for path in runs.rglob("*"))
 
 
+def test_candidate_a_real_crash_evidence_survives_run_root_cleanup(
+    tmp_path: Path,
+) -> None:
+    candidate_a = importlib.import_module("candidate_a.adapter")
+    artifact = qualification.run_qualification(
+        _config(
+            tmp_path,
+            run_id="candidate-a-crash-detail",
+            case_ids=("crash.terminate.before_staging",),
+        ),
+        environment=_environment(),
+        adapter_loader=lambda _: candidate_a.Adapter(),
+    )
+
+    details = qualification.load_execution_details(
+        artifact.details_path,
+        measurements_path=artifact.measurements_path,
+        expected_sha256=artifact.summary["details_sha256"],
+        expected_records=artifact.summary["detail_records"],
+    )
+    oracle = details[0]["oracle_results"]
+    process = oracle["process"]
+    recovery_evidence = oracle["recovery_evidence"]
+    assert oracle["boundary"] == "before_staging"
+    assert oracle["prior_publication_queryable"] is True
+    assert oracle["rollback_available"] is True
+    assert oracle["subsequent_operation_succeeds"] is True
+    assert process["worker_pid"] > 0
+    assert process["actual_return_code"] == process["expected_return_code"] == 86
+    assert process["termination_kind"] == "exit_code"
+    assert process["requested_boundary"] == process["observed_stage"] == "before_staging"
+    assert process["lease_status"] == "valid"
+    assert process["worker_alive_after_exit"] is False
+    assert process["pid_lease_agreement"] is True
+    assert process["termination_observed"] is True
+    assert recovery_evidence["observed_stage"] == "before_staging"
+    assert len(recovery_evidence["recovery_terminal_sha256"]) == 64
+    assert len(recovery_evidence["subsequent_publication_sha256"]) == 64
+    assert not {
+        "stdout",
+        "stderr",
+        "stdout_bytes",
+        "stderr_bytes",
+    } & set(process)
+    runs = artifact.invocation_root / "runs"
+    assert not runs.exists() or not any(path.is_file() for path in runs.rglob("*"))
+
+
+@pytest.mark.parametrize(
+    ("route", "tool"),
+    (
+        ("generic", "search_objects+execute_sql"),
+        ("named_preset", "top_sessions"),
+    ),
+)
+def test_candidate_a_dbhub_readiness_names_only_local_routes(
+    tmp_path: Path,
+    route: str,
+    tool: str,
+) -> None:
+    candidate_a = importlib.import_module("candidate_a.adapter")
+    case = shared.WorkloadCase(
+        case_id=f"dbhub.{route}",
+        group=shared.WorkloadGroup.DBHUB,
+        parameters=(("route", route),),
+    )
+    run_root = tmp_path / route
+    run_root.mkdir()
+    request = shared.CandidateRequest(
+        case=case,
+        fixture=shared.load_fixture_bundle(_TINY),
+        run_root=run_root,
+        repetition=0,
+        stop=shared.EarlyStopController(case.case_id, case.early_stop_limits),
+    )
+
+    result = candidate_a.Adapter().execute(request)
+
+    assert result.oracle_results == {
+        "ready_for_shared_dbhub_runner": True,
+        "route": route,
+        "tool": tool,
+    }
+
+
 def test_detail_stream_rejects_canonical_tampering(
     tmp_path: Path,
 ) -> None:
