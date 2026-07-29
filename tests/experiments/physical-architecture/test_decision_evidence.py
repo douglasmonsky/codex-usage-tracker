@@ -4,7 +4,6 @@ import hashlib
 import importlib
 import json
 import sys
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +16,7 @@ if str(_EXPERIMENT_ROOT) not in sys.path:
 
 decision_evidence = importlib.import_module("decision_evidence")
 shared = importlib.import_module("shared")
+_SCORE_INPUT_CACHE: dict[tuple[object, ...], dict[str, object]] = {}
 
 
 def _hash(label: str) -> str:
@@ -236,40 +236,195 @@ def _score_input(
     fixture_digests: dict[str, tuple[str, str]],
     code_commit: str,
 ) -> dict[str, object]:
-    case_id = f"build.scale.{scale}"
-    base_value = {"A": 1, "C": 2, "D": 3}[candidate_id]
-    dimensions = [
-        {
-            "dimension": dimension.value,
-            "formula_id": decision_evidence.SCORE_FORMULA_IDS[dimension.value],
-            "source_case_ids": [case_id],
-            "value": str(base_value),
-        }
-        for dimension in sorted(shared.ScoreDimension, key=lambda item: item.value)
-    ]
-    manifest_digest, oracle_digest = fixture_digests[scale]
-    score = shared.CandidateScoreInput(
-        candidate_id=candidate_id,
-        fixture_manifest_digest=manifest_digest,
-        fixture_oracle_digest=oracle_digest,
-        code_commit=code_commit,
-        scale=scale,
-        costs=tuple(
-            shared.DimensionCost(
-                dimension=shared.ScoreDimension(str(dimension["dimension"])),
-                value=Decimal(str(dimension["value"])),
-                source_case_ids=(case_id,),
-            )
-            for dimension in dimensions
-        ),
+    cache_key = (
+        candidate_id,
+        scale,
+        tuple(sorted(fixture_digests.items())),
+        code_commit,
     )
-    return {
-        "dimensions": dimensions,
-        "fixture_id": scale,
-        "formula_contract_sha256": decision_evidence.SCORE_FORMULA_CONTRACT_SHA256,
-        "input_sha256": score.digest,
-        "scale": scale,
+    if cache_key not in _SCORE_INPUT_CACHE:
+        _SCORE_INPUT_CACHE[cache_key] = decision_evidence.extract_score_input(
+            candidate_id=candidate_id,
+            scale=scale,
+            evidence=_score_evidence(fixture_digests, code_commit),
+        )
+    return json.loads(json.dumps(_SCORE_INPUT_CACHE[cache_key]))
+
+
+def _score_evidence_bundle(
+    *,
+    profile: str,
+    case_ids: list[str],
+    code_commit: str,
+    fixture_digests: dict[str, tuple[str, str]],
+    mutate_measurement: Any = None,
+    mutate_detail: Any = None,
+) -> object:
+    run_id = f"score.{profile}"
+    repetitions = 1 if all(case_id.startswith("crash.") for case_id in case_ids) else 5
+    environment = _environment()["identity"]
+    environment_digest = shared.canonical_sha256(environment)
+    manifest_digest, oracle_digest = fixture_digests[profile]
+    invocation_base = {
+        "schema": "codex-usage-tracker.physical-bakeoff-invocation.v1",
+        "run_id": run_id,
+        "code_commit": code_commit,
+        "fixture": {
+            "profile": profile,
+            "fixture_revision": shared.FIXTURE_REVISION,
+            "manifest_digest": manifest_digest,
+            "oracle_digest": oracle_digest,
+        },
+        "workload_matrix_digest": _hash("score.workload"),
+        "environment": environment,
+        "environment_digest": environment_digest,
+        "candidate_ids": ["A"],
+        "case_ids": case_ids,
+        "group_ids": [],
+        "repetitions": repetitions,
+        "speed_claim": repetitions >= 5,
+        "profiled": False,
+        "include_research": False,
+        "qualification_model": None,
+        "retain_run_artifacts": False,
+        "completion_marker": "summary.json",
     }
+    invocation = {
+        **invocation_base,
+        "invocation_digest": shared.canonical_sha256(invocation_base),
+    }
+    measurements: list[dict[str, object]] = []
+    details: list[dict[str, object]] = []
+    execution_index = 0
+    for case_id in case_ids:
+        for repetition in range(repetitions):
+            identity = {
+                "run_id": run_id,
+                "candidate_id": "A",
+                "case_id": case_id,
+                "fixture_profile": profile,
+                "fixture_manifest_digest": manifest_digest,
+                "fixture_oracle_digest": oracle_digest,
+                "repetition": repetition,
+                "profiled": False,
+                "code_commit": code_commit,
+                "workload_matrix_digest": invocation["workload_matrix_digest"],
+                "environment": environment,
+                "qualification_model": None,
+            }
+            values = {
+                "automatic_index_count": 0,
+                "database_bytes": 100,
+                "facts_inserted": 1,
+                "facts_updated": 0,
+                "full_scan_count": 0,
+                "index_bytes": 20,
+                "mcp_latency_ns": 20,
+                "pages_read": 4,
+                "pages_written": 2,
+                "prior_publication_survived": True,
+                "projection_rows_written": 3,
+                "response_bytes": 30,
+                "selector_pages_gap_free": True,
+                "sql_latencies_ns": [10],
+                "temporary_sort_count": 0,
+                "tracker_batches": 1,
+                "tracker_calls": 1,
+                "tracker_polls": 0,
+                "tracker_retries": 0,
+                "refresh_jobs": 0,
+                "wal_bytes": 5,
+                "writer_transactions": 1,
+            }
+            measurement: dict[str, object] = {
+                "schema": shared.MEASUREMENT_SCHEMA,
+                "identity": identity,
+                "wall_time_ns": repetition + 1,
+                "process_cpu_ns": repetition + 1,
+                "outcome": "passed",
+                "partial": False,
+                "stop_decision": None,
+                "detail_code": None,
+                "values": values,
+            }
+            if mutate_measurement is not None:
+                mutate_measurement(measurement)
+            measurements.append(measurement)
+            projected_identity = {
+                **{key: value for key, value in identity.items() if key != "environment"},
+                "environment_digest": environment_digest,
+            }
+            detail_base = {
+                "schema": "codex-usage-tracker.physical-bakeoff-detail.v1",
+                "invocation_digest": invocation["invocation_digest"],
+                "execution_index": execution_index,
+                "measurement_identity": projected_identity,
+                "measurement_identity_digest": shared.canonical_sha256(projected_identity),
+                "measurement_record_digest": shared.canonical_sha256(measurement),
+                "outcome": "passed",
+                "partial": False,
+                "stop_decision": None,
+                "detail_code": None,
+                "oracle_results": None,
+            }
+            detail = {**detail_base, "detail_digest": shared.canonical_sha256(detail_base)}
+            if mutate_detail is not None:
+                mutate_detail(detail)
+            details.append(detail)
+            execution_index += 1
+    measurement_bytes = b"".join(shared.canonical_json_bytes(row) for row in measurements)
+    detail_bytes = b"".join(shared.canonical_json_bytes(row) for row in details)
+    summary_base = {
+        "schema": "codex-usage-tracker.physical-bakeoff-summary.v1",
+        "status": "passed",
+        "run_id": run_id,
+        "invocation_digest": invocation["invocation_digest"],
+        "code_commit": code_commit,
+        "fixture_manifest_digest": manifest_digest,
+        "fixture_oracle_digest": oracle_digest,
+        "workload_matrix_digest": invocation["workload_matrix_digest"],
+        "environment_digest": environment_digest,
+        "measurement_file": "measurements.jsonl",
+        "measurement_sha256": hashlib.sha256(measurement_bytes).hexdigest(),
+        "records": len(measurements),
+        "details_file": "details.jsonl",
+        "details_sha256": hashlib.sha256(detail_bytes).hexdigest(),
+        "detail_records": len(details),
+        "planned_executions": len(measurements),
+        "optional_repetitions_skipped": 0,
+        "retain_run_artifacts": False,
+        "failure": None,
+        "cases": [],
+    }
+    summary = {**summary_base, "summary_digest": shared.canonical_sha256(summary_base)}
+    return decision_evidence.QualificationScoreEvidence(
+        invocation_bytes=shared.canonical_json_bytes(invocation),
+        measurement_bytes=measurement_bytes,
+        detail_bytes=detail_bytes,
+        summary_bytes=shared.canonical_json_bytes(summary),
+    )
+
+
+def _score_evidence(
+    fixture_digests: dict[str, tuple[str, str]],
+    code_commit: str,
+) -> list[object]:
+    cases = {
+        item
+        for scale in ("standard", "production", "growth")
+        for item in decision_evidence.score_formula_source_cases(scale)
+    }
+    return [
+        _score_evidence_bundle(
+            profile=profile,
+            case_ids=sorted(
+                {case_id for expected_profile, case_id in cases if expected_profile == profile}
+            ),
+            code_commit=code_commit,
+            fixture_digests=fixture_digests,
+        )
+        for profile in ("tiny", "standard", "production", "growth")
+    ]
 
 
 def _candidate_rows(
@@ -446,6 +601,18 @@ def _valid_manifest() -> dict[str, Any]:
             *(f"dbhub.{route}" for route in shared.DBHUB_LOCAL_ROUTES),
         }
     )
+    growth_cases = sorted({"build.scale.growth", *query_case_ids})
+    production_cases = sorted(
+        {
+            "build.scale.production",
+            *query_case_ids,
+            *(
+                case_id
+                for profile, case_id in decision_evidence.score_formula_source_cases("production")
+                if profile == "production"
+            ),
+        }
+    )
     runs = [
         {
             "candidate_ids": ["A", "C", "D"],
@@ -462,8 +629,8 @@ def _valid_manifest() -> dict[str, Any]:
         },
         {
             "candidate_ids": ["A", "C", "D"],
-            "case_ids": ["build.scale.growth"],
-            "case_ids_sha256": shared.canonical_sha256(["build.scale.growth"]),
+            "case_ids": growth_cases,
+            "case_ids_sha256": shared.canonical_sha256(growth_cases),
             "fixture_id": "growth",
             "invocation_input_id": "qualification.growth.invocation",
             "measurements_output_id": "qualification.growth.measurements",
@@ -475,8 +642,8 @@ def _valid_manifest() -> dict[str, Any]:
         },
         {
             "candidate_ids": ["A", "C", "D"],
-            "case_ids": ["build.scale.production"],
-            "case_ids_sha256": shared.canonical_sha256(["build.scale.production"]),
+            "case_ids": production_cases,
+            "case_ids_sha256": shared.canonical_sha256(production_cases),
             "fixture_id": "production",
             "invocation_input_id": "qualification.production.invocation",
             "measurements_output_id": "qualification.production.measurements",
@@ -727,7 +894,8 @@ def _valid_manifest() -> dict[str, Any]:
             "case_count": len(
                 set(standard_cases)
                 | set(crash_case_ids)
-                | {"build.scale.production", "build.scale.growth"}
+                | set(production_cases)
+                | set(growth_cases)
             ),
             "contract_version": shared.CANDIDATE_ADAPTER_CONTRACT_VERSION,
             "matrix_input_id": "workload.matrix",
@@ -1190,6 +1358,128 @@ def test_scoring_formula_and_eliminate_before_score_are_frozen() -> None:
         match="between 0 and 0",
     ):
         decision_evidence.build_manifest(fabricated_scores)
+
+
+def test_extracts_all_score_dimensions_from_authenticated_qualification_evidence() -> None:
+    _, fixture_digests = _fixture_rows()
+    code_commit = "a" * 40
+    evidence = _score_evidence(fixture_digests, code_commit)
+
+    score = decision_evidence.extract_score_input(
+        candidate_id="A",
+        scale="standard",
+        evidence=evidence,
+    )
+
+    assert score["formula_contract_sha256"] == decision_evidence.SCORE_FORMULA_CONTRACT_SHA256
+    assert score["fixture_id"] == "standard"
+    assert score["scale"] == "standard"
+    assert [row["dimension"] for row in score["dimensions"]] == sorted(
+        dimension.value for dimension in shared.ScoreDimension
+    )
+    assert {row["dimension"]: row["value"] for row in score["dimensions"]} == {
+        "cold_build_expansion_latency": "40",
+        "crash_recovery_lifecycle_simplicity": "25000025",
+        "database_index_wal_size": "125",
+        "evidence_stability_selector_cost": "20050",
+        "implementation_complexity_operability": "70",
+        "named_query_evidence_mcp_payload_efficiency": "69002072070",
+        "ordinary_tail_latency_write_amplification": "54000045",
+    }
+
+
+@pytest.mark.parametrize(
+    ("mutation", "match"),
+    [
+        (
+            lambda bundles: setattr(
+                bundles[1],
+                "summary_bytes",
+                bundles[1].summary_bytes.replace(
+                    b'"measurement_sha256":"', b'"measurement_sha256":"0'
+                ),
+            ),
+            "canonical|digest",
+        ),
+        (
+            lambda bundles: setattr(
+                bundles[1],
+                "detail_bytes",
+                bundles[1].detail_bytes.replace(
+                    b'"measurement_record_digest":"', b'"measurement_record_digest":"0', 1
+                ),
+            ),
+            "detail.*canonical|digest",
+        ),
+    ],
+)
+def test_score_extraction_rejects_stale_or_authentication_independent_evidence(
+    mutation: Any,
+    match: str,
+) -> None:
+    _, fixture_digests = _fixture_rows()
+    bundles = _score_evidence(fixture_digests, "a" * 40)
+    mutation(bundles)
+
+    with pytest.raises(decision_evidence.DecisionEvidenceContractError, match=match):
+        decision_evidence.extract_score_input(
+            candidate_id="A",
+            scale="standard",
+            evidence=bundles,
+        )
+
+
+def test_score_extraction_fails_closed_on_missing_wrong_case_profile_or_unit() -> None:
+    _, fixture_digests = _fixture_rows()
+    code_commit = "a" * 40
+    cases = decision_evidence.score_formula_source_cases("standard")
+
+    missing = _score_evidence(fixture_digests, code_commit)
+    missing[1] = _score_evidence_bundle(
+        profile="standard",
+        case_ids=[
+            case_id
+            for profile, case_id in cases
+            if profile == "standard" and case_id != "build.scale.standard"
+        ],
+        code_commit=code_commit,
+        fixture_digests=fixture_digests,
+    )
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError, match="missing.*build.scale.standard"
+    ):
+        decision_evidence.extract_score_input(candidate_id="A", scale="standard", evidence=missing)
+
+    wrong_profile = _score_evidence(fixture_digests, code_commit)
+    wrong_profile[1] = _score_evidence_bundle(
+        profile="standard",
+        case_ids=["ordinary.no_source_change"],
+        code_commit=code_commit,
+        fixture_digests=fixture_digests,
+    )
+    with pytest.raises(decision_evidence.DecisionEvidenceContractError, match="profile"):
+        decision_evidence.extract_score_input(
+            candidate_id="A",
+            scale="standard",
+            evidence=wrong_profile,
+        )
+
+    wrong_unit = _score_evidence(fixture_digests, code_commit)
+    wrong_unit[1] = _score_evidence_bundle(
+        profile="standard",
+        case_ids=[case_id for profile, case_id in cases if profile == "standard"],
+        code_commit=code_commit,
+        fixture_digests=fixture_digests,
+        mutate_measurement=lambda row: row["values"].update({"response_bytes": "30"}),
+    )
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError, match="response_bytes.*integer"
+    ):
+        decision_evidence.extract_score_input(
+            candidate_id="A",
+            scale="standard",
+            evidence=wrong_unit,
+        )
 
 
 def test_rejects_stale_schema_and_agent_perf_workload_identity() -> None:

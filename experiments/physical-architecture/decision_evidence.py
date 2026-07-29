@@ -13,7 +13,7 @@ import json
 import os
 import re
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -54,7 +54,189 @@ SCORE_FORMULA_IDS = {
     shared.ScoreDimension.QUERY_EFFICIENCY.value: "ck04.score.query-mcp-payload-efficiency.v1",
     shared.ScoreDimension.STORAGE.value: "ck04.score.database-index-wal-bytes.v1",
 }
-SCORE_FORMULA_CONTRACT_SHA256 = shared.canonical_sha256(SCORE_FORMULA_IDS)
+_ORDINARY_SCORE_CASES = tuple(
+    f"ordinary.{change}"
+    for change in (
+        "no_source_change",
+        "one_model_call",
+        "one_tool_start",
+        "tool_terminal_transition",
+        "tool_plus_state_change",
+        "32_call_tail",
+        "2000_call_tail",
+        "late_event",
+        "rate_card_change",
+    )
+)
+_QUERY_SCORE_CASES = tuple(
+    sorted(
+        case.case_id
+        for case in shared.build_workload_matrix(physical_cores=1).cases
+        if case.group is shared.WorkloadGroup.QUERY
+    )
+)
+_CRASH_SCORE_CASES = tuple(
+    sorted(
+        (
+            *(f"crash.terminate.{boundary}" for boundary in shared.CRASH_BOUNDARIES),
+            *(f"crash.fault.{fault}" for fault in shared.CRASH_FAULTS),
+        )
+    )
+)
+_EVIDENCE_SCORE_CASES = (
+    "query.deep_keyset.page_10",
+    "query.deep_keyset.page_100",
+    "query.deep_keyset.page_1000",
+    "query.deep_keyset.page_10000",
+    "query.feature.selected_session_timeline",
+)
+_PRODUCTION_EXPANSION_CASES = (
+    "build.empty.30_days",
+    "build.empty.90_days",
+    "build.empty.all_time",
+    "build.empty.one_year",
+    "build.expand.30_days_to_90_days",
+    "build.expand.90_days_to_one_year",
+    "build.expand.one_year_to_all_time",
+)
+SCORE_FORMULA_SOURCE_CASES = {
+    shared.ScoreDimension.COLD_BUILD.value: (
+        ("$scale", "build.scale.{scale}"),
+        *(("production", case_id) for case_id in _PRODUCTION_EXPANSION_CASES),
+    ),
+    shared.ScoreDimension.CRASH_RECOVERY.value: tuple(
+        ("tiny", case_id) for case_id in _CRASH_SCORE_CASES
+    ),
+    shared.ScoreDimension.EVIDENCE_STABILITY.value: tuple(
+        ("$scale", case_id) for case_id in _EVIDENCE_SCORE_CASES
+    ),
+    shared.ScoreDimension.OPERABILITY.value: (
+        ("$scale", "build.scale.{scale}"),
+        *(("production", case_id) for case_id in _ORDINARY_SCORE_CASES),
+        *(("tiny", case_id) for case_id in _CRASH_SCORE_CASES),
+    ),
+    shared.ScoreDimension.ORDINARY_TAIL.value: tuple(
+        ("production", case_id) for case_id in _ORDINARY_SCORE_CASES
+    ),
+    shared.ScoreDimension.QUERY_EFFICIENCY.value: tuple(
+        ("$scale", case_id) for case_id in _QUERY_SCORE_CASES
+    ),
+    shared.ScoreDimension.STORAGE.value: (("$scale", "build.scale.{scale}"),),
+}
+SCORE_FORMULA_CONTRACT = {
+    "schema": "codex-usage-tracker.ck04-score-formulas.v1",
+    "nearest_rank_p95": "sort ascending; select ceil(0.95 * sample_count), one-based",
+    "missingness": (
+        "fail closed on a missing case/field, non-passed or profiled record, "
+        "wrong profile/unit, stale digest chain, or fewer than five samples "
+        "except one sample for crash cases"
+    ),
+    "dimensions": {
+        shared.ScoreDimension.COLD_BUILD.value: {
+            "formula_id": SCORE_FORMULA_IDS[shared.ScoreDimension.COLD_BUILD.value],
+            "source_cases": SCORE_FORMULA_SOURCE_CASES[shared.ScoreDimension.COLD_BUILD.value],
+            "source_fields": ("wall_time_ns",),
+            "aggregation": (
+                "sum nearest-rank p95 wall_time_ns for the scale build and the "
+                "seven frozen production empty-build and expansion cases"
+            ),
+            "unit": "nanoseconds",
+        },
+        shared.ScoreDimension.CRASH_RECOVERY.value: {
+            "formula_id": SCORE_FORMULA_IDS[shared.ScoreDimension.CRASH_RECOVERY.value],
+            "source_cases": SCORE_FORMULA_SOURCE_CASES[shared.ScoreDimension.CRASH_RECOVERY.value],
+            "source_fields": (
+                "wall_time_ns",
+                "values.prior_publication_survived",
+                "values.writer_transactions",
+            ),
+            "aggregation": (
+                "sum per-case p95 wall_time_ns plus 1000000 ns per maximum writer "
+                "transaction; prior_publication_survived must be true"
+            ),
+            "unit": "normalized_nanoseconds",
+        },
+        shared.ScoreDimension.EVIDENCE_STABILITY.value: {
+            "formula_id": SCORE_FORMULA_IDS[shared.ScoreDimension.EVIDENCE_STABILITY.value],
+            "source_cases": SCORE_FORMULA_SOURCE_CASES[
+                shared.ScoreDimension.EVIDENCE_STABILITY.value
+            ],
+            "source_fields": (
+                "values.pages_read",
+                "values.selector_pages_gap_free",
+                "values.sql_latencies_ns",
+                "values.temporary_sort_count",
+            ),
+            "aggregation": (
+                "sum per-case p95 SQL latency plus 1000 ns per maximum page read "
+                "plus 1000000000 ns per maximum temporary sort; gap-free must be true"
+            ),
+            "unit": "normalized_nanoseconds",
+        },
+        shared.ScoreDimension.OPERABILITY.value: {
+            "formula_id": SCORE_FORMULA_IDS[shared.ScoreDimension.OPERABILITY.value],
+            "source_cases": SCORE_FORMULA_SOURCE_CASES[shared.ScoreDimension.OPERABILITY.value],
+            "source_fields": (
+                "values.refresh_jobs",
+                "values.tracker_batches",
+                "values.tracker_polls",
+                "values.tracker_retries",
+                "values.writer_transactions",
+            ),
+            "aggregation": "sum per-case maxima of the five operational counts",
+            "unit": "operations",
+        },
+        shared.ScoreDimension.ORDINARY_TAIL.value: {
+            "formula_id": SCORE_FORMULA_IDS[shared.ScoreDimension.ORDINARY_TAIL.value],
+            "source_cases": SCORE_FORMULA_SOURCE_CASES[shared.ScoreDimension.ORDINARY_TAIL.value],
+            "source_fields": (
+                "wall_time_ns",
+                "values.pages_written",
+                "values.projection_rows_written",
+                "values.writer_transactions",
+            ),
+            "aggregation": (
+                "sum per-case p95 wall_time_ns plus 1000000 ns per maximum page "
+                "written, projection row written, and writer transaction"
+            ),
+            "unit": "normalized_nanoseconds",
+        },
+        shared.ScoreDimension.QUERY_EFFICIENCY.value: {
+            "formula_id": SCORE_FORMULA_IDS[shared.ScoreDimension.QUERY_EFFICIENCY.value],
+            "source_cases": SCORE_FORMULA_SOURCE_CASES[
+                shared.ScoreDimension.QUERY_EFFICIENCY.value
+            ],
+            "source_fields": (
+                "values.mcp_latency_ns",
+                "values.response_bytes",
+                "values.sql_latencies_ns",
+                "values.tracker_calls",
+            ),
+            "aggregation": (
+                "sum per-case p95 SQL latency plus p95 MCP latency plus 1000 ns "
+                "per maximum response byte plus 1000000000 ns per maximum tracker call"
+            ),
+            "unit": "normalized_nanoseconds",
+        },
+        shared.ScoreDimension.STORAGE.value: {
+            "formula_id": SCORE_FORMULA_IDS[shared.ScoreDimension.STORAGE.value],
+            "source_cases": SCORE_FORMULA_SOURCE_CASES[shared.ScoreDimension.STORAGE.value],
+            "source_fields": (
+                "values.database_bytes",
+                "values.index_bytes",
+                "values.wal_bytes",
+            ),
+            "aggregation": "maximum per-record sum of database, index, and WAL bytes",
+            "unit": "bytes",
+        },
+    },
+    "scale_identity": {
+        "standard": "standard build/query/evidence plus production tails and tiny crashes",
+        "production": ("production build/expansion/query/evidence/tails plus tiny crashes"),
+        "growth": "growth build/query/evidence plus production tails and tiny crashes",
+    },
+}
+SCORE_FORMULA_CONTRACT_SHA256 = shared.canonical_sha256(SCORE_FORMULA_CONTRACT)
 _REQUIRED_QUESTION_IDS = frozenset(shared.P1_QUESTION_IDS) | frozenset(
     shared.REQUIRED_SLICE_QUESTION_IDS
 )
@@ -188,6 +370,492 @@ class DecisionEvidenceBuild:
     payload: dict[str, Any]
     canonical_bytes: bytes
     sha256: str
+
+
+@dataclass
+class QualificationScoreEvidence:
+    """Exact canonical qualification artifacts consumed by score extraction."""
+
+    invocation_bytes: bytes
+    measurement_bytes: bytes
+    detail_bytes: bytes
+    summary_bytes: bytes
+
+
+@dataclass(frozen=True)
+class _ScoreMeasurement:
+    run_id: str
+    candidate_id: str
+    case_id: str
+    profile: str
+    repetition: int
+    code_commit: str
+    fixture_manifest_digest: str
+    fixture_oracle_digest: str
+    workload_matrix_digest: str
+    environment_digest: str
+    wall_time_ns: int
+    values: Mapping[str, Any]
+
+
+def score_formula_source_cases(scale: str) -> tuple[tuple[str, str], ...]:
+    """Return the exact profile/case identities used by every score dimension."""
+
+    if scale not in _SCALE_ORDER:
+        raise DecisionEvidenceContractError(
+            "score extraction scale must be standard, production, or growth"
+        )
+    cases = {
+        (
+            scale if profile == "$scale" else profile,
+            case_id.format(scale=scale),
+        )
+        for formula_cases in SCORE_FORMULA_SOURCE_CASES.values()
+        for profile, case_id in formula_cases
+    }
+    return tuple(sorted(cases))
+
+
+def extract_score_input(
+    *,
+    candidate_id: str,
+    scale: str,
+    evidence: Sequence[QualificationScoreEvidence],
+) -> dict[str, object]:
+    """Derive one canonical score input from authenticated qualification evidence."""
+
+    candidate_id = _candidate_id(candidate_id, "score extraction candidate_id")
+    required_cases = score_formula_source_cases(scale)
+    if not evidence:
+        raise DecisionEvidenceContractError("score extraction evidence cannot be empty")
+    measurements: list[_ScoreMeasurement] = []
+    for index, bundle in enumerate(evidence):
+        if not isinstance(bundle, QualificationScoreEvidence):
+            raise DecisionEvidenceContractError(
+                f"score evidence[{index}] must be QualificationScoreEvidence"
+            )
+        measurements.extend(
+            _authenticate_score_evidence(
+                bundle,
+                context=f"score evidence[{index}]",
+                candidate_id=candidate_id,
+            )
+        )
+    code_commits = {row.code_commit for row in measurements}
+    workload_digests = {row.workload_matrix_digest for row in measurements}
+    environment_digests = {row.environment_digest for row in measurements}
+    if len(code_commits) != 1:
+        raise DecisionEvidenceContractError("score evidence uses multiple code commits")
+    if len(workload_digests) != 1:
+        raise DecisionEvidenceContractError("score evidence uses multiple workload matrices")
+    if len(environment_digests) != 1:
+        raise DecisionEvidenceContractError("score evidence uses multiple environments")
+    grouped: dict[tuple[str, str], list[_ScoreMeasurement]] = {}
+    for row in measurements:
+        key = (row.profile, row.case_id)
+        grouped.setdefault(key, []).append(row)
+    required_set = set(required_cases)
+    admitted_formula_cases = {
+        item
+        for admitted_scale in _SCALE_ORDER
+        for item in score_formula_source_cases(admitted_scale)
+    }
+    formula_case_ids = {case_id for _, case_id in admitted_formula_cases}
+    for profile, case_id in grouped:
+        if case_id in formula_case_ids and (profile, case_id) not in admitted_formula_cases:
+            raise DecisionEvidenceContractError(
+                f"score source case {case_id} has wrong fixture profile {profile}"
+            )
+    missing = sorted(required_set - set(grouped))
+    if missing:
+        missing_text = ", ".join(f"{profile}:{case_id}" for profile, case_id in missing)
+        raise DecisionEvidenceContractError(
+            f"score evidence is missing source cases: {missing_text}"
+        )
+    selected: dict[tuple[str, str], tuple[_ScoreMeasurement, ...]] = {}
+    for key in required_cases:
+        rows = tuple(grouped[key])
+        minimum = 1 if key[1].startswith("crash.") else 5
+        if len(rows) < minimum:
+            raise DecisionEvidenceContractError(
+                f"score source case {key[1]} requires at least {minimum} authenticated samples"
+            )
+        selected[key] = rows
+    scale_build = selected[(scale, f"build.scale.{scale}")][0]
+    costs = tuple(
+        shared.DimensionCost(
+            dimension=dimension,
+            value=_extract_dimension_cost(dimension, scale=scale, selected=selected),
+            source_case_ids=tuple(
+                sorted(
+                    case_id.format(scale=scale)
+                    for _, case_id in SCORE_FORMULA_SOURCE_CASES[dimension.value]
+                )
+            ),
+        )
+        for dimension in sorted(shared.ScoreDimension, key=lambda item: item.value)
+    )
+    score_input = shared.CandidateScoreInput(
+        candidate_id=candidate_id,
+        fixture_manifest_digest=scale_build.fixture_manifest_digest,
+        fixture_oracle_digest=scale_build.fixture_oracle_digest,
+        code_commit=next(iter(code_commits)),
+        scale=scale,
+        costs=costs,
+    )
+    return {
+        "dimensions": [
+            {
+                "dimension": cost.dimension.value,
+                "formula_id": SCORE_FORMULA_IDS[cost.dimension.value],
+                "source_case_ids": list(cost.source_case_ids),
+                "value": _canonical_decimal(cost.value),
+            }
+            for cost in costs
+        ],
+        "fixture_id": scale,
+        "formula_contract_sha256": SCORE_FORMULA_CONTRACT_SHA256,
+        "input_sha256": score_input.digest,
+        "scale": scale,
+    }
+
+
+def _authenticate_score_evidence(
+    bundle: QualificationScoreEvidence,
+    *,
+    context: str,
+    candidate_id: str,
+) -> tuple[_ScoreMeasurement, ...]:
+    invocation = _canonical_score_object(bundle.invocation_bytes, f"{context} invocation")
+    summary = _canonical_score_object(bundle.summary_bytes, f"{context} summary")
+    _verify_score_digest(invocation, "invocation_digest", f"{context} invocation")
+    _verify_score_digest(summary, "summary_digest", f"{context} summary")
+    if invocation.get("schema") != "codex-usage-tracker.physical-bakeoff-invocation.v1":
+        raise DecisionEvidenceContractError(f"{context} invocation schema is unsupported")
+    if summary.get("schema") != "codex-usage-tracker.physical-bakeoff-summary.v1":
+        raise DecisionEvidenceContractError(f"{context} summary schema is unsupported")
+    if summary.get("status") != "passed" or summary.get("failure") is not None:
+        raise DecisionEvidenceContractError(f"{context} summary must be a passed qualification")
+    if invocation.get("profiled") is not False:
+        raise DecisionEvidenceContractError(f"{context} profiled evidence cannot feed scores")
+    if invocation.get("invocation_digest") != summary.get("invocation_digest"):
+        raise DecisionEvidenceContractError(f"{context} summary invocation digest is stale")
+    if hashlib.sha256(bundle.measurement_bytes).hexdigest() != summary.get("measurement_sha256"):
+        raise DecisionEvidenceContractError(f"{context} measurement digest is stale")
+    if hashlib.sha256(bundle.detail_bytes).hexdigest() != summary.get("details_sha256"):
+        raise DecisionEvidenceContractError(f"{context} detail digest is stale")
+    measurements = _canonical_score_lines(
+        bundle.measurement_bytes,
+        artifact=f"{context} measurements",
+    )
+    details = _canonical_score_lines(bundle.detail_bytes, artifact=f"{context} details")
+    if len(measurements) != len(details):
+        raise DecisionEvidenceContractError(f"{context} measurement/detail counts differ")
+    if summary.get("records") != len(measurements) or summary.get("detail_records") != len(details):
+        raise DecisionEvidenceContractError(f"{context} summary record counts are stale")
+    fixture = invocation.get("fixture")
+    environment = invocation.get("environment")
+    if not isinstance(fixture, dict) or not isinstance(environment, dict):
+        raise DecisionEvidenceContractError(f"{context} invocation identity is incomplete")
+    environment_digest = shared.canonical_sha256(environment)
+    if invocation.get("environment_digest") != environment_digest:
+        raise DecisionEvidenceContractError(f"{context} environment digest is stale")
+    summary_bindings = {
+        "run_id": invocation.get("run_id"),
+        "code_commit": invocation.get("code_commit"),
+        "fixture_manifest_digest": fixture.get("manifest_digest"),
+        "fixture_oracle_digest": fixture.get("oracle_digest"),
+        "workload_matrix_digest": invocation.get("workload_matrix_digest"),
+        "environment_digest": environment_digest,
+    }
+    if any(summary.get(field) != expected for field, expected in summary_bindings.items()):
+        raise DecisionEvidenceContractError(f"{context} summary identity is stale")
+    candidate_ids = invocation.get("candidate_ids")
+    case_ids = invocation.get("case_ids")
+    if candidate_ids != [candidate_id] or not isinstance(case_ids, list):
+        raise DecisionEvidenceContractError(
+            f"{context} invocation must contain only candidate {candidate_id}"
+        )
+    planned_repetitions = _integer(
+        invocation.get("repetitions"),
+        f"{context} invocation repetitions",
+        minimum=1,
+        maximum=100,
+    )
+    if invocation.get("speed_claim") is True and planned_repetitions < 5:
+        raise DecisionEvidenceContractError(
+            f"{context} speed claim requires five unprofiled repetitions"
+        )
+    if summary.get("planned_executions") != len(case_ids) * planned_repetitions:
+        raise DecisionEvidenceContractError(f"{context} planned execution count is stale")
+    admitted_cases = set(case_ids)
+    rows: list[_ScoreMeasurement] = []
+    identities: set[tuple[str, str, int]] = set()
+    for index, (measurement, detail) in enumerate(zip(measurements, details, strict=True)):
+        item_context = f"{context} record[{index}]"
+        _verify_score_digest(detail, "detail_digest", f"{item_context} detail")
+        if measurement.get("schema") != shared.MEASUREMENT_SCHEMA:
+            raise DecisionEvidenceContractError(f"{item_context} measurement schema is unsupported")
+        if detail.get("schema") != "codex-usage-tracker.physical-bakeoff-detail.v1":
+            raise DecisionEvidenceContractError(f"{item_context} detail schema is unsupported")
+        if detail.get("execution_index") != index:
+            raise DecisionEvidenceContractError(f"{item_context} execution index is stale")
+        if detail.get("invocation_digest") != invocation.get("invocation_digest"):
+            raise DecisionEvidenceContractError(f"{item_context} detail invocation digest is stale")
+        if detail.get("measurement_record_digest") != shared.canonical_sha256(measurement):
+            raise DecisionEvidenceContractError(
+                f"{item_context} detail measurement record digest is stale"
+            )
+        identity = measurement.get("identity")
+        values = measurement.get("values")
+        projected = detail.get("measurement_identity")
+        if (
+            not isinstance(identity, dict)
+            or not isinstance(values, dict)
+            or not isinstance(projected, dict)
+        ):
+            raise DecisionEvidenceContractError(f"{item_context} measurement is incomplete")
+        expected_projected = {
+            **{key: value for key, value in identity.items() if key != "environment"},
+            "environment_digest": environment_digest,
+        }
+        if projected != expected_projected or detail.get(
+            "measurement_identity_digest"
+        ) != shared.canonical_sha256(projected):
+            raise DecisionEvidenceContractError(
+                f"{item_context} detail measurement identity digest is stale"
+            )
+        case_id = identity.get("case_id")
+        repetition = identity.get("repetition")
+        if (
+            identity.get("candidate_id") != candidate_id
+            or case_id not in admitted_cases
+            or type(repetition) is not int
+            or repetition < 0
+            or repetition >= planned_repetitions
+        ):
+            raise DecisionEvidenceContractError(f"{item_context} identity escaped invocation")
+        bindings = {
+            "run_id": invocation.get("run_id"),
+            "fixture_profile": fixture.get("profile"),
+            "fixture_manifest_digest": fixture.get("manifest_digest"),
+            "fixture_oracle_digest": fixture.get("oracle_digest"),
+            "code_commit": invocation.get("code_commit"),
+            "workload_matrix_digest": invocation.get("workload_matrix_digest"),
+            "environment": environment,
+            "profiled": False,
+        }
+        if any(identity.get(field) != expected for field, expected in bindings.items()):
+            raise DecisionEvidenceContractError(f"{item_context} identity binding is stale")
+        if (
+            measurement.get("outcome") != "passed"
+            or measurement.get("partial") is not False
+            or detail.get("outcome") != "passed"
+            or detail.get("partial") is not False
+        ):
+            raise DecisionEvidenceContractError(f"{item_context} must be complete and passed")
+        identity_key = (str(identity["run_id"]), str(case_id), repetition)
+        if identity_key in identities:
+            raise DecisionEvidenceContractError(f"{item_context} replays a measurement identity")
+        identities.add(identity_key)
+        rows.append(
+            _ScoreMeasurement(
+                run_id=str(identity["run_id"]),
+                candidate_id=candidate_id,
+                case_id=str(case_id),
+                profile=str(identity["fixture_profile"]),
+                repetition=repetition,
+                code_commit=_commit(identity["code_commit"], f"{item_context}.code_commit"),
+                fixture_manifest_digest=_sha256(
+                    identity["fixture_manifest_digest"],
+                    f"{item_context}.fixture_manifest_digest",
+                ),
+                fixture_oracle_digest=_sha256(
+                    identity["fixture_oracle_digest"],
+                    f"{item_context}.fixture_oracle_digest",
+                ),
+                workload_matrix_digest=_sha256(
+                    identity["workload_matrix_digest"],
+                    f"{item_context}.workload_matrix_digest",
+                ),
+                environment_digest=environment_digest,
+                wall_time_ns=_integer(
+                    measurement.get("wall_time_ns"),
+                    f"{item_context}.wall_time_ns",
+                    minimum=0,
+                ),
+                values=values,
+            )
+        )
+    return tuple(rows)
+
+
+def _canonical_score_object(payload: bytes, artifact: str) -> dict[str, Any]:
+    decoded = _decode_json_object(payload, artifact=artifact)
+    if payload != shared.canonical_json_bytes(decoded):
+        raise DecisionEvidenceContractError(f"{artifact} is not canonical JSON")
+    return decoded
+
+
+def _canonical_score_lines(payload: bytes, *, artifact: str) -> tuple[dict[str, Any], ...]:
+    if not payload:
+        raise DecisionEvidenceContractError(f"{artifact} cannot be empty")
+    lines = payload.splitlines(keepends=True)
+    rows = tuple(
+        _canonical_score_object(line, f"{artifact}[{index}]") for index, line in enumerate(lines)
+    )
+    if b"".join(shared.canonical_json_bytes(row) for row in rows) != payload:
+        raise DecisionEvidenceContractError(f"{artifact} is not canonical JSONL")
+    return rows
+
+
+def _verify_score_digest(document: Mapping[str, Any], field: str, context: str) -> None:
+    expected = document.get(field)
+    base = {key: value for key, value in document.items() if key != field}
+    if expected != shared.canonical_sha256(base):
+        raise DecisionEvidenceContractError(f"{context} {field} is stale")
+
+
+def _dimension_rows(
+    dimension: shared.ScoreDimension,
+    *,
+    scale: str,
+    selected: Mapping[tuple[str, str], tuple[_ScoreMeasurement, ...]],
+) -> tuple[tuple[_ScoreMeasurement, ...], ...]:
+    return tuple(
+        selected[
+            (
+                scale if profile == "$scale" else profile,
+                case_id.format(scale=scale),
+            )
+        ]
+        for profile, case_id in SCORE_FORMULA_SOURCE_CASES[dimension.value]
+    )
+
+
+def _extract_dimension_cost(
+    dimension: shared.ScoreDimension,
+    *,
+    scale: str,
+    selected: Mapping[tuple[str, str], tuple[_ScoreMeasurement, ...]],
+) -> Decimal:
+    case_rows = _dimension_rows(dimension, scale=scale, selected=selected)
+    if dimension is shared.ScoreDimension.COLD_BUILD:
+        value = sum(_p95(row.wall_time_ns for row in rows) for rows in case_rows)
+    elif dimension is shared.ScoreDimension.ORDINARY_TAIL:
+        value = sum(
+            _p95(row.wall_time_ns for row in rows)
+            + 1_000_000
+            * (
+                _maximum_value(rows, "pages_written")
+                + _maximum_value(rows, "projection_rows_written")
+                + _maximum_value(rows, "writer_transactions")
+            )
+            for rows in case_rows
+        )
+    elif dimension is shared.ScoreDimension.QUERY_EFFICIENCY:
+        value = sum(
+            _p95_sql_latency(rows)
+            + _p95(_integer_value(row, "mcp_latency_ns") for row in rows)
+            + 1_000 * _maximum_value(rows, "response_bytes")
+            + 1_000_000_000 * _maximum_value(rows, "tracker_calls")
+            for rows in case_rows
+        )
+    elif dimension is shared.ScoreDimension.STORAGE:
+        value = max(
+            _integer_value(row, "database_bytes")
+            + _integer_value(row, "index_bytes")
+            + _integer_value(row, "wal_bytes")
+            for rows in case_rows
+            for row in rows
+        )
+    elif dimension is shared.ScoreDimension.CRASH_RECOVERY:
+        for rows in case_rows:
+            if any(_boolean_value(row, "prior_publication_survived") is not True for row in rows):
+                raise DecisionEvidenceContractError(
+                    f"score source case {rows[0].case_id} did not preserve the prior publication"
+                )
+        value = sum(
+            _p95(row.wall_time_ns for row in rows)
+            + 1_000_000 * _maximum_value(rows, "writer_transactions")
+            for rows in case_rows
+        )
+    elif dimension is shared.ScoreDimension.EVIDENCE_STABILITY:
+        for rows in case_rows:
+            if any(_boolean_value(row, "selector_pages_gap_free") is not True for row in rows):
+                raise DecisionEvidenceContractError(
+                    f"score source case {rows[0].case_id} is not gap-free"
+                )
+        value = sum(
+            _p95_sql_latency(rows)
+            + 1_000 * _maximum_value(rows, "pages_read")
+            + 1_000_000_000 * _maximum_value(rows, "temporary_sort_count")
+            for rows in case_rows
+        )
+    else:
+        value = sum(
+            max(
+                sum(
+                    _integer_value(row, field)
+                    for field in (
+                        "refresh_jobs",
+                        "tracker_batches",
+                        "tracker_polls",
+                        "tracker_retries",
+                        "writer_transactions",
+                    )
+                )
+                for row in rows
+            )
+            for rows in case_rows
+        )
+    return Decimal(value)
+
+
+def _integer_value(row: _ScoreMeasurement, field: str) -> int:
+    return _integer(
+        row.values.get(field),
+        f"score source {row.profile}:{row.case_id} values.{field}",
+        minimum=0,
+    )
+
+
+def _boolean_value(row: _ScoreMeasurement, field: str) -> bool:
+    return _boolean(
+        row.values.get(field),
+        f"score source {row.profile}:{row.case_id} values.{field}",
+    )
+
+
+def _maximum_value(rows: Sequence[_ScoreMeasurement], field: str) -> int:
+    return max(_integer_value(row, field) for row in rows)
+
+
+def _p95_sql_latency(rows: Sequence[_ScoreMeasurement]) -> int:
+    values: list[int] = []
+    for row in rows:
+        latencies = row.values.get("sql_latencies_ns")
+        if not isinstance(latencies, list) or not latencies:
+            raise DecisionEvidenceContractError(
+                f"score source {row.profile}:{row.case_id} values.sql_latencies_ns "
+                "must be a non-empty integer array"
+            )
+        values.extend(
+            _integer(
+                value,
+                f"score source {row.profile}:{row.case_id} values.sql_latencies_ns",
+                minimum=0,
+            )
+            for value in latencies
+        )
+    return _p95(values)
+
+
+def _p95(values: Iterable[int]) -> int:
+    ordered = sorted(values)
+    if not ordered:
+        raise DecisionEvidenceContractError("score distribution cannot be empty")
+    return ordered[((95 * len(ordered) + 99) // 100) - 1]
 
 
 @dataclass(frozen=True)
@@ -1185,7 +1853,7 @@ def _validate_score_inputs(
                 dimension["source_case_ids"],
                 f"{dimension_context}.source_case_ids",
                 minimum=1,
-                maximum=64,
+                maximum=128,
                 item_maximum=128,
             )
             for case_id in source_case_ids:
@@ -1198,6 +1866,14 @@ def _validate_score_inputs(
                 source_case_ids,
                 f"{dimension_context}.source_case_ids",
             )
+            expected_source_case_ids = sorted(
+                case_id.format(scale=scale)
+                for _, case_id in SCORE_FORMULA_SOURCE_CASES[dimension_name]
+            )
+            if source_case_ids != expected_source_case_ids:
+                raise DecisionEvidenceContractError(
+                    f"{dimension_context}.source_case_ids differ from frozen scoring formula"
+                )
             decimal_value = _decimal(
                 dimension["value"],
                 f"{dimension_context}.value",
