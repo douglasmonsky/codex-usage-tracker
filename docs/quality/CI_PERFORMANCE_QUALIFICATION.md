@@ -13,9 +13,10 @@ the tests, but that lane never asserts them. Row counts, planner choices,
 transaction counts and scope, percentile sample semantics, query plans,
 response sizes, and all other deterministic assertions remain blocking.
 
-The scale step has a five-minute host-side deadline. Exit 124 or 137 is reported
-as bounded suite non-completion, not as proof of an absolute-latency product
-regression. Ordinary assertion and process failures remain blocking.
+The repository-owned Python wrapper gives the scale step a five-minute
+host-side deadline in both required CI and `just v`. Only a deadline observed
+by that wrapper becomes bounded suite non-completion; an independent exit 137,
+OOM, assertion, or process failure remains a distinct blocking failure.
 
 ## Outcomes
 
@@ -36,12 +37,19 @@ The performance plugin emits one
 plugin reports include `pytest_exit_status`, so an invariant failure remains
 distinguishable from a qualified timing regression.
 
+Every completed qualification report must contain the exact 17 metrics and
+budgets in
+`codex-usage-tracker.ci-performance-budgets.v1`. Missing, extra, renamed, or
+changed budgets make the report invalid rather than silently weakening the
+gate.
+
 ## Hosted-runner qualification
 
 The plugin measures three independent calibration rounds both before and after
 the performance suite. Each round contains:
 
-- a fixed CPU probe comparing wall time with process CPU time; and
+- a fixed CPU probe comparing wall time with process CPU time and requiring at
+  most 50 ms of process CPU for the fixed work; and
 - 60 short SQLite WAL transactions measuring p95 and maximum duration.
 
 At least two of three rounds must be healthy at both boundaries. A qualified
@@ -68,19 +76,15 @@ The authoritative absolute-budget command is explicit strict mode on a known
 qualification host:
 
 ```bash
-CODEX_USAGE_PERFORMANCE_LANE=strict \
-CODEX_USAGE_PERFORMANCE_REPORT=/tmp/performance-qualification.json \
-python -m pytest -p no:tach -p tests.kernel.performance_qualification \
-  tests/kernel/test_ingest_performance.py \
-  tests/kernel/allowance/test_performance.py \
-  tests/kernel/evidence/test_performance.py \
-  tests/kernel/interfaces/test_performance.py \
-  tests/kernel/query/test_performance.py
+python scripts/run_performance_suite.py \
+  --lane strict \
+  --report /tmp/performance-qualification.json
 ```
 
 Strict mode has no runner escape: any wall-clock breach fails. The scheduled
-`Qualified hosted performance` workflow is deliberately labeled as hosted and
-calibration-qualified; it is not represented as controlled hardware.
+`Repeated hosted performance qualification` workflow is deliberately labeled
+as hosted and calibration-qualified; it is not represented as controlled
+hardware.
 
 ## Cost
 

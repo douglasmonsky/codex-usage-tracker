@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from pathlib import Path
 
 import pytest
 
 from scripts.aggregate_performance_qualification import aggregate_reports
+from scripts.performance_budget_contract import PERFORMANCE_BUDGETS_MS
+from scripts.run_performance_suite import run_bounded_command
 from tests.kernel import performance_qualification
 from tests.kernel.performance_qualification import (
     BudgetObservation,
@@ -35,6 +39,18 @@ def _round(*, healthy: bool) -> CalibrationRound:
 
 def _boundary(*states: bool) -> CalibrationBoundary:
     return CalibrationBoundary(tuple(_round(healthy=state) for state in states))
+
+
+def test_calibration_rejects_uniformly_slow_cpu() -> None:
+    slow = CalibrationRound(
+        cpu_wall_ms=5_000.0,
+        cpu_process_ms=4_999.0,
+        sqlite_p95_ms=1.0,
+        sqlite_max_ms=3.0,
+    )
+
+    assert slow.scheduler_gap_ms == 1.0
+    assert slow.healthy is False
 
 
 def test_qualified_hosted_runner_fails_a_real_regression() -> None:
@@ -189,6 +205,21 @@ def test_strict_helper_still_fails_an_absolute_budget(
         )
 
 
+def test_budget_recorder_rejects_unknown_or_changed_contracts() -> None:
+    with pytest.raises(ValueError, match="unknown performance budget metric"):
+        performance_qualification.record_wall_clock_budget(
+            "renamed_writer_p95_ms",
+            1.0,
+            50.0,
+        )
+    with pytest.raises(ValueError, match="must be 50.000000 ms"):
+        performance_qualification.record_wall_clock_budget(
+            "active_writer_p95_ms",
+            1.0,
+            500.0,
+        )
+
+
 def test_hosted_hook_keeps_runner_unqualified_machine_readable(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -312,19 +343,21 @@ def _run_report(
     runner_qualified: bool = True,
     pytest_exit_status: int = 0,
 ) -> dict[str, object]:
+    observations = [
+        {
+            "budget": budget,
+            "metric": metric,
+            "observed": budget / 2,
+        }
+        for metric, budget in PERFORMANCE_BUDGETS_MS.items()
+    ]
+    for observation in observations:
+        if observation["metric"] == "active_writer_p95_ms":
+            observation["observed"] = writer_p95_ms
+        elif observation["metric"] == "active_writer_max_ms":
+            observation["observed"] = writer_p95_ms + 5.0
     return {
-        "observations": [
-            {
-                "budget": 50.0,
-                "metric": "active_writer_p95_ms",
-                "observed": writer_p95_ms,
-            },
-            {
-                "budget": 150.0,
-                "metric": "active_writer_max_ms",
-                "observed": writer_p95_ms + 5.0,
-            },
-        ],
+        "observations": observations,
         "outcome": outcome,
         "pytest_exit_status": pytest_exit_status,
         "runner_qualified": runner_qualified,
@@ -386,3 +419,50 @@ def test_five_run_aggregate_keeps_failure_classes_distinct() -> None:
     assert aggregate_reports(tuple(failed))["outcome"] == "test_failure"
     assert aggregate_reports(tuple(timed_out))["outcome"] == "suite_timeout"
     assert aggregate_reports(healthy[:4])["outcome"] == "invalid_report"
+
+
+def test_five_run_aggregate_requires_exact_budget_contract() -> None:
+    healthy = [_run_report(20.0) for _index in range(5)]
+    missing = [dict(report) for report in healthy]
+    missing[0] = {
+        **missing[0],
+        "observations": list(missing[0]["observations"])[1:],
+    }
+    extra = [dict(report) for report in healthy]
+    extra_observations = list(extra[0]["observations"])
+    extra_observations.append(
+        {"budget": 1.0, "metric": "unrelated_metric_ms", "observed": 0.1}
+    )
+    extra[0] = {**extra[0], "observations": extra_observations}
+    wrong_budget = [dict(report) for report in healthy]
+    changed = [dict(item) for item in wrong_budget[0]["observations"]]
+    changed[0]["budget"] = float(changed[0]["budget"]) + 1.0
+    wrong_budget[0] = {**wrong_budget[0], "observations": changed}
+
+    assert aggregate_reports(tuple(missing))["outcome"] == "invalid_report"
+    assert aggregate_reports(tuple(extra))["outcome"] == "invalid_report"
+    assert aggregate_reports(tuple(wrong_budget))["outcome"] == "invalid_report"
+
+
+def test_bounded_runner_distinguishes_timeout_from_exit_137(tmp_path: Path) -> None:
+    timeout_report = tmp_path / "timeout.json"
+    timeout_status = run_bounded_command(
+        (sys.executable, "-c", "import time; time.sleep(5)"),
+        environment=os.environ,
+        timeout_seconds=0.05,
+        report_path=timeout_report,
+    )
+    killed_report = tmp_path / "killed.json"
+    killed_status = run_bounded_command(
+        (sys.executable, "-c", "raise SystemExit(137)"),
+        environment=os.environ,
+        timeout_seconds=5.0,
+        report_path=killed_report,
+    )
+
+    assert timeout_status == 124
+    assert json.loads(timeout_report.read_text(encoding="utf-8"))["outcome"] == (
+        "suite_timeout"
+    )
+    assert killed_status == 137
+    assert not killed_report.exists()

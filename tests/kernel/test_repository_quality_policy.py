@@ -86,20 +86,21 @@ def test_ci_runs_scale_invariants_without_a_host_wall_clock_gate() -> None:
         "tests/kernel/interfaces/test_performance.py",
         "tests/kernel/query/test_performance.py",
     ):
-        assert workflow.count(path) == 2
+        assert workflow.count(path) == 1
         assert f"--ignore={path}" in workflow
     assert 'if [ "$MATRIX_PYTHON" = "3.14" ]; then' not in workflow
     assert "Run synthetic scale invariants" in workflow
-    assert "CODEX_USAGE_PERFORMANCE_LANE: invariants" in workflow
+    assert "scripts/run_performance_suite.py --lane invariants" in workflow
     assert "github_hosted_qualified" not in workflow
     assert "CODEX_USAGE_PERFORMANCE_REPORT" not in workflow
     assert "-p tests.kernel.performance_qualification" not in workflow
-    assert "timeout --signal=TERM --kill-after=30s 5m" in workflow
-    assert "scale invariant suite timed out" in workflow
+    assert "timeout --signal" not in workflow
+    assert "137" not in workflow
     assert "continue-on-error:" not in workflow
     assert "Summarize performance qualification" not in workflow
     assert "Upload performance qualification telemetry" not in workflow
-    assert "CODEX_USAGE_PERFORMANCE_LANE=invariants" in justfile
+    assert "scripts/run_performance_suite.py --lane invariants" in justfile
+    assert justfile.count("--ignore=tests/kernel/") >= 5
     assert "tests/kernel/test_ci_performance_qualification.py" in justfile
 
 
@@ -116,16 +117,16 @@ def test_hosted_performance_workflow_repeats_pinned_image_qualification() -> Non
     assert "schedule:" in workflow
     assert "runs-on: ubuntu-24.04" in workflow
     assert "for repetition in 1 2 3 4 5" in workflow
-    assert "CODEX_USAGE_PERFORMANCE_LANE: github_hosted_qualified" in workflow
-    assert "-p tests.kernel.performance_qualification" in workflow
-    assert "timeout --signal=TERM --kill-after=30s 5m" in workflow
-    assert '"outcome":"suite_timeout"' in workflow
+    assert "--lane github_hosted_qualified" in workflow
+    assert "scripts/run_performance_suite.py" in workflow
+    assert "timeout --signal" not in workflow
+    assert "137" not in workflow
     assert "scripts/aggregate_performance_qualification.py" in workflow
     assert "performance-qualification-summary.json" in workflow
     assert "continue-on-error:" not in workflow
     assert "self-hosted" not in workflow
     assert "controlled" not in workflow.lower()
-    assert "CODEX_USAGE_PERFORMANCE_LANE=strict" in qualification
+    assert "--lane strict" in qualification
     assert "Strict mode has no runner escape" in qualification
     assert "five independent unprofiled repetitions" in qualification
     assert "median" in qualification

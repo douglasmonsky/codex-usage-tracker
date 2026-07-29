@@ -17,8 +17,6 @@ jobs:
     name: Five-run calibrated qualification
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    env:
-      CODEX_USAGE_PERFORMANCE_LANE: github_hosted_qualified
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,22 +32,13 @@ jobs:
         run: |
           mkdir -p performance-runs
           for repetition in 1 2 3 4 5; do
-            export CODEX_USAGE_PERFORMANCE_REPORT="performance-runs/repetition-${repetition}.json"
+            report="performance-runs/repetition-${repetition}.json"
             set +e
-            timeout --signal=TERM --kill-after=30s 5m \
-              python -m pytest -p no:tach -p tests.kernel.performance_qualification \
-              tests/kernel/test_ingest_performance.py \
-              tests/kernel/allowance/test_performance.py \
-              tests/kernel/evidence/test_performance.py \
-              tests/kernel/interfaces/test_performance.py \
-              tests/kernel/query/test_performance.py
+            python scripts/run_performance_suite.py \
+              --lane github_hosted_qualified \
+              --report "$report"
             status=$?
             set -e
-            if test "$status" -eq 124 || test "$status" -eq 137; then
-              printf '%s\n' \
-                '{"lane":"github_hosted_qualified","outcome":"suite_timeout","schema":"codex-usage-tracker.ci-performance-qualification.v1","timeout_seconds":300}' \
-                > "$CODEX_USAGE_PERFORMANCE_REPORT"
-            fi
             echo "repetition=${repetition} process_status=${status}"
           done
       - name: Aggregate sustained performance evidence

@@ -16,11 +16,14 @@ from pathlib import Path
 
 import pytest
 
+from scripts.performance_budget_contract import require_budget
+
 _CALIBRATION_ROUNDS = 3
 _CALIBRATION_QUORUM = 2
 _CPU_ITERATIONS = 5_000
 _SQLITE_SAMPLES = 60
 _CPU_SCHEDULER_GAP_BUDGET_MS = 50.0
+_CPU_PROCESS_BUDGET_MS = 50.0
 _SQLITE_P95_BUDGET_MS = 10.0
 _SQLITE_MAX_BUDGET_MS = 150.0
 _LANE_ENV = "CODEX_USAGE_PERFORMANCE_LANE"
@@ -69,7 +72,8 @@ class CalibrationRound:
     @property
     def healthy(self) -> bool:
         return (
-            self.scheduler_gap_ms <= _CPU_SCHEDULER_GAP_BUDGET_MS
+            self.cpu_process_ms <= _CPU_PROCESS_BUDGET_MS
+            and self.scheduler_gap_ms <= _CPU_SCHEDULER_GAP_BUDGET_MS
             and self.sqlite_p95_ms <= _SQLITE_P95_BUDGET_MS
             and self.sqlite_max_ms <= _SQLITE_MAX_BUDGET_MS
         )
@@ -184,6 +188,7 @@ def classify_performance(
 
 
 def record_wall_clock_budget(metric: str, observed: float, budget: float) -> None:
+    require_budget(metric, budget)
     observation = BudgetObservation(metric, observed, budget)
     _OBSERVATIONS.append(observation)
     if _lane() is PerformanceLane.STRICT and observed > budget:

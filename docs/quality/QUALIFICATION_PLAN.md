@@ -164,7 +164,10 @@ repeated qualification protocol in
 [`CI_PERFORMANCE_QUALIFICATION.md`](CI_PERFORMANCE_QUALIFICATION.md) owns
 absolute timing evidence. A GitHub-hosted runner may enforce absolute latency
 only when same-run calibration qualifies it. Explicit strict mode on a known
-qualification host remains the authoritative absolute-budget command.
+qualification host remains the authoritative absolute-budget command. The
+repository-owned runner bounds the scale suite to five minutes in CI and
+`just v`, and its versioned 17-metric contract fails closed on missing,
+renamed, extra, or changed budgets.
 
 ### Mandatory attribution
 

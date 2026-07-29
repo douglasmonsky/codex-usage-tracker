@@ -357,6 +357,8 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         ".github/workflows/performance-qualification.yml",
         "docs/quality/CI_PERFORMANCE_QUALIFICATION.md",
         "scripts/aggregate_performance_qualification.py",
+        "scripts/performance_budget_contract.py",
+        "scripts/run_performance_suite.py",
         "tests/kernel/performance_qualification.py",
         "tests/kernel/test_ci_performance_qualification.py",
     } == CI_PERFORMANCE_QUALIFICATION_ADDITIONS

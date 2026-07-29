@@ -11,6 +11,17 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TypedDict
 
+if __package__:
+    from .performance_budget_contract import (
+        PERFORMANCE_BUDGET_CONTRACT_VERSION,
+        PERFORMANCE_BUDGETS_MS,
+    )
+else:
+    from performance_budget_contract import (  # type: ignore[import-not-found, no-redef]
+        PERFORMANCE_BUDGET_CONTRACT_VERSION,
+        PERFORMANCE_BUDGETS_MS,
+    )
+
 _RUN_SCHEMA = "codex-usage-tracker.ci-performance-qualification.v1"
 _AGGREGATE_SCHEMA = "codex-usage-tracker.ci-performance-qualification.aggregate.v1"
 _REQUIRED_REPETITIONS = 5
@@ -37,6 +48,7 @@ def _base_report(
     reports: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
     return {
+        "budget_contract": PERFORMANCE_BUDGET_CONTRACT_VERSION,
         "breaches": [],
         "metrics": [],
         "repetitions_expected": _REQUIRED_REPETITIONS,
@@ -98,14 +110,16 @@ def _aggregate_metrics(
         return None
     observations = [item for item in run_maps if item is not None]
     metric_names = set(observations[0])
-    if any(set(item) != metric_names for item in observations[1:]):
+    if metric_names != set(PERFORMANCE_BUDGETS_MS) or any(
+        set(item) != metric_names for item in observations[1:]
+    ):
         return None
 
     metrics: list[MetricSummary] = []
     for metric in sorted(metric_names):
         samples = [item[metric][0] for item in observations]
         budgets = {item[metric][1] for item in observations}
-        if len(budgets) != 1:
+        if budgets != {PERFORMANCE_BUDGETS_MS[metric]}:
             return None
         budget = budgets.pop()
         ordered = sorted(samples)
@@ -198,7 +212,7 @@ def aggregate_reports(
         return _terminal_report(
             reports,
             "invalid_report",
-            "metric names and budgets must match across all repetitions",
+            "metric names and budgets must exactly match the versioned contract",
         )
     breaches = [
         metric
