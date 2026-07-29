@@ -15,10 +15,10 @@ Start at `docs/INDEX.md`. The only implementation roadmap is
 `docs/roadmap/tasks/`. Archived documents and historical release notes are
 evidence, not authority.
 
-Work one CK packet at a time. Do not begin a dependent packet before its
-prerequisites are checked complete. Update the packet status, master checkbox
-ledger, measurements, deviations, and residual risks in the same change that
-completes a packet.
+Advance CK packets in dependency order. Do not begin a dependent packet before
+its prerequisites are checked complete. Update the packet status, master
+checkbox ledger, measurements, deviations, and residual risks in the same
+change that completes a packet.
 
 ## Implementation boundary
 
@@ -94,6 +94,25 @@ it locally or in CI without a new maintainer decision. Do not use
 `agent_maintainer verify` as an acceptance gate. Agent Maintainer remains
 available for doctor, context, change plans, guidance, and host-side waiting.
 
+## Execution delegation
+
+The maintainer authorizes execution subagents for this roadmap:
+
+- Assign each CK packet to a dedicated execution subagent with a focused
+  branch, worktree, and file allowlist.
+- Treat the roadmap, design documents, and packet contracts as the authority
+  for dependency order and parallel eligibility. When they explicitly identify
+  dependency-safe, disjoint lanes, run those lanes concurrently with separate
+  execution agents. Otherwise keep execution serial; never invent parallelism
+  across dependency edges.
+- Before starting a writing agent, name its owner, worktree, immutable base
+  SHA, file allowlist, expected artifact, and merge checkpoint. Never place
+  multiple writing agents in one checkout or give agents overlapping files.
+- Keep one root integrator responsible for shared contracts, integration order,
+  acceptance, final primary validation, the one final read-only reviewer, CI,
+  PR/merge operations, and packet/ledger accounting. Execution agents do not
+  integrate their own lane or add extra reviewers.
+
 ## Tools
 
 Use `rg` for exact paths, strings, routes, schema fields, and documentation
@@ -125,8 +144,9 @@ rules are in the qualification and bakeoff documents.
 - Linear is the intended program tracker. `docs/roadmap/LINEAR_BACKLOG.md` is
   the source record, but do not create or update Linear work without explicit
   maintainer direction.
-- Parallel lanes are allowed only when explicitly authorized for the task and
-  the packet names disjoint ownership, one immutable base, and one integrator.
+- The delegation policy above is standing maintainer authorization for this
+  roadmap. A parallel lane still requires explicit eligibility in the
+  controlling roadmap, design document, or packet contract.
 - After implementation and primary validation, use at most one comprehensive
   read-only reviewer. Record total findings, accepted findings, reviewer token
   status, and tokens per accepted finding.
