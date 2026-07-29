@@ -428,6 +428,41 @@ def test_unpublished_build_uses_disposable_io_then_restores_normal_wal(
     assert not artifact.path.with_name(f"{artifact.path.name}-shm").exists()
 
 
+def test_optimizer_transaction_is_committed_before_wal_finalization(
+    fixture: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_connect = sqlite3.connect
+
+    class ProfilingConnection(sqlite3.Connection):
+        def execute(
+            self,
+            sql: str,
+            parameters: Any = (),
+            /,
+        ) -> sqlite3.Cursor:
+            cursor = super().execute(sql, parameters)
+            if sql == "PRAGMA optimize":
+                super().execute("BEGIN IMMEDIATE")
+            return cursor
+
+    def profiling_connect(*args: Any, **kwargs: Any) -> sqlite3.Connection:
+        kwargs["factory"] = ProfilingConnection
+        return original_connect(*args, **kwargs)
+
+    monkeypatch.setattr(schema_module.sqlite3, "connect", profiling_connect)
+
+    artifact = candidate_a.build_artifact(
+        fixture,
+        tmp_path / "optimizer-transaction.sqlite",
+    )
+
+    assert artifact.stats.final_journal_mode == "wal"
+    with database(artifact.path, read_only=True) as connection:
+        schema_module.validate_database(connection)
+
+
 def test_validation_modes_keep_exhaustive_integrity_as_the_default(
     built: tuple[Any, Any],
 ) -> None:

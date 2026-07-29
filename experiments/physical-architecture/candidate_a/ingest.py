@@ -1465,7 +1465,10 @@ def build_artifact(
         )
         connection.commit()
         stats.writer_transactions += 1
-        connection.execute("PRAGMA optimize")
+        connection.execute("PRAGMA optimize").fetchall()
+        # ANALYZE work selected by optimize may open a transaction. Finalize it
+        # before journal_mode changes the unpublished artifact from OFF to WAL.
+        connection.commit()
         durability_started = time.perf_counter_ns()
         finalize_unpublished_database(connection)
         stats.durability_transition_ns = time.perf_counter_ns() - durability_started
