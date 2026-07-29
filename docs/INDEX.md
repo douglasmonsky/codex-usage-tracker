@@ -4,6 +4,14 @@ This is the single entry point for the agent-first clean cutover. Active
 documents below are mutually controlling: each owns one implementation area,
 and none of the archived documents may override them.
 
+## Current execution handoff
+
+The
+[CK-04 cross-task execution handoff](roadmap/tasks/ck-04-run-physical-architecture-bakeoff.md#cross-task-execution-handoff)
+records the current worktree, branch, validation, and resume state. It is an
+operational checkpoint; the authority set below wins if the handoff ever
+conflicts with it.
+
 ## Authority set
 
 | Order | Document | Controls |
