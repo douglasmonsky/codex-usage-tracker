@@ -434,6 +434,7 @@ CK04_PHYSICAL_BAKEOFF_ADDITIONS = frozenset(
         "experiments/physical-architecture/candidate_d/store.py",
         "experiments/physical-architecture/candidate_d/workload.py",
         "tests/experiments/physical-architecture/candidate_a/test_candidate_a.py",
+        "tests/experiments/physical-architecture/candidate_a/test_candidate_a_query_hardening.py",
         "tests/experiments/physical-architecture/candidate_c/test_candidate_c.py",
         "tests/experiments/physical-architecture/candidate_d/test_candidate_d.py",
         "tests/experiments/physical-architecture/test_bakeoff_runner.py",
