@@ -151,8 +151,7 @@ _UNSAFE_CHANGES = (
     "recanonicalization",
     "database_schema_upgrade",
 )
-DBHUB_TRIAL_MODES = ("generic", "named_preset")
-DBHUB_MODEL_CLASSES = ("default", "less_capable")
+DBHUB_LOCAL_ROUTES = ("generic", "named_preset")
 
 
 def _parameters(**values: ParameterValue) -> tuple[tuple[str, ParameterValue], ...]:
@@ -418,18 +417,16 @@ def build_workload_matrix(*, physical_cores: int) -> WorkloadMatrix:
             *_crash_cases(),
             *(
                 WorkloadCase(
-                    f"dbhub.{mode}.{model_class}",
+                    f"dbhub.{route}",
                     WorkloadGroup.DBHUB,
                     _parameters(
-                        model_class=model_class,
                         profile="standard",
-                        tool_mode=mode,
+                        route=route,
                         transport="stdio",
                         version="0.24.0",
                     ),
                 )
-                for mode in DBHUB_TRIAL_MODES
-                for model_class in DBHUB_MODEL_CLASSES
+                for route in DBHUB_LOCAL_ROUTES
             ),
             WorkloadCase(
                 "agent_perf.standard_cpu_attribution",

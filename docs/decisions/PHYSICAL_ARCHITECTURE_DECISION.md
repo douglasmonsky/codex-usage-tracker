@@ -207,15 +207,25 @@ owns the authoritative speed baseline.
 ## DBHub disposition
 
 DBHub `0.24.0` remains a pinned dev-only schema and query-plan research tool.
-The earlier bakeoff returned the same bounded result through generic and named
-routes, and both model classes selected the named route. The final v2 manifest
-must record five samples for each route/model combination, wall time, process
-CPU, scanned rows, SQL statements, MCP calls, response bytes, correctness, and
-the explicit unavailability of model-token telemetry.
+CK-04 owns exactly two deliberately executed local routes: generic schema
+search plus read SQL, and the named `top_sessions` preset. The final v2
+manifest must record five samples for each route, global sequence indexes
+`0..9` in alternating route order, wall time, process CPU, response bytes,
+result rows/hash, correctness, and exact MCP calls (two generic, one named).
+Scanned rows and SQL statements are observed/unavailable provenance objects;
+returned rows and assumed route shape are not substitutes. Whenever unavailable
+or deferred, `limitations` explicitly names `dbhub.scanned_rows`,
+`dbhub.sql_statements`, or `dbhub.model_operability`, respectively.
 
 Generic SQL is not a product dependency. The named-plan registry remains the
 runtime direction because it requires fewer calls and schema bytes, preserves
-grades and formulas, bounds rows, and remains operable by less-capable models.
+grades and formulas, and bounds rows.
+
+This benchmark does not establish model route selection or installed-model
+operability: the current runner invokes no model. Exact model identity,
+host/runtime versions, reasoning effort, exact synthetic-prompt artifact
+identity/hash, token source, and authorization for billed calls were never
+frozen. The manifest records this as a deferred CK-11 operability requirement.
 
 ## Rejected alternatives
 
@@ -247,6 +257,6 @@ Typed contracts and adapter boundaries are retained ideas, not a dependency.
 | Production query implementation | CK-08/CK-09 independently return database-derived rows and rerun every CK-03 oracle. |
 | Tail overlay has no production fold path | CK-07 implements and crash-qualifies threshold-driven fold or isolated-artifact selection. |
 | Experimental promotion is not durably atomic | CK-07 implements fsync, pointer, lease, rollback, reconciliation, and protected cleanup. |
-| Model tokens are unavailable in DBHub trials | CK-11 records exact installed-agent model and tool-call token telemetry. |
+| Installed-model DBHub operability is deferred | CK-11 records exact model identity, host/runtime versions, reasoning effort, synthetic-prompt artifact identity/hash, token source, and authorization before any billed call. |
 
 No residual risk permits weakening a roadmap hard gate.

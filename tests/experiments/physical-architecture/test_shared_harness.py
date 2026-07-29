@@ -335,12 +335,20 @@ def test_workload_matrix_is_complete_unique_and_deterministic() -> None:
         for case in first.cases
         if case.group in {WorkloadGroup.UNSAFE_CHANGE, WorkloadGroup.CRASH}
     )
-    assert set(first.ids(WorkloadGroup.DBHUB)) == {
-        "dbhub.generic.default",
-        "dbhub.generic.less_capable",
-        "dbhub.named_preset.default",
-        "dbhub.named_preset.less_capable",
-    }
+    assert all(
+        case.minimum_repetitions == 5
+        for case in first.cases
+        if case.group is WorkloadGroup.DBHUB
+    )
+    assert first.ids(WorkloadGroup.DBHUB) == (
+        "dbhub.generic",
+        "dbhub.named_preset",
+    )
+    for route in shared.DBHUB_LOCAL_ROUTES:
+        case = first.by_id(f"dbhub.{route}")
+        assert case.parameter("route") == route
+        assert "model_class" not in dict(case.parameters)
+        assert "tool_mode" not in dict(case.parameters)
     query_question_ids = {
         case.parameter("question_id")
         for case in first.cases

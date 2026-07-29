@@ -77,8 +77,7 @@ from .stop import (
     StopMetric,
 )
 from .workload import (
-    DBHUB_MODEL_CLASSES,
-    DBHUB_TRIAL_MODES,
+    DBHUB_LOCAL_ROUTES,
     P1_QUESTION_IDS,
     QUESTION_WORKLOAD_CONTRACTS,
     WorkloadCase,
@@ -93,10 +92,9 @@ __all__ = [
     "CRASH_BOUNDARIES",
     "CRASH_FAULTS",
     "DBHUB_MAX_ROW_CAP",
-    "DBHUB_MODEL_CLASSES",
+    "DBHUB_LOCAL_ROUTES",
     "DBHUB_NPM_INTEGRITY",
     "DBHUB_PACKAGE",
-    "DBHUB_TRIAL_MODES",
     "DBHUB_VERSION",
     "FIXTURE_REVISION",
     "MEASUREMENT_SCHEMA",

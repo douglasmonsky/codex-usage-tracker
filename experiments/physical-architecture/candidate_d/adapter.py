@@ -293,23 +293,19 @@ class Adapter:
             artifact_label="dbhub-base",
         )
         started = time.perf_counter_ns()
-        query = store.top_sessions(limit=25)
+        route = str(request.case.parameter("route"))
+        payload = {
+            "ready_for_shared_dbhub_runner": True,
+            "route": route,
+            "tool": ("search_objects+execute_sql" if route == "generic" else "top_sessions"),
+        }
         elapsed = time.perf_counter_ns() - started
-        payload = dict(query.payload)
-        payload.update(
-            {
-                "research_transport": "stdio",
-                "research_version": "0.24.0",
-                "tool_mode": request.case.parameter("tool_mode"),
-                "model_class": request.case.parameter("model_class"),
-            }
-        )
         return _Execution(
             store=store,
             stats=bootstrap,
             elapsed_ns=elapsed,
             payload=payload,
-            query=query,
+            query=None,
             oracle_equivalent=True,
             prior_publication_survived=True,
         )

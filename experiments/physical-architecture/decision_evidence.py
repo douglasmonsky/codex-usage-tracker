@@ -88,6 +88,28 @@ _OBSERVED_PLAN_COUNTER_FIELDS = frozenset({*_APPROVED_PLAN_COUNTER_FIELDS, "sql_
 _UNAVAILABLE_REASON_CODES = frozenset(
     {"host_does_not_report", "telemetry_not_exposed", "tooling_does_not_report"}
 )
+_CANDIDATE_A_CRASH_EXIT_CODE = 86
+_DBHUB_ROUTE_TO_TOOL = {
+    "generic": "search_objects+execute_sql",
+    "named_preset": "top_sessions",
+}
+_DBHUB_MODEL_OPERABILITY_REQUIRED_FIELDS = (
+    "authorization",
+    "exact_model_id",
+    "host_version",
+    "reasoning_effort",
+    "runtime_version",
+    "synthetic_input_artifact_id",
+    "synthetic_input_sha256",
+    "token_source",
+)
+_RECOVERY_ACTIONS = frozenset(
+    {
+        "kept_active_pair",
+        "reconstructed_missing_active_pointer",
+        "rolled_back_to_valid_pair",
+    }
+)
 
 _ARTIFACT_SPECS = {
     "fixture_manifest": ("input", "canonical_json"),
@@ -1629,7 +1651,12 @@ def _validate_crash_observations(
                 raise DecisionEvidenceContractError(
                     f"{context}.case_id differs from termination boundary"
                 )
-            _validate_process_termination(observation["process"], context=context)
+            _validate_process_termination(
+                observation["process"],
+                context=context,
+                boundary=boundary,
+            )
+            expected_recovery_stage: str | None = boundary
         elif mode == "injected_fault":
             fault = _text(observation["fault"], f"{context}.fault", maximum=64)
             if fault not in shared.CRASH_FAULTS or observation["boundary"] is not None:
@@ -1649,9 +1676,14 @@ def _validate_crash_observations(
                 raise DecisionEvidenceContractError(
                     f"{context}.process must be not_applicable for injected fault"
                 )
+            expected_recovery_stage = None
         else:
             raise DecisionEvidenceContractError(f"{context}.mode is unsupported")
-        _validate_recovery(observation["recovery"], context=context)
+        _validate_recovery(
+            observation["recovery"],
+            context=context,
+            expected_stage=expected_recovery_stage,
+        )
         artifacts.use(
             observation["output_artifact_id"],
             context=f"{context}.output_artifact_id",
@@ -1674,14 +1706,104 @@ def _validate_crash_observations(
             )
 
 
-def _validate_process_termination(value: object, *, context: str) -> None:
+def _validate_process_termination(
+    value: object,
+    *,
+    context: str,
+    boundary: str,
+) -> None:
     process = _object(
         value,
         f"{context}.process",
-        {"status", "termination_observed"},
+        {
+            "actual_return_code",
+            "expected_return_code",
+            "lease_status",
+            "observed_stage",
+            "pid_lease_agreement",
+            "requested_boundary",
+            "status",
+            "termination_kind",
+            "termination_observed",
+            "worker_alive_after_exit",
+            "worker_pid",
+        },
     )
     if process["status"] != "observed":
         raise DecisionEvidenceContractError(f"{context}.process.status must be observed")
+    _integer(process["worker_pid"], f"{context}.process.worker_pid", minimum=1)
+    actual_return_code = _integer(
+        process["actual_return_code"],
+        f"{context}.process.actual_return_code",
+        minimum=0,
+    )
+    expected_return_code = _integer(
+        process["expected_return_code"],
+        f"{context}.process.expected_return_code",
+        minimum=0,
+    )
+    if (
+        actual_return_code != _CANDIDATE_A_CRASH_EXIT_CODE
+        or expected_return_code != _CANDIDATE_A_CRASH_EXIT_CODE
+    ):
+        raise DecisionEvidenceContractError(
+            f"{context}.process return codes must both equal {_CANDIDATE_A_CRASH_EXIT_CODE}"
+        )
+    if (
+        _text(
+            process["termination_kind"],
+            f"{context}.process.termination_kind",
+            maximum=32,
+        )
+        != "exit_code"
+    ):
+        raise DecisionEvidenceContractError(f"{context}.process.termination_kind must be exit_code")
+    requested_boundary = _text(
+        process["requested_boundary"],
+        f"{context}.process.requested_boundary",
+        maximum=64,
+    )
+    observed_stage = _text(
+        process["observed_stage"],
+        f"{context}.process.observed_stage",
+        maximum=64,
+    )
+    if requested_boundary != boundary or observed_stage != boundary:
+        raise DecisionEvidenceContractError(
+            f"{context}.process requested boundary and observed stage must match {boundary}"
+        )
+    lease_status = _text(
+        process["lease_status"],
+        f"{context}.process.lease_status",
+        maximum=32,
+    )
+    if boundary == "during_old_artifact_cleanup":
+        if lease_status != "missing" or process["pid_lease_agreement"] is not None:
+            raise DecisionEvidenceContractError(
+                f"{context}.process cleanup boundary must record a missing lease "
+                "and null PID/lease agreement"
+            )
+    elif (
+        lease_status != "valid"
+        or _boolean(
+            process["pid_lease_agreement"],
+            f"{context}.process.pid_lease_agreement",
+        )
+        is not True
+    ):
+        raise DecisionEvidenceContractError(
+            f"{context}.process must record a valid agreeing worker lease"
+        )
+    if (
+        _boolean(
+            process["worker_alive_after_exit"],
+            f"{context}.process.worker_alive_after_exit",
+        )
+        is not False
+    ):
+        raise DecisionEvidenceContractError(
+            f"{context}.process worker remained alive after observed exit"
+        )
     if (
         _boolean(
             process["termination_observed"],
@@ -1694,16 +1816,25 @@ def _validate_process_termination(value: object, *, context: str) -> None:
         )
 
 
-def _validate_recovery(value: object, *, context: str) -> None:
+def _validate_recovery(
+    value: object,
+    *,
+    context: str,
+    expected_stage: str | None,
+) -> None:
     recovery = _object(
         value,
         f"{context}.recovery",
         {
             "abandoned_artifact_disposition",
             "candidate_publication_committed",
+            "observed_stage",
             "prior_publication_queryable",
+            "recovery_action",
+            "recovery_terminal_sha256",
             "rollback_available",
             "sidecar_terminal_state",
+            "subsequent_publication_sha256",
             "subsequent_operation_succeeds",
         },
     )
@@ -1727,6 +1858,31 @@ def _validate_recovery(value: object, *, context: str) -> None:
     _identifier(
         recovery["abandoned_artifact_disposition"],
         f"{context}.recovery.abandoned_artifact_disposition",
+    )
+    observed_stage = _text(
+        recovery["observed_stage"],
+        f"{context}.recovery.observed_stage",
+        maximum=64,
+    )
+    if observed_stage not in shared.CRASH_BOUNDARIES or (
+        expected_stage is not None and observed_stage != expected_stage
+    ):
+        raise DecisionEvidenceContractError(
+            f"{context}.recovery.observed_stage does not match persisted crash stage"
+        )
+    recovery_action = _identifier(
+        recovery["recovery_action"],
+        f"{context}.recovery.recovery_action",
+    )
+    if recovery_action not in _RECOVERY_ACTIONS:
+        raise DecisionEvidenceContractError(f"{context}.recovery.recovery_action is unsupported")
+    _sha256(
+        recovery["recovery_terminal_sha256"],
+        f"{context}.recovery.recovery_terminal_sha256",
+    )
+    _sha256(
+        recovery["subsequent_publication_sha256"],
+        f"{context}.recovery.subsequent_publication_sha256",
     )
 
 
@@ -2008,6 +2164,7 @@ def _validate_dbhub(
         {
             "engine_level_read_only",
             "input_artifact_id",
+            "model_operability",
             "output_artifact_id",
             "package",
             "package_integrity",
@@ -2046,51 +2203,60 @@ def _validate_dbhub(
         direction="output",
         kinds=frozenset({"dbhub_measurements"}),
     )
-    trials = _list(dbhub["trials"], "$.dbhub.trials", minimum=4, maximum=4)
+    _validate_dbhub_model_operability(dbhub["model_operability"])
+    trials = _list(dbhub["trials"], "$.dbhub.trials", minimum=2, maximum=2)
     trial_ids: list[str] = []
-    combinations: set[tuple[str, str]] = set()
+    routes: set[str] = set()
     sample_ids_seen: set[str] = set()
+    sequence_routes: dict[int, str] = {}
     result_identity: tuple[int, str] | None = None
-    unavailable: set[str] = set()
+    unavailable = {"dbhub.model_operability"}
     for index, row in enumerate(trials):
         context = f"$.dbhub.trials[{index}]"
         trial = _object(
             row,
             context,
             {
-                "correct_route",
-                "mode",
-                "model_class",
-                "model_tokens",
+                "executed_route",
+                "executed_tool",
                 "qualification_run_id",
                 "samples",
-                "selected_tool",
                 "trial_id",
             },
         )
         trial_id = _identifier(trial["trial_id"], f"{context}.trial_id")
         trial_ids.append(trial_id)
-        model_class = _text(trial["model_class"], f"{context}.model_class", maximum=32)
-        mode = _text(trial["mode"], f"{context}.mode", maximum=32)
-        combination = (model_class, mode)
-        if (
-            model_class not in shared.DBHUB_MODEL_CLASSES
-            or mode not in shared.DBHUB_TRIAL_MODES
-            or combination in combinations
-        ):
-            raise DecisionEvidenceContractError(f"{context} model/mode is unsupported or duplicate")
-        combinations.add(combination)
-        case_id = f"dbhub.{mode}.{model_class}"
+        route = _text(
+            trial["executed_route"],
+            f"{context}.executed_route",
+            maximum=32,
+        )
+        if route not in shared.DBHUB_LOCAL_ROUTES or route in routes:
+            raise DecisionEvidenceContractError(
+                f"{context}.executed_route is unsupported or duplicate"
+            )
+        routes.add(route)
+        if trial_id != route:
+            raise DecisionEvidenceContractError(
+                f"{context}.trial_id must equal the deliberately executed route"
+            )
+        case_id = f"dbhub.{route}"
         _qualification_case(
             trial["qualification_run_id"],
             case_id,
             qualification_runs,
             context=f"{context}.qualification_run_id",
         )
-        _identifier(trial["selected_tool"], f"{context}.selected_tool")
-        if _boolean(trial["correct_route"], f"{context}.correct_route") is not True:
-            raise DecisionEvidenceContractError(f"{context}.correct_route must be true")
-        samples = _list(trial["samples"], f"{context}.samples", minimum=5, maximum=100)
+        executed_tool = _text(
+            trial["executed_tool"],
+            f"{context}.executed_tool",
+            maximum=64,
+        )
+        if executed_tool != _DBHUB_ROUTE_TO_TOOL[route]:
+            raise DecisionEvidenceContractError(
+                f"{context}.executed_tool differs from the local route contract"
+            )
+        samples = _list(trial["samples"], f"{context}.samples", minimum=5, maximum=5)
         sample_ids: list[str] = []
         for sample_index, sample_value in enumerate(samples):
             sample_context = f"{context}.samples[{sample_index}]"
@@ -2106,6 +2272,7 @@ def _validate_dbhub(
                     "result_sha256",
                     "sample_id",
                     "scanned_rows",
+                    "sequence_index",
                     "sql_statements",
                     "wall_time_ns",
                 },
@@ -2115,6 +2282,17 @@ def _validate_dbhub(
                 raise DecisionEvidenceContractError(f"DBHub sample ID duplicated: {sample_id}")
             sample_ids_seen.add(sample_id)
             sample_ids.append(sample_id)
+            sequence_index = _integer(
+                sample["sequence_index"],
+                f"{sample_context}.sequence_index",
+                minimum=0,
+                maximum=9,
+            )
+            if sequence_index in sequence_routes:
+                raise DecisionEvidenceContractError(
+                    f"DBHub sequence index duplicated: {sequence_index}"
+                )
+            sequence_routes[sequence_index] = route
             _integer(sample["wall_time_ns"], f"{sample_context}.wall_time_ns", minimum=1)
             _integer(
                 sample["process_cpu_ns"],
@@ -2127,12 +2305,13 @@ def _validate_dbhub(
                 minimum=0,
             ):
                 unavailable.add("dbhub.scanned_rows")
-            _integer(
+            if _validate_observed_integer(
                 sample["sql_statements"],
                 f"{sample_context}.sql_statements",
-                minimum=1,
-            )
-            expected_calls = 2 if mode == "generic" else 1
+                minimum=0,
+            ):
+                unavailable.add("dbhub.sql_statements")
+            expected_calls = 2 if route == "generic" else 1
             if (
                 _integer(sample["mcp_calls"], f"{sample_context}.mcp_calls", minimum=1)
                 != expected_calls
@@ -2161,20 +2340,45 @@ def _validate_dbhub(
                     "DBHub routes did not return identical correct result"
                 )
         _require_ordered_unique(sample_ids, f"{context}.samples")
-        if _validate_model_tokens(
-            trial["model_tokens"],
-            context=f"{context}.model_tokens",
-        ):
-            unavailable.add("dbhub.model_tokens")
     _require_ordered_unique(trial_ids, "$.dbhub.trials")
-    expected_combinations = {
-        (model_class, mode)
-        for model_class in shared.DBHUB_MODEL_CLASSES
-        for mode in shared.DBHUB_TRIAL_MODES
-    }
-    if combinations != expected_combinations:
-        raise DecisionEvidenceContractError("DBHub four-trial matrix is incomplete")
+    if routes != set(shared.DBHUB_LOCAL_ROUTES):
+        raise DecisionEvidenceContractError("DBHub two-route matrix is incomplete")
+    if set(sequence_routes) != set(range(10)):
+        raise DecisionEvidenceContractError(
+            "DBHub global sequence indexes must be exactly 0 through 9"
+        )
+    for sequence_index in range(10):
+        expected_route = shared.DBHUB_LOCAL_ROUTES[sequence_index % 2]
+        if sequence_routes[sequence_index] != expected_route:
+            raise DecisionEvidenceContractError(
+                "DBHub samples must alternate generic and named_preset routes"
+            )
     return unavailable
+
+
+def _validate_dbhub_model_operability(value: object) -> None:
+    context = "$.dbhub.model_operability"
+    operability = _object(
+        value,
+        context,
+        {"owner_packet_id", "required_evidence_fields", "status"},
+    )
+    if operability["status"] != "deferred":
+        raise DecisionEvidenceContractError(f"{context}.status must remain deferred until CK-11")
+    if operability["owner_packet_id"] != "CK-11":
+        raise DecisionEvidenceContractError(f"{context}.owner_packet_id must be CK-11")
+    required_fields = _string_list(
+        operability["required_evidence_fields"],
+        f"{context}.required_evidence_fields",
+        minimum=len(_DBHUB_MODEL_OPERABILITY_REQUIRED_FIELDS),
+        maximum=len(_DBHUB_MODEL_OPERABILITY_REQUIRED_FIELDS),
+        item_maximum=32,
+    )
+    _require_ordered_unique(required_fields, f"{context}.required_evidence_fields")
+    if tuple(required_fields) != _DBHUB_MODEL_OPERABILITY_REQUIRED_FIELDS:
+        raise DecisionEvidenceContractError(
+            f"{context}.required_evidence_fields must freeze exact CK-11 prerequisites"
+        )
 
 
 def _validate_observed_integer(
@@ -2200,38 +2404,6 @@ def _validate_observed_integer(
     raise DecisionEvidenceContractError(f"{context}.status is unsupported")
 
 
-def _validate_model_tokens(value: object, *, context: str) -> bool:
-    if not isinstance(value, dict):
-        raise DecisionEvidenceContractError(f"{context} must be an object")
-    status = value.get("status")
-    if status == "observed":
-        tokens = _object(
-            value,
-            context,
-            {
-                "cached_input_tokens",
-                "input_tokens",
-                "output_tokens",
-                "reasoning_tokens",
-                "status",
-            },
-        )
-        for field_name in (
-            "cached_input_tokens",
-            "input_tokens",
-            "output_tokens",
-            "reasoning_tokens",
-        ):
-            _integer(tokens[field_name], f"{context}.{field_name}", minimum=0)
-        return False
-    if status == "unavailable":
-        unavailable = _object(value, context, {"reason_code", "status"})
-        if unavailable["reason_code"] not in _UNAVAILABLE_REASON_CODES:
-            raise DecisionEvidenceContractError(f"{context}.reason_code is unsupported")
-        return True
-    raise DecisionEvidenceContractError(f"{context}.status is unsupported")
-
-
 def _validate_limitations(
     value: object,
     artifacts: _ArtifactIndex,
@@ -2240,8 +2412,6 @@ def _validate_limitations(
 ) -> None:
     rows = _list(value, "$.limitations", minimum=1, maximum=MAX_LIMITATIONS)
     limitation_ids: list[str] = []
-    require_dbhub_token_limitation = "dbhub.model_tokens" in required_telemetry_limitations
-    dbhub_token_limitation = False
     for index, row in enumerate(rows):
         context = f"$.limitations[{index}]"
         limitation = _object(
@@ -2299,13 +2469,13 @@ def _validate_limitations(
                 direction="output",
                 kinds=frozenset(_REQUIRED_ARTIFACT_KINDS["output"]),
             )
-        if area == "dbhub.model_tokens" and limitation["category"] == "telemetry_unavailable":
-            dbhub_token_limitation = True
+        if area == "dbhub.model_operability" and (
+            limitation["category"] != "implementation_seam" or packet_ids != ["CK-11"]
+        ):
+            raise DecisionEvidenceContractError(
+                f"{context} DBHub model operability must be a CK-11 implementation seam"
+            )
     _require_ordered_unique(limitation_ids, "$.limitations")
-    if require_dbhub_token_limitation and not dbhub_token_limitation:
-        raise DecisionEvidenceContractError(
-            "unavailable DBHub model tokens require explicit limitation"
-        )
 
 
 def _validate_telemetry_limitations(
@@ -2320,6 +2490,7 @@ def _validate_telemetry_limitations(
         required_telemetry_limitations=required_telemetry_limitations,
     )
     rows = _list(value, "$.limitations", minimum=1, maximum=MAX_LIMITATIONS)
+    limitation_areas: set[str] = set()
     telemetry_limitations: set[str] = set()
     for index, row in enumerate(rows):
         context = f"$.limitations[{index}]"
@@ -2335,17 +2506,19 @@ def _validate_telemetry_limitations(
                 "summary",
             },
         )
+        area = _identifier(limitation["area"], f"{context}.area")
+        limitation_areas.add(area)
         if limitation["category"] == "telemetry_unavailable":
-            telemetry_limitations.add(_identifier(limitation["area"], f"{context}.area"))
-    missing = sorted(required_telemetry_limitations - telemetry_limitations)
+            telemetry_limitations.add(area)
+    missing = sorted(required_telemetry_limitations - limitation_areas)
     if missing:
         raise DecisionEvidenceContractError(
             "unavailable telemetry requires explicit limitations: " + ", ".join(missing)
         )
     optional_telemetry = {
         "agent_perf.process_cpu",
-        "dbhub.model_tokens",
         "dbhub.scanned_rows",
+        "dbhub.sql_statements",
     }
     stale = sorted((telemetry_limitations & optional_telemetry) - required_telemetry_limitations)
     if stale:

@@ -212,12 +212,11 @@ def _execute_case(
         return _execute_crash(database, request)
     if case.group is shared.WorkloadGroup.DBHUB:
         artifact = _current_publication(database)
+        route = str(case.parameter("route"))
         result = {
-            "tool_mode": case.parameter("tool_mode"),
-            "model_class": case.parameter("model_class"),
-            "snapshot": artifact.path.name,
-            "read_only": True,
-            "row_cap": shared.DBHUB_MAX_ROW_CAP,
+            "ready_for_shared_dbhub_runner": True,
+            "route": route,
+            "tool": ("search_objects+execute_sql" if route == "generic" else "top_sessions"),
         }
         return artifact, result, True, (), MutationStats(facts_unchanged=1)
     if case.group is shared.WorkloadGroup.AGENT_PERF:

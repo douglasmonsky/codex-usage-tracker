@@ -152,12 +152,32 @@ def _query_rows() -> tuple[list[dict[str, object]], list[str]]:
     return sorted(rows, key=lambda row: str(row["query_case_id"])), case_ids
 
 
+def _recovery_evidence(
+    *,
+    case_id: str,
+    observed_stage: str,
+) -> dict[str, object]:
+    return {
+        "abandoned_artifact_disposition": "abandon_candidate",
+        "candidate_publication_committed": False,
+        "observed_stage": observed_stage,
+        "prior_publication_queryable": True,
+        "recovery_action": "kept_active_pair",
+        "recovery_terminal_sha256": _hash(f"{case_id}.recovery-terminal"),
+        "rollback_available": True,
+        "sidecar_terminal_state": "failed",
+        "subsequent_operation_succeeds": True,
+        "subsequent_publication_sha256": _hash(f"{case_id}.subsequent-publication"),
+    }
+
+
 def _crash_rows() -> tuple[list[dict[str, object]], list[str]]:
     rows: list[dict[str, object]] = []
     case_ids: list[str] = []
-    for boundary in shared.CRASH_BOUNDARIES:
+    for index, boundary in enumerate(shared.CRASH_BOUNDARIES):
         case_id = f"crash.terminate.{boundary}"
         case_ids.append(case_id)
+        lease_missing = boundary == "during_old_artifact_cleanup"
         rows.append(
             {
                 "boundary": boundary,
@@ -168,21 +188,26 @@ def _crash_rows() -> tuple[list[dict[str, object]], list[str]]:
                 "observation_id": f"A.{case_id}",
                 "output_artifact_id": "crash.measurements",
                 "process": {
+                    "actual_return_code": 86,
+                    "expected_return_code": 86,
+                    "lease_status": "missing" if lease_missing else "valid",
+                    "observed_stage": boundary,
+                    "pid_lease_agreement": None if lease_missing else True,
+                    "requested_boundary": boundary,
                     "status": "observed",
+                    "termination_kind": "exit_code",
                     "termination_observed": True,
+                    "worker_alive_after_exit": False,
+                    "worker_pid": 10_000 + index,
                 },
                 "qualification_run_id": "run.crash",
-                "recovery": {
-                    "abandoned_artifact_disposition": "abandon_candidate",
-                    "candidate_publication_committed": False,
-                    "prior_publication_queryable": True,
-                    "rollback_available": True,
-                    "sidecar_terminal_state": "failed",
-                    "subsequent_operation_succeeds": True,
-                },
+                "recovery": _recovery_evidence(
+                    case_id=case_id,
+                    observed_stage=boundary,
+                ),
             }
         )
-    for fault in shared.CRASH_FAULTS:
+    for index, fault in enumerate(shared.CRASH_FAULTS):
         case_id = f"crash.fault.{fault}"
         case_ids.append(case_id)
         rows.append(
@@ -196,14 +221,10 @@ def _crash_rows() -> tuple[list[dict[str, object]], list[str]]:
                 "output_artifact_id": "crash.measurements",
                 "process": {"status": "not_applicable"},
                 "qualification_run_id": "run.crash",
-                "recovery": {
-                    "abandoned_artifact_disposition": "abandon_candidate",
-                    "candidate_publication_committed": False,
-                    "prior_publication_queryable": True,
-                    "rollback_available": True,
-                    "sidecar_terminal_state": "failed",
-                    "subsequent_operation_succeeds": True,
-                },
+                "recovery": _recovery_evidence(
+                    case_id=case_id,
+                    observed_stage=shared.CRASH_BOUNDARIES[index % len(shared.CRASH_BOUNDARIES)],
+                ),
             }
         )
     return sorted(rows, key=lambda row: str(row["observation_id"])), case_ids
@@ -370,42 +391,42 @@ def _agent_perf_workload(
 def _dbhub_trials() -> list[dict[str, object]]:
     trials: list[dict[str, object]] = []
     result_digest = _hash("dbhub-result")
-    for model_class in shared.DBHUB_MODEL_CLASSES:
-        for mode in shared.DBHUB_TRIAL_MODES:
-            trial_id = f"{model_class}.{mode}"
-            samples = [
-                {
-                    "correct": True,
-                    "mcp_calls": 2 if mode == "generic" else 1,
-                    "process_cpu_ns": 3_000_000 + index,
-                    "response_bytes": 7_500,
-                    "result_rows": 25,
-                    "result_sha256": result_digest,
-                    "sample_id": f"{trial_id}.{index:02d}",
-                    "scanned_rows": {
-                        "reason_code": "tooling_does_not_report",
-                        "status": "unavailable",
-                    },
-                    "sql_statements": 2 if mode == "generic" else 1,
-                    "wall_time_ns": 4_000_000 + index,
-                }
-                for index in range(5)
-            ]
-            trials.append(
-                {
-                    "correct_route": True,
-                    "mode": mode,
-                    "model_class": model_class,
-                    "model_tokens": {
-                        "reason_code": "telemetry_not_exposed",
-                        "status": "unavailable",
-                    },
-                    "qualification_run_id": "run.standard",
-                    "samples": samples,
-                    "selected_tool": "execute_sql" if mode == "generic" else "top_sessions",
-                    "trial_id": trial_id,
-                }
-            )
+    route_tools = {
+        "generic": "search_objects+execute_sql",
+        "named_preset": "top_sessions",
+    }
+    for route_index, route in enumerate(shared.DBHUB_LOCAL_ROUTES):
+        samples = [
+            {
+                "correct": True,
+                "mcp_calls": 2 if route == "generic" else 1,
+                "process_cpu_ns": 3_000_000 + repetition,
+                "response_bytes": 7_500,
+                "result_rows": 25,
+                "result_sha256": result_digest,
+                "sample_id": f"{route}.{repetition:02d}",
+                "scanned_rows": {
+                    "reason_code": "tooling_does_not_report",
+                    "status": "unavailable",
+                },
+                "sequence_index": repetition * len(shared.DBHUB_LOCAL_ROUTES) + route_index,
+                "sql_statements": {
+                    "reason_code": "tooling_does_not_report",
+                    "status": "unavailable",
+                },
+                "wall_time_ns": 4_000_000 + repetition,
+            }
+            for repetition in range(5)
+        ]
+        trials.append(
+            {
+                "executed_route": route,
+                "executed_tool": route_tools[route],
+                "qualification_run_id": "run.standard",
+                "samples": samples,
+                "trial_id": route,
+            }
+        )
     return sorted(trials, key=lambda trial: str(trial["trial_id"]))
 
 
@@ -414,7 +435,7 @@ def _valid_manifest() -> dict[str, Any]:
     fixtures, fixture_digests = _fixture_rows()
     query_rows, query_case_ids = _query_rows()
     crash_rows, crash_case_ids = _crash_rows()
-    matrix_digest = "d6059274027d4fb9bfe286ef0932142c49f00e4a6a6e7badb6585ebc44edfb11"
+    matrix_digest = "4d846d6f7869991117562d7aea9f61cb8fe9d967160415e749010f9704963a94"
     agent_workload = _agent_perf_workload(fixture_digests, matrix_digest)
 
     standard_cases = sorted(
@@ -422,11 +443,7 @@ def _valid_manifest() -> dict[str, Any]:
             "agent_perf.standard_cpu_attribution",
             "build.scale.standard",
             *query_case_ids,
-            *(
-                f"dbhub.{mode}.{model_class}"
-                for model_class in shared.DBHUB_MODEL_CLASSES
-                for mode in shared.DBHUB_TRIAL_MODES
-            ),
+            *(f"dbhub.{route}" for route in shared.DBHUB_LOCAL_ROUTES),
         }
     )
     runs = [
@@ -614,6 +631,20 @@ def _valid_manifest() -> dict[str, Any]:
         "dbhub": {
             "engine_level_read_only": False,
             "input_artifact_id": "dbhub.invocation",
+            "model_operability": {
+                "owner_packet_id": "CK-11",
+                "required_evidence_fields": [
+                    "authorization",
+                    "exact_model_id",
+                    "host_version",
+                    "reasoning_effort",
+                    "runtime_version",
+                    "synthetic_input_artifact_id",
+                    "synthetic_input_sha256",
+                    "token_source",
+                ],
+                "status": "deferred",
+            },
             "output_artifact_id": "dbhub.measurements",
             "package": shared.DBHUB_PACKAGE,
             "package_integrity": shared.DBHUB_NPM_INTEGRITY,
@@ -637,20 +668,31 @@ def _valid_manifest() -> dict[str, Any]:
                 "summary": "Profiler output did not expose process CPU time.",
             },
             {
-                "area": "dbhub.model_tokens",
-                "category": "telemetry_unavailable",
+                "area": "dbhub.model_operability",
+                "category": "implementation_seam",
                 "evidence_output_ids": ["dbhub.measurements"],
-                "limitation_id": "dbhub-model-tokens",
+                "limitation_id": "dbhub-model-operability",
                 "owner_packet_ids": ["CK-11"],
-                "summary": "Qualification host did not expose per-trial model token telemetry.",
+                "summary": (
+                    "Exact installed-model identity and an authorized billed model "
+                    "call are deferred to CK-11; this local runner invokes no model."
+                ),
             },
             {
                 "area": "dbhub.scanned_rows",
                 "category": "telemetry_unavailable",
                 "evidence_output_ids": ["dbhub.measurements"],
                 "limitation_id": "dbhub-scanned-rows",
-                "owner_packet_ids": ["CK-11"],
+                "owner_packet_ids": ["CK-04"],
                 "summary": "DBHub did not expose rows scanned by SQLite.",
+            },
+            {
+                "area": "dbhub.sql_statements",
+                "category": "telemetry_unavailable",
+                "evidence_output_ids": ["dbhub.measurements"],
+                "limitation_id": "dbhub-sql-statements",
+                "owner_packet_ids": ["CK-04"],
+                "summary": "DBHub did not expose executed SQL statement counts.",
             },
         ],
         "qualification_runs": runs,
@@ -915,18 +957,157 @@ def test_crash_evidence_uses_tiny_fixture_and_durable_observation_fields() -> No
     ):
         decision_evidence.build_manifest(wrong_fixture)
 
-    discarded_process_field = _valid_manifest()
+    missing_process_field = _valid_manifest()
     termination = next(
         row
-        for row in discarded_process_field["crash_observations"]
+        for row in missing_process_field["crash_observations"]
         if row["mode"] == "process_termination"
     )
-    termination["process"]["worker_pid"] = 1234
+    del termination["process"]["worker_pid"]
     with pytest.raises(
         decision_evidence.DecisionEvidenceContractError,
-        match="unsupported=.*worker_pid",
+        match="missing=.*worker_pid",
     ):
-        decision_evidence.build_manifest(discarded_process_field)
+        decision_evidence.build_manifest(missing_process_field)
+
+    mismatched_return_code = _valid_manifest()
+    termination = next(
+        row
+        for row in mismatched_return_code["crash_observations"]
+        if row["mode"] == "process_termination"
+    )
+    termination["process"]["actual_return_code"] = 85
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="return codes must both equal 86",
+    ):
+        decision_evidence.build_manifest(mismatched_return_code)
+
+    mismatched_stage = _valid_manifest()
+    termination = next(
+        row
+        for row in mismatched_stage["crash_observations"]
+        if row["mode"] == "process_termination"
+    )
+    termination["process"]["observed_stage"] = "during_parse"
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="requested boundary and observed stage",
+    ):
+        decision_evidence.build_manifest(mismatched_stage)
+
+    live_worker = _valid_manifest()
+    termination = next(
+        row for row in live_worker["crash_observations"] if row["mode"] == "process_termination"
+    )
+    termination["process"]["worker_alive_after_exit"] = True
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="worker remained alive",
+    ):
+        decision_evidence.build_manifest(live_worker)
+
+    mismatched_lease = _valid_manifest()
+    termination = next(
+        row
+        for row in mismatched_lease["crash_observations"]
+        if row["mode"] == "process_termination" and row["boundary"] != "during_old_artifact_cleanup"
+    )
+    termination["process"]["pid_lease_agreement"] = False
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="valid agreeing worker lease",
+    ):
+        decision_evidence.build_manifest(mismatched_lease)
+
+    missing_recovery_hash = _valid_manifest()
+    injected_fault = next(
+        row
+        for row in missing_recovery_hash["crash_observations"]
+        if row["mode"] == "injected_fault"
+    )
+    del injected_fault["recovery"]["recovery_terminal_sha256"]
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="missing=.*recovery_terminal_sha256",
+    ):
+        decision_evidence.build_manifest(missing_recovery_hash)
+
+
+def test_dbhub_local_routes_are_deliberate_and_globally_sequenced() -> None:
+    manifest = _valid_manifest()
+    trials = manifest["dbhub"]["trials"]
+    assert [trial["executed_route"] for trial in trials] == [
+        "generic",
+        "named_preset",
+    ]
+    assert [trial["executed_tool"] for trial in trials] == [
+        "search_objects+execute_sql",
+        "top_sessions",
+    ]
+    assert [
+        (
+            sample["sequence_index"],
+            trial["executed_route"],
+        )
+        for trial in trials
+        for sample in trial["samples"]
+    ] == [
+        (0, "generic"),
+        (2, "generic"),
+        (4, "generic"),
+        (6, "generic"),
+        (8, "generic"),
+        (1, "named_preset"),
+        (3, "named_preset"),
+        (5, "named_preset"),
+        (7, "named_preset"),
+        (9, "named_preset"),
+    ]
+    assert all(
+        "model_class" not in trial
+        and "model_tokens" not in trial
+        and "selected_tool" not in trial
+        and "correct_route" not in trial
+        for trial in trials
+    )
+    decision_evidence.build_manifest(manifest)
+
+    nonalternating = _valid_manifest()
+    generic, named = nonalternating["dbhub"]["trials"]
+    generic["samples"][0]["sequence_index"] = 1
+    named["samples"][0]["sequence_index"] = 0
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="must alternate generic and named_preset",
+    ):
+        decision_evidence.build_manifest(nonalternating)
+
+    wrong_tool = _valid_manifest()
+    wrong_tool["dbhub"]["trials"][0]["executed_tool"] = "execute_sql"
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="differs from the local route contract",
+    ):
+        decision_evidence.build_manifest(wrong_tool)
+
+    wrong_calls = _valid_manifest()
+    wrong_calls["dbhub"]["trials"][0]["samples"][0]["mcp_calls"] = 1
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="differs from DBHub route contract",
+    ):
+        decision_evidence.build_manifest(wrong_calls)
+
+    mismatched_result = _valid_manifest()
+    mismatched_result["dbhub"]["trials"][1]["samples"][0]["result_sha256"] = _hash(
+        "different-dbhub-result"
+    )
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="did not return identical correct result",
+    ):
+        decision_evidence.build_manifest(mismatched_result)
 
 
 def test_optional_telemetry_requires_explicit_provenance_and_limitations() -> None:
@@ -965,33 +1146,22 @@ def test_optional_telemetry_requires_explicit_provenance_and_limitations() -> No
     ):
         decision_evidence.build_manifest(bare_scans)
 
-    observed_tokens = _valid_manifest()
-    for trial in observed_tokens["dbhub"]["trials"]:
-        trial["model_tokens"] = {
-            "cached_input_tokens": 100,
-            "input_tokens": 200,
-            "output_tokens": 50,
-            "reasoning_tokens": 25,
-            "status": "observed",
-        }
-    observed_tokens["limitations"] = [
-        row for row in observed_tokens["limitations"] if row["area"] != "dbhub.model_tokens"
+    observed_statements = _valid_manifest()
+    for trial in observed_statements["dbhub"]["trials"]:
+        for sample in trial["samples"]:
+            sample["sql_statements"] = {"status": "observed", "value": 3}
+    observed_statements["limitations"] = [
+        row for row in observed_statements["limitations"] if row["area"] != "dbhub.sql_statements"
     ]
-    decision_evidence.build_manifest(observed_tokens)
+    decision_evidence.build_manifest(observed_statements)
 
-    legacy_token_status = _valid_manifest()
-    legacy_token_status["dbhub"]["trials"][0]["model_tokens"] = {
-        "cached_input_tokens": 100,
-        "input_tokens": 200,
-        "output_tokens": 50,
-        "reasoning_tokens": 25,
-        "status": "available",
-    }
+    bare_statements = _valid_manifest()
+    bare_statements["dbhub"]["trials"][0]["samples"][0]["sql_statements"] = 2
     with pytest.raises(
         decision_evidence.DecisionEvidenceContractError,
-        match="status is unsupported",
+        match="observed/unavailable provenance object",
     ):
-        decision_evidence.build_manifest(legacy_token_status)
+        decision_evidence.build_manifest(bare_statements)
 
 
 def test_scoring_formula_and_eliminate_before_score_are_frozen() -> None:
@@ -1087,11 +1257,31 @@ def test_rejects_asserted_crash_agent_perf_shortcut_and_dbhub_gap() -> None:
         decision_evidence.build_manifest(missing_cpu)
 
 
-def test_unavailable_model_tokens_require_explicit_limitation() -> None:
+def test_deferred_model_operability_requires_explicit_ck11_limitation() -> None:
     manifest = _valid_manifest()
-    manifest["limitations"][0]["area"] = "other.measurement"
+    manifest["limitations"] = [
+        row for row in manifest["limitations"] if row["area"] != "dbhub.model_operability"
+    ]
     with pytest.raises(
         decision_evidence.DecisionEvidenceContractError,
         match="explicit limitations",
     ):
         decision_evidence.build_manifest(manifest)
+
+    incomplete_prerequisites = _valid_manifest()
+    incomplete_prerequisites["dbhub"]["model_operability"]["required_evidence_fields"].remove(
+        "exact_model_id"
+    )
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="between 8 and 8",
+    ):
+        decision_evidence.build_manifest(incomplete_prerequisites)
+
+    wrong_owner = _valid_manifest()
+    wrong_owner["dbhub"]["model_operability"]["owner_packet_id"] = "CK-04"
+    with pytest.raises(
+        decision_evidence.DecisionEvidenceContractError,
+        match="owner_packet_id must be CK-11",
+    ):
+        decision_evidence.build_manifest(wrong_owner)

@@ -45,7 +45,8 @@ the required question cases. It rejects absolute, escaping, missing, or non-CK-0
   deterministic ties, and bounded full sorting;
 - all nine publication termination boundaries and the injected-fault union required by the
   bake-off and qualification plan;
-- four DBHub generic/named by default/less-capable trials and the file-based agent-perf
+- two non-model DBHub local-route cases (`generic` and `named_preset`), with five
+  globally sequenced alternating samples per route, and the file-based agent-perf
   attribution workload.
 
 The matrix digest includes the qualification host's physical-core input. Candidate result
@@ -80,6 +81,12 @@ with the CK-03 oracle. The prior publication, rollback, sidecar terminal state, 
 artifact disposition, and subsequent recovery are all observed facts; exceptions or a
 candidate's assertion are not substitutes.
 
+The aggregate v2 evidence additionally requires the positive worker PID, actual and expected
+exit code `86`, exit-code termination kind, requested and persisted boundary, lease/PID
+agreement, post-exit liveness check, and exact hashes of the recovery-terminal and subsequent
+publication records. Injected faults retain `process.status=not_applicable` in the aggregate
+while still carrying their observed recovery stage, action, and record hashes.
+
 ## DBHub research
 
 `build_dbhub_run()` creates a disposable copy of a synthetic SQLite snapshot, removes all
@@ -94,6 +101,17 @@ after the MCP process exits.
 
 DBHub is dev-only comparison infrastructure, never a candidate, runtime dependency, plugin,
 or user workflow.
+
+CK-04 deliberately executes the local generic route
+(`search_objects` plus `execute_sql`) and named-preset route (`top_sessions`); it does not
+ask a model to select a route. Each sample records result rows/hash, correctness, wall and
+process CPU time, response bytes, and the exact MCP-call count. `scanned_rows` and
+`sql_statements` remain observed/unavailable provenance objects because returned rows and
+route shape are not substitutes for those measurements.
+
+The current runner invokes no model. Exact installed-model identity, host and runtime
+versions, reasoning effort, synthetic-input artifact identity/hash, token source, and
+authorization for billed calls are a deferred CK-11 operability gate.
 
 ## Agent Perf
 

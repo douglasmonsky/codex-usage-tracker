@@ -306,8 +306,7 @@ Every result records:
 - server and MCP-shaped latency;
 - response bytes and duplicated representation bytes;
 - tracker calls, batches, polls, retries, and refresh jobs;
-- model input/output tokens and answer correctness for default and
-  less-capable-model trials.
+- answer correctness.
 
 Use `agent-perf` on the identical standard workload to identify Python CPU hot
 paths. Compare unprofiled identical workloads for speed claims. Profile output
@@ -398,16 +397,26 @@ The experiment:
   must be made owner-writable only for the process and digest-verified after;
 - exposes only schema search, read SQL, and a small parameterized custom-tool
   registry;
-- compares generic exploration with our named preset tools;
-- uses both the default and less-capable qualification models;
+- deliberately executes the local generic route (`search_objects` plus
+  `execute_sql`) and named-preset route (`top_sessions`);
+- records five samples for each route with global sequence indexes `0..9` in
+  alternating generic/named-preset order;
 - measures correctness, wall/CPU time, scanned rows, SQL statements, MCP calls,
-  response bytes, and model tokens.
+  and response bytes;
+- records scanned rows and SQL statements only as observed/unavailable
+  provenance; returned rows and route shape are not measurement substitutes.
 
 DBHub is useful if it speeds schema and query-plan exploration or demonstrates
 which parameterized presets reduce agent work. It is rejected as a product
-dependency if generic SQL needs more calls/tokens, weakens semantic grades,
-cannot enforce the bounded contract, or encourages plans outside the registry.
+dependency if generic SQL needs more calls, weakens semantic grades, cannot
+enforce the bounded contract, or encourages plans outside the registry.
 Custom tools remain interesting as design inspiration for typed named plans.
+
+CK-04 is a deterministic local-route benchmark, not an installed-model
+qualification. The current runner invokes no model, and exact model identity,
+host/runtime versions, reasoning effort, exact synthetic-prompt artifact
+identity/hash, token source, and authorization for billed calls were never
+frozen. CK-11 owns that deferred operability evidence.
 
 ## Semantic Kernel decision
 

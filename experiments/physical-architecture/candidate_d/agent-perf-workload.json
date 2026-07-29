@@ -6,7 +6,7 @@
   "fixture_revision": "agent-kernel-structural-v1",
   "fixture_manifest_digest": "b5b938232e199793f49d7ab0bf67d360ea658f332f15e5d53449d4327c821f26",
   "fixture_oracle_digest": "ca44e370f96923c1b3537f1b18089109e1d609d0fcd78bf995deb71d27353bc2",
-  "workload_matrix_digest": "b20ee7ca86c53e80b90f6b6093c7412ac3379aa14edcf2d68aac4e3cbd2abe71",
+  "workload_matrix_digest": "4d846d6f7869991117562d7aea9f61cb8fe9d967160415e749010f9704963a94",
   "synthetic_only": true,
   "workload_id": "build.scale.standard",
   "command_argv": [

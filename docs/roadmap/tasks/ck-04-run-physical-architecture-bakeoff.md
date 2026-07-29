@@ -33,8 +33,8 @@ survives injected crashes.
 
 **Tests/benchmarks:** Complete workload matrix, scales/history ranges,
 parallel-worker experiments, query plans, storage/WAL/pages, crash matrix,
-default/lower-model DBHub comparison, repeated unprofiled timings, agent-perf
-attribution.
+two-route local DBHub comparison, repeated unprofiled timings, agent-perf
+attribution. Installed-model operability is deferred to CK-11.
 
 **Acceptance:** At least one candidate passes every hard gate; selection score
 and sensitivity analysis are reproducible; decision names exact tables,
@@ -78,3 +78,11 @@ because those remediations changed the measured code. CK-04 remains in
 progress until a clean commit completes the required five-run timings,
 69-query matrix, 25-case recovery matrix, growth sensitivity, DBHub comparison,
 canonical v2 aggregate evidence, release-candidate checks, and CI.
+
+The CK-04 DBHub benchmark is deterministic and local: five samples each
+deliberately execute the `generic` and `named_preset` routes in alternating
+global order. It does not ask a model to select a route, and the current runner
+invokes no model. Exact model identity, host/runtime versions, reasoning effort,
+synthetic-prompt artifact identity/hash, token source, and authorization for
+billed calls were never frozen; CK-11 owns that installed-model operability
+record.

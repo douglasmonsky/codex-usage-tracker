@@ -816,3 +816,34 @@ def test_agent_perf_workload_is_the_frozen_standard_fixture_command() -> None:
         "PYTHONHASHSEED": "0",
         "PYTHONPATH": "experiments/physical-architecture",
     }
+
+
+@pytest.mark.parametrize(
+    ("route", "tool"),
+    (
+        ("generic", "search_objects+execute_sql"),
+        ("named_preset", "top_sessions"),
+    ),
+)
+def test_dbhub_cases_only_report_local_runner_readiness(
+    tmp_path: Path,
+    fixture: shared.FixtureBundle,
+    route: str,
+    tool: str,
+) -> None:
+    request = _request(
+        case_id=f"dbhub.{route}",
+        fixture=fixture,
+        run_root=tmp_path / route,
+    )
+
+    result = shared.execute_candidate(candidate_d.Adapter(), request)
+
+    assert result.outcome is shared.RunOutcome.PASSED
+    assert result.oracle_results == {
+        "ready_for_shared_dbhub_runner": True,
+        "route": route,
+        "tool": tool,
+    }
+    assert result.measurements.sql_statements == 0
+    assert result.measurements.rows_scanned == 0

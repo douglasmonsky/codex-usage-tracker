@@ -433,7 +433,7 @@ def test_adapter_supports_each_mandatory_group_and_optional_staging(
         "unsafe.source_replacement",
         "query.q-ctx-01.warm_first_page",
         "crash.terminate.before_staging",
-        "dbhub.named_preset.default",
+        "dbhub.named_preset",
         "agent_perf.standard_cpu_attribution",
     )
     for case_id in selected:
@@ -445,6 +445,12 @@ def test_adapter_supports_each_mandatory_group_and_optional_staging(
         assert result.measurements.tracker_calls == 1
         assert result.measurements.oracle_equivalent is True
         assert result.publication is not None
+        if case.group is shared.WorkloadGroup.DBHUB:
+            assert result.oracle_results == {
+                "ready_for_shared_dbhub_runner": True,
+                "route": "named_preset",
+                "tool": "top_sessions",
+            }
 
     optional = matrix.by_id("build.writer.partitioned_staging")
     request = _request(fixture=fixture, case=optional, run_root=tmp_path / "optional")
@@ -469,6 +475,36 @@ def test_adapter_uses_shared_early_stop_controller(tmp_path: Path) -> None:
     assert result.outcome is shared.RunOutcome.STOPPED
     assert request.stop.decision is not None
     assert request.stop.decision.metric is shared.StopMetric.RESPONSE_BYTES
+
+
+@pytest.mark.parametrize(
+    ("route", "tool"),
+    (
+        ("generic", "search_objects+execute_sql"),
+        ("named_preset", "top_sessions"),
+    ),
+)
+def test_dbhub_cases_only_report_local_runner_readiness(
+    tmp_path: Path,
+    route: str,
+    tool: str,
+) -> None:
+    fixture = _fixture()
+    case = shared.build_workload_matrix(physical_cores=4).by_id(f"dbhub.{route}")
+    request = _request(
+        fixture=fixture,
+        case=case,
+        run_root=tmp_path / route,
+    )
+
+    result = shared.execute_candidate(candidate_c.Adapter(), request)
+
+    assert result.outcome is shared.RunOutcome.PASSED
+    assert result.oracle_results == {
+        "ready_for_shared_dbhub_runner": True,
+        "route": route,
+        "tool": tool,
+    }
 
 
 def test_agent_perf_workload_is_exact_standard_file_contract(tmp_path: Path) -> None:

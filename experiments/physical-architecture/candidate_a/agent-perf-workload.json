@@ -25,5 +25,5 @@
   "synthetic_only": true,
   "version": 1,
   "workload_id": "build.scale.standard",
-  "workload_matrix_digest": "d6059274027d4fb9bfe286ef0932142c49f00e4a6a6e7badb6585ebc44edfb11"
+  "workload_matrix_digest": "4d846d6f7869991117562d7aea9f61cb8fe9d967160415e749010f9704963a94"
 }
