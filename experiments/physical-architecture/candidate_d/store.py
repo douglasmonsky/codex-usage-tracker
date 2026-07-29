@@ -371,6 +371,26 @@ def _decode_field(kind: str, integer: int | None, text: str | None) -> object:
     raise CandidateDIntegrityError(f"invalid stored question-case value kind {kind!r}")
 
 
+def _source_admitted_for_history(
+    source: shared.SourceArtifact,
+    entry: Mapping[str, Any],
+    *,
+    history_selection: str,
+    window_start_us: int,
+    window_end_us: int,
+) -> bool:
+    if str(entry.get("history_selection")) == "deferred":
+        return False
+    if history_selection == "all_time":
+        return True
+    if source.time_range_confidence != "trusted":
+        return True
+    hint = source.time_range_hint
+    if hint is None:
+        return True
+    return hint[0] <= window_end_us and hint[1] > window_start_us
+
+
 class CandidateDStore:
     """Typed facts plus one narrow total-order-to-occurrence sequence index."""
 
@@ -483,9 +503,14 @@ class CandidateDStore:
             source_files_inventoried=len(fixture.sources),
             source_bytes_inventoried=fixture.source_bytes,
         )
-        if rescan:
-            stats.source_files_rescanned = len(fixture.sources)
-            stats.source_bytes_rescanned = fixture.source_bytes
+        history = _mapping(fixture.manifest.get("history"), label="fixture history")
+        windows = _mapping(history.get("windows"), label="fixture history windows")
+        window = _mapping(
+            windows.get(history_selection),
+            label="fixture history selection",
+        )
+        window_start_us = _integer(window.get("start_us"), label="history start")
+        window_end_us = _integer(window.get("end_us"), label="history end")
         source_entries = {
             str(entry["path"]): entry
             for entry in fixture.manifest["sources"]
@@ -498,13 +523,22 @@ class CandidateDStore:
                 source_entries.get(source.relative_path.as_posix()),
                 label="fixture source entry",
             )
-            selected = str(entry.get("history_selection")) != "deferred"
+            selected = _source_admitted_for_history(
+                source,
+                entry,
+                history_selection=history_selection,
+                window_start_us=window_start_us,
+                window_end_us=window_end_us,
+            )
             if not selected:
                 stats.source_files_deferred += 1
                 stats.source_bytes_deferred += source.byte_count
                 continue
             stats.source_files_selected += 1
             stats.source_bytes_selected += source.byte_count
+            if rescan:
+                stats.source_files_rescanned += 1
+                stats.source_bytes_rescanned += source.byte_count
             selected_sources.append((source, entry))
             body = source.absolute_path.read_bytes()
             stats.source_files_parsed += 1

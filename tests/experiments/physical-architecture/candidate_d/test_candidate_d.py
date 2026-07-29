@@ -5,6 +5,7 @@ import json
 import sqlite3
 import sys
 from collections.abc import Iterator, Mapping
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,7 @@ sys.path.insert(0, str(_EXPERIMENT_ROOT))
 shared = importlib.import_module("shared")
 candidate_d = importlib.import_module("candidate_d")
 candidate_schema = importlib.import_module("candidate_d.schema")
+candidate_store = importlib.import_module("candidate_d.store")
 
 _TINY = _REPO_ROOT / "tests" / "agent_kernel" / "fixtures" / "tiny-v1"
 _AGENT_PERF_WORKLOAD = _EXPERIMENT_ROOT / "candidate_d" / "agent-perf-workload.json"
@@ -75,6 +77,234 @@ def _oracle_rows(
         for oracle_id, question in fixture.oracle["questions"].items()
         if question["question_id"] == question_id
     }
+
+
+def _expected_selected_sources(
+    fixture: shared.FixtureBundle,
+    history_selection: str,
+) -> tuple[shared.SourceArtifact, ...]:
+    history = fixture.manifest["history"]
+    window = history["windows"][history_selection]
+    start_us = int(window["start_us"])
+    end_us = int(window["end_us"])
+    return tuple(
+        source
+        for source in fixture.sources
+        if source.state != "deferred"
+        and (
+            history_selection == "all_time"
+            or source.time_range_confidence != "trusted"
+            or source.time_range_hint is None
+            or (source.time_range_hint[0] <= end_us and source.time_range_hint[1] > start_us)
+        )
+    )
+
+
+def _assert_source_counters(
+    stats: candidate_d.BuildStats,
+    fixture: shared.FixtureBundle,
+    *,
+    history_selection: str,
+    rescan: bool,
+) -> None:
+    selected = _expected_selected_sources(fixture, history_selection)
+    selected_paths = {source.relative_path for source in selected}
+    deferred = tuple(
+        source for source in fixture.sources if source.relative_path not in selected_paths
+    )
+    selected_bytes = sum(source.byte_count for source in selected)
+    deferred_bytes = sum(source.byte_count for source in deferred)
+
+    assert stats.source_files_inventoried == len(fixture.sources)
+    assert stats.source_bytes_inventoried == fixture.source_bytes
+    assert stats.source_files_selected == len(selected)
+    assert stats.source_bytes_selected == selected_bytes
+    assert stats.source_files_parsed == len(selected)
+    assert stats.source_bytes_parsed == selected_bytes
+    assert stats.source_files_deferred == len(deferred)
+    assert stats.source_bytes_deferred == deferred_bytes
+    assert stats.source_files_rescanned == (len(selected) if rescan else 0)
+    assert stats.source_bytes_rescanned == (selected_bytes if rescan else 0)
+
+
+def test_named_history_skips_only_trusted_nonoverlap_before_opening_source(
+    tmp_path: Path,
+    fixture: shared.FixtureBundle,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selected = _expected_selected_sources(fixture, "30_days")
+    selected_paths = {source.absolute_path for source in selected}
+    skipped_paths = {
+        source.absolute_path
+        for source in fixture.sources
+        if source.absolute_path not in selected_paths
+    }
+    original_read_bytes = Path.read_bytes
+
+    def guarded_read_bytes(path: Path) -> bytes:
+        if path in skipped_paths:
+            raise AssertionError(f"skipped source body was opened: {path.name}")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", guarded_read_bytes)
+    store, stats, _ = candidate_d.publish_new_store(
+        fixture=fixture,
+        run_root=tmp_path,
+        history_selection="30_days",
+    )
+
+    _assert_source_counters(
+        stats,
+        fixture,
+        history_selection="30_days",
+        rescan=False,
+    )
+    assert {
+        source.relative_path.as_posix()
+        for source in selected
+        if source.time_range_confidence != "trusted"
+    } == {
+        "sources/active/source-0000.jsonl",
+        "sources/active/source-0001.jsonl",
+        "sources/malformed/malformed.jsonl",
+        "sources/replaced/revision-1.jsonl",
+        "sources/truncated/truncated.jsonl",
+    }
+    connection = _connection(store)
+    try:
+        expected = fixture.manifest["history"]["selections"]["30_days"]
+        assert int(connection.execute("SELECT COUNT(*) FROM model_calls").fetchone()[0]) == int(
+            expected["calls"]
+        )
+    finally:
+        connection.close()
+    for question_id in _REQUIRED_QUESTION_IDS:
+        actual = {
+            row["oracle_id"]: row["row"]
+            for row in store.query_question(question_id).payload["rows"]
+        }
+        assert actual == _oracle_rows(fixture, question_id)
+
+
+def test_source_hint_overlap_uses_half_open_hint_against_closed_window(
+    fixture: shared.FixtureBundle,
+) -> None:
+    source = next(item for item in fixture.sources if item.time_range_confidence == "trusted")
+    window = fixture.manifest["history"]["windows"]["30_days"]
+    start_us = int(window["start_us"])
+    end_us = int(window["end_us"])
+    selected_entry = {"history_selection": "selected"}
+    deferred_entry = {"history_selection": "deferred"}
+
+    at_closed_end = replace(
+        source,
+        time_range_hint=(end_us, end_us + 1),
+    )
+    strictly_before = replace(
+        source,
+        time_range_hint=(start_us - 1, start_us),
+    )
+    strictly_after = replace(
+        source,
+        time_range_hint=(end_us + 1, end_us + 2),
+    )
+    uncertain = replace(
+        strictly_after,
+        time_range_confidence="uncertain",
+    )
+    unavailable = replace(
+        strictly_after,
+        time_range_hint=None,
+        time_range_confidence="unavailable",
+    )
+
+    assert candidate_store._source_admitted_for_history(
+        at_closed_end,
+        selected_entry,
+        history_selection="30_days",
+        window_start_us=start_us,
+        window_end_us=end_us,
+    )
+    assert not candidate_store._source_admitted_for_history(
+        strictly_before,
+        selected_entry,
+        history_selection="30_days",
+        window_start_us=start_us,
+        window_end_us=end_us,
+    )
+    assert not candidate_store._source_admitted_for_history(
+        strictly_after,
+        selected_entry,
+        history_selection="30_days",
+        window_start_us=start_us,
+        window_end_us=end_us,
+    )
+    assert candidate_store._source_admitted_for_history(
+        uncertain,
+        selected_entry,
+        history_selection="30_days",
+        window_start_us=start_us,
+        window_end_us=end_us,
+    )
+    assert candidate_store._source_admitted_for_history(
+        unavailable,
+        selected_entry,
+        history_selection="30_days",
+        window_start_us=start_us,
+        window_end_us=end_us,
+    )
+    assert candidate_store._source_admitted_for_history(
+        strictly_after,
+        selected_entry,
+        history_selection="all_time",
+        window_start_us=start_us,
+        window_end_us=end_us,
+    )
+    assert not candidate_store._source_admitted_for_history(
+        unavailable,
+        deferred_entry,
+        history_selection="all_time",
+        window_start_us=start_us,
+        window_end_us=end_us,
+    )
+
+
+def test_history_expansion_rescans_only_sources_admitted_by_larger_window(
+    tmp_path: Path,
+    fixture: shared.FixtureBundle,
+) -> None:
+    store, _, _ = candidate_d.publish_new_store(
+        fixture=fixture,
+        run_root=tmp_path,
+        history_selection="30_days",
+    )
+
+    stats = store.expand(fixture, history_selection="90_days")
+
+    _assert_source_counters(
+        stats,
+        fixture,
+        history_selection="90_days",
+        rescan=True,
+    )
+
+
+def test_all_time_preserves_non_deferred_source_admission(
+    tmp_path: Path,
+    fixture: shared.FixtureBundle,
+) -> None:
+    _, stats, _ = candidate_d.publish_new_store(
+        fixture=fixture,
+        run_root=tmp_path,
+        history_selection="all_time",
+    )
+
+    _assert_source_counters(
+        stats,
+        fixture,
+        history_selection="all_time",
+        rescan=False,
+    )
 
 
 def test_schema_is_typed_and_compact_sequence_is_synchronized(
@@ -569,6 +799,12 @@ def test_agent_perf_workload_is_the_frozen_standard_fixture_command() -> None:
     assert workload.candidate_id == "D"
     assert workload.fixture_profile == "standard"
     assert workload.fixture_revision == "agent-kernel-structural-v1"
+    assert workload.fixture_manifest_digest == (
+        "b5b938232e199793f49d7ab0bf67d360ea658f332f15e5d53449d4327c821f26"
+    )
+    assert workload.fixture_oracle_digest == (
+        "ca44e370f96923c1b3537f1b18089109e1d609d0fcd78bf995deb71d27353bc2"
+    )
     assert workload.workload_id == "build.scale.standard"
     assert workload.minimum_unprofiled_runs == 5
     assert workload.profile_is_attribution_only is True
