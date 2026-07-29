@@ -145,6 +145,14 @@ Record median, p95, maximum, and coefficient of variation over at least five
 unprofiled runs. Cold filesystem tests state how cache was controlled. Warm
 tests reuse the same process and committed database.
 
+Required pull-request CI applies the host-classification protocol in
+[`CI_PERFORMANCE_QUALIFICATION.md`](CI_PERFORMANCE_QUALIFICATION.md). A
+GitHub-hosted runner may enforce absolute latency only when repeated same-run
+calibration qualifies it. An unqualified runner produces machine-readable
+telemetry without converting a host pause into a product-regression claim;
+deterministic correctness remains blocking. Explicit strict mode on a known
+qualification host remains the authoritative absolute-budget command.
+
 ### Mandatory attribution
 
 Use the `agent-perf` skill and pinned dev dependency on the identical 100,000

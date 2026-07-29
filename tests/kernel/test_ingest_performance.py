@@ -15,6 +15,7 @@ from codex_usage_tracker.kernel import ingest, writer
 from codex_usage_tracker.kernel.database import initialize_analytical_database
 from codex_usage_tracker.kernel.ingest import KernelIngestor, RefreshTrigger
 from codex_usage_tracker.kernel.operational import kernel_paths, load_cutover_control
+from tests.kernel.performance_qualification import record_wall_clock_budget
 from tests.kernel.test_ingest_pipeline import _token_line
 
 _CALL_COUNT = 100_000
@@ -220,9 +221,10 @@ def test_100k_call_build_meets_bounded_writer_budget(tmp_path: Path) -> None:
         f"initial build used {len(ordered)} writer transactions; "
         f"budget={_INITIAL_BUILD_TRANSACTION_BUDGET}"
     )
-    assert p95 <= _INITIAL_WRITER_P95_BUDGET_MS, (
-        f"staging writer p95 {p95:.3f} ms exceeded "
-        f"{_INITIAL_WRITER_P95_BUDGET_MS:.1f} ms; total={elapsed:.3f}s"
+    record_wall_clock_budget(
+        "initial_writer_p95_ms",
+        p95,
+        _INITIAL_WRITER_P95_BUDGET_MS,
     )
     with sqlite3.connect(paths.analytical) as connection:
         assert (
@@ -283,7 +285,10 @@ def test_append_safe_refresh_keeps_active_writer_lock_bounded(tmp_path: Path) ->
         assert result.inserted_calls == _ACTIVE_WRITER_APPEND_CALLS
         timings.extend(result.writer_transaction_ms)
 
-    p95, maximum = _assert_active_writer_latency_budget(tuple(timings))
+    assert len(timings) >= _ACTIVE_WRITER_MIN_SAMPLES
+    ordered = sorted(timings)
+    p95 = ordered[math.ceil(len(ordered) * 0.95) - 1]
+    maximum = ordered[-1]
     print(
         json.dumps(
             {
@@ -296,6 +301,16 @@ def test_append_safe_refresh_keeps_active_writer_lock_bounded(tmp_path: Path) ->
             },
             sort_keys=True,
         )
+    )
+    record_wall_clock_budget(
+        "active_writer_p95_ms",
+        p95,
+        _ACTIVE_WRITER_P95_BUDGET_MS,
+    )
+    record_wall_clock_budget(
+        "active_writer_max_ms",
+        maximum,
+        _ACTIVE_WRITER_MAX_BUDGET_MS,
     )
 
 

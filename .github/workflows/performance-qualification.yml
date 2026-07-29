@@ -1,0 +1,62 @@
+name: Qualified hosted performance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qualified-hosted-performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualification:
+    name: Calibration-qualified hosted performance
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install kernel tooling
+        run: python -m pip install ".[dev]"
+      - name: Run calibration-qualified performance contracts
+        env:
+          CODEX_USAGE_PERFORMANCE_LANE: github_hosted_qualified
+          CODEX_USAGE_PERFORMANCE_REPORT: performance-qualification.json
+        run: |
+          python -m pytest -p no:tach -p tests.kernel.performance_qualification \
+            tests/kernel/test_ingest_performance.py \
+            tests/kernel/allowance/test_performance.py \
+            tests/kernel/evidence/test_performance.py \
+            tests/kernel/interfaces/test_performance.py \
+            tests/kernel/query/test_performance.py
+      - name: Summarize qualification
+        if: always()
+        run: |
+          if test -f performance-qualification.json; then
+            {
+              echo '### Calibration-qualified hosted performance'
+              echo '```json'
+              cat performance-qualification.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Performance qualification report was not produced.' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload qualification telemetry
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qualified-hosted-performance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: performance-qualification.json
+          if-no-files-found: warn
+          retention-days: 30

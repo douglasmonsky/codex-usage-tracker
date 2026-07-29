@@ -30,6 +30,7 @@ from codex_usage_tracker.kernel.query import (
     QueryService,
 )
 from codex_usage_tracker.kernel.rollups import rebuild_generation_rollups
+from tests.kernel.performance_qualification import record_wall_clock_budget
 
 _CALL_COUNT = 100_000
 _TOOL_COUNT = 25_000
@@ -94,7 +95,11 @@ def test_100k_rollup_rebuild_budget(
     large_rollup_metrics: dict[str, float],
 ) -> None:
     assert large_service is not None
-    assert large_rollup_metrics["elapsed_ms"] <= 5_500
+    record_wall_clock_budget(
+        "rollup_rebuild_elapsed_ms",
+        large_rollup_metrics["elapsed_ms"],
+        5_500.0,
+    )
 
 
 def test_100k_common_comparison_and_concentration_budgets(
@@ -163,10 +168,18 @@ def test_100k_common_comparison_and_concentration_budgets(
             sort_keys=True,
         )
     )
-    assert common_p95 <= 500.0
-    assert comparison_p95 <= 1_000.0
-    assert concentration_p95 <= 1_000.0
-    assert daily_p95 <= 500.0
+    record_wall_clock_budget("common_query_p95_ms", common_p95, 500.0)
+    record_wall_clock_budget(
+        "comparison_query_p95_ms",
+        comparison_p95,
+        1_000.0,
+    )
+    record_wall_clock_budget(
+        "concentration_query_p95_ms",
+        concentration_p95,
+        1_000.0,
+    )
+    record_wall_clock_budget("daily_query_p95_ms", daily_p95, 500.0)
     assert common_result.plan_id.endswith("rollup_model_effort.v1")
     assert common_result.scanned_count == 4
     assert concentration_result.plan_id.endswith("rollup_thread.v1")
@@ -269,9 +282,13 @@ def test_100k_r5_analytical_primitive_budgets(
             sort_keys=True,
         )
     )
-    assert top_threads_p95 <= 1_000.0
-    assert top_thread_costs_p95 <= 100.0
-    assert tool_impact_p95 <= 500.0
+    record_wall_clock_budget("top_threads_p95_ms", top_threads_p95, 1_000.0)
+    record_wall_clock_budget(
+        "top_thread_costs_p95_ms",
+        top_thread_costs_p95,
+        100.0,
+    )
+    record_wall_clock_budget("tool_impact_p95_ms", tool_impact_p95, 500.0)
     assert top_threads_bytes <= 64_000
     assert tool_impact_bytes <= 64_000
     assert top_threads_result.returned_count == 25

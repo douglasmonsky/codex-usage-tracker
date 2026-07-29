@@ -88,3 +88,30 @@ def test_ci_runs_performance_contracts_only_in_the_dedicated_step() -> None:
         assert workflow.count(path) == 2
         assert f"--ignore={path}" in workflow
     assert 'if [ "$MATRIX_PYTHON" = "3.14" ]; then' not in workflow
+    assert "CODEX_USAGE_PERFORMANCE_LANE: github_hosted_qualified" in workflow
+    assert "CODEX_USAGE_PERFORMANCE_REPORT: performance-qualification.json" in workflow
+    assert "-p tests.kernel.performance_qualification" in workflow
+    assert "continue-on-error:" not in workflow
+    assert "Summarize performance qualification" in workflow
+    assert "Upload performance qualification telemetry" in workflow
+
+
+def test_hosted_performance_workflow_is_truthfully_qualified_not_controlled() -> None:
+    workflow = (
+        _REPO_ROOT / ".github" / "workflows" / "performance-qualification.yml"
+    ).read_text(encoding="utf-8")
+    qualification = (
+        _REPO_ROOT / "docs" / "quality" / "CI_PERFORMANCE_QUALIFICATION.md"
+    ).read_text(encoding="utf-8")
+
+    assert "name: Qualified hosted performance" in workflow
+    assert "workflow_dispatch:" in workflow
+    assert "schedule:" in workflow
+    assert "runs-on: ubuntu-24.04" in workflow
+    assert "CODEX_USAGE_PERFORMANCE_LANE: github_hosted_qualified" in workflow
+    assert "-p tests.kernel.performance_qualification" in workflow
+    assert "continue-on-error:" not in workflow
+    assert "self-hosted" not in workflow
+    assert "controlled" not in workflow.lower()
+    assert "CODEX_USAGE_PERFORMANCE_LANE=strict" in qualification
+    assert "Strict mode has no runner escape" in qualification
