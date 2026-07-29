@@ -679,6 +679,44 @@ def test_gitnexus_fts_corruption_signature_rejects_near_misses(
     assert bootstrap._is_recognized_gitnexus_fts_corruption(result) is False
 
 
+def test_gitnexus_fts_corruption_signature_ignores_terminal_control_framing() -> None:
+    diagnostic = (
+        "\x1b[2K\r\x1b[31mAnalysis failed:\x1b[0m "
+        "COPY failed for File: Runtime exception: "
+        "FTS ind\x1b[36mex\x1b[0m 'file_\rfts' "
+        "is incon\x1b[2Ksistent: "
+        "document node off\x00set 281 missing during dele\x08te. "
+        "\x1b]8;;https://example.invalid\x1b\\Drop\x1b]8;;\x1b\\ "
+        "and recreate FTS index.\x07"
+    )
+    result = bootstrap.CommandResult(1, "", diagnostic)
+
+    assert bootstrap._is_recognized_gitnexus_fts_corruption(result) is True
+    assert result.stderr == diagnostic
+
+
+def test_gitnexus_fts_corruption_signature_rejects_terminal_metadata_and_near_miss() -> None:
+    terminal_title = f"\x1b]0;{_GITNEXUS_FTS_CORRUPTION}\x07unrelated failure"
+    ansi_near_miss = (
+        "\x1b[31mFTS index 'symbol_fts' inconsistent:\x1b[0m "
+        "node offset 281 missing during delete. "
+        "Drop and recreate FTS index."
+    )
+
+    assert (
+        bootstrap._is_recognized_gitnexus_fts_corruption(
+            bootstrap.CommandResult(1, terminal_title, "")
+        )
+        is False
+    )
+    assert (
+        bootstrap._is_recognized_gitnexus_fts_corruption(
+            bootstrap.CommandResult(1, "", ansi_near_miss)
+        )
+        is False
+    )
+
+
 def test_gitnexus_analyzer_runner_streams_and_keeps_a_bounded_diagnostic_tail(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
