@@ -1,0 +1,144 @@
+{
+  "schema": "codex-usage-tracker.ck08-fact-backed-oracle-prerequisite-gap.v1",
+  "task": "CK-08",
+  "status": "blocked",
+  "recorded_at": "2026-07-30",
+  "base_main_sha": "7ff3eaa268def98dfbff0693160211ffb0c2cedc",
+  "boundary": {
+    "implementation_added": false,
+    "public_api_added": false,
+    "projection_added": false,
+    "ck09_started": false,
+    "reason": "The frozen CK-03 question oracle rows are not derivable from the canonical database-v1 facts emitted for the same typed requests."
+  },
+  "authority": {
+    "question_catalog": {
+      "path": "config/agent-kernel/question-catalog-v1.json",
+      "sha256": "51f9008297cf9cccd24dcc41b43f0e0285c71af1301090796951ba3367836824",
+      "foundation_cutover_named_plans": 21,
+      "foundation_cutover_oracle_variants": 42
+    },
+    "fixture_manifest": {
+      "path": "tests/agent_kernel/fixtures/tiny-v1/manifest.json",
+      "sha256": "6cb0425f6a6fb755e87b5bbdf1144c7d9eca49c889577c8c9a0ec0961fe4e45e",
+      "synthetic_only": true
+    },
+    "oracle_bundle": {
+      "path": "tests/agent_kernel/fixtures/tiny-v1/oracle-bundle.json",
+      "sha256": "9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b"
+    },
+    "database_v1_ddl": {
+      "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+      "sha256": "50c94bf6da492d3bc5a366bf17f6f0ba989018a505539526413bf01b1b1be934",
+      "question_cases_table_present": false
+    }
+  },
+  "reproduction": {
+    "oracle_id": "oracle:q-acc-01:boundaries",
+    "plan_id": "current_usage",
+    "request_window": {
+      "start_us": 1767225600000000,
+      "end_us": 1767312000000000,
+      "timezone": "UTC",
+      "interval": "[start,end)"
+    },
+    "frozen_ck03_expected_row": {
+      "cached_input_tokens": 12500,
+      "calls": 18,
+      "configured_cost_usd": "62.5",
+      "estimated_credits": "312.5",
+      "output_tokens": 3125,
+      "reasoning_tokens": 2083,
+      "total_tokens": 21875,
+      "uncached_input_tokens": 6250
+    },
+    "database_v1_fact_query": {
+      "source": "model_calls_visible",
+      "predicate": "event_at_us >= :start_us AND event_at_us < :end_us",
+      "result": {
+        "cached_input_tokens": 9885,
+        "calls": 2,
+        "output_tokens": 263,
+        "reasoning_tokens": 1267,
+        "total_tokens": 12021,
+        "uncached_input_tokens": 1873
+      }
+    },
+    "publication_path": [
+      "codex_jsonl.ingest on the checked-in tiny-v1 synthetic fixture",
+      "prepare_write_set_from_changes",
+      "PublicationWriter.publish",
+      "read model_calls_visible from the committed publication"
+    ],
+    "mismatch": {
+      "calls": {
+        "expected": 18,
+        "canonical_facts": 2
+      },
+      "uncached_input_tokens": {
+        "expected": 6250,
+        "canonical_facts": 1873
+      },
+      "total_tokens": {
+        "expected": 21875,
+        "canonical_facts": 12021
+      }
+    }
+  },
+  "ck04_proof_limitation": {
+    "candidate_schema_path": "experiments/physical-architecture/candidate_a/schema.py",
+    "candidate_schema_sha256": "363f95a90e476ad1081dab17939138b081460687040b0afe1498131b8d32f13a",
+    "candidate_query_path": "experiments/physical-architecture/candidate_a/queries.py",
+    "candidate_query_sha256": "bd6959c11d12b0baff7f379603d529696b05377c9628b48d1da66e86a627fe5f",
+    "answer_source": "question_cases.observed_facts_json",
+    "ingest_source": "oracle_case payload observed_facts",
+    "production_disposition": "forbidden",
+    "contract_basis": "AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md states that Candidate A question_cases are harness-only and forbidden in the production package."
+  },
+  "rejected_workarounds": [
+    "Add question_cases or another oracle-answer table to database-v1.",
+    "Read oracle_case records or the oracle bundle from the runtime query path.",
+    "Return frozen expected values instead of executing a canonical fact plan.",
+    "Add a CK-09 projection to hide the mismatch.",
+    "Silently weaken or replace the unchanged CK-03 oracle."
+  ],
+  "required_prerequisite": {
+    "decision": "Freeze fact-backed Foundation/Cutover question cases before CK-08 resumes.",
+    "acceptance": [
+      "All 21 named Foundation/Cutover plans retain their contract IDs, grades, formulas, limits, and prohibited claims.",
+      "All 42 variants emit canonical typed facts that independently reconcile to the expected row for the exact typed request.",
+      "Expected rows are calculated by a reference oracle that does not read production query output.",
+      "Every required logical selector resolves to an actual database-v1 entity and occurrence coordinate.",
+      "The proof contains no question_cases table, oracle_case runtime read, projection, generic SQL surface, or frozen 0.28 dependency."
+    ],
+    "ownership": "A contract and fixture amendment is required before CK-08 implementation can resume; CK-08 must not invent that semantic change inside the query compiler."
+  },
+  "review_accounting": {
+    "reviewer_count": 1,
+    "total_findings": 0,
+    "accepted_findings": 0,
+    "accepted_finding_ids": [],
+    "reviewer_token_status": "pending",
+    "reviewer_tokens": null,
+    "tokens_per_accepted_finding": null,
+    "attribution": "unavailable",
+    "measurement_error": "The installed codex-usage-tracker CLI does not expose the historical strict reviewer-token subcommand; the measurement was not retried."
+  },
+  "validation": {
+    "focused_scope_tests": "15 passed",
+    "agent_kernel_contracts": "passed: 40 questions and 14,459 guidance bytes",
+    "release_safety": "passed",
+    "just_vp": "passed after lockfile-pinned root development dependencies were installed",
+    "git_diff_check": "passed",
+    "review": "one final comprehensive read-only reviewer; no findings",
+    "broader_profiles": "just v and just vc were not run because this is a blocker-only documentation and scope-allowlist change with no package, schema, runtime, or public-contract implementation"
+  },
+  "growth_waiver": "CK-04 growth repetitions 3 and 4 remain waived; the strict v2 aggregate is not claimed.",
+  "privacy": {
+    "synthetic_fixture_only": true,
+    "real_codex_logs_read": false,
+    "raw_bodies_read_or_committed": false,
+    "local_tracker_database_read": false,
+    "secrets_read_or_committed": false
+  }
+}

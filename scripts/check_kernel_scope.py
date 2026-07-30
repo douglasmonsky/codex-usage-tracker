@@ -541,6 +541,12 @@ CK07_PUBLICATION_RECOVERY_ADDITIONS = frozenset(
     }
 )
 
+CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
+    }
+)
+
 CI_PERFORMANCE_QUALIFICATION_ADDITIONS = frozenset(
     {
         ".github/workflows/performance-qualification.yml",
@@ -583,6 +589,7 @@ INTEGRATION_ADDITIONS = (
     | CK05_CANONICAL_STORAGE_ADDITIONS
     | CK06_ADAPTER_INGESTION_ADDITIONS
     | CK07_PUBLICATION_RECOVERY_ADDITIONS
+    | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))")
