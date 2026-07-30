@@ -7,10 +7,10 @@ in the linked files under [`docs/roadmap/tasks/`](tasks/).
 
 ## Overall
 
-- Completed packets: **8 / 19**
-- In progress: **CK-07B final gates; CK-07A and CK-08 blocked**
+- Completed packets: **9 / 19**
+- In progress: **CK-07A ready to resume after CK-07B merge; CK-08 blocked**
 - Not started: **9**
-- Critical-path completion: **8 / 18**
+- Critical-path completion: **9 / 18**
 - Optional packets: **CK-15**
 
 A packet may be checked only after its acceptance criteria and required checks
@@ -28,8 +28,8 @@ corrective packet's executable producer-to-consumer seam checks.
 
 - [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
 - [x] **M1 — Architecture Selected** · 4 / 4 · CK-01–CK-04 complete
-- [ ] **M2 — Kernel Alpha** · 3 / 7 · CK-05–CK-07 complete; CK-07B final
-  gates in progress; CK-07A and CK-08 blocked; CK-09 not started
+- [ ] **M2 — Kernel Alpha** · 4 / 7 · CK-05–CK-07 and CK-07B complete;
+  CK-07A ready to resume; CK-08 blocked; CK-09 not started
 - [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
 - [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
 - [ ] **M5 — Public Release** · 0 / 1 required · CK-16 not started
@@ -70,14 +70,15 @@ corrective packet's executable producer-to-consumer seam checks.
 - [x] **CK-07 — Implement publication, refresh, and recovery** · **Completed** ·
   depends on CK-06
   · [packet](tasks/ck-07-implement-publication-refresh-recovery.md)
-- [ ] **CK-07B — Freeze formula and provenance contract** · **In progress —
-  review findings resolved; final validation, CI, merge, and exact-main
-  verification pending** ·
+- [x] **CK-07B — Freeze formula and provenance contract** · **Completed on
+  merge via PR #383; exact-main verification is recorded in the completion
+  handoff** ·
   corrective dependency discovered by CK-07A; depends on CK-07 and CK-07A
   blocker evidence
   · [packet](tasks/ck-07b-freeze-formula-and-provenance-contract.md)
 - [ ] **CK-07A — Reconcile fact-backed oracles and qualify packet seams** ·
-  **Blocked until CK-07B merges; not requalified** · depends on CK-07, the
+  **Ready to resume after CK-07B merges; not requalified** · depends on CK-07,
+  the
   CK-08 blocker evidence, and CK-07B
   · [packet](tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md)
 - [ ] **CK-08 — Implement query and evidence** · **Blocked — the frozen CK-03

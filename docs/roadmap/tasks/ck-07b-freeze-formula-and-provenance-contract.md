@@ -1,6 +1,7 @@
 # CK-07B — Freeze formula and provenance contract
 
-**Status:** Validated — CI, merge, and exact-main verification pending
+**Status:** Completed on merge via PR #383 — exact-main verification is recorded
+in the completion handoff
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 

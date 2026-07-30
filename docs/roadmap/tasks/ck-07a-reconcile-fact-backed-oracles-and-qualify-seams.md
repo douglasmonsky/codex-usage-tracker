@@ -1,6 +1,6 @@
 # CK-07A — Reconcile fact-backed oracles and qualify packet seams
 
-**Status:** Blocked until CK-07B merges; not requalified
+**Status:** Ready to resume after CK-07B merges; not requalified
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 

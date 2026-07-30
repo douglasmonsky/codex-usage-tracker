@@ -1,7 +1,7 @@
 {
   "schema": "codex-usage-tracker.ck07b-formula-and-provenance-contract-evidence.v1",
   "packet": "CK-07B",
-  "status": "validated_ci_pending",
+  "status": "complete_on_merge",
   "base": {
     "ref": "origin/main",
     "sha": "99680e80f75107e31b73072dcdcd3a74f602dbf6"
@@ -71,7 +71,16 @@
         "impacted_symbols": 18
       }
     ],
-    "high_or_critical_impacts": 0
+    "high_or_critical_impacts": 0,
+    "precommit_detect_changes": {
+      "scope": "compare",
+      "base_ref": "origin/main",
+      "changed_files": 25,
+      "changed_symbols": 123,
+      "affected_processes": 286,
+      "risk": "critical",
+      "disposition": "Accepted after the complete just vc profile and independent final review; the graph classifies the new executable contract and its broad contract-test consumers as high fan-out."
+    }
   },
   "privacy": {
     "fixtures": "synthetic contract vectors only",
@@ -86,12 +95,13 @@
     "just_vc": "passed; functional, invariant-performance, release-safety, and package checks",
     "final_review": "5 findings, 5 accepted and corrected",
     "review_token_status": "unavailable; repository reviewer metrics returned no attribution and were not retried",
-    "ci": "pending",
-    "exact_main": "pending"
+    "ci": "passed for PR #383",
+    "exact_main": "post-merge verification required and recorded in the completion handoff"
   },
   "merge": {
-    "pull_request": null,
-    "merged_sha": null
+    "pull_request": "https://github.com/douglasmonsky/codex-usage-tracker/pull/383",
+    "merged_sha": null,
+    "merged_sha_recording_rule": "A commit cannot contain its own eventual squash-merge SHA; verify and report exact origin/main after merge."
   },
   "resume": {
     "ck07a_ready_after_merge": true,

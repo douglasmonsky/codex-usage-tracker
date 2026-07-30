@@ -21,8 +21,8 @@ recorded. Corrective packet
 then found that the catalog's 45 formula IDs and owner-specific selector
 provenance had no executable authority.
 [CK-07B](roadmap/tasks/ck-07b-freeze-formula-and-provenance-contract.md)
-supplies that narrow decision contract and is completing its final gates.
-CK-07A remains blocked until CK-07B merges and is not requalified or complete.
+supplies the narrow decision contract through PR #383. After that PR merges,
+CK-07A is ready to resume but is not requalified or complete.
 It must still repair CK-03 oracle lineage,
 replace CK-04's candidate-only answer proof, and requalify the unchanged
 CK-05–CK-07 consumer seams before CK-08 may resume. CK-08 remains blocked and
