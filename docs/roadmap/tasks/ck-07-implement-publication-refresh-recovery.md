@@ -85,3 +85,11 @@ The CK-04 growth repetitions 3 and 4 remain explicitly waived. CK-07 makes no
 strict-v2 aggregate claim. CK-08 query/evidence, projections and named plans,
 public MCP/setup/CLI/skill surfaces, release, deployment, and optional CK-15
 remain outside this packet.
+
+CK-07's publication path correctly exposed the canonical result that disproved
+the frozen question row. Its implementation remains complete, while
+[CK-07A](ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md) must replay
+no-change, tail, rebuild, replacement, late-event, and recovery behavior
+against the corrected fixture and refresh the linked evidence. A code change
+is admitted only if that unchanged replay exposes a concrete publication or
+recovery deficiency.

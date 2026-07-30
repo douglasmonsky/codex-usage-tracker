@@ -10,6 +10,13 @@ Keep the branch and pull request focused on that packet, and update the
 [checkbox ledger](docs/roadmap/TASK_PACKETS.md) only after every acceptance
 criterion and required measurement passes.
 
+For every upstream artifact consumed as truth, the packet must name and execute
+its producer-to-consumer seam check: exact producer identity, consumer path,
+independent truth source, and requalification set. Matching hashes or a prior
+packet's completion do not prove semantic compatibility. If a downstream
+consumer exposes a mismatch, stop it and add a corrective packet rather than
+silently changing expected output or historical evidence.
+
 The replacement belongs under `src/codex_usage_tracker/agent_kernel/`. Do not
 import, migrate, or extend the frozen 0.28 spike under
 `src/codex_usage_tracker/kernel/`.

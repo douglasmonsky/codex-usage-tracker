@@ -16,6 +16,14 @@ spike and Console before the new public release.
 - Implement under `src/codex_usage_tracker/agent_kernel/`.
 - Never import the spike root or open/migrate its database.
 - Freeze a contract and failing oracle before production implementation.
+- Connect every dependency edge with an executable seam contract naming the
+  producer artifact, consumer path, independent truth source, and
+  requalification set.
+- A copied expected row, formula-consistent oracle, matching digest, or
+  database-resident answer table does not prove canonical-fact lineage.
+- If downstream work disproves an upstream semantic claim, stop the dependent,
+  add a corrective packet, preserve the historical evidence, and requalify
+  every affected seam before resuming.
 - Use synthetic fixtures only.
 - Query never refreshes.
 - The host waits; the model never polls.
@@ -36,7 +44,7 @@ spike and Console before the new public release.
 | 0. Authority cleanup and spike freeze | CK-00 | 0.28 main and accepted direction | One docs index/roadmap, disposition, frozen oracle ref | No active contradictory docs or obsolete workflow artifacts |
 | 1. Question and logical contracts | CK-01–CK-03 | Authority docs and catalog | Executable question registry, logical vectors, shared fixtures/oracles | Every supported question maps to facts, plans, evidence, budgets |
 | 2. Physical decision | CK-04 | Shared contracts/harness | A/C/D results and architecture decision | One candidate passes hard gates and selection rule |
-| 3. Canonical kernel | CK-05–CK-07 | Selected design | Storage, identity, Codex adapter, ingestion, publication/recovery | Exact facts and bounded tails survive lifecycle/crash matrix |
+| 3. Canonical kernel | CK-05–CK-07, CK-07A correction | Selected design and executable seam contracts | Storage, identity, Codex adapter, ingestion, publication/recovery, fact-lineage requalification | Exact facts and bounded tails survive lifecycle/crash matrix; published facts independently reconcile to question truth |
 | 4. Answers and evidence | CK-08–CK-09 | Published canonical kernel | Query/evidence grammar, projections, Foundation/Cutover named plans | Question oracles and performance gates pass |
 | 5. Installed agent experience | CK-10–CK-12 | Queryable kernel | Setup, MCP/skill/CLI, exact installed harness, full qualification | Fresh CLI/Desktop tasks pass accuracy/call/token/latency gates |
 | 6. Clean cutover and retirement | CK-13–CK-14 | Fully qualified candidate | Cutover decision, clean package, spike/Console deletion | Replacement selected; prior public release remains reinstall rollback |
@@ -46,7 +54,7 @@ spike and Console before the new public release.
 
 ```text
 CK-00 -> CK-01 -> CK-02 -> CK-03 -> CK-04 -> CK-05 -> CK-06
-      -> CK-07 -> CK-08 -> CK-09 -> CK-10 -> CK-11 -> CK-12
+      -> CK-07 -> CK-07A -> CK-08 -> CK-09 -> CK-10 -> CK-11 -> CK-12
       -> CK-13 -> CK-14 -> CK-16
 ```
 
@@ -67,7 +75,8 @@ flowchart LR
     DEC --> K[CK-05 Selected kernel]
     K --> AD[CK-06 Codex adapter and ingest]
     AD --> P[CK-07 Publication and recovery]
-    P --> Q[CK-08 Query and evidence]
+    P --> SEAM[CK-07A Fact-lineage seam repair]
+    SEAM --> Q[CK-08 Query and evidence]
     Q --> PR[CK-09 Projections and named plans]
     PR --> UX[CK-10 Setup, MCP, skill]
     UX --> IH[CK-11 Installed harness]
@@ -88,7 +97,8 @@ Parallel work is optional and never changes dependency order.
 | After CK-02 | Fixture generator, oracle case authoring, benchmark measurement schema | CK-03 integrator owns manifest and expected-answer schema. |
 | CK-04 | Candidate A, C, and D implementations in separate experiment directories | One integrator owns shared harness/fixture/query/evidence contracts and final scoring. |
 | After CK-05 | Codex adapter parser cases; storage failure-injection harness | Identity/domain/schema interfaces have one owner. |
-| After CK-07 | Fact-backed query compiler; evidence cursor service; installed harness skeleton | Public request/result schemas and registry have one owner. |
+| CK-07A | Scenario/canonical-fact generation; independent reference evaluator; CK-04 proof replacement; CK-05–CK-07 requalification | One integrator freezes scenario, expected-row, selector, and seam-evidence schemas before disjoint lanes begin. |
+| After CK-07A | Fact-backed query compiler; evidence cursor service; installed harness skeleton | Public request/result schemas and registry have one owner. |
 | CK-09 | Disjoint projection families after dirty-key registry is frozen | Projection registry and publication call site have one owner. |
 | CK-12 | CLI and Desktop fresh-task runs; performance repetitions; crash matrix | Candidate artifacts, fixture digest, and scorecard schema are immutable. |
 | CK-14 | Runtime deletion; frontend/Node removal; package/CI cleanup | Package manifest and release checker have one owner. |
@@ -117,6 +127,9 @@ Rollback: revert the planning branch; no runtime behavior changed.
 - logical identity/time/missing/token/lifecycle/allowance/valuation vectors
   pass independently of physical storage;
 - fixture manifests are deterministic.
+- every question case emits canonical typed facts for its exact typed request;
+- an independent reference evaluator derives expected rows without production
+  SQL, an answer table, or copied grading output.
 
 Rollback: contract changes only. Resolve ambiguity before physical candidates.
 
@@ -125,6 +138,9 @@ Rollback: contract changes only. Resolve ambiguity before physical candidates.
 - all candidates implement all five vertical slices;
 - identical fixtures and harness;
 - hard correctness/recovery/performance gates applied;
+- query correctness is derived from permitted candidate facts; an
+  `oracle_case`, `question_cases`, or equivalent expected-answer table cannot
+  satisfy the gate;
 - early failures recorded without long waits;
 - DBHub dev-only comparison complete;
 - one signed decision artifact selects tables/indexes and rejects alternatives.
@@ -140,11 +156,15 @@ empty.
 - reads stay available during build;
 - source lifecycle and crash matrix pass;
 - no raw bodies and no spike imports.
+- consumer-side replay proves that the exact published database-v1 facts
+  reconcile to independent expected rows for every admitted upstream question
+  case.
 
 Rollback: candidate database path is independent; spike remains untouched.
 
 ### Gate G4: answer kernel
 
+- CK-07A fact-lineage and downstream seam requalification evidence is complete;
 - Foundation and Cutover named plans pass exact oracles;
 - admitted projections name consumers and bounded dirty updates;
 - evidence selectors/cursors survive rebuild/replacement/late events;
@@ -262,6 +282,8 @@ The clean-cutover program is complete when:
 - fresh installed Codex tasks are the release gate;
 - public artifacts are verified and released;
 - the roadmap ledger and Linear backlog mark all blocking packets complete;
+- every dependency used as truth has producer identity, consumer replay,
+  independent truth, and current requalification evidence;
 - optional future seams add no current runtime burden.
 
 ## Explicit future items

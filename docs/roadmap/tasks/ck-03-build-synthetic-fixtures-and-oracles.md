@@ -119,3 +119,13 @@ patch candidates around an oracle error; fix and rerun all candidates.
 
 1. `test: add agent-kernel source fixture generator`
 2. `test: add accounting lifecycle and evidence oracles`
+
+## Corrective requalification
+
+CK-08 later proved that the question expected rows were generated independently
+from the canonical event stream for the same requests. Historical CK-03
+digests and execution evidence remain preserved, but the claim that question
+rows are canonical-fact truth is pending
+[CK-07A](ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md).
+CK-07A owns the new fixture revision, independent reference evaluator, exact
+digest refresh, and linked requalification evidence.

@@ -22,6 +22,38 @@ user installs.
 
 No lower level substitutes for a required higher level.
 
+### Evidence claim classes
+
+Evidence must state the exact class proved; these claims are not
+interchangeable:
+
+| Claim | Required proof |
+| --- | --- |
+| Structural validity | Schema, identity, ordering, and digest checks pass. |
+| Formula consistency | Values inside one oracle record satisfy its declared formulas. |
+| Canonical-fact lineage | The exact typed request selects canonical typed facts emitted by its scenario, and an independent evaluator derives the expected result from those facts. |
+| Consumer replay | The actual downstream adapter, storage, publication, or query path produces the same result from only its permitted inputs. |
+
+A packet may claim only the classes it executed. A prior packet's completion,
+matching hashes, or internal oracle reconciliation cannot substitute for
+canonical-fact lineage or consumer replay.
+
+Every dependency edge used as truth records a seam contract with:
+
+```text
+producer artifact path, schema, revision, and digest
+consumer packet and executable path
+independent truth source or reference evaluator
+executable seam check
+exact request/result comparison
+affected evidence and packets to requalify after change
+```
+
+If consumer replay disproves an upstream claim, the dependent packet stops.
+The roadmap admits a corrective packet, preserves the historical record, and
+requires current requalification evidence before the dependency may be
+consumed again.
+
 ## Synthetic fixture strategy
 
 Fixtures contain no real local usage records or raw content. A deterministic
@@ -138,6 +170,23 @@ Every catalog ID has:
 - default and hard byte limits;
 - less-capable-model expected behavior.
 
+Every question variant also has a fact-lineage triangle:
+
+1. one scenario declaration emits its canonical typed facts and real selector
+   occurrences;
+2. an independent reference evaluator calculates the expected row for the
+   exact typed request without production SQL or copied grading output;
+3. the downstream consumer calculates the same row from its permitted
+   canonical facts.
+
+The reference evaluator and production consumer may share locked formulas and
+typed contracts, but they must not share computed answer rows. `oracle_case`
+records, the oracle bundle, `question_cases`, or an equivalent expected-answer
+table are grading metadata only and cannot appear in a runtime answer path.
+Mutation qualification proves both directions: changing grading output cannot
+change the consumer result, while changing canonical facts changes the
+consumer result and causes oracle comparison to fail.
+
 ## Performance workloads
 
 Use the scales, history ranges, workloads, hard gates, and early-stop rules in
@@ -218,6 +267,7 @@ start promptly and no long analytical lock is held.
 For each named plan:
 
 - exact oracle;
+- current producer/consumer seam evidence;
 - plan/compiler ID;
 - required index/projection;
 - `EXPLAIN QUERY PLAN`;

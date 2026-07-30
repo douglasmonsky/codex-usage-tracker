@@ -7,10 +7,10 @@ in the linked files under [`docs/roadmap/tasks/`](tasks/).
 
 ## Overall
 
-- Completed packets: **8 / 17**
-- In progress: **CK-08 blocked on a fact-backed oracle prerequisite**
-- Not started: **8**
-- Critical-path completion: **8 / 16**
+- Completed packets: **8 / 18**
+- In progress: **CK-07A admitted; CK-08 blocked until its seam evidence passes**
+- Not started: **9**
+- Critical-path completion: **8 / 17**
 - Optional packets: **CK-15**
 
 A packet may be checked only after its acceptance criteria and required checks
@@ -18,12 +18,18 @@ pass, measurements and residual risks are recorded, and any required review is
 resolved. Updating a checkbox also requires updating the packet's `Status`
 line and the milestone accounting below.
 
+Historical completion is preserved when a later consumer finds a semantic
+mismatch. The corrective packet becomes a new dependency and must publish
+linked requalification evidence for every affected prior packet. A digest,
+formula-consistent oracle, or prior completion status cannot replace the
+corrective packet's executable producer-to-consumer seam checks.
+
 ## Milestones
 
 - [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
 - [x] **M1 — Architecture Selected** · 4 / 4 · CK-01–CK-04 complete
-- [ ] **M2 — Kernel Alpha** · 3 / 5 · CK-05–CK-07 complete; CK-08 blocked;
-  CK-09 not started
+- [ ] **M2 — Kernel Alpha** · 3 / 6 · CK-05–CK-07 complete; CK-07A admitted;
+  CK-08 blocked; CK-09 not started
 - [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
 - [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
 - [ ] **M5 — Public Release** · 0 / 1 required · CK-16 not started
@@ -64,10 +70,14 @@ line and the milestone accounting below.
 - [x] **CK-07 — Implement publication, refresh, and recovery** · **Completed** ·
   depends on CK-06
   · [packet](tasks/ck-07-implement-publication-refresh-recovery.md)
+- [ ] **CK-07A — Reconcile fact-backed oracles and qualify packet seams** ·
+  **Admitted corrective prerequisite** · depends on CK-07 and the CK-08
+  blocker evidence
+  · [packet](tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md)
 - [ ] **CK-08 — Implement query and evidence** · **Blocked — the frozen CK-03
   question oracle rows are not derivable from database-v1 canonical facts;
   [evidence](../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)** ·
-  depends on CK-07
+  depends on CK-07A
   · [packet](tasks/ck-08-implement-query-and-evidence.md)
 - [ ] **CK-09 — Admit projections and named plans** · Not started ·
   depends on CK-08
@@ -108,8 +118,8 @@ line and the milestone accounting below.
 
 ## Critical path
 
-`CK-00 → CK-01 → CK-02 → CK-03 → CK-04 → CK-05 → CK-06 → CK-07 → CK-08
-→ CK-09 → CK-10 → CK-11 → CK-12 → CK-13 → CK-14 → CK-16`
+`CK-00 → CK-01 → CK-02 → CK-03 → CK-04 → CK-05 → CK-06 → CK-07 → CK-07A
+→ CK-08 → CK-09 → CK-10 → CK-11 → CK-12 → CK-13 → CK-14 → CK-16`
 
 CK-15 remains outside the critical path unless the maintainer explicitly
 promotes it into the release.
