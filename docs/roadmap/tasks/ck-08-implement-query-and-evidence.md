@@ -1,6 +1,6 @@
 # CK-08 — Implement fact-backed query and evidence services
 
-**Status:** Not started
+**Status:** Blocked — fact-backed oracle prerequisite missing
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -42,6 +42,33 @@ a CK-09 projection.
 returning incomplete data. No API is public yet.
 
 **Cleanup/docs:** Produce measured projection-admission list.
+
+## Blocking prerequisite found
+
+CK-08 cannot implement or accept the named plans against the unchanged CK-03
+question oracles without violating the fact-backed runtime boundary. The
+checked-in `Q-ACC-01` boundaries case asks for one exact half-open window and
+expects 18 calls and 6,250 uncached-input tokens. Publishing the same synthetic
+fixture through the CK-06 adapter and CK-07 writer produces 2 canonical calls
+and 1,873 uncached-input tokens in that window.
+
+The CK-04 Candidate A proof does not resolve this mismatch. Its query reads a
+candidate-only `question_cases` table populated from `oracle_case` grading
+records. The database-v1 contract explicitly forbids that table in the
+production package. Adding an equivalent table, reading `oracle_case` records
+at runtime, or changing a query to return the frozen expected row would make
+the grading truth the answer source instead of deriving the answer from
+canonical facts.
+
+The exact inputs, hashes, SQL result, and contract references are recorded in
+[`fact-backed-oracle-prerequisite-gap.json`](../../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json).
+Before CK-08 can resume, the authority set must freeze Foundation/Cutover
+question cases whose expected rows are independently calculated from the
+canonical facts emitted for the same typed requests. The replacement must keep
+all 21 named plans, 42 variants, grades, formulas, selectors, and limits, and
+must prove the oracle without a candidate-only answer table. This packet
+remains unchecked; no registry entry, query/evidence implementation,
+projection, public API, or CK-09 work is admitted by this blocker record.
 
 **Suggested commits:**
 

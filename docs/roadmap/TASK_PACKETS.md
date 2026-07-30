@@ -8,8 +8,8 @@ in the linked files under [`docs/roadmap/tasks/`](tasks/).
 ## Overall
 
 - Completed packets: **8 / 17**
-- In progress: **None**
-- Not started: **9**
+- In progress: **CK-08 blocked on a fact-backed oracle prerequisite**
+- Not started: **8**
 - Critical-path completion: **8 / 16**
 - Optional packets: **CK-15**
 
@@ -22,7 +22,8 @@ line and the milestone accounting below.
 
 - [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
 - [x] **M1 — Architecture Selected** · 4 / 4 · CK-01–CK-04 complete
-- [ ] **M2 — Kernel Alpha** · 3 / 5 · CK-05–CK-07 complete; CK-08–CK-09 not started
+- [ ] **M2 — Kernel Alpha** · 3 / 5 · CK-05–CK-07 complete; CK-08 blocked;
+  CK-09 not started
 - [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
 - [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
 - [ ] **M5 — Public Release** · 0 / 1 required · CK-16 not started
@@ -63,7 +64,9 @@ line and the milestone accounting below.
 - [x] **CK-07 — Implement publication, refresh, and recovery** · **Completed** ·
   depends on CK-06
   · [packet](tasks/ck-07-implement-publication-refresh-recovery.md)
-- [ ] **CK-08 — Implement query and evidence** · Not started ·
+- [ ] **CK-08 — Implement query and evidence** · **Blocked — the frozen CK-03
+  question oracle rows are not derivable from database-v1 canonical facts;
+  [evidence](../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)** ·
   depends on CK-07
   · [packet](tasks/ck-08-implement-query-and-evidence.md)
 - [ ] **CK-09 — Admit projections and named plans** · Not started ·

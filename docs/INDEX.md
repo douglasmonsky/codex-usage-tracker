@@ -9,11 +9,15 @@ and none of the archived documents may override them.
 CK-07 is complete with its
 [publication, refresh, and recovery evidence](decisions/evidence/ck07/publication-refresh-recovery-evidence.json)
 recorded. CK-05 canonical storage and CK-06 adapter/ingestion remain its
-verified dependencies. The CK-04 growth exception remains explicit and the
-strict v2 aggregate is not claimed. After the CK-07 merge is verified,
-execution may transfer to
-[CK-08](roadmap/tasks/ck-08-implement-query-and-evidence.md) in a separate
-Codex task; CK-08 is not part of this packet. The authority set below wins over
+verified dependencies. CK-08 began from the verified CK-07 merge and found a
+missing fact-backed oracle prerequisite: the frozen CK-03 question rows do not
+equal the canonical database-v1 facts for their own requests, while the CK-04
+query proof obtained those rows from a candidate-only `question_cases` table
+that database-v1 explicitly forbids. CK-08 is therefore blocked at its packet
+boundary with the exact
+[prerequisite evidence](decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)
+recorded. CK-09 is not admitted. The CK-04 growth exception remains explicit
+and the strict v2 aggregate is not claimed. The authority set below wins over
 historical operational checkpoints.
 
 ## Authority set

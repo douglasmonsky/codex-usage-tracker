@@ -13,6 +13,7 @@ from scripts.check_kernel_scope import (
     CK05_CANONICAL_STORAGE_ADDITIONS,
     CK06_ADAPTER_INGESTION_ADDITIONS,
     CK07_PUBLICATION_RECOVERY_ADDITIONS,
+    CK08_PREREQUISITE_BLOCKER_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS,
     INTEGRATION_ADDITIONS,
@@ -506,6 +507,9 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/agent_kernel/publication/test_writer.py",
         "tests/kernel/test_kernel_scope.py",
     } == CK07_PUBLICATION_RECOVERY_ADDITIONS
+    assert {
+        "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
+    } == CK08_PREREQUISITE_BLOCKER_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -536,6 +540,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK05_CANONICAL_STORAGE_ADDITIONS
         | CK06_ADAPTER_INGESTION_ADDITIONS
         | CK07_PUBLICATION_RECOVERY_ADDITIONS
+        | CK08_PREREQUISITE_BLOCKER_ADDITIONS
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )
 
