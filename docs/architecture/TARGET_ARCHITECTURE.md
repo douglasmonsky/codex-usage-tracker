@@ -277,15 +277,18 @@ refreshes, builds indexes, or hydrates history.
 
 ## Optional context composition
 
-The architecture preserves only a capability seam:
+The architecture preserves a capability-gated, body-free structural seam:
 
-- an adapter may eventually emit structural component observations;
+- an admitted adapter may emit structural component observations;
 - query results already support capability and measurement masks;
-- context components have a logical contract and evidence class.
+- context components have a logical contract, database-v1 relation, and
+  evidence class.
 
-No optional-content database, fragment persistence, tokenizer dependency, raw
-context endpoint, or indexing command is in the MVP. Admission requires a
-separate post-MVP question and performance contract.
+CK-07C adds only the typed metadata relation required to represent positive
+`context_component_coverage_v1` facts. It does not add an optional-content
+database, fragment persistence, tokenizer dependency, raw context endpoint,
+indexing command, or public product surface. Broader admission still requires
+a separate post-MVP question and performance contract.
 
 ## Data Analytics and native presentation
 

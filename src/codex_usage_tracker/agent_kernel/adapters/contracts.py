@@ -34,6 +34,7 @@ class Capability(IntFlag):
     STATE_CHANGE_OBSERVATION = 1 << 4
     TOOL_LIFECYCLE = 1 << 5
     VALUATION = 1 << 6
+    CONTEXT_COMPONENT = 1 << 7
 
 
 CAPABILITY_MASK = int(
@@ -44,6 +45,7 @@ CAPABILITY_MASK = int(
     | Capability.STATE_CHANGE_OBSERVATION
     | Capability.TOOL_LIFECYCLE
     | Capability.VALUATION
+    | Capability.CONTEXT_COMPONENT
 )
 
 

@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/douglasmonsky/codex-usage-tracker/config/agent-kernel/plan-operand-contract-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "source_catalog", "source_formula_contract", "plans"],
+  "properties": {
+    "schema": {"const": "codex-usage-tracker.plan-operand-contract.v1"},
+    "version": {"const": 1},
+    "source_catalog": {"const": "config/agent-kernel/question-catalog-v1.json"},
+    "source_formula_contract": {"const": "config/agent-kernel/formula-contract-v1.json"},
+    "plans": {
+      "type": "array",
+      "minItems": 40,
+      "maxItems": 40,
+      "items": {"$ref": "#/$defs/plan"}
+    }
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "formulaIdentifier": {"type": "string", "pattern": "^[a-z][a-z0-9_]*_v1$"},
+    "names": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {"type": {"enum": ["integer", "object", "string"]}}
+    },
+    "parameters": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/identifier"},
+      "additionalProperties": {"$ref": "#/$defs/parameter"}
+    },
+    "requestSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "optional", "additional_parameters"],
+      "properties": {
+        "required": {"$ref": "#/$defs/parameters"},
+        "optional": {"$ref": "#/$defs/parameters"},
+        "additional_parameters": {"const": false}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relation", "fields"],
+      "properties": {
+        "relation": {"$ref": "#/$defs/identifier"},
+        "fields": {"$ref": "#/$defs/names"}
+      }
+    },
+    "formulaUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "use_id", "formula_id", "source_relations", "operand_slots",
+        "output_bindings", "internal_only", "consume_as", "derivation_rule"
+      ],
+      "properties": {
+        "use_id": {"type": "string", "minLength": 1},
+        "formula_id": {"$ref": "#/$defs/formulaIdentifier"},
+        "source_relations": {"$ref": "#/$defs/names"},
+        "operand_slots": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/identifier"},
+          "additionalProperties": {"$ref": "#/$defs/identifier"}
+        },
+        "output_bindings": {
+          "type": "object",
+          "propertyNames": {"$ref": "#/$defs/identifier"},
+          "additionalProperties": {"type": "string", "minLength": 1}
+        },
+        "internal_only": {"type": "boolean"},
+        "consume_as": {"type": ["string", "null"], "minLength": 1}
+        ,
+        "derivation_rule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["symbol", "stage", "calls_per_group"],
+          "properties": {
+            "symbol": {"type": "string", "pattern": "^derive_[a-z0-9_]+$"},
+            "stage": {"type": "integer", "minimum": 1, "maximum": 2},
+            "calls_per_group": {"type": "integer", "minimum": 1, "maximum": 5}
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"internal_only": {"const": true}}},
+          "then": {"properties": {"consume_as": {"type": "string", "minLength": 1}}},
+          "else": {"properties": {"consume_as": {"type": "null"}}}
+        }
+      ]
+    },
+    "answerBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field", "classification", "slot", "formula_id", "output_key",
+        "derivation_rule", "source_rule"
+      ],
+      "properties": {
+        "field": {"$ref": "#/$defs/identifier"},
+        "classification": {"enum": ["direct_fact", "formula_output"]},
+        "slot": {"$ref": "#/$defs/identifier"},
+        "formula_id": {"type": ["string", "null"]},
+        "output_key": {"type": ["string", "null"]},
+        "derivation_rule": {
+          "type": "string",
+          "pattern": "^derive_[a-z0-9_]+$"
+        },
+        "source_rule": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["manifest", "relations"],
+              "properties": {
+                "manifest": {"const": "permitted_sources"},
+                "relations": {"$ref": "#/$defs/names"}
+              }
+            }
+          ]
+        }
+      }
+    },
+    "semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["null", "empty", "missing"],
+      "properties": {
+        "null": {"type": "string", "minLength": 1},
+        "empty": {"type": "string", "minLength": 1},
+        "missing": {"type": "string", "minLength": 1}
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_id", "plan_id", "status", "blocked_reason", "derivation_symbol",
+        "request_schema", "permitted_sources", "gates", "grouping", "fact_order",
+        "result_order", "answer_fields", "formula_uses", "answer_bindings",
+        "null_empty_semantics"
+      ],
+      "properties": {
+        "question_id": {"type": "string", "pattern": "^Q-[A-Z]+-[0-9]{2}$"},
+        "plan_id": {"$ref": "#/$defs/identifier"},
+        "status": {"enum": ["resolved", "blocked"]},
+        "blocked_reason": {"type": ["string", "null"]},
+        "derivation_symbol": {
+          "type": "string",
+          "pattern": "^derive_[a-z][a-z0-9_]*_v1$"
+        },
+        "request_schema": {"$ref": "#/$defs/requestSchema"},
+        "permitted_sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/source"}
+        },
+        "gates": {"$ref": "#/$defs/names"},
+        "grouping": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["keys", "cardinality", "derivation_rule"],
+          "properties": {
+            "keys": {"$ref": "#/$defs/names"},
+            "cardinality": {"enum": ["single", "one_per_distinct_key"]},
+            "derivation_rule": {
+              "type": "string",
+              "pattern": "^derive_[a-z0-9_]+$"
+            }
+          }
+        },
+        "fact_order": {"$ref": "#/$defs/names"},
+        "result_order": {"$ref": "#/$defs/names"},
+        "answer_fields": {"$ref": "#/$defs/names"},
+        "formula_uses": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/formulaUse"}
+        },
+        "answer_bindings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/answerBinding"}
+        },
+        "null_empty_semantics": {"$ref": "#/$defs/semantics"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "resolved"}}},
+          "then": {"properties": {"blocked_reason": {"type": "null"}}},
+          "else": {"properties": {"blocked_reason": {"type": "string", "minLength": 1}}}
+        }
+      ]
+    }
+  }
+}

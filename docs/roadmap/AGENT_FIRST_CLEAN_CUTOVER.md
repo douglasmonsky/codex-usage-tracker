@@ -44,7 +44,7 @@ spike and Console before the new public release.
 | 0. Authority cleanup and spike freeze | CK-00 | 0.28 main and accepted direction | One docs index/roadmap, disposition, frozen oracle ref | No active contradictory docs or obsolete workflow artifacts |
 | 1. Question and logical contracts | CK-01–CK-03 | Authority docs and catalog | Executable question registry, logical vectors, shared fixtures/oracles | Every supported question maps to facts, plans, evidence, budgets |
 | 2. Physical decision | CK-04 | Shared contracts/harness | A/C/D results and architecture decision | One candidate passes hard gates and selection rule |
-| 3. Canonical kernel | CK-05–CK-07, CK-07B contract correction, CK-07A seam correction | Selected design and executable seam contracts | Storage, identity, Codex adapter, ingestion, publication/recovery, executable formula/provenance authority, fact-lineage requalification | Exact facts and bounded tails survive lifecycle/crash matrix; published facts independently reconcile to question truth |
+| 3. Canonical kernel | CK-05–CK-07, CK-07B/CK-07C contract corrections, CK-07A seam correction | Selected design and executable seam contracts | Storage, identity, Codex adapter, ingestion, publication/recovery, executable formula/provenance/operand authority, fact-lineage requalification | Exact facts and bounded tails survive lifecycle/crash matrix; published facts independently reconcile to question truth |
 | 4. Answers and evidence | CK-08–CK-09 | Published canonical kernel | Query/evidence grammar, projections, Foundation/Cutover named plans | Question oracles and performance gates pass |
 | 5. Installed agent experience | CK-10–CK-12 | Queryable kernel | Setup, MCP/skill/CLI, exact installed harness, full qualification | Fresh CLI/Desktop tasks pass accuracy/call/token/latency gates |
 | 6. Clean cutover and retirement | CK-13–CK-14 | Fully qualified candidate | Cutover decision, clean package, spike/Console deletion | Replacement selected; prior public release remains reinstall rollback |
@@ -54,7 +54,7 @@ spike and Console before the new public release.
 
 ```text
 CK-00 -> CK-01 -> CK-02 -> CK-03 -> CK-04 -> CK-05 -> CK-06
-      -> CK-07 -> CK-07B -> CK-07A -> CK-08 -> CK-09 -> CK-10 -> CK-11 -> CK-12
+      -> CK-07 -> CK-07B -> CK-07C -> CK-07A -> CK-08 -> CK-09 -> CK-10 -> CK-11 -> CK-12
       -> CK-13 -> CK-14 -> CK-16
 ```
 
@@ -76,7 +76,8 @@ flowchart LR
     K --> AD[CK-06 Codex adapter and ingest]
     AD --> P[CK-07 Publication and recovery]
     P --> CONTRACT[CK-07B Formula and provenance contract]
-    CONTRACT --> SEAM[CK-07A Fact-lineage seam repair]
+    CONTRACT --> OPERANDS[CK-07C Plan operands and missing facts]
+    OPERANDS --> SEAM[CK-07A Fact-lineage seam repair]
     SEAM --> Q[CK-08 Query and evidence]
     Q --> PR[CK-09 Projections and named plans]
     PR --> UX[CK-10 Setup, MCP, skill]
@@ -98,7 +99,8 @@ Parallel work is optional and never changes dependency order.
 | After CK-02 | Fixture generator, oracle case authoring, benchmark measurement schema | CK-03 integrator owns manifest and expected-answer schema. |
 | CK-04 | Candidate A, C, and D implementations in separate experiment directories | One integrator owns shared harness/fixture/query/evidence contracts and final scoring. |
 | After CK-05 | Codex adapter parser cases; storage failure-injection harness | Identity/domain/schema interfaces have one owner. |
-| CK-07A after CK-07B | Scenario/canonical-fact generation; independent reference evaluator; CK-04 proof replacement; CK-05–CK-07 requalification | One integrator consumes the CK-07B formula/selector authority and owns scenario, expected-row, selector, and seam-evidence schemas before disjoint lanes begin. |
+| CK-07C after CK-07B | Plan/direct-fact binding artifact and pure compiler; deterministic valuation relation; missing canonical-fact representation | One integrator owns the binding schema, pure interface, database amendment, and CK-07A resume contract. |
+| CK-07A after CK-07C | Scenario/canonical-fact generation; independent reference evaluator; CK-04 proof replacement; CK-05–CK-07 requalification | One integrator consumes the CK-07B/CK-07C formula, selector, operand, and fact authority and owns scenario, expected-row, selector, and seam-evidence schemas before disjoint lanes begin. |
 | After CK-07A | Fact-backed query compiler; evidence cursor service; installed harness skeleton | Public request/result schemas and registry have one owner. |
 | CK-09 | Disjoint projection families after dirty-key registry is frozen | Projection registry and publication call site have one owner. |
 | CK-12 | CLI and Desktop fresh-task runs; performance repetitions; crash matrix | Candidate artifacts, fixture digest, and scorecard schema are immutable. |

@@ -67,8 +67,8 @@ def test_packaged_ddl_is_exact_contract_and_inventory_locked() -> None:
 
     analytical = schema_objects("analytical")
     operational = schema_objects("operational")
-    assert sum(item.object_type == "table" for item in analytical) == 41
-    assert sum(item.object_type == "index" for item in analytical) == 43
+    assert sum(item.object_type == "table" for item in analytical) == 42
+    assert sum(item.object_type == "index" for item in analytical) == 44
     assert [item.name for item in analytical if item.object_type == "view"] == [
         "model_calls_visible"
     ]

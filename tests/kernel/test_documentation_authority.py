@@ -32,6 +32,7 @@ _PACKET_IDS = {
     *(f"CK-{number:02d}" for number in range(17)),
     "CK-07A",
     "CK-07B",
+    "CK-07C",
 }
 
 
@@ -67,12 +68,12 @@ def test_master_ledger_links_exactly_one_file_per_packet() -> None:
     ledger_path = _DOCS / "roadmap" / "TASK_PACKETS.md"
     ledger = ledger_path.read_text(encoding="utf-8")
     packet_ids = re.findall(
-        r"^- \[[ xX]\] \*\*(CK-\d{2}[AB]?)\b",
+        r"^- \[[ xX]\] \*\*(CK-\d{2}[ABC]?)\b",
         ledger,
         re.MULTILINE,
     )
     packet_links = re.findall(
-        r"\[packet\]\((tasks/ck-\d{2}[ab]?-.*\.md)\)",
+        r"\[packet\]\((tasks/ck-\d{2}[abc]?-.*\.md)\)",
         ledger,
     )
 
@@ -133,12 +134,12 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert "producer artifact and exact identity" in agents
     assert "independent truth source or reference evaluator" in agents
     assert "CK-07A" in index
-    assert "CK-07 -> CK-07B -> CK-07A -> CK-08" in roadmap
-    assert "CK-07 → CK-07B\n→ CK-07A → CK-08" in ledger
+    assert "CK-07 -> CK-07B -> CK-07C -> CK-07A -> CK-08" in roadmap
+    assert "CK-07 → CK-07B\n→ CK-07C → CK-07A → CK-08" in ledger
     assert "| CK-07A |" in backlog
     assert "### Evidence claim classes" in qualification
     assert "### Fact-backed plan admission" in query_contract
-    assert "**Dependencies:** CK-07 and CK-07B merged and verified" in ck07a
+    assert "**Dependencies:** CK-07, CK-07B, and CK-07C merged and verified" in ck07a
     assert "## Frozen seam contracts" in ck07a
     assert "## Frozen correction formats" in ck07a
     assert "agent-kernel-structural-v2" in ck07a

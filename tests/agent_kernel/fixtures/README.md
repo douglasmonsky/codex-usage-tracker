@@ -72,9 +72,9 @@ The checked-in tiny fixture is the only materialized corpus:
 
 | Artifact | SHA-256 |
 | --- | --- |
-| Manifest | `78003a7cfdee8beb1a263b3027fec162a612352be6fbefd13a65e821640bc7ae` |
-| Oracle | `9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b` |
-| Complete tree | `e6caa8bc1ff642018f21f6638dd69c6c704bdecdda362adc41daff021618799a` |
+| Manifest | `91e0658f913c917bd8ce69fac9a1d75e881f41630eccc0f30f68bd9b6a972a35` |
+| Oracle | `38787c3806be52a69ec03e7e8dcb0044b87dac4be826d620abf4cf34656da412` |
+| Complete tree | `2321918c18652fc617882aef5f9c8584d3d6d73576037b516a2c9f9dcbc0f656` |
 
 Independent processes with distinct hash seeds reproduced those exact bytes.
 CI runs the same digest ratchet across its supported Python matrix.
@@ -100,7 +100,7 @@ Single unprofiled local qualification runs produced:
 
 | Scale/mode | Calls | Elapsed | Exact source bytes | Records | Manifest SHA-256 |
 | --- | ---: | ---: | ---: | ---: | --- |
-| Tiny persisted | 100 | 21 ms | 244,657 | 339 | `78003a7cfdee8beb1a263b3027fec162a612352be6fbefd13a65e821640bc7ae` |
+| Tiny persisted | 100 | 26 ms | 244,757 | 339 | `91e0658f913c917bd8ce69fac9a1d75e881f41630eccc0f30f68bd9b6a972a35` |
 | Small persisted | 10,000 | 688 ms | 10,658,480 | 23,311 | `cc3dba2b0109604b006ace5f97721d7d5ad4be400788422248e48411b5dd29fe` |
 | Standard persisted | 100,000 | 6.819 s | 105,606,168 | 232,201 | `b5b938232e199793f49d7ab0bf67d360ea658f332f15e5d53449d4327c821f26` |
 | Production manifest-only | 1,316,864 | 90.745 s | 1,392,996,507 | 3,056,541 | `a781398b8f7a471f1cb727ce6bda23a9e2d41046c26f3fc74354a99aec9869a9` |

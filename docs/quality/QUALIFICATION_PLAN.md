@@ -54,6 +54,15 @@ The roadmap admits a corrective packet, preserves the historical record, and
 requires current requalification evidence before the dependency may be
 consumed again.
 
+CK-07C adds an L0 prerequisite for CK-07A: the versioned plan-operand artifact
+must schema-validate and reconcile exactly 40 plans, 61 formula uses, 112
+direct bindings, 73 formula-output bindings, and all 185 answer fields. Its
+pure compiler/evaluator vectors cover request and fact typing, gates, grouping,
+total order, `NULL` and empty behavior, exact decimal serialization, missing
+operands, output extraction, and internal-only formula consumption. These
+contract vectors prove executability only; they do not substitute for
+CK-07A's 80-case canonical-fact lineage and database consumer replay.
+
 ## Synthetic fixture strategy
 
 Fixtures contain no real local usage records or raw content. A deterministic

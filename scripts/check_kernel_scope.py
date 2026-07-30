@@ -558,6 +558,26 @@ CK07B_FORMULA_PROVENANCE_ADDITIONS = frozenset(
     }
 )
 
+CK07C_PLAN_OPERAND_FACT_ADDITIONS = frozenset(
+    {
+        "config/agent-kernel/plan-operand-contract-v1.json",
+        "config/agent-kernel/plan-operand-contract-v1.schema.json",
+        "docs/architecture/PLAN_OPERAND_AND_FACT_CONTRACT.md",
+        "docs/decisions/evidence/ck07c/plan-operand-and-fact-contract-evidence.json",
+        "docs/roadmap/tasks/ck-07c-freeze-plan-operands-and-missing-facts.md",
+        "src/codex_usage_tracker/agent_kernel/domain/plan_operands.py",
+        "src/codex_usage_tracker/agent_kernel/domain/plan_derivations_accounting.py",
+        "src/codex_usage_tracker/agent_kernel/domain/plan_derivations_structural.py",
+        "src/codex_usage_tracker/agent_kernel/domain/valuation.py",
+        "tests/agent_kernel/contracts/test_current_valuation_relation.py",
+        "tests/agent_kernel/contracts/test_plan_operand_contract.py",
+        "tests/agent_kernel/contracts/test_plan_derivations_accounting.py",
+        "tests/agent_kernel/contracts/test_plan_derivations_structural.py",
+        "tests/agent_kernel/contracts/vectors/plan-operands-v1.json",
+        "tests/agent_kernel/publication/test_preparation.py",
+    }
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -607,6 +627,7 @@ INTEGRATION_ADDITIONS = (
     | CK06_ADAPTER_INGESTION_ADDITIONS
     | CK07_PUBLICATION_RECOVERY_ADDITIONS
     | CK07B_FORMULA_PROVENANCE_ADDITIONS
+    | CK07C_PLAN_OPERAND_FACT_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )

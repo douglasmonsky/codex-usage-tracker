@@ -5,6 +5,7 @@
   "guidance_budget_bytes": 16384,
   "parameter_ids": [
     "allowance_selector",
+    "as_of_us",
     "cohort",
     "context_epoch",
     "current_project",
@@ -975,7 +976,7 @@
       "required_capabilities": ["context_window", "state_change_observation"],
       "required_measurements": ["context_window_tokens", "mutation_count", "turn_count"],
       "logical_plan": {
-        "primitives": ["session", "state_change", "turn"],
+        "primitives": ["canonical_call", "session", "state_change", "turn"],
         "operations": ["feature_vector"],
         "compiler_id": null
       },
@@ -1852,7 +1853,7 @@
       "stage": "Foundation",
       "intent_phrases": ["Is the index fresh/complete enough, and what capabilities or measurements are missing?"],
       "parameters": {
-        "required": [],
+        "required": ["as_of_us"],
         "optional": ["scope", "window"]
       },
       "required_capabilities": ["publication_state", "source_inventory"],

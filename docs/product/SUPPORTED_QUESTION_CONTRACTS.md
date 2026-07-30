@@ -630,6 +630,8 @@ Shared defaults below apply unless a question states otherwise:
   measurements are missing?”
 - **Facts/plan:** publication, coverage, source inventory, capabilities,
   measurements, valuation, storage/operation state.
+- **Parameters:** required captured `as_of_us`; optional scope/window. The
+  kernel never reads a clock.
 - **Calculation:** exact age/ranges/counts; `indexed_from` distinct from
   `guaranteed_complete_from`.
 - **Coverage/evidence:** E0.

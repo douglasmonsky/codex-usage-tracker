@@ -15,6 +15,12 @@ Start at `docs/INDEX.md`. The only implementation roadmap is
 `docs/roadmap/tasks/`. Archived documents and historical release notes are
 evidence, not authority.
 
+CK-07C additionally owns
+`docs/architecture/PLAN_OPERAND_AND_FACT_CONTRACT.md` and the versioned
+`config/agent-kernel/plan-operand-contract-v1.json`. CK-07A remains blocked
+until that packet is merged and exact-main verified; CK-07C does not qualify
+CK-07A's 80 structural-v2 variants.
+
 Advance CK packets in dependency order. Do not begin a dependent packet before
 its prerequisites are checked complete. Update the packet status, master
 checkbox ledger, measurements, deviations, and residual risks in the same

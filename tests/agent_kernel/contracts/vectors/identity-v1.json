@@ -282,16 +282,18 @@
       "entity": "context_component",
       "kind": "context-component",
       "identity_input_fields": [
-        "call_id",
+        "session_id",
         "turn_id",
+        "call_id",
         "category"
       ],
       "identity_tuple": [
-        "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q",
+        "session:v1:ch5fgvul4mnz7oxhjwla4cwwsgu4roq6rolyy2tejsho33yb46ka",
         "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a",
+        "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q",
         "tool_output"
       ],
-      "expected_id": "context-component:v1:u2f7id3ocldurdhnvaoyk62ma54u7nhof56a2mjlxj4flbv4d64a"
+      "expected_id": "context-component:v1:b6qvil2nk5xuxycdwf7yxpheiwuyanpr4hcxsspzy7dk5jwqqy4a"
     },
     {
       "id": "identity.allowance_limit",

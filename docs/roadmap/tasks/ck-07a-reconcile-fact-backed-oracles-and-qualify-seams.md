@@ -1,6 +1,6 @@
 # CK-07A — Reconcile fact-backed oracles and qualify packet seams
 
-**Status:** Ready to resume after CK-07B merges; not requalified
+**Status:** Ready to resume after CK-07C merges; not requalified
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -21,7 +21,7 @@ answers from permitted facts.
 `FORMULA_AND_SELECTOR_CONTRACT.md`,
 `QUERY_EVIDENCE_PROJECTION_CONTRACTS.md`, `QUALIFICATION_PLAN.md`, and the
 [CK-08 blocker evidence](../../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json).
-**Dependencies:** CK-07 and CK-07B merged and verified; CK-08 blocker evidence
+**Dependencies:** CK-07, CK-07B, and CK-07C merged and verified; CK-08 blocker evidence
 merged.
 
 ## CK-07B resume authority
@@ -145,6 +145,12 @@ Linear mutation.
 
 **Required tests/checks:**
 
+- consume the exact merged CK-07C
+  `plan-operand-contract-v1.json` and paired schema through
+  `compile_plan_operands` and `evaluate_plan`; the reference and database-v1
+  lanes independently normalize permitted relation rows and may not share
+  selection code, operands, answers, owner-resolution results, or comparison
+  output;
 - fail-first reproduction of the frozen `Q-ACC-01` mismatch;
 - all 80 question variants reconcile scenario facts to independent expected
   rows and replay through CK-06, CK-07, and database-v1;

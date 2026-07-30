@@ -340,11 +340,11 @@ def test_recent_history_prunes_only_nonoverlapping_trusted_sources(
     )
 
     assert artifact.stats.source_files_inventoried == 12
-    assert artifact.stats.source_bytes_inventoried == 244_657
+    assert artifact.stats.source_bytes_inventoried == 244_757
     assert artifact.stats.source_files_selected == 7
-    assert artifact.stats.source_bytes_selected == 184_519
+    assert artifact.stats.source_bytes_selected == 184_619
     assert artifact.stats.source_files_parsed == 7
-    assert artifact.stats.source_bytes_parsed == 184_519
+    assert artifact.stats.source_bytes_parsed == 184_619
     assert artifact.stats.source_files_deferred == 5
     assert artifact.stats.source_bytes_deferred == 60_138
 
@@ -380,11 +380,11 @@ def test_all_time_preserves_every_persisted_source(
 ) -> None:
     _, artifact = built
     assert artifact.stats.source_files_inventoried == 12
-    assert artifact.stats.source_bytes_inventoried == 244_657
+    assert artifact.stats.source_bytes_inventoried == 244_757
     assert artifact.stats.source_files_selected == 11
-    assert artifact.stats.source_bytes_selected == 244_657
+    assert artifact.stats.source_bytes_selected == 244_757
     assert artifact.stats.source_files_parsed == 11
-    assert artifact.stats.source_bytes_parsed == 244_657
+    assert artifact.stats.source_bytes_parsed == 244_757
     assert artifact.stats.source_files_deferred == 1
     assert artifact.stats.source_bytes_deferred == 0
 

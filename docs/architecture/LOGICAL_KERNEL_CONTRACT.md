@@ -361,6 +361,28 @@ valuation applies one selected revision at query/projection time and records:
 Historical-as-rated valuation is unsupported unless a future contract stores
 the selected historical revision explicitly.
 
+CK-07C freezes `valuation_match` as a deterministic read-side logical
+relation, not a persisted answer or projection. It joins a call and its model
+profile to the immutable validated rate-card revision selected by the same
+publication digest. The relation records exact four-class rated and missing
+token fields, configured cost and credit estimates, match basis, explicit
+unpriced reasons, and numerator/denominator coverage. Missing or unmatched
+rates produce `NULL` estimates, never zero.
+
+### Context components
+
+`context_component` is a body-free structural fact owned by a session, with
+optional turn and call ownership. It records a fixed category, observed UTF-8
+bytes and event count, optional estimator and estimated tokens, inclusion and
+measurement bases, an optional total-context byte denominator for the same
+owner/inclusion basis, measurement mask, complete canonical order, source
+occurrence, and publication provenance. It never stores a prompt, response,
+reasoning, command, patch, file, message, or tool-output body.
+
+Presence in a source is not proof that a component was included in a model
+call. Positive coverage requires the component capability and its declared
+inclusion basis. Capability absence is unavailable, not an empty cohort.
+
 ## Publication and coverage
 
 A publication is the only queryable truth unit. It has:

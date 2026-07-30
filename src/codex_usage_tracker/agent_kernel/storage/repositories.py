@@ -46,6 +46,7 @@ _SELECTED_FACT_TABLES = frozenset(
         "state_changes",
         "activities",
         "compaction_boundaries",
+        "context_components",
         "allowance_limits",
         "allowance_cycles",
         "allowance_observations",
