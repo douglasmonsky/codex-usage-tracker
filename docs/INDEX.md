@@ -6,13 +6,15 @@ and none of the archived documents may override them.
 
 ## Current packet boundary
 
-CK-05 is complete with its
-[canonical storage evidence](decisions/evidence/ck05/canonical-storage-evidence.json)
-recorded. The CK-04 growth exception remains explicit and the strict v2
-aggregate is not claimed. After the CK-05 merge is verified, execution
-transfers to [CK-06](roadmap/tasks/ck-06-implement-codex-adapter-and-ingestion.md)
-in a clean Codex task. The authority set below wins over historical
-operational checkpoints.
+CK-07 is complete with its
+[publication, refresh, and recovery evidence](decisions/evidence/ck07/publication-refresh-recovery-evidence.json)
+recorded. CK-05 canonical storage and CK-06 adapter/ingestion remain its
+verified dependencies. The CK-04 growth exception remains explicit and the
+strict v2 aggregate is not claimed. After the CK-07 merge is verified,
+execution may transfer to
+[CK-08](roadmap/tasks/ck-08-implement-query-and-evidence.md) in a separate
+Codex task; CK-08 is not part of this packet. The authority set below wins over
+historical operational checkpoints.
 
 ## Authority set
 

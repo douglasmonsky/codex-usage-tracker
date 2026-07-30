@@ -516,6 +516,31 @@ CK06_ADAPTER_INGESTION_ADDITIONS = frozenset(
     }
 )
 
+CK07_PUBLICATION_RECOVERY_ADDITIONS = frozenset(
+    {
+        "docs/INDEX.md",
+        "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/tasks/ck-07-implement-publication-refresh-recovery.md",
+        "scripts/benchmark_ck07_publication.py",
+        "scripts/check_kernel_scope.py",
+        "src/codex_usage_tracker/agent_kernel/publication/__init__.py",
+        "src/codex_usage_tracker/agent_kernel/publication/planner.py",
+        "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "src/codex_usage_tracker/agent_kernel/publication/projections.py",
+        "src/codex_usage_tracker/agent_kernel/publication/recovery.py",
+        "src/codex_usage_tracker/agent_kernel/publication/validation.py",
+        "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+        "src/codex_usage_tracker/agent_kernel/storage/operational.py",
+        "tests/agent_kernel/publication/test_operational_recovery.py",
+        "tests/agent_kernel/publication/test_performance.py",
+        "tests/agent_kernel/publication/test_planner_validation.py",
+        "tests/agent_kernel/publication/test_process_crash_matrix.py",
+        "tests/agent_kernel/publication/test_writer.py",
+        "tests/kernel/test_kernel_scope.py",
+    }
+)
+
 CI_PERFORMANCE_QUALIFICATION_ADDITIONS = frozenset(
     {
         ".github/workflows/performance-qualification.yml",
@@ -557,6 +582,7 @@ INTEGRATION_ADDITIONS = (
     | CK04_PHYSICAL_BAKEOFF_ADDITIONS
     | CK05_CANONICAL_STORAGE_ADDITIONS
     | CK06_ADAPTER_INGESTION_ADDITIONS
+    | CK07_PUBLICATION_RECOVERY_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))")
