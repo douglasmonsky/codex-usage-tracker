@@ -1,0 +1,135 @@
+{
+  "schema": "codex-usage-tracker.ck07c-plan-operand-and-fact-contract-evidence.v1",
+  "packet": "CK-07C",
+  "status": "complete_on_merge",
+  "base": {
+    "ref": "origin/main",
+    "sha": "eec1acf34aa1e30e5415e6b12c95221daf226fff"
+  },
+  "plan_operand_contract": {
+    "family": "codex-usage-tracker.plan-operand-contract.v1",
+    "plans": 40,
+    "resolved_derivation_symbols": 40,
+    "formula_uses": 61,
+    "direct_fact_bindings": 112,
+    "formula_output_bindings": 73,
+    "answer_fields": 185,
+    "artifacts": [
+      {
+        "path": "config/agent-kernel/plan-operand-contract-v1.json",
+        "sha256": "967f7ed7209f11f273be4da3256edf084267430cec9599454b1987bcbd069e3a"
+      },
+      {
+        "path": "config/agent-kernel/plan-operand-contract-v1.schema.json",
+        "sha256": "619b4f4e546def5a44bfd97d7ab9778fea204aca6cfc32cec3f7a92d54a037e8"
+      },
+      {
+        "path": "tests/agent_kernel/contracts/vectors/plan-operands-v1.json",
+        "sha256": "24f369c6ce7d6d3fc52c48f5bfec098da68625c8a836a89ad8914844f98bacc4",
+        "known_answer_cases": 40,
+        "executable_negative_cases": 15,
+        "post_normalization_origin_parity_cases": 40
+      }
+    ]
+  },
+  "pure_interfaces": {
+    "module": "codex_usage_tracker.agent_kernel.domain.plan_operands",
+    "symbols": [
+      "FactCoordinates",
+      "CanonicalFact",
+      "PlanRequest",
+      "FormulaInvocation",
+      "PlanGroup",
+      "PlanMaterialization",
+      "PlanEvaluation",
+      "PlanOperandContractError",
+      "compile_plan_operands",
+      "evaluate_plan"
+    ],
+    "valuation_module": "codex_usage_tracker.agent_kernel.domain.valuation",
+    "valuation_symbols": [
+      "CurrentRateCard",
+      "CurrentValuationMatch",
+      "compile_current_valuation_matches"
+    ],
+    "storage_reads": 0,
+    "clock_reads": 0,
+    "oracle_grading_comparison_inputs": 0
+  },
+  "database_v1": {
+    "old_schema_sha256": "6ae65b6eb7024486f8fe42e19ab6799a252b721e6a9519f19d70e91f4aae6b77",
+    "new_schema_sha256": "2a388dbb498dfd0122f7d10e5ee607db1e4a9ec57b6c7f549c1f6c8797a21bae",
+    "tables": 42,
+    "indexes": 44,
+    "new_relation": "context_components",
+    "valuation_decision": "pure deterministic current-rate-card join; no persisted answer or valuation cache",
+    "compatibility": "old database-v1 digest fails closed and rebuilds; no migration or compatibility views"
+  },
+  "structural_inputs": {
+    "allowance": "typed observations, completed cycles, and distinct adjacent compatible intervals; equal-time distinct observations form a zero-width interval",
+    "hierarchy_and_cohorts": "sessions and late_parent_edges own hierarchy; cohort members and roles are typed request inputs",
+    "retry": "fixed inspect-attempt-failure-reinspect-retry stages derived from ordered tool/resource/lifecycle facts",
+    "features": "fixed transient structural and investigation counts, sums, coverage, and selectors; no generic persisted feature blob",
+    "total_order": "owner-derived FactCoordinates with exact seven-part total order",
+    "publication": "one accepted publication snapshot with head, coverage, delta, rate-card identity, and selected canonical facts",
+    "bounded_adjacency": "immediate adjacency in the complete eligible ordered stream; intervening_events is exactly zero"
+  },
+  "selector_provenance": {
+    "selector_kinds": 14,
+    "narrowed": false,
+    "required_materialized_ordered_equality_preserved": true,
+    "owner_dispatched_existence_preserved": true,
+    "typed_non_placeholder_provenance_preserved": true
+  },
+  "synthetic_fixture": {
+    "revision": "agent-kernel-structural-v1",
+    "manifest_sha256": "91e0658f913c917bd8ce69fac9a1d75e881f41630eccc0f30f68bd9b6a972a35",
+    "oracle_sha256": "38787c3806be52a69ec03e7e8dcb0044b87dac4be826d620abf4cf34656da412",
+    "tree_sha256": "2321918c18652fc617882aef5f9c8584d3d6d73576037b516a2c9f9dcbc0f656",
+    "source_bytes": 244757,
+    "source_records": 339,
+    "real_codex_data_used": false
+  },
+  "validation": {
+    "focused_agent_kernel": "326 passed",
+    "operand_compiler": "72 passed",
+    "typing": {
+      "mypy": "172 source files; no issues",
+      "pyright": "0 errors, 0 warnings"
+    },
+    "just_v": "passed independently; 1189 tests and 13 performance-invariant tests",
+    "just_vc": "passed; 1189 tests, 13 performance-invariant tests, package build, and dist release-safety",
+    "performance": {
+      "final_invariants_lane": "13 passed; no breaches",
+      "qualification_mode": "invariants_only; no before/after quorum claimed",
+      "earlier_transient_observation": "one pre-final run observed allowance_read_p95_ms 555.897731 against 550.0; final just vc observed 479.657527"
+    },
+    "kernel_scope_and_shared_25_percent_ratchet": "passed"
+  },
+  "review": {
+    "status": "complete; all accepted findings corrected",
+    "findings": 4,
+    "accepted_findings": 4,
+    "unresolved_findings": 0,
+    "accepted_finding_ids": [
+      "P1-grouping-cardinality",
+      "P1-replay-stability",
+      "P1-allowance-order",
+      "P2-finite-decimal"
+    ],
+    "token_metrics": "unavailable; historical strict measurement was not retried",
+    "measurement_error": "codex-usage-tracker rejected the unavailable strict command"
+  },
+  "pull_request": {
+    "url": null,
+    "merge_sha": null,
+    "exact_main_verification": "pending"
+  },
+  "ck07a_resume": {
+    "ready_on_merge": true,
+    "residual_operand_or_fact_gap": null,
+    "requalified_variants_claimed": 0,
+    "required_authority": "validated plan-operand artifact/schema, CK-07B formula and selector-provenance contracts, pure compiler/evaluator and valuation symbols, database-v1 schema digest above",
+    "separation": "scenario and database-v1 evaluators independently select and normalize canonical facts; they share no selected rows, operands, answers, grading, comparison output, or owner-resolution results"
+  }
+}

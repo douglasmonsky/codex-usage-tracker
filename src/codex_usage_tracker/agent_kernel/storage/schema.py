@@ -12,7 +12,7 @@ from hashlib import sha256
 from importlib.resources import files
 
 SCHEMA_CONTRACT_ID = "codex-usage-tracker.agent-kernel.schema-contract.v1"
-SCHEMA_CONTRACT_SHA256 = "6ae65b6eb7024486f8fe42e19ab6799a252b721e6a9519f19d70e91f4aae6b77"
+SCHEMA_CONTRACT_SHA256 = "2a388dbb498dfd0122f7d10e5ee607db1e4a9ec57b6c7f549c1f6c8797a21bae"
 SCHEMA_VERSION = "1"
 ANALYTICAL_DATABASE_IDENTITY = "codex-usage-tracker.agent-kernel.v1"
 OPERATIONAL_DATABASE_IDENTITY = "codex-usage-tracker.agent-kernel.operations.v1"

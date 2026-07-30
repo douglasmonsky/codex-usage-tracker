@@ -49,11 +49,11 @@ patch candidates around an oracle error; fix and rerun all candidates.
 - Fixture revision `agent-kernel-structural-v1` generates deterministic
   structural-only JSONL for tiny, small, standard, production, and growth
   profiles. The checked-in tiny corpus contains 100 canonical calls, 339 source
-  records, and 244,657 exact source bytes.
+  records, and 244,757 exact source bytes.
 - The tiny manifest, oracle, and complete-tree SHA-256 digests are
-  `78003a7cfdee8beb1a263b3027fec162a612352be6fbefd13a65e821640bc7ae`,
-  `9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b`,
-  and `e6caa8bc1ff642018f21f6638dd69c6c704bdecdda362adc41daff021618799a`.
+  `91e0658f913c917bd8ce69fac9a1d75e881f41630eccc0f30f68bd9b6a972a35`,
+  `38787c3806be52a69ec03e7e8dcb0044b87dac4be826d620abf4cf34656da412`,
+  and `2321918c18652fc617882aef5f9c8584d3d6d73576037b516a2c9f9dcbc0f656`.
   Independent Python 3.14 processes with distinct hash seeds reproduce those
   exact bytes; the supported Python matrix repeats the digest ratchet in CI.
 - The oracle bundle covers all five bake-off slices, all 80 CK-01 oracle IDs,

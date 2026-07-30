@@ -41,6 +41,13 @@ evaluators may share this authority, but each must independently select and
 normalize its permitted facts. Neither evaluator may import the other or
 consume the other's emitted answer, oracle, grade, or comparison result.
 
+CK-07C supplies the missing executable consumer contract in
+`plan-operand-contract-v1.json` and
+`codex_usage_tracker.agent_kernel.domain.plan_operands`. Its bindings replace
+the narrative `operand_rule` as the authority for converting normalized
+relation rows into operands and direct facts; this CK-07B artifact continues
+to own formula operation semantics.
+
 The default token formulas are:
 
 ```text

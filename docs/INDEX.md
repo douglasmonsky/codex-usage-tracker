@@ -21,8 +21,12 @@ recorded. Corrective packet
 then found that the catalog's 45 formula IDs and owner-specific selector
 provenance had no executable authority.
 [CK-07B](roadmap/tasks/ck-07b-freeze-formula-and-provenance-contract.md)
-supplies the narrow decision contract through PR #383. After that PR merges,
-CK-07A is ready to resume but is not requalified or complete.
+supplies that narrow decision contract through PR #383. Retained CK-07A
+analysis then proved the plan-to-operand mapping and several canonical fact
+representations were still not executable.
+[CK-07C](roadmap/tasks/ck-07c-freeze-plan-operands-and-missing-facts.md)
+is in progress to supply those bindings and facts. CK-07A remains blocked and
+is not requalified or complete.
 It must still repair CK-03 oracle lineage,
 replace CK-04's candidate-only answer proof, and requalify the unchanged
 CK-05–CK-07 consumer seams before CK-08 may resume. CK-08 remains blocked and
@@ -37,16 +41,17 @@ strict v2 aggregate is not claimed.
 | 2 | `docs/product/SUPPORTED_QUESTION_CONTRACTS.md` | Supported intents, answer grades, evidence, performance classes, named presets, and unsupported conclusions. |
 | 3 | `docs/architecture/LOGICAL_KERNEL_CONTRACT.md` | Physical-design-independent entities, fields, identities, time, missingness, provenance, and publication semantics. |
 | 4 | `docs/architecture/FORMULA_AND_SELECTOR_CONTRACT.md` | Executable formula semantics, answer-field bindings, selector ownership, provenance, and exact comparison. |
-| 5 | `docs/architecture/PHYSICAL_ARCHITECTURE_BAKEOFF.md` | Candidate A/C/D experiment, fixtures, workloads, measurements, and selection decision. |
-| 6 | `docs/architecture/TARGET_ARCHITECTURE.md` | Package ownership and runtime boundaries after the bake-off. |
-| 7 | `docs/architecture/ADAPTER_CONTRACT.md` | Codex source ingestion, normalization, capabilities, cursors, replacement, duplicates, and the future-agent seam. |
-| 8 | `docs/architecture/PUBLICATION_REFRESH_RECOVERY.md` | Refresh state machine, dirty keys, small tails, large artifacts, crashes, promotion, and rollback. |
-| 9 | `docs/architecture/QUERY_EVIDENCE_PROJECTION_CONTRACTS.md` | Named plans, bounded composition, evidence, pagination, projections, valuation, and result envelopes. |
-| 10 | `docs/product/AGENT_SETUP_AND_MCP_EXPERIENCE.md` | First use, history selection, host waiting, reopen, refresh/expansion, call budgets, and skill behavior. |
-| 11 | `docs/quality/QUALIFICATION_PLAN.md` | Synthetic truth, production-shape profiling, benchmarks, installed-agent trials, crash tests, and ratchets. |
-| 12 | `docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md` | The only authoritative implementation roadmap, dependencies, gates, cutover, and release. |
-| 13 | `docs/roadmap/TASK_PACKETS.md` and `docs/roadmap/tasks/` | Checkbox completion accounting and one agent-executable contract file per packet. |
-| 14 | `docs/roadmap/LINEAR_BACKLOG.md` | Linear-ready initiative, project, milestone, issue, dependency, and label mapping. |
+| 5 | `docs/architecture/PLAN_OPERAND_AND_FACT_CONTRACT.md` | Executable plan-to-operand/direct-fact bindings, pure compiler boundary, valuation relation, and missing canonical facts. |
+| 6 | `docs/architecture/PHYSICAL_ARCHITECTURE_BAKEOFF.md` | Candidate A/C/D experiment, fixtures, workloads, measurements, and selection decision. |
+| 7 | `docs/architecture/TARGET_ARCHITECTURE.md` | Package ownership and runtime boundaries after the bake-off. |
+| 8 | `docs/architecture/ADAPTER_CONTRACT.md` | Codex source ingestion, normalization, capabilities, cursors, replacement, duplicates, and the future-agent seam. |
+| 9 | `docs/architecture/PUBLICATION_REFRESH_RECOVERY.md` | Refresh state machine, dirty keys, small tails, large artifacts, crashes, promotion, and rollback. |
+| 10 | `docs/architecture/QUERY_EVIDENCE_PROJECTION_CONTRACTS.md` | Named plans, bounded composition, evidence, pagination, projections, valuation, and result envelopes. |
+| 11 | `docs/product/AGENT_SETUP_AND_MCP_EXPERIENCE.md` | First use, history selection, host waiting, reopen, refresh/expansion, call budgets, and skill behavior. |
+| 12 | `docs/quality/QUALIFICATION_PLAN.md` | Synthetic truth, production-shape profiling, benchmarks, installed-agent trials, crash tests, and ratchets. |
+| 13 | `docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md` | The only authoritative implementation roadmap, dependencies, gates, cutover, and release. |
+| 14 | `docs/roadmap/TASK_PACKETS.md` and `docs/roadmap/tasks/` | Checkbox completion accounting and one agent-executable contract file per packet. |
+| 15 | `docs/roadmap/LINEAR_BACKLOG.md` | Linear-ready initiative, project, milestone, issue, dependency, and label mapping. |
 
 ## Area ownership
 
@@ -56,6 +61,7 @@ strict v2 aggregate is not claimed.
 | Can the product answer this question, and how? | `SUPPORTED_QUESTION_CONTRACTS.md` |
 | What does a session, turn, call, tool, resource, observation, or publication mean? | `LOGICAL_KERNEL_CONTRACT.md` |
 | What exactly does a formula compute, and how must selector evidence resolve? | `FORMULA_AND_SELECTOR_CONTRACT.md` |
+| How do named plans derive formula operands and direct facts, and which missing fact representations are authoritative? | `PLAN_OPERAND_AND_FACT_CONTRACT.md` |
 | Which physical schema is allowed? | The completed decision artifact required by `PHYSICAL_ARCHITECTURE_BAKEOFF.md` |
 | Which package owns a behavior? | `TARGET_ARCHITECTURE.md` |
 | How does Codex JSONL become canonical facts? | `ADAPTER_CONTRACT.md` |

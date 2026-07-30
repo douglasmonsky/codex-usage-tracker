@@ -104,6 +104,14 @@ through its authoritative owner with typed non-placeholder provenance.
 `selector_anchors` is not a universal registry and no plan may substitute a
 different kind when owner resolution fails.
 
+Plan materialization is governed by `plan-operand-contract-v1.json`. It binds
+every formula use and direct answer field to permitted logical relations,
+typed request/publication/selector gates, grouping, complete order, closed
+operand derivations, missing/empty behavior, and exact output extraction.
+`compile_plan_operands` and `evaluate_plan` are pure L0 authorities; a
+production plan still requires CK-07A's independent scenario and database-v1
+fact selection and exact consumer replay before admission.
+
 ## Typed compositional boundary
 
 The generic query grammar is allowlisted:

@@ -159,6 +159,10 @@ class PriorPublicationSnapshot:
     source_diagnostic_keys: frozenset[tuple[int, str, int, int, str]] = frozenset()
     entity_rows: Mapping[str, PreparedRow] = field(default_factory=dict)
     occurrence_ids: frozenset[str] = frozenset()
+    late_parent_versions: Mapping[str, int] = field(default_factory=dict)
+    late_parent_edges: Mapping[tuple[str, str, str], PreparedRow] = field(default_factory=dict)
+    allowance_predecessors: Mapping[tuple[str, ...], PreparedRow] = field(default_factory=dict)
+    allowance_intervals: Mapping[str, PreparedRow] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "entity_counts", MappingProxyType(dict(self.entity_counts)))
@@ -188,6 +192,26 @@ class PriorPublicationSnapshot:
             MappingProxyType(dict(self.entity_rows)),
         )
         object.__setattr__(self, "occurrence_ids", frozenset(self.occurrence_ids))
+        object.__setattr__(
+            self,
+            "late_parent_versions",
+            MappingProxyType(dict(self.late_parent_versions)),
+        )
+        object.__setattr__(
+            self,
+            "late_parent_edges",
+            MappingProxyType(dict(self.late_parent_edges)),
+        )
+        object.__setattr__(
+            self,
+            "allowance_predecessors",
+            MappingProxyType(dict(self.allowance_predecessors)),
+        )
+        object.__setattr__(
+            self,
+            "allowance_intervals",
+            MappingProxyType(dict(self.allowance_intervals)),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,12 +223,18 @@ class PublicationWriteSet:
     tail_state: ModelCallTailState | None = None
     expected_source_revisions: Mapping[int, str] = field(default_factory=dict)
     cursor_snapshot: tuple[SourceCursor, ...] = ()
+    existing_occurrence_ids: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         object.__setattr__(
             self,
             "expected_source_revisions",
             MappingProxyType(dict(self.expected_source_revisions)),
+        )
+        object.__setattr__(
+            self,
+            "existing_occurrence_ids",
+            frozenset(self.existing_occurrence_ids),
         )
 
 
@@ -250,6 +280,7 @@ _ROW_ORDER = (
     "tool_resources",
     "activities",
     "compaction_boundaries",
+    "context_components",
     "state_changes",
     "allowance_limits",
     "allowance_cycles",
@@ -390,6 +421,26 @@ _MUTABLE_COLUMNS = {
             "last_seen_publication_id",
         }
     ),
+    "context_components": frozenset(
+        {
+            "observed_utf8_bytes",
+            "observed_event_count",
+            "estimator",
+            "estimated_tokens",
+            "total_context_utf8_bytes",
+            "inclusion_basis",
+            "capability_basis",
+            "measurement_basis",
+            "event_at_us",
+            "source_rank",
+            "source_order",
+            "event_kind_order",
+            "transition_rank",
+            "measurement_mask",
+            "primary_occurrence_id",
+            "last_seen_publication_id",
+        }
+    ),
     "allowance_limits": frozenset({"last_seen_publication_id"}),
     "allowance_cycles": frozenset(
         {
@@ -397,6 +448,24 @@ _MUTABLE_COLUMNS = {
             "end_at_us",
             "completion_status",
             "last_seen_publication_id",
+        }
+    ),
+    "allowance_observations": frozenset(
+        {
+            "plan_identity",
+            "window_kind",
+            "reset_identity",
+            "used_percent",
+            "remaining_percent",
+            "absolute_fields_json",
+            "reset_time_us",
+            "observed_at_us",
+            "source_rank",
+            "source_order",
+            "event_kind_order",
+            "transition_rank",
+            "measurement_mask",
+            "primary_occurrence_id",
         }
     ),
 }
@@ -409,6 +478,7 @@ _OBSERVATION_KINDS = {
     "ToolLifecycleObserved": "tool",
     "ActivityLifecycleObserved": "activity",
     "CompactionObserved": "compaction",
+    "ContextComponentObserved": "context-component",
     "ResourceObserved": "resource",
     "ToolResourceLinkObserved": "tool-resource-link",
     "StateChangeObserved": "state-change",
@@ -431,6 +501,7 @@ _ENTITY_COUNT_NAMES = {
     "ToolLifecycleObserved": "tool_invocations",
     "ActivityLifecycleObserved": "activities",
     "CompactionObserved": "compaction_boundaries",
+    "ContextComponentObserved": "context_components",
     "ResourceObserved": "resources",
     "StateChangeObserved": "state_changes",
     "AllowanceObservationObserved": "allowance_observations",
@@ -444,6 +515,7 @@ _ENTITY_TABLES = {
     "ToolLifecycleObserved": ("tool_invocations", "tool_id"),
     "ActivityLifecycleObserved": ("activities", "activity_id"),
     "CompactionObserved": ("compaction_boundaries", "compaction_id"),
+    "ContextComponentObserved": ("context_components", "component_id"),
     "ResourceObserved": ("resources", "resource_id"),
     "StateChangeObserved": ("state_changes", "change_id"),
     "AllowanceObservationObserved": (
@@ -627,6 +699,13 @@ def _read_affected_entity_rows(
                     semantic_id("project", [str(observation.identity_tuple[0])]),
                 )
             )
+        elif observation.observation_type == "SessionRelationshipObserved":
+            for session_id in (
+                observation.payload.get("session_id"),
+                observation.payload.get("parent_session_id"),
+            ):
+                if isinstance(session_id, str):
+                    affected.add(("sessions", "session_id", session_id))
     for table, id_column, logical_id in sorted(affected):
         rows = _prepared_rows(
             connection.execute(
@@ -657,6 +736,165 @@ def _read_existing_occurrence_ids(
         if row is not None:
             existing.add(str(row[0]))
     return frozenset(existing)
+
+
+def _read_late_parent_versions(
+    connection: sqlite3.Connection,
+    changes: ProposedChangeSet,
+) -> dict[str, int]:
+    child_ids = sorted(
+        {
+            str(observation.payload["session_id"])
+            for observation in changes.observations
+            if observation.observation_type == "SessionRelationshipObserved"
+        }
+    )
+    result: dict[str, int] = {}
+    for child_id in child_ids:
+        row = connection.execute(
+            """
+            SELECT MAX(relationship_version)
+            FROM late_parent_edges
+            WHERE child_session_id = ?
+            """,
+            (child_id,),
+        ).fetchone()
+        if row is not None and row[0] is not None:
+            result[child_id] = int(row[0])
+    return result
+
+
+def _read_late_parent_edges(
+    connection: sqlite3.Connection,
+    changes: ProposedChangeSet,
+) -> dict[tuple[str, str, str], PreparedRow]:
+    child_ids = sorted(
+        {
+            str(observation.payload["session_id"])
+            for observation in changes.observations
+            if observation.observation_type == "SessionRelationshipObserved"
+        }
+    )
+    result: dict[tuple[str, str, str], PreparedRow] = {}
+    for child_id in child_ids:
+        rows = _prepared_rows(
+            connection.execute(
+                """
+                SELECT *
+                FROM late_parent_edges
+                WHERE child_session_id = ?
+                ORDER BY relationship_version
+                """,
+                (child_id,),
+            ),
+            "late_parent_edges",
+        )
+        for row in rows:
+            key = (
+                child_id,
+                str(row.values["parent_session_id"]),
+                str(row.values["relationship_basis"]),
+            )
+            result[key] = row
+    return result
+
+
+def _read_allowance_predecessors(
+    connection: sqlite3.Connection,
+    changes: ProposedChangeSet,
+) -> dict[tuple[str, ...], PreparedRow]:
+    keys = sorted(
+        {
+            tuple(
+                str(observation.payload[field])
+                for field in (
+                    "provider",
+                    "limit_id",
+                    "plan_identity",
+                    "window_kind",
+                    "cycle_id",
+                    "reset_identity",
+                )
+            )
+            for observation in changes.observations
+            if observation.observation_type == "AllowanceObservationObserved"
+        }
+    )
+    result: dict[tuple[str, ...], PreparedRow] = {}
+    for key in keys:
+        row = connection.execute(
+            """
+            SELECT ao.observation_id, al.provider, ao.limit_id,
+                   ao.plan_identity, ao.window_kind, ao.cycle_id,
+                   ao.reset_identity, ao.observed_at_us, ao.source_rank,
+                   ao.source_order, ao.event_kind_order, ao.transition_rank,
+                   ao.used_percent, ao.remaining_percent
+            FROM allowance_observations AS ao
+            JOIN allowance_limits AS al ON al.limit_id = ao.limit_id
+            WHERE al.provider = ? AND ao.limit_id = ?
+              AND ao.plan_identity = ? AND ao.window_kind = ?
+              AND ao.cycle_id = ? AND ao.reset_identity = ?
+              AND ao.observed_at_us IS NOT NULL
+            ORDER BY (ao.observed_at_us IS NULL) DESC,
+                     ao.observed_at_us DESC, ao.source_rank DESC,
+                     ao.source_order DESC, ao.event_kind_order DESC,
+                     ao.observation_id DESC, ao.transition_rank DESC
+            LIMIT 1
+            """,
+            key,
+        ).fetchone()
+        if row is not None:
+            columns = (
+                "observation_id",
+                "provider",
+                "limit_id",
+                "plan_identity",
+                "window_kind",
+                "cycle_id",
+                "reset_identity",
+                "observed_at_us",
+                "source_rank",
+                "source_order",
+                "event_kind_order",
+                "transition_rank",
+                "used_percent",
+                "remaining_percent",
+            )
+            result[key] = PreparedRow(
+                "allowance_observations",
+                dict(zip(columns, row, strict=True)),
+            )
+    return result
+
+
+def _read_allowance_intervals(
+    connection: sqlite3.Connection,
+    changes: ProposedChangeSet,
+) -> dict[str, PreparedRow]:
+    observation_ids = sorted(
+        {
+            observation.logical_id
+            for observation in changes.observations
+            if observation.observation_type == "AllowanceObservationObserved"
+        }
+    )
+    if not observation_ids:
+        return {}
+    placeholders = ", ".join("?" for _ in observation_ids)
+    rows = _prepared_rows(
+        connection.execute(
+            f"""
+            SELECT *
+            FROM allowance_intervals
+            WHERE start_observation_id IN ({placeholders})
+               OR end_observation_id IN ({placeholders})
+            ORDER BY interval_id
+            """,
+            (*observation_ids, *observation_ids),
+        ),
+        "allowance_intervals",
+    )
+    return {str(row.values["interval_id"]): row for row in rows}
 
 
 def _read_unaffected_tail_state(
@@ -782,6 +1020,10 @@ def read_prior_publication_snapshot(
         source_diagnostic_keys=_read_existing_source_diagnostic_keys(connection, changes),
         entity_rows=_read_affected_entity_rows(connection, changes),
         occurrence_ids=_read_existing_occurrence_ids(connection, changes),
+        late_parent_versions=_read_late_parent_versions(connection, changes),
+        late_parent_edges=_read_late_parent_edges(connection, changes),
+        allowance_predecessors=_read_allowance_predecessors(connection, changes),
+        allowance_intervals=_read_allowance_intervals(connection, changes),
     )
 
 
@@ -1329,6 +1571,8 @@ class PublicationWriter:
     ) -> tuple[tuple[object, ...], ...]:
         result: list[tuple[object, ...]] = []
         for occurrence in write_set.changes.occurrences:
+            if occurrence.occurrence_id in write_set.existing_occurrence_ids:
+                continue
             source = occurrence.source_range
             record = SourceOccurrence(
                 occurrence.occurrence_id,

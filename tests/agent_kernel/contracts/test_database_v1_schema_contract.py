@@ -10,7 +10,7 @@ _CONTRACT_PATH = (
     _REPO_ROOT / "docs" / "architecture" / "AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md"
 )
 _CONTRACT_ID = "codex-usage-tracker.agent-kernel.schema-contract.v1"
-_EXPECTED_DIGEST = "6ae65b6eb7024486f8fe42e19ab6799a252b721e6a9519f19d70e91f4aae6b77"
+_EXPECTED_DIGEST = "2a388dbb498dfd0122f7d10e5ee607db1e4a9ec57b6c7f549c1f6c8797a21bae"
 _COPY_STABILITY_VECTOR_ID = "database-v1.multi-producer-copy-stability.v1"
 _COPY_STABILITY_VECTOR_ROWS = (
     "| `sessions` | `session:shared` | `root:a/file:a#1` | `root:b/file:b#1` | 1 | 2 |",
@@ -19,7 +19,7 @@ _COPY_STABILITY_VECTOR_ROWS = (
     "| `tool_invocations` | `tool:shared` | `root:a/file:a#4` | `root:b/file:b#4` | 1 | 2 |",
     "| `allowance_observations` | `allowance-observation:shared` | `root:a/file:a#5` | `root:b/file:b#5` | 1 | 2 |",
 )
-_EXPECTED_OBJECT_COUNTS = (41, 43, 6, 6)
+_EXPECTED_OBJECT_COUNTS = (42, 44, 6, 6)
 _ANALYTICAL_TABLES = (
     "metadata",
     "publications",
@@ -47,6 +47,7 @@ _ANALYTICAL_TABLES = (
     "tool_resources",
     "activities",
     "compaction_boundaries",
+    "context_components",
     "state_changes",
     "allowance_limits",
     "allowance_cycles",
@@ -99,6 +100,7 @@ _ANALYTICAL_INDEXES = (
     "state_changes_by_resource",
     "compactions_timeline",
     "compactions_by_session",
+    "context_components_timeline",
     "allowance_observations_timeline",
     "allowance_observations_by_compatibility",
     "allowance_intervals_timeline",
@@ -318,11 +320,47 @@ def test_database_v1_multi_producer_identity_seams_are_structurally_locked() -> 
             "model_calls": ("call_id",),
             "tool_invocations": ("tool_id",),
             "allowance_observations": ("observation_id",),
+            "context_components": ("component_id",),
             "source_occurrences": ("occurrence_id",),
         }
         assert {
             table: _primary_key(analytical_db, table) for table in semantic_primary_keys
         } == semantic_primary_keys
+        context_columns = {
+            str(row[1]) for row in analytical_db.execute("PRAGMA table_info(context_components)")
+        }
+        assert {
+            "component_id",
+            "session_id",
+            "turn_id",
+            "call_id",
+            "category",
+            "observed_utf8_bytes",
+            "observed_event_count",
+            "total_context_utf8_bytes",
+            "estimator",
+            "estimated_tokens",
+            "inclusion_basis",
+            "capability_basis",
+            "measurement_basis",
+            "event_at_us",
+            "source_rank",
+            "source_order",
+            "event_kind_order",
+            "transition_rank",
+            "measurement_mask",
+            "primary_occurrence_id",
+            "first_seen_publication_id",
+            "last_seen_publication_id",
+        } == context_columns
+        assert not context_columns & {
+            "body",
+            "content",
+            "prompt",
+            "response",
+            "reasoning",
+            "tool_output",
+        }
     finally:
         analytical_db.close()
         operational_db.close()

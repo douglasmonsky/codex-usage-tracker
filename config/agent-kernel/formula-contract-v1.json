@@ -298,6 +298,7 @@
         "last"
       ],
       "fact_relations": [
+        "canonical_call",
         "session",
         "state_change",
         "turn"
@@ -584,6 +585,7 @@
         "turn_count"
       ],
       "fact_relations": [
+        "canonical_call",
         "session",
         "state_change",
         "turn"
@@ -3030,6 +3032,7 @@
       "plan_id": "growth_without_mutation",
       "formula_id": "context_growth_v1",
       "canonical_relations": [
+        "canonical_call",
         "session",
         "state_change",
         "turn"
@@ -3054,6 +3057,7 @@
       "plan_id": "growth_without_mutation",
       "formula_id": "mutation_density_v1",
       "canonical_relations": [
+        "canonical_call",
         "session",
         "state_change",
         "turn"
@@ -3172,7 +3176,9 @@
         "publication",
         "source_manifestation"
       ],
-      "required_parameters": [],
+      "required_parameters": [
+        "as_of_us"
+      ],
       "optional_parameters": [
         "scope",
         "window"

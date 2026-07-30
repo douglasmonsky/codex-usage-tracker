@@ -9,10 +9,52 @@ from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.discovery import (
     select_sources,
 )
 from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.ingest import ingest
+from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.normalize import normalize_record
 from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.parser import ParseBatch
+from codex_usage_tracker.agent_kernel.adapters.contracts import Capability, SourceRange
 
 ROOT = Path(__file__).parents[1] / "fixtures" / "tiny-v1"
 MANIFEST = ROOT / "manifest.json"
+
+
+def test_context_component_normalization_is_typed_body_free_and_capability_aware() -> None:
+    record = {
+        "type": "context_component",
+        "event_at_us": 1_700_000_000_000_000,
+        "source_order": 7,
+        "payload": {
+            "component_id": "native-component-1",
+            "session_id": "native-session-1",
+            "turn_id": "native-turn-1",
+            "call_id": "native-call-1",
+            "category": "tool_output",
+            "observed_utf8_bytes": 144,
+            "observed_event_count": 2,
+            "total_context_utf8_bytes": 200,
+            "estimator": "cl100k_base",
+            "estimated_tokens": 36,
+            "inclusion_basis": "known_included_in_call",
+            "capability_basis": "codex_jsonl_structural_event",
+            "measurement_basis": "exact_utf8_bytes_estimated_tokens",
+        },
+    }
+    observation = normalize_record(
+        record,
+        SourceRange("manifestation:test", 1, "revision-1", 0, 0, 200),
+    )
+    replacement = normalize_record(
+        record,
+        SourceRange("manifestation:replacement", 2, "revision-2", 5, 500, 700),
+    )
+
+    assert observation.observation_type == "ContextComponentObserved"
+    assert replacement.logical_id == observation.logical_id
+    assert replacement.occurrence_id != observation.occurrence_id
+    assert observation.capability_mask == int(Capability.CONTEXT_COMPONENT)
+    assert observation.payload["observed_utf8_bytes"] == 144
+    assert observation.payload["estimated_tokens"] == 36
+    assert observation.payload["total_context_utf8_bytes"] == 200
+    assert "body" not in observation.payload
 
 
 def _signature(result):
@@ -32,7 +74,7 @@ def test_full_synthetic_ingestion_matches_ck03_accounting_and_has_no_bodies() ->
     assert result.metrics.sources_considered == 12
     assert result.metrics.sources_selected == 11
     assert result.metrics.sources_deferred == 1
-    assert result.metrics.source_bytes_selected == 244657
+    assert result.metrics.source_bytes_selected == 244757
     assert result.metrics.records_seen == 339
     assert result.metrics.diagnostics_emitted == 1
     assert result.changes.accounting.canonical_counts == {
@@ -54,9 +96,27 @@ def test_full_synthetic_ingestion_matches_ck03_accounting_and_has_no_bodies() ->
     assert result.changes.accounting.token_sums["cached_input_tokens"].missing_count == 5
     assert result.changes.accounting.token_sums["reasoning_tokens"].value == 31850
     assert result.changes.accounting.token_sums["output_tokens"].value == 47450
-    assert len({item.occurrence_id for item in result.changes.occurrences}) == len(result.changes.occurrences)
-    forbidden = {"body", "command", "content", "diff", "patch", "prompt", "reasoning", "response", "stderr", "stdout", "tool_output"}
-    assert all(str(key).lower() not in forbidden for item in result.changes.observations for key in item.payload)
+    assert len({item.occurrence_id for item in result.changes.occurrences}) == len(
+        result.changes.occurrences
+    )
+    forbidden = {
+        "body",
+        "command",
+        "content",
+        "diff",
+        "patch",
+        "prompt",
+        "reasoning",
+        "response",
+        "stderr",
+        "stdout",
+        "tool_output",
+    }
+    assert all(
+        str(key).lower() not in forbidden
+        for item in result.changes.observations
+        for key in item.payload
+    )
 
 
 def test_parallel_worker_counts_are_deterministic_and_bounded() -> None:
@@ -71,10 +131,10 @@ def test_parallel_worker_counts_are_deterministic_and_bounded() -> None:
 def test_named_history_windows_match_fixture_call_counts_and_coverage() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     expected = {
-        "30_days": (4, 184519),
-        "90_days": (10, 184519),
-        "one_year": (34, 214584),
-        "all_time": (100, 244657),
+        "30_days": (4, 184619),
+        "90_days": (10, 184619),
+        "one_year": (34, 214684),
+        "all_time": (100, 244757),
     }
     for name, (expected_calls, expected_bytes) in expected.items():
         window = manifest["history"]["windows"][name]
@@ -108,7 +168,10 @@ def test_ck02_identity_derivation_is_executable_for_emitted_observations() -> No
         kind = kinds.get(observation.observation_type)
         if kind is not None:
             assert observation.logical_id == semantic_id(kind, observation.identity_tuple)
-    assert all(item.occurrence_id.startswith("source-occurrence:v1:") for item in result.changes.occurrences)
+    assert all(
+        item.occurrence_id.startswith("source-occurrence:v1:")
+        for item in result.changes.occurrences
+    )
 
 
 def test_malformed_records_flush_in_bounded_batches(tmp_path: Path) -> None:

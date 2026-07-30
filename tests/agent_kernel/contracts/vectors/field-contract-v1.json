@@ -1467,14 +1467,30 @@
       "id": "field.context_component",
       "entity": "context_component",
       "record": {
-        "component_id": "context-component:v1:u2f7id3ocldurdhnvaoyk62ma54u7nhof56a2mjlxj4flbv4d64a",
-        "call_id": "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q",
+        "component_id": "context-component:v1:b6qvil2nk5xuxycdwf7yxpheiwuyanpr4hcxsspzy7dk5jwqqy4a",
+        "session_id": "session:v1:ch5fgvul4mnz7oxhjwla4cwwsgu4roq6rolyy2tejsho33yb46ka",
         "turn_id": "turn:v1:5rcoyph6igf36vxn3jyv26ixsxygtdahr6mestu3tnk6bbad2i7a",
+        "call_id": "call:v1:qalvn2ajqkevrjnkcuccriwuvhd6oxffwetrrau3ea5gzmqmh32q",
         "category": "tool_output",
         "observed_utf8_bytes": 1,
-        "event_count": 1,
+        "observed_event_count": 1,
+        "total_context_utf8_bytes": 1,
+        "estimator": "fixture",
         "estimated_tokens": 1,
-        "inclusion_basis": "fixture"
+        "inclusion_basis": "fixture",
+        "capability_basis": "fixture",
+        "measurement_basis": "fixture",
+        "event_at_us": 100,
+        "measurement_mask": 1,
+        "evidence_coordinates": [
+          {
+            "source_manifestation_id": "source-manifestation:v1:lyhp3de3mn7xwdn7amv6vnkjjabw3y2bczicu7pfhg5t3a4cxsea",
+            "source_revision": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "record_ordinal": 1,
+            "adapter_version": "codex-jsonl.v1"
+          }
+        ],
+        "publication_id": "session:v1:ly4h5wl3xcwosiubv36cztq7pxkh3gi5yx447fl5dddtgcpnbnna"
       },
       "assertions": {
         "component_id": {
@@ -1486,7 +1502,16 @@
           "missing_probe": "reject_null",
           "identity_participation": "excluded"
         },
-        "call_id": {
+        "session_id": {
+          "checks": [
+            "identity_input",
+            "logical_id"
+          ],
+          "basis": "identity_v1",
+          "missing_probe": "reject_null",
+          "identity_participation": "included"
+        },
+        "turn_id": {
           "checks": [
             "identity_input",
             "logical_id"
@@ -1495,7 +1520,7 @@
           "missing_probe": "allow_null",
           "identity_participation": "included"
         },
-        "turn_id": {
+        "call_id": {
           "checks": [
             "identity_input",
             "logical_id"
@@ -1518,14 +1543,30 @@
             "nonnegative_integer"
           ],
           "basis": "adapter_exact",
-          "missing_probe": "allow_null",
+          "missing_probe": "reject_null",
           "identity_participation": "excluded"
         },
-        "event_count": {
+        "observed_event_count": {
           "checks": [
             "nonnegative_integer"
           ],
           "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "total_context_utf8_bytes": {
+          "checks": [
+            "nonnegative_integer"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "estimator": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "configured_estimate",
           "missing_probe": "allow_null",
           "identity_participation": "excluded"
         },
@@ -1542,6 +1583,54 @@
             "nonempty_text"
           ],
           "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "capability_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "measurement_basis": {
+          "checks": [
+            "nonempty_text"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "event_at_us": {
+          "checks": [
+            "utc_microseconds"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "allow_null",
+          "identity_participation": "excluded"
+        },
+        "measurement_mask": {
+          "checks": [
+            "measurement_mask"
+          ],
+          "basis": "adapter_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "evidence_coordinates": {
+          "checks": [
+            "source_coordinates"
+          ],
+          "basis": "occurrence_exact",
+          "missing_probe": "reject_null",
+          "identity_participation": "excluded"
+        },
+        "publication_id": {
+          "checks": [
+            "logical_id"
+          ],
+          "basis": "publication_exact",
           "missing_probe": "reject_null",
           "identity_participation": "excluded"
         }

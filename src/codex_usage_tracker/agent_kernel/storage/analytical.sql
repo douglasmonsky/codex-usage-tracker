@@ -852,6 +852,60 @@ CREATE TABLE compaction_boundaries (
     REFERENCES publications(publication_id)
 ) STRICT, WITHOUT ROWID;
 
+CREATE TABLE context_components (
+  component_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  turn_id TEXT,
+  call_id TEXT,
+  category TEXT NOT NULL
+    CHECK (category IN (
+      'assistant_message',
+      'developer_instruction',
+      'memory',
+      'other_structural',
+      'system_instruction',
+      'tool_definition',
+      'tool_output',
+      'user_message',
+      'workspace_context'
+    )),
+  observed_utf8_bytes INTEGER NOT NULL CHECK (observed_utf8_bytes >= 0),
+  observed_event_count INTEGER NOT NULL CHECK (observed_event_count >= 0),
+  estimator TEXT,
+  estimated_tokens INTEGER CHECK (estimated_tokens IS NULL OR estimated_tokens >= 0),
+  total_context_utf8_bytes INTEGER
+    CHECK (total_context_utf8_bytes IS NULL OR total_context_utf8_bytes >= 0),
+  inclusion_basis TEXT NOT NULL
+    CHECK (inclusion_basis IN (
+      'inclusion_unknown',
+      'known_included_in_call',
+      'observed_in_source',
+      'selected_by_host'
+    )),
+  capability_basis TEXT NOT NULL,
+  measurement_basis TEXT NOT NULL,
+  event_at_us INTEGER,
+  source_rank INTEGER NOT NULL CHECK (source_rank >= 0),
+  source_order INTEGER NOT NULL CHECK (source_order >= 0),
+  event_kind_order INTEGER NOT NULL CHECK (event_kind_order >= 0),
+  transition_rank INTEGER NOT NULL CHECK (transition_rank >= 0),
+  measurement_mask INTEGER NOT NULL CHECK (measurement_mask >= 0),
+  primary_occurrence_id TEXT NOT NULL,
+  first_seen_publication_id TEXT NOT NULL,
+  last_seen_publication_id TEXT NOT NULL,
+  CHECK ((estimator IS NULL) = (estimated_tokens IS NULL)),
+  FOREIGN KEY (component_id) REFERENCES identity_registry(logical_id),
+  FOREIGN KEY (session_id) REFERENCES sessions(session_id),
+  FOREIGN KEY (turn_id) REFERENCES turns(turn_id),
+  FOREIGN KEY (call_id) REFERENCES model_call_locations(call_id),
+  FOREIGN KEY (primary_occurrence_id)
+    REFERENCES source_occurrences(occurrence_id),
+  FOREIGN KEY (first_seen_publication_id)
+    REFERENCES publications(publication_id),
+  FOREIGN KEY (last_seen_publication_id)
+    REFERENCES publications(publication_id)
+) STRICT, WITHOUT ROWID;
+
 CREATE TABLE state_changes (
   change_id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,
@@ -1528,6 +1582,17 @@ CREATE INDEX compactions_timeline
   );
 CREATE INDEX compactions_by_session
   ON compaction_boundaries(session_id ASC, source_order ASC, compaction_id ASC);
+CREATE INDEX context_components_timeline
+  ON context_components(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    event_at_us ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    component_id ASC,
+    transition_rank ASC
+  );
 CREATE INDEX allowance_observations_timeline
   ON allowance_observations(
     (observed_at_us IS NULL) ASC,

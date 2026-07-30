@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from collections.abc import Callable, Mapping
+from decimal import Decimal
 
 from ..adapters.codex_jsonl.canonicalize import ProposedChangeSet
 from ..adapters.contracts import (
@@ -84,6 +85,7 @@ class _WriteSetPreparer:
         self._add_projects()
         self._build_lifecycle()
         self._add_observation_rows()
+        self._add_allowance_intervals()
         self._add_accounting()
         return PublicationWriteSet(
             changes=self.changes,
@@ -93,6 +95,7 @@ class _WriteSetPreparer:
             tail_state=self._tail_state(),
             expected_source_revisions=self.prior.source_revisions,
             cursor_snapshot=self._cursor_snapshot(),
+            existing_occurrence_ids=self.prior.occurrence_ids,
         )
 
     def _identity(
@@ -526,6 +529,7 @@ class _WriteSetPreparer:
             "ToolResourceLinkObserved": self._add_tool_resource,
             "ActivityLifecycleObserved": self._add_activity,
             "CompactionObserved": self._add_compaction,
+            "ContextComponentObserved": self._add_context_component,
             "StateChangeObserved": self._add_state_change,
             "AllowanceLimitObserved": self._add_allowance_limit,
             "AllowanceObservationObserved": self._add_allowance_observation,
@@ -535,6 +539,10 @@ class _WriteSetPreparer:
             handler = handlers.get(observation.observation_type)
             if handler is not None:
                 handler(logical_id, grouped, observation)
+        for logical_id, grouped in sorted(self.observations_by_id.items()):
+            observation = max(grouped, key=lambda item: item.sort_key)
+            if observation.observation_type == "SessionRelationshipObserved":
+                self._add_session_relationship(logical_id, grouped, observation)
 
     @staticmethod
     def _common_order(
@@ -656,6 +664,127 @@ class _WriteSetPreparer:
                 tuple(_MUTABLE_COLUMNS["turns"]),
             )
         )
+
+    def _add_session_relationship(
+        self,
+        _logical_id: str,
+        _grouped: list[AdapterObservation],
+        observation: AdapterObservation,
+    ) -> None:
+        child_id = str(observation.payload["session_id"])
+        parent_id = str(observation.payload["parent_session_id"])
+        available_sessions = {
+            str(row.values["session_id"]) for row in self.rows if row.table == "sessions"
+        } | {
+            logical_id
+            for logical_id, row in self.prior.entity_rows.items()
+            if row.table == "sessions"
+        }
+        if child_id not in available_sessions or parent_id not in available_sessions:
+            return
+        relationship_key = (
+            child_id,
+            parent_id,
+            str(observation.payload["relationship_basis"]),
+        )
+        child_edges_by_relationship: dict[tuple[str, str, str], AdapterObservation] = {}
+        for grouped in self.observations_by_id.values():
+            candidate = max(grouped, key=lambda item: item.sort_key)
+            if (
+                candidate.observation_type != "SessionRelationshipObserved"
+                or candidate.payload.get("session_id") != child_id
+            ):
+                continue
+            key = (
+                child_id,
+                str(candidate.payload["parent_session_id"]),
+                str(candidate.payload["relationship_basis"]),
+            )
+            existing = child_edges_by_relationship.get(key)
+            if existing is None or candidate.sort_key > existing.sort_key:
+                child_edges_by_relationship[key] = candidate
+        if observation is not child_edges_by_relationship[relationship_key]:
+            return
+        child_edges = sorted(
+            child_edges_by_relationship.values(),
+            key=lambda item: item.sort_key,
+        )
+        prior_edge = self.prior.late_parent_edges.get(relationship_key)
+        if prior_edge is not None:
+            edge = prior_edge
+        else:
+            new_edges = [
+                item
+                for item in child_edges
+                if (
+                    child_id,
+                    str(item.payload["parent_session_id"]),
+                    str(item.payload["relationship_basis"]),
+                )
+                not in self.prior.late_parent_edges
+            ]
+            relationship_version = (
+                self.prior.late_parent_versions.get(child_id, 0) + new_edges.index(observation) + 1
+            )
+            edge = PreparedRow(
+                "late_parent_edges",
+                {
+                    "child_session_id": child_id,
+                    "relationship_version": relationship_version,
+                    "parent_session_id": parent_id,
+                    "relationship_basis": str(observation.payload["relationship_basis"]),
+                    **self._common_order(observation),
+                    "occurrence_id": observation.occurrence_id,
+                    "first_seen_publication_id": self.publication_id,
+                },
+            )
+        self.rows.append(edge)
+        if observation is not child_edges[-1]:
+            return
+
+        child_index = next(
+            (
+                index
+                for index, row in enumerate(self.rows)
+                if row.table == "sessions" and row.values["session_id"] == child_id
+            ),
+            None,
+        )
+        child = (
+            self.rows[child_index]
+            if child_index is not None
+            else self.prior.entity_rows.get(child_id)
+        )
+        if child is None:
+            raise PublicationWriteError(
+                f"late parent relationship has no observed child session: {child_id}"
+            )
+        parent = next(
+            (
+                row
+                for row in self.rows
+                if row.table == "sessions" and row.values["session_id"] == parent_id
+            ),
+            self.prior.entity_rows.get(parent_id),
+        )
+        parent_root = None if parent is None else parent.values.get("root_session_id")
+        parent_depth = None if parent is None else parent.values.get("delegation_depth")
+        updated = PreparedRow(
+            "sessions",
+            {
+                **child.values,
+                "root_session_id": parent_root or parent_id,
+                "parent_session_id": parent_id,
+                "relationship_basis": str(observation.payload["relationship_basis"]),
+                "delegation_depth": (1 if parent_depth is None else int(parent_depth) + 1),
+                "last_seen_publication_id": self.publication_id,
+            },
+            tuple(_MUTABLE_COLUMNS["sessions"]),
+        )
+        if child_index is None:
+            self.rows.append(updated)
+        else:
+            self.rows[child_index] = updated
 
     def _add_model_call(
         self,
@@ -907,6 +1036,45 @@ class _WriteSetPreparer:
             )
         )
 
+    def _add_context_component(
+        self,
+        logical_id: str,
+        _grouped: list[AdapterObservation],
+        observation: AdapterObservation,
+    ) -> None:
+        payload = observation.payload
+        prior = self.prior.entity_rows.get(logical_id)
+        self.rows.append(
+            PreparedRow(
+                "context_components",
+                {
+                    "component_id": logical_id,
+                    "session_id": str(payload["session_id"]),
+                    "turn_id": payload.get("turn_id"),
+                    "call_id": payload.get("call_id"),
+                    "category": str(payload["category"]),
+                    "observed_utf8_bytes": int(payload["observed_utf8_bytes"]),
+                    "observed_event_count": int(payload["observed_event_count"]),
+                    "estimator": payload.get("estimator"),
+                    "estimated_tokens": payload.get("estimated_tokens"),
+                    "total_context_utf8_bytes": payload.get("total_context_utf8_bytes"),
+                    "inclusion_basis": str(payload["inclusion_basis"]),
+                    "capability_basis": str(payload["capability_basis"]),
+                    "measurement_basis": str(payload["measurement_basis"]),
+                    **self._common_order(observation),
+                    "measurement_mask": observation.measurement_mask,
+                    "primary_occurrence_id": observation.occurrence_id,
+                    "first_seen_publication_id": (
+                        self.publication_id
+                        if prior is None
+                        else prior.values["first_seen_publication_id"]
+                    ),
+                    "last_seen_publication_id": self.publication_id,
+                },
+                tuple(_MUTABLE_COLUMNS["context_components"]),
+            )
+        )
+
     def _add_allowance_limit(
         self,
         logical_id: str,
@@ -946,51 +1114,162 @@ class _WriteSetPreparer:
             (
                 str(payload["limit_id"]),
                 str(payload["reset_identity"]),
-                None,
-                None,
+                payload.get("cycle_start_us"),
+                payload.get("cycle_end_us"),
             ),
         )
-        self.rows.extend(
-            (
-                PreparedRow(
-                    "allowance_cycles",
-                    {
-                        "cycle_id": cycle_id,
-                        "limit_id": str(payload["limit_id"]),
-                        "reset_identity": str(payload["reset_identity"]),
-                        "start_at_us": None,
-                        "end_at_us": None,
-                        "reset_basis": observation.basis,
-                        "completion_status": "open",
-                        "first_seen_publication_id": self.publication_id,
-                        "last_seen_publication_id": self.publication_id,
-                    },
-                    tuple(_MUTABLE_COLUMNS["allowance_cycles"]),
-                ),
-                PreparedRow(
-                    "allowance_observations",
-                    {
-                        "observation_id": logical_id,
-                        "limit_id": str(payload["limit_id"]),
-                        "cycle_id": cycle_id,
-                        "plan_identity": str(payload["plan_identity"]),
-                        "window_kind": str(payload["window_kind"]),
-                        "reset_identity": str(payload["reset_identity"]),
-                        "observation_ordinal": int(payload["observation_ordinal"]),
-                        "used_percent": payload.get("used_percent"),
-                        "remaining_percent": payload.get("remaining_percent"),
-                        "absolute_fields_json": "{}",
-                        "reset_time_us": payload.get("reset_time_us"),
-                        "observed_at_us": observation.event_at_us,
-                        "source_rank": observation.source_rank,
-                        "source_order": observation.source_order,
-                        "event_kind_order": observation.event_kind_order,
-                        "transition_rank": observation.transition_rank,
-                        "measurement_mask": observation.measurement_mask,
-                        "primary_occurrence_id": observation.occurrence_id,
-                        "first_seen_publication_id": self.publication_id,
-                    },
-                ),
+        self.rows.append(
+            PreparedRow(
+                "allowance_cycles",
+                {
+                    "cycle_id": cycle_id,
+                    "limit_id": str(payload["limit_id"]),
+                    "reset_identity": str(payload["reset_identity"]),
+                    "start_at_us": payload.get("cycle_start_us"),
+                    "end_at_us": payload.get("cycle_end_us"),
+                    "reset_basis": observation.basis,
+                    "completion_status": str(payload["completion_status"]),
+                    "first_seen_publication_id": self.publication_id,
+                    "last_seen_publication_id": self.publication_id,
+                },
+                tuple(_MUTABLE_COLUMNS["allowance_cycles"]),
+            )
+        )
+        prior = self.prior.entity_rows.get(logical_id)
+        self.rows.append(
+            PreparedRow(
+                "allowance_observations",
+                {
+                    "observation_id": logical_id,
+                    "limit_id": str(payload["limit_id"]),
+                    "cycle_id": cycle_id,
+                    "plan_identity": str(payload["plan_identity"]),
+                    "window_kind": str(payload["window_kind"]),
+                    "reset_identity": str(payload["reset_identity"]),
+                    "observation_ordinal": int(payload["observation_ordinal"]),
+                    "used_percent": payload.get("used_percent"),
+                    "remaining_percent": payload.get("remaining_percent"),
+                    "absolute_fields_json": "{}",
+                    "reset_time_us": payload.get("reset_time_us"),
+                    "observed_at_us": observation.event_at_us,
+                    "source_rank": observation.source_rank,
+                    "source_order": observation.source_order,
+                    "event_kind_order": observation.event_kind_order,
+                    "transition_rank": observation.transition_rank,
+                    "measurement_mask": observation.measurement_mask,
+                    "primary_occurrence_id": observation.occurrence_id,
+                    "first_seen_publication_id": (
+                        self.publication_id
+                        if prior is None
+                        else prior.values["first_seen_publication_id"]
+                    ),
+                },
+                tuple(_MUTABLE_COLUMNS["allowance_observations"]),
+            )
+        )
+
+    @staticmethod
+    def _decimal_text(value: Decimal) -> str:
+        if value == 0:
+            return "0"
+        text = format(value.normalize(), "f")
+        return text.rstrip("0").rstrip(".") if "." in text else text
+
+    def _add_allowance_intervals(self) -> None:
+        compatibility_fields = (
+            "provider",
+            "limit_id",
+            "plan_identity",
+            "window_kind",
+            "cycle_id",
+            "reset_identity",
+        )
+        grouped_current: dict[tuple[str, ...], list[dict[str, object]]] = defaultdict(list)
+        for grouped in self.observations_by_id.values():
+            if grouped[0].observation_type != "AllowanceObservationObserved":
+                continue
+            observation = max(grouped, key=lambda item: item.sort_key)
+            key = tuple(str(observation.payload[field]) for field in compatibility_fields)
+            grouped_current[key].append(
+                {
+                    "observation_id": observation.logical_id,
+                    **dict(observation.payload),
+                    "observed_at_us": observation.event_at_us,
+                    **self._common_order(observation),
+                }
+            )
+        for key, current in sorted(grouped_current.items()):
+            facts = list(current)
+            predecessor = self.prior.allowance_predecessors.get(key)
+            if predecessor is not None:
+                facts.append(dict(predecessor.values))
+            facts.sort(
+                key=lambda item: (
+                    item.get("observed_at_us") is None,
+                    0 if item.get("observed_at_us") is None else item["observed_at_us"],
+                    item.get("source_rank", 0),
+                    item.get("source_order", 0),
+                    item.get("event_kind_order", 0),
+                    str(item["observation_id"]),
+                    item.get("transition_rank", 0),
+                )
+            )
+            for start, end in zip(facts, facts[1:], strict=False):
+                start_id = str(start["observation_id"])
+                end_id = str(end["observation_id"])
+                if start_id == end_id:
+                    continue
+                start_at = start.get("observed_at_us")
+                end_at = end.get("observed_at_us")
+                if type(start_at) is not int or type(end_at) is not int:
+                    continue
+                if end_at < start_at:
+                    raise PublicationWriteError("allowance observation time decreases")
+                self._add_allowance_interval_row(start, end, start_id, end_id, start_at, end_at)
+
+    def _add_allowance_interval_row(
+        self,
+        start: Mapping[str, object],
+        end: Mapping[str, object],
+        start_id: str,
+        end_id: str,
+        start_at: int,
+        end_at: int,
+    ) -> None:
+        deltas: list[Decimal] = []
+        if start.get("used_percent") is not None and end.get("used_percent") is not None:
+            deltas.append(Decimal(str(end["used_percent"])) - Decimal(str(start["used_percent"])))
+        if start.get("remaining_percent") is not None and end.get("remaining_percent") is not None:
+            deltas.append(
+                Decimal(str(start["remaining_percent"])) - Decimal(str(end["remaining_percent"]))
+            )
+        if deltas and any(delta != deltas[0] for delta in deltas[1:]):
+            raise PublicationWriteError("used and remaining percentage deltas disagree")
+        percent_delta = None if not deltas else self._decimal_text(deltas[0])
+        interval_identity = (start_id, end_id)
+        interval_id = semantic_id("allowance-interval", interval_identity)
+        self._identity(interval_id, "allowance-interval", interval_identity)
+        prior = self.prior.allowance_intervals.get(interval_id)
+        if prior is not None:
+            self.rows.append(prior)
+            return
+        self.rows.append(
+            PreparedRow(
+                "allowance_intervals",
+                {
+                    "interval_id": interval_id,
+                    "limit_id": str(start["limit_id"]),
+                    "cycle_id": str(start["cycle_id"]),
+                    "start_observation_id": start_id,
+                    "end_observation_id": end_id,
+                    "start_us": start_at,
+                    "end_us": end_at,
+                    "percent_delta": percent_delta,
+                    "compatibility_basis": "exact_identity_tuple_v1",
+                    "ratio_eligible": int(percent_delta is not None and Decimal(percent_delta) > 0),
+                    "coverage_json": "{}",
+                    "first_seen_publication_id": self.publication_id,
+                },
             )
         )
 
@@ -1090,7 +1369,8 @@ class _WriteSetPreparer:
             corrected_by_kind[count_name] += classification == "corrected"
             terminalized_by_kind[count_name] += classification == "terminalized"
         for count_name in count_name_by_table.values():
-            counts[count_name] = counts.get(count_name, 0) + inserted_by_kind[count_name]
+            if count_name in counts or inserted_by_kind[count_name]:
+                counts[count_name] = counts.get(count_name, 0) + inserted_by_kind[count_name]
         inserted_occurrences = sum(
             occurrence.occurrence_id not in self.prior.occurrence_ids
             for occurrence in self.changes.occurrences

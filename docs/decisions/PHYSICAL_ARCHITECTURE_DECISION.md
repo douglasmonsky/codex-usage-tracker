@@ -33,9 +33,11 @@ experimental candidates or the spike runtime.
 
 The first qualification pass selected Candidate A after eliminating Candidates
 C and D. The final read-only review found seven gaps that prevented acceptance.
-Six remediations remain accepted. CK-07B now supplies the executable formula
-and selector-provenance authority discovered missing during CK-07A. The
-query-correctness remediation itself remains pending CK-07A because its
+Six remediations remain accepted. CK-07B supplies executable formula and
+selector-provenance authority. CK-07C supplies the executable plan-to-operand
+and direct-fact bindings plus the smallest missing canonical fact surfaces
+discovered during CK-07A. The query-correctness remediation itself remains
+pending CK-07A because its
 database-resident answer source did not prove canonical-fact lineage:
 
 | Review gap | Remediation |
@@ -214,7 +216,7 @@ performance measurements remain historical physical evidence, but the query
 correctness claim is not accepted as a fact-lineage proof.
 
 Candidate A remains an experimental physical-plan reference. CK-07A must
-consume CK-07B, replace this proof with permitted fact-backed qualification,
+consume CK-07B and CK-07C, replace this proof with permitted fact-backed qualification,
 and requalify
 CK-05–CK-07 before CK-08 may implement production query code. A false-zero,
 expected-answer table, or oracle-backed runtime answer remains a release
@@ -279,7 +281,7 @@ Typed contracts and adapter boundaries are retained ideas, not a dependency.
 | --- | --- |
 | Growth-scale build cost and I/O variance | Three current-commit repetitions and one prior complete bundle passed, but two current repetitions were waived. CK-05/CK-06 benchmark streaming, batching, compact SQLite, and truthful progress against the same fixture. |
 | Build RSS | CK-06 proves bounded streaming and queue depth; no whole-history materialization. |
-| Fact-backed query qualification | CK-07B freezes formula and provenance authority. CK-07A then replaces Candidate A's `question_cases` proof, reconciles independent expected rows to canonical published facts, and requalifies CK-03–CK-07 before CK-08/CK-09. |
+| Fact-backed query qualification | CK-07B freezes formula and provenance authority. CK-07C freezes executable plan operands/direct facts and the required valuation, context, allowance, hierarchy, total-order, and publication fact representations. CK-07A then replaces Candidate A's `question_cases` proof, reconciles independent expected rows to canonical published facts, and requalifies CK-03–CK-07 before CK-08/CK-09. |
 | Tail overlay has no production fold path | CK-07 implements and crash-qualifies threshold-driven fold or isolated-artifact selection. |
 | Experimental promotion is not durably atomic | CK-07 implements fsync, pointer, lease, rollback, reconciliation, and protected cleanup. |
 | Installed-model DBHub operability is deferred | CK-11 records exact model identity, host/runtime versions, reasoning effort, synthetic-prompt artifact identity/hash, token source, and authorization before any billed call. |

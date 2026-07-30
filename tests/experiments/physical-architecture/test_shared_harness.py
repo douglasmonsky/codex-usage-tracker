@@ -87,10 +87,10 @@ def test_fixture_ingestion_verifies_ck03_bytes_and_contract() -> None:
     assert fixture.seed == 20260728
     assert fixture.fixture_revision == "agent-kernel-structural-v1"
     assert fixture.manifest_digest == (
-        "78003a7cfdee8beb1a263b3027fec162a612352be6fbefd13a65e821640bc7ae"
+        "91e0658f913c917bd8ce69fac9a1d75e881f41630eccc0f30f68bd9b6a972a35"
     )
     assert fixture.oracle_digest == (
-        "9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b"
+        "38787c3806be52a69ec03e7e8dcb0044b87dac4be826d620abf4cf34656da412"
     )
     assert len(fixture.sources) == 11
     assert len(fixture.phases) == 8
@@ -100,7 +100,7 @@ def test_fixture_ingestion_verifies_ck03_bytes_and_contract() -> None:
         "replacement",
         "truncation",
     }
-    assert fixture.source_bytes == 244_657
+    assert fixture.source_bytes == 244_757
     assert set(fixture.vertical_slices) == {
         "context_deterioration",
         "workflow_sequence_first_mutation",

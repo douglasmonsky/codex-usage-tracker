@@ -22,6 +22,7 @@ EVENT_KIND_ORDER = {
     "turn_start": 20,
     "model_call": 30,
     "compaction_boundary": 35,
+    "context_component": 37,
     "tool_start": 40,
     "tool_terminal": 50,
     "activity": 55,
@@ -82,6 +83,10 @@ _MEASUREMENT_BITS = {
     "event_at_us": 1 << 5,
     "duration_us": 1 << 6,
     "output_bytes": 1 << 7,
+    "observed_utf8_bytes": 1 << 8,
+    "observed_event_count": 1 << 9,
+    "estimated_tokens": 1 << 10,
+    "total_context_utf8_bytes": 1 << 11,
 }
 
 _NORMALIZED_RECORD_TYPES = frozenset(
@@ -89,6 +94,7 @@ _NORMALIZED_RECORD_TYPES = frozenset(
         "activity",
         "allowance_observation",
         "compaction_boundary",
+        "context_component",
         "late_parent",
         "model_call",
         "session_start",
@@ -98,6 +104,27 @@ _NORMALIZED_RECORD_TYPES = frozenset(
         "tool_terminal",
         "turn_start",
         *CONTROL_RECORD_TYPES,
+    }
+)
+_CONTEXT_CATEGORIES = frozenset(
+    {
+        "assistant_message",
+        "developer_instruction",
+        "memory",
+        "other_structural",
+        "system_instruction",
+        "tool_definition",
+        "tool_output",
+        "user_message",
+        "workspace_context",
+    }
+)
+_CONTEXT_INCLUSION_BASES = frozenset(
+    {
+        "inclusion_unknown",
+        "known_included_in_call",
+        "observed_in_source",
+        "selected_by_host",
     }
 )
 _ENVELOPE_TYPES = {
@@ -382,6 +409,7 @@ def normalize_record(record: Mapping[str, Any], source_range: SourceRange, *, so
         "activity",
         "allowance_observation",
         "compaction_boundary",
+        "context_component",
         "late_parent",
         "model_call",
         "session_start",
@@ -399,6 +427,7 @@ def normalize_record(record: Mapping[str, Any], source_range: SourceRange, *, so
     entity_kind = "observation"
     identity: tuple[Any, ...]
     logical_value: object = None
+    canonical_turn: str | None
     observation_type: str
     if record_type in {"session_start", "session_terminal"}:
         session = _string(payload.get("session_id"), "session_id")
@@ -519,6 +548,96 @@ def normalize_record(record: Mapping[str, Any], source_range: SourceRange, *, so
         values = {"compaction_id": semantic_id("compaction", identity), "session_id": canonical_session, "before_context_epoch": before, "after_context_epoch": after}
         observation_type = "CompactionObserved"
         capability = int(Capability.MODEL_CALL_USAGE)
+    elif record_type == "context_component":
+        session = _string(payload.get("session_id"), "session_id")
+        category = _string(payload.get("category"), "category")
+        inclusion_basis = _string(payload.get("inclusion_basis"), "inclusion_basis")
+        capability_basis = _string(payload.get("capability_basis"), "capability_basis")
+        measurement_basis = _string(payload.get("measurement_basis"), "measurement_basis")
+        turn = _string(payload.get("turn_id"), "turn_id", allow_none=True)
+        call = _string(payload.get("call_id"), "call_id", allow_none=True)
+        estimator = _string(payload.get("estimator"), "estimator", allow_none=True)
+        assert (
+            session is not None
+            and category is not None
+            and inclusion_basis is not None
+            and capability_basis is not None
+            and measurement_basis is not None
+        )
+        if category not in _CONTEXT_CATEGORIES:
+            raise NormalizationError("category is not a structural context category")
+        if inclusion_basis not in _CONTEXT_INCLUSION_BASES:
+            raise NormalizationError("inclusion_basis is not a supported typed basis")
+        canonical_session = _session_id(session)
+        canonical_turn = (
+            _turn_id(canonical_session, payload, source_order) if turn is not None else None
+        )
+        canonical_call = (
+            semantic_id("call", [call, canonical_session, canonical_turn])
+            if call is not None and canonical_turn is not None
+            else None
+        )
+        observed_utf8_bytes = _integer(
+            payload.get("observed_utf8_bytes"),
+            "observed_utf8_bytes",
+            allow_none=False,
+            nonnegative=True,
+        )
+        observed_event_count = _integer(
+            payload.get("observed_event_count"),
+            "observed_event_count",
+            allow_none=False,
+            nonnegative=True,
+        )
+        estimated_tokens = _integer(
+            payload.get("estimated_tokens"),
+            "estimated_tokens",
+            nonnegative=True,
+        )
+        total_context_utf8_bytes = _integer(
+            payload.get("total_context_utf8_bytes"),
+            "total_context_utf8_bytes",
+            nonnegative=True,
+        )
+        if (estimator is None) != (estimated_tokens is None):
+            raise NormalizationError(
+                "estimator and estimated_tokens must either both be present or both be absent"
+            )
+        # The upstream component key and physical occurrence are provenance,
+        # not semantic identity.  One structural category within the same
+        # owner tuple remains stable across copies, replacements, and rebuilds.
+        identity = (
+            canonical_session,
+            canonical_turn,
+            canonical_call,
+            category,
+        )
+        entity_kind, logical_value = "context-component", None
+        values = {
+            "component_id": semantic_id("context-component", identity),
+            "session_id": canonical_session,
+            "turn_id": canonical_turn,
+            "call_id": canonical_call,
+            "category": category,
+            "observed_utf8_bytes": observed_utf8_bytes,
+            "observed_event_count": observed_event_count,
+            "estimator": estimator,
+            "estimated_tokens": estimated_tokens,
+            "total_context_utf8_bytes": total_context_utf8_bytes,
+            "inclusion_basis": inclusion_basis,
+            "capability_basis": capability_basis,
+            "measurement_basis": measurement_basis,
+        }
+        observation_type = "ContextComponentObserved"
+        capability = int(Capability.CONTEXT_COMPONENT)
+        measurement_mask |= (
+            _MEASUREMENT_BITS["observed_utf8_bytes"]
+            | _MEASUREMENT_BITS["observed_event_count"]
+        )
+        if estimated_tokens is not None:
+            measurement_mask |= _MEASUREMENT_BITS["estimated_tokens"]
+        if total_context_utf8_bytes is not None:
+            measurement_mask |= _MEASUREMENT_BITS["total_context_utf8_bytes"]
     elif record_type == "state_change":
         change = _string(payload.get("change_id"), "change_id")
         session = _string(payload.get("session_id"), "session_id")
@@ -557,6 +676,15 @@ def normalize_record(record: Mapping[str, Any], source_range: SourceRange, *, so
         canonical_limit = semantic_id("allowance-limit", limit_identity)
         cycle_start = _integer(payload.get("cycle_start_us"), "cycle_start_us")
         cycle_end = _integer(payload.get("cycle_end_us"), "cycle_end_us")
+        validate_utc_microseconds(cycle_start)
+        validate_utc_microseconds(cycle_end)
+        if cycle_start is not None and cycle_end is not None and cycle_start > cycle_end:
+            raise NormalizationError("allowance cycle start must not exceed end")
+        completion_status = _string(
+            payload.get("completion_status", "open"),
+            "completion_status",
+        )
+        assert completion_status is not None
         cycle_identity = (canonical_limit, reset, cycle_start, cycle_end)
         canonical_cycle = semantic_id("allowance-cycle", cycle_identity)
         observed_at_us = payload.get("observed_at_us", event_at_us)
@@ -568,7 +696,7 @@ def normalize_record(record: Mapping[str, Any], source_range: SourceRange, *, so
             "adapter_version": source_range.adapter_version,
         }
         identity = (canonical_limit, canonical_cycle, observed_at_us, source_occurrence)
-        values = {"limit_id": canonical_limit, "cycle_id": canonical_cycle, "provider": provider, "account_local_identity": account, "plan_identity": plan, "window_kind": window, "reset_identity": reset, "observation_ordinal": observation_ordinal, "observation_ordinal_basis": "upstream_zero_based_plus_one", "used_percent": _canonical_decimal(payload.get("used_percent"), "used_percent"), "remaining_percent": _canonical_decimal(payload.get("remaining_percent"), "remaining_percent"), "reset_time_us": normalize_timestamp(payload.get("reset_time_us"))[0] if payload.get("reset_time_us") is not None else None}
+        values = {"limit_id": canonical_limit, "cycle_id": canonical_cycle, "provider": provider, "account_local_identity": account, "plan_identity": plan, "window_kind": window, "reset_identity": reset, "cycle_start_us": cycle_start, "cycle_end_us": cycle_end, "completion_status": completion_status, "observation_ordinal": observation_ordinal, "observation_ordinal_basis": "upstream_zero_based_plus_one", "used_percent": _canonical_decimal(payload.get("used_percent"), "used_percent"), "remaining_percent": _canonical_decimal(payload.get("remaining_percent"), "remaining_percent"), "reset_time_us": normalize_timestamp(payload.get("reset_time_us"))[0] if payload.get("reset_time_us") is not None else None}
         observation_type = "AllowanceObservationObserved"
         capability = int(Capability.ALLOWANCE_OBSERVATION)
         for field in ("used_percent", "remaining_percent", "reset_time_us"):
@@ -705,7 +833,7 @@ def related_observations(observation: AdapterObservation) -> tuple[AdapterObserv
                     event_at_us=observation.event_at_us,
                     source_order=observation.source_order,
                     event_kind_order=observation.event_kind_order,
-                    payload={key: payload[key] for key in ("limit_id", "cycle_id", "provider", "account_local_identity", "plan_identity", "window_kind", "reset_identity") if key in payload},
+                    payload={key: payload[key] for key in ("limit_id", "cycle_id", "provider", "account_local_identity", "plan_identity", "window_kind", "reset_identity", "cycle_start_us", "cycle_end_us", "completion_status") if key in payload},
                     capability_mask=observation.capability_mask,
                     measurement_mask=observation.measurement_mask,
                     basis=observation.basis,

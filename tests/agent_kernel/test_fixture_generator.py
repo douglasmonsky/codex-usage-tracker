@@ -28,9 +28,9 @@ from tests.agent_kernel.fixtures.generator.sources import (
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _COMMITTED_TINY = Path(__file__).with_name("fixtures") / "tiny-v1"
-_TINY_MANIFEST_SHA256 = "78003a7cfdee8beb1a263b3027fec162a612352be6fbefd13a65e821640bc7ae"
-_TINY_ORACLE_SHA256 = "9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b"
-_TINY_TREE_SHA256 = "e6caa8bc1ff642018f21f6638dd69c6c704bdecdda362adc41daff021618799a"
+_TINY_MANIFEST_SHA256 = "91e0658f913c917bd8ce69fac9a1d75e881f41630eccc0f30f68bd9b6a972a35"
+_TINY_ORACLE_SHA256 = "38787c3806be52a69ec03e7e8dcb0044b87dac4be826d620abf4cf34656da412"
+_TINY_TREE_SHA256 = "2321918c18652fc617882aef5f9c8584d3d6d73576037b516a2c9f9dcbc0f656"
 
 
 def _generated_files(root: Path) -> dict[str, bytes]:
