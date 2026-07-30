@@ -798,6 +798,8 @@ def _is_sha256(value: str | None) -> bool:
 
 
 def _validate_metadata_contract(connection: sqlite3.Connection) -> None:
+    from .evidence import count_evidence_rows
+
     metadata = dict(connection.execute("SELECT key, value FROM metadata"))
     if metadata.get("schema_id") != SCHEMA_ID:
         raise ValueError("candidate A schema identity mismatch")
@@ -823,6 +825,16 @@ def _validate_metadata_contract(connection: sqlite3.Connection) -> None:
         raise ValueError("candidate A projection-row metadata is invalid") from error
     if projection_rows < 0:
         raise ValueError("candidate A projection-row metadata is invalid")
+    try:
+        evidence_exact_count = int(metadata.get("evidence_exact_count", ""))
+    except ValueError as error:
+        raise ValueError("candidate A evidence-count metadata is invalid") from error
+    if (
+        evidence_exact_count < 0
+        or str(evidence_exact_count) != metadata.get("evidence_exact_count")
+        or evidence_exact_count != count_evidence_rows(connection)
+    ):
+        raise ValueError("candidate A evidence-count metadata is invalid")
     tail_state = connection.execute(
         """
         SELECT

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import sqlite3
 import sys
 from pathlib import Path
 from typing import Any
@@ -20,8 +21,11 @@ queries_module = importlib.import_module("candidate_a.queries")
 schema_module = importlib.import_module("candidate_a.schema")
 
 all_evidence_rows = evidence_module.all_evidence_rows
+count_evidence_rows = evidence_module.count_evidence_rows
+read_evidence_row_count = evidence_module.read_evidence_row_count
 apply_ordinary_change = maintenance_module.apply_ordinary_change
 database = schema_module.database
+validate_database = schema_module.validate_database
 run_bounded_sort = queries_module.run_bounded_sort
 run_evidence_feature = queries_module.run_evidence_feature
 
@@ -121,6 +125,75 @@ _FACT_SQL = {
         LIMIT 100
     """,
 }
+
+
+@pytest.mark.parametrize(
+    ("change", "expected_delta"),
+    [
+        ("no_source_change", 0),
+        ("one_model_call", 1),
+        ("32_call_tail", 32),
+        ("late_event", 1),
+        ("one_tool_start", 1),
+        ("tool_plus_state_change", 2),
+        ("tool_terminal_transition", 1),
+        ("rate_card_change", 0),
+    ],
+)
+def test_exact_evidence_count_is_persisted_and_tracks_ordinary_changes(
+    fixture: Any,
+    tmp_path: Path,
+    change: str,
+    expected_delta: int,
+) -> None:
+    artifact = candidate_a.build_artifact(fixture, tmp_path / f"{change}.sqlite")
+    with database(artifact.path, read_only=True) as connection:
+        before = count_evidence_rows(connection)
+        assert read_evidence_row_count(connection) == before
+        initial = run_evidence_feature(
+            connection,
+            publication_id=artifact.publication_id,
+            exact_count=True,
+        )
+        assert initial.payload["page"]["exact_count"] == before
+        assert initial.full_scan_count == 0
+        assert any("SEARCH metadata" in plan for plan in initial.query_plans)
+
+    apply_ordinary_change(artifact.path, change)
+
+    with database(artifact.path, read_only=True) as connection:
+        after = count_evidence_rows(connection)
+        assert after == before + expected_delta
+        assert read_evidence_row_count(connection) == after
+        updated = run_evidence_feature(
+            connection,
+            publication_id=artifact.publication_id,
+            exact_count=True,
+        )
+        assert updated.payload["page"]["exact_count"] == after
+        assert updated.full_scan_count == 0
+
+
+def test_exact_evidence_count_tampering_fails_validation(
+    fixture: Any,
+    tmp_path: Path,
+) -> None:
+    artifact = candidate_a.build_artifact(fixture, tmp_path / "tampered-count.sqlite")
+    with sqlite3.connect(artifact.path) as connection:
+        connection.execute(
+            """
+            UPDATE metadata
+            SET value = CAST(value AS INTEGER) + 1
+            WHERE key = 'evidence_exact_count'
+            """
+        )
+        connection.commit()
+
+    with (
+        database(artifact.path, read_only=True) as connection,
+        pytest.raises(ValueError, match="evidence-count metadata"),
+    ):
+        validate_database(connection, mode="prepublication")
 
 
 @pytest.fixture

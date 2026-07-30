@@ -53,6 +53,11 @@ The matrix digest includes the qualification host's physical-core input. Candida
 files use `codex-usage-tracker.physical-bakeoff-measurement.v2`. The collector owns wall and
 process clocks; the candidate supplies the remaining explicit resource, storage, ingestion,
 projection, plan, MCP, call, token, correctness, selector, and publication measurements.
+Candidate A materializes the exact 13-domain evidence-row count during publication and updates
+it by authenticated ordinary-change deltas in the same writer transaction. Exact-count queries
+read that validated fact instead of rescanning multi-million-row indexes; prepublication
+validation recomputes the count, and ordinary-change tests compare every maintained delta with
+the underlying domains.
 JSON Lines records are canonical and append-only. Candidate A ordinary-tail records separately
 report operation latency after preparation, WAL frames written during a clean checkpoint epoch,
 and explicit committed analytical transactions; each value carries its exact provenance basis.

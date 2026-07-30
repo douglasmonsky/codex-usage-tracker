@@ -15,7 +15,7 @@ from typing import Any
 
 import shared
 
-from .evidence import iter_evidence_page_anchors
+from .evidence import count_evidence_rows, iter_evidence_page_anchors
 from .schema import (
     PREPUBLICATION_VALIDATION,
     create_database,
@@ -1455,6 +1455,7 @@ def build_artifact(
                 ("fixture_oracle_digest", fixture.oracle_digest),
                 ("history_selection", history_selection),
                 ("projection_rows", str(projection_rows)),
+                ("evidence_exact_count", str(count_evidence_rows(connection))),
                 ("evidence_anchors_valid", "true"),
                 (
                     "prepublication_validation",

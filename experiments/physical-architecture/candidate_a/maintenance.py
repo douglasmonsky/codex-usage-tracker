@@ -8,6 +8,7 @@ from pathlib import Path
 
 import shared
 
+from .evidence import increment_evidence_row_count
 from .schema import MODEL_CALL_TAIL_MAX_ROWS, open_database
 
 
@@ -651,6 +652,7 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
     dirty_keys = 0
     projection_read = 0
     projection_written = 0
+    evidence_count_delta = 0
     try:
         _require_clean_wal_epoch(connection, "before ordinary operation")
         if change == "no_source_change":
@@ -690,6 +692,7 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
                 count=count,
                 late=change == "late_event",
             )
+            evidence_count_delta = inserted
             projection_read, projection_written = _increment_call_projections(
                 connection,
                 usage_delta,
@@ -703,6 +706,7 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
                 connection,
                 include_state_change=change == "tool_plus_state_change",
             )
+            evidence_count_delta = inserted
             projection_read, projection_written = _increment_tool_family_start(
                 connection,
                 tool_start_delta,
@@ -721,6 +725,7 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
             dirty_keys = projection_written
         elif change == "tool_terminal_transition":
             updated, tool_terminal_delta = _terminal_transition(connection)
+            evidence_count_delta = 1
             projection_read, projection_written = _increment_tool_family_terminal(
                 connection,
                 tool_terminal_delta,
@@ -744,6 +749,8 @@ def apply_ordinary_change(path: Path, change: str) -> MaintenanceStats:
             dirty_keys = 1
         else:
             raise ValueError(f"unknown candidate A ordinary change: {change}")
+        if evidence_count_delta:
+            increment_evidence_row_count(connection, evidence_count_delta)
         connection.commit()
         latency = time.perf_counter_ns() - started
         pages_written = _require_checkpointed_wal(connection, "after ordinary operation")

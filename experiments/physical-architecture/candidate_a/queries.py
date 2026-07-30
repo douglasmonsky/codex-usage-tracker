@@ -14,6 +14,7 @@ from .evidence import (
     EvidencePage,
     cursor_for_order_key,
     evidence_page,
+    read_evidence_row_count,
 )
 
 
@@ -624,26 +625,13 @@ def run_evidence_feature(
         plans += page.query_plans
     exact: int | None = None
     if exact_count:
-        count_sql = """
-            SELECT
-                (SELECT count(*) FROM selector_anchors) +
-                (SELECT count(*) FROM sessions) +
-                (SELECT count(*) FROM sessions WHERE terminal_at_us IS NOT NULL) +
-                (SELECT count(*) FROM turns) +
-                (SELECT count(*) FROM model_calls_visible) +
-                (SELECT count(*) FROM tool_invocations) +
-                (SELECT count(*) FROM tool_invocations WHERE terminal_at_us IS NOT NULL) +
-                (SELECT count(*) FROM activities) +
-                (SELECT count(*) FROM state_changes) +
-                (SELECT count(*) FROM compaction_boundaries) +
-                (SELECT count(*) FROM allowance_observations) +
-                (SELECT count(*) FROM allowance_compatibility) +
-                (SELECT count(*) FROM late_parent_edges)
-        """
         count_started = time.perf_counter_ns()
-        exact = int(connection.execute(count_sql).fetchone()[0])
+        exact = read_evidence_row_count(connection)
         latencies.append(time.perf_counter_ns() - count_started)
-        plans += _plan(connection, count_sql)
+        plans += _plan(
+            connection,
+            "SELECT value FROM metadata WHERE key = 'evidence_exact_count'",
+        )
     payload = _evidence_payload(
         page,
         exact_count=exact,

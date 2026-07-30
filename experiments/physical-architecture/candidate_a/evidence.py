@@ -14,6 +14,7 @@ import shared
 
 _CURSOR_SCHEMA = "candidate-a-keyset-v1"
 _CURSOR_DOMAIN = b"codex-usage-tracker-ck04-candidate-a"
+_EXACT_COUNT_METADATA_KEY = "evidence_exact_count"
 MAXIMUM_ANCHORED_PAGE_POSITION = 10_000
 OrderKey = tuple[int, int, int, int, str, int]
 
@@ -37,6 +38,59 @@ class EvidencePage:
 class _Stream:
     sql: str
     parameters: tuple[object, ...]
+
+
+def count_evidence_rows(connection: sqlite3.Connection) -> int:
+    """Count every row admitted by the exact 13-domain evidence contract."""
+    return int(
+        connection.execute(
+            """
+            SELECT
+                (SELECT count(*) FROM selector_anchors) +
+                (SELECT count(*) FROM sessions) +
+                (SELECT count(*) FROM sessions WHERE terminal_at_us IS NOT NULL) +
+                (SELECT count(*) FROM turns) +
+                (SELECT count(*) FROM model_calls_visible) +
+                (SELECT count(*) FROM tool_invocations) +
+                (SELECT count(*) FROM tool_invocations WHERE terminal_at_us IS NOT NULL) +
+                (SELECT count(*) FROM activities) +
+                (SELECT count(*) FROM state_changes) +
+                (SELECT count(*) FROM compaction_boundaries) +
+                (SELECT count(*) FROM allowance_observations) +
+                (SELECT count(*) FROM allowance_compatibility) +
+                (SELECT count(*) FROM late_parent_edges)
+            """
+        ).fetchone()[0]
+    )
+
+
+def read_evidence_row_count(connection: sqlite3.Connection) -> int:
+    row = connection.execute(
+        "SELECT value FROM metadata WHERE key = ?",
+        (_EXACT_COUNT_METADATA_KEY,),
+    ).fetchone()
+    if row is None:
+        raise EvidenceContractError("candidate A exact evidence count is unavailable")
+    try:
+        count = int(row[0])
+    except (TypeError, ValueError) as error:
+        raise EvidenceContractError("candidate A exact evidence count is invalid") from error
+    if count < 0 or str(count) != str(row[0]):
+        raise EvidenceContractError("candidate A exact evidence count is invalid")
+    return count
+
+
+def increment_evidence_row_count(connection: sqlite3.Connection, delta: int) -> int:
+    if delta < 0:
+        raise ValueError("candidate A exact evidence count delta must be nonnegative")
+    count = read_evidence_row_count(connection) + delta
+    updated = connection.execute(
+        "UPDATE metadata SET value = ? WHERE key = ?",
+        (str(count), _EXACT_COUNT_METADATA_KEY),
+    ).rowcount
+    if updated != 1:
+        raise EvidenceContractError("candidate A exact evidence count update failed")
+    return count
 
 
 def _cursor_payload(publication_id: str, order_key: OrderKey) -> bytes:
@@ -681,9 +735,7 @@ def iter_evidence_page_anchors(
     if page_size < 1 or page_stride < 1 or maximum_page_position < 1:
         raise EvidenceContractError("candidate A anchor dimensions must be positive")
     rows_per_anchor = page_size * page_stride
-    maximum_rows = (
-        (maximum_page_position - 1) * page_size // rows_per_anchor
-    ) * rows_per_anchor
+    maximum_rows = ((maximum_page_position - 1) * page_size // rows_per_anchor) * rows_per_anchor
     if maximum_rows == 0:
         return
     streams = _streams(
@@ -726,9 +778,7 @@ def evidence_page(
     has_more = len(selected) > page_size
     visible = selected[:page_size]
     next_cursor = (
-        _encode_cursor(publication_id, _row_order(visible[-1]))
-        if has_more and visible
-        else None
+        _encode_cursor(publication_id, _row_order(visible[-1])) if has_more and visible else None
     )
     return EvidencePage(
         publication_id=publication_id,
