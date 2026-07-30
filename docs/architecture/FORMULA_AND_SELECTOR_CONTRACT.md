@@ -106,11 +106,13 @@ interval row or interval selector.
 
 ### Rate card
 
-`valuation` owns immutable validated `rate_card_revisions` and the selected
-`active_rate_card`. A logical rate-card selector resolves by its normalized
-digest. Its `configured_artifact` provenance includes source name, fetch time,
-validation status, and digest. Missing or invalid active cards leave estimates
-`NULL`; they never fall back to another selector kind.
+`valuation` owns immutable validated `rate_card_revisions` and the
+publication-selected frontier whose head is `active_rate_card`. A logical
+rate-card selector for a valuation row resolves by the normalized digest of
+the revision selected for that call. Its `configured_artifact` provenance
+includes source name, fetch time, effective time, validation status, and
+digest. Missing, invalid, future-only, or ambiguous frontier matches leave
+estimates `NULL`; they never fall back to another selector kind.
 
 ### Window
 

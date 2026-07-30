@@ -1,7 +1,7 @@
 # CK-07C — Freeze plan operands and missing canonical facts
 
-**Status:** Completed on merge; CK-07A is ready to resume but remains
-unrequalified
+**Status:** Completed on merge; CK-07D is admitted and CK-07A remains blocked
+and unrequalified
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -163,12 +163,13 @@ durable evidence in the same pull request.
 
 **Suggested commit:** `feat(agent-kernel): freeze CK-07C operand contracts`
 
-## CK-07A resume contract
+## Downstream resume contract
 
-CK-07A consumes only the exact merged artifact/schema and pure symbols named
-above, the unchanged CK-07B formula/selector authorities, and the typed
-database-v1 relations accepted by this packet. Its independent reference lane
-normalizes scenario declarations to `CanonicalFact` rows. Its independent
-database lane selects permitted database-v1 rows in one read snapshot and
-normalizes them separately. Both call `evaluate_plan`; neither shares selected
-rows, operands, answers, or owner-resolution results.
+CK-07D first consumes the valuation symbols and typed database-v1 relations
+accepted by this packet and replaces the time-blind singular-card selection
+with the admitted effective-dated contract. CK-07A then consumes the exact
+merged CK-07B/CK-07C/CK-07D artifacts and pure symbols. Its independent
+reference lane normalizes scenario declarations to `CanonicalFact` rows. Its
+independent database lane selects permitted database-v1 rows in one read
+snapshot and normalizes them separately. Both call `evaluate_plan`; neither
+shares selected rows, operands, answers, or owner-resolution results.

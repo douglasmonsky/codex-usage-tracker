@@ -123,9 +123,16 @@ a different, versioned operation.
 derived from:
 
 - canonical call token measurements and model-profile ownership;
-- the captured publication's rate-card digest;
-- the matching immutable, validated rate-card revision; and
-- active rate-card selection for that same publication.
+- the call's `event_at_us`;
+- the captured publication's immutable validated rate-card frontier; and
+- the matching revision with the greatest
+  `effective_at_us <= call.event_at_us`.
+
+The frontier head is the publication rate-card digest. Each valuation row
+carries the digest of the revision actually selected for that call. A later
+revision matching only some models leaves older matching revisions eligible
+for other models. Equal-effective equal-precedence matches are ambiguous and
+fail closed; fetch time and insertion order never choose a revision.
 
 `codex_usage_tracker.agent_kernel.domain.valuation` supplies the pure typed
 relation compiler. It performs exact Decimal arithmetic over the four token
@@ -133,10 +140,11 @@ classes, preserves the `reasoning_in_output` rule, and returns match basis,
 cost/credit estimates, rated and missing token fields, coverage numerators and
 denominators, explicit unpriced reasons, and configured-estimate grades.
 
-Missing, invalid, unmatched, or partial rate cards create typed unpriced rows
-with `NULL` estimates. They never create zero cost and never fall back to a
-different card. Calls are immutable; this relation is not a projection or an
-expected-answer cache.
+Missing or malformed call time, missing effective time, invalid frontier,
+unmatched or partial rate cards, future-only matches, and ambiguous matches
+create typed unpriced rows with `NULL` estimates. They never create zero cost
+or fall back to fetch time. Calls are immutable; this relation is not a
+projection or an expected-answer cache.
 
 ## Context components
 
@@ -255,9 +263,11 @@ CK-07A compares normalized request digest; every answer value including
 ordered role-kind-selector-provenance sequence. This packet makes that replay
 executable but does not claim that any of the 80 variants has passed.
 
-## Exact CK-07A resume surface
+## Exact downstream resume surface
 
-CK-07A must validate `config/agent-kernel/plan-operand-contract-v1.json`
+CK-07D first corrects the valuation seam below. CK-07A remains blocked until
+CK-07D is merged, exact-main verified, and its affected seams are requalified.
+CK-07A must then validate `config/agent-kernel/plan-operand-contract-v1.json`
 against `config/agent-kernel/plan-operand-contract-v1.schema.json`. Its shared
 pure symbols are:
 
@@ -265,9 +275,13 @@ pure symbols are:
   `PlanGroup`, `PlanMaterialization`, `PlanEvaluation`, and
   `PlanOperandContractError`;
 - `compile_plan_operands` and `evaluate_plan`;
-- `CurrentRateCard`, `CurrentValuationMatch`, and
+- CK-07D's publication-frontier rate-card input,
+  `CurrentValuationMatch`, and effective-dated
   `compile_current_valuation_matches`;
 - CK-07B's `evaluate_formula`.
+
+CK-07C's singular `CurrentRateCard` input is retained only as the exact
+producer seam that CK-07D must replace; it is not CK-07A resume authority.
 
 The CK-07C source paths that create or amend executable behavior are:
 

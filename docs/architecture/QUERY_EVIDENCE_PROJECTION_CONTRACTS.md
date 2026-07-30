@@ -366,9 +366,11 @@ canonical facts/occurrences and publication deltas; there is no complete
 projection copy per generation. An old publication selected through rollback
 uses its own complete artifact.
 
-A rate-card-dependent projection carries the selected digest. Rate changes
-update valuation rows/keys only. Exact token rollups never inherit a rate-card
-version.
+A rate-card-dependent projection carries the publication frontier head and the
+selected revision digest for each valuation row. Rate changes update only
+matching valuation rows/keys at or after their explicit effective boundary;
+deliberately backdated revisions may update the corresponding older interval.
+Exact token rollups never inherit a rate-card version.
 
 ### Initial candidate projections
 

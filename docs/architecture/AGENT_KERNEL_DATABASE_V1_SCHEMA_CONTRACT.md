@@ -1947,16 +1947,19 @@ must tolerate an empty admitted registry. `evidence_page_anchor_current` is
 also deferred to CK-08 and may be admitted only if a measured deep-page
 consumer justifies it.
 
-Current valuation is computed from immutable calls plus `active_rate_card`.
+Current valuation is computed from immutable calls plus the validated
+rate-card lineage whose head is selected by `active_rate_card`. CK-07D may add
+only the minimal predecessor/series linkage needed to reproduce that
+publication-captured frontier; it does not add a call-to-rate assignment.
 There is no `valuation_matches_current` table in database-v1. CK-08 may keep
-that join query-time; CK-09 may materialize it only through the same measured
-projection-admission rule. Optional context-component storage is outside the
-MVP contract rather than an unspecified database choice. Point events are
-represented by the indexed typed streams and `lifecycle_transitions`; no global
-event-backbone table is admitted. Query windows are request values and are not
-persisted. The projection, deep-page anchor, and current-valuation
-materialization decisions named here are the only deferred physical choices in
-this contract.
+that effective-dated join query-time; CK-09 may materialize it only through the
+same measured projection-admission rule. Optional context-component storage is
+outside the MVP contract rather than an unspecified database choice. Point
+events are represented by the indexed typed streams and
+`lifecycle_transitions`; no global event-backbone table is admitted. Query
+windows are request values and are not persisted. The projection, deep-page
+anchor, and current-valuation materialization decisions named here are the only
+deferred physical choices in this contract.
 
 `model_call_tail`, `model_call_tail_state`, and `model_calls_visible` are CK-07
 storage, not projections. The tail is append-only and capped at 32,000 rows.

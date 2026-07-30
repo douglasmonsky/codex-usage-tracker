@@ -277,8 +277,13 @@ Shared defaults below apply unless a question states otherwise:
   visible; aggregate valuation is the sum of priced canonical calls.
 - **Coverage/evidence:** E0/E1 with rate digest, rated/unrated tokens/calls.
 - **Must not:** label estimate as billed cost or reconstruct historical prices.
-- **Oracle emphasis:** mixed prices, rate replacement, missing required token,
-  ties, zero priced coverage.
+- **Oracle emphasis:** mixed prices, before/exact/after effective boundaries,
+  late-ingested historical calls, model-subset replacement, missing required
+  token, ties, zero priced coverage.
+
+Here, “reconstruct historical prices” means the price known at ingestion or
+the amount charged. Applying the publication's current configured schedule by
+explicit effective time remains an estimate and does not make either claim.
 
 #### Q-ACC-07: Pricing and credit gaps
 

@@ -578,6 +578,13 @@ CK07C_PLAN_OPERAND_FACT_ADDITIONS = frozenset(
     }
 )
 
+CK07D_EFFECTIVE_DATED_VALUATION_ADMISSION_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck07d/effective-dated-valuation-gap.json",
+        "docs/roadmap/tasks/ck-07d-implement-effective-dated-rate-card-valuation.md",
+    }
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -628,6 +635,7 @@ INTEGRATION_ADDITIONS = (
     | CK07_PUBLICATION_RECOVERY_ADDITIONS
     | CK07B_FORMULA_PROVENANCE_ADDITIONS
     | CK07C_PLAN_OPERAND_FACT_ADDITIONS
+    | CK07D_EFFECTIVE_DATED_VALUATION_ADMISSION_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )

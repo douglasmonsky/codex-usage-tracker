@@ -33,7 +33,7 @@ Projects:
 | --- | --- |
 | M0 Authority Ready | CK-00 merged; one authority set and roadmap. |
 | M1 Architecture Selected | CK-01–CK-04 complete; physical decision recorded. |
-| M2 Kernel Alpha | CK-05–CK-09 plus corrective CK-07B and CK-07A complete; exact published facts independently reconcile to named-plan truth. |
+| M2 Kernel Alpha | CK-05–CK-09 plus corrective CK-07B–CK-07D and CK-07A complete; effective-dated valuation and exact published facts independently reconcile to named-plan truth. |
 | M3 Codex MVP Qualified | CK-10–CK-12 complete; installed fresh tasks pass. |
 | M4 Clean Cutover | CK-13–CK-14 complete; spike/Console absent. |
 | M5 Public Release | CK-16 complete; CK-15 included only if independently admitted. |
@@ -77,7 +77,8 @@ complete contract and `TASK_PACKETS.md` as the completion ledger.
 | CK-07 | Implement lock-bounded publication and crash recovery | P2 | M2 | CK-06 | workstream:publication, type:performance, type:quality, cutover:blocker | No-change/ordinary-tail/large-artifact paths pass; reads available; crash matrix and duplicate-operation reuse pass. |
 | CK-07B | Freeze formula and selector-provenance authority | P2 | M2 | CK-07; CK-07A blocker evidence | workstream:contracts, type:quality, cutover:blocker | All 45 formulas and 185 fields are executable; all 14 selector kinds resolve through authoritative owners with exact provenance and lifecycle gates. |
 | CK-07C | Freeze plan operands and missing canonical facts | P2 | M2 | CK-07B; retained CK-07A blocker evidence | workstream:contracts, workstream:storage, type:quality, cutover:blocker | All 61 formula uses and 185 answer fields have executable plan bindings; valuation, context, allowance, hierarchy, order, and publication inputs are materially representable without expected-answer data. |
-| CK-07A | Reconcile fact-backed oracles and qualify packet seams | P2 | M2 | CK-07C; CK-08 blocker evidence | workstream:contracts, workstream:fixtures, workstream:qualification, type:quality, cutover:blocker | All question cases derive independent truth from canonical scenarios; Foundation/Cutover cases replay through CK-06/CK-07/database-v1; CK-03–CK-07 evidence is requalified. |
+| CK-07D | Implement effective-dated rate-card valuation | P2 | M2 | CK-07C; retained CK-07A/CK-08 blocker evidence | workstream:contracts, workstream:storage, workstream:publication, type:quality, cutover:blocker | Each call selects the greatest matching publication-captured revision effective at its event time; invalid or ambiguous lineages fail closed; CK-05/CK-07/CK-07C seams are requalified. |
+| CK-07A | Reconcile fact-backed oracles and qualify packet seams | P2 | M2 | CK-07D; CK-08 blocker evidence | workstream:contracts, workstream:fixtures, workstream:qualification, type:quality, cutover:blocker | All question cases derive independent truth from canonical scenarios; Foundation/Cutover cases replay through CK-06/CK-07/database-v1; CK-03–CK-07 evidence is requalified. |
 | CK-08 | Implement fact-backed query and stable evidence | P3 | M2 | CK-07A | workstream:query, type:quality | Exact registry plans/evidence/cursors/labels/grades work from one snapshot; projection admission report measured. |
 | CK-09 | Add measured current projections and named plans | P3 | M2 | CK-08 | workstream:query, workstream:publication, type:performance, parallel:eligible, cutover:blocker | Foundation/Cutover plans pass oracles/SQL/MCP/bytes; every projection has consumer, dirty keys, storage/fanout budget. |
 | CK-10 | Deliver agent-led setup, MCP, CLI, and skill | P3 | M3 | CK-09 | workstream:agent-experience, cutover:blocker | Recommended recent start, host wait/no polling, query-first warm path, closed bounded tools, version coherence. |
@@ -133,9 +134,10 @@ Use this body when creating each issue:
    it from that PR.
 3. Create CK-01 through CK-04. Keep CK-05 blocked until the decision artifact
    is accepted.
-4. Create CK-05 through CK-07 after M1. Close CK-07B, resume CK-07A before
-   CK-08, and make CK-08 depend on merged seam evidence; then create CK-08 and CK-09. Use
-   dependency links, not status text, to enforce the critical path.
+4. Create CK-05 through CK-07 after M1. Close CK-07B and CK-07C, implement
+   CK-07D, then resume CK-07A before CK-08. Make CK-08 depend on merged seam
+   evidence; then create CK-08 and CK-09. Use dependency links, not status
+   text, to enforce the critical path.
 5. Create CK-10 through CK-12 after named-plan contracts stabilize.
 6. Do not put CK-13 in progress while any `cutover:blocker` is open.
 7. Create CK-14 only after the maintainer approves CK-13's deletion checkpoint.
@@ -148,7 +150,8 @@ Use this body when creating each issue:
 | CK-03 | Fixture generator; accounting/lifecycle/evidence oracle case sets | Shared manifest/oracle schemas frozen |
 | CK-04 | Candidate A; Candidate C; Candidate D | Shared harness complete, then decision integration |
 | CK-06/CK-07 | Adapter parser cases; crash/failure harness | CK-05 ports fixed; publication integrates |
-| CK-07A after CK-07B | Canonical scenario/reference evaluator; CK-04 proof replacement; CK-05–CK-07 replay | Shared formula, scenario, expected-row, selector, and evidence schemas frozen |
+| CK-07D after CK-07C | Boundary evaluator; revision-frontier/compiler; database/publication integration | Effective-time, lineage, publication, and requalification contracts frozen |
+| CK-07A after CK-07D | Canonical scenario/reference evaluator; CK-04 proof replacement; CK-05–CK-07 replay | Shared formula, scenario, expected-row, selector, and evidence schemas frozen |
 | CK-08/CK-11 | Query/evidence implementation; installed harness skeleton | Public schemas remain CK-10-owned |
 | CK-09 | Session/family; time/model; tool/resource; allowance projection families | Dirty-key/projection registry frozen |
 | CK-12 | Repeated performance; crash matrix; fresh CLI; fresh Desktop | Exact artifact and fixture digests frozen |
