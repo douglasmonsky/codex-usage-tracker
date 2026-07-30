@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
+from typing import cast
 
 from .canonical import canonical_sha256
 from .crash import CRASH_BOUNDARIES, CRASH_FAULTS
@@ -355,9 +356,9 @@ def _query_cases() -> Iterable[WorkloadCase]:
     )
     for feature, parameters in feature_parameters:
         performance_class = str(parameters["performance_class"])
-        maximum_full_scans = int(parameters["maximum_full_scans"])
-        maximum_automatic_indexes = int(parameters["maximum_automatic_indexes"])
-        maximum_temporary_sorts = int(parameters["maximum_temporary_sorts"])
+        maximum_full_scans = cast(int, parameters["maximum_full_scans"])
+        maximum_automatic_indexes = cast(int, parameters["maximum_automatic_indexes"])
+        maximum_temporary_sorts = cast(int, parameters["maximum_temporary_sorts"])
         yield WorkloadCase(
             f"query.feature.{feature}",
             WorkloadGroup.QUERY,

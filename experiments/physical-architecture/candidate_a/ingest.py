@@ -563,10 +563,10 @@ def _iter_parsed_sources(
     ) as executor:
         pending: deque[Future[_ParsedSource]] = deque()
         for _ in range(queue_capacity):
-            source = next(source_iterator, None)
-            if source is None:
+            queued_source = next(source_iterator, None)
+            if queued_source is None:
                 break
-            pending.append(_submit_parse_task(executor, source, ranks, stats))
+            pending.append(_submit_parse_task(executor, queued_source, ranks, stats))
         stats.parser_peak_pending = len(pending)
         while pending:
             future = pending.popleft()
