@@ -121,7 +121,7 @@
     "measurement_error": "codex-usage-tracker rejected the unavailable strict command"
   },
   "pull_request": {
-    "url": null,
+    "url": "https://github.com/douglasmonsky/codex-usage-tracker/pull/384",
     "merge_sha": null,
     "exact_main_verification": "pending"
   },

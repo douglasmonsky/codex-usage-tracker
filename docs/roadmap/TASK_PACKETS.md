@@ -77,8 +77,8 @@ corrective packet's executable producer-to-consumer seam checks.
   blocker evidence
   · [packet](tasks/ck-07b-freeze-formula-and-provenance-contract.md)
 - [x] **CK-07C — Freeze plan operands and missing canonical facts** ·
-  **Completed on merge; exact-main verification is recorded in the completion
-  handoff** · corrective dependency discovered by CK-07A after CK-07B;
+  **Completed on merge via PR #384; exact-main verification is recorded in
+  the completion handoff** · corrective dependency discovered by CK-07A after CK-07B;
   depends on CK-07B and retained CK-07A blocker evidence
   · [packet](tasks/ck-07c-freeze-plan-operands-and-missing-facts.md)
 - [ ] **CK-07A — Reconcile fact-backed oracles and qualify packet seams** ·
