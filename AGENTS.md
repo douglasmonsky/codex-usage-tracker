@@ -20,6 +20,19 @@ its prerequisites are checked complete. Update the packet status, master
 checkbox ledger, measurements, deviations, and residual risks in the same
 change that completes a packet.
 
+## Packet task handoff
+
+Keep each CK packet in its own Codex task. After a packet is fully accepted,
+merged, and verified on `main`, the completing task must create a new Codex
+task in the same project folder for the next admitted packet. Give the new task
+a clean, decision-complete handoff that names the canonical repository and
+`main` commit, packet authority and acceptance criteria, completed evidence,
+remaining approval gates, relevant commands, and any known risks or
+pre-existing failures. Verify that the new task started in the intended project
+folder with the handoff before ending the completing task. The completing task
+must not begin implementation of the next packet; ownership transfers at the
+packet boundary.
+
 ## Implementation boundary
 
 - Build the replacement under `src/codex_usage_tracker/agent_kernel/`.
