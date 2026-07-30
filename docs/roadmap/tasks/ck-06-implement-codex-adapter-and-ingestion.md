@@ -1,6 +1,6 @@
 # CK-06 — Implement Codex adapter and bounded ingestion
 
-**Status:** Not started
+**Status:** Completed
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -40,6 +40,26 @@ workers.
 **Acceptance:** CK-03 adapter/accounting/source oracles pass; 30/90/year/all-time
 selected bytes and coverage exact; parsing scales without nondeterminism; no
 raw bodies enter proposed records.
+
+**Evidence:** [codex-adapter-ingestion-evidence.json](../../decisions/evidence/ck06/codex-adapter-ingestion-evidence.json)
+
+**Implementation record:** The `codex-jsonl` adapter declares capability mask
+`127` across allowance observations, model usage, session hierarchy, source
+occurrences, state changes, tool lifecycle, and valuation. Structural source
+records are normalized to integer UTC microseconds, and the synthetic fixture's
+zero-based allowance ordinal is explicitly normalized to the positive storage
+ordinal with basis `upstream_zero_based_plus_one`. The adapter emits no prompt,
+response, reasoning, command, patch, or tool-output body. Publication,
+promotion, refresh, recovery, projections, MCP, and release work remain CK-07
+or later responsibilities.
+
+**Validation record:** Focused adapter tests pass for complete/partial,
+malformed, replacement, truncation, moving-tail, duplicate, parent, token,
+resource, state-change, allowance, and 1/2/4/8-worker cases. The full
+synthetic stream reproduces 100 canonical model calls and 102 occurrences;
+the four token classes remain separate and cached totals remain NULL when five
+calls lack cached input. Review accounting and final CI/main verification are
+recorded in the evidence file after closeout.
 
 **Failure/rollback:** Reject affected range/source and preserve prior cursor.
 Delete unpublished new artifacts only.
