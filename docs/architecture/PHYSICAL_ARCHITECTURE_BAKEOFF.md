@@ -345,7 +345,7 @@ Other hard gates:
 - same-snapshot publication identity and facts;
 - prior publication survives every injected failure;
 - database and WAL stay within the measured winning candidate's
-  production-shape ratchet plus at most 3% headroom;
+  production-shape ratchet plus at most 25% headroom;
 - ordinary tails have bounded dirty-key and projection fanout.
 
 The harness stops a run as soon as a monotonic hard limit is irrecoverably

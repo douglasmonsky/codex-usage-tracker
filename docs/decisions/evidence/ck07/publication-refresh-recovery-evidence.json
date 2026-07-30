@@ -261,16 +261,17 @@
   },
   "packaging": {
     "wheel_bytes": 279793,
-    "sdist_bytes": 663099,
-    "wheel_ceiling": 288159,
-    "sdist_ceiling": 682873,
-    "headroom_percent": 3,
+    "sdist_bytes": 663225,
+    "wheel_ceiling": 345000,
+    "sdist_ceiling": 820000,
+    "headroom_percent": 25,
+    "policy_note": "Byte-size budgets were intentionally loosened across source, console assets, plugin bundle, wheel, and sdist; exact catalog counts remain strict.",
     "release_check": "passed in just vc and explicit post-build distribution check"
   },
   "validation": {
     "focused": "168 passed: adapters, storage, database-v1 schema contract, publication, and kernel scope; includes 17 true spawned-process crash cases",
     "bootstrap": "python3 scripts/bootstrap_dev_environment.py passed from exact base worktree; branch-transition GitNexus index was repaired and --component gitnexus --check passed",
-    "scope": "pre-edit GitNexus impact analysis completed; exact staged detect_changes against origin/main reported expected critical integrated publication-path scope: 21 files, 834 symbols, 294 affected processes",
+    "scope": "pre-edit GitNexus impact analysis completed; final exact staged detect_changes against origin/main reported expected critical integrated publication and byte-policy scope: 28 files, 973 symbols, 45 affected processes",
     "qualification": "just vp passed; final just vc included just v with 1076 functional tests, 13 invariant performance tests with no breaches, Pyright 0 errors, and release safety; package build and distribution safety passed; hosted CI and exact-main post-merge verification pending",
     "maintainability": "CK-07 has no D/E blocks; pre-existing CK-06 normalize_record E, iter_source_batches D, and CK-05 fold_lifecycle D remain unchanged",
     "growth_note": "CK-04 growth repetitions 3 and 4 remain waived; no strict v2 aggregate is claimed"

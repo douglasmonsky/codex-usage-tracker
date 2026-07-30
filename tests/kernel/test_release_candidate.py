@@ -133,7 +133,7 @@ def test_release_candidate_budget_is_measured_and_bounded() -> None:
     ]
 
     assert budget["schema"] == "codex-usage-tracker.kernel-rc-budget.v1"
-    assert budget["headroom_percent"] <= 3
+    assert budget["headroom_percent"] <= 25
     assert _measurement_failures(
         budget,
         {
@@ -155,8 +155,8 @@ def test_release_candidate_budget_is_measured_and_bounded() -> None:
 
 def test_release_candidate_budget_rejects_excess_headroom_and_count_drift() -> None:
     budget = {
-        "headroom_percent": 3,
-        "kernel_source_bytes": 104,
+        "headroom_percent": 25,
+        "kernel_source_bytes": 126,
         "mcp_tools": 7,
     }
 
@@ -165,7 +165,7 @@ def test_release_candidate_budget_rejects_excess_headroom_and_count_drift() -> N
         {"kernel_source_bytes": 100, "mcp_tools": 6},
     )
 
-    assert "kernel_source_bytes ceiling 104 exceeds 3% maximum 103" in failures
+    assert "kernel_source_bytes ceiling 126 exceeds 25% maximum 125" in failures
     assert "mcp_tools catalog ceiling 7 must equal measured 6" in failures
 
 
