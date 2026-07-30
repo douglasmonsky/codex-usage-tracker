@@ -63,6 +63,23 @@ operands, output extraction, and internal-only formula consumption. These
 contract vectors prove executability only; they do not substitute for
 CK-07A's 80-case canonical-fact lineage and database consumer replay.
 
+CK-07D adds the remaining L0 valuation prerequisite. Synthetic calls before,
+at, and after an explicit pricing boundary must select the greatest matching
+publication-captured revision effective at each call's `event_at_us`.
+Late-ingested historical calls, model-subset changes, future revisions, missing
+times, invalid lineages, and ambiguous equal-effective matches must replay
+identically through the pure reference boundary and database-v1 publication
+path. Typed unpriced valuation rows must remain unpriced in coverage. CK-05,
+CK-07, and CK-07C valuation seams require linked requalification before CK-07A
+may resume.
+
+CK-07D's local implementation results, artifact identities, twelve acceptance
+proofs, validation measurements, review state, and residual merge gates are
+recorded in
+`docs/decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json`.
+That local evidence does not unblock CK-07A or CK-08 before merge and
+exact-main verification.
+
 ## Synthetic fixture strategy
 
 Fixtures contain no real local usage records or raw content. A deterministic

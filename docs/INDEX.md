@@ -25,8 +25,19 @@ supplies that narrow decision contract through PR #383. Retained CK-07A
 analysis then proved the plan-to-operand mapping and several canonical fact
 representations were still not executable.
 [CK-07C](roadmap/tasks/ck-07c-freeze-plan-operands-and-missing-facts.md)
-is in progress to supply those bindings and facts. CK-07A remains blocked and
-is not requalified or complete.
+supplied those bindings and facts through PR #384, merged as `dbf98ff4`.
+Review of its valuation seam then found that the pure compiler applies one
+selected revision to every call without using call event time. Corrective
+packet
+[CK-07D](roadmap/tasks/ck-07d-implement-effective-dated-rate-card-valuation.md)
+is implemented locally with the exact
+[gap evidence](decisions/evidence/ck07d/effective-dated-valuation-gap.json).
+Its
+[implementation evidence](decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json)
+records the effective-time compiler, immutable publication frontier, schema and
+plan-contract identities, focused requalification, validation, review, and
+remaining merge gates. CK-07A remains blocked and is not requalified or
+complete until CK-07D is merged and exact-main verified.
 It must still repair CK-03 oracle lineage,
 replace CK-04's candidate-only answer proof, and requalify the unchanged
 CK-05–CK-07 consumer seams before CK-08 may resume. CK-08 remains blocked and

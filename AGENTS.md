@@ -17,9 +17,11 @@ evidence, not authority.
 
 CK-07C additionally owns
 `docs/architecture/PLAN_OPERAND_AND_FACT_CONTRACT.md` and the versioned
-`config/agent-kernel/plan-operand-contract-v1.json`. CK-07A remains blocked
-until that packet is merged and exact-main verified; CK-07C does not qualify
-CK-07A's 80 structural-v2 variants.
+`config/agent-kernel/plan-operand-contract-v1.json`. CK-07D is the admitted
+corrective packet for effective-dated rate-card valuation. CK-07A remains
+blocked until CK-07D is implemented, merged, exact-main verified, and its
+affected CK-05/CK-07/CK-07C seams are requalified; neither corrective packet
+qualifies CK-07A's 80 structural-v2 variants.
 
 Advance CK packets in dependency order. Do not begin a dependent packet before
 its prerequisites are checked complete. Update the packet status, master

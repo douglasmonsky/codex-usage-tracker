@@ -33,6 +33,7 @@ _PACKET_IDS = {
     "CK-07A",
     "CK-07B",
     "CK-07C",
+    "CK-07D",
 }
 
 
@@ -68,12 +69,12 @@ def test_master_ledger_links_exactly_one_file_per_packet() -> None:
     ledger_path = _DOCS / "roadmap" / "TASK_PACKETS.md"
     ledger = ledger_path.read_text(encoding="utf-8")
     packet_ids = re.findall(
-        r"^- \[[ xX]\] \*\*(CK-\d{2}[ABC]?)\b",
+        r"^- \[[ xX]\] \*\*(CK-\d{2}[ABCD]?)\b",
         ledger,
         re.MULTILINE,
     )
     packet_links = re.findall(
-        r"\[packet\]\((tasks/ck-\d{2}[abc]?-.*\.md)\)",
+        r"\[packet\]\((tasks/ck-\d{2}[abcd]?-.*\.md)\)",
         ledger,
     )
 
@@ -128,18 +129,26 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
         "docs/roadmap/tasks/"
         "ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md"
     )
+    ck07d = _read(
+        "docs/roadmap/tasks/"
+        "ck-07d-implement-effective-dated-rate-card-valuation.md"
+    )
     ck08 = _read("docs/roadmap/tasks/ck-08-implement-query-and-evidence.md")
 
     assert "## Cross-packet semantic continuity" in agents
     assert "producer artifact and exact identity" in agents
     assert "independent truth source or reference evaluator" in agents
     assert "CK-07A" in index
-    assert "CK-07 -> CK-07B -> CK-07C -> CK-07A -> CK-08" in roadmap
-    assert "CK-07 → CK-07B\n→ CK-07C → CK-07A → CK-08" in ledger
+    assert "CK-07 -> CK-07B -> CK-07C -> CK-07D -> CK-07A -> CK-08" in roadmap
+    assert "CK-07 → CK-07B\n→ CK-07C → CK-07D → CK-07A → CK-08" in ledger
+    assert "| CK-07D |" in backlog
     assert "| CK-07A |" in backlog
     assert "### Evidence claim classes" in qualification
     assert "### Fact-backed plan admission" in query_contract
-    assert "**Dependencies:** CK-07, CK-07B, and CK-07C merged and verified" in ck07a
+    assert "**Dependencies:** CK-07, CK-07B, CK-07C, and CK-07D merged" in ck07a
+    assert "greatest eligible" in ck07d
+    assert "fetched_at_us" in ck07d
+    assert "late-ingested" in ck07d
     assert "## Frozen seam contracts" in ck07a
     assert "## Frozen correction formats" in ck07a
     assert "agent-kernel-structural-v2" in ck07a

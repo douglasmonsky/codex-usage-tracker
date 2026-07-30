@@ -305,8 +305,17 @@ def derive_pricing_coverage_v1(
     use = _uses(plan)["valuation_coverage_v1"]
     out = []
     for profile, rows in grouped.items():
-        priced = [row for row in rows if _need(row, "call_id") in valuations]
-        unpriced = [row for row in rows if _need(row, "call_id") not in valuations]
+        priced = [
+            row
+            for row in rows
+            if (
+                (valuation := valuations.get(_need(row, "call_id"))) is not None
+                and valuation.values.get("cost_grade") == "configured_estimate"
+                and valuation.values.get("configured_cost_usd") is not None
+            )
+        ]
+        priced_ids = {_need(row, "call_id") for row in priced}
+        unpriced = [row for row in rows if _need(row, "call_id") not in priced_ids]
         out.append(
             _group(
                 {"model_profile_id": profile},

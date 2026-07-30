@@ -5,7 +5,9 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from codex_usage_tracker.agent_kernel.domain.valuation import (
-    CurrentRateCard,
+    RateCardFrontier,
+    RateCardRevision,
+    ValuationUnpricedReason,
     compile_current_valuation_matches,
 )
 
@@ -16,6 +18,12 @@ def _card(**updates: object) -> dict[str, object]:
     card: dict[str, object] = {
         "rate_card_id": "rate-card:synthetic",
         "digest": _DIGEST,
+        "predecessor_digest": None,
+        "effective_at_us": 0,
+        "fetched_at_us": 999,
+        "source_name": "synthetic",
+        "source_url": None,
+        "currency": "USD",
         "model_match_rules": [
             {
                 "model_profile_id": "profile:exact",
@@ -39,10 +47,18 @@ def _card(**updates: object) -> dict[str, object]:
             "output_tokens": "4",
         },
         "reasoning_in_output": False,
+        "confidence": "synthetic",
         "validation_status": "valid",
     }
     card.update(updates)
     return card
+
+
+def _frontier(card: object | None, *, head_digest: str = _DIGEST) -> dict[str, object]:
+    return {
+        "head_digest": head_digest,
+        "revisions": [] if card is None else [card],
+    }
 
 
 def _profiles() -> list[dict[str, object]]:
@@ -65,6 +81,7 @@ def _profiles() -> list[dict[str, object]]:
 def _call(call_id: str, profile_id: str = "profile:exact", **tokens: object) -> dict[str, object]:
     call: dict[str, object] = {
         "call_id": call_id,
+        "event_at_us": 100,
         "model_profile_id": profile_id,
         "uncached_input_tokens": 1,
         "cached_input_tokens": 2,
@@ -79,7 +96,7 @@ def test_compiles_exact_decimal_values_in_deterministic_call_order() -> None:
     matches = compile_current_valuation_matches(
         [_call("call:z"), _call("call:a", "profile:alias")],
         list(reversed(_profiles())),
-        _card(),
+        _frontier(_card()),
         publication_rate_card_digest=_DIGEST,
     )
 
@@ -109,7 +126,7 @@ def test_exact_match_wins_a_rule_tie_independent_of_authored_class_order() -> No
     match = compile_current_valuation_matches(
         [_call("call:tie")],
         _profiles(),
-        card,
+        _frontier(card),
         publication_rate_card_digest=_DIGEST,
     )[0]
 
@@ -134,7 +151,7 @@ def test_partial_rates_and_missing_tokens_remain_explicit_null_aware_facts() -> 
     match = compile_current_valuation_matches(
         [_call("call:partial", cached_input_tokens=None, reasoning_tokens=0)],
         _profiles(),
-        card,
+        _frontier(card),
         publication_rate_card_digest=_DIGEST,
     )[0]
 
@@ -170,7 +187,7 @@ def test_reasoning_in_output_excludes_reasoning_without_double_counting() -> Non
     match = compile_current_valuation_matches(
         [_call("call:reasoning", reasoning_tokens=999)],
         _profiles(),
-        card,
+        _frontier(card),
         publication_rate_card_digest=_DIGEST,
     )[0]
 
@@ -183,28 +200,50 @@ def test_reasoning_in_output_excludes_reasoning_without_double_counting() -> Non
 @pytest.mark.parametrize(
     ("card", "digest", "reason"),
     [
-        (None, _DIGEST, "missing_rate_card"),
-        (_card(), "not-a-digest", "invalid_rate_card_digest"),
-        (_card(), "sha256:" + "b" * 64, "rate_card_digest_mismatch"),
-        (_card(validation_status="invalid"), _DIGEST, "invalid_rate_card"),
-        (_card(model_match_rules=["not-a-rule"]), _DIGEST, "invalid_rate_card"),
         (
-            _card(
-                reasoning_in_output=True,
-                four_class_rates={
-                    "uncached_input_tokens": "1",
-                    "cached_input_tokens": "1",
-                    "reasoning_tokens": "1",
-                    "output_tokens": "1",
-                },
+            _frontier(None),
+            _DIGEST,
+            ValuationUnpricedReason.MISSING_RATE_CARD_FRONTIER,
+        ),
+        (
+            _frontier(_card()),
+            "not-a-digest",
+            ValuationUnpricedReason.INVALID_RATE_CARD_DIGEST,
+        ),
+        (
+            _frontier(_card()),
+            "sha256:" + "b" * 64,
+            ValuationUnpricedReason.RATE_CARD_HEAD_MISMATCH,
+        ),
+        (
+            _frontier(_card(validation_status="invalid")),
+            _DIGEST,
+            ValuationUnpricedReason.INVALID_RATE_CARD_REVISION,
+        ),
+        (
+            _frontier(_card(model_match_rules=["not-a-rule"])),
+            _DIGEST,
+            ValuationUnpricedReason.INVALID_RATE_CARD_REVISION,
+        ),
+        (
+            _frontier(
+                _card(
+                    reasoning_in_output=True,
+                    four_class_rates={
+                        "uncached_input_tokens": "1",
+                        "cached_input_tokens": "1",
+                        "reasoning_tokens": "1",
+                        "output_tokens": "1",
+                    },
+                )
             ),
             _DIGEST,
-            "invalid_rate_card",
+            ValuationUnpricedReason.INVALID_RATE_CARD_REVISION,
         ),
     ],
 )
 def test_missing_or_invalid_cards_fail_closed_without_false_zero(
-    card: object, digest: str, reason: str
+    card: object, digest: str, reason: ValuationUnpricedReason
 ) -> None:
     match = compile_current_valuation_matches(
         [_call("call:unpriced")],
@@ -244,7 +283,7 @@ def test_unmatched_and_missing_profiles_are_typed_unpriced_rows() -> None:
                 "service_tier": None,
             }
         ],
-        _card(),
+        _frontier(_card()),
         publication_rate_card_digest=_DIGEST,
     )
 
@@ -265,18 +304,23 @@ def test_observed_rated_zero_is_a_real_zero_but_unrated_zero_is_null() -> None:
         output_tokens=0,
     )
     rated = compile_current_valuation_matches(
-        [zero], _profiles(), _card(), publication_rate_card_digest=_DIGEST
+        [zero], _profiles(), _frontier(_card()), publication_rate_card_digest=_DIGEST
     )[0]
     unrated = compile_current_valuation_matches(
         [zero],
         _profiles(),
-        _card(
-            four_class_rates={field: None for field in (
-                "uncached_input_tokens",
-                "cached_input_tokens",
-                "reasoning_tokens",
-                "output_tokens",
-            )}
+        _frontier(
+            _card(
+                four_class_rates={
+                    field: None
+                    for field in (
+                        "uncached_input_tokens",
+                        "cached_input_tokens",
+                        "reasoning_tokens",
+                        "output_tokens",
+                    )
+                }
+            )
         ),
         publication_rate_card_digest=_DIGEST,
     )[0]
@@ -288,9 +332,15 @@ def test_observed_rated_zero_is_a_real_zero_but_unrated_zero_is_null() -> None:
 
 
 def test_dataclasses_are_frozen_and_duplicate_fact_ids_are_rejected() -> None:
-    card = CurrentRateCard(
+    card = RateCardRevision(
         rate_card_id="rate-card:synthetic",
         digest=_DIGEST,
+        predecessor_digest=None,
+        effective_at_us=0,
+        fetched_at_us=999,
+        source_name="synthetic",
+        source_url=None,
+        currency="USD",
         model_match_rules=(
             {"model_profile_id": "profile:exact"},
         ),
@@ -307,14 +357,16 @@ def test_dataclasses_are_frozen_and_duplicate_fact_ids_are_rejected() -> None:
             "output_tokens",
         )},
         reasoning_in_output=False,
+        confidence="synthetic",
         validation_status="valid",
     )
+    frontier = RateCardFrontier(head_digest=card.digest, revisions=(card,))
     with pytest.raises(FrozenInstanceError):
         card.digest = "sha256:" + "b" * 64  # type: ignore[misc]
     match = compile_current_valuation_matches(
         [_call("call:frozen")],
         _profiles(),
-        card,
+        frontier,
         publication_rate_card_digest=_DIGEST,
     )[0]
     with pytest.raises(FrozenInstanceError):
@@ -323,6 +375,6 @@ def test_dataclasses_are_frozen_and_duplicate_fact_ids_are_rejected() -> None:
         compile_current_valuation_matches(
             [_call("call:duplicate"), _call("call:duplicate")],
             _profiles(),
-            card,
+            frontier,
             publication_rate_card_digest=_DIGEST,
         )

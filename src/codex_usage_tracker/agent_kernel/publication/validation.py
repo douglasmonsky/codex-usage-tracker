@@ -22,6 +22,10 @@ from ..storage.database import (
     validate_database,
 )
 from ..storage.lifecycle import LifecycleFoldError, LifecycleRepository
+from ..storage.rate_cards import (
+    RateCardFrontierError,
+    validate_publication_rate_card_frontier,
+)
 from ..storage.schema import SCHEMA_CONTRACT_SHA256
 
 
@@ -728,6 +732,15 @@ def validate_open_artifact(
         _validate_tail(connection, identity.publication_id)
         _validate_model_call_ownership(connection)
         _validate_identity_registry(connection)
+        try:
+            validate_publication_rate_card_frontier(
+                connection,
+                identity.publication_id,
+            )
+        except RateCardFrontierError as error:
+            raise PublicationValidationError(
+                f"publication rate-card frontier invalid: {error}"
+            ) from error
         _validate_lifecycle_folds(connection)
         _validate_coverage(connection, identity.publication_id)
         counts = _validate_counts(connection, identity.publication_id)

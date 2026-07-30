@@ -1,6 +1,6 @@
 # CK-07A — Reconcile fact-backed oracles and qualify packet seams
 
-**Status:** Ready to resume after CK-07C merges; not requalified
+**Status:** Blocked pending CK-07D; not requalified
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -21,8 +21,26 @@ answers from permitted facts.
 `FORMULA_AND_SELECTOR_CONTRACT.md`,
 `QUERY_EVIDENCE_PROJECTION_CONTRACTS.md`, `QUALIFICATION_PLAN.md`, and the
 [CK-08 blocker evidence](../../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json).
-**Dependencies:** CK-07, CK-07B, and CK-07C merged and verified; CK-08 blocker evidence
-merged.
+**Dependencies:** CK-07, CK-07B, CK-07C, and CK-07D merged and verified;
+CK-08 blocker evidence merged.
+
+## CK-07D resume authority
+
+Consume only CK-07D's merged publication-captured rate-card frontier, pure
+effective-dated valuation compiler, selected revision digest, typed unpriced
+reasons, and corrected pricing-coverage semantics. The scenario lane uses an
+independent synthetic effective-time boundary evaluator; the database-v1 lane
+reads the accepted publication frontier and canonical call event times. They
+must agree on selected revision digest, configured value, grade, missingness,
+and coverage without sharing selected rows or outputs.
+
+The pre-merge CK-07D implementation record is
+`docs/decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json`.
+It names `RateCardRevision`, `RateCardFrontier`, `ValuationUnpricedReason`, the
+database-v1 schema digest, and the amended pricing-coverage operand/vector
+digests. This record is handoff evidence only: CK-07A remains blocked and must
+restart from the eventual merged SHA rather than importing or transplanting
+the CK-07D worktree.
 
 ## CK-07B resume authority
 

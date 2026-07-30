@@ -1,0 +1,68 @@
+{
+  "schema": "codex-usage-tracker.ck07d-effective-dated-valuation-gap.v1",
+  "packet": "CK-07D",
+  "status": "admitted",
+  "discovered_at": "2026-07-30",
+  "base": {
+    "ref": "origin/main",
+    "sha": "dbf98ff4ac971e41442af871e9241c9df20b8ef5"
+  },
+  "producer": {
+    "packet": "CK-07C",
+    "artifact": "src/codex_usage_tracker/agent_kernel/domain/valuation.py",
+    "symbols": [
+      "CurrentRateCard",
+      "CurrentValuationMatch",
+      "compile_current_valuation_matches"
+    ],
+    "database_artifact": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+    "database_fields_already_present": [
+      "model_calls.event_at_us",
+      "rate_card_revisions.effective_at_us",
+      "rate_card_revisions.fetched_at_us"
+    ]
+  },
+  "mismatch": {
+    "current_input_cardinality": "exactly one selected CurrentRateCard",
+    "call_time_read_by_compiler": false,
+    "effective_time_present_on_compiler_input": false,
+    "publication_selection": "active_rate_card identifies one revision",
+    "observable_failure": "selecting a new rate card applies it to historical calls before its effective time"
+  },
+  "consumer": {
+    "retained_packet": "CK-07A",
+    "future_packet": "CK-08",
+    "required_path": "publication-captured rate-card frontier -> pure per-call valuation compiler -> valuation_match -> plan operand and pricing coverage"
+  },
+  "independent_truth": {
+    "kind": "synthetic effective-time boundary evaluator",
+    "required_cases": [
+      "before boundary",
+      "exact boundary",
+      "after boundary",
+      "late-ingested pre-boundary call",
+      "changed-model subset",
+      "newer alias versus older exact match",
+      "backdated bounded-interval correction",
+      "future revision",
+      "missing time",
+      "invalid lineage",
+      "ambiguous equal-effective overlap"
+    ]
+  },
+  "requalification": [
+    "CK-05 database-v1 schema and rebuild behavior",
+    "CK-07 publication, tail, rebuild, replacement, late-event, and recovery behavior",
+    "CK-07C valuation relation and plan-operand integration",
+    "CK-07A independent scenario and database-v1 replay"
+  ],
+  "scope_decision": {
+    "valuation_class": "current configured estimate",
+    "canonical_calls_rewritten": false,
+    "per_call_price_assignment_persisted": false,
+    "billed_cost_claimed": false,
+    "historical_as_known_claimed": false,
+    "fetched_at_used_as_effective_time": false,
+    "real_codex_data_used": false
+  }
+}

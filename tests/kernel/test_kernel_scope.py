@@ -15,6 +15,7 @@ from scripts.check_kernel_scope import (
     CK07_PUBLICATION_RECOVERY_ADDITIONS,
     CK07B_FORMULA_PROVENANCE_ADDITIONS,
     CK07C_PLAN_OPERAND_FACT_ADDITIONS,
+    CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS,
     CK08_PREREQUISITE_BLOCKER_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS,
@@ -540,6 +541,16 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/agent_kernel/publication/test_preparation.py",
     } == CK07C_PLAN_OPERAND_FACT_ADDITIONS
     assert {
+        "docs/decisions/evidence/ck07d/effective-dated-valuation-gap.json",
+        "docs/roadmap/tasks/ck-07d-implement-effective-dated-rate-card-valuation.md",
+        "docs/decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json",
+        "src/codex_usage_tracker/agent_kernel/publication/rate_cards.py",
+        "src/codex_usage_tracker/agent_kernel/storage/rate_cards.py",
+        "tests/agent_kernel/contracts/reference/effective_dated_valuation.py",
+        "tests/agent_kernel/contracts/test_effective_dated_valuation.py",
+        "tests/agent_kernel/publication/test_rate_cards.py",
+    } == CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS
+    assert {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
     } == CK08_PREREQUISITE_BLOCKER_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
@@ -574,6 +585,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK07_PUBLICATION_RECOVERY_ADDITIONS
         | CK07B_FORMULA_PROVENANCE_ADDITIONS
         | CK07C_PLAN_OPERAND_FACT_ADDITIONS
+        | CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS
         | CK08_PREREQUISITE_BLOCKER_ADDITIONS
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )

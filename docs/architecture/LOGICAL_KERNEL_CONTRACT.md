@@ -349,7 +349,9 @@ times, currency, model match rules, four-class rates, credit rates, confidence,
 and validation status.
 
 Canonical calls are never rewritten when a rate card changes. Current
-valuation applies one selected revision at query/projection time and records:
+configured valuation uses the accepted publication's immutable revision
+frontier. For each call, it applies the matching revision with the greatest
+`effective_at_us <= call.event_at_us` and records:
 
 - rate-card digest;
 - match basis;
@@ -358,16 +360,20 @@ valuation applies one selected revision at query/projection time and records:
 - unpriced reason;
 - coverage numerator and denominator.
 
-Historical-as-rated valuation is unsupported unless a future contract stores
-the selected historical revision explicitly.
+This is effective-dated current estimation for historical calls, not the price
+known when a call was ingested or the amount a provider billed. Those
+historical-as-known/as-charged claims remain unsupported unless a future
+contract stores the selected observation or billing fact explicitly.
 
-CK-07C freezes `valuation_match` as a deterministic read-side logical
-relation, not a persisted answer or projection. It joins a call and its model
-profile to the immutable validated rate-card revision selected by the same
-publication digest. The relation records exact four-class rated and missing
-token fields, configured cost and credit estimates, match basis, explicit
-unpriced reasons, and numerator/denominator coverage. Missing or unmatched
-rates produce `NULL` estimates, never zero.
+CK-07D corrects CK-07C's `valuation_match` into a deterministic effective-dated
+read-side logical relation, not a persisted answer or projection. It joins a
+call and its model profile to the immutable validated frontier captured by the
+same publication, then selects by call event time and match precedence. The
+relation records the selected revision digest, exact four-class rated and
+missing token fields, configured cost and credit estimates, match basis,
+explicit unpriced reasons, and numerator/denominator coverage. Missing,
+future-only, invalid, or ambiguous matches produce `NULL` estimates, never
+zero. Fetch time and insertion order never select a revision.
 
 ### Context components
 

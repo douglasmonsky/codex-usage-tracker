@@ -35,7 +35,7 @@ redoing whole-database or whole-projection work for an ordinary tail.
 | `no_change` | Same source revisions, same rate card, same schema/projections | Return current publication; operational summary only. |
 | `append_safe_small` | One call, one tool transition, bounded complete records | Short incremental transaction. |
 | `append_safe_large` | Bounded but exceeds small-tail row/byte/fanout limits | Isolated artifact or chunked catch-up selected before writing. |
-| `valuation_only` | Current rate-card revision changes | Dirty valuation keys/projections; facts untouched. |
+| `valuation_only` | Publication rate-card frontier changes | Dirty affected valuation keys/projections; facts untouched. |
 | `source_replace` | Truncation, replacement, canonical owner changes | Isolated artifact. |
 | `recanonicalize` | Identity/normalization version changes | Isolated artifact. |
 | `schema_upgrade` | Physical schema change | Isolated artifact. |
@@ -324,9 +324,27 @@ merges are explicit breaking changes.
 
 ## Rate-card changes
 
-A valid new rate card changes current valuation identity and projection keys.
-It does not parse sources, rewrite calls, or alter exact token totals. Invalid
-cards fail closed and leave the prior valid revision active with a diagnostic.
+A valid new rate-card frontier changes current valuation identity only for
+matching calls at or after the explicit effective boundary. Earlier calls keep
+their selected revision digest and value unless the newly admitted revision is
+deliberately backdated. It does not parse sources, rewrite calls, or alter
+exact token totals. Invalid, incomplete, cyclic, head-mismatched, or ambiguous
+frontiers fail closed and leave the prior valid frontier active with a
+diagnostic.
+
+Revision rows are immutable and fully prepared before the writer lock. Inside
+the publication transaction, `active_rate_card` selects the request's head
+digest, retains `selected_at_us` when an ordinary tail keeps the same head, and
+advances `publication_id` to the accepted publication. The writer and
+same-snapshot artifact validator both walk the complete predecessor chain and
+fail closed before head promotion when the chain is missing, cyclic, invalid,
+or disagrees with the publication digest.
+
+The valuation-only plan carries the exact affected
+`ValuationDirtyInterval` rows. A backdated correction dirties only its
+half-open `[effective_at_us, next_effective_at_us)` interval and the affected
+match rules; publication recovery rolls the selected head and those prepared
+rows back atomically.
 
 ## Repair and rollback
 
