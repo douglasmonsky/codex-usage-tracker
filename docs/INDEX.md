@@ -4,13 +4,14 @@ This is the single entry point for the agent-first clean cutover. Active
 documents below are mutually controlling: each owns one implementation area,
 and none of the archived documents may override them.
 
-## Current execution handoff
+## Current packet boundary
 
-The
-[CK-04 cross-task execution handoff](roadmap/tasks/ck-04-run-physical-architecture-bakeoff.md#cross-task-execution-handoff)
-records the current worktree, branch, validation, and resume state. It is an
-operational checkpoint; the authority set below wins if the handoff ever
-conflicts with it.
+CK-04 is complete with the explicit growth exception recorded in the
+[physical architecture decision](decisions/PHYSICAL_ARCHITECTURE_DECISION.md).
+After the CK-04 merge is verified, execution transfers to
+[CK-05](roadmap/tasks/ck-05-implement-canonical-storage-kernel.md) in a clean
+Codex task. The authority set below wins over historical operational
+checkpoints.
 
 ## Authority set
 

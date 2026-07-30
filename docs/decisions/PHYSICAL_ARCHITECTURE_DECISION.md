@@ -1,17 +1,18 @@
 # Physical Architecture Decision
 
-**Status:** Remediation implemented; clean requalification pending
-**Decision date:** Pending final CK-04 qualification
-**Provisional direction:** Candidate A mechanisms
-**Decision commit:** Pending
+**Status:** Accepted with an explicit growth-evidence exception
+**Decision date:** 2026-07-30
+**Selected direction:** Candidate A mechanisms
+**Decision evidence commit:** `95492032373beeaa700af90b542a0a07f4220c74`
 **Production schema contract:**
 [AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md](../architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md)
 (`eecff68062a8d0cba0619058a6e660f565d9a96c2575ab0dc93d72b987f31543`)
-**Aggregate evidence:** Pending canonical v2 manifest
+**Evidence exception:**
+[aggregate-evidence.json](evidence/ck04/aggregate-evidence.json)
 
-## Provisional decision
+## Decision
 
-Candidate A remains the provisional physical direction for the agent-kernel v1
+Candidate A is the selected physical direction for the agent-kernel v1
 production implementation:
 
 - typed canonical fact and lifecycle tables;
@@ -24,11 +25,11 @@ production implementation:
 - isolated artifacts plus an atomic active pointer for large or unsafe work.
 
 Candidate A is a **design and contract reference**, not production code to
-transplant. If clean requalification confirms its eligibility, CK-05 starts a
-clean implementation under `src/codex_usage_tracker/agent_kernel/` and imports
-nothing from the experimental candidates or the spike runtime.
+transplant. CK-05 starts a clean implementation under
+`src/codex_usage_tracker/agent_kernel/` and imports nothing from the
+experimental candidates or the spike runtime.
 
-## Why the decision is not yet accepted
+## Acceptance outcome
 
 The first qualification pass selected Candidate A after eliminating Candidates
 C and D. The final read-only review found seven gaps that prevented acceptance.
@@ -44,32 +45,49 @@ All seven remediations are implemented:
 | Production DDL was incomplete | A complete database-v1 schema, index, cursor, coverage, delta, and publication contract is frozen separately. |
 | Decision evidence was not reproducible enough | A strict bounded v2 manifest validator rejects missing, stale, non-canonical, private, or invented evidence. |
 
-Candidates C and D remain historically eliminated by unchanged evidence:
+Candidates C and D are eliminated by current evidence:
 Candidate C did not perform the required process termination, and Candidate D
-exceeded the production 30-day `5 s` hard gate. Candidate A is not called
-eligible again until the remediated code is committed, the canonical clean
-runner finishes, and the v2 evidence manifest validates.
+exceeded the production 30-day `5 s` hard gate.
 
-## Requalification gate
+Candidate A passed the current-commit standard, production, history, expansion,
+query, ordinary-tail, crash/recovery, Agent Perf, and DBHub lanes. The
+maintainer directed CK-04 to stop after growth repetition 2, yielding three
+successful current-commit growth samples. Repetitions 3 and 4 are explicitly
+waived because their additional runtime was disproportionate to the remaining
+decision value.
 
-The acceptance commit must record five unprofiled repetitions for every speed
-claim on the exact clean code commit, including:
+This exception does not rewrite the evidence contract. The strict canonical v2
+aggregate is intentionally not emitted because its five-current-repetition
+growth requirement is unsatisfied. The exception artifact authenticates the
+three current samples and the earlier complete five-run bundle. Candidate A's
+experimental implementation and shared implementation have identical Git tree
+identities across those two commits. The earlier bundle is corroboration, not
+a same-commit substitute.
 
-- the 100,000-call standard build;
-- production 30-day, 90-day, one-year, and all-time builds;
-- the required ordinary tails;
-- all required SQL- and MCP-shaped query cases;
-- the complete recovery matrix;
-- the 2,500,000-call growth sensitivity;
-- the pinned DBHub comparison;
-- exact Agent Perf attribution for the checked-in standard workload.
+## Requalification record
+
+The accepted evidence at
+`95492032373beeaa700af90b542a0a07f4220c74` records:
+
+| Lane | Result | Canonical summary digest |
+| --- | --- | --- |
+| Standard workload | 365 / 365 passed | `496336d432557a6feb227950bef81465e9f22df0917f1d5dbf27794e3d7038db` |
+| Production scale and tail | 395 / 395 passed | `f74688fa78352589563536c339c3da09e97fadf0da310055642d474234e3b50c` |
+| Short history | 15 / 15 passed | `147a00de01af36a7349259582c81654fb4f5a3709ab9262a36da907d5ee30d9b` |
+| All-time history | 5 / 5 passed | `4a531a455b35b5b6d7f09b12bd4be242abb73fd41f1192646cf7e2c34b1c5157` |
+| History expansion | 15 / 15 passed | `2d65a5f2b420e14b496acf50ba45f1e9fcab5a0c3803e9f23076d597c5955ba2` |
+| Crash and recovery | 25 / 25 passed | `9b697b6f882056a3cb393d3f10ac9f3954f933f6b74a86c23a39e4d3c0c1fc71` |
+| Candidate C elimination | Expected process-termination observation absent | retained current-commit artifact |
+| Candidate D elimination | Expected production build watchdog failure | retained current-commit artifact |
+| Agent Perf | Five unprofiled runs plus one attribution profile | retained current-commit artifact |
+| DBHub 0.24.0 | Ten alternating samples; identical snapshot | retained current-commit artifact |
+| Growth sensitivity | Three current samples passed; two waived | exception artifact |
 
 Profiled measurements are attribution only. Raw outputs remain ignored under
-`experiments/physical-architecture/.measurements/`. The committed aggregate
-contains only bounded canonical evidence with exact input/output hashes,
-environment identity, score derivation, plan allowances and observations,
-crash proof, Agent Perf attribution, DBHub comparison, and explicit
-limitations.
+`experiments/physical-architecture/.measurements/`. No canonical aggregate is
+claimed. The committed bounded exception artifact records exact input hashes,
+current and prior commits, tree identities, completed repetitions, the
+explicit limitation, and the risks carried into CK-05 and CK-06.
 
 ## Selected physical contract
 
@@ -194,15 +212,12 @@ blocker.
 
 ## Agent Perf result
 
-The remediated Agent Perf contract is the exact checked-in 100,000-call
-`build.scale.standard` workload. The most recent attribution run used
-Agent Perf with Scalene `2.3.0`; `_insert_record` was the largest Python
-hotspot at `8.30%`. Its five matching unprofiled samples ranged from `7.07 s`
-to `7.34 s`.
-
-Those samples confirm that the remediation changed build cost materially and
-invalidated the earlier production timing claims. The clean requalification
-owns the authoritative speed baseline.
+The Agent Perf contract is the exact checked-in 100,000-call
+`build.scale.standard` workload. The accepted attribution run used Agent Perf
+with Scalene `2.3.0`; `_insert_record` was the largest Python hotspot at
+`6.21%`. Its five matching unprofiled samples ranged from `7.13 s` to
+`7.28 s`. The unprofiled samples are the speed authority; the profile is
+attribution only.
 
 ## DBHub disposition
 
@@ -252,7 +267,7 @@ Typed contracts and adapter boundaries are retained ideas, not a dependency.
 
 | Risk | Required owner |
 | --- | --- |
-| Growth-scale build cost and I/O variance | CK-04 reruns the remediated growth sensitivity; CK-05/CK-06 then benchmark streaming, batching, compact SQLite, and truthful progress against the same fixture. |
+| Growth-scale build cost and I/O variance | Three current-commit repetitions and one prior complete bundle passed, but two current repetitions were waived. CK-05/CK-06 benchmark streaming, batching, compact SQLite, and truthful progress against the same fixture. |
 | Build RSS | CK-06 proves bounded streaming and queue depth; no whole-history materialization. |
 | Production query implementation | CK-08/CK-09 independently return database-derived rows and rerun every CK-03 oracle. |
 | Tail overlay has no production fold path | CK-07 implements and crash-qualifies threshold-driven fold or isolated-artifact selection. |

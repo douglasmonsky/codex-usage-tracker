@@ -124,8 +124,7 @@ artifacts use synthetic data only.
 
 ## Physical direction
 
-Candidate A's physical mechanisms are the provisional direction pending the
-clean CK-04 requalification:
+Candidate A's physical mechanisms are the selected CK-05 direction:
 
 - typed canonical facts and lifecycle rows;
 - physical source occurrences distinct from canonical entities;
@@ -138,9 +137,12 @@ clean CK-04 requalification:
 Candidate C was eliminated because its crash driver did not terminate a
 process. Candidate D was eliminated after its production 30-day build exceeded
 the `5 s` hard gate. Candidate A's recovery, SQL-derived-answer, planner,
-parallel-parser, CPU-attribution, production-schema, and evidence-manifest
-proofs have been hardened after final review. The decision becomes accepted
-only after those exact changes pass the clean canonical rerun.
+parallel-parser, CPU-attribution, production-schema, and evidence proofs passed
+the accepted CK-04 qualification. Three current-commit growth repetitions
+passed; the maintainer waived repetitions 3 and 4 after directing the long run
+to stop. The strict five-current-repetition v2 aggregate is therefore not
+claimed. The bounded exception and remaining CK-05/CK-06 growth risks are
+recorded in the physical decision.
 
 The complete selection, exact CK-05 table/index inventory, measured projection
 candidates, publication mechanism, limitations, and follow-up risks are in
@@ -192,14 +194,13 @@ product-level gates:
 
 Only the following material decisions remain open:
 
-1. Final CK-04 acceptance of Candidate A after clean requalification.
-2. The exact projection subset admitted by measured Tier 1 consumers from the
+1. The exact projection subset admitted by measured Tier 1 consumers from the
    CK-04 candidate set.
-3. The final public tool grouping and payload shape after installed-agent
+2. The final public tool grouping and payload shape after installed-agent
    qualification.
-4. Whether optional structural context composition earns a post-MVP capability.
-5. Brand and package-name migration timing after the Codex-first MVP.
-6. Which native presentation surface is officially available and useful at
+3. Whether optional structural context composition earns a post-MVP capability.
+4. Brand and package-name migration timing after the Codex-first MVP.
+5. Which native presentation surface is officially available and useful at
    enhancement time.
 
 Every other choice should be made within the controlling contracts without

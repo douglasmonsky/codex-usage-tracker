@@ -1,6 +1,6 @@
 # CK-04 — Run A/C/D physical bake-off and decide
 
-**Status:** In progress
+**Status:** Completed with an explicit growth-evidence exception
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -61,8 +61,8 @@ shared harness is frozen. One integrator owns shared files and scoring.
 
 ## Execution record
 
-**Status:** Remediation implemented; clean requalification pending
-**Provisional direction:** Candidate A mechanisms
+**Status:** Completed with an explicit growth-evidence exception
+**Selected direction:** Candidate A mechanisms
 **Decision:** [PHYSICAL_ARCHITECTURE_DECISION.md](../../decisions/PHYSICAL_ARCHITECTURE_DECISION.md)
 **Production schema contract:** [AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md](../../architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md)
 
@@ -73,11 +73,19 @@ database-derived query answers, per-case planner eligibility gates, real
 production database-v1 contract, and a strict canonical decision-evidence
 validator.
 
-The earlier Candidate A speed and eligibility claims are historical only
-because those remediations changed the measured code. CK-04 remains in
-progress until a clean commit completes the required five-run timings,
-69-query matrix, 25-case recovery matrix, growth sensitivity, DBHub comparison,
-canonical v2 aggregate evidence, release-candidate checks, and CI.
+The current evidence commit
+`95492032373beeaa700af90b542a0a07f4220c74` passed the standard,
+production/history, ordinary-tail, 69-query, 25-case recovery, DBHub, Agent
+Perf, and current Candidate C/D elimination lanes. After three successful
+current-commit growth samples, the maintainer directed the run to stop after
+repetition 2 and waived repetitions 3 and 4.
+
+The committed
+[growth-evidence exception](../../decisions/evidence/ck04/aggregate-evidence.json)
+records that limitation, authenticates the partial current bundle, and links a
+prior complete five-run bundle whose Candidate A and shared Git trees are
+identical. The strict canonical v2 aggregate was not emitted and is not claimed
+to have passed.
 
 The CK-04 DBHub benchmark is deterministic and local: five samples each
 deliberately execute the `generic` and `named_preset` routes in alternating
@@ -91,8 +99,9 @@ record.
 
 **Recorded:** 2026-07-29, America/New_York
 
-**Authority:** Operational checkpoint. The packet and its controlling
-documents still decide behavior.
+**Authority:** Historical operational checkpoint, superseded by the completed
+execution record above. It is retained to explain the implementation and
+review provenance; the packet and its controlling documents decide behavior.
 
 ### Goal
 
@@ -164,11 +173,9 @@ stable source/file lineage, producer-local clocks, publication coverage,
 copy-stable semantic identities, and source-keyed dirty hints. It adds no
 remote collector, service, authentication, or multi-machine runtime.
 
-Candidate A is provisional, not selected finally. Remaining CK-04 evidence
-includes the 69-by-five query matrix, 25 crash cases, five unprofiled timings,
-one Agent Perf attribution run, ten alternating DBHub route samples,
-production/growth/ordinary qualification, current-commit C/D eliminations,
-canonical aggregate evidence, release-candidate checks, and CI.
+Candidate A is selected as the CK-05 design and contract reference. CK-05 must
+implement it cleanly under `src/codex_usage_tracker/agent_kernel/`; it must not
+copy or import experimental Candidate A or the frozen spike runtime.
 
 Completed checks include:
 
@@ -252,7 +259,7 @@ The three paused branches predate only the documentation commit `336bb48`.
 Honor the no-Serena instruction without editing their `AGENTS.md`; their
 implementation commits should cherry-pick cleanly.
 
-### Integration sequence
+### Historical integration sequence
 
 1. Run full bootstrap in each reused worktree, then spawn one writer per lane.
 2. Resume the three lanes above in parallel using their ignored resume files.
@@ -267,7 +274,12 @@ implementation commits should cherry-pick cleanly.
 8. Run final qualification, write canonical v2 evidence, complete the
    decision/packet/ledger, and run `just vc`.
 9. Push, open the PR, monitor green CI, and merge CK-04.
-10. Start CK-05 only from the merged dependency.
+10. Create a clean CK-05 Codex task from the verified merged dependency.
+
+Steps 1–7 were completed. Step 8 completed all qualification lanes except the
+two maintainer-waived growth repetitions, so the strict canonical v2 aggregate
+was replaced by the explicit exception artifact rather than weakened or
+misrepresented. Steps 9–10 are the closeout actions owned by this task.
 
 ### Aggregate evidence contract
 

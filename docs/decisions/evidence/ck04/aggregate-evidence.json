@@ -1,0 +1,63 @@
+{
+  "schema": "codex-usage-tracker.ck04-growth-evidence-exception.v1",
+  "decision": "accept_three_current_commit_samples_with_prior_complete_corroboration",
+  "authorized_stop": {
+    "basis": "user_directed_stop_after_repetition_2",
+    "date": "2026-07-30",
+    "remaining_repetitions_waived": [
+      3,
+      4
+    ]
+  },
+  "current_commit": {
+    "code_commit": "95492032373beeaa700af90b542a0a07f4220c74",
+    "candidate_a_tree": "503d9c351a3d3f4f24f4cf740d9301e28fdc6ca2",
+    "shared_tree": "6ee0402738168c7fea0a0d64bbf570ff7d190746",
+    "invocation_digest": "3efdc20047881e808d2620bc9d965f4c48c4f1cedab6a412217815668ffcf55a",
+    "invocation_sha256": "6fc0c33c10605300dce476f90162ba743698da5356ebb74914cf055ee644afeb",
+    "measurements_sha256": "07455889bd4f4d7571098ecac0eef4dc2157cb1b8a3487106d4c55e8dabf6f87",
+    "details_sha256": "31f1d4a2c11875f04677bae99cc1adba415b84827148f0de7bd1bb8c9ba4457c",
+    "completed_repetitions": [
+      {
+        "repetition": 0,
+        "outcome": "passed",
+        "wall_time_ns": 751879722542,
+        "process_cpu_ns": 240228252000
+      },
+      {
+        "repetition": 1,
+        "outcome": "passed",
+        "wall_time_ns": 657272103500,
+        "process_cpu_ns": 232426642000
+      },
+      {
+        "repetition": 2,
+        "outcome": "passed",
+        "wall_time_ns": 616960673916,
+        "process_cpu_ns": 233843196000
+      }
+    ]
+  },
+  "prior_complete_bundle": {
+    "code_commit": "745f4ffa000be9922b310931db147e295dc98ebb",
+    "candidate_a_tree": "503d9c351a3d3f4f24f4cf740d9301e28fdc6ca2",
+    "shared_tree": "6ee0402738168c7fea0a0d64bbf570ff7d190746",
+    "status": "passed",
+    "records": 350,
+    "measurement_sha256": "6033370fbd2d2a1dc0f702e495be2fad73f898d0ff4ff0719df46394039046f6",
+    "details_sha256": "f3a86abc55ddb9eb7adaf26521d771312b26a40fdb90d8742580cca7638a9dd3",
+    "summary_digest": "f3a274cdcf043735be1d0652900ac244d553e76fcca4e56761ea5f9815eecf17"
+  },
+  "intervening_change_scope": [
+    "experiments/physical-architecture/README.md",
+    "experiments/physical-architecture/qualification.py",
+    "experiments/physical-architecture/run_bakeoff.py",
+    "tests/experiments/physical-architecture/test_bakeoff_runner.py"
+  ],
+  "limitations": [
+    "The current-commit growth invocation has no canonical completion summary because it was stopped after repetition 2.",
+    "The strict aggregate v2 five-repetition growth gate is not satisfied at the current commit.",
+    "The prior complete bundle is corroborating evidence, not a same-commit substitute.",
+    "CK-05 and CK-06 retain growth build cost and I/O variance as explicit optimization risks."
+  ]
+}
