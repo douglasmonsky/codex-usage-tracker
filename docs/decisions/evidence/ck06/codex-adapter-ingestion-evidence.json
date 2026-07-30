@@ -1,0 +1,124 @@
+{
+  "schema": "codex-usage-tracker.ck06-adapter-ingestion-evidence.v1",
+  "task": "CK-06",
+  "base_main_sha": "cfbcb955580520170bab4cfde81303129ca22d7c",
+  "adapter_contract": "codex-usage-tracker.adapter.v1",
+  "adapter_id": "codex-jsonl",
+  "schema_contract": "codex-usage-tracker.agent-kernel.v1",
+  "schema_digest": "6ae65b6eb7024486f8fe42e19ab6799a252b721e6a9519f19d70e91f4aae6b77",
+  "fixture": {
+    "profile": "tiny",
+    "manifest_digest": "78003a7cfdee8beb1a263b3027fec162a612352be6fbefd13a65e821640bc7ae",
+    "oracle_digest": "9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b",
+    "source_bytes": 244657,
+    "source_records": 339,
+    "raw_body_present": false,
+    "note": "All inputs are the checked-in synthetic fixture; no runtime or local Codex data was read."
+  },
+  "full_ingestion": {
+    "sources_considered": 12,
+    "sources_selected": 11,
+    "sources_deferred": 1,
+    "source_bytes_selected": 244657,
+    "records_seen": 339,
+    "diagnostics_emitted": 1,
+    "canonical_counts": {
+      "activities": 5,
+      "allowance_limits": 1,
+      "allowance_observations": 4,
+      "compaction_boundaries": 2,
+      "model_calls": 100,
+      "projects": 1,
+      "resources": 25,
+      "sessions": 10,
+      "state_changes": 5,
+      "tool_invocations": 25,
+      "turns": 50
+    },
+    "occurrence_counts": {
+      "activities": 5,
+      "allowance_limits": 4,
+      "allowance_observations": 4,
+      "compaction_boundaries": 2,
+      "model_calls": 102,
+      "projects": 10,
+      "resources": 49,
+      "sessions": 19,
+      "state_changes": 5,
+      "tool_invocations": 49,
+      "turns": 50
+    },
+    "token_sums": {
+      "uncached_input_tokens": {"value": 53650, "observed_count": 100, "missing_count": 0},
+      "cached_input_tokens": {"value": null, "observed_count": 95, "missing_count": 5},
+      "reasoning_tokens": {"value": 31850, "observed_count": 100, "missing_count": 0},
+      "output_tokens": {"value": 47450, "observed_count": 100, "missing_count": 0}
+    }
+  },
+  "history_windows": {
+    "30_days": {"canonical_model_calls": 4, "selected_sources": 7, "deferred_sources": 5, "selected_bytes": 184519},
+    "90_days": {"canonical_model_calls": 10, "selected_sources": 7, "deferred_sources": 5, "selected_bytes": 184519},
+    "one_year": {"canonical_model_calls": 34, "selected_sources": 9, "deferred_sources": 3, "selected_bytes": 214584},
+    "all_time": {"canonical_model_calls": 100, "selected_sources": 11, "deferred_sources": 1, "selected_bytes": 244657}
+  },
+  "determinism": {
+    "batch_size": 32,
+    "worker_counts": [1, 2, 4, 8],
+    "ordered_observation_count": 450,
+    "same_ordered_signature": true,
+    "same_accounting": true,
+    "batches_emitted": 20,
+    "bounded_batch_records": 32,
+    "bounded_reorder_slots": "one in-flight batch per source plus queue capacity",
+    "envelope_shapes": ["normalized_adapter_record", "response.completed", "tool.started", "tool.completed"]
+  },
+  "performance": {
+    "synthetic_fixture_only": true,
+    "repetitions_per_worker_count": 5,
+    "units": {"elapsed": "ns", "rss": "bytes"},
+    "workers": {
+      "1": {"median_elapsed_ns": 33726584, "p95_elapsed_ns": 40541750, "max_elapsed_ns": 40541750, "cv_elapsed": 0.08889949113788359, "max_peak_rss_bytes": 32555008, "max_queue_depth": 1},
+      "2": {"median_elapsed_ns": 30059916, "p95_elapsed_ns": 31743000, "max_elapsed_ns": 31743000, "cv_elapsed": 0.023902420040235586, "max_peak_rss_bytes": 32669696, "max_queue_depth": 2},
+      "4": {"median_elapsed_ns": 30825625, "p95_elapsed_ns": 32715584, "max_elapsed_ns": 32715584, "cv_elapsed": 0.03664484926262676, "max_peak_rss_bytes": 32931840, "max_queue_depth": 4},
+      "8": {"median_elapsed_ns": 31558583, "p95_elapsed_ns": 33059166, "max_elapsed_ns": 33059166, "cv_elapsed": 0.021086621661285648, "max_peak_rss_bytes": 33144832, "max_queue_depth": 8}
+    },
+    "growth_repetitions_3_and_4": "waived_by_CK-04_decision; no_strict_v2_aggregate_claimed"
+  },
+  "cursor_lifecycle": {
+    "partial_final_line": "does_not_advance_complete_record_cursor",
+    "replacement": "replaced",
+    "truncation": "truncated",
+    "moving_tail": "append_safe",
+    "malformed_range": "isolated_and_reported_without_invalidating_other_records"
+  },
+  "review_accounting": {
+    "reviewer_count": 1,
+    "findings": [
+      {"id": "F1", "severity": "critical", "accepted": true, "summary": "Translate Codex event envelopes before normalization."},
+      {"id": "F2", "severity": "critical", "accepted": true, "summary": "Derive CK-02 logical and source-occurrence identities locally."},
+      {"id": "F3", "severity": "high", "accepted": true, "summary": "Bound diagnostic batches and parser reorder slots."},
+      {"id": "F4", "severity": "high", "accepted": true, "summary": "Emit worker failure at the next batch index."},
+      {"id": "F5", "severity": "high", "accepted": true, "summary": "Use stable manifestation keys and replacement identities."},
+      {"id": "F6", "severity": "medium", "accepted": true, "summary": "Expose file-budget overflow as explicit deferred coverage."},
+      {"id": "F7", "severity": "medium", "accepted": true, "summary": "Refresh evidence only after complete qualification."}
+    ],
+    "accepted_findings": ["F1", "F2", "F3", "F4", "F5", "F6", "F7"],
+    "reviewer_token_status": "pending",
+    "tokens_per_accepted_finding": null,
+    "note": "One final read-only reviewer; all seven findings were accepted and corrected. The installed metrics CLI has no token subcommand, so token status remains pending and was not retried."
+  },
+  "packaging": {
+    "wheel_bytes": 229432,
+    "sdist_bytes": 616331,
+    "wheel_ceiling": 236300,
+    "sdist_ceiling": 634700,
+    "release_check": "passed"
+  },
+  "validation": {
+    "focused": "tests/agent_kernel/adapters and kernel scope: 30 passed; Ruff passed",
+    "bootstrap": "python3 scripts/bootstrap_dev_environment.py passed before semantic work; --component gitnexus --check passed",
+    "scope": "GitNexus impact was run before existing-symbol edits; exact origin/main detect_changes passed before commit",
+    "qualification": "just vp passed; just v passed with 991 functional and 13 invariant tests, Pyright 0 errors, release safety passed; package build and check_release --dist passed; CI and exact-main verification pending",
+    "growth_note": "CK-04 growth repetitions 3 and 4 remain waived; no strict v2 aggregate is claimed"
+  }
+}

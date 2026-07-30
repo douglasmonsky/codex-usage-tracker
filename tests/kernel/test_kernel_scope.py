@@ -11,6 +11,7 @@ from scripts.check_kernel_scope import (
     CK03_SYNTHETIC_ORACLE_ADDITIONS,
     CK04_PHYSICAL_BAKEOFF_ADDITIONS,
     CK05_CANONICAL_STORAGE_ADDITIONS,
+    CK06_ADAPTER_INGESTION_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS,
     INTEGRATION_ADDITIONS,
@@ -462,6 +463,26 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/agent_kernel/storage/test_repositories.py",
         "tests/agent_kernel/storage/test_tiny_accounting.py",
     } == CK05_CANONICAL_STORAGE_ADDITIONS
+    assert {
+        "docs/decisions/evidence/ck06/codex-adapter-ingestion-evidence.json",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/tasks/ck-06-implement-codex-adapter-and-ingestion.md",
+        "scripts/check_kernel_scope.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/__init__.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/contracts.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/__init__.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/canonicalize.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/cursor.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/discovery.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/ingest.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/normalize.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/parser.py",
+        "src/codex_usage_tracker/agent_kernel/storage/source_progress.py",
+        "tests/agent_kernel/adapters/__init__.py",
+        "tests/agent_kernel/adapters/test_contracts.py",
+        "tests/agent_kernel/adapters/test_cursor.py",
+        "tests/agent_kernel/adapters/test_ingestion.py",
+    } == CK06_ADAPTER_INGESTION_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -490,6 +511,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
         | CK04_PHYSICAL_BAKEOFF_ADDITIONS
         | CK05_CANONICAL_STORAGE_ADDITIONS
+        | CK06_ADAPTER_INGESTION_ADDITIONS
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )
 

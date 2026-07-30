@@ -493,6 +493,29 @@ CK05_CANONICAL_STORAGE_ADDITIONS = frozenset(
     }
 )
 
+CK06_ADAPTER_INGESTION_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck06/codex-adapter-ingestion-evidence.json",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/tasks/ck-06-implement-codex-adapter-and-ingestion.md",
+        "src/codex_usage_tracker/agent_kernel/adapters/__init__.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/contracts.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/__init__.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/canonicalize.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/cursor.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/discovery.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/ingest.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/normalize.py",
+        "src/codex_usage_tracker/agent_kernel/adapters/codex_jsonl/parser.py",
+        "src/codex_usage_tracker/agent_kernel/storage/source_progress.py",
+        "tests/agent_kernel/adapters/__init__.py",
+        "tests/agent_kernel/adapters/test_contracts.py",
+        "tests/agent_kernel/adapters/test_cursor.py",
+        "tests/agent_kernel/adapters/test_ingestion.py",
+        "scripts/check_kernel_scope.py",
+    }
+)
+
 CI_PERFORMANCE_QUALIFICATION_ADDITIONS = frozenset(
     {
         ".github/workflows/performance-qualification.yml",
@@ -533,6 +556,7 @@ INTEGRATION_ADDITIONS = (
     | DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
     | CK04_PHYSICAL_BAKEOFF_ADDITIONS
     | CK05_CANONICAL_STORAGE_ADDITIONS
+    | CK06_ADAPTER_INGESTION_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))")
