@@ -74,3 +74,11 @@ The CK-04 exception is unchanged: current-commit growth repetitions 3 and 4
 were waived and the strict v2 aggregate is not claimed. Growth build cost and
 SQLite I/O variance remain explicit risks. CK-06 owns bounded ingestion,
 streaming and batching beyond the repository seams, queue depth, and RSS.
+
+CK-05's schema and repository implementation are not implicated by the CK-03
+question-row mismatch: database-v1 contains no `question_cases` answer table.
+Its fixture digests, counts, and accounting evidence must nevertheless be
+reissued by
+[CK-07A](ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md) after the
+corrected canonical scenario fixture is frozen. A code change is admitted only
+if that unchanged consumer replay exposes a concrete storage deficiency.

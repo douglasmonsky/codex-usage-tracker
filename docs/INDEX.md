@@ -16,8 +16,13 @@ query proof obtained those rows from a candidate-only `question_cases` table
 that database-v1 explicitly forbids. CK-08 is therefore blocked at its packet
 boundary with the exact
 [prerequisite evidence](decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)
-recorded. CK-09 is not admitted. The CK-04 growth exception remains explicit
-and the strict v2 aggregate is not claimed. The authority set below wins over
+recorded. Corrective packet
+[CK-07A](roadmap/tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md)
+is now the admitted critical-path work: it repairs CK-03 oracle lineage,
+replaces CK-04's candidate-only answer proof, and requalifies the unchanged
+CK-05–CK-07 consumer seams before CK-08 may resume. CK-08 remains blocked and
+CK-09 is not admitted. The CK-04 growth exception remains explicit and the
+strict v2 aggregate is not claimed. The authority set below wins over
 historical operational checkpoints.
 
 ## Authority set
@@ -66,6 +71,9 @@ historical operational checkpoints.
 4. Read the qualification cases and budgets before writing code.
 5. Consult archived spike evidence only for the exact oracle or lesson named by
    the packet.
+6. For every upstream artifact consumed as truth, run the packet's executable
+   seam check against the actual consumer path and independent reference
+   evaluator; a digest or prior completion status is not sufficient.
 
 ### Changing a product contract
 
@@ -109,6 +117,11 @@ If two active documents appear inconsistent:
 4. the qualification plan decides whether a claim is proven;
 5. stop the affected packet and record a decision amendment rather than
    silently choosing the spike behavior.
+
+If an already completed packet's artifact fails in a downstream consumer,
+preserve the historical completion record, add a corrective packet to the
+dependency graph, and require linked requalification evidence for every
+affected downstream seam before dependent work resumes.
 
 Archived documents, old branch names, current spike schemas, and historical
 release notes never resolve an active-contract conflict.

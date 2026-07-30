@@ -71,3 +71,13 @@ limitation.
 
 1. `feat: add Codex source adapter`
 2. `perf: add bounded deterministic ingestion`
+
+## Corrective requalification
+
+CK-06 correctly exposed the canonical facts that revealed the CK-03 mismatch.
+Its implementation remains complete, while
+[CK-07A](ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md) must replay
+the adapter against the corrected fixture, prove grading metadata cannot become
+canonical facts, and refresh fixture digests, counts, measurements, and
+evidence. A code change is admitted only if that unchanged replay exposes a
+concrete adapter deficiency.

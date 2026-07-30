@@ -27,6 +27,10 @@ _ARCHIVE_PATHS = (
     "docs/archive/spike/ALLOWANCE_EFFICIENCY_FINDINGS.md",
     "docs/archive/spike/OVERLAY_ADAPTER_CONTRACT_0_28.md",
 )
+_PACKET_IDS = {
+    *(f"CK-{number:02d}" for number in range(17)),
+    "CK-07A",
+}
 
 
 def _read(path: str) -> str:
@@ -60,16 +64,20 @@ def test_authority_set_exists_and_has_one_roadmap() -> None:
 def test_master_ledger_links_exactly_one_file_per_packet() -> None:
     ledger_path = _DOCS / "roadmap" / "TASK_PACKETS.md"
     ledger = ledger_path.read_text(encoding="utf-8")
-    packet_ids = re.findall(r"^- \[[ xX]\] \*\*(CK-\d{2})\b", ledger, re.MULTILINE)
+    packet_ids = re.findall(
+        r"^- \[[ xX]\] \*\*(CK-\d{2}A?)\b",
+        ledger,
+        re.MULTILINE,
+    )
     packet_links = re.findall(
-        r"\[packet\]\((tasks/ck-\d{2}-[^)]+\.md)\)",
+        r"\[packet\]\((tasks/ck-\d{2}a?-.*\.md)\)",
         ledger,
     )
 
-    assert len(packet_ids) == 17
-    assert set(packet_ids) == {f"CK-{number:02d}" for number in range(17)}
-    assert len(packet_links) == 17
-    assert len(set(packet_links)) == 17
+    assert len(packet_ids) == len(_PACKET_IDS)
+    assert set(packet_ids) == _PACKET_IDS
+    assert len(packet_links) == len(_PACKET_IDS)
+    assert len(set(packet_links)) == len(_PACKET_IDS)
     assert all((ledger_path.parent / link).is_file() for link in packet_links)
 
     task_files = sorted((_DOCS / "roadmap" / "tasks").glob("ck-*.md"))
@@ -98,6 +106,54 @@ def test_master_ledger_links_exactly_one_file_per_packet() -> None:
             "**Required tests/checks:**" in body
             or "**Tests/benchmarks:**" in body
         )
+
+
+def test_corrective_seam_packet_is_critical_path_authority() -> None:
+    agents = _read("AGENTS.md")
+    index = _read("docs/INDEX.md")
+    roadmap = _read("docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md")
+    ledger = _read("docs/roadmap/TASK_PACKETS.md")
+    backlog = _read("docs/roadmap/LINEAR_BACKLOG.md")
+    qualification = _read("docs/quality/QUALIFICATION_PLAN.md")
+    query_contract = _read(
+        "docs/architecture/QUERY_EVIDENCE_PROJECTION_CONTRACTS.md"
+    )
+    physical_decision = _read(
+        "docs/decisions/PHYSICAL_ARCHITECTURE_DECISION.md"
+    )
+    ck07a = _read(
+        "docs/roadmap/tasks/"
+        "ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md"
+    )
+    ck08 = _read("docs/roadmap/tasks/ck-08-implement-query-and-evidence.md")
+
+    assert "## Cross-packet semantic continuity" in agents
+    assert "producer artifact and exact identity" in agents
+    assert "independent truth source or reference evaluator" in agents
+    assert "CK-07A" in index
+    assert "CK-07 -> CK-07A -> CK-08" in roadmap
+    assert "CK-07 → CK-07A\n→ CK-08" in ledger
+    assert "| CK-07A |" in backlog
+    assert "### Evidence claim classes" in qualification
+    assert "### Fact-backed plan admission" in query_contract
+    assert "**Dependencies:** CK-07 merged and verified" in ck07a
+    assert "## Frozen seam contracts" in ck07a
+    assert "## Frozen correction formats" in ck07a
+    assert "agent-kernel-structural-v2" in ck07a
+    assert all(
+        evidence_path in ck07a
+        for evidence_path in (
+            "docs/decisions/evidence/ck04/aggregate-evidence.json",
+            "docs/decisions/evidence/ck05/canonical-storage-evidence.json",
+            "docs/decisions/evidence/ck06/codex-adapter-ingestion-evidence.json",
+            "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
+        )
+    )
+    assert "all 80 variants" in ck07a
+    assert "all 80 question variants" in ck07a
+    assert "aggregate score/sensitivity evidence" in ck07a
+    assert "query correctness is not accepted" in physical_decision
+    assert "**Dependencies:** CK-07A merged with exact-main seam evidence." in ck08
 
 
 def test_question_catalog_and_diagram_inventory_are_complete() -> None:

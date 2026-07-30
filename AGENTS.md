@@ -20,6 +20,35 @@ its prerequisites are checked complete. Update the packet status, master
 checkbox ledger, measurements, deviations, and residual risks in the same
 change that completes a packet.
 
+## Cross-packet semantic continuity
+
+A packet is connected to its prerequisites by executable semantics, not only
+by document links, identifiers, hashes, counts, or a prior `Completed` status.
+Before a packet may consume an upstream artifact as truth, its contract must
+name:
+
+- the producer artifact and exact identity;
+- the consumer path that uses it;
+- an independent truth source or reference evaluator;
+- the executable seam check that compares producer meaning with consumer
+  behavior;
+- the downstream packets and evidence that require requalification if the seam
+  changes.
+
+For fact-backed behavior, preserve a three-way proof: one scenario declaration
+emits canonical typed facts, an independent reference evaluator calculates the
+expected result for the exact typed request, and the production consumer
+calculates the same result from its permitted facts. A database table
+containing expected answers, a copied oracle row, internal formula
+consistency, or a matching digest does not prove fact lineage.
+
+When a downstream packet exposes an upstream semantic mismatch, stop the
+affected packet, record exact reproduction evidence, and add a corrective
+packet to the dependency graph. Preserve historical packet evidence; amend it
+through a linked requalification record rather than silently changing its
+meaning. Do not resume dependents until the corrective packet replays every
+affected seam against the actual downstream implementation.
+
 ## Packet task handoff
 
 Keep each CK packet in its own Codex task. After a packet is fully accepted,
@@ -31,7 +60,8 @@ remaining approval gates, relevant commands, and any known risks or
 pre-existing failures. Verify that the new task started in the intended project
 folder with the handoff before ending the completing task. The completing task
 must not begin implementation of the next packet; ownership transfers at the
-packet boundary.
+packet boundary. The handoff must also name the admitted producer artifacts,
+consumer seam checks, independent truth source, and requalification set.
 
 ## Implementation boundary
 
@@ -87,13 +117,15 @@ packet boundary.
 ## Working method
 
 1. Read the current packet and only its controlling authority documents.
-2. Name the observable contract and add or select the failing synthetic oracle.
-3. Implement the smallest complete change inside the packet's ownership.
-4. Run focused checks, then the smallest complete repository profile covering
+2. Name the observable contract, upstream producer artifact, consumer path,
+   independent truth source, and executable seam check.
+3. Add or select the failing synthetic oracle.
+4. Implement the smallest complete change inside the packet's ownership.
+5. Run focused checks, then the smallest complete repository profile covering
    every touched contract.
-5. Record correctness, latency, storage, response-byte, MCP-call, and model-token
+6. Record correctness, latency, storage, response-byte, MCP-call, and model-token
    measurements required by the packet.
-6. Stabilize the diff, then use at most one final read-only reviewer.
+7. Stabilize the diff, then use at most one final read-only reviewer.
 
 Prefer direct functions, explicit data structures, cohesive modules, and clear
 dependency direction. Add abstraction only when it removes present

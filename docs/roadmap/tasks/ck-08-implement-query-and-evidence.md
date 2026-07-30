@@ -9,8 +9,9 @@ resolve stable bounded evidence before adding projections.
 
 **Why:** Fact-backed truth is the oracle for every later optimization.
 
-**Controls:** `QUERY_EVIDENCE_PROJECTION_CONTRACTS.md`, CK-01, CK-05–CK-07.
-**Dependencies:** CK-07.
+**Controls:** `QUERY_EVIDENCE_PROJECTION_CONTRACTS.md`, CK-01, CK-05–CK-07,
+and CK-07A.
+**Dependencies:** CK-07A merged with exact-main seam evidence.
 
 **Scope and expected files:**
 
@@ -62,7 +63,9 @@ canonical facts.
 
 The exact inputs, hashes, SQL result, and contract references are recorded in
 [`fact-backed-oracle-prerequisite-gap.json`](../../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json).
-Before CK-08 can resume, the authority set must freeze Foundation/Cutover
+Corrective packet
+[CK-07A](ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md) owns this
+prerequisite. Before CK-08 can resume, the authority set must freeze Foundation/Cutover
 question cases whose expected rows are independently calculated from the
 canonical facts emitted for the same typed requests. The replacement must keep
 all 21 named plans, 42 variants, grades, formulas, selectors, and limits, and

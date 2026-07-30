@@ -95,6 +95,14 @@ synthetic-prompt artifact identity/hash, token source, and authorization for
 billed calls were never frozen; CK-11 owns that installed-model operability
 record.
 
+CK-08 later established that Candidate A's “database-derived” query proof read
+`question_cases.observed_facts_json`, populated from `oracle_case` grading
+records. The physical measurements, recovery evidence, selected database-v1
+shape, and growth waiver remain historical evidence, but that query proof does
+not establish canonical-fact lineage. Corrective packet
+[CK-07A](ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md) must
+replace and requalify it before CK-08 resumes.
+
 ## Cross-task execution handoff
 
 **Recorded:** 2026-07-29, America/New_York

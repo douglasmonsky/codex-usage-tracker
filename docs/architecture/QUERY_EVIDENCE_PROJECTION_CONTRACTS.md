@@ -72,6 +72,28 @@ Registry changes require contract tests, qualification updates, and a version
 change. A plan may not silently fall back to a broad generic scan that exceeds
 its declared budget.
 
+### Fact-backed plan admission
+
+A named plan is admitted to implementation only after its exact typed request
+has an executable fact-lineage triangle:
+
+1. a scenario declaration emits canonical typed facts and selector
+   occurrences;
+2. an independent reference evaluator derives the expected row from those
+   facts without calling the production compiler;
+3. the permitted database-v1 fact plan produces the same row from one read
+   snapshot.
+
+The scenario, reference evaluator, and production plan may share versioned
+formulas and contracts, but they cannot share computed answer rows. Candidate
+or grading tables such as `question_cases`, `oracle_case` runtime reads, and
+equivalent expected-answer caches are forbidden. A matching digest, formula
+check, or database round trip alone does not admit a plan.
+
+Every plan records its producer artifact identity, consumer seam check, and
+requalification set. If any of those inputs change, the plan returns to
+unimplemented until its seam qualification passes again.
+
 ## Typed compositional boundary
 
 The generic query grammar is allowlisted:

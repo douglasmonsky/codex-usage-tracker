@@ -245,6 +245,7 @@ CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS = frozenset(
         "docs/roadmap/tasks/ck-05-implement-canonical-storage-kernel.md",
         "docs/roadmap/tasks/ck-06-implement-codex-adapter-and-ingestion.md",
         "docs/roadmap/tasks/ck-07-implement-publication-refresh-recovery.md",
+        "docs/roadmap/tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md",
         "docs/roadmap/tasks/ck-08-implement-query-and-evidence.md",
         "docs/roadmap/tasks/ck-09-admit-projections-and-named-plans.md",
         "docs/roadmap/tasks/ck-10-deliver-setup-mcp-cli-skill.md",
