@@ -111,7 +111,7 @@
     "wheel_bytes": 229432,
     "sdist_bytes": 616331,
     "wheel_ceiling": 236300,
-    "sdist_ceiling": 634700,
+    "sdist_ceiling": 634400,
     "release_check": "passed"
   },
   "validation": {
