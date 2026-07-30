@@ -404,6 +404,10 @@ def test_completed_run_artifacts_are_discarded_unless_explicitly_retained(
     assert any((retained.invocation_root / "runs").rglob("candidate.sqlite"))
 
 
+@pytest.mark.skipif(
+    sys.platform != "darwin",
+    reason="the accepted prepared-artifact contract requires macOS cp -c",
+)
 def test_candidate_a_reuses_scale_build_for_query_and_cloned_ordinary_repetitions(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

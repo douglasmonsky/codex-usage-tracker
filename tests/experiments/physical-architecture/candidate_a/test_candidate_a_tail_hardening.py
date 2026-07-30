@@ -98,7 +98,7 @@ def test_pending_tool_lookup_stays_indexed_with_closed_history(
             WITH RECURSIVE sequence(value) AS (
                 VALUES (1)
                 UNION ALL
-                SELECT value + 1 FROM sequence WHERE value < 2_000
+                SELECT value + 1 FROM sequence WHERE value < 2000
             ),
             base AS (
                 SELECT *
