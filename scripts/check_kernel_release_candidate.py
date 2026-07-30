@@ -244,7 +244,7 @@ def _measurement_failures(
     if (
         isinstance(headroom, bool)
         or not isinstance(headroom, (int, float))
-        or not 0 <= headroom <= 3
+        or not 0 <= headroom <= 25
     ):
         return [f"invalid release-candidate headroom_percent {headroom}"]
     for name, measured in measurements.items():

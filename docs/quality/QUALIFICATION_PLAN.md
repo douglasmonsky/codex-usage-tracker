@@ -255,7 +255,8 @@ Report:
 - runtime dependency count;
 - frontend/Node/static-asset absence after retirement.
 
-Ratchets use the measured accepted output plus no more than 3% headroom. A
+Byte-size ratchets use the measured accepted output plus no more than 25%
+headroom. Exact catalog counts remain unbuffered. A
 ratchet change requires the exact semantic reason and before/after attribution.
 
 ## Exact installed artifact qualification

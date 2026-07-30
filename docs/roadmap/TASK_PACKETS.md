@@ -7,10 +7,10 @@ in the linked files under [`docs/roadmap/tasks/`](tasks/).
 
 ## Overall
 
-- Completed packets: **7 / 17**
+- Completed packets: **8 / 17**
 - In progress: **None**
-- Not started: **10**
-- Critical-path completion: **7 / 16**
+- Not started: **9**
+- Critical-path completion: **8 / 16**
 - Optional packets: **CK-15**
 
 A packet may be checked only after its acceptance criteria and required checks
@@ -22,7 +22,7 @@ line and the milestone accounting below.
 
 - [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
 - [x] **M1 — Architecture Selected** · 4 / 4 · CK-01–CK-04 complete
-- [ ] **M2 — Kernel Alpha** · 2 / 5 · CK-05–CK-06 complete; CK-07–CK-09 not started
+- [ ] **M2 — Kernel Alpha** · 3 / 5 · CK-05–CK-07 complete; CK-08–CK-09 not started
 - [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
 - [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
 - [ ] **M5 — Public Release** · 0 / 1 required · CK-16 not started
@@ -60,7 +60,7 @@ line and the milestone accounting below.
 - [x] **CK-06 — Implement the Codex adapter and ingestion** · **Completed** ·
   depends on CK-05
   · [packet](tasks/ck-06-implement-codex-adapter-and-ingestion.md)
-- [ ] **CK-07 — Implement publication, refresh, and recovery** · Not started ·
+- [x] **CK-07 — Implement publication, refresh, and recovery** · **Completed** ·
   depends on CK-06
   · [packet](tasks/ck-07-implement-publication-refresh-recovery.md)
 - [ ] **CK-08 — Implement query and evidence** · Not started ·

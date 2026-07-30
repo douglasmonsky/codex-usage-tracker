@@ -1,0 +1,279 @@
+{
+  "schema": "codex-usage-tracker.ck07-publication-refresh-recovery-evidence.v1",
+  "task": "CK-07",
+  "base_main_sha": "f8bf681bf57557973b13bb4e5d92a7803ff44ae8",
+  "schema_contract": "codex-usage-tracker.agent-kernel.v1",
+  "schema_digest": "6ae65b6eb7024486f8fe42e19ab6799a252b721e6a9519f19d70e91f4aae6b77",
+  "adapter_contract": "codex-usage-tracker.adapter.v1",
+  "adapter_id": "codex-jsonl",
+  "fixture": {
+    "profile": "tiny",
+    "manifest_digest": "78003a7cfdee8beb1a263b3027fec162a612352be6fbefd13a65e821640bc7ae",
+    "oracle_digest": "9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b",
+    "source_bytes": 244657,
+    "source_records": 339,
+    "synthetic_only": true,
+    "raw_body_present": false,
+    "note": "Only the checked-in CK-03 tiny fixture was used. No frozen 0.28 runtime, real Codex logs, prompts, responses, reasoning, commands, patches, tool bodies, secrets, or local tracker databases were inspected."
+  },
+  "publication_accounting": {
+    "canonical_counts": {
+      "activities": 5,
+      "allowance_limits": 1,
+      "allowance_observations": 4,
+      "compaction_boundaries": 2,
+      "model_calls": 100,
+      "projects": 1,
+      "resources": 25,
+      "sessions": 10,
+      "state_changes": 5,
+      "tool_invocations": 25,
+      "turns": 50
+    },
+    "model_call_occurrences": 102,
+    "token_sums": {
+      "uncached_input_tokens": {
+        "value": 53650,
+        "observed_count": 100,
+        "missing_count": 0
+      },
+      "cached_input_tokens": {
+        "value": null,
+        "observed_count": 95,
+        "missing_count": 5
+      },
+      "reasoning_tokens": {
+        "value": 31850,
+        "observed_count": 100,
+        "missing_count": 0
+      },
+      "output_tokens": {
+        "value": 47450,
+        "observed_count": 100,
+        "missing_count": 0
+      }
+    },
+    "idempotence": "same operation and publication IDs replay without duplicate publications, occurrences, facts, lifecycle rows, or head changes",
+    "same_snapshot_authority": true
+  },
+  "planner": {
+    "small_tail_limits": {
+      "selected_bytes": 8388608,
+      "selected_records": 32,
+      "observations": 12000,
+      "occurrences": 12000,
+      "affected_sessions": 2000,
+      "affected_turns": 4000,
+      "affected_resources": 4000,
+      "affected_allowance_cycles": 512,
+      "dirty_keys": 16000,
+      "projection_rows": 16000,
+      "expected_wal_bytes": 16777216,
+      "planning_staleness_us": 5000000,
+      "model_call_tail_rows": 32000
+    },
+    "thirty_two_call_class": "append_safe_small",
+    "two_thousand_call_class": "append_safe_large",
+    "unsafe_classes": [
+      "source_replace",
+      "recanonicalize",
+      "schema_upgrade",
+      "projection_upgrade",
+      "history_expand"
+    ],
+    "rate_only_class": "valuation_only",
+    "moving_tail_maximum_passes": 2,
+    "watcher_hints_are_correctness_authority": false,
+    "periodic_reconciliation_required": true
+  },
+  "publication_protocol": {
+    "no_change_analytical_transactions": 0,
+    "small_path": "one BEGIN IMMEDIATE transaction after all parsing, canonicalization, bounds, identity encoding, and row preparation",
+    "large_path": "owner-only isolated artifact build, validation, production durability restore, digest and fsync preflight, fenced pointer activation, rollback retention, and sidecar reconciliation",
+    "query_can_refresh": false,
+    "long_work_wait_boundary": "host",
+    "model_polling_surface": false,
+    "concurrent_reader_available": true,
+    "source_revision_fencing": true,
+    "parent_publication_fencing": true,
+    "promotion_generation_fencing": true,
+    "initial_pointer_generation": 1,
+    "rollback_retained_after_replacement": true
+  },
+  "operational_recovery": {
+    "compatible_refresh": "joins one existing operation",
+    "incompatible_refresh": "bounded conflict without a second worker",
+    "worker_identity": "pid plus process-start token",
+    "lease_fencing_tokens_monotonic": true,
+    "status_snapshot_read_only": true,
+    "dirty_hint_identity": [
+      "source_id",
+      "technical_path_key"
+    ],
+    "startup_order": [
+      "validate active and rollback pointer-artifact pairs",
+      "open analytical reads",
+      "repair pointer if required",
+      "reconcile sidecar intents and jobs",
+      "recover stale leases",
+      "age-gated protected cleanup"
+    ],
+    "error_codes": [
+      "candidate_not_selected",
+      "stale_lease",
+      "stale_worker"
+    ],
+    "host_wait_maximum_poll_interval_ms": 250
+  },
+  "crash_matrix": {
+    "small_transaction_fault_stages": [
+      "after_begin",
+      "after_recheck",
+      "after_publication",
+      "after_occurrences",
+      "after_facts",
+      "after_metadata",
+      "after_head",
+      "before_commit"
+    ],
+    "process_exit_stages": [
+      "after_begin",
+      "after_recheck",
+      "after_publication",
+      "after_occurrences",
+      "after_facts",
+      "after_metadata",
+      "after_head",
+      "before_commit"
+    ],
+    "promotion_fault_stages": [
+      "after_candidate_preflight",
+      "before_pointer_write",
+      "before_pointer_replace",
+      "after_pointer_replace",
+      "after_directory_fsync",
+      "after_pointer_write",
+      "after_reopen_validate",
+      "after_sidecar_reconcile"
+    ],
+    "promotion_process_exit_stages": [
+      "before_pointer_replace",
+      "after_pointer_replace",
+      "after_directory_fsync",
+      "after_reopen_validate",
+      "after_sidecar_reconcile"
+    ],
+    "small_publication_process_exit_stages": [
+      "after_small_analytical_commit",
+      "after_small_pointer_write"
+    ],
+    "cleanup_process_exit_stages": [
+      "before_cleanup_unlink",
+      "after_cleanup_unlink"
+    ],
+    "process_exit_case_count": 17,
+    "required_outcome": "prior committed publication remains readable or the fully validated candidate is selected; sidecar recovery cannot invalidate analytical truth; active and rollback artifacts remain protected; retry succeeds deterministically"
+  },
+  "performance": {
+    "measurement": "five unprofiled repetitions on the local development host; nearest-rank p95; every append was fully validated after commit; absolute promotion activation measured after candidate digest/fsync preflight and through pointer activation plus bounded reopen validation",
+    "hard_budget_comparisons": {
+      "no_change_p95_le_100ms": true,
+      "one_call_p95_le_500ms": true,
+      "one_tool_p95_le_500ms": true,
+      "two_thousand_large_path_activation_p95_le_50ms": true
+    },
+    "no_change": {
+      "median_ms": 0.026,
+      "p95_ms": 0.045,
+      "maximum_ms": 0.045,
+      "cv": 0.27815
+    },
+    "one_call_transaction": {
+      "median_ms": 1.488,
+      "p95_ms": 1.893,
+      "maximum_ms": 1.893,
+      "cv": 0.10574
+    },
+    "one_tool_lifecycle_transaction": {
+      "median_ms": 1.324,
+      "p95_ms": 1.488,
+      "maximum_ms": 1.488,
+      "cv": 0.12832
+    },
+    "thirty_two_call_transaction": {
+      "median_ms": 12.432,
+      "p95_ms": 13.908,
+      "maximum_ms": 13.908,
+      "cv": 0.08962
+    },
+    "two_thousand_large_path": {
+      "candidate_build_median_ms": 801.417,
+      "candidate_build_p95_ms": 817.541,
+      "candidate_build_maximum_ms": 817.541,
+      "candidate_preflight_median_ms": 6.66,
+      "candidate_preflight_p95_ms": 6.712,
+      "activation_median_ms": 21.199,
+      "activation_p95_ms": 24.052,
+      "activation_maximum_ms": 24.052,
+      "full_promotion_median_ms": 28.347,
+      "full_promotion_p95_ms": 31.132,
+      "candidate_file_bytes": 11878400,
+      "max_rss_raw": 106364928
+    },
+    "forced_unsafe_short_writer_diagnostic": {
+      "planner_rejected": true,
+      "transaction_p95_ms": 182.843,
+      "transaction_body_p95_ms": 130.655,
+      "begin_and_commit_p95_ms": 59.985,
+      "total_wall_p95_ms": 339.425,
+      "max_wal_bytes": 14658992,
+      "note": "This deliberately forced diagnostic proves why 2,000 records are not admitted to the measured 32-record small path. It is not the selected production route or a passing-gate claim."
+    },
+    "adapter_queue": {
+      "workers": 2,
+      "record_batch_size": 32,
+      "max_queue_depth": 2,
+      "peak_rss_bytes": 35815424
+    },
+    "agent_perf": {
+      "run_id": "20260730T114459Z-7ab5e8c5",
+      "profiler": "scalene 2.3.0",
+      "status": "complete",
+      "top_application_hotspot": "PublicationWriter._execute_values",
+      "activation_diagnosis_run_id": "20260730T121933Z-07238207",
+      "note": "Profile shares are attribution only. The activation diagnosis identified full post-swap reconciliation as the regression; speed claims use the final five unprofiled repetitions above."
+    },
+    "growth_repetitions_3_and_4": "waived_by_CK-04_decision; no_strict_v2_aggregate_claimed"
+  },
+  "review_accounting": {
+    "reviewer_count": 1,
+    "findings": [
+      {"id": "F1", "severity": "high", "accepted": true, "summary": "Carry complete source coverage and cursors into every incremental publication."},
+      {"id": "F2", "severity": "high", "accepted": true, "summary": "Fence short publications with pointer advancement and promotion exclusion."},
+      {"id": "F3", "severity": "high", "accepted": true, "summary": "Classify cross-publication entity, occurrence, lifecycle, token, and tail deltas from prior truth."},
+      {"id": "F4", "severity": "high", "accepted": true, "summary": "Recompute and reconcile the full isolated-artifact manifest before promotion."},
+      {"id": "F5", "severity": "medium", "accepted": true, "summary": "Recover dead active jobs without leases and exhaust truncated startup state."}
+    ],
+    "accepted_findings": ["F1", "F2", "F3", "F4", "F5"],
+    "reviewer_token_status": "pending",
+    "tokens_per_accepted_finding": null,
+    "note": "One final comprehensive read-only reviewer; all five findings were accepted for correction. The installed reviewer-token tooling does not support the historical strict subcommand, so token status remains pending and was not retried."
+  },
+  "packaging": {
+    "wheel_bytes": 279793,
+    "sdist_bytes": 663225,
+    "wheel_ceiling": 345000,
+    "sdist_ceiling": 820000,
+    "headroom_percent": 25,
+    "policy_note": "Byte-size budgets were intentionally loosened across source, console assets, plugin bundle, wheel, and sdist; exact catalog counts remain strict.",
+    "release_check": "passed in just vc and explicit post-build distribution check"
+  },
+  "validation": {
+    "focused": "168 passed: adapters, storage, database-v1 schema contract, publication, and kernel scope; includes 17 true spawned-process crash cases",
+    "bootstrap": "python3 scripts/bootstrap_dev_environment.py passed from exact base worktree; branch-transition GitNexus index was repaired and --component gitnexus --check passed",
+    "scope": "pre-edit GitNexus impact analysis completed; final exact staged detect_changes against origin/main reported expected critical integrated publication and byte-policy scope: 28 files, 973 symbols, 45 affected processes",
+    "qualification": "just vp passed; final just vc included just v with 1076 functional tests, 13 invariant performance tests with no breaches, Pyright 0 errors, and release safety; package build and distribution safety passed; hosted CI and exact-main post-merge verification pending",
+    "maintainability": "CK-07 has no D/E blocks; pre-existing CK-06 normalize_record E, iter_source_batches D, and CK-05 fold_lifecycle D remain unchanged",
+    "growth_note": "CK-04 growth repetitions 3 and 4 remain waived; no strict v2 aggregate is claimed"
+  }
+}

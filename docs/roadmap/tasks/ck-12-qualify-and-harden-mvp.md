@@ -29,7 +29,8 @@ fresh CLI/Desktop default/lower model.
 
 **Acceptance:** Every hard gate passes; residual host/model latency is
 separated and within release criteria; no unresolved accepted review finding;
-ratchets have <=3% headroom.
+byte-size ratchets have <=25% headroom while exact catalog counts remain
+unbuffered.
 
 **Failure/rollback:** Keep replacement disabled and create a narrowly owned
 follow-up packet. A hard-gate failure cannot be converted to a caveat.

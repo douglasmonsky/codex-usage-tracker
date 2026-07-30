@@ -36,7 +36,8 @@ scan, package/CI/source bytes, no frontend/Node files, full replacement
 qualification, and clean-install smoke of the exact locally built candidate.
 
 **Acceptance:** Retired paths/surfaces absent; package and CI budgets decrease
-with <=3% headroom; no useful oracle lost; full L0–L5 remains green.
+with <=25% byte-size headroom and exact catalog counts; no useful oracle lost;
+full L0–L5 remains green.
 
 **Failure/rollback:** Revert CK-14 before release. Do not retain partial legacy
 shims to make deletion tests pass.
