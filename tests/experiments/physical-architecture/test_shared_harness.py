@@ -11,7 +11,11 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-import tomllib
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _EXPERIMENT_ROOT = _REPO_ROOT / "experiments" / "physical-architecture"
