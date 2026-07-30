@@ -8,14 +8,22 @@ from typing import Any
 
 import shared
 
-from .ingest import BuildArtifact, IngestStats, build_artifact
+from .ingest import BuildArtifact, IngestStats, build_artifact, file_sha256
 from .maintenance import (
     MaintenanceStats,
     TailFoldRequired,
     apply_ordinary_change,
     apply_source_phase,
 )
-from .metrics import ArtifactMetrics, artifact_metrics
+from .metrics import (
+    ArtifactMetrics,
+    ImmutableArtifactMetrics,
+    artifact_metrics,
+    immutable_artifact_fingerprint,
+    immutable_artifact_metrics,
+    reuse_immutable_artifact_metrics,
+    validate_immutable_artifact_metrics,
+)
 from .prepared_artifact import PreparationEvidence, clone_prepared_artifact
 from .publication import CandidateACrashDriver, publish_artifact
 from .queries import (
@@ -40,6 +48,7 @@ class Adapter:
 
     def __init__(self) -> None:
         self._prepared_scale_artifacts: dict[int, BuildArtifact] = {}
+        self._prepared_scale_metrics: dict[int, ImmutableArtifactMetrics] = {}
         self._prepared_ordinary_artifacts: dict[
             tuple[str, int], tuple[BuildArtifact, PreparationEvidence]
         ] = {}
@@ -112,8 +121,6 @@ class Adapter:
                 defer_secondary_indexes=defer_secondary_indexes,
                 parser_workers=parser_workers,
             )
-        if request.case.case_id == f"build.scale.{request.fixture.profile}":
-            self._prepared_scale_artifacts[request.repetition] = artifact
         index_maintenance_ns = artifact.stats.index_maintenance_ns
         if index_mode == "rebuilt":
             rebuild_started = time.perf_counter_ns()
@@ -122,10 +129,23 @@ class Adapter:
                 connection.execute("PRAGMA optimize")
             index_maintenance_ns += time.perf_counter_ns() - rebuild_started
         elapsed = time.perf_counter_ns() - started
+        retained_fingerprint = (
+            immutable_artifact_fingerprint(artifact.path)
+            if request.case.case_id == f"build.scale.{request.fixture.profile}"
+            else None
+        )
         storage = artifact_metrics(
             artifact.path,
             occurrence_rows=artifact.stats.occurrence_rows,
         )
+        if retained_fingerprint is not None:
+            self._prepared_scale_artifacts[request.repetition] = artifact
+            self._prepared_scale_metrics[request.repetition] = immutable_artifact_metrics(
+                artifact.path,
+                metrics=storage,
+                artifact_sha256=file_sha256(artifact.path),
+                fingerprint=retained_fingerprint,
+            )
         if self._observe_stop(
             request,
             (
@@ -349,6 +369,11 @@ class Adapter:
 
     def _query(self, request: shared.CandidateRequest) -> shared.CandidateResult:
         artifact = self._query_artifact(request)
+        snapshot = self._prepared_query_metrics(request, artifact)
+        if snapshot is not None:
+            # Check the source before opening it so a journal/WAL mutation cannot
+            # make SQLite fail obscurely before the immutable-source violation.
+            validate_immutable_artifact_metrics(snapshot, artifact.path)
         started = time.perf_counter_ns()
         plan_stopped = False
         with database(artifact.path, read_only=True) as connection:
@@ -384,9 +409,13 @@ class Adapter:
                     self._query_plan_observations(result),
                 )
         elapsed = time.perf_counter_ns() - started
-        storage = artifact_metrics(
-            artifact.path,
-            occurrence_rows=artifact.stats.occurrence_rows,
+        storage = (
+            reuse_immutable_artifact_metrics(snapshot, artifact.path)
+            if snapshot is not None
+            else artifact_metrics(
+                artifact.path,
+                occurrence_rows=artifact.stats.occurrence_rows,
+            )
         )
         values = self._values(
             artifact,
@@ -424,6 +453,16 @@ class Adapter:
         ):
             return artifact
         return publish_artifact(request.fixture, request.run_root)
+
+    def _prepared_query_metrics(
+        self,
+        request: shared.CandidateRequest,
+        artifact: BuildArtifact,
+    ) -> ImmutableArtifactMetrics | None:
+        snapshot = self._prepared_scale_metrics.get(request.repetition)
+        if snapshot is not None and artifact.path.resolve() == snapshot.fingerprint.resolved_path:
+            return snapshot
+        return None
 
     @staticmethod
     def _query_plan_observations(

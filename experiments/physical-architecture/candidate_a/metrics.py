@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 import resource
 import sqlite3
-from dataclasses import dataclass
+import stat
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .schema import database
@@ -25,11 +26,107 @@ class ArtifactMetrics:
     journal_bytes: int
 
 
+@dataclass(frozen=True)
+class ArtifactFingerprint:
+    """Cheap identity checks for a retained, immutable SQLite artifact."""
+
+    resolved_path: Path
+    device: int
+    inode: int
+    size: int
+    mtime_ns: int
+
+
+@dataclass(frozen=True)
+class ImmutableArtifactMetrics:
+    """Authenticated static metrics captured for one retained scale artifact."""
+
+    metrics: ArtifactMetrics
+    fingerprint: ArtifactFingerprint
+    artifact_sha256: str
+
+
+class ImmutableArtifactMetricsError(ValueError):
+    """A retained source no longer satisfies the read-only reuse invariant."""
+
+
 def _peak_rss_bytes() -> int:
     value = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     if os.uname().sysname == "Darwin":
         return value
     return value * 1024
+
+
+def with_current_peak_rss(metrics: ArtifactMetrics) -> ArtifactMetrics:
+    """Keep storage facts static while reporting the process metric at query time."""
+    return replace(metrics, peak_rss_bytes=_peak_rss_bytes())
+
+
+def _fingerprint(path: Path) -> ArtifactFingerprint:
+    resolved = path.resolve(strict=True)
+    source_stat = resolved.stat()
+    if not stat.S_ISREG(source_stat.st_mode):
+        raise ImmutableArtifactMetricsError("retained source must be a regular file")
+    return ArtifactFingerprint(
+        resolved_path=resolved,
+        device=source_stat.st_dev,
+        inode=source_stat.st_ino,
+        size=source_stat.st_size,
+        mtime_ns=source_stat.st_mtime_ns,
+    )
+
+
+def _validate_reuse_sidecars(path: Path) -> None:
+    journal = path.with_name(f"{path.name}-journal")
+    if journal.exists():
+        raise ImmutableArtifactMetricsError("retained source has a rollback journal")
+    wal = path.with_name(f"{path.name}-wal")
+    if wal.exists() and wal.stat().st_size != 0:
+        raise ImmutableArtifactMetricsError("retained source has a nonempty WAL")
+
+
+def immutable_artifact_fingerprint(path: Path) -> ArtifactFingerprint:
+    """Return a clean retained-source fingerprint for static metric capture."""
+    fingerprint = _fingerprint(path)
+    _validate_reuse_sidecars(fingerprint.resolved_path)
+    return fingerprint
+
+
+def immutable_artifact_metrics(
+    path: Path,
+    *,
+    metrics: ArtifactMetrics,
+    artifact_sha256: str,
+    fingerprint: ArtifactFingerprint,
+) -> ImmutableArtifactMetrics:
+    """Capture static metrics only after the retained source is stable and clean."""
+    current = immutable_artifact_fingerprint(path)
+    if current != fingerprint:
+        raise ImmutableArtifactMetricsError("retained source changed while metrics were captured")
+    return ImmutableArtifactMetrics(
+        metrics=metrics,
+        fingerprint=fingerprint,
+        artifact_sha256=artifact_sha256,
+    )
+
+
+def validate_immutable_artifact_metrics(
+    snapshot: ImmutableArtifactMetrics,
+    path: Path,
+) -> None:
+    """Fail closed when a retained source no longer matches its snapshot."""
+    current = immutable_artifact_fingerprint(path)
+    if current != snapshot.fingerprint:
+        raise ImmutableArtifactMetricsError("retained source fingerprint changed")
+
+
+def reuse_immutable_artifact_metrics(
+    snapshot: ImmutableArtifactMetrics,
+    path: Path,
+) -> ArtifactMetrics:
+    """Validate immutable-source assumptions and reuse only static metric facts."""
+    validate_immutable_artifact_metrics(snapshot, path)
+    return with_current_peak_rss(snapshot.metrics)
 
 
 def _dbstat_bytes(

@@ -387,7 +387,9 @@ def test_candidate_a_reuses_scale_build_for_query_and_cloned_ordinary_repetition
     monkeypatch.setattr(shared, "load_fixture_bundle", lambda _: production_fixture)
     candidate_a = importlib.import_module("candidate_a.adapter")
     original_publish = candidate_a.publish_artifact
+    original_metrics = candidate_a.artifact_metrics
     published: list[tuple[int, str, Path]] = []
+    metric_paths: list[Path] = []
 
     def recording_publish(*args: Any, **kwargs: Any) -> Any:
         artifact = original_publish(*args, **kwargs)
@@ -400,6 +402,10 @@ def test_candidate_a_reuses_scale_build_for_query_and_cloned_ordinary_repetition
         )
         return artifact
 
+    def recording_metrics(path: Path, *, occurrence_rows: int) -> Any:
+        metric_paths.append(path)
+        return original_metrics(path, occurrence_rows=occurrence_rows)
+
     class RecordingAdapter(candidate_a.Adapter):
         def __init__(self) -> None:
             super().__init__()
@@ -411,6 +417,7 @@ def test_candidate_a_reuses_scale_build_for_query_and_cloned_ordinary_repetition
             return artifact
 
     monkeypatch.setattr(candidate_a, "publish_artifact", recording_publish)
+    monkeypatch.setattr(candidate_a, "artifact_metrics", recording_metrics)
     original_execute_measured = shared.execute_measured_candidate
     prepared_before_measurement: list[Path] = []
 
@@ -465,6 +472,9 @@ def test_candidate_a_reuses_scale_build_for_query_and_cloned_ordinary_repetition
         "source_case_id": "build.scale.production",
     }
     assert len(published) == 2
+    assert [path for path in metric_paths if path.name == "publication.sqlite"] == [
+        path for _index, _digest, path in published
+    ]
     expected_publications = {
         repetition: adapter._prepared_scale_artifacts[repetition].publication_id
         for repetition in range(2)

@@ -74,8 +74,12 @@ and never copies sidecars or falls back to a full copy. Preparation timing is re
 preparation evidence, outside the ordinary-operation measurement.
 Build timing remains isolated in the scale case, ordinary timing begins after cloning, query
 timing begins after artifact selection, and the runner deletes the temporarily retained
-scale roots after all consumers finish. This avoids rebuilding an identical multi-gigabyte
-fixture without changing either score input. Pass
+scale roots after all consumers finish. Candidate A captures one authenticated static storage
+metric snapshot for each retained scale artifact; prepared queries validate its resolved-path,
+device/inode, size, mtime, journal/WAL, and build-time SHA-256 assumptions before reusing its
+table/index/free-list/row facts, while refreshing the current process peak RSS. A mismatch
+fails the query before evidence is emitted rather than rescanning or reporting stale storage.
+This avoids rebuilding an identical multi-gigabyte fixture without changing either score input. Pass
 `--retain-run-artifacts` only for a bounded diagnostic that genuinely needs the generated
 candidate database; the retention choice is recorded in both invocation and summary
 artifacts.

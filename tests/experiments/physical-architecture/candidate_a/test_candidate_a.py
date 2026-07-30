@@ -20,6 +20,7 @@ adapter_module = importlib.import_module("candidate_a.adapter")
 evidence_module = importlib.import_module("candidate_a.evidence")
 ingest_module = importlib.import_module("candidate_a.ingest")
 maintenance_module = importlib.import_module("candidate_a.maintenance")
+metrics_module = importlib.import_module("candidate_a.metrics")
 schema_module = importlib.import_module("candidate_a.schema")
 
 Adapter = adapter_module.Adapter
@@ -107,6 +108,104 @@ def test_large_scale_builds_use_bounded_parallel_parsers(
     assert adapter._parser_worker_count(production_request) == 4
     assert adapter._parser_worker_count(tiny_request) == 1
     assert adapter._parser_worker_count(configured_request) == 2
+
+
+def test_prepared_query_reuses_immutable_storage_metrics_and_fails_closed(
+    fixture: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    matrix = shared.build_workload_matrix(physical_cores=_PHYSICAL_CORES)
+    adapter = Adapter()
+    scale_root = tmp_path / "scale"
+    scale_request = _request(
+        fixture=fixture,
+        case=matrix.by_id("build.scale.tiny"),
+        run_root=scale_root,
+    )
+    metric_calls: list[Path] = []
+    original_metrics = adapter_module.artifact_metrics
+
+    def recording_metrics(path: Path, *, occurrence_rows: int) -> Any:
+        metric_calls.append(path)
+        return original_metrics(path, occurrence_rows=occurrence_rows)
+
+    peaks = iter((101, 202, 303, 404))
+    monkeypatch.setattr(adapter_module, "artifact_metrics", recording_metrics)
+    monkeypatch.setattr(metrics_module, "_peak_rss_bytes", lambda: next(peaks))
+
+    build = adapter.execute(scale_request)
+    artifact = adapter._prepared_scale_artifacts[0]
+    before_digest = __import__("hashlib").sha256(artifact.path.read_bytes()).hexdigest()
+    assert adapter._prepared_scale_metrics[0].artifact_sha256 == before_digest
+    query_case = matrix.by_id("query.q-acc-01.warm_first_page")
+
+    def prepared_query() -> Any:
+        return adapter.execute(
+            shared.CandidateRequest(
+                case=query_case,
+                fixture=fixture,
+                run_root=scale_root,
+                repetition=0,
+                stop=shared.EarlyStopController(
+                    query_case.case_id,
+                    query_case.early_stop_limits,
+                ),
+            )
+        )
+
+    first = prepared_query()
+    second = prepared_query()
+
+    assert metric_calls == [artifact.path]
+    assert first.measurements.peak_rss_bytes == 202
+    assert second.measurements.peak_rss_bytes == 303
+    for field in (
+        "fact_rows",
+        "lifecycle_rows",
+        "occurrence_rows",
+        "projection_rows",
+        "database_bytes",
+        "table_bytes",
+        "index_bytes",
+        "free_list_bytes",
+        "wal_bytes",
+        "journal_bytes",
+    ):
+        assert getattr(first.measurements, field) == getattr(build.measurements, field)
+        assert getattr(second.measurements, field) == getattr(build.measurements, field)
+    assert __import__("hashlib").sha256(artifact.path.read_bytes()).hexdigest() == before_digest
+
+    artifact.path.with_name(f"{artifact.path.name}-journal").write_bytes(b"mutation")
+    with pytest.raises(metrics_module.ImmutableArtifactMetricsError, match="rollback journal"):
+        prepared_query()
+    artifact.path.with_name(f"{artifact.path.name}-journal").unlink()
+    artifact.path.with_name(f"{artifact.path.name}-wal").write_bytes(b"mutation")
+    with pytest.raises(metrics_module.ImmutableArtifactMetricsError, match="nonempty WAL"):
+        prepared_query()
+    artifact.path.with_name(f"{artifact.path.name}-wal").unlink()
+    artifact.path.touch()
+    with pytest.raises(metrics_module.ImmutableArtifactMetricsError, match="fingerprint changed"):
+        prepared_query()
+    assert metric_calls == [artifact.path]
+
+    unprepared_case = matrix.by_id("query.q-acc-02.warm_first_page")
+    unprepared_root = tmp_path / "unprepared"
+    unprepared_root.mkdir()
+    unprepared = Adapter().execute(
+        shared.CandidateRequest(
+            case=unprepared_case,
+            fixture=fixture,
+            run_root=unprepared_root,
+            repetition=0,
+            stop=shared.EarlyStopController(
+                unprepared_case.case_id,
+                unprepared_case.early_stop_limits,
+            ),
+        )
+    )
+    assert unprepared.outcome is shared.RunOutcome.PASSED
+    assert len(metric_calls) == 2
 
 
 def test_schema_is_typed_compact_and_deduplicated(
