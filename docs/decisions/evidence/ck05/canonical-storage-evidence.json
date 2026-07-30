@@ -1,0 +1,202 @@
+{
+  "schema": "codex-usage-tracker.ck05-canonical-storage-evidence.v1",
+  "packet": "CK-05",
+  "base_commit": "c0b68a11cbcc29c3be2c583a0d659d67f6510098",
+  "recorded_at": "2026-07-30",
+  "database_contract": {
+    "analytical_identity": "codex-usage-tracker.agent-kernel.v1",
+    "operational_identity": "codex-usage-tracker.agent-kernel.operations.v1",
+    "canonical_cache_filename": "agent-usage-kernel-v1.sqlite3",
+    "schema_contract_id": "codex-usage-tracker.agent-kernel.schema-contract.v1",
+    "ddl_sha256": "6ae65b6eb7024486f8fe42e19ab6799a252b721e6a9519f19d70e91f4aae6b77",
+    "analytical_inventory": {
+      "tables": 41,
+      "indexes": 43,
+      "views": 1,
+      "view_names": [
+        "model_calls_visible"
+      ]
+    },
+    "operational_inventory": {
+      "tables": 6,
+      "indexes": 6,
+      "views": 0
+    },
+    "separation_checks": [
+      "analytical-open-as-operational rejected",
+      "operational-open-as-analytical rejected",
+      "legacy and foreign databases rejected before writer PRAGMAs"
+    ]
+  },
+  "connection_modes": {
+    "writer": {
+      "foreign_keys": 1,
+      "journal_mode": "wal",
+      "synchronous": 1,
+      "busy_timeout_ms": 5000,
+      "cache_size": -20000,
+      "mmap_size": 0,
+      "temp_store": 2,
+      "wal_autocheckpoint": 1000
+    },
+    "read_only": {
+      "uri_mode": "ro",
+      "query_only": 1,
+      "foreign_keys": 1,
+      "busy_timeout_ms": 5000
+    },
+    "isolated_builder": {
+      "journal_mode": "off",
+      "synchronous": 0,
+      "foreign_keys": 1
+    },
+    "owner_only": {
+      "directory_mode": "0700",
+      "database_and_sidecar_mode": "0600",
+      "symlink_nonowner_and_permissive_paths": "rejected"
+    }
+  },
+  "integrity": {
+    "quick_check": "ok",
+    "integrity_check": "ok",
+    "foreign_key_violations": 0,
+    "physical_query_compilation": "passed against declared indexes"
+  },
+  "identity_vectors": {
+    "vector_ids": 29,
+    "semantic_identity_vectors": 26,
+    "occurrence_vectors": 1,
+    "collision_vectors": 1,
+    "publication_derivation_vectors": 1,
+    "selected_storage_result": "passed",
+    "canonical_bytes_and_sha256_persisted": true,
+    "multi_producer_copy_stability_entities": 5
+  },
+  "tiny_v1_accounting": {
+    "canonical_counts": {
+      "sessions": 10,
+      "turns": 50,
+      "model_calls": 100,
+      "tool_invocations": 25,
+      "activities": 5,
+      "state_changes": 5,
+      "allowance_observations": 4
+    },
+    "model_call_occurrences": 102,
+    "source_manifestations": 12,
+    "token_observed_sums": {
+      "uncached_input_tokens": 53650,
+      "cached_input_tokens": 161555,
+      "reasoning_tokens": 31850,
+      "output_tokens": 47450
+    },
+    "cached_input_observed_count": 95,
+    "cached_input_missing_count": 5,
+    "cached_input_total": null,
+    "default_total_tokens": null,
+    "reasoning_in_default_total": false,
+    "four_token_classes_remain_separate": true,
+    "selected_storage_result": "passed"
+  },
+  "storage_baseline": {
+    "fixture": "tiny-v1 synthetic accounting oracle",
+    "fixture_manifest_sha256": "78003a7cfdee8beb1a263b3027fec162a612352be6fbefd13a65e821640bc7ae",
+    "fixture_oracle_sha256": "9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b",
+    "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "python": "3.14.6",
+    "sqlite": "3.53.3",
+    "database_bytes": 679936,
+    "wal_bytes": 0,
+    "shm_bytes": 32768,
+    "page_size": 4096,
+    "page_count": 166
+  },
+  "repository_operation_baseline": {
+    "clock": "time.perf_counter_ns",
+    "method": "10 unrecorded warmups followed by 100 sequential samples against one owner-only tiny-v1 WAL database; values are descriptive, not release thresholds",
+    "accounting_summary": {
+      "median_ns": 49041,
+      "p95_ns": 58084,
+      "max_ns": 162625,
+      "cv": 0.238254
+    },
+    "model_call_tokens": {
+      "median_ns": 155791,
+      "p95_ns": 179500,
+      "max_ns": 272875,
+      "cv": 0.099949
+    },
+    "source_occurrences_for_call": {
+      "median_ns": 6500,
+      "p95_ns": 7083,
+      "max_ns": 13875,
+      "cv": 0.13517
+    },
+    "identity_lookup": {
+      "median_ns": 5792,
+      "p95_ns": 6209,
+      "max_ns": 6333,
+      "cv": 0.02653
+    }
+  },
+  "dependency_policy": {
+    "new_runtime_dependencies": [],
+    "implementation_imports": "Python standard library and owned agent_kernel modules only",
+    "distribution_measurement": {
+      "wheel_bytes": 203890,
+      "wheel_previous_ceiling_bytes": 175625,
+      "wheel_delta_over_previous_ceiling_bytes": 28265,
+      "wheel_new_ceiling_bytes": 208945,
+      "sdist_bytes": 595642,
+      "sdist_previous_ceiling_bytes": 525900,
+      "sdist_delta_over_previous_ceiling_bytes": 69742,
+      "sdist_new_ceiling_bytes": 610000,
+      "headroom_percent": 3
+    }
+  },
+  "validation": {
+    "focused_storage_contract_and_release_regressions": "71 passed",
+    "sdist_embedded_identity_and_accounting_tests": "32 passed",
+    "just_vp": "passed",
+    "just_v": "passed: 976 functional tests and 13 invariant-performance tests",
+    "just_vc": "passed: build and release-content qualification",
+    "gitnexus_detect_changes": "medium risk: 34 files, 18 changed symbols, 1 affected execution flow"
+  },
+  "review_accounting": {
+    "reviewers": 1,
+    "status": "completed; all accepted findings corrected before commit",
+    "total_findings": 5,
+    "accepted_findings": 5,
+    "accepted_finding_ids": [
+      "CK05-REV-01",
+      "CK05-REV-02",
+      "CK05-REV-03",
+      "CK05-REV-04",
+      "CK05-REV-05"
+    ],
+    "reviewer_token_status": "pending",
+    "reviewer_tokens": null,
+    "tokens_per_accepted_finding": null,
+    "attribution": "unavailable",
+    "measurement_error": "installed codex-usage-tracker CLI does not expose the strict subcommand expected by the aggregate-only metrics helper; not retried"
+  },
+  "residual_risks_and_boundaries": {
+    "ck04_growth_exception": "Current-commit growth repetitions 3 and 4 remain waived; the strict v2 aggregate is not claimed.",
+    "ck05_risks": [
+      "growth build cost",
+      "SQLite I/O variance"
+    ],
+    "ck06_ownership": [
+      "bounded ingestion",
+      "streaming and batching behavior beyond storage repository seams",
+      "queue depth and RSS qualification"
+    ],
+    "excluded": [
+      "Codex parser",
+      "publication worker",
+      "projections",
+      "MCP",
+      "migration and compatibility views"
+    ]
+  }
+}

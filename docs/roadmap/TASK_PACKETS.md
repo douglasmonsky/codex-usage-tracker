@@ -7,10 +7,10 @@ in the linked files under [`docs/roadmap/tasks/`](tasks/).
 
 ## Overall
 
-- Completed packets: **5 / 17**
+- Completed packets: **6 / 17**
 - In progress: **None**
-- Not started: **12**
-- Critical-path completion: **5 / 16**
+- Not started: **11**
+- Critical-path completion: **6 / 16**
 - Optional packets: **CK-15**
 
 A packet may be checked only after its acceptance criteria and required checks
@@ -22,7 +22,7 @@ line and the milestone accounting below.
 
 - [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
 - [x] **M1 — Architecture Selected** · 4 / 4 · CK-01–CK-04 complete
-- [ ] **M2 — Kernel Alpha** · 0 / 5 · CK-05–CK-09 not started
+- [ ] **M2 — Kernel Alpha** · 1 / 5 · CK-05 complete; CK-06–CK-09 not started
 - [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
 - [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
 - [ ] **M5 — Public Release** · 0 / 1 required · CK-16 not started
@@ -54,7 +54,7 @@ line and the milestone accounting below.
 
 ### M2 — Kernel Alpha
 
-- [ ] **CK-05 — Implement the canonical storage kernel** · Not started ·
+- [x] **CK-05 — Implement the canonical storage kernel** · **Completed** ·
   depends on CK-04
   · [packet](tasks/ck-05-implement-canonical-storage-kernel.md)
 - [ ] **CK-06 — Implement the Codex adapter and ingestion** · Not started ·

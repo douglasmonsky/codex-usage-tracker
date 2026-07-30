@@ -133,20 +133,15 @@ The maintainer authorizes execution subagents for this roadmap:
   pinned `scalene` console entry point from `PATH`, not from the workload
   interpreter argument. Keep Python 3.14 test qualification separate from any
   profiling-interpreter compatibility claim.
-- Assign each CK packet to a dedicated execution subagent with a focused
-  branch, worktree, and file allowlist.
-- Treat the roadmap, design documents, and packet contracts as the authority
-  for dependency order and parallel eligibility. When they explicitly identify
-  dependency-safe, disjoint lanes, run those lanes concurrently with separate
-  execution agents. Otherwise keep execution serial; never invent parallelism
-  across dependency edges.
-- Before starting a writing agent, name its owner, worktree, immutable base
-  SHA, file allowlist, expected artifact, and merge checkpoint. Never place
-  multiple writing agents in one checkout or give agents overlapping files.
-- Keep one root integrator responsible for shared contracts, integration order,
-  acceptance, final primary validation, the one final read-only reviewer, CI,
-  PR/merge operations, and packet/ledger accounting. Execution agents do not
-  integrate their own lane or add extra reviewers.
+- Use as many execution agents as materially help, while preserving roadmap
+  dependency order and packet boundaries.
+- Before concurrent writing begins, name each owner, worktree, immutable base
+  SHA, file allowlist, expected artifact, and merge checkpoint. Writers may
+  share a checkout only when their file ownership is explicit and
+  non-overlapping.
+- Coordinate shared contracts, integration order, acceptance, primary
+  validation, review accounting, CI, PR/merge operations, and packet/ledger
+  accounting across the participating agents.
 
 ## Tools
 

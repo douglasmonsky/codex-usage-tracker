@@ -6,12 +6,13 @@ and none of the archived documents may override them.
 
 ## Current packet boundary
 
-CK-04 is complete with the explicit growth exception recorded in the
-[physical architecture decision](decisions/PHYSICAL_ARCHITECTURE_DECISION.md).
-After the CK-04 merge is verified, execution transfers to
-[CK-05](roadmap/tasks/ck-05-implement-canonical-storage-kernel.md) in a clean
-Codex task. The authority set below wins over historical operational
-checkpoints.
+CK-05 is complete with its
+[canonical storage evidence](decisions/evidence/ck05/canonical-storage-evidence.json)
+recorded. The CK-04 growth exception remains explicit and the strict v2
+aggregate is not claimed. After the CK-05 merge is verified, execution
+transfers to [CK-06](roadmap/tasks/ck-06-implement-codex-adapter-and-ingestion.md)
+in a clean Codex task. The authority set below wins over historical
+operational checkpoints.
 
 ## Authority set
 

@@ -27,6 +27,9 @@ include scripts/build_kernel_console.mjs
 include scripts/check_kernel_console.mjs
 include scripts/smoke_installed_console.py
 recursive-include frontend/kernel-console *.css *.html *.js *.json
+recursive-include tests/agent_kernel/storage *.py
+include tests/agent_kernel/contracts/vectors/identity-v1.json
+recursive-include tests/agent_kernel/fixtures/tiny-v1 *.json
 recursive-include tests/kernel *.json *.jsonl *.py
 recursive-include tests/frontend *.mjs
 recursive-include tests/e2e *.mjs

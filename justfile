@@ -27,6 +27,7 @@ vp:
         scripts/smoke_installed_package.py \
         scripts/generate_kernel_interfaces.py \
         scripts/generate_kernel_manifests.py \
+        src/codex_usage_tracker/agent_kernel \
         src/codex_usage_tracker/kernel \
         src/codex_usage_tracker/release \
         experiments/physical-architecture/qualification.py \
