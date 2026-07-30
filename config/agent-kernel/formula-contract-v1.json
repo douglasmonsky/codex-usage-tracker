@@ -1,0 +1,3753 @@
+{
+  "schema": "codex-usage-tracker.formula-contract.v1",
+  "version": 1,
+  "source_catalog": "config/agent-kernel/question-catalog-v1.json",
+  "formulas": [
+    {
+      "id": "accepted_mutation_summary_v1",
+      "inputs": [
+        "records mutation counters"
+      ],
+      "fact_relations": [
+        "publication",
+        "publication_delta"
+      ],
+      "filtering": "No hidden filter is allowed inside accepted_mutation_summary_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke accepted_mutation_summary_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "accepted_mutation_summary_v1"
+    },
+    {
+      "id": "adjacent_event_gap_v1",
+      "inputs": [
+        "current",
+        "previous"
+      ],
+      "fact_relations": [
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside adjacent_event_gap_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke adjacent_event_gap_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "microseconds",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "adjacent_event_gap_v1"
+    },
+    {
+      "id": "bounded_adjacency_v1",
+      "inputs": [
+        "ordered records.id"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "resource",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside bounded_adjacency_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke bounded_adjacency_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "Record input order is semantic; equal source positions retain their supplied order.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "deterministically ordered object list",
+      "operation": "evaluate_formula",
+      "symbol": "bounded_adjacency_v1"
+    },
+    {
+      "id": "cached_output_ratio_v1",
+      "inputs": [
+        "numerator",
+        "denominator"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside cached_output_ratio_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke cached_output_ratio_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "cached_output_ratio_v1"
+    },
+    {
+      "id": "cached_share_v1",
+      "inputs": [
+        "numerator",
+        "denominator"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "compaction_boundary",
+        "session",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside cached_share_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke cached_share_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "cached_share_v1"
+    },
+    {
+      "id": "compatible_allowance_interval_v1",
+      "inputs": [
+        "left_provider",
+        "right_provider",
+        "left_limit",
+        "right_limit",
+        "left_plan",
+        "right_plan",
+        "left_window_kind",
+        "right_window_kind",
+        "left_reset",
+        "right_reset",
+        "left_observed_at_us",
+        "right_observed_at_us"
+      ],
+      "fact_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "turn",
+        "valuation_match"
+      ],
+      "filtering": "No hidden filter is allowed inside compatible_allowance_interval_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke compatible_allowance_interval_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "compatible_allowance_interval_v1"
+    },
+    {
+      "id": "compatible_positive_allowance_ratio_v1",
+      "inputs": [
+        "compatible",
+        "value",
+        "allowance_delta"
+      ],
+      "fact_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "turn",
+        "valuation_match"
+      ],
+      "filtering": "No hidden filter is allowed inside compatible_positive_allowance_ratio_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke compatible_positive_allowance_ratio_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "compatible_positive_allowance_ratio_v1"
+    },
+    {
+      "id": "completed_allowance_cycle_comparison_v1",
+      "inputs": [
+        "left",
+        "right"
+      ],
+      "fact_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "valuation_match"
+      ],
+      "filtering": "No hidden filter is allowed inside completed_allowance_cycle_comparison_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke completed_allowance_cycle_comparison_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "completed_allowance_cycle_comparison_v1"
+    },
+    {
+      "id": "completion_cohort_ratio_v1",
+      "inputs": [
+        "numerator",
+        "denominator"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside completion_cohort_ratio_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke completion_cohort_ratio_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "completion_cohort_ratio_v1"
+    },
+    {
+      "id": "consecutive_delta_v1",
+      "inputs": [
+        "current",
+        "previous"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "compaction_boundary",
+        "session",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside consecutive_delta_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke consecutive_delta_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "consecutive_delta_v1"
+    },
+    {
+      "id": "consecutive_profile_transition_v1",
+      "inputs": [
+        "ordered records.profile,total_tokens"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "model_profile",
+        "session"
+      ],
+      "filtering": "No hidden filter is allowed inside consecutive_profile_transition_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke consecutive_profile_transition_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "Record input order is semantic; equal source positions retain their supplied order.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object: transition_count and ordered token_delta list",
+      "operation": "evaluate_formula",
+      "symbol": "consecutive_profile_transition_v1"
+    },
+    {
+      "id": "context_component_coverage_v1",
+      "inputs": [
+        "records.bytes",
+        "total_bytes"
+      ],
+      "fact_relations": [
+        "context_component",
+        "session",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside context_component_coverage_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke context_component_coverage_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "context_component_coverage_v1"
+    },
+    {
+      "id": "context_growth_v1",
+      "inputs": [
+        "first",
+        "last"
+      ],
+      "fact_relations": [
+        "session",
+        "state_change",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside context_growth_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke context_growth_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "context_growth_v1"
+    },
+    {
+      "id": "context_pressure_v1",
+      "inputs": [
+        "input_tokens",
+        "context_window_tokens"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "compaction_boundary",
+        "session",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside context_pressure_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke context_pressure_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "context_pressure_v1"
+    },
+    {
+      "id": "current_valuation_v1",
+      "inputs": [
+        "records.cost_usd"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "session",
+        "turn",
+        "valuation_match"
+      ],
+      "filtering": "No hidden filter is allowed inside current_valuation_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke current_valuation_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "current_valuation_v1"
+    },
+    {
+      "id": "equal_window_delta_v1",
+      "inputs": [
+        "current",
+        "previous"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "model_profile",
+        "project",
+        "session",
+        "tool_invocation"
+      ],
+      "filtering": "No hidden filter is allowed inside equal_window_delta_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke equal_window_delta_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "equal_window_delta_v1"
+    },
+    {
+      "id": "exclusive_inclusive_scope_v1",
+      "inputs": [
+        "inclusive",
+        "descendant"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "project",
+        "resource",
+        "session",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside exclusive_inclusive_scope_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke exclusive_inclusive_scope_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "exclusive_inclusive_scope_v1"
+    },
+    {
+      "id": "explicit_cohort_comparison_v1",
+      "inputs": [
+        "left",
+        "right"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside explicit_cohort_comparison_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke explicit_cohort_comparison_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "explicit_cohort_comparison_v1"
+    },
+    {
+      "id": "first_boundary_v1",
+      "inputs": [
+        "boundary_kind",
+        "ordered records.kind,tokens"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside first_boundary_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke first_boundary_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "Record input order is semantic; equal source positions retain their supplied order.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "first_boundary_v1"
+    },
+    {
+      "id": "freshness_age_v1",
+      "inputs": [
+        "current",
+        "previous"
+      ],
+      "fact_relations": [
+        "publication",
+        "source_manifestation"
+      ],
+      "filtering": "No hidden filter is allowed inside freshness_age_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke freshness_age_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "microseconds",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "freshness_age_v1"
+    },
+    {
+      "id": "half_open_interval_membership_v1",
+      "inputs": [
+        "start_us",
+        "end_us",
+        "event_time_us"
+      ],
+      "fact_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside half_open_interval_membership_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke half_open_interval_membership_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "half_open_interval_membership_v1"
+    },
+    {
+      "id": "hhi_v1",
+      "inputs": [
+        "values"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "session"
+      ],
+      "filtering": "No hidden filter is allowed inside hhi_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke hhi_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "Values are sorted numerically for ranking or median; equal numeric values have identical contribution.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "hhi_v1"
+    },
+    {
+      "id": "investigation_feature_vector_v1",
+      "inputs": [
+        "candidate_features: nonempty map of named numeric canonical feature values"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "resource",
+        "session",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside investigation_feature_vector_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke investigation_feature_vector_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "lexicographically keyed normalized candidate-feature object",
+      "operation": "evaluate_formula",
+      "symbol": "investigation_feature_vector_v1"
+    },
+    {
+      "id": "later_earlier_median_ratio_v1",
+      "inputs": [
+        "earlier values",
+        "later values"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside later_earlier_median_ratio_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke later_earlier_median_ratio_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "Values are sorted numerically for ranking or median; equal numeric values have identical contribution.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "later_earlier_median_ratio_v1"
+    },
+    {
+      "id": "mutation_density_v1",
+      "inputs": [
+        "mutation_count",
+        "turn_count"
+      ],
+      "fact_relations": [
+        "session",
+        "state_change",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside mutation_density_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke mutation_density_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "mutation_density_v1"
+    },
+    {
+      "id": "observational_cohort_comparison_v1",
+      "inputs": [
+        "left",
+        "right"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "session",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside observational_cohort_comparison_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke observational_cohort_comparison_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "observational_cohort_comparison_v1"
+    },
+    {
+      "id": "observed_duration_v1",
+      "inputs": [
+        "records.duration_us"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "resource",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside observed_duration_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke observed_duration_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "observed_duration_v1"
+    },
+    {
+      "id": "observed_share_v1",
+      "inputs": [
+        "numerator",
+        "denominator"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "model_profile",
+        "project",
+        "session"
+      ],
+      "filtering": "No hidden filter is allowed inside observed_share_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke observed_share_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "observed_share_v1"
+    },
+    {
+      "id": "resource_operation_breakdown_v1",
+      "inputs": [
+        "records.operation"
+      ],
+      "fact_relations": [
+        "resource",
+        "state_change",
+        "tool_invocation"
+      ],
+      "filtering": "No hidden filter is allowed inside resource_operation_breakdown_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke resource_operation_breakdown_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "resource_operation_breakdown_v1"
+    },
+    {
+      "id": "resource_revisit_v1",
+      "inputs": [
+        "ordered records.resource,operation"
+      ],
+      "fact_relations": [
+        "resource",
+        "session",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside resource_revisit_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke resource_revisit_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "Record input order is semantic; equal source positions retain their supplied order.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "resource_revisit_v1"
+    },
+    {
+      "id": "retry_sequence_matcher_v1",
+      "inputs": [
+        "ordered records.id,stage,resource"
+      ],
+      "fact_relations": [
+        "resource",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "After the exact formula_uses plan gates canonical rows, match only contiguous inspect, attempt, failure, reinspect, retry stages whose five events share one nonempty canonical resource identity; interleaving, cancellation, and an open retry do not match; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke retry_sequence_matcher_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "Record input order is semantic; equal source positions retain their supplied order.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object: retry_cycles and ordered matched_events",
+      "operation": "evaluate_formula",
+      "symbol": "retry_sequence_matcher_v1"
+    },
+    {
+      "id": "second_difference_v1",
+      "inputs": [
+        "previous",
+        "middle",
+        "current"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside second_difference_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke second_difference_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "second_difference_v1"
+    },
+    {
+      "id": "semantic_occurrence_reconciliation_v1",
+      "inputs": [
+        "manifestation_count",
+        "semantic_entity_count"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "source_manifestation",
+        "source_occurrence"
+      ],
+      "filtering": "No hidden filter is allowed inside semantic_occurrence_reconciliation_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke semantic_occurrence_reconciliation_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "semantic_occurrence_reconciliation_v1"
+    },
+    {
+      "id": "side_by_side_delta_v1",
+      "inputs": [
+        "current",
+        "previous"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "resource",
+        "session",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside side_by_side_delta_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke side_by_side_delta_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "side_by_side_delta_v1"
+    },
+    {
+      "id": "signed_driver_contribution_v1",
+      "inputs": [
+        "current",
+        "previous"
+      ],
+      "fact_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "model_profile",
+        "session",
+        "tool_invocation",
+        "turn",
+        "valuation_match"
+      ],
+      "filtering": "No hidden filter is allowed inside signed_driver_contribution_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke signed_driver_contribution_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "signed_driver_contribution_v1"
+    },
+    {
+      "id": "signed_driver_reconciliation_v1",
+      "inputs": [
+        "values",
+        "total_delta"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "model_profile",
+        "project",
+        "session",
+        "tool_invocation"
+      ],
+      "filtering": "No hidden filter is allowed inside signed_driver_reconciliation_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke signed_driver_reconciliation_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "signed_driver_reconciliation_v1"
+    },
+    {
+      "id": "structural_workflow_features_v1",
+      "inputs": [
+        "frequency",
+        "failure_count",
+        "mutation_count",
+        "observed_sequences",
+        "structural_features: map"
+      ],
+      "fact_relations": [
+        "resource",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside structural_workflow_features_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke structural_workflow_features_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object: frequency, failure_coverage, mutation_coverage, structural_features",
+      "operation": "evaluate_formula",
+      "symbol": "structural_workflow_features_v1"
+    },
+    {
+      "id": "symmetric_boundary_comparison_v1",
+      "inputs": [
+        "before",
+        "after"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "compaction_boundary",
+        "session",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside symmetric_boundary_comparison_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke symmetric_boundary_comparison_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object",
+      "operation": "evaluate_formula",
+      "symbol": "symmetric_boundary_comparison_v1"
+    },
+    {
+      "id": "top_n_share_v1",
+      "inputs": [
+        "values",
+        "n"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "session"
+      ],
+      "filtering": "No hidden filter is allowed inside top_n_share_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke top_n_share_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "Values are sorted numerically for ranking or median; equal numeric values have identical contribution.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "fixed-key object: top_share and remainder_share",
+      "operation": "evaluate_formula",
+      "symbol": "top_n_share_v1"
+    },
+    {
+      "id": "top_share_v1",
+      "inputs": [
+        "values",
+        "n"
+      ],
+      "fact_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "model_profile",
+        "session",
+        "tool_invocation",
+        "turn",
+        "valuation_match"
+      ],
+      "filtering": "No hidden filter is allowed inside top_share_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke top_share_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "Values are sorted numerically for ranking or median; equal numeric values have identical contribution.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "ratio",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "top_share_v1"
+    },
+    {
+      "id": "total_input_tokens_v1",
+      "inputs": [
+        "records.uncached_input_tokens",
+        "records.cached_input_tokens"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside total_input_tokens_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke total_input_tokens_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "tokens",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "total_input_tokens_v1"
+    },
+    {
+      "id": "total_order_v1",
+      "inputs": [
+        "records.event_at_us",
+        "records source ordering coordinates"
+      ],
+      "fact_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "resource",
+        "source_occurrence",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside total_order_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke total_order_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "Ascending (event_at_us is null, event_at_us, source_rank, source_order, event_kind_order, logical_id, transition_rank); all tuple coordinates are required.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "deterministically ordered object list",
+      "operation": "evaluate_formula",
+      "symbol": "total_order_v1"
+    },
+    {
+      "id": "total_tokens_v1",
+      "inputs": [
+        "records.uncached_input_tokens",
+        "records.cached_input_tokens",
+        "records.output_tokens"
+      ],
+      "fact_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "model_profile",
+        "project",
+        "resource",
+        "session",
+        "state_change",
+        "tool_invocation",
+        "turn",
+        "valuation_match"
+      ],
+      "filtering": "No hidden filter is allowed inside total_tokens_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke total_tokens_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "tokens",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "total_tokens_v1"
+    },
+    {
+      "id": "trajectory_slope_v1",
+      "inputs": [
+        "ordered values"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "compaction_boundary",
+        "session",
+        "turn"
+      ],
+      "filtering": "No hidden filter is allowed inside trajectory_slope_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke trajectory_slope_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "trajectory_slope_v1"
+    },
+    {
+      "id": "valuation_coverage_v1",
+      "inputs": [
+        "numerator",
+        "denominator"
+      ],
+      "fact_relations": [
+        "canonical_call",
+        "model_profile",
+        "valuation_match"
+      ],
+      "filtering": "No hidden filter is allowed inside valuation_coverage_v1. Accept operands only from the exact formula_uses entry after that named plan applies typed request, capability, publication, selector, and half-open window gates; answer, oracle, and grading fields are forbidden.",
+      "grouping": "Invoke valuation_coverage_v1 once per deterministic output group produced by the exact formula_uses plan; group identity and input order come from canonical logical IDs and the catalog order contract, never from an emitted answer row.",
+      "ordering": "No row ordering affects this scalar or fixed-key aggregation.",
+      "null_empty_behavior": "Missing required measurement yields null when a measurement is unavailable; malformed operand types fail closed; empty cohorts use the operation-specific neutral/null result.",
+      "numeric_types": "Signed integer counts and UTC microseconds; Decimal exact arithmetic for ratios, medians, means, and rates.",
+      "rounding": "No implicit rounding or binary float conversion; Decimal precision is preserved.",
+      "units": "count or named fact fields",
+      "window_boundary_source": "The normalized caller cohort is bounded by its source [start_us, end_us) interval when temporal; this evaluator reads no clock or storage.",
+      "result_shape": "scalar, boolean, or null",
+      "operation": "evaluate_formula",
+      "symbol": "valuation_coverage_v1"
+    }
+  ],
+  "answer_field_bindings": [
+    {
+      "question_id": "Q-ACC-01",
+      "fields": [
+        {
+          "field": "cached_input_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "calls",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "configured_cost_usd",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "estimated_credits",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "output_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "reasoning_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "total_tokens",
+          "classification": "formula_output",
+          "formula_id": "total_tokens_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "uncached_input_tokens",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-ACC-02",
+      "fields": [
+        {
+          "field": "cached_input_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "calls",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "output_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "reasoning_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "remainder_share",
+          "classification": "formula_output",
+          "formula_id": "top_n_share_v1",
+          "output_key": "remainder_share"
+        },
+        {
+          "field": "top_share",
+          "classification": "formula_output",
+          "formula_id": "top_n_share_v1",
+          "output_key": "top_share"
+        },
+        {
+          "field": "total_tokens",
+          "classification": "formula_output",
+          "formula_id": "total_tokens_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "uncached_input_tokens",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": [
+        "hhi_v1"
+      ]
+    },
+    {
+      "question_id": "Q-ACC-03",
+      "fields": [
+        {
+          "field": "current_total_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "driver_contribution",
+          "classification": "formula_output",
+          "formula_id": "signed_driver_reconciliation_v1",
+          "output_key": "drivers"
+        },
+        {
+          "field": "previous_total_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "total_delta",
+          "classification": "formula_output",
+          "formula_id": "equal_window_delta_v1",
+          "output_key": "$"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-ACC-04",
+      "fields": [
+        {
+          "field": "cached_input_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "calls",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "output_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "reasoning_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "share",
+          "classification": "formula_output",
+          "formula_id": "observed_share_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "uncached_input_tokens",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-ACC-05",
+      "fields": [
+        {
+          "field": "exclusive_tokens",
+          "classification": "formula_output",
+          "formula_id": "exclusive_inclusive_scope_v1",
+          "output_key": "exclusive"
+        },
+        {
+          "field": "family_tokens",
+          "classification": "formula_output",
+          "formula_id": "exclusive_inclusive_scope_v1",
+          "output_key": "inclusive"
+        },
+        {
+          "field": "session_count",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "share",
+          "classification": "formula_output",
+          "formula_id": "observed_share_v1",
+          "output_key": "$"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-ACC-06",
+      "fields": [
+        {
+          "field": "configured_cost_usd",
+          "classification": "formula_output",
+          "formula_id": "current_valuation_v1",
+          "output_key": "configured_cost_usd"
+        },
+        {
+          "field": "estimated_credits",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "rated_calls",
+          "classification": "formula_output",
+          "formula_id": "current_valuation_v1",
+          "output_key": "rated_calls"
+        },
+        {
+          "field": "total_tokens",
+          "classification": "formula_output",
+          "formula_id": "total_tokens_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "unrated_calls",
+          "classification": "formula_output",
+          "formula_id": "current_valuation_v1",
+          "output_key": "unrated_calls"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-ACC-07",
+      "fields": [
+        {
+          "field": "priced_calls",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "pricing_coverage",
+          "classification": "formula_output",
+          "formula_id": "valuation_coverage_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "unpriced_calls",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "unpriced_tokens",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-CTX-01",
+      "fields": [
+        {
+          "field": "cached_share",
+          "classification": "formula_output",
+          "formula_id": "cached_share_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "cached_input_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "total_input_tokens",
+          "classification": "formula_output",
+          "formula_id": "total_input_tokens_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "uncached_input_tokens",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-CTX-02",
+      "fields": [
+        {
+          "field": "cached_share",
+          "classification": "formula_output",
+          "formula_id": "cached_share_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "context_pressure",
+          "classification": "formula_output",
+          "formula_id": "context_pressure_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "context_window_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "ordered_input_tokens",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": [
+        "trajectory_slope_v1"
+      ]
+    },
+    {
+      "question_id": "Q-CTX-03",
+      "fields": [
+        {
+          "field": "later_earlier_ratio",
+          "classification": "formula_output",
+          "formula_id": "later_earlier_median_ratio_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "second_difference",
+          "classification": "formula_output",
+          "formula_id": "second_difference_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "turn_tokens",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-CTX-04",
+      "fields": [
+        {
+          "field": "current_uncached_input_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "input_delta",
+          "classification": "formula_output",
+          "formula_id": "consecutive_delta_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "previous_uncached_input_tokens",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-CTX-05",
+      "fields": [
+        {
+          "field": "following_input_delta",
+          "classification": "formula_output",
+          "formula_id": "consecutive_delta_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "intervening_events",
+          "classification": "formula_output",
+          "formula_id": "bounded_adjacency_v1",
+          "output_key": "[].intervening_events"
+        },
+        {
+          "field": "tool_output_bytes",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-CTX-06",
+      "fields": [
+        {
+          "field": "cached_input_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "cached_output_ratio",
+          "classification": "formula_output",
+          "formula_id": "cached_output_ratio_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "output_tokens",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-CTX-07",
+      "fields": [
+        {
+          "field": "component_bytes",
+          "classification": "formula_output",
+          "formula_id": "context_component_coverage_v1",
+          "output_key": "component_bytes"
+        },
+        {
+          "field": "component_count",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "estimated_component_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "unattributed_bytes",
+          "classification": "formula_output",
+          "formula_id": "context_component_coverage_v1",
+          "output_key": "unattributed_bytes"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-CTX-08",
+      "fields": [
+        {
+          "field": "after_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "before_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "context_delta",
+          "classification": "formula_output",
+          "formula_id": "symmetric_boundary_comparison_v1",
+          "output_key": "delta"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-CTX-09",
+      "fields": [
+        {
+          "field": "context_growth",
+          "classification": "formula_output",
+          "formula_id": "context_growth_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "mutation_count",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "turn_count",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": [
+        "mutation_density_v1"
+      ]
+    },
+    {
+      "question_id": "Q-CTX-10",
+      "fields": [
+        {
+          "field": "cohort_size",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "context_features",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "usage_features",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": [
+        "explicit_cohort_comparison_v1"
+      ]
+    },
+    {
+      "question_id": "Q-WF-01",
+      "fields": [
+        {
+          "field": "calls",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "completion_state",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "tokens_per_completed_turn",
+          "classification": "formula_output",
+          "formula_id": "completion_cohort_ratio_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "total_tokens",
+          "classification": "formula_output",
+          "formula_id": "total_tokens_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "turns",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-WF-02",
+      "fields": [
+        {
+          "field": "first_action_tokens",
+          "classification": "formula_output",
+          "formula_id": "first_boundary_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "first_mutation_tokens",
+          "classification": "formula_output",
+          "formula_id": "first_boundary_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "first_success_tokens",
+          "classification": "formula_output",
+          "formula_id": "first_boundary_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "mutation_observed",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-WF-03",
+      "fields": [
+        {
+          "field": "operation_count",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "revisit_count",
+          "classification": "formula_output",
+          "formula_id": "resource_revisit_v1",
+          "output_key": "revisit_count"
+        },
+        {
+          "field": "revisit_distance",
+          "classification": "formula_output",
+          "formula_id": "resource_revisit_v1",
+          "output_key": "revisit_distance"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-WF-04",
+      "fields": [
+        {
+          "field": "matched_events",
+          "classification": "formula_output",
+          "formula_id": "retry_sequence_matcher_v1",
+          "output_key": "matched_events"
+        },
+        {
+          "field": "retry_cycles",
+          "classification": "formula_output",
+          "formula_id": "retry_sequence_matcher_v1",
+          "output_key": "retry_cycles"
+        },
+        {
+          "field": "terminal_status",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-WF-05",
+      "fields": [
+        {
+          "field": "calls",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "duration_us",
+          "classification": "formula_output",
+          "formula_id": "observed_duration_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "failure_count",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "following_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "tool_output_bytes",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": [
+        "bounded_adjacency_v1"
+      ]
+    },
+    {
+      "question_id": "Q-WF-06",
+      "fields": [
+        {
+          "field": "following_cached_input_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "following_output_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "following_uncached_input_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "intervening_events",
+          "classification": "formula_output",
+          "formula_id": "bounded_adjacency_v1",
+          "output_key": "[].intervening_events"
+        },
+        {
+          "field": "tool_output_bytes",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-WF-07",
+      "fields": [
+        {
+          "field": "duration_us",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "observed_mutations",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "operation_count",
+          "classification": "formula_output",
+          "formula_id": "resource_operation_breakdown_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "tool_output_bytes",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-WF-08",
+      "fields": [
+        {
+          "field": "current_profile",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "previous_profile",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "token_delta",
+          "classification": "formula_output",
+          "formula_id": "consecutive_profile_transition_v1",
+          "output_key": "token_delta"
+        },
+        {
+          "field": "transition_count",
+          "classification": "formula_output",
+          "formula_id": "consecutive_profile_transition_v1",
+          "output_key": "transition_count"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-WF-09",
+      "fields": [
+        {
+          "field": "failure_coverage",
+          "classification": "formula_output",
+          "formula_id": "structural_workflow_features_v1",
+          "output_key": "failure_coverage"
+        },
+        {
+          "field": "frequency",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "mutation_coverage",
+          "classification": "formula_output",
+          "formula_id": "structural_workflow_features_v1",
+          "output_key": "mutation_coverage"
+        },
+        {
+          "field": "structural_features",
+          "classification": "formula_output",
+          "formula_id": "structural_workflow_features_v1",
+          "output_key": "structural_features"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-WF-10",
+      "fields": [
+        {
+          "field": "event_gap_us",
+          "classification": "formula_output",
+          "formula_id": "adjacent_event_gap_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "tool_duration_us",
+          "classification": "formula_output",
+          "formula_id": "observed_duration_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "tool_status",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-DEL-01",
+      "fields": [
+        {
+          "field": "child_count",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "descendant_exclusive_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "family_inclusive_tokens",
+          "classification": "formula_output",
+          "formula_id": "exclusive_inclusive_scope_v1",
+          "output_key": "inclusive"
+        },
+        {
+          "field": "parent_exclusive_tokens",
+          "classification": "formula_output",
+          "formula_id": "exclusive_inclusive_scope_v1",
+          "output_key": "exclusive"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-DEL-02",
+      "fields": [
+        {
+          "field": "cohort_size",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "model_mix",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "mutation_features",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "usage_features",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": [
+        "observational_cohort_comparison_v1"
+      ]
+    },
+    {
+      "question_id": "Q-ALW-01",
+      "fields": [
+        {
+          "field": "allowance_percent",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "cached_input_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "calls",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "configured_cost_usd",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "estimated_credits",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "output_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "reasoning_tokens",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "turns",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "uncached_input_tokens",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": [
+        "compatible_allowance_interval_v1",
+        "total_tokens_v1"
+      ]
+    },
+    {
+      "question_id": "Q-ALW-02",
+      "fields": [
+        {
+          "field": "boundary_compatibility",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "event_kind",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "event_time_us",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "included_in_interval",
+          "classification": "formula_output",
+          "formula_id": "half_open_interval_membership_v1",
+          "output_key": "$"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-ALW-03",
+      "fields": [
+        {
+          "field": "allowance_delta",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "calls_per_point",
+          "classification": "formula_output",
+          "formula_id": "compatible_positive_allowance_ratio_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "cost_per_point",
+          "classification": "formula_output",
+          "formula_id": "compatible_positive_allowance_ratio_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "credits_per_point",
+          "classification": "formula_output",
+          "formula_id": "compatible_positive_allowance_ratio_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "tokens_per_point",
+          "classification": "formula_output",
+          "formula_id": "compatible_positive_allowance_ratio_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "turns_per_point",
+          "classification": "formula_output",
+          "formula_id": "compatible_positive_allowance_ratio_v1",
+          "output_key": "$"
+        }
+      ],
+      "internal_formula_ids": [
+        "total_tokens_v1"
+      ]
+    },
+    {
+      "question_id": "Q-ALW-04",
+      "fields": [
+        {
+          "field": "allowance_movement",
+          "classification": "formula_output",
+          "formula_id": "completed_allowance_cycle_comparison_v1",
+          "output_key": "delta"
+        },
+        {
+          "field": "calls",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "configured_cost_usd",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "cycle_duration_us",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "estimated_credits",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "total_tokens",
+          "classification": "formula_output",
+          "formula_id": "total_tokens_v1",
+          "output_key": "$"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-OPS-01",
+      "fields": [
+        {
+          "field": "corrected_count",
+          "classification": "formula_output",
+          "formula_id": "accepted_mutation_summary_v1",
+          "output_key": "corrected_count"
+        },
+        {
+          "field": "inserted_count",
+          "classification": "formula_output",
+          "formula_id": "accepted_mutation_summary_v1",
+          "output_key": "inserted_count"
+        },
+        {
+          "field": "recanonicalized_count",
+          "classification": "formula_output",
+          "formula_id": "accepted_mutation_summary_v1",
+          "output_key": "recanonicalized_count"
+        },
+        {
+          "field": "removed_count",
+          "classification": "formula_output",
+          "formula_id": "accepted_mutation_summary_v1",
+          "output_key": "removed_count"
+        },
+        {
+          "field": "terminalized_count",
+          "classification": "formula_output",
+          "formula_id": "accepted_mutation_summary_v1",
+          "output_key": "terminalized_count"
+        },
+        {
+          "field": "token_delta",
+          "classification": "formula_output",
+          "formula_id": "accepted_mutation_summary_v1",
+          "output_key": "token_delta"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-OPS-02",
+      "fields": [
+        {
+          "field": "capabilities",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "freshness_age_us",
+          "classification": "formula_output",
+          "formula_id": "freshness_age_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "guaranteed_complete_from_us",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "indexed_from_us",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "measurements",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "valuation_coverage",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-OPS-03",
+      "fields": [
+        {
+          "field": "canonical_basis",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "excluded_occurrence_count",
+          "classification": "formula_output",
+          "formula_id": "semantic_occurrence_reconciliation_v1",
+          "output_key": "excluded_occurrence_count"
+        },
+        {
+          "field": "manifestation_count",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "semantic_entity_count",
+          "classification": "formula_output",
+          "formula_id": "semantic_occurrence_reconciliation_v1",
+          "output_key": "semantic_entity_count"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-OPS-04",
+      "fields": [
+        {
+          "field": "event_kind",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "event_time_us",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "lifecycle_basis",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "occurrence_coordinates",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "token_measurements",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": [
+        "total_order_v1"
+      ]
+    },
+    {
+      "question_id": "Q-REV-01",
+      "fields": [
+        {
+          "field": "allowance_facts",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "change_drivers",
+          "classification": "formula_output",
+          "formula_id": "signed_driver_contribution_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "context_facts",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "model_mix",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "session_concentration",
+          "classification": "formula_output",
+          "formula_id": "top_share_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "tool_mix",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "usage_totals",
+          "classification": "formula_output",
+          "formula_id": "total_tokens_v1",
+          "output_key": "$"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-REV-02",
+      "fields": [
+        {
+          "field": "baseline",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "candidate_features",
+          "classification": "formula_output",
+          "formula_id": "investigation_feature_vector_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "coverage",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "representative_selectors",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": []
+    },
+    {
+      "question_id": "Q-REV-03",
+      "fields": [
+        {
+          "field": "completion_state",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "context_features",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "delegation_metrics",
+          "classification": "formula_output",
+          "formula_id": "exclusive_inclusive_scope_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "resource_metrics",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "state_change_metrics",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "token_deltas",
+          "classification": "formula_output",
+          "formula_id": "side_by_side_delta_v1",
+          "output_key": "$"
+        },
+        {
+          "field": "tool_metrics",
+          "classification": "direct_fact"
+        },
+        {
+          "field": "turn_call_counts",
+          "classification": "direct_fact"
+        }
+      ],
+      "internal_formula_ids": [
+        "total_tokens_v1"
+      ]
+    }
+  ],
+  "formula_uses": [
+    {
+      "question_id": "Q-ACC-01",
+      "plan_id": "current_usage",
+      "formula_id": "total_tokens_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "project",
+        "session",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "current_project",
+        "current_session",
+        "scope",
+        "timezone"
+      ],
+      "output_fields": [
+        "total_tokens"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build total_tokens_v1 operands only from the listed canonical relations after current_usage applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ACC-02",
+      "plan_id": "top_sessions",
+      "formula_id": "hhi_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [],
+      "internal_use": true,
+      "operand_rule": "Build hhi_v1 operands only from the listed canonical relations after top_sessions applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ACC-02",
+      "plan_id": "top_sessions",
+      "formula_id": "top_n_share_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "remainder_share",
+        "top_share"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build top_n_share_v1 operands only from the listed canonical relations after top_sessions applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ACC-02",
+      "plan_id": "top_sessions",
+      "formula_id": "total_tokens_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "total_tokens"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build total_tokens_v1 operands only from the listed canonical relations after top_sessions applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ACC-03",
+      "plan_id": "period_drivers",
+      "formula_id": "equal_window_delta_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "model_profile",
+        "project",
+        "session",
+        "tool_invocation"
+      ],
+      "required_parameters": [
+        "current_window",
+        "driver_dimension",
+        "previous_window",
+        "timezone"
+      ],
+      "optional_parameters": [
+        "limit",
+        "week_start"
+      ],
+      "output_fields": [
+        "total_delta"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build equal_window_delta_v1 operands only from the listed canonical relations after period_drivers applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ACC-03",
+      "plan_id": "period_drivers",
+      "formula_id": "signed_driver_reconciliation_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "model_profile",
+        "project",
+        "session",
+        "tool_invocation"
+      ],
+      "required_parameters": [
+        "current_window",
+        "driver_dimension",
+        "previous_window",
+        "timezone"
+      ],
+      "optional_parameters": [
+        "limit",
+        "week_start"
+      ],
+      "output_fields": [
+        "driver_contribution"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build signed_driver_reconciliation_v1 operands only from the listed canonical relations after period_drivers applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ACC-04",
+      "plan_id": "model_effort_mix",
+      "formula_id": "observed_share_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "model_profile"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "share"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build observed_share_v1 operands only from the listed canonical relations after model_effort_mix applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ACC-05",
+      "plan_id": "project_family_usage",
+      "formula_id": "exclusive_inclusive_scope_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "project",
+        "session"
+      ],
+      "required_parameters": [
+        "family_mode",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "exclusive_tokens",
+        "family_tokens"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build exclusive_inclusive_scope_v1 operands only from the listed canonical relations after project_family_usage applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ACC-05",
+      "plan_id": "project_family_usage",
+      "formula_id": "observed_share_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "project",
+        "session"
+      ],
+      "required_parameters": [
+        "family_mode",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "share"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build observed_share_v1 operands only from the listed canonical relations after project_family_usage applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ACC-06",
+      "plan_id": "top_valued_entities",
+      "formula_id": "current_valuation_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session",
+        "turn",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "entity_kind",
+        "rate_card",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "configured_cost_usd",
+        "rated_calls",
+        "unrated_calls"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build current_valuation_v1 operands only from the listed canonical relations after top_valued_entities applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ACC-06",
+      "plan_id": "top_valued_entities",
+      "formula_id": "total_tokens_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session",
+        "turn",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "entity_kind",
+        "rate_card",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "total_tokens"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build total_tokens_v1 operands only from the listed canonical relations after top_valued_entities applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ACC-07",
+      "plan_id": "pricing_coverage",
+      "formula_id": "valuation_coverage_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "model_profile",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "rate_card",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "timezone"
+      ],
+      "output_fields": [
+        "pricing_coverage"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build valuation_coverage_v1 operands only from the listed canonical relations after pricing_coverage applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ALW-01",
+      "plan_id": "allowance_movement",
+      "formula_id": "compatible_allowance_interval_v1",
+      "canonical_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "turn",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "allowance_selector",
+        "limit",
+        "rate_card",
+        "timezone"
+      ],
+      "output_fields": [],
+      "internal_use": true,
+      "operand_rule": "Build compatible_allowance_interval_v1 operands only from the listed canonical relations after allowance_movement applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ALW-01",
+      "plan_id": "allowance_movement",
+      "formula_id": "total_tokens_v1",
+      "canonical_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "turn",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "allowance_selector",
+        "limit",
+        "rate_card",
+        "timezone"
+      ],
+      "output_fields": [],
+      "internal_use": true,
+      "operand_rule": "Build total_tokens_v1 operands only from the listed canonical relations after allowance_movement applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ALW-02",
+      "plan_id": "allowance_interval_events",
+      "formula_id": "half_open_interval_membership_v1",
+      "canonical_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "end_observation",
+        "start_observation"
+      ],
+      "optional_parameters": [
+        "cursor",
+        "evidence_view",
+        "limit"
+      ],
+      "output_fields": [
+        "included_in_interval"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build half_open_interval_membership_v1 operands only from the listed canonical relations after allowance_interval_events applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ALW-03",
+      "plan_id": "allowance_local_efficiency",
+      "formula_id": "compatible_positive_allowance_ratio_v1",
+      "canonical_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "turn",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "allowance_selector",
+        "limit",
+        "rate_card",
+        "timezone"
+      ],
+      "output_fields": [
+        "calls_per_point",
+        "cost_per_point",
+        "credits_per_point",
+        "tokens_per_point",
+        "turns_per_point"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build compatible_positive_allowance_ratio_v1 operands only from the listed canonical relations after allowance_local_efficiency applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ALW-03",
+      "plan_id": "allowance_local_efficiency",
+      "formula_id": "total_tokens_v1",
+      "canonical_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "turn",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "allowance_selector",
+        "limit",
+        "rate_card",
+        "timezone"
+      ],
+      "output_fields": [],
+      "internal_use": true,
+      "operand_rule": "Build total_tokens_v1 operands only from the listed canonical relations after allowance_local_efficiency applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ALW-04",
+      "plan_id": "allowance_cycle_comparison",
+      "formula_id": "completed_allowance_cycle_comparison_v1",
+      "canonical_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "allowance_selector",
+        "limit",
+        "rate_card",
+        "timezone"
+      ],
+      "output_fields": [
+        "allowance_movement"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build completed_allowance_cycle_comparison_v1 operands only from the listed canonical relations after allowance_cycle_comparison applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-ALW-04",
+      "plan_id": "allowance_cycle_comparison",
+      "formula_id": "total_tokens_v1",
+      "canonical_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "allowance_selector",
+        "limit",
+        "rate_card",
+        "timezone"
+      ],
+      "output_fields": [
+        "total_tokens"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build total_tokens_v1 operands only from the listed canonical relations after allowance_cycle_comparison applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-01",
+      "plan_id": "cache_reuse_candidates",
+      "formula_id": "cached_share_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "threshold",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "percentile",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "cached_share"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build cached_share_v1 operands only from the listed canonical relations after cache_reuse_candidates applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-01",
+      "plan_id": "cache_reuse_candidates",
+      "formula_id": "total_input_tokens_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "threshold",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "percentile",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "total_input_tokens"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build total_input_tokens_v1 operands only from the listed canonical relations after cache_reuse_candidates applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-02",
+      "plan_id": "context_pressure_trajectory",
+      "formula_id": "cached_share_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "compaction_boundary",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "context_epoch",
+        "limit",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "cached_share"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build cached_share_v1 operands only from the listed canonical relations after context_pressure_trajectory applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-02",
+      "plan_id": "context_pressure_trajectory",
+      "formula_id": "context_pressure_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "compaction_boundary",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "context_epoch",
+        "limit",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "context_pressure"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build context_pressure_v1 operands only from the listed canonical relations after context_pressure_trajectory applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-02",
+      "plan_id": "context_pressure_trajectory",
+      "formula_id": "trajectory_slope_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "compaction_boundary",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "context_epoch",
+        "limit",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [],
+      "internal_use": true,
+      "operand_rule": "Build trajectory_slope_v1 operands only from the listed canonical relations after context_pressure_trajectory applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-03",
+      "plan_id": "token_acceleration",
+      "formula_id": "later_earlier_median_ratio_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "minimum_samples",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "later_earlier_ratio"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build later_earlier_median_ratio_v1 operands only from the listed canonical relations after token_acceleration applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-03",
+      "plan_id": "token_acceleration",
+      "formula_id": "second_difference_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "minimum_samples",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "second_difference"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build second_difference_v1 operands only from the listed canonical relations after token_acceleration applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-04",
+      "plan_id": "uncached_input_jumps",
+      "formula_id": "consecutive_delta_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "compaction_boundary",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "context_epoch",
+        "limit",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "input_delta"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build consecutive_delta_v1 operands only from the listed canonical relations after uncached_input_jumps applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-05",
+      "plan_id": "tool_output_adjacency",
+      "formula_id": "bounded_adjacency_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "threshold",
+        "timezone",
+        "tool_selector"
+      ],
+      "output_fields": [
+        "intervening_events"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build bounded_adjacency_v1 operands only from the listed canonical relations after tool_output_adjacency applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-05",
+      "plan_id": "tool_output_adjacency",
+      "formula_id": "consecutive_delta_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "threshold",
+        "timezone",
+        "tool_selector"
+      ],
+      "output_fields": [
+        "following_input_delta"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build consecutive_delta_v1 operands only from the listed canonical relations after tool_output_adjacency applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-06",
+      "plan_id": "cached_replay_small_output",
+      "formula_id": "cached_output_ratio_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "threshold",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "cached_output_ratio"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build cached_output_ratio_v1 operands only from the listed canonical relations after cached_replay_small_output applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-07",
+      "plan_id": "context_composition",
+      "formula_id": "context_component_coverage_v1",
+      "canonical_relations": [
+        "context_component",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "component_bytes",
+        "unattributed_bytes"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build context_component_coverage_v1 operands only from the listed canonical relations after context_composition applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-08",
+      "plan_id": "compaction_comparison",
+      "formula_id": "symmetric_boundary_comparison_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "compaction_boundary",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "context_epoch",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "context_delta"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build symmetric_boundary_comparison_v1 operands only from the listed canonical relations after compaction_comparison applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-09",
+      "plan_id": "growth_without_mutation",
+      "formula_id": "context_growth_v1",
+      "canonical_relations": [
+        "session",
+        "state_change",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "minimum_samples",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "context_growth"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build context_growth_v1 operands only from the listed canonical relations after growth_without_mutation applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-09",
+      "plan_id": "growth_without_mutation",
+      "formula_id": "mutation_density_v1",
+      "canonical_relations": [
+        "session",
+        "state_change",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "minimum_samples",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [],
+      "internal_use": true,
+      "operand_rule": "Build mutation_density_v1 operands only from the listed canonical relations after growth_without_mutation applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-CTX-10",
+      "plan_id": "long_vs_split_cohorts",
+      "formula_id": "explicit_cohort_comparison_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "cohort",
+        "window"
+      ],
+      "optional_parameters": [
+        "minimum_samples",
+        "timezone"
+      ],
+      "output_fields": [],
+      "internal_use": true,
+      "operand_rule": "Build explicit_cohort_comparison_v1 operands only from the listed canonical relations after long_vs_split_cohorts applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-DEL-01",
+      "plan_id": "parent_subagent_usage",
+      "formula_id": "exclusive_inclusive_scope_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session"
+      ],
+      "required_parameters": [
+        "family_mode",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "family_inclusive_tokens",
+        "parent_exclusive_tokens"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build exclusive_inclusive_scope_v1 operands only from the listed canonical relations after parent_subagent_usage applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-DEL-02",
+      "plan_id": "delegation_cohorts",
+      "formula_id": "observational_cohort_comparison_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "cohort",
+        "window"
+      ],
+      "optional_parameters": [
+        "minimum_samples",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [],
+      "internal_use": true,
+      "operand_rule": "Build observational_cohort_comparison_v1 operands only from the listed canonical relations after delegation_cohorts applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-OPS-01",
+      "plan_id": "latest_publication_delta",
+      "formula_id": "accepted_mutation_summary_v1",
+      "canonical_relations": [
+        "publication",
+        "publication_delta"
+      ],
+      "required_parameters": [],
+      "optional_parameters": [
+        "entity_kind",
+        "limit"
+      ],
+      "output_fields": [
+        "corrected_count",
+        "inserted_count",
+        "recanonicalized_count",
+        "removed_count",
+        "terminalized_count",
+        "token_delta"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build accepted_mutation_summary_v1 operands only from the listed canonical relations after latest_publication_delta applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-OPS-02",
+      "plan_id": "data_health",
+      "formula_id": "freshness_age_v1",
+      "canonical_relations": [
+        "publication",
+        "source_manifestation"
+      ],
+      "required_parameters": [],
+      "optional_parameters": [
+        "scope",
+        "window"
+      ],
+      "output_fields": [
+        "freshness_age_us"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build freshness_age_v1 operands only from the listed canonical relations after data_health applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-OPS-03",
+      "plan_id": "dedup_source_audit",
+      "formula_id": "semantic_occurrence_reconciliation_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "source_manifestation",
+        "source_occurrence"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "scope"
+      ],
+      "output_fields": [
+        "excluded_occurrence_count",
+        "semantic_entity_count"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build semantic_occurrence_reconciliation_v1 operands only from the listed canonical relations after dedup_source_audit applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-OPS-04",
+      "plan_id": "evidence_timeline",
+      "formula_id": "total_order_v1",
+      "canonical_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "resource",
+        "source_occurrence",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "evidence_view"
+      ],
+      "optional_parameters": [
+        "allowance_selector",
+        "cursor",
+        "limit",
+        "resource_selector",
+        "session_selector",
+        "tool_selector"
+      ],
+      "output_fields": [],
+      "internal_use": true,
+      "operand_rule": "Build total_order_v1 operands only from the listed canonical relations after evidence_timeline applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-REV-01",
+      "plan_id": "weekly_review",
+      "formula_id": "signed_driver_contribution_v1",
+      "canonical_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "model_profile",
+        "session",
+        "tool_invocation",
+        "turn",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "current_window",
+        "previous_window"
+      ],
+      "optional_parameters": [
+        "current_project",
+        "rate_card",
+        "timezone",
+        "week_start"
+      ],
+      "output_fields": [
+        "change_drivers"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build signed_driver_contribution_v1 operands only from the listed canonical relations after weekly_review applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-REV-01",
+      "plan_id": "weekly_review",
+      "formula_id": "top_share_v1",
+      "canonical_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "model_profile",
+        "session",
+        "tool_invocation",
+        "turn",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "current_window",
+        "previous_window"
+      ],
+      "optional_parameters": [
+        "current_project",
+        "rate_card",
+        "timezone",
+        "week_start"
+      ],
+      "output_fields": [
+        "session_concentration"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build top_share_v1 operands only from the listed canonical relations after weekly_review applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-REV-01",
+      "plan_id": "weekly_review",
+      "formula_id": "total_tokens_v1",
+      "canonical_relations": [
+        "allowance_observation",
+        "canonical_call",
+        "model_profile",
+        "session",
+        "tool_invocation",
+        "turn",
+        "valuation_match"
+      ],
+      "required_parameters": [
+        "current_window",
+        "previous_window"
+      ],
+      "optional_parameters": [
+        "current_project",
+        "rate_card",
+        "timezone",
+        "week_start"
+      ],
+      "output_fields": [
+        "usage_totals"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build total_tokens_v1 operands only from the listed canonical relations after weekly_review applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-REV-02",
+      "plan_id": "investigation_candidates",
+      "formula_id": "investigation_feature_vector_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "resource",
+        "session",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "minimum_samples",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "candidate_features"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build investigation_feature_vector_v1 operands only from the listed canonical relations after investigation_candidates applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-REV-03",
+      "plan_id": "compare_sessions",
+      "formula_id": "exclusive_inclusive_scope_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "resource",
+        "session",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "left_session",
+        "right_session"
+      ],
+      "optional_parameters": [
+        "evidence_view",
+        "family_mode",
+        "limit",
+        "window"
+      ],
+      "output_fields": [
+        "delegation_metrics"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build exclusive_inclusive_scope_v1 operands only from the listed canonical relations after compare_sessions applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-REV-03",
+      "plan_id": "compare_sessions",
+      "formula_id": "side_by_side_delta_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "resource",
+        "session",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "left_session",
+        "right_session"
+      ],
+      "optional_parameters": [
+        "evidence_view",
+        "family_mode",
+        "limit",
+        "window"
+      ],
+      "output_fields": [
+        "token_deltas"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build side_by_side_delta_v1 operands only from the listed canonical relations after compare_sessions applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-REV-03",
+      "plan_id": "compare_sessions",
+      "formula_id": "total_tokens_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "resource",
+        "session",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "left_session",
+        "right_session"
+      ],
+      "optional_parameters": [
+        "evidence_view",
+        "family_mode",
+        "limit",
+        "window"
+      ],
+      "output_fields": [],
+      "internal_use": true,
+      "operand_rule": "Build total_tokens_v1 operands only from the listed canonical relations after compare_sessions applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-01",
+      "plan_id": "turn_completion_efficiency",
+      "formula_id": "completion_cohort_ratio_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "tokens_per_completed_turn"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build completion_cohort_ratio_v1 operands only from the listed canonical relations after turn_completion_efficiency applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-01",
+      "plan_id": "turn_completion_efficiency",
+      "formula_id": "total_tokens_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "session",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "total_tokens"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build total_tokens_v1 operands only from the listed canonical relations after turn_completion_efficiency applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-02",
+      "plan_id": "first_action_mutation",
+      "formula_id": "first_boundary_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "first_action_tokens",
+        "first_mutation_tokens",
+        "first_success_tokens"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build first_boundary_v1 operands only from the listed canonical relations after first_action_mutation applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-03",
+      "plan_id": "repeated_resource_operations",
+      "formula_id": "resource_revisit_v1",
+      "canonical_relations": [
+        "resource",
+        "session",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "resource_selector",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "revisit_count",
+        "revisit_distance"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build resource_revisit_v1 operands only from the listed canonical relations after repeated_resource_operations applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-04",
+      "plan_id": "retry_cycles",
+      "formula_id": "retry_sequence_matcher_v1",
+      "canonical_relations": [
+        "resource",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "resource_selector",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "matched_events",
+        "retry_cycles"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build retry_sequence_matcher_v1 operands only from the listed canonical relations after retry_cycles applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-05",
+      "plan_id": "tool_family_behavior",
+      "formula_id": "bounded_adjacency_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "resource",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone",
+        "tool_selector"
+      ],
+      "output_fields": [],
+      "internal_use": true,
+      "operand_rule": "Build bounded_adjacency_v1 operands only from the listed canonical relations after tool_family_behavior applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-05",
+      "plan_id": "tool_family_behavior",
+      "formula_id": "observed_duration_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "resource",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone",
+        "tool_selector"
+      ],
+      "output_fields": [
+        "duration_us"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build observed_duration_v1 operands only from the listed canonical relations after tool_family_behavior applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-06",
+      "plan_id": "tool_following_activity",
+      "formula_id": "bounded_adjacency_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "timezone",
+        "tool_selector"
+      ],
+      "output_fields": [
+        "intervening_events"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build bounded_adjacency_v1 operands only from the listed canonical relations after tool_following_activity applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-07",
+      "plan_id": "resource_hotspots",
+      "formula_id": "resource_operation_breakdown_v1",
+      "canonical_relations": [
+        "resource",
+        "state_change",
+        "tool_invocation"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "resource_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "operation_count"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build resource_operation_breakdown_v1 operands only from the listed canonical relations after resource_hotspots applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-08",
+      "plan_id": "model_effort_transitions",
+      "formula_id": "consecutive_profile_transition_v1",
+      "canonical_relations": [
+        "canonical_call",
+        "model_profile",
+        "session"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "token_delta",
+        "transition_count"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build consecutive_profile_transition_v1 operands only from the listed canonical relations after model_effort_transitions applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-09",
+      "plan_id": "automation_candidates",
+      "formula_id": "structural_workflow_features_v1",
+      "canonical_relations": [
+        "resource",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "minimum_samples",
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "project_selector",
+        "timezone"
+      ],
+      "output_fields": [
+        "failure_coverage",
+        "mutation_coverage",
+        "structural_features"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build structural_workflow_features_v1 operands only from the listed canonical relations after automation_candidates applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-10",
+      "plan_id": "tool_duration_gaps",
+      "formula_id": "adjacent_event_gap_v1",
+      "canonical_relations": [
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "threshold",
+        "timezone",
+        "tool_selector"
+      ],
+      "output_fields": [
+        "event_gap_us"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build adjacent_event_gap_v1 operands only from the listed canonical relations after tool_duration_gaps applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    },
+    {
+      "question_id": "Q-WF-10",
+      "plan_id": "tool_duration_gaps",
+      "formula_id": "observed_duration_v1",
+      "canonical_relations": [
+        "tool_invocation",
+        "turn"
+      ],
+      "required_parameters": [
+        "window"
+      ],
+      "optional_parameters": [
+        "limit",
+        "session_selector",
+        "threshold",
+        "timezone",
+        "tool_selector"
+      ],
+      "output_fields": [
+        "tool_duration_us"
+      ],
+      "internal_use": false,
+      "operand_rule": "Build observed_duration_v1 operands only from the listed canonical relations after tool_duration_gaps applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
+    }
+  ]
+}

@@ -1,0 +1,332 @@
+{
+  "schema": "codex-usage-tracker.selector-provenance.v1",
+  "version": 1,
+  "logical_contract": "codex-usage-tracker.agent-kernel.logical.v1",
+  "database_contract": "codex-usage-tracker.agent-kernel.schema-contract.v1",
+  "resolution": "owner_dispatch",
+  "selector_kinds": [
+    "allowance_interval",
+    "allowance_observation",
+    "call",
+    "model_profile",
+    "project",
+    "publication",
+    "rate_card",
+    "resource",
+    "session",
+    "source_manifestation",
+    "state_change",
+    "tool",
+    "turn",
+    "window"
+  ],
+  "comparison": {
+    "required_role_kind_sequence_equals_materialized": true,
+    "repeated_kinds_allowed": true,
+    "referenced_entity_must_exist": true,
+    "provenance_must_be_typed_and_non_placeholder": true,
+    "stable_through": [
+      "clean_rebuild",
+      "source_replacement",
+      "late_event_replay"
+    ]
+  },
+  "provenance_kinds": [
+    "configured_artifact",
+    "derived_boundary_pair",
+    "publication_commit",
+    "request_derivation",
+    "source_inventory",
+    "source_occurrence"
+  ],
+  "provenance_contracts": [
+    {
+      "kind": "configured_artifact",
+      "required_fields": [
+        "digest",
+        "source_name",
+        "fetched_at_us",
+        "validation_status"
+      ],
+      "stable_identity_fields": [
+        "digest"
+      ]
+    },
+    {
+      "kind": "derived_boundary_pair",
+      "required_fields": [
+        "start_observation_selector",
+        "end_observation_selector",
+        "start_occurrences",
+        "end_occurrences",
+        "compatibility_version"
+      ],
+      "stable_identity_fields": [
+        "start_observation_selector",
+        "end_observation_selector",
+        "compatibility_version"
+      ]
+    },
+    {
+      "kind": "publication_commit",
+      "required_fields": [
+        "operation_id",
+        "artifact_manifest_sha256",
+        "committed_at_us"
+      ],
+      "stable_identity_fields": [
+        "operation_id",
+        "artifact_manifest_sha256",
+        "committed_at_us"
+      ]
+    },
+    {
+      "kind": "request_derivation",
+      "required_fields": [
+        "request_digest",
+        "parameter_role",
+        "start_us",
+        "end_us",
+        "timezone"
+      ],
+      "stable_identity_fields": [
+        "request_digest",
+        "parameter_role",
+        "start_us",
+        "end_us",
+        "timezone"
+      ]
+    },
+    {
+      "kind": "source_inventory",
+      "required_fields": [
+        "source_id",
+        "content_revision",
+        "state",
+        "selected_publication_id"
+      ],
+      "stable_identity_fields": [
+        "source_id"
+      ]
+    },
+    {
+      "kind": "source_occurrence",
+      "required_fields": [
+        "occurrences"
+      ],
+      "stable_identity_fields": []
+    }
+  ],
+  "ownership": [
+    {
+      "kind": "allowance_interval",
+      "owner": "allowance",
+      "resolution_source": "allowance_intervals",
+      "identity_basis": "start observation ID, end observation ID, and compatibility version",
+      "materialization": "publish one row for distinct adjacent compatible observations; equal-boundary evidence has no interval row or interval selector",
+      "provenance_kind": "derived_boundary_pair",
+      "required_provenance_fields": [
+        "start_observation_selector",
+        "end_observation_selector",
+        "start_occurrences",
+        "end_occurrences",
+        "compatibility_version"
+      ],
+      "conditional_absence": "incompatible, non-adjacent, missing, or identical boundary observations"
+    },
+    {
+      "kind": "rate_card",
+      "owner": "valuation",
+      "resolution_source": "rate_card_revisions plus active_rate_card",
+      "identity_basis": "validated normalized rate-card digest",
+      "materialization": "persist validated revisions and the active selection atomically with the publication",
+      "provenance_kind": "configured_artifact",
+      "required_provenance_fields": [
+        "digest",
+        "source_name",
+        "fetched_at_us",
+        "validation_status"
+      ],
+      "conditional_absence": "no validated active rate card"
+    },
+    {
+      "kind": "window",
+      "owner": "evidence",
+      "resolution_source": "normalized request value",
+      "identity_basis": "start_us, end_us, and timezone",
+      "materialization": "derive a stable logical selector per role without persisting a database row",
+      "provenance_kind": "request_derivation",
+      "required_provenance_fields": [
+        "request_digest",
+        "parameter_role",
+        "start_us",
+        "end_us",
+        "timezone"
+      ],
+      "conditional_absence": "the plan has no window role"
+    },
+    {
+      "kind": "publication",
+      "owner": "publication",
+      "resolution_source": "publications plus publication_head",
+      "identity_basis": "committed publication logical identity",
+      "materialization": "resolve the committed row in the same read snapshot as facts and coverage",
+      "provenance_kind": "publication_commit",
+      "required_provenance_fields": [
+        "operation_id",
+        "artifact_manifest_sha256",
+        "committed_at_us"
+      ],
+      "conditional_absence": "never absent when a queryable publication exists"
+    },
+    {
+      "kind": "model_profile",
+      "owner": "facts/model_calls",
+      "resolution_source": "model_profiles",
+      "identity_basis": "model, reasoning effort, and service tier",
+      "materialization": "resolve the canonical profile row and representative calls in the selected result",
+      "provenance_kind": "source_occurrence",
+      "required_provenance_fields": [
+        "profile_tuple",
+        "representative_call_selectors",
+        "representative_call_occurrences"
+      ],
+      "conditional_absence": "no selected call has the profile"
+    },
+    {
+      "kind": "source_manifestation",
+      "owner": "sources",
+      "resolution_source": "source_manifestations",
+      "identity_basis": "stable source-file lineage tuple",
+      "materialization": "resolve directly from the selected source inventory; no self-referential JSONL occurrence is required",
+      "provenance_kind": "source_inventory",
+      "required_provenance_fields": [
+        "source_id",
+        "content_revision",
+        "state",
+        "selected_publication_id"
+      ],
+      "conditional_absence": "the result does not describe a physical manifestation"
+    },
+    {
+      "kind": "allowance_observation",
+      "owner": "facts/source-occurrence",
+      "resolution_source": "canonical facts plus source occurrences",
+      "identity_basis": "canonical logical ID",
+      "materialization": "resolve canonical selected fact and its source occurrence coordinates",
+      "provenance_kind": "source_occurrence",
+      "required_provenance_fields": [
+        "occurrences"
+      ],
+      "conditional_absence": "no selected canonical entity of this kind"
+    },
+    {
+      "kind": "call",
+      "owner": "facts/source-occurrence",
+      "resolution_source": "canonical facts plus source occurrences",
+      "identity_basis": "canonical logical ID",
+      "materialization": "resolve canonical selected fact and its source occurrence coordinates",
+      "provenance_kind": "source_occurrence",
+      "required_provenance_fields": [
+        "occurrences"
+      ],
+      "conditional_absence": "no selected canonical entity of this kind"
+    },
+    {
+      "kind": "project",
+      "owner": "facts/source-occurrence",
+      "resolution_source": "canonical facts plus source occurrences",
+      "identity_basis": "canonical logical ID",
+      "materialization": "resolve canonical selected fact and its source occurrence coordinates",
+      "provenance_kind": "source_occurrence",
+      "required_provenance_fields": [
+        "occurrences"
+      ],
+      "conditional_absence": "no selected canonical entity of this kind"
+    },
+    {
+      "kind": "resource",
+      "owner": "facts/source-occurrence",
+      "resolution_source": "canonical facts plus source occurrences",
+      "identity_basis": "canonical logical ID",
+      "materialization": "resolve canonical selected fact and its source occurrence coordinates",
+      "provenance_kind": "source_occurrence",
+      "required_provenance_fields": [
+        "occurrences"
+      ],
+      "conditional_absence": "no selected canonical entity of this kind"
+    },
+    {
+      "kind": "session",
+      "owner": "facts/source-occurrence",
+      "resolution_source": "canonical facts plus source occurrences",
+      "identity_basis": "canonical logical ID",
+      "materialization": "resolve canonical selected fact and its source occurrence coordinates",
+      "provenance_kind": "source_occurrence",
+      "required_provenance_fields": [
+        "occurrences"
+      ],
+      "conditional_absence": "no selected canonical entity of this kind"
+    },
+    {
+      "kind": "state_change",
+      "owner": "facts/source-occurrence",
+      "resolution_source": "canonical facts plus source occurrences",
+      "identity_basis": "canonical logical ID",
+      "materialization": "resolve canonical selected fact and its source occurrence coordinates",
+      "provenance_kind": "source_occurrence",
+      "required_provenance_fields": [
+        "occurrences"
+      ],
+      "conditional_absence": "no selected canonical entity of this kind"
+    },
+    {
+      "kind": "tool",
+      "owner": "facts/source-occurrence",
+      "resolution_source": "canonical facts plus source occurrences",
+      "identity_basis": "canonical logical ID",
+      "materialization": "resolve canonical selected fact and its source occurrence coordinates",
+      "provenance_kind": "source_occurrence",
+      "required_provenance_fields": [
+        "occurrences"
+      ],
+      "conditional_absence": "no selected canonical entity of this kind"
+    },
+    {
+      "kind": "turn",
+      "owner": "facts/source-occurrence",
+      "resolution_source": "canonical facts plus source occurrences",
+      "identity_basis": "canonical logical ID",
+      "materialization": "resolve canonical selected fact and its source occurrence coordinates",
+      "provenance_kind": "source_occurrence",
+      "required_provenance_fields": [
+        "occurrences"
+      ],
+      "conditional_absence": "no selected canonical entity of this kind"
+    }
+  ],
+  "plan_scope_sources": [
+    {
+      "question_id": "Q-ALW-02",
+      "plan_id": "allowance_interval_events",
+      "variants": [
+        "empty_interval",
+        "same_time_boundary"
+      ],
+      "scope_source": "allowance_observation_pair",
+      "algorithm": "resolve both observation selectors, then use [start.observed_at_us,end.observed_at_us); equal observations or times produce an empty result and require no allowance_interval selector",
+      "empty_behavior": "return zero event rows and both boundary references; never invent a microsecond or an impossible interval row"
+    },
+    {
+      "question_id": "Q-OPS-01",
+      "plan_id": "latest_publication_delta",
+      "variants": [
+        "no_change",
+        "recanonicalized_owner"
+      ],
+      "scope_source": "latest_accepted_publication_delta",
+      "algorithm": "resolve publication_head and read the latest accepted publication_deltas row plus bounded entity and sample rows; do not select calls or synthesize a time window",
+      "empty_behavior": "a no-change refresh creates no publication; report the latest accepted publication delta and separately preserve the operational no-change fact"
+    }
+  ]
+}

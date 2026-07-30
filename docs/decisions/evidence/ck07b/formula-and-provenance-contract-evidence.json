@@ -1,0 +1,106 @@
+{
+  "schema": "codex-usage-tracker.ck07b-formula-and-provenance-contract-evidence.v1",
+  "packet": "CK-07B",
+  "status": "validated_ci_pending",
+  "base": {
+    "ref": "origin/main",
+    "sha": "99680e80f75107e31b73072dcdcd3a74f602dbf6"
+  },
+  "ck07a_blocker": {
+    "retained_worktree": "codex-usage-tracker-ck07a-fact-backed-seam-repair",
+    "evidence_sha256": "9e8d106d9b93c982a1343a18c77ec3b0e3acb4d7a2b00957bb3bf3e08cfc260f",
+    "attempted_variants": 80,
+    "complete_comparisons": 0
+  },
+  "formula_contract": {
+    "family": "codex-usage-tracker.formula-contract.v1",
+    "definition_count": 45,
+    "catalog_use_count": 61,
+    "question_count": 40,
+    "answer_field_binding_count": 185,
+    "artifacts": [
+      {
+        "path": "config/agent-kernel/formula-contract-v1.json",
+        "sha256": "71841c529e6a042bff1809d5ebc8837e3e36d0ef1a9687ea6f4a8a398d2d9730"
+      },
+      {
+        "path": "config/agent-kernel/formula-contract-v1.schema.json",
+        "sha256": "ae22c03e681206b2cef57971cdb995ed3c284679f25d6559a28989d25fa5941d"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/domain/formulas.py",
+        "sha256": "c488a7db0355414990fbed01d63b33759f0b83a89cd61cc28f9c12b382577785"
+      }
+    ]
+  },
+  "selector_contract": {
+    "family": "codex-usage-tracker.selector-provenance.v1",
+    "declared_and_accepted_kind_count": 14,
+    "provenance_kind_count": 6,
+    "owner_specific_decision": true,
+    "selector_narrowing": [],
+    "database_v1_migration": false,
+    "no_window_variant_count": 4,
+    "artifacts": [
+      {
+        "path": "config/agent-kernel/selector-provenance-v1.json",
+        "sha256": "1a5ad492d7684b8050a71606af918d0e5964fffd32826c5ae0479d829131b41b"
+      },
+      {
+        "path": "config/agent-kernel/selector-provenance-v1.schema.json",
+        "sha256": "c1ece7b92795a138a288b011139d1d238f8cdebb59368d45a76a4c1a3cb8b4af"
+      },
+      {
+        "path": "tests/agent_kernel/contracts/reference/selector_provenance.py",
+        "sha256": "bec4f93a92a0b7f35f23e2267b5837a098372b99c48f2f4fd1dd7871b225b7d6"
+      }
+    ]
+  },
+  "gitnexus": {
+    "version": "1.6.9",
+    "bootstrap": "passed",
+    "impact_analysis": [
+      {
+        "symbol": "catalog_failures",
+        "risk": "MEDIUM",
+        "impacted_symbols": 15
+      },
+      {
+        "symbol": "build_guidance",
+        "risk": "LOW",
+        "impacted_symbols": 18
+      }
+    ],
+    "high_or_critical_impacts": 0
+  },
+  "privacy": {
+    "fixtures": "synthetic contract vectors only",
+    "real_tracker_databases": false,
+    "real_codex_logs": false,
+    "raw_prompts_responses_commands_patches_or_tool_bodies": false,
+    "secrets": false
+  },
+  "validation": {
+    "focused_contracts": "passed; 59 tests plus kernel integration scope",
+    "just_v": "passed within just vc; 1096 tests, 1 warning",
+    "just_vc": "passed; functional, invariant-performance, release-safety, and package checks",
+    "final_review": "5 findings, 5 accepted and corrected",
+    "review_token_status": "unavailable; repository reviewer metrics returned no attribution and were not retried",
+    "ci": "pending",
+    "exact_main": "pending"
+  },
+  "merge": {
+    "pull_request": null,
+    "merged_sha": null
+  },
+  "resume": {
+    "ck07a_ready_after_merge": true,
+    "ck07a_requalified": false,
+    "ck08_blocked": true,
+    "carry_forward_rule": "CK-04 through CK-07 lanes may be carried only when input bytes and named execution paths are byte-identical and path-identical."
+  },
+  "residual_risks": [
+    "CK-07A must still independently execute and compare all 80 structural-v2 variants.",
+    "The historical CK-04 growth-evidence exception remains in force."
+  ]
+}

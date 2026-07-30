@@ -1692,6 +1692,13 @@ CREATE INDEX model_call_tail_by_session
 ```
 <!-- analytical-ddl:end -->
 
+`selector_anchors` is a physical optimization for the ten listed kinds, not
+the complete logical selector registry. The four additional logical kinds
+(`model_profile`, `rate_card`, `source_manifestation`, and `window`) resolve
+through their existing authoritative owners under
+`selector-provenance-v1.json`; windows are request-owned non-persisted values.
+This owner dispatch requires no database-v1 DDL amendment.
+
 ### Required analytical metadata and validation
 
 `metadata` contains one row per key for at least these keys:

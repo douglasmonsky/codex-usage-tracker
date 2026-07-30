@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/douglasmonsky/codex-usage-tracker/config/agent-kernel/selector-provenance-v1.schema.json",
+  "title": "Codex Usage Tracker selector provenance contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "logical_contract",
+    "database_contract",
+    "resolution",
+    "selector_kinds",
+    "comparison",
+    "provenance_kinds",
+    "provenance_contracts",
+    "ownership",
+    "plan_scope_sources"
+  ],
+  "properties": {
+    "schema": {
+      "const": "codex-usage-tracker.selector-provenance.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "logical_contract": {
+      "const": "codex-usage-tracker.agent-kernel.logical.v1"
+    },
+    "database_contract": {
+      "const": "codex-usage-tracker.agent-kernel.schema-contract.v1"
+    },
+    "resolution": {
+      "const": "owner_dispatch"
+    },
+    "selector_kinds": {
+      "$ref": "#/$defs/ids"
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_role_kind_sequence_equals_materialized",
+        "repeated_kinds_allowed",
+        "referenced_entity_must_exist",
+        "provenance_must_be_typed_and_non_placeholder",
+        "stable_through"
+      ],
+      "properties": {
+        "required_role_kind_sequence_equals_materialized": {
+          "const": true
+        },
+        "repeated_kinds_allowed": {
+          "const": true
+        },
+        "referenced_entity_must_exist": {
+          "const": true
+        },
+        "provenance_must_be_typed_and_non_placeholder": {
+          "const": true
+        },
+        "stable_through": {
+          "const": [
+            "clean_rebuild",
+            "source_replacement",
+            "late_event_replay"
+          ]
+        }
+      }
+    },
+    "provenance_kinds": {
+      "type": "array",
+      "const": [
+        "configured_artifact",
+        "derived_boundary_pair",
+        "publication_commit",
+        "request_derivation",
+        "source_inventory",
+        "source_occurrence"
+      ]
+    },
+    "provenance_contracts": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/provenance"
+      }
+    },
+    "ownership": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "items": {
+        "$ref": "#/$defs/ownership"
+      }
+    },
+    "plan_scope_sources": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/plan"
+      }
+    }
+  },
+  "$defs": {
+    "ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$"
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "required_fields",
+        "stable_identity_fields"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "configured_artifact",
+            "derived_boundary_pair",
+            "publication_commit",
+            "request_derivation",
+            "source_inventory",
+            "source_occurrence"
+          ]
+        },
+        "required_fields": {
+          "$ref": "#/$defs/ids"
+        },
+        "stable_identity_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        }
+      }
+    },
+    "ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "owner",
+        "resolution_source",
+        "identity_basis",
+        "materialization",
+        "provenance_kind",
+        "required_provenance_fields",
+        "conditional_absence"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "allowance_interval",
+            "allowance_observation",
+            "call",
+            "project",
+            "resource",
+            "session",
+            "state_change",
+            "tool",
+            "turn",
+            "rate_card",
+            "window",
+            "publication",
+            "model_profile",
+            "source_manifestation"
+          ]
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resolution_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "materialization": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance_kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_provenance_fields": {
+          "$ref": "#/$defs/ids"
+        },
+        "conditional_absence": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_id",
+        "plan_id",
+        "variants",
+        "scope_source",
+        "algorithm",
+        "empty_behavior"
+      ],
+      "properties": {
+        "question_id": {
+          "enum": [
+            "Q-ALW-02",
+            "Q-OPS-01"
+          ]
+        },
+        "plan_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "variants": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "scope_source": {
+          "enum": [
+            "allowance_observation_pair",
+            "latest_accepted_publication_delta"
+          ]
+        },
+        "algorithm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "empty_behavior": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

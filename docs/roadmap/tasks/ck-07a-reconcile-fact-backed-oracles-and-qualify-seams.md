@@ -1,6 +1,6 @@
 # CK-07A — Reconcile fact-backed oracles and qualify packet seams
 
-**Status:** Admitted corrective prerequisite
+**Status:** Blocked until CK-07B merges; not requalified
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -18,9 +18,27 @@ answers from permitted facts.
 `PHYSICAL_ARCHITECTURE_BAKEOFF.md`,
 `AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md`, `ADAPTER_CONTRACT.md`,
 `PUBLICATION_REFRESH_RECOVERY.md`,
+`FORMULA_AND_SELECTOR_CONTRACT.md`,
 `QUERY_EVIDENCE_PROJECTION_CONTRACTS.md`, `QUALIFICATION_PLAN.md`, and the
 [CK-08 blocker evidence](../../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json).
-**Dependencies:** CK-07 merged and verified; CK-08 blocker evidence merged.
+**Dependencies:** CK-07 and CK-07B merged and verified; CK-08 blocker evidence
+merged.
+
+## CK-07B resume authority
+
+Consume `formula-contract-v1.json` and its schema,
+`evaluate_formula`, `selector-provenance-v1.json` and its schema, and
+`validate_evidence_references_v1` exactly as named by
+`FORMULA_AND_SELECTOR_CONTRACT.md`. Complete each of the 80 comparisons over
+the full answer including `NULL`, grades and deterministic ordering, all 185
+field bindings, and the exact ordered
+`(role, selector_kind, selector, provenance)` reference sequence.
+
+The reference and database-v1 replay evaluators may share those contracts and
+pure symbols only; neither may import the other or consume emitted oracle,
+grading, or comparison output. A CK-04 through CK-07 lane may be carried only
+when its input bytes and named execution path are both byte-identical and
+path-identical. Otherwise rerun that lane and record the changed identity.
 
 ## Frozen seam contracts
 

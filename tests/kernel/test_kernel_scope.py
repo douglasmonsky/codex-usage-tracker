@@ -13,6 +13,7 @@ from scripts.check_kernel_scope import (
     CK05_CANONICAL_STORAGE_ADDITIONS,
     CK06_ADAPTER_INGESTION_ADDITIONS,
     CK07_PUBLICATION_RECOVERY_ADDITIONS,
+    CK07B_FORMULA_PROVENANCE_ADDITIONS,
     CK08_PREREQUISITE_BLOCKER_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS,
@@ -508,6 +509,19 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/test_kernel_scope.py",
     } == CK07_PUBLICATION_RECOVERY_ADDITIONS
     assert {
+        "config/agent-kernel/formula-contract-v1.json",
+        "config/agent-kernel/formula-contract-v1.schema.json",
+        "config/agent-kernel/selector-provenance-v1.json",
+        "config/agent-kernel/selector-provenance-v1.schema.json",
+        "docs/architecture/FORMULA_AND_SELECTOR_CONTRACT.md",
+        "docs/decisions/evidence/ck07b/formula-and-provenance-contract-evidence.json",
+        "docs/roadmap/tasks/ck-07b-freeze-formula-and-provenance-contract.md",
+        "src/codex_usage_tracker/agent_kernel/domain/formulas.py",
+        "tests/agent_kernel/contracts/reference/selector_provenance.py",
+        "tests/agent_kernel/contracts/test_formula_contract.py",
+        "tests/agent_kernel/contracts/test_selector_provenance_contract.py",
+    } == CK07B_FORMULA_PROVENANCE_ADDITIONS
+    assert {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
     } == CK08_PREREQUISITE_BLOCKER_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
@@ -540,6 +554,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK05_CANONICAL_STORAGE_ADDITIONS
         | CK06_ADAPTER_INGESTION_ADDITIONS
         | CK07_PUBLICATION_RECOVERY_ADDITIONS
+        | CK07B_FORMULA_PROVENANCE_ADDITIONS
         | CK08_PREREQUISITE_BLOCKER_ADDITIONS
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )

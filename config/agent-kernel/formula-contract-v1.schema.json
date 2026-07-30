@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/douglasmonsky/codex-usage-tracker/config/agent-kernel/formula-contract-v1.schema.json",
+  "title": "Codex Usage Tracker formula contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "source_catalog",
+    "formulas",
+    "answer_field_bindings",
+    "formula_uses"
+  ],
+  "properties": {
+    "schema": {
+      "const": "codex-usage-tracker.formula-contract.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "source_catalog": {
+      "const": "config/agent-kernel/question-catalog-v1.json"
+    },
+    "formulas": {
+      "type": "array",
+      "minItems": 45,
+      "maxItems": 45,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/formula"
+      }
+    },
+    "answer_field_bindings": {
+      "type": "array",
+      "minItems": 40,
+      "maxItems": 40,
+      "items": { "$ref": "#/$defs/questionBindings" }
+    },
+    "formula_uses": {
+      "type": "array",
+      "minItems": 61,
+      "maxItems": 61,
+      "items": {
+        "$ref": "#/$defs/formulaUse"
+      }
+    }
+  },
+  "$defs": {
+    "formulaUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_id",
+        "plan_id",
+        "formula_id",
+        "canonical_relations",
+        "required_parameters",
+        "optional_parameters",
+        "output_fields",
+        "internal_use",
+        "operand_rule"
+      ],
+      "properties": {
+        "question_id": {
+          "type": "string",
+          "pattern": "^Q-[A-Z]+-[0-9]{2}$"
+        },
+        "plan_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "formula_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "canonical_relations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        },
+        "required_parameters": {
+          "$ref": "#/$defs/names"
+        },
+        "optional_parameters": {
+          "$ref": "#/$defs/names"
+        },
+        "output_fields": {
+          "$ref": "#/$defs/names"
+        },
+        "internal_use": {
+          "type": "boolean"
+        },
+        "operand_rule": {
+          "type": "string",
+          "minLength": 80
+        }
+      }
+    },
+    "questionBindings": {
+      "type": "object", "additionalProperties": false,
+      "required": ["question_id", "fields", "internal_formula_ids"],
+      "properties": {
+        "question_id": { "type": "string", "pattern": "^Q-[A-Z]+-[0-9]{2}$" },
+        "fields": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/fieldBinding" } },
+        "internal_formula_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        }
+      }
+    },
+    "fieldBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["field", "classification"],
+      "properties": {
+        "field": { "type": "string", "minLength": 1 },
+        "classification": { "enum": ["direct_fact", "formula_output"] },
+        "formula_id": { "$ref": "#/$defs/identifier" },
+        "output_key": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "classification": {"const": "formula_output"}
+            }
+          },
+          "then": {
+            "required": ["formula_id", "output_key"]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {"required": ["formula_id"]},
+                {"required": ["output_key"]}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*_v1$"
+    },
+    "names": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "formula": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "inputs",
+        "fact_relations",
+        "filtering",
+        "grouping",
+        "ordering",
+        "null_empty_behavior",
+        "numeric_types",
+        "rounding",
+        "units",
+        "window_boundary_source",
+        "result_shape",
+        "operation",
+        "symbol"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "fact_relations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "filtering": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grouping": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ordering": {
+          "type": "string",
+          "minLength": 1
+        },
+        "null_empty_behavior": {
+          "type": "string",
+          "minLength": 1
+        },
+        "numeric_types": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rounding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "units": {
+          "type": "string",
+          "minLength": 1
+        },
+        "window_boundary_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result_shape": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
