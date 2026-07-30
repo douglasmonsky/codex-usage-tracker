@@ -8,6 +8,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from ..adapters.contracts import SourceState
+from ..domain.valuation import ValuationDirtyInterval
 
 if TYPE_CHECKING:
     from ..adapters.codex_jsonl.canonicalize import ProposedChangeSet
@@ -85,12 +86,15 @@ class RefreshIntent:
     watcher_dirty_hint_count: int = 0
     periodic_reconciliation_due: bool = False
     current_tail_rows: int = 0
+    valuation_dirty_intervals: tuple[ValuationDirtyInterval, ...] = ()
 
     def __post_init__(self) -> None:
         if self.parent_observed_at_us > self.planned_at_us:
             raise ValueError("planning clock precedes parent observation")
         if self.watcher_dirty_hint_count < 0 or self.current_tail_rows < 0:
             raise ValueError("refresh counters must be nonnegative")
+        if self.valuation_dirty_intervals and not self.rate_card_changed:
+            raise ValueError("valuation dirty intervals require a rate-card change")
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,10 +104,14 @@ class PublicationPlan:
     estimate: ChangeEstimate
     reasons: tuple[str, ...]
     analytical_write_required: bool
+    valuation_dirty_intervals: tuple[ValuationDirtyInterval, ...] = ()
 
     @property
     def is_small(self) -> bool:
-        return self.operation_class is OperationClass.APPEND_SAFE_SMALL
+        return self.operation_class in {
+            OperationClass.APPEND_SAFE_SMALL,
+            OperationClass.VALUATION_ONLY,
+        }
 
 
 BoundaryT = TypeVar("BoundaryT")
@@ -399,6 +407,11 @@ def plan_refresh(
 ) -> PublicationPlan:
     """Choose the operation class before any analytical write lock exists."""
 
+    if (
+        intent.valuation_dirty_intervals
+        and dirty_keys != len(intent.valuation_dirty_intervals)
+    ):
+        raise ValueError("dirty-key estimate must equal valuation dirty interval count")
     estimate = estimate_change_set(
         changes,
         dirty_keys=dirty_keys,
@@ -415,4 +428,5 @@ def plan_refresh(
         estimate=estimate,
         reasons=reasons,
         analytical_write_required=operation_class not in {OperationClass.NO_CHANGE},
+        valuation_dirty_intervals=intent.valuation_dirty_intervals,
     )

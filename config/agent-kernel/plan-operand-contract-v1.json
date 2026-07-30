@@ -1490,9 +1490,10 @@
             "rate_card_digest",
             "match_basis",
             "configured_cost_usd",
+            "cost_grade",
             "estimated_credits",
             "coverage_basis",
-            "unpriced_reason"
+            "cost_unpriced_reason"
           ]
         }
       ],

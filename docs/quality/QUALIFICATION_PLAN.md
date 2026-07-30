@@ -73,6 +73,13 @@ path. Typed unpriced valuation rows must remain unpriced in coverage. CK-05,
 CK-07, and CK-07C valuation seams require linked requalification before CK-07A
 may resume.
 
+CK-07D's local implementation results, artifact identities, twelve acceptance
+proofs, validation measurements, review state, and residual merge gates are
+recorded in
+`docs/decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json`.
+That local evidence does not unblock CK-07A or CK-08 before merge and
+exact-main verification.
+
 ## Synthetic fixture strategy
 
 Fixtures contain no real local usage records or raw content. A deterministic

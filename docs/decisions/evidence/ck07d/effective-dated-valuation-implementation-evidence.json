@@ -1,0 +1,163 @@
+{
+  "schema": "codex-usage-tracker.ck07d-effective-dated-valuation-implementation-evidence.v1",
+  "packet": "CK-07D",
+  "status": "implemented_local_commit_pending",
+  "base": {
+    "ref": "feature/ck07d-effective-pricing",
+    "sha": "2f3a41f54731ab175b667298b76e9cc7fae120da",
+    "authority_parent": "dbf98ff4ac971e41442af871e9241c9df20b8ef5"
+  },
+  "valuation_contract": {
+    "class": "current_configured_estimate",
+    "billed_cost_claimed": false,
+    "historical_as_known_claimed": false,
+    "canonical_calls_rewritten": false,
+    "persisted_call_price_assignment": false,
+    "valuation_cache_added": false,
+    "selection": "greatest matching captured revision effective_at_us <= call.event_at_us",
+    "same_time_precedence": "exact model profile before alias",
+    "fetched_at_role": "provenance_only",
+    "symbols": [
+      "RateCardRevision",
+      "RateCardFrontier",
+      "ValuationDirtyInterval",
+      "ValuationUnpricedReason",
+      "CurrentValuationMatch",
+      "compile_current_valuation_matches",
+      "validate_rate_card_frontier",
+      "derive_frontier_dirty_intervals"
+    ]
+  },
+  "publication_frontier": {
+    "identity": "publication rate_card_digest plus immutable predecessor chain",
+    "head_table": "active_rate_card",
+    "lineage_column": "rate_card_revisions.predecessor_rate_card_id",
+    "effective_at_required": true,
+    "prepared_before_writer_lock": true,
+    "validated_before_head_promotion": true,
+    "same_snapshot_open_validation": true,
+    "ordinary_tail_preserves_selected_at": true,
+    "historical_publication_reproducible": true,
+    "recovery_atomic": true
+  },
+  "database_v1": {
+    "old_schema_sha256": "2a388dbb498dfd0122f7d10e5ee607db1e4a9ec57b6c7f549c1f6c8797a21bae",
+    "new_schema_sha256": "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5",
+    "tables": 42,
+    "indexes": 44,
+    "compatibility": "old database-v1 digest fails closed and rebuilds; no migration or compatibility view"
+  },
+  "plan_operand_contract": {
+    "old_contract_sha256": "967f7ed7209f11f273be4da3256edf084267430cec9599454b1987bcbd069e3a",
+    "new_contract_sha256": "19b9c69f50f67b01321e1f269cee2f70370ca64c0c666ff4dac2cc52efa314b4",
+    "old_vectors_sha256": "24f369c6ce7d6d3fc52c48f5bfec098da68625c8a836a89ad8914844f98bacc4",
+    "new_vectors_sha256": "cc4d944354356136c45c6a22aa0a289849fe6c4804e4a5d5bd5574cac1ab72c2",
+    "new_logical_vector_bundle_sha256": "87b9d08a8d1186ab1e3eb794f58d17fd28b991e210fc0144713f1299ab224b2c",
+    "pricing_rule": "priced only when cost_grade is configured_estimate and configured_cost_usd is non-null",
+    "typed_unpriced_row_counted_as_priced": false
+  },
+  "acceptance_cases": [
+    {
+      "case": 1,
+      "proof": "before, exact-boundary, and after calls agree with independent reference selection"
+    },
+    {
+      "case": 2,
+      "proof": "late-ingested historical calls retain old selected digest, value, and valuation identity"
+    },
+    {
+      "case": 3,
+      "proof": "model-subset revision falls back to the older matching revision for unchanged models"
+    },
+    {
+      "case": 4,
+      "proof": "future, invalid, missing-effective, missing-call-time, and unmatched inputs emit stable typed null valuations"
+    },
+    {
+      "case": 5,
+      "proof": "missing predecessor, cycle, head mismatch, and equal-effective ambiguity fail closed before preparation and again inside writer promotion"
+    },
+    {
+      "case": 6,
+      "proof": "exact profile beats alias only among matches at the same effective time"
+    },
+    {
+      "case": 7,
+      "proof": "existing four-token-class, reasoning-output, Decimal, partial cost, credit, and missingness tests remain green"
+    },
+    {
+      "case": 8,
+      "proof": "typed unpriced valuation rows are excluded from priced calls and their tokens remain unpriced"
+    },
+    {
+      "case": 9,
+      "proof": "initial publication, unchanged tail metadata, no-change, replacement rebuild, late-event crash rollback/retry, and historical frontier replay preserve head and revision digests"
+    },
+    {
+      "case": 10,
+      "proof": "focused valuation, plan, schema, storage, publication, and recovery lane passed"
+    },
+    {
+      "case": 11,
+      "proof": "newer eligible alias beats older exact; same-effective exact beats alias"
+    },
+    {
+      "case": 12,
+      "proof": "backdated correction changes and dirties only the matching half-open effective interval"
+    }
+  ],
+  "synthetic_reference": {
+    "module": "tests/agent_kernel/contracts/reference/effective_dated_valuation.py",
+    "real_codex_data_used": false,
+    "live_pricing_fetched": false,
+    "body_fields_used": false,
+    "reference_sha256": "9d968411f466b58d3e2ba83b4d3657c6b289179227ccaf786f7c287b53908f9f",
+    "acceptance_test_sha256": "03530f9951fff4fd785bf41f641e576624b33906a73f7172767462b0a34855bd",
+    "publication_test_sha256": "a0005ac2cea8ec9bffa5d1994c8b0b2d1d0f347f718f5b2394777be3dff610df"
+  },
+  "validation": {
+    "focused": "post-review recovery lane: 61 passed in 5.95s; earlier coupled lane: 197 passed in 9.80s",
+    "just_v": "passed post-review: 1210 tests in 101 seconds plus 13 performance invariants",
+    "just_vc": "passed post-review: 1210 tests in 103.91s plus 13 performance invariants with zero breaches and complete distribution checks",
+    "git_diff_check": "passed within both broad gates",
+    "gitnexus_bootstrap_check": "passed at final pre-commit gate with GitNexus 1.6.9 and Node v26.5.0",
+    "gitnexus_detect_changes": "completed exact compare against origin/main; reported critical over-aggregation reconciled by exact diff inspection and complete validation"
+  },
+  "measurements": {
+    "focused_elapsed_seconds": 5.95,
+    "full_pytest_elapsed_seconds": 101.0,
+    "complete_pytest_elapsed_seconds": 103.91,
+    "latest_complete_performance_invariant_breaches": 0,
+    "transient_nonblocking_breaches": [
+      "post-review just v observed allowance_read_p95_ms 561.272775 against 550.0; just vc observed 464.124777 and CK-07D does not modify the allowance runtime"
+    ]
+  },
+  "review": {
+    "status": "complete; both findings accepted, corrected, and revalidated",
+    "reviewer_count": 1,
+    "findings": 2,
+    "accepted_findings": 2,
+    "unresolved_findings": 0,
+    "token_metrics": "unavailable from the reviewer orchestration surface"
+  },
+  "historical_evidence": [
+    "docs/decisions/evidence/ck05/canonical-storage-evidence.json",
+    "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
+    "docs/decisions/evidence/ck07c/plan-operand-and-fact-contract-evidence.json",
+    "docs/decisions/evidence/ck07d/effective-dated-valuation-gap.json"
+  ],
+  "residual_risks": [
+    "Required CI, PR merge, and exact-main verification are outside this local implementation state.",
+    "CK-07A remains zero of 80 variants requalified until its independent scenario and database-v1 replay consume the merged CK-07D authority.",
+    "CK-08 remains blocked; no query, projection, MCP, CLI, UI, release, or deployment work is claimed.",
+    "Rate values are synthetic contract data; no provider billing or historical-as-known truth is claimed.",
+    "One post-review just v invariant sample exceeded the allowance-read budget by 11.272775 ms; the complete just vc rerun was below budget and the changed code has no allowance-runtime path.",
+    "GitNexus pre-edit impact aggregation over-reported unrelated frozen-runtime and experiment processes; exact repository search and focused/full validation remain the controlling reconciliation."
+  ],
+  "downstream": {
+    "ck07a_status": "blocked_pending_ck07d_merge_and_exact_main",
+    "ck07a_requalified_variants": 0,
+    "ck08_status": "blocked",
+    "linear_mutated": false
+  }
+}

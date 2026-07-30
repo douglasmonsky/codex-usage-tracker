@@ -578,10 +578,16 @@ CK07C_PLAN_OPERAND_FACT_ADDITIONS = frozenset(
     }
 )
 
-CK07D_EFFECTIVE_DATED_VALUATION_ADMISSION_ADDITIONS = frozenset(
+CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS = frozenset(
     {
+        "docs/decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json",
         "docs/decisions/evidence/ck07d/effective-dated-valuation-gap.json",
         "docs/roadmap/tasks/ck-07d-implement-effective-dated-rate-card-valuation.md",
+        "src/codex_usage_tracker/agent_kernel/publication/rate_cards.py",
+        "src/codex_usage_tracker/agent_kernel/storage/rate_cards.py",
+        "tests/agent_kernel/contracts/reference/effective_dated_valuation.py",
+        "tests/agent_kernel/contracts/test_effective_dated_valuation.py",
+        "tests/agent_kernel/publication/test_rate_cards.py",
     }
 )
 
@@ -635,7 +641,7 @@ INTEGRATION_ADDITIONS = (
     | CK07_PUBLICATION_RECOVERY_ADDITIONS
     | CK07B_FORMULA_PROVENANCE_ADDITIONS
     | CK07C_PLAN_OPERAND_FACT_ADDITIONS
-    | CK07D_EFFECTIVE_DATED_VALUATION_ADMISSION_ADDITIONS
+    | CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )

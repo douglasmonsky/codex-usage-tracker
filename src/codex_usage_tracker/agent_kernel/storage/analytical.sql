@@ -1043,9 +1043,10 @@ CREATE TABLE rate_card_revisions (
   rate_card_id TEXT PRIMARY KEY,
   digest TEXT NOT NULL UNIQUE
     CHECK (length(digest) = 64 AND digest NOT GLOB '*[^0-9a-f]*'),
+  predecessor_rate_card_id TEXT,
   source_name TEXT NOT NULL,
   source_url TEXT,
-  effective_at_us INTEGER,
+  effective_at_us INTEGER NOT NULL,
   fetched_at_us INTEGER NOT NULL,
   currency TEXT NOT NULL,
   model_match_rules_json TEXT NOT NULL,
@@ -1056,7 +1057,13 @@ CREATE TABLE rate_card_revisions (
   validation_status TEXT NOT NULL
     CHECK (validation_status IN ('valid', 'invalid')),
   first_seen_publication_id TEXT NOT NULL,
+  CHECK (
+    predecessor_rate_card_id IS NULL
+    OR predecessor_rate_card_id <> rate_card_id
+  ),
   FOREIGN KEY (rate_card_id) REFERENCES identity_registry(logical_id),
+  FOREIGN KEY (predecessor_rate_card_id)
+    REFERENCES rate_card_revisions(rate_card_id),
   FOREIGN KEY (first_seen_publication_id)
     REFERENCES publications(publication_id)
 ) STRICT, WITHOUT ROWID;

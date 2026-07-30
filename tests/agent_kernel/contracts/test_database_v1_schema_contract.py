@@ -10,7 +10,7 @@ _CONTRACT_PATH = (
     _REPO_ROOT / "docs" / "architecture" / "AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md"
 )
 _CONTRACT_ID = "codex-usage-tracker.agent-kernel.schema-contract.v1"
-_EXPECTED_DIGEST = "2a388dbb498dfd0122f7d10e5ee607db1e4a9ec57b6c7f549c1f6c8797a21bae"
+_EXPECTED_DIGEST = "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5"
 _COPY_STABILITY_VECTOR_ID = "database-v1.multi-producer-copy-stability.v1"
 _COPY_STABILITY_VECTOR_ROWS = (
     "| `sessions` | `session:shared` | `root:a/file:a#1` | `root:b/file:b#1` | 1 | 2 |",
@@ -364,3 +364,22 @@ def test_database_v1_multi_producer_identity_seams_are_structurally_locked() -> 
     finally:
         analytical_db.close()
         operational_db.close()
+
+
+def test_rate_card_frontier_schema_is_effective_dated_and_self_linked() -> None:
+    markdown = _CONTRACT_PATH.read_text(encoding="utf-8")
+    analytical_db = _build_database(_normalized_ddl(markdown, "analytical"))
+    try:
+        columns = {
+            str(row[1]): row
+            for row in analytical_db.execute("PRAGMA table_info(rate_card_revisions)")
+        }
+        assert columns["effective_at_us"][3] == 1
+        assert "predecessor_rate_card_id" in columns
+        assert (
+            "rate_card_revisions",
+            "predecessor_rate_card_id",
+            "rate_card_id",
+        ) in _foreign_keys(analytical_db, "rate_card_revisions")
+    finally:
+        analytical_db.close()

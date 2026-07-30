@@ -1,10 +1,10 @@
 # Agent-kernel database-v1 physical schema contract
 
-**Status:** CK-04 production authority with CK-07C narrow fact amendment
+**Status:** CK-04 production authority with CK-07C fact and CK-07D rate-card amendments
 **Contract:** `codex-usage-tracker.agent-kernel.schema-contract.v1`
 **Database identity:** `codex-usage-tracker.agent-kernel.v1`
 **Operational-sidecar identity:** `codex-usage-tracker.agent-kernel.operations.v1`
-**Canonical SHA-256:** `2a388dbb498dfd0122f7d10e5ee607db1e4a9ec57b6c7f549c1f6c8797a21bae`
+**Canonical SHA-256:** `1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5`
 
 This document closes the physical-schema decisions required before CK-05,
 CK-06, and CK-07. It is the implementation contract for those packets.
@@ -21,6 +21,12 @@ coverage; it is not a content store, query projection, or CK-04 bake-off
 rerun. CK-07C also completes the already-selected allowance-cycle,
 allowance-interval, and late-parent writer paths without adding further
 tables.
+
+CK-07D makes `rate_card_revisions.effective_at_us` mandatory and adds the
+immutable `predecessor_rate_card_id` lineage edge. The 42-table/44-index
+inventory is unchanged. `active_rate_card` remains the publication-selected
+head; publication validation must reproduce its complete predecessor chain
+before promotion.
 
 ## Contract boundaries
 
@@ -1160,9 +1166,10 @@ CREATE TABLE rate_card_revisions (
   rate_card_id TEXT PRIMARY KEY,
   digest TEXT NOT NULL UNIQUE
     CHECK (length(digest) = 64 AND digest NOT GLOB '*[^0-9a-f]*'),
+  predecessor_rate_card_id TEXT,
   source_name TEXT NOT NULL,
   source_url TEXT,
-  effective_at_us INTEGER,
+  effective_at_us INTEGER NOT NULL,
   fetched_at_us INTEGER NOT NULL,
   currency TEXT NOT NULL,
   model_match_rules_json TEXT NOT NULL,
@@ -1173,7 +1180,13 @@ CREATE TABLE rate_card_revisions (
   validation_status TEXT NOT NULL
     CHECK (validation_status IN ('valid', 'invalid')),
   first_seen_publication_id TEXT NOT NULL,
+  CHECK (
+    predecessor_rate_card_id IS NULL
+    OR predecessor_rate_card_id <> rate_card_id
+  ),
   FOREIGN KEY (rate_card_id) REFERENCES identity_registry(logical_id),
+  FOREIGN KEY (predecessor_rate_card_id)
+    REFERENCES rate_card_revisions(rate_card_id),
   FOREIGN KEY (first_seen_publication_id)
     REFERENCES publications(publication_id)
 ) STRICT, WITHOUT ROWID;
@@ -1948,8 +1961,8 @@ also deferred to CK-08 and may be admitted only if a measured deep-page
 consumer justifies it.
 
 Current valuation is computed from immutable calls plus the validated
-rate-card lineage whose head is selected by `active_rate_card`. CK-07D may add
-only the minimal predecessor/series linkage needed to reproduce that
+rate-card lineage whose head is selected by `active_rate_card`. CK-07D adds
+only `predecessor_rate_card_id`, the minimal linkage needed to reproduce that
 publication-captured frontier; it does not add a call-to-rate assignment.
 There is no `valuation_matches_current` table in database-v1. CK-08 may keep
 that effective-dated join query-time; CK-09 may materialize it only through the

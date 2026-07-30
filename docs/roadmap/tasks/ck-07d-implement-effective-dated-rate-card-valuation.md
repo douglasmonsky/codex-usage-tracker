@@ -1,6 +1,6 @@
 # CK-07D — Implement effective-dated rate-card valuation
 
-**Status:** Admitted; implementation not started
+**Status:** Implemented, validated, and reviewed locally; commit, CI, merge, and exact-main verification pending
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -153,6 +153,20 @@ post-merge verification.
     valuations only in `[effective_at_us, next_effective_at_us)` for the
     affected match rules, dirties that historical interval, and preserves
     selected digests and values outside it through publication/recovery.
+
+## Local implementation record
+
+The implementation and its coupled evidence are recorded in
+[effective-dated-valuation-implementation-evidence.json](../../decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json).
+The local branch now contains the pure frontier compiler, typed fail-closed
+reasons, immutable predecessor-chain storage, atomic publication/head
+validation, bounded valuation dirty intervals, corrected pricing coverage, and
+the CK-05/CK-07/CK-07C focused requalification lane. Historical CK-07C evidence
+remains unchanged.
+
+This local state does not satisfy the packet's PR, CI, merge, or exact-main
+acceptance gates. CK-07A remains zero of 80 variants requalified and CK-08
+remains blocked until those gates pass.
 
 ## Requalification and acceptance
 

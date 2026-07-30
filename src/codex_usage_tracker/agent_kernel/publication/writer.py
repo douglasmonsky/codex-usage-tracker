@@ -29,7 +29,12 @@ from ..adapters.contracts import (
 )
 from ..domain.identity import canonical_cbor, semantic_id
 from ..domain.models import LifecycleTransition, SourceOccurrence
+from ..domain.valuation import RateCardFrontier
 from ..storage.lifecycle import LifecycleRepository
+from ..storage.rate_cards import (
+    RateCardFrontierError,
+    validate_publication_rate_card_frontier,
+)
 from ..storage.repositories import validate_storage_scalars
 from ..storage.schema import SCHEMA_CONTRACT_ID, SCHEMA_CONTRACT_SHA256
 from ..storage.source_progress import (
@@ -163,6 +168,7 @@ class PriorPublicationSnapshot:
     late_parent_edges: Mapping[tuple[str, str, str], PreparedRow] = field(default_factory=dict)
     allowance_predecessors: Mapping[tuple[str, ...], PreparedRow] = field(default_factory=dict)
     allowance_intervals: Mapping[str, PreparedRow] = field(default_factory=dict)
+    rate_card_frontier: RateCardFrontier | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "entity_counts", MappingProxyType(dict(self.entity_counts)))
@@ -286,6 +292,7 @@ _ROW_ORDER = (
     "allowance_cycles",
     "allowance_observations",
     "allowance_intervals",
+    "rate_card_revisions",
     "selector_anchors",
     "publication_source_coverage",
     "publication_capability_coverage",
@@ -951,6 +958,10 @@ def read_prior_publication_snapshot(
     if head is None:
         return PriorPublicationSnapshot()
     publication_id = str(head[0])
+    rate_card_frontier = validate_publication_rate_card_frontier(
+        connection,
+        publication_id,
+    )
     entity_counts = {
         str(row[0]): int(row[1])
         for row in connection.execute(
@@ -1024,6 +1035,7 @@ def read_prior_publication_snapshot(
         late_parent_edges=_read_late_parent_edges(connection, changes),
         allowance_predecessors=_read_allowance_predecessors(connection, changes),
         allowance_intervals=_read_allowance_intervals(connection, changes),
+        rate_card_frontier=rate_card_frontier,
     )
 
 
@@ -1039,6 +1051,7 @@ def prepare_write_set_from_changes(
     """Purely prepare CK-06 observations for the short writer transaction."""
 
     changes.assert_body_free()
+    prior_was_provided = prior is not None
     if prior is None:
         prior = PriorPublicationSnapshot()
     if not (
@@ -1048,7 +1061,7 @@ def prepare_write_set_from_changes(
         or changes.diagnostics
         or changes.selected_sources
         or changes.deferred_sources
-    ):
+    ) and not prior_was_provided:
         return PublicationWriteSet(changes, (), ())
     # Imported lazily so preparation can use the public writer value types
     # without introducing a new public module dependency.
@@ -1183,11 +1196,13 @@ class PublicationWriter:
         """Commit a small publication through the fenced pointer coordinator."""
 
         if (
-            plan.operation_class is not OperationClass.APPEND_SAFE_SMALL
+            plan.operation_class
+            not in {OperationClass.APPEND_SAFE_SMALL, OperationClass.VALUATION_ONLY}
             or not plan.analytical_write_required
         ):
             raise PublicationWriteError(
-                "pointer coordination accepts append-safe-small publications only"
+                "pointer coordination accepts append-safe-small or valuation-only "
+                "publications only"
             )
         if (
             pointer_request.operation_id != request.operation_id
@@ -1270,10 +1285,13 @@ class PublicationWriter:
         write_set: PublicationWriteSet,
     ) -> None:
         if (
-            plan.operation_class is not OperationClass.APPEND_SAFE_SMALL
+            plan.operation_class
+            not in {OperationClass.APPEND_SAFE_SMALL, OperationClass.VALUATION_ONLY}
             or not plan.analytical_write_required
         ):
-            raise PublicationWriteError("short writer accepts append_safe_small plans only")
+            raise PublicationWriteError(
+                "short writer accepts append_safe_small or valuation_only plans only"
+            )
         if plan.parent_publication_id != request.parent_publication_id:
             raise PublicationWriteError("publication request and plan disagree on parent")
         self._validate_write_set(plan, request, write_set)
@@ -1385,6 +1403,16 @@ class PublicationWriter:
         self._write_progress(write_set, request)
         self._write_tail_state(write_set.tail_state)
         self._reconcile_local(plan, write_set)
+        self._activate_rate_card(request)
+        try:
+            validate_publication_rate_card_frontier(
+                self._connection,
+                request.publication_id,
+            )
+        except RateCardFrontierError as error:
+            raise PublicationWriteError(
+                f"publication rate-card frontier invalid: {error}"
+            ) from error
         actual_manifest = artifact_manifest_sha256(
             manifest_from_database(
                 self._connection,
@@ -1395,6 +1423,36 @@ class PublicationWriter:
         )
         if actual_manifest != request.artifact_manifest_sha256:
             raise PublicationWriteError("artifact manifest differs from the planner-proven digest")
+
+    def _activate_rate_card(self, request: PublicationRequest) -> None:
+        if request.rate_card_digest is None:
+            return
+        row = self._connection.execute(
+            "SELECT rate_card_id FROM rate_card_revisions WHERE digest = ?",
+            (request.rate_card_digest,),
+        ).fetchone()
+        if row is None:
+            raise PublicationWriteError("publication rate-card head revision is missing")
+        self._connection.execute(
+            """
+            INSERT INTO active_rate_card(
+                singleton,
+                rate_card_id,
+                selected_at_us,
+                publication_id
+            )
+            VALUES (1, ?, ?, ?)
+            ON CONFLICT(singleton) DO UPDATE SET
+              rate_card_id = excluded.rate_card_id,
+              selected_at_us = CASE
+                WHEN active_rate_card.rate_card_id = excluded.rate_card_id
+                THEN active_rate_card.selected_at_us
+                ELSE excluded.selected_at_us
+              END,
+              publication_id = excluded.publication_id
+            """,
+            (row[0], request.committed_at_us, request.publication_id),
+        )
 
     def _activate_head(self, request: PublicationRequest) -> None:
         self._connection.execute(

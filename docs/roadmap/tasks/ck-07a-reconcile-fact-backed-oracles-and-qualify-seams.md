@@ -34,6 +34,14 @@ reads the accepted publication frontier and canonical call event times. They
 must agree on selected revision digest, configured value, grade, missingness,
 and coverage without sharing selected rows or outputs.
 
+The pre-merge CK-07D implementation record is
+`docs/decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json`.
+It names `RateCardRevision`, `RateCardFrontier`, `ValuationUnpricedReason`, the
+database-v1 schema digest, and the amended pricing-coverage operand/vector
+digests. This record is handoff evidence only: CK-07A remains blocked and must
+restart from the eventual merged SHA rather than importing or transplanting
+the CK-07D worktree.
+
 ## CK-07B resume authority
 
 Consume `formula-contract-v1.json` and its schema,

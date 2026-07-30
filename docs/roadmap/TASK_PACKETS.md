@@ -8,7 +8,7 @@ in the linked files under [`docs/roadmap/tasks/`](tasks/).
 ## Overall
 
 - Completed packets: **10 / 21**
-- In progress: **CK-07D effective-dated rate-card valuation**
+- In progress: **CK-07D implemented, validated, and reviewed locally; commit/merge acceptance pending**
 - Not started: **10**
 - Critical-path completion: **10 / 20**
 - Optional packets: **CK-15**
@@ -29,7 +29,8 @@ corrective packet's executable producer-to-consumer seam checks.
 - [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
 - [x] **M1 — Architecture Selected** · 4 / 4 · CK-01–CK-04 complete
 - [ ] **M2 — Kernel Alpha** · 5 / 9 · CK-05–CK-07, CK-07B, and CK-07C
-  complete; CK-07D admitted; CK-07A and CK-08 blocked; CK-09 not started
+  complete; CK-07D implemented locally with acceptance pending; CK-07A and
+  CK-08 blocked; CK-09 not started
 - [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
 - [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
 - [ ] **M5 — Public Release** · 0 / 1 required · CK-16 not started
@@ -82,11 +83,13 @@ corrective packet's executable producer-to-consumer seam checks.
   depends on CK-07B and retained CK-07A blocker evidence
   · [packet](tasks/ck-07c-freeze-plan-operands-and-missing-facts.md)
 - [ ] **CK-07D — Implement effective-dated rate-card valuation** ·
-  **Admitted; implementation not started** · corrective dependency discovered
+  **Implemented, validated, and reviewed locally; commit, CI, merge, and exact-main
+  acceptance pending** · corrective dependency discovered
   after CK-07C; depends on merged CK-07C and retained CK-07A/CK-08 blocker
   evidence
   · [packet](tasks/ck-07d-implement-effective-dated-rate-card-valuation.md)
   · [gap evidence](../decisions/evidence/ck07d/effective-dated-valuation-gap.json)
+  · [implementation evidence](../decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json)
 - [ ] **CK-07A — Reconcile fact-backed oracles and qualify packet seams** ·
   **Blocked pending CK-07D; not requalified** · depends on CK-07, the CK-08
   blocker evidence, CK-07B, CK-07C, and CK-07D

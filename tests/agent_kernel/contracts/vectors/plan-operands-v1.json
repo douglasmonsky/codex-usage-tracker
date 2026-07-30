@@ -1764,13 +1764,14 @@
             "configured_cost_usd": {
               "decimal": "0.2500"
             },
+            "cost_grade": "configured_estimate",
+            "cost_unpriced_reason": null,
             "coverage_basis": 1,
             "estimated_credits": {
               "decimal": "0.2500"
             },
             "match_basis": 1,
-            "rate_card_digest": "digest:1",
-            "unpriced_reason": 1
+            "rate_card_digest": "digest:1"
           },
           "coordinates": {
             "event_at_us": 10,
@@ -1785,16 +1786,15 @@
           "logical_id": "valuation_match:2",
           "values": {
             "call_id": "call:2",
-            "configured_cost_usd": {
-              "decimal": "0.2500"
-            },
+            "configured_cost_usd": null,
+            "cost_grade": "unsupported",
+            "cost_unpriced_reason": "model_unmatched",
             "coverage_basis": 1,
             "estimated_credits": {
               "decimal": "0.2500"
             },
             "match_basis": 1,
-            "rate_card_digest": "digest:1",
-            "unpriced_reason": 1
+            "rate_card_digest": null
           },
           "coordinates": {
             "event_at_us": 50,
@@ -1806,6 +1806,42 @@
         }
       ],
       "expected_groups": [
+        {
+          "key": [
+            [
+              "model_profile_id",
+              "model_profile:2"
+            ]
+          ],
+          "direct_slots": {
+            "priced_calls": 0,
+            "unpriced_calls": 1,
+            "unpriced_tokens": {
+              "decimal": "3"
+            }
+          },
+          "formula_calls": [
+            {
+              "use_id": "Q-ACC-07:valuation_coverage_v1:0:0",
+              "formula_id": "valuation_coverage_v1",
+              "operands": {
+                "denominator": 1,
+                "numerator": 0
+              },
+              "output_bindings": {
+                "pricing_coverage": "$"
+              },
+              "internal_only": false,
+              "consume_as": null
+            }
+          ],
+          "order_key": [
+            {
+              "decimal": "-3"
+            },
+            "model_profile:2"
+          ]
+        },
         {
           "key": [
             [
@@ -1837,49 +1873,28 @@
             0,
             "model_profile:1"
           ]
-        },
-        {
-          "key": [
-            [
-              "model_profile_id",
-              "model_profile:2"
-            ]
-          ],
-          "direct_slots": {
-            "priced_calls": 1,
-            "unpriced_calls": 0,
-            "unpriced_tokens": null
-          },
-          "formula_calls": [
-            {
-              "use_id": "Q-ACC-07:valuation_coverage_v1:0:0",
-              "formula_id": "valuation_coverage_v1",
-              "operands": {
-                "denominator": 1,
-                "numerator": 1
-              },
-              "output_bindings": {
-                "pricing_coverage": "$"
-              },
-              "internal_only": false,
-              "consume_as": null
-            }
-          ],
-          "order_key": [
-            0,
-            "model_profile:2"
-          ]
         }
       ],
       "expected_group_keys": [
         {
-          "model_profile_id": "model_profile:1"
+          "model_profile_id": "model_profile:2"
         },
         {
-          "model_profile_id": "model_profile:2"
+          "model_profile_id": "model_profile:1"
         }
       ],
       "expected_rows": [
+        {
+          "model_profile_id": "model_profile:2",
+          "priced_calls": 0,
+          "pricing_coverage": {
+            "decimal": "0"
+          },
+          "unpriced_calls": 1,
+          "unpriced_tokens": {
+            "decimal": "3"
+          }
+        },
         {
           "model_profile_id": "model_profile:1",
           "priced_calls": 1,
@@ -1888,19 +1903,10 @@
           },
           "unpriced_calls": 0,
           "unpriced_tokens": null
-        },
-        {
-          "model_profile_id": "model_profile:2",
-          "priced_calls": 1,
-          "pricing_coverage": {
-            "decimal": "1"
-          },
-          "unpriced_calls": 0,
-          "unpriced_tokens": null
         }
       ],
-      "expected_materialization_sha256": "2d3142ce96576ba75f6be9334a06e92c976e4b4133c085769dca0ad31cff8d36",
-      "expected_evaluation_sha256": "1a66e8bedea061c188ff48b771eecf263d29586b40a83d5abc0936da8939b3ad",
+      "expected_materialization_sha256": "638afa91ac420e2bf9faf248d88f80b4ee75d0dfc676a381e324509f2251f362",
+      "expected_evaluation_sha256": "d47a2e3df9dc52a7da2916ac004b3aebeba2f1ce1e0a395df4fabb078196b0d5",
       "formula_use_ids": [
         "Q-ACC-07:valuation_coverage_v1:0"
       ],

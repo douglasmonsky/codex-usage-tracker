@@ -146,6 +146,11 @@ create typed unpriced rows with `NULL` estimates. They never create zero cost
 or fall back to fetch time. Calls are immutable; this relation is not a
 projection or an expected-answer cache.
 
+The `pricing_coverage` plan consumes `cost_grade` and
+`cost_unpriced_reason`. A valuation row is priced only when
+`cost_grade == configured_estimate` and `configured_cost_usd` is non-`NULL`;
+the mere presence of a typed valuation row never implies pricing coverage.
+
 ## Context components
 
 Positive `context_component_coverage_v1` operands cannot be reconstructed from
@@ -265,8 +270,8 @@ executable but does not claim that any of the 80 variants has passed.
 
 ## Exact downstream resume surface
 
-CK-07D first corrects the valuation seam below. CK-07A remains blocked until
-CK-07D is merged, exact-main verified, and its affected seams are requalified.
+CK-07D supplies the valuation seam below. CK-07A remains blocked until CK-07D
+is merged, exact-main verified, and its affected seams are requalified.
 CK-07A must then validate `config/agent-kernel/plan-operand-contract-v1.json`
 against `config/agent-kernel/plan-operand-contract-v1.schema.json`. Its shared
 pure symbols are:
@@ -275,13 +280,14 @@ pure symbols are:
   `PlanGroup`, `PlanMaterialization`, `PlanEvaluation`, and
   `PlanOperandContractError`;
 - `compile_plan_operands` and `evaluate_plan`;
-- CK-07D's publication-frontier rate-card input,
-  `CurrentValuationMatch`, and effective-dated
+- CK-07D's `RateCardRevision`, `RateCardFrontier`,
+  `ValuationUnpricedReason`, `CurrentValuationMatch`, and effective-dated
   `compile_current_valuation_matches`;
 - CK-07B's `evaluate_formula`.
 
-CK-07C's singular `CurrentRateCard` input is retained only as the exact
-producer seam that CK-07D must replace; it is not CK-07A resume authority.
+CK-07C's singular `CurrentRateCard` input is replaced and is not CK-07A resume
+authority. CK-07A must consume the publication-captured frontier and compare
+the selected revision digest, values, grades, and typed missingness.
 
 The CK-07C source paths that create or amend executable behavior are:
 

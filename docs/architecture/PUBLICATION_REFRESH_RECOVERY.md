@@ -332,6 +332,20 @@ exact token totals. Invalid, incomplete, cyclic, head-mismatched, or ambiguous
 frontiers fail closed and leave the prior valid frontier active with a
 diagnostic.
 
+Revision rows are immutable and fully prepared before the writer lock. Inside
+the publication transaction, `active_rate_card` selects the request's head
+digest, retains `selected_at_us` when an ordinary tail keeps the same head, and
+advances `publication_id` to the accepted publication. The writer and
+same-snapshot artifact validator both walk the complete predecessor chain and
+fail closed before head promotion when the chain is missing, cyclic, invalid,
+or disagrees with the publication digest.
+
+The valuation-only plan carries the exact affected
+`ValuationDirtyInterval` rows. A backdated correction dirties only its
+half-open `[effective_at_us, next_effective_at_us)` interval and the affected
+match rules; publication recovery rolls the selected head and those prepared
+rows back atomically.
+
 ## Repair and rollback
 
 Repair is deterministic and operator/host initiated. It reports pointer pairs,
