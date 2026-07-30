@@ -47,6 +47,12 @@ def _parser() -> argparse.ArgumentParser:
         help="retain generated candidate databases after measurements are recorded",
     )
     parser.add_argument(
+        "--build-repetition-cooldown-seconds",
+        type=int,
+        default=0,
+        help="unmeasured cooldown between repeated build cases",
+    )
+    parser.add_argument(
         "--filesystem-cache-state",
         choices=("cold", "warm", "uncontrolled"),
         default="uncontrolled",
@@ -77,6 +83,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             qualification_model=arguments.qualification_model,
             filesystem_cache_state=arguments.filesystem_cache_state,
             retain_run_artifacts=arguments.retain_run_artifacts,
+            build_repetition_cooldown_seconds=(
+                arguments.build_repetition_cooldown_seconds
+            ),
         )
         artifact = qualification.run_qualification(config)
     except qualification.QualificationRunFailed as error:

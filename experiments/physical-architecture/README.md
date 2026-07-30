@@ -68,6 +68,13 @@ nearest-rank p95, maximum, and population coefficient of variation. `rank_candid
 the seven documented weights and deterministic lower-cost normalization over identical
 fixture digests and scale. Profile output is attribution evidence only.
 
+Qualification hosts may pass
+`--build-repetition-cooldown-seconds <0..300>` to insert an unmeasured pause
+between repeated build samples. The exact cooldown is bound into the canonical
+invocation. It does not alter a case's measured wall time, early-stop limit,
+fixture, or candidate behavior; use it to prevent teardown I/O or thermal load
+from one large build contaminating the next repetition.
+
 The qualification runner retains canonical invocation, measurement, and summary files but
 discards candidate run roots by default. When Candidate A's matching `build.scale.<profile>`
 case, query cases, and ordinary changes share an invocation, invocation schema v3 records

@@ -13,6 +13,7 @@ import sqlite3
 import subprocess
 import sys
 import sysconfig
+import time
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -164,6 +165,7 @@ class QualificationConfig:
     qualification_model: str | None = None
     filesystem_cache_state: str = "uncontrolled"
     retain_run_artifacts: bool = False
+    build_repetition_cooldown_seconds: int = 0
 
     def __post_init__(self) -> None:
         if not _RUN_ID.fullmatch(self.run_id):
@@ -200,6 +202,13 @@ class QualificationConfig:
             raise QualificationContractError("qualification model cannot be blank")
         if self.filesystem_cache_state not in {"cold", "warm", "uncontrolled"}:
             raise QualificationContractError("filesystem cache state is not recognized")
+        if (
+            type(self.build_repetition_cooldown_seconds) is not int
+            or not 0 <= self.build_repetition_cooldown_seconds <= 300
+        ):
+            raise QualificationContractError(
+                "build repetition cooldown must be an integer from 0 through 300 seconds"
+            )
 
 
 @dataclass(frozen=True)
@@ -311,6 +320,7 @@ def run_qualification(
     environment: shared.EnvironmentFingerprint | None = None,
     adapter_loader: AdapterLoader = load_candidate_adapter,
     collector_factory: CollectorFactory = shared.MeasurementCollector,
+    sleeper: Callable[[float], None] = time.sleep,
 ) -> QualificationArtifact:
     prepared = _prepare_run(config, environment=environment)
     planned_executions = len(prepared.candidates) * len(prepared.cases) * config.repetitions
@@ -415,6 +425,12 @@ def run_qualification(
                             )
                         optional_skips += config.repetitions - repetition - 1
                         break
+                    if (
+                        case.group is shared.WorkloadGroup.BUILD
+                        and repetition + 1 < config.repetitions
+                        and config.build_repetition_cooldown_seconds
+                    ):
+                        sleeper(float(config.build_repetition_cooldown_seconds))
                 if failure is not None:
                     break
             if failure is not None:
@@ -582,6 +598,9 @@ def _invocation_payload(
         "include_research": config.include_research,
         "qualification_model": config.qualification_model,
         "retain_run_artifacts": config.retain_run_artifacts,
+        "build_repetition_cooldown_seconds": (
+            config.build_repetition_cooldown_seconds
+        ),
         "prepared_scale_artifact_policy": _prepared_scale_artifact_policy(config, prepared),
         "completion_marker": SUMMARY_FILE,
     }

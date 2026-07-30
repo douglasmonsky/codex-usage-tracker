@@ -89,6 +89,7 @@ def _config(
     speed_claim: bool = False,
     profiled: bool = False,
     retain_run_artifacts: bool = False,
+    build_repetition_cooldown_seconds: int = 0,
 ) -> Any:
     return qualification.QualificationConfig(
         fixture_root=_TINY,
@@ -101,6 +102,7 @@ def _config(
         speed_claim=speed_claim,
         profiled=profiled,
         retain_run_artifacts=retain_run_artifacts,
+        build_repetition_cooldown_seconds=build_repetition_cooldown_seconds,
     )
 
 
@@ -172,6 +174,29 @@ def test_speed_claim_requires_five_unprofiled_repetitions(
     assert [record.identity.repetition for record in artifact.records] == list(range(5))
     assert all(record.identity.profiled is False for record in artifact.records)
     assert artifact.summary["cases"][0]["wall_time_distribution"]["sample_count"] == 5
+
+
+def test_build_repetition_cooldown_is_unmeasured_and_recorded(
+    tmp_path: Path,
+) -> None:
+    sleeps: list[float] = []
+    artifact = qualification.run_qualification(
+        _config(
+            tmp_path,
+            run_id="build-cooldown",
+            repetitions=5,
+            speed_claim=True,
+            build_repetition_cooldown_seconds=2,
+        ),
+        environment=_environment(),
+        adapter_loader=lambda _: _FakeAdapter("A"),
+        sleeper=sleeps.append,
+    )
+
+    assert sleeps == [2.0, 2.0, 2.0, 2.0]
+    invocation = json.loads(artifact.invocation_path.read_text(encoding="utf-8"))
+    assert invocation["build_repetition_cooldown_seconds"] == 2
+    assert [record.identity.repetition for record in artifact.records] == list(range(5))
 
 
 @pytest.mark.parametrize("outcome", [shared.RunOutcome.FAILED, shared.RunOutcome.STOPPED])
