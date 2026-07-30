@@ -10,6 +10,7 @@ from scripts.check_kernel_scope import (
     CK02_LOGICAL_CONTRACT_ADDITIONS,
     CK03_SYNTHETIC_ORACLE_ADDITIONS,
     CK04_PHYSICAL_BAKEOFF_ADDITIONS,
+    CK05_CANONICAL_STORAGE_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS,
     INTEGRATION_ADDITIONS,
@@ -436,6 +437,31 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/performance_qualification.py",
         "tests/kernel/test_ci_performance_qualification.py",
     } == CI_PERFORMANCE_QUALIFICATION_ADDITIONS
+    assert {
+        "docs/decisions/evidence/ck05/canonical-storage-evidence.json",
+        "src/codex_usage_tracker/agent_kernel/__init__.py",
+        "src/codex_usage_tracker/agent_kernel/domain/__init__.py",
+        "src/codex_usage_tracker/agent_kernel/domain/identity.py",
+        "src/codex_usage_tracker/agent_kernel/domain/measurements.py",
+        "src/codex_usage_tracker/agent_kernel/domain/models.py",
+        "src/codex_usage_tracker/agent_kernel/domain/time.py",
+        "src/codex_usage_tracker/agent_kernel/storage/__init__.py",
+        "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+        "src/codex_usage_tracker/agent_kernel/storage/database.py",
+        "src/codex_usage_tracker/agent_kernel/storage/identity.py",
+        "src/codex_usage_tracker/agent_kernel/storage/lifecycle.py",
+        "src/codex_usage_tracker/agent_kernel/storage/occurrences.py",
+        "src/codex_usage_tracker/agent_kernel/storage/operational.sql",
+        "src/codex_usage_tracker/agent_kernel/storage/paths.py",
+        "src/codex_usage_tracker/agent_kernel/storage/repositories.py",
+        "src/codex_usage_tracker/agent_kernel/storage/schema.py",
+        "tests/agent_kernel/storage/test_database_schema.py",
+        "tests/agent_kernel/storage/test_identity.py",
+        "tests/agent_kernel/storage/test_import_isolation.py",
+        "tests/agent_kernel/storage/test_lifecycle.py",
+        "tests/agent_kernel/storage/test_repositories.py",
+        "tests/agent_kernel/storage/test_tiny_accounting.py",
+    } == CK05_CANONICAL_STORAGE_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -463,6 +489,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK03_SYNTHETIC_ORACLE_ADDITIONS
         | DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS
         | CK04_PHYSICAL_BAKEOFF_ADDITIONS
+        | CK05_CANONICAL_STORAGE_ADDITIONS
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )
 
