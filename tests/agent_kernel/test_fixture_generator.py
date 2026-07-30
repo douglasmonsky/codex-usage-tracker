@@ -12,13 +12,25 @@ from tests.agent_kernel.fixtures.generator.generate import (
     generate_fixture,
     tree_digest,
 )
-from tests.agent_kernel.fixtures.generator.profile import load_profile
+from tests.agent_kernel.fixtures.generator.profile import (
+    load_profile,
+    planned_distribution,
+)
+from tests.agent_kernel.fixtures.generator.semantic import (
+    event_at_us,
+    history_windows,
+    selected,
+)
+from tests.agent_kernel.fixtures.generator.sources import (
+    clustered_source_index,
+    source_specs,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _COMMITTED_TINY = Path(__file__).with_name("fixtures") / "tiny-v1"
-_TINY_MANIFEST_SHA256 = "a599cf149783af04d861699b0ff587a169f20dec4d372e4ffbe3f21c51995817"
+_TINY_MANIFEST_SHA256 = "78003a7cfdee8beb1a263b3027fec162a612352be6fbefd13a65e821640bc7ae"
 _TINY_ORACLE_SHA256 = "9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b"
-_TINY_TREE_SHA256 = "a5bd281d7553836d952b1930196a3ddfadceae00b8ff0425695bb26c433b20cd"
+_TINY_TREE_SHA256 = "e6caa8bc1ff642018f21f6638dd69c6c704bdecdda362adc41daff021618799a"
 
 
 def _generated_files(root: Path) -> dict[str, bytes]:
@@ -27,6 +39,239 @@ def _generated_files(root: Path) -> dict[str, bytes]:
         for path in sorted(root.rglob("*"))
         if path.is_file()
     }
+
+
+def _source_timestamps(
+    root: Path,
+    relative_path: str,
+    *,
+    record_type: str | None = None,
+) -> list[int]:
+    timestamps: list[int] = []
+    source_path = root / relative_path
+    if not source_path.exists():
+        return timestamps
+    for line in source_path.read_bytes().splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if (
+            isinstance(record, dict)
+            and type(record.get("event_at_us")) is int
+            and (record_type is None or record.get("type") == record_type)
+        ):
+            timestamps.append(record["event_at_us"])
+    return timestamps
+
+
+def _inventory_selects(
+    entry: dict[str, object],
+    *,
+    start_us: int,
+    end_us: int,
+) -> bool:
+    confidence = entry["time_range_confidence"]
+    hint = entry["time_range_hint"]
+    if confidence != "trusted":
+        return True
+    assert isinstance(hint, dict)
+    return hint["end_us"] > start_us and hint["start_us"] <= end_us
+
+
+def _include_planned_timestamp(
+    bounds: list[list[int] | None],
+    source_index: int,
+    timestamp: int,
+) -> None:
+    bound = bounds[source_index]
+    if bound is None:
+        bounds[source_index] = [timestamp, timestamp + 1]
+        return
+    bound[0] = min(bound[0], timestamp)
+    bound[1] = max(bound[1], timestamp + 1)
+
+
+def test_source_time_hints_cover_every_emitted_timestamp_and_late_event() -> None:
+    manifest = json.loads(
+        (_COMMITTED_TINY / "manifest.json").read_text(encoding="utf-8")
+    )
+    entries = manifest["sources"]
+    assert isinstance(entries, list)
+
+    hinted_paths = 0
+    for entry in entries:
+        assert isinstance(entry, dict)
+        timestamps = _source_timestamps(_COMMITTED_TINY, entry["path"])
+        confidence = entry["time_range_confidence"]
+        hint = entry["time_range_hint"]
+        assert confidence in {"trusted", "uncertain", "unavailable"}
+        if hint is None:
+            assert confidence == "unavailable"
+            assert not timestamps
+            continue
+        assert confidence in {"trusted", "uncertain"}
+        assert set(hint) == {"end_us", "start_us"}
+        assert hint["start_us"] < hint["end_us"]
+        assert timestamps
+        assert hint["start_us"] <= min(timestamps)
+        assert max(timestamps) < hint["end_us"]
+        hinted_paths += 1
+
+    assert hinted_paths > 1
+    unavailable_paths = {
+        entry["path"]
+        for entry in entries
+        if entry["time_range_confidence"] == "unavailable"
+    }
+    assert unavailable_paths == {
+        "sources/deferred/deferred.jsonl",
+        "sources/malformed/malformed.jsonl",
+        "sources/truncated/truncated.jsonl",
+    }
+
+    uncertain_entries = [
+        entry
+        for entry in entries
+        if entry["time_range_confidence"] == "uncertain"
+    ]
+    assert {entry["path"] for entry in uncertain_entries} == {
+        "sources/active/source-0000.jsonl",
+        "sources/active/source-0001.jsonl",
+        "sources/replaced/revision-1.jsonl",
+    }
+    for uncertain in uncertain_entries:
+        uncertain_hint = uncertain["time_range_hint"]
+        assert isinstance(uncertain_hint, dict)
+        assert _inventory_selects(
+            uncertain,
+            start_us=uncertain_hint["end_us"] + 1,
+            end_us=uncertain_hint["end_us"] + 2,
+        )
+
+    assert not _inventory_selects(
+        {
+            "time_range_confidence": "trusted",
+            "time_range_hint": {"end_us": 100, "start_us": 99},
+        },
+        start_us=100,
+        end_us=200,
+    )
+    assert _inventory_selects(
+        {
+            "time_range_confidence": "trusted",
+            "time_range_hint": {"end_us": 201, "start_us": 200},
+        },
+        start_us=100,
+        end_us=200,
+    )
+
+    profile = load_profile("tiny")
+    distribution = planned_distribution(profile)
+    expected_late_timestamps = {
+        event_at_us(profile, ordinal, late=True)
+        for ordinal in range(profile.model_calls)
+        if selected(
+            ordinal,
+            profile.model_calls,
+            distribution["late_events"],
+        )
+    }
+    observed_late_timestamps = set()
+    for entry in entries:
+        if not entry["persisted_when_requested"]:
+            continue
+        timestamps = _source_timestamps(
+            _COMMITTED_TINY,
+            entry["path"],
+            record_type="model_call",
+        )
+        hint = entry["time_range_hint"]
+        if not isinstance(hint, dict):
+            continue
+        for timestamp in expected_late_timestamps.intersection(timestamps):
+            assert hint["start_us"] <= timestamp < hint["end_us"]
+            observed_late_timestamps.add(timestamp)
+    assert observed_late_timestamps == expected_late_timestamps
+
+
+def test_production_source_plan_limits_30_day_inventory_to_recent_clusters() -> None:
+    profile = load_profile("production")
+    distribution = planned_distribution(profile)
+    specs = source_specs(profile)
+    active_count = sum(spec.state == "active" for spec in specs)
+    archived = next(spec for spec in specs if spec.state == "archived")
+    replaced = next(spec for spec in specs if spec.state == "replaced")
+    bounds: list[list[int] | None] = [None] * len(specs)
+
+    for ordinal in range(profile.model_calls):
+        source_index = clustered_source_index(
+            ordinal,
+            model_calls=profile.model_calls,
+            active_sources=active_count,
+        )
+        timestamp = event_at_us(
+            profile,
+            ordinal,
+            late=selected(
+                ordinal,
+                profile.model_calls,
+                distribution["late_events"],
+            ),
+        )
+        _include_planned_timestamp(bounds, source_index, timestamp)
+        if selected(
+            ordinal,
+            profile.model_calls,
+            distribution["duplicate_call_occurrences"],
+        ):
+            _include_planned_timestamp(bounds, archived.index, timestamp)
+    _include_planned_timestamp(bounds, replaced.index, profile.start_at_us)
+    uncertain_indices = {0, 1, replaced.index}
+
+    window = history_windows(
+        profile,
+        late_event_count=distribution["late_events"],
+    )["30_days"]
+    entries = [
+        {
+            "time_range_confidence": (
+                "unavailable"
+                if bound is None
+                else (
+                    "uncertain"
+                    if spec.index in uncertain_indices
+                    else "trusted"
+                )
+            ),
+            "time_range_hint": (
+                None
+                if bound is None
+                else {"end_us": bound[1], "start_us": bound[0]}
+            ),
+        }
+        for spec, bound in zip(specs, bounds, strict=True)
+    ]
+    selected_indices = {
+        index
+        for index, entry in enumerate(entries)
+        if _inventory_selects(
+            entry,
+            start_us=window["start_us"],
+            end_us=window["end_us"],
+        )
+    }
+
+    assert selected_indices == {
+        0,
+        1,
+        *range(620, 643),
+    }
+    assert len(selected_indices) == 25
+    assert 0 in selected_indices
+    assert 1 in selected_indices
+    assert replaced.index in selected_indices
+    assert len(selected_indices) < active_count // 20
 
 
 def test_tiny_fixture_is_exactly_reproducible_and_matches_committed_bytes(

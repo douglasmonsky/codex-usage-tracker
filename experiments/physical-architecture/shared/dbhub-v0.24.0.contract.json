@@ -1,0 +1,19 @@
+{
+  "custom_tool_maximum": 4,
+  "custom_tool_minimum": 1,
+  "engine_read_only": false,
+  "generic_tools": [
+    "search_objects",
+    "execute_sql"
+  ],
+  "max_rows": 100,
+  "npm_integrity": "sha512-R+S7FQXwHyr99Klei+sHG8ijLdk8Ob/B3KN2zAjKptQZGoyTe6hHtN3S74wG0dx3BxvEPShb3iv4nNgcHStz5w==",
+  "package": "@bytebase/dbhub",
+  "post_run_digest_required": true,
+  "runtime_snapshot_owner_write_required": true,
+  "schema": "codex-usage-tracker.dbhub-research-contract.v1",
+  "snapshot": "disposable_synthetic_copy",
+  "tool_read_only": true,
+  "transport": "stdio",
+  "version": "0.24.0"
+}

@@ -51,10 +51,11 @@ patch candidates around an oracle error; fix and rerun all candidates.
   profiles. The checked-in tiny corpus contains 100 canonical calls, 339 source
   records, and 244,657 exact source bytes.
 - The tiny manifest, oracle, and complete-tree SHA-256 digests are
-  `a599cf149783af04d861699b0ff587a169f20dec4d372e4ffbe3f21c51995817`,
+  `78003a7cfdee8beb1a263b3027fec162a612352be6fbefd13a65e821640bc7ae`,
   `9f78b8f87c17ef5e98810be6a4a01f4a13bfc055ac8eb74c9f147a7087d8e41b`,
-  and `a5bd281d7553836d952b1930196a3ddfadceae00b8ff0425695bb26c433b20cd`.
-  Python 3.13 and 3.14 independently reproduce those exact bytes.
+  and `e6caa8bc1ff642018f21f6638dd69c6c704bdecdda362adc41daff021618799a`.
+  Independent Python 3.14 processes with distinct hash seeds reproduce those
+  exact bytes; the supported Python matrix repeats the digest ratchet in CI.
 - The oracle bundle covers all five bake-off slices, all 80 CK-01 oracle IDs,
   four-class token accounting and missingness, lifecycle ordering, evidence
   pagination/selectors, source replacement/truncation/copy behavior, and nine

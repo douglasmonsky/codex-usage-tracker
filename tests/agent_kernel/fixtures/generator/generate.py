@@ -36,7 +36,11 @@ from tests.agent_kernel.fixtures.generator.semantic import (
     state_change_record,
     tool_records,
 )
-from tests.agent_kernel.fixtures.generator.sources import SourceSpec, source_specs
+from tests.agent_kernel.fixtures.generator.sources import (
+    SourceSpec,
+    clustered_source_index,
+    source_specs,
+)
 from tests.agent_kernel.fixtures.oracles.bundle import build_oracle_bundle
 from tests.agent_kernel.fixtures.oracles.common import canonical_json_bytes
 from tests.agent_kernel.fixtures.oracles.source_ledger import SourceLedger
@@ -47,6 +51,16 @@ _CATALOG_PATH = (
 )
 _EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 _MAX_OPEN_FILES = 768
+_WINDOW_INDEPENDENT_EVENT_KINDS = frozenset(
+    {
+        "allowance_compatibility",
+        "late_parent",
+        "oracle_case",
+        "selector_anchor",
+        "slice_control",
+        "source_revision",
+    }
+)
 _AT_FDCWD = -100
 _RENAME_EXCL = 0x00000004
 _RENAME_NOREPLACE = 0x00000001
@@ -73,6 +87,9 @@ class _SourceStats:
     bytes: int = 0
     records: int = 0
     digest: Any = None
+    time_range_start_us: int | None = None
+    time_range_end_us: int | None = None
+    window_selection_uncertain: bool = False
 
     def __post_init__(self) -> None:
         if self.digest is None:
@@ -134,6 +151,23 @@ class _SourceSink:
         stats.bytes += len(body)
         stats.records += 1
         self.event_counts[event_kind] += 1
+        if event_kind in _WINDOW_INDEPENDENT_EVENT_KINDS:
+            stats.window_selection_uncertain = True
+        if record is not None and type(record.get("event_at_us")) is int:
+            event_at_us = record["event_at_us"]
+            if stats.time_range_start_us is None:
+                stats.time_range_start_us = event_at_us
+                stats.time_range_end_us = event_at_us + 1
+            else:
+                stats.time_range_start_us = min(
+                    stats.time_range_start_us,
+                    event_at_us,
+                )
+                assert stats.time_range_end_us is not None
+                stats.time_range_end_us = max(
+                    stats.time_range_end_us,
+                    event_at_us + 1,
+                )
         if self.materialize:
             self._handle(source_index).write(body)
         if record is not None:
@@ -213,7 +247,11 @@ def _generate_source_stream(
     _emit_control_stream(profile, _load_catalog(), sink)
 
     for ordinal in range(profile.model_calls):
-        source_index = ordinal % active_count
+        source_index = clustered_source_index(
+            ordinal,
+            model_calls=profile.model_calls,
+            active_sources=active_count,
+        )
         missing_cached = selected(
             ordinal,
             profile.model_calls,
@@ -487,6 +525,35 @@ def _phase_artifacts(
     return entries, mappings
 
 
+def _source_time_inventory(
+    spec: SourceSpec,
+    stats: _SourceStats,
+) -> dict[str, Any]:
+    if (
+        stats.time_range_start_us is None
+        or stats.time_range_end_us is None
+    ):
+        return {
+            "time_range_confidence": "unavailable",
+            "time_range_hint": None,
+        }
+    confidence = (
+        "uncertain"
+        if (
+            spec.history_selection == "uncertain"
+            or stats.window_selection_uncertain
+        )
+        else "trusted"
+    )
+    return {
+        "time_range_confidence": confidence,
+        "time_range_hint": {
+            "end_us": stats.time_range_end_us,
+            "start_us": stats.time_range_start_us,
+        },
+    }
+
+
 def _source_manifest(
     specs: tuple[SourceSpec, ...],
     sink: _SourceSink,
@@ -509,6 +576,7 @@ def _source_manifest(
                 "records": stats.records,
                 "revision": spec.revision,
                 "state": spec.state,
+                **_source_time_inventory(spec, stats),
             }
         )
     return result
@@ -614,6 +682,16 @@ def _build_manifest(
                 spec.history_selection == "uncertain"
                 for spec in specs
             ),
+        },
+        "source_time_inventory": {
+            "confidence_values": [
+                "trusted",
+                "uncertain",
+                "unavailable",
+            ],
+            "hint_interval": "half_open_utc_microseconds",
+            "selection_policy": "skip_nonoverlapping_trusted_only",
+            "version": 1,
         },
         "sources": sources,
         "stream_aggregates": stream_aggregates,

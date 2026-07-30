@@ -53,6 +53,28 @@ time_range_confidence
 state
 ```
 
+`time_range_hint`, when present, is
+`{start_us, end_us}` in integer UTC microseconds and describes the half-open
+interval `[start_us, end_us)`. `time_range_confidence` is exactly one of:
+
+- `trusted`: the conservative interval contains every structural event
+  timestamp in the source and may prove that a whole source cannot overlap the
+  selected history window;
+- `uncertain`: the hint may guide ordering or hydration but cannot by itself
+  make the source safely skippable, including sources that contain
+  window-independent selector, oracle, lifecycle, or compatibility records;
+- `unavailable`: no timestamp bound is established and the hint is `NULL`.
+
+Malformed, deferred, empty, and no-timestamp sources never receive fabricated
+bounds. Discovery may skip a source without hydration only when a `trusted`
+half-open interval proves non-overlap. All `uncertain` or `unavailable` sources
+remain selected or deferred with explicit coverage.
+
+Named synthetic history windows retain their closed `[start_us, end_us]`
+semantics. Therefore a half-open source hint overlaps such a window exactly
+when `hint.end_us > window.start_us` and
+`hint.start_us <= window.end_us`.
+
 Discovery supports a byte and file budget. For first use, the planner selects
 whole sources using trustworthy time-range hints and hydrates only uncertain
 sources needed to prove the selected cutoff. Deferred sources remain in
@@ -61,6 +83,14 @@ coverage metadata.
 Paths are normalized for stable local identity, not sanitized. Public MCP
 results normally use logical resource labels and selectors rather than
 technical source paths.
+
+The frozen CK-03 synthetic manifest keeps
+`codex-usage-tracker.synthetic-fixture-manifest.v1` and
+`agent-kernel-structural-v1`: this is an additive correction of inventory
+metadata already optional in adapter v1, not a source-event or oracle semantic
+revision. Every synthetic source entry now requires both time-range fields, the
+manifest digest identifies the corrected artifact, and the bake-off fixture
+loader rejects pre-correction manifests.
 
 ## Cursor contract
 
