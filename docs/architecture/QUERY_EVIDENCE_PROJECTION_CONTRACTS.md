@@ -94,6 +94,16 @@ Every plan records its producer artifact identity, consumer seam check, and
 requalification set. If any of those inputs change, the plan returns to
 unimplemented until its seam qualification passes again.
 
+Formula execution is governed by `formula-contract-v1.json`: 45 definitions,
+61 catalog uses, and 185 answer-field bindings. Evidence execution is governed
+by `selector-provenance-v1.json`. Each case declares ordered, role-tagged
+required, conditional, and forbidden references. The materialized
+`(role, selector_kind)` sequence must exactly equal the required sequence;
+repeated kinds for different roles are valid. Each selector then resolves
+through its authoritative owner with typed non-placeholder provenance.
+`selector_anchors` is not a universal registry and no plan may substitute a
+different kind when owner resolution fails.
+
 ## Typed compositional boundary
 
 The generic query grammar is allowlisted:

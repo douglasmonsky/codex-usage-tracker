@@ -398,6 +398,10 @@ state-change:<logical_id>
 allowance-observation:<logical_id>
 allowance-interval:<logical_id>
 publication:<logical_id>
+model-profile:<logical_id>
+rate-card:<logical_id>
+source-manifestation:<logical_id>
+window:<logical_id>
 ```
 
 An occurrence coordinate contains source manifestation ID, source revision,
@@ -408,6 +412,14 @@ Evidence resolution first finds the logical entity in the selected publication,
 then returns canonical facts plus one or more occurrence coordinates. An alias
 may resolve an old logical selector to the same entity and must disclose that
 resolution.
+
+Not every logical selector is source-occurrence-owned or stored in
+`selector_anchors`. Resolution dispatches to the owner fixed by
+`selector-provenance-v1.json`. A model profile uses representative call
+occurrences; a rate card uses validated configured-artifact provenance; a
+window is the non-persisted normalized request value; a publication uses commit
+provenance; and a source manifestation uses selected source-inventory
+provenance. All provenance is typed and non-placeholder.
 
 ## Canonical entity relationships
 

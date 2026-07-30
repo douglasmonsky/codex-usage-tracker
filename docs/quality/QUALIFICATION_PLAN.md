@@ -187,6 +187,16 @@ Mutation qualification proves both directions: changing grading output cannot
 change the consumer result, while changing canonical facts changes the
 consumer result and causes oracle comparison to fail.
 
+CK-07B adds two L0 gates. The formula registry must reconcile exactly to 45
+definitions, 61 question uses, and all 185 answer fields, with one synthetic
+success vector per formula plus boundary/null/empty failures. The selector
+registry must reconcile exactly to all 14 logical/catalog kinds. For every
+structural-v2 case, qualification compares the full ordered
+`(role, selector_kind, selector, provenance)` sequence, proves referenced
+entity existence, rejects placeholders, and replays clean rebuild, source
+replacement, and late events. Q-ALW-02 and Q-OPS-01 use their plan-specific
+no-window rules.
+
 ## Performance workloads
 
 Use the scales, history ranges, workloads, hard gates, and early-stop rules in

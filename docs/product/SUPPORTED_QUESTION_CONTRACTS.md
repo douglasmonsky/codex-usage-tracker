@@ -760,6 +760,14 @@ less-capable-model instruction
 Static tests reconcile this Markdown catalog, registry, question-to-primitive
 matrix, task packets, qualification prompts, and plan implementations.
 
+`config/agent-kernel/formula-contract-v1.json` is the executable authority for
+all formula IDs and answer-field bindings. A catalog question's
+`selector_kinds` is a plan allowlist. Each scenario case declares the ordered,
+role-tagged references that are required, conditional, or forbidden; repeated
+kinds are allowed. Evidence is complete only when that required role/kind
+sequence exactly equals the materialized sequence and every reference passes
+the owner-specific rules in `FORMULA_AND_SELECTOR_CONTRACT.md`.
+
 ## Qualification
 
 Every admitted question proves:
@@ -768,7 +776,8 @@ Every admitted question proves:
 - duplicate occurrences do not change totals;
 - time boundaries/timezones and missing values are correct;
 - hierarchy, pricing, allowance, and driver reconciliations pass;
-- every selector resolves in the same publication;
+- every selector resolves through its authoritative owner in the same
+  publication or, for a request-owned window, the same request digest;
 - keyset pages have no gaps/duplicates;
 - no unsupported causal field exists;
 - expected physical compiler/index/projection is used;
