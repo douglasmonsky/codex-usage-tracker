@@ -23,8 +23,10 @@ remains preserved as the reproduction that caused the stop, but it is no
 longer the current boundary blocker. CK-04's invalid `question_cases`
 correctness proof is replaced; its current-commit growth repetitions 3 and 4
 remain explicitly waived and no strict five-repetition aggregate is claimed.
-CK-08 is now ready as the next packet. CK-08 implementation has not begun, and
-CK-09 remains unadmitted.
+CK-08 is complete on merge: all 21 plans and 42 fact-backed variants reconcile,
+every plan is classified, and no projection or public surface was added. Its
+single final reviewer findings were all accepted and corrected. CK-09 is ready
+as the next packet but has not started.
 
 ## Authority set
 

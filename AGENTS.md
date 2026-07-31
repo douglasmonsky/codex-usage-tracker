@@ -20,9 +20,10 @@ CK-07C additionally owns
 `config/agent-kernel/plan-operand-contract-v1.json`. CK-07D merged the
 effective-dated rate-card valuation correction at `e49531b`. CK-07E is the
 admitted test-only prerequisite for independent structural and query-only
-database-v1 fact adapters. CK-07A remains blocked and 0 / 80 requalified until
-CK-07E is merged and exact-main verified; neither prerequisite packet
-qualifies CK-07A's 80 structural-v2 variants.
+database-v1 fact adapters. CK-07A consumed CK-07B through CK-07E and is
+complete with 80 / 80 structural-v2 variants requalified. CK-08 is complete on
+merge with all 21 plans and 42 variants qualified. CK-09 is the current ready
+packet but has not started.
 
 Advance CK packets in dependency order. Do not begin a dependent packet before
 its prerequisites are checked complete. Update the packet status, master

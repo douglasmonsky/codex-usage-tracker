@@ -6,7 +6,7 @@
 **Decision evidence commit:** `95492032373beeaa700af90b542a0a07f4220c74`
 **Production schema contract:**
 [AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md](../architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md)
-(`eecff68062a8d0cba0619058a6e660f565d9a96c2575ab0dc93d72b987f31543`)
+(`1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5`)
 **Evidence exception:**
 [aggregate-evidence.json](evidence/ck04/aggregate-evidence.json)
 
@@ -109,6 +109,7 @@ The authoritative evidence order is:
 
 ```text
 (
+  event_at_us IS NULL ASC,
   event_at_us,
   source_rank,
   source_order,

@@ -171,6 +171,10 @@ Rollback: candidate database path is independent; spike remains untouched.
 
 ### Gate G4: answer kernel
 
+CK-08 completes the fact-backed half of this gate with three
+fact-table-sufficient plans and 18 measured CK-09 projection admissions.
+CK-09 is ready as the next packet and has not started.
+
 - CK-07D effective-dated valuation and affected seam requalification evidence
   is complete;
 - CK-07E independent fact-adapter parity, provenance, independence, and

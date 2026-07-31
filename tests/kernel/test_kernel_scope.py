@@ -19,6 +19,7 @@ from scripts.check_kernel_scope import (
     CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS,
     CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS,
     CK08_PREREQUISITE_BLOCKER_ADDITIONS,
+    CK08_QUERY_EVIDENCE_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS,
     INTEGRATION_ADDITIONS,
@@ -587,6 +588,31 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
     assert {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
     } == CK08_PREREQUISITE_BLOCKER_ADDITIONS
+    assert {
+        "docs/decisions/evidence/ck08/fact-backed-query-and-evidence-qualification.json",
+        "docs/decisions/evidence/ck08/query-scale-raw-benchmark.json",
+        "scripts/benchmark_ck08_query_scale.py",
+        "scripts/collect_ck08_evidence.py",
+        "src/codex_usage_tracker/agent_kernel/evidence/__init__.py",
+        "src/codex_usage_tracker/agent_kernel/evidence/cursors.py",
+        "src/codex_usage_tracker/agent_kernel/evidence/selectors.py",
+        "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+        "src/codex_usage_tracker/agent_kernel/query/__init__.py",
+        "src/codex_usage_tracker/agent_kernel/query/compiler.py",
+        "src/codex_usage_tracker/agent_kernel/query/contracts.py",
+        "src/codex_usage_tracker/agent_kernel/query/registry.py",
+        "src/codex_usage_tracker/agent_kernel/query/service.py",
+        "tests/agent_kernel/evidence/__init__.py",
+        "tests/agent_kernel/evidence/test_cursors.py",
+        "tests/agent_kernel/evidence/test_selectors.py",
+        "tests/agent_kernel/evidence/test_service.py",
+        "tests/agent_kernel/query/__init__.py",
+        "tests/agent_kernel/query/test_compiler.py",
+        "tests/agent_kernel/query/test_contracts.py",
+        "tests/agent_kernel/query/test_registry.py",
+        "tests/agent_kernel/query/test_service.py",
+        "tests/agent_kernel/test_ck08_evidence.py",
+    } == CK08_QUERY_EVIDENCE_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -622,6 +648,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS
         | CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS
         | CK07A_FACT_BACKED_REQUALIFICATION_ADDITIONS
+        | CK08_QUERY_EVIDENCE_ADDITIONS
         | CK08_PREREQUISITE_BLOCKER_ADDITIONS
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )

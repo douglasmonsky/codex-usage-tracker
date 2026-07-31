@@ -101,6 +101,24 @@ sources/plans, response bytes, timings, lifecycle replay, privacy, and CK-03
 through CK-07 requalification. CK-04's current-commit growth repetitions 3 and
 4 remain waived; the strict five-repetition aggregate remains unclaimed.
 
+CK-08 adds L2 query/evidence qualification and bounded L3 scale classification.
+Its durable evidence executes 21 Foundation/Cutover plans across 42 fact-backed
+variants through the real internal query service, compares complete typed rows,
+grades, order, request/comparison digests, and evidence references, and records
+all SQL sources and exact `EXPLAIN` structures. It separately proves signed
+keyset pagination, exact-count opt-in, response-byte accounting, query-only
+write denial, and rebuild/replacement/late-event behavior.
+
+The standard query-only database-v1 fixture contains 100,000 synthetic calls;
+the production fixture contains 1,316,864. Repeated standard and production
+measurements classify three plans as fact-table-sufficient. Eighteen plans stop
+after a retained required-gate breach and carry measured CK-09 projection
+admission evidence. Classification is a passing CK-08 outcome because every
+plan is either fact-table-sufficient or explicitly projection-required; it is
+not a waiver and CK-08 implements no projection. The separate full
+publication-path attempt is retained as a bounded predecessor-path failure and
+is not mislabeled as a publication-valid scale result.
+
 ## Synthetic fixture strategy
 
 Fixtures contain no real local usage records or raw content. A deterministic

@@ -94,6 +94,31 @@ Every plan records its producer artifact identity, consumer seam check, and
 requalification set. If any of those inputs change, the plan returns to
 unimplemented until its seam qualification passes again.
 
+### CK-08 internal implementation record
+
+CK-08 implements the fact-backed registry, compiler, request/result contracts,
+and query-only service in `agent_kernel/query/`, with selector resolution,
+signed keyset cursors, and bounded evidence reads in `agent_kernel/evidence/`.
+These are internal Python services only. They accept registered typed fields,
+never raw SQL or SQL fragments, and cannot refresh, publish, acquire a writer
+path, or read expected-answer/grading artifacts.
+
+Qualification executes all 21 Foundation/Cutover plans across 42 CK-07A
+fact-backed variants. Complete typed rows, grades, deterministic order,
+request/comparison digests, and required evidence sequences match the
+independent authority. Cursor serialization binds its version, request digest,
+plan, publication, and order; malformed, tampered, stale, replacement, and
+mismatched bindings fail closed.
+
+Measured standard and production query-only database-v1 fixtures admit direct
+fact-table execution for `latest_publication_delta`, `data_health`, and
+`resource_hotspots`. The other 18 plans retain correct fact-backed execution
+evidence but require a CK-09 projection to meet at least one latency or payload
+gate. Their measured deficiency, budget, candidate consumer, and bounded
+dirty-key inputs are recorded in
+`docs/decisions/evidence/ck08/fact-backed-query-and-evidence-qualification.json`.
+That list is admission evidence only; CK-08 adds no projection.
+
 Formula execution is governed by `formula-contract-v1.json`: 45 definitions,
 61 catalog uses, and 185 answer-field bindings. Evidence execution is governed
 by `selector-provenance-v1.json`. Each case declares ordered, role-tagged
