@@ -129,3 +129,7 @@ rows are canonical-fact truth is pending
 [CK-07A](ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md).
 CK-07A owns the new fixture revision, independent reference evaluator, exact
 digest refresh, and linked requalification evidence.
+
+CK-07A completed that correction with 80 / 80 fact-backed variants. Historical
+CK-03 evidence remains preserved; current requalification authority is the
+[CK-07A evidence](../../decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json).

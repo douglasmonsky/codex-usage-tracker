@@ -13,6 +13,31 @@ output bodies, credentials, or absolute paths.
 - Aggregate production shape:
   `codex-usage-tracker.production-shape-profile.v1`
 
+CK-07A adds the corrected `tiny-v2` qualification fixture:
+
+- source revision: `agent-kernel-structural-v2`;
+- scenario sidecar:
+  `codex-usage-tracker.synthetic-question-scenarios.v1`;
+- oracle bundle: `codex-usage-tracker.synthetic-oracle-bundle.v2`; and
+- manifest: `codex-usage-tracker.synthetic-fixture-manifest.v2`.
+
+Its four compact base JSONL streams plus one 80-record semantic-mutation stream
+contain adapter-ingestible structural events only. The manifest declares all
+80 base-plus-mutation constructions, composed hashes, and asserted source and
+published predicates. Question intent, normalized requests, independently
+frozen canonical structural declarations, and required evidence live in
+`question-scenarios.json`; independently derived rows and grades live in
+`oracle-bundle.json`. No source JSONL record contains
+`oracle_case`, expected rows, grades, grading/comparison output, answer caches,
+body content, secrets, or absolute paths.
+
+`scripts/generate_ck07a_fixture.py` deterministically rebuilds all 80 variants.
+`tests.agent_kernel.fixtures.oracles.reference.evaluate_question_case` derives
+answers without SQLite or Candidate A.
+`tests.agent_kernel.fixtures.oracles.database_replay.evaluate_published_question_case`
+uses one query-only database-v1 snapshot and does not import the reference
+evaluator or expected output.
+
 Each source is compact canonical JSON Lines: lexicographically sorted object
 keys, UTF-8, no insignificant whitespace, and one LF terminator per record.
 The deliberately malformed source contains one synthetic invalid line so every
@@ -78,6 +103,23 @@ The checked-in tiny fixture is the only materialized corpus:
 
 Independent processes with distinct hash seeds reproduced those exact bytes.
 CI runs the same digest ratchet across its supported Python matrix.
+
+The CK-07A structural-v2 identities are:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Manifest bytes | `2098bfe5c920df4f8d4216baeecbde2ab572687f8da0f3e52a6db0e01ceb029a` |
+| Manifest digest | `b6e8e5886482f59d36554db52dd30a834e7e1ca057b7fb54d04c9a558ffc354e` |
+| Question scenarios | `6f26bd08536909a49740787e54b37974874cb7913463cc5c7801b06a9c841d63` |
+| Oracle bundle | `cc7b5b6880f4085f32a5a55226854c3dd6108b6cbbb8110142511c52a2f1279f` |
+| Complete tree | `cb19cfd5375366354da8ef9a6ef5eb957b5d7633b9d0e77c3192c97896781a4a` |
+
+The v2 tree is 1,348,201 bytes because it adds the required 970,420-byte
+question-scenario declaration sidecar. That new schema artifact is not a shared
+response-byte ratchet. Comparable byte gates pass: source JSONL shrank from the
+v1 corpus, the v2 oracle is within 25% of v1, and Candidate A's maximum encoded
+response remains below the 20,480-byte 25%-headroom ceiling. Exact measurements
+are in the CK-07A durable evidence.
 
 ## On-demand scales
 

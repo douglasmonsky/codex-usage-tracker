@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from codex_usage_tracker.agent_kernel.domain.plan_operands import evaluate_plan
 from codex_usage_tracker.agent_kernel.domain.valuation import (
     RateCardFrontier,
     RateCardRevision,
@@ -104,6 +105,16 @@ def test_current_usage_facts_request_and_evidence_are_equivalent() -> None:
     assert len(reference.evidence_references) == len(SELECTOR_KINDS)
     assert {item.selector_kind for item in reference.evidence_references} == SELECTOR_KINDS
     assert {item.provenance_kind for item in reference.evidence_references} == PROVENANCE_KINDS
+
+
+def test_current_usage_materializations_are_executable_plan_inputs() -> None:
+    contract = plan_contract()
+    reference, database = _materialize_pair(build_structural_v2())
+
+    reference_result = evaluate_plan(contract, reference.request, reference.facts)
+    database_result = evaluate_plan(contract, database.request, database.facts)
+
+    assert reference_result.rows == database_result.rows
 
 
 def test_every_plan_relation_is_selected_independently() -> None:

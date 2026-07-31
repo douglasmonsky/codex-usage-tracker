@@ -1,7 +1,7 @@
 # CK-07C — Freeze plan operands and missing canonical facts
 
-**Status:** Completed on merge; CK-07D is admitted and CK-07A remains blocked
-and unrequalified
+**Status:** Completed on merge; CK-07D is admitted and CK-07A subsequently
+completed
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 

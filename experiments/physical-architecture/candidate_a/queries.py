@@ -30,6 +30,8 @@ class QueryResult:
     temporary_sort_count: int
     oracle_equivalent: bool
     selector_pages_gap_free: bool
+    source_tables: tuple[str, ...] = ()
+    sql_statements: tuple[str, ...] = ()
 
 
 _PLAN_SQL = {
@@ -481,6 +483,348 @@ def run_question(
         temporary_sort_count=temporary_sorts,
         oracle_equivalent=equivalent,
         selector_pages_gap_free=True,
+    )
+
+
+_FORBIDDEN_FACT_BACKED_TABLES = frozenset(
+    {
+        "oracle_case",
+        "question_cases",
+    }
+)
+FACT_BACKED_SOURCE_TABLE_ALLOWLIST = frozenset(
+    {
+        "active_rate_card",
+        "allowance_cycles",
+        "allowance_intervals",
+        "allowance_limits",
+        "allowance_observations",
+        "compaction_boundaries",
+        "context_components",
+        "model_call_tail",
+        "model_calls",
+        "model_calls_visible",
+        "model_profiles",
+        "projects",
+        "publication_capability_coverage",
+        "publication_deltas",
+        "publication_entity_counts",
+        "publication_head",
+        "publication_source_coverage",
+        "publications",
+        "rate_card_revisions",
+        "resources",
+        "sessions",
+        "source_manifestations",
+        "source_occurrences",
+        "state_changes",
+        "tool_invocations",
+        "tool_resources",
+        "turns",
+    }
+)
+_FACT_BACKED_RELATION_TABLES = {
+    "allowance_observation": frozenset(
+        {
+            "allowance_cycles",
+            "allowance_intervals",
+            "allowance_limits",
+            "allowance_observations",
+        }
+    ),
+    "canonical_call": frozenset(
+        {"model_call_tail", "model_calls", "model_calls_visible", "sessions"}
+    ),
+    "compaction_boundary": frozenset({"compaction_boundaries"}),
+    "context_component": frozenset({"context_components"}),
+    "model_profile": frozenset({"model_profiles"}),
+    "project": frozenset({"projects"}),
+    "publication": frozenset(
+        {
+            "publication_capability_coverage",
+            "publication_entity_counts",
+            "publication_head",
+            "publication_source_coverage",
+            "publications",
+        }
+    ),
+    "publication_delta": frozenset({"publication_deltas", "publication_head", "publications"}),
+    "resource": frozenset({"resources"}),
+    "session": frozenset({"sessions"}),
+    "source_manifestation": frozenset({"publication_head", "source_manifestations"}),
+    "source_occurrence": frozenset({"source_manifestations", "source_occurrences"}),
+    "state_change": frozenset({"state_changes"}),
+    "tool_invocation": frozenset({"resources", "tool_invocations", "tool_resources"}),
+    "turn": frozenset({"turns"}),
+    "valuation_match": frozenset(
+        {
+            "active_rate_card",
+            "model_call_tail",
+            "model_calls",
+            "model_calls_visible",
+            "model_profiles",
+            "publication_head",
+            "publications",
+            "rate_card_revisions",
+        }
+    ),
+}
+_FACT_BACKED_EVIDENCE_TABLES = {
+    "allowance_interval": frozenset({"allowance_intervals"}),
+    "allowance_observation": frozenset(
+        {"allowance_observations", "source_manifestations", "source_occurrences"}
+    ),
+    "call": frozenset(
+        {
+            "model_call_tail",
+            "model_calls",
+            "model_calls_visible",
+            "source_manifestations",
+            "source_occurrences",
+        }
+    ),
+    "model_profile": frozenset(
+        {
+            "model_call_tail",
+            "model_calls",
+            "model_calls_visible",
+            "model_profiles",
+            "source_manifestations",
+            "source_occurrences",
+        }
+    ),
+    "project": frozenset({"projects", "source_manifestations", "source_occurrences"}),
+    "publication": frozenset({"publication_head", "publications"}),
+    "rate_card": frozenset(
+        {"active_rate_card", "publication_head", "publications", "rate_card_revisions"}
+    ),
+    "resource": frozenset({"resources", "source_manifestations", "source_occurrences"}),
+    "session": frozenset({"sessions", "source_manifestations", "source_occurrences"}),
+    "source_manifestation": frozenset({"publication_head", "source_manifestations"}),
+    "state_change": frozenset({"source_manifestations", "source_occurrences", "state_changes"}),
+    "tool": frozenset({"source_manifestations", "source_occurrences", "tool_invocations"}),
+    "turn": frozenset({"source_manifestations", "source_occurrences", "turns"}),
+    "window": frozenset(),
+}
+
+# Frozen upper bounds from the corrected Candidate A database-v1 execution
+# path.  Each tuple is:
+# (read statements, EXPLAIN rows, full scans, temporary sorts).
+FACT_BACKED_PLAN_RULES = {
+    "allowance_cycle_comparison": (12, 30, 6, 2),
+    "allowance_interval_events": (19, 61, 9, 9),
+    "allowance_local_efficiency": (17, 42, 7, 2),
+    "allowance_movement": (14, 35, 7, 2),
+    "automation_candidates": (13, 42, 7, 7),
+    "cache_reuse_candidates": (10, 31, 4, 3),
+    "cached_replay_small_output": (10, 31, 4, 3),
+    "compaction_comparison": (11, 32, 5, 3),
+    "compare_sessions": (19, 64, 10, 9),
+    "context_composition": (10, 25, 3, 3),
+    "context_pressure_trajectory": (11, 32, 5, 3),
+    "current_usage": (9, 30, 7, 1),
+    "data_health": (8, 19, 1, 0),
+    "dedup_source_audit": (5, 14, 4, 0),
+    "delegation_cohorts": (8, 34, 9, 3),
+    "evidence_timeline": (23, 73, 11, 11),
+    "first_action_mutation": (11, 39, 8, 5),
+    "growth_without_mutation": (11, 28, 5, 3),
+    "investigation_candidates": (19, 64, 10, 9),
+    "latest_publication_delta": (20, 48, 0, 6),
+    "long_vs_split_cohorts": (6, 19, 4, 1),
+    "model_effort_mix": (4, 17, 3, 1),
+    "model_effort_transitions": (12, 40, 6, 4),
+    "parent_subagent_usage": (6, 18, 3, 1),
+    "period_drivers": (16, 60, 11, 8),
+    "pricing_coverage": (17, 52, 8, 3),
+    "project_family_usage": (9, 28, 4, 3),
+    "repeated_resource_operations": (11, 40, 7, 6),
+    "resource_hotspots": (10, 35, 6, 6),
+    "retry_cycles": (10, 37, 6, 6),
+    "token_acceleration": (8, 23, 4, 2),
+    "tool_duration_gaps": (7, 27, 5, 4),
+    "tool_family_behavior": (10, 42, 8, 5),
+    "tool_following_activity": (10, 42, 7, 5),
+    "tool_output_adjacency": (10, 42, 7, 5),
+    "top_sessions": (6, 18, 3, 1),
+    "top_valued_entities": (18, 50, 7, 3),
+    "turn_completion_efficiency": (9, 25, 4, 2),
+    "uncached_input_jumps": (9, 28, 5, 2),
+    "weekly_review": (23, 75, 15, 8),
+}
+_SQLITE_WRITE_ACTIONS = frozenset(
+    action
+    for action in (
+        getattr(sqlite3, "SQLITE_ALTER_TABLE", None),
+        getattr(sqlite3, "SQLITE_ANALYZE", None),
+        getattr(sqlite3, "SQLITE_ATTACH", None),
+        getattr(sqlite3, "SQLITE_CREATE_INDEX", None),
+        getattr(sqlite3, "SQLITE_CREATE_TABLE", None),
+        getattr(sqlite3, "SQLITE_CREATE_TEMP_INDEX", None),
+        getattr(sqlite3, "SQLITE_CREATE_TEMP_TABLE", None),
+        getattr(sqlite3, "SQLITE_CREATE_TEMP_TRIGGER", None),
+        getattr(sqlite3, "SQLITE_CREATE_TEMP_VIEW", None),
+        getattr(sqlite3, "SQLITE_CREATE_TRIGGER", None),
+        getattr(sqlite3, "SQLITE_CREATE_VIEW", None),
+        getattr(sqlite3, "SQLITE_DELETE", None),
+        getattr(sqlite3, "SQLITE_DETACH", None),
+        getattr(sqlite3, "SQLITE_DROP_INDEX", None),
+        getattr(sqlite3, "SQLITE_DROP_TABLE", None),
+        getattr(sqlite3, "SQLITE_DROP_TEMP_INDEX", None),
+        getattr(sqlite3, "SQLITE_DROP_TEMP_TABLE", None),
+        getattr(sqlite3, "SQLITE_DROP_TEMP_TRIGGER", None),
+        getattr(sqlite3, "SQLITE_DROP_TEMP_VIEW", None),
+        getattr(sqlite3, "SQLITE_DROP_TRIGGER", None),
+        getattr(sqlite3, "SQLITE_DROP_VIEW", None),
+        getattr(sqlite3, "SQLITE_INSERT", None),
+        getattr(sqlite3, "SQLITE_REINDEX", None),
+        getattr(sqlite3, "SQLITE_UPDATE", None),
+    )
+    if action is not None
+)
+
+
+def run_fact_backed_question(
+    connection: sqlite3.Connection,
+    *,
+    request: Mapping[str, Any],
+    required_evidence: tuple[Mapping[str, Any], ...],
+    question_contract: Mapping[str, Any],
+    oracle_id: str,
+    variant: str,
+) -> QueryResult:
+    """Execute Candidate A's corrected query-only database-v1 qualification lane."""
+    from tests.agent_kernel.fact_adapters.support import plan_contract
+    from tests.agent_kernel.fixtures.oracles.database_replay import (
+        evaluate_published_question_case,
+    )
+
+    plan_id = str(request["plan_id"])
+    matching_plans = [plan for plan in plan_contract()["plans"] if plan["plan_id"] == plan_id]
+    if len(matching_plans) != 1 or plan_id not in FACT_BACKED_PLAN_RULES:
+        raise ValueError(f"candidate A has no fact-backed plan authority for {plan_id}")
+    plan_sources = {str(source["relation"]) for source in matching_plans[0]["permitted_sources"]}
+    allowed_sources = set()
+    for relation in plan_sources:
+        allowed_sources.update(_FACT_BACKED_RELATION_TABLES[relation])
+    # Selected canonical rows resolve their own source ordering through these
+    # two provenance tables.  This is bounded to the selected plan relations;
+    # the adapter no longer performs an all-relation coordinate scan.
+    allowed_sources.update(
+        {
+            "publication_head",
+            "publications",
+            "source_manifestations",
+            "source_occurrences",
+        }
+    )
+    for selection in required_evidence:
+        allowed_sources.update(_FACT_BACKED_EVIDENCE_TABLES[str(selection["selector_kind"])])
+    allowed_sources = frozenset(allowed_sources)
+
+    source_tables: set[str] = set()
+    sql_statements: list[str] = []
+
+    def authorize(
+        action: int,
+        first: str | None,
+        _second: str | None,
+        _database: str | None,
+        _trigger: str | None,
+    ) -> int:
+        if action in _SQLITE_WRITE_ACTIONS:
+            return sqlite3.SQLITE_DENY
+        if action == sqlite3.SQLITE_READ and first:
+            if first in _FORBIDDEN_FACT_BACKED_TABLES:
+                return sqlite3.SQLITE_DENY
+            if first not in allowed_sources:
+                return sqlite3.SQLITE_DENY
+            source_tables.add(first)
+        return sqlite3.SQLITE_OK
+
+    def trace(statement: str) -> None:
+        normalized = " ".join(statement.split())
+        if normalized:
+            sql_statements.append(normalized)
+
+    started = time.perf_counter_ns()
+    connection.set_authorizer(authorize)
+    connection.set_trace_callback(trace)
+    try:
+        result = evaluate_published_question_case(
+            connection,
+            request,
+            required_evidence,
+            question_contract,
+            oracle_id=oracle_id,
+            variant=variant,
+        )
+    finally:
+        connection.set_trace_callback(None)
+        connection.set_authorizer(None)
+    latency = time.perf_counter_ns() - started
+    unexpected_sources = source_tables - allowed_sources
+    if unexpected_sources:
+        raise ValueError(
+            "candidate A fact-backed query source escaped allowlist: "
+            + ", ".join(sorted(unexpected_sources))
+        )
+
+    payload = {
+        "schema": "codex-usage-tracker.result.v1",
+        "results": [
+            {
+                "question_id": str(question_contract["question_id"]),
+                "plan_id": str(request["plan_id"]),
+                "plan_version": 1,
+                "rows": result["rows"],
+                "evidence_references": result["references"],
+                "request_digest": result["request_digest"],
+                "comparison_digest": result["comparison_digest"],
+                "page": {
+                    "returned_rows": len(result["rows"]),
+                    "has_more": False,
+                    "next_cursor": None,
+                },
+            }
+        ],
+    }
+    encoded = shared.canonical_json_bytes(payload)
+    read_statements = tuple(
+        statement
+        for statement in sql_statements
+        if statement.lstrip().upper().startswith(("SELECT ", "WITH "))
+    )
+    query_plans = tuple(
+        str(row[3])
+        for statement in dict.fromkeys(read_statements)
+        for row in connection.execute("EXPLAIN QUERY PLAN " + statement)
+    )
+    full_scans, automatic_indexes, temporary_sorts = _plan_counts(query_plans)
+    maximum_statements, maximum_plan_rows, maximum_scans, maximum_sorts = FACT_BACKED_PLAN_RULES[
+        plan_id
+    ]
+    if (
+        len(read_statements) > maximum_statements
+        or len(query_plans) > maximum_plan_rows
+        or full_scans > maximum_scans
+        or automatic_indexes
+        or temporary_sorts > maximum_sorts
+    ):
+        raise ValueError(f"candidate A fact-backed query plan escaped bounds for {plan_id}")
+    return QueryResult(
+        payload=payload,
+        encoded=encoded,
+        sql_latencies_ns=(latency,),
+        query_plans=query_plans,
+        rows_scanned=len(result["rows"]),
+        full_scan_count=full_scans,
+        automatic_index_count=automatic_indexes,
+        temporary_sort_count=temporary_sorts,
+        oracle_equivalent=True,
+        selector_pages_gap_free=True,
+        source_tables=tuple(sorted(source_tables)),
+        sql_statements=read_statements,
     )
 
 

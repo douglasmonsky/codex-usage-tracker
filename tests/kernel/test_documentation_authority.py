@@ -181,7 +181,9 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert "all 80 variants" in ck07a
     assert "all 80 question variants" in ck07a
     assert "aggregate score/sensitivity evidence" in ck07a
-    assert "query correctness is not accepted" in physical_decision
+    assert "80 / 80 fact-backed variants passed" in physical_decision
+    assert "explicit growth-evidence exception" in physical_decision
+    assert "two current repetitions were waived" in physical_decision
     assert "**Dependencies:** CK-07A merged with exact-main seam evidence." in ck08
 
 

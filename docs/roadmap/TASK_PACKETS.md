@@ -7,10 +7,10 @@ in the linked files under [`docs/roadmap/tasks/`](tasks/).
 
 ## Overall
 
-- Completed packets: **12 / 22**
+- Completed packets: **13 / 22**
 - In progress: **None**
-- Not started: **10**
-- Critical-path completion: **12 / 21**
+- Not started: **9**
+- Critical-path completion: **13 / 21**
 - Optional packets: **CK-15**
 
 A packet may be checked only after its acceptance criteria and required checks
@@ -28,9 +28,8 @@ corrective packet's executable producer-to-consumer seam checks.
 
 - [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
 - [x] **M1 — Architecture Selected** · 4 / 4 · CK-01–CK-04 complete
-- [ ] **M2 — Kernel Alpha** · 7 / 10 · CK-05–CK-07 and CK-07B–CK-07E
-  complete; CK-07A remains 0 / 80 requalified and
-  CK-08 blocked; CK-09 not started
+- [ ] **M2 — Kernel Alpha** · 8 / 10 · CK-05–CK-07, CK-07B–CK-07E, and
+  CK-07A complete; CK-08 is ready and CK-09 is not started
 - [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
 - [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
 - [ ] **M5 — Public Release** · 0 / 1 required · CK-16 not started
@@ -91,17 +90,18 @@ corrective packet's executable producer-to-consumer seam checks.
   · [implementation evidence](../decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json)
 - [x] **CK-07E — Implement independent fact adapters** ·
   **Completed on merge; exact-main verification is recorded in the completion
-  handoff; CK-07A remains 0 / 80 requalified** · prerequisite packet
+  handoff** · prerequisite packet
   discovered after merged CK-07D; depends on CK-07B, CK-07C, CK-07D, and
   retained CK-07A/CK-08 blocker evidence
   · [packet](tasks/ck-07e-implement-independent-fact-adapters.md)
-- [ ] **CK-07A — Reconcile fact-backed oracles and qualify packet seams** ·
-  **Blocked pending CK-07E; 0 / 80 requalified** · depends on CK-07, the CK-08
+- [x] **CK-07A — Reconcile fact-backed oracles and qualify packet seams** ·
+  **Completed; 80 / 80 fact-backed variants requalified** · depends on CK-07, the CK-08
   blocker evidence, CK-07B, CK-07C, CK-07D, and CK-07E
   · [packet](tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md)
-- [ ] **CK-08 — Implement query and evidence** · **Blocked — the frozen CK-03
-  question oracle rows are not derivable from database-v1 canonical facts;
-  [evidence](../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)** ·
+- [ ] **CK-08 — Implement query and evidence** · **Ready — CK-07A replaced the
+  historical fact-backed oracle gap; the original
+  [gap evidence](../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)
+  remains preserved** ·
   depends on CK-07A
   · [packet](tasks/ck-08-implement-query-and-evidence.md)
 - [ ] **CK-09 — Admit projections and named plans** · Not started ·

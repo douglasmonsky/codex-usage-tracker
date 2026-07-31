@@ -892,13 +892,16 @@ def build_query_only_database(declaration: Mapping[str, Any]) -> sqlite3.Connect
                 "inventory_completed_at_us": 600,
             },
         )
+    publication_call_count = publication_fact["values"]["measurements"].get("calls")
+    if publication_call_count is None:
+        publication_call_count = publication_fact["values"]["measurements"]["model_calls"]
     for capability_id, eligible, observed, unavailable, grade in (
         ("context_components", 2, 2, 0, "exact"),
         (
             "valuation",
-            publication_fact["values"]["measurements"]["calls"],
+            publication_call_count,
             publication_fact["values"]["valuation_coverage"]["priced_calls"],
-            publication_fact["values"]["measurements"]["calls"]
+            publication_call_count
             - publication_fact["values"]["valuation_coverage"]["priced_calls"],
             "configured_estimate",
         ),
@@ -986,8 +989,23 @@ def build_query_only_database(declaration: Mapping[str, Any]) -> sqlite3.Connect
         },
     )
 
+    fallback_occurrence_id = next(
+        (
+            occurrence["occurrence_id"]
+            for occurrences in declaration["occurrences"].values()
+            for occurrence in occurrences
+        ),
+        None,
+    )
+
     def occurrence_id(logical_id: str) -> str:
-        return declaration["occurrences"][logical_id][0]["occurrence_id"]
+        occurrences = declaration["occurrences"].get(logical_id, ())
+        if occurrences:
+            return occurrences[0]["occurrence_id"]
+        return fallback_occurrence_id or semantic_id(
+            "source-occurrence",
+            ["query-only-coordinate-anchor"],
+        )
 
     for fact in by_relation["model_profile"]:
         values = fact["values"]
@@ -1297,8 +1315,8 @@ def build_query_only_database(declaration: Mapping[str, Any]) -> sqlite3.Connect
     for interval_id, interval in declaration["allowance_intervals"].items():
         start_fact = allowance_facts[interval["start_observation_id"]]
         end_fact = allowance_facts[interval["end_observation_id"]]
-        start_percent = start_fact["values"]["allowance_percent"]
-        end_percent = end_fact["values"]["allowance_percent"]
+        start_percent = Decimal(str(start_fact["values"]["allowance_percent"]))
+        end_percent = Decimal(str(end_fact["values"]["allowance_percent"]))
         insert(
             "allowance_intervals",
             {

@@ -81,3 +81,8 @@ the adapter against the corrected fixture, prove grading metadata cannot become
 canonical facts, and refresh fixture digests, counts, measurements, and
 evidence. A code change is admitted only if that unchanged replay exposes a
 concrete adapter deficiency.
+
+CK-07A requalified CK-06 ingestion against all 80 corrected variants without
+an adapter implementation change. Historical CK-06 evidence remains
+preserved; current seam authority is the
+[CK-07A evidence](../../decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json).

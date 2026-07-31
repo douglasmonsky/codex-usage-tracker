@@ -28,6 +28,7 @@ from codex_usage_tracker.agent_kernel.publication.rate_cards import (
     PreparedRateCardFrontier,
     attach_rate_card_frontier,
     prepare_rate_card_frontier,
+    read_current_valuation_inputs,
 )
 from codex_usage_tracker.agent_kernel.publication.validation import (
     PublicationValidationError,
@@ -283,14 +284,19 @@ def test_writer_rejects_ambiguous_frontier_and_preserves_active_head(
         committed_at_us=5_000,
     )
     prior = read_prior_publication_snapshot(connection, _empty_changes())
+    write_set_without_frontier = prepare_write_set_from_changes(
+        _empty_changes(),
+        request,
+        prior=prior,
+    )
     write_set = attach_rate_card_frontier(
-        prepare_write_set_from_changes(
-            _empty_changes(),
-            request,
-            prior=prior,
-        ),
+        write_set_without_frontier,
         request,
         forged,
+        current_inputs=read_current_valuation_inputs(
+            connection,
+            write_set_without_frontier,
+        ),
     )
     plan = PublicationPlan(
         OperationClass.VALUATION_ONLY,
@@ -315,14 +321,17 @@ def test_writer_rejects_ambiguous_frontier_and_preserves_active_head(
         PublicationWriter(connection).publish(plan, request, write_set)
     assert connection.execute("SELECT COUNT(*) FROM publications").fetchone()[0] == 1
     assert connection.execute("SELECT COUNT(*) FROM rate_card_revisions").fetchone()[0] == 1
-    assert connection.execute(
-        """
+    assert (
+        connection.execute(
+            """
         SELECT revision.digest
         FROM active_rate_card AS active
         JOIN rate_card_revisions AS revision
           ON revision.rate_card_id = active.rate_card_id
         """
-    ).fetchone()[0] == old.digest
+        ).fetchone()[0]
+        == old.digest
+    )
     connection.close()
 
 
@@ -385,8 +394,7 @@ def test_rebuild_replacement_and_late_event_recovery_preserve_frontier(
     replacement_changes = replace(
         changes,
         selected_sources=tuple(
-            replace(source, state=SourceState.REPLACED)
-            for source in changes.selected_sources
+            replace(source, state=SourceState.REPLACED) for source in changes.selected_sources
         ),
     )
     replacement_plan = plan_refresh(
@@ -433,14 +441,19 @@ def test_rebuild_replacement_and_late_event_recovery_preserve_frontier(
         publication_id=late_request.publication_id,
         previous=prior.rate_card_frontier,
     )
+    late_write_set_without_frontier = prepare_write_set_from_changes(
+        changes,
+        late_request,
+        prior=prior,
+    )
     late_write_set = attach_rate_card_frontier(
-        prepare_write_set_from_changes(
-            changes,
-            late_request,
-            prior=prior,
-        ),
+        late_write_set_without_frontier,
         late_request,
         unchanged,
+        current_inputs=read_current_valuation_inputs(
+            connection,
+            late_write_set_without_frontier,
+        ),
     )
     late_plan = PublicationPlan(
         OperationClass.APPEND_SAFE_SMALL,
@@ -578,14 +591,29 @@ def test_publication_frontier_is_atomic_reproducible_and_recovery_safe(
         publication_id=second_request.publication_id,
         previous=prior.rate_card_frontier,
     )
-    second_write_set = attach_rate_card_frontier(
-        prepare_write_set_from_changes(
-            _empty_changes(),
+    second_write_set_without_frontier = prepare_write_set_from_changes(
+        _empty_changes(),
+        second_request,
+        prior=prior,
+    )
+    with pytest.raises(
+        ValueError,
+        match="require complete current valuation inputs",
+    ):
+        attach_rate_card_frontier(
+            second_write_set_without_frontier,
             second_request,
-            prior=prior,
-        ),
+            second_prepared,
+        )
+    second_inputs = read_current_valuation_inputs(
+        connection,
+        second_write_set_without_frontier,
+    )
+    second_write_set = attach_rate_card_frontier(
+        second_write_set_without_frontier,
         second_request,
         second_prepared,
+        current_inputs=second_inputs,
     )
     second_plan = PublicationPlan(
         OperationClass.VALUATION_ONLY,
@@ -620,16 +648,32 @@ def test_publication_frontier_is_atomic_reproducible_and_recovery_safe(
         )
     assert connection.execute("SELECT COUNT(*) FROM publications").fetchone()[0] == 1
     assert connection.execute("SELECT COUNT(*) FROM rate_card_revisions").fetchone()[0] == 2
-    assert connection.execute(
-        """
+    assert (
+        connection.execute(
+            """
         SELECT revision.digest
         FROM active_rate_card AS active
         JOIN rate_card_revisions AS revision
           ON revision.rate_card_id = active.rate_card_id
         """
-    ).fetchone()[0] == later.digest
+        ).fetchone()[0]
+        == later.digest
+    )
 
     PublicationWriter(connection).publish(second_plan, second_request, second_write_set)
+    valuation_coverage = connection.execute(
+        """
+        SELECT eligible_entity_count, observed_entity_count,
+               unavailable_entity_count, basis
+          FROM publication_capability_coverage
+         WHERE publication_id = ? AND capability_id = 'valuation'
+        """,
+        (second_request.publication_id,),
+    ).fetchone()
+    assert valuation_coverage is not None
+    assert valuation_coverage[0] == len(second_inputs.calls)
+    assert valuation_coverage[1] + valuation_coverage[2] == len(second_inputs.calls)
+    assert valuation_coverage[3] == "effective_dated_frontier_recompile_v1"
     validate_open_artifact(
         connection,
         expected_publication_id=second_request.publication_id,
@@ -676,14 +720,19 @@ def test_publication_frontier_is_atomic_reproducible_and_recovery_safe(
     )
     assert unchanged_prepared.rows == ()
     assert unchanged_prepared.dirty_intervals == ()
+    third_write_set_without_frontier = prepare_write_set_from_changes(
+        _empty_changes(),
+        third_request,
+        prior=current,
+    )
     third_write_set = attach_rate_card_frontier(
-        prepare_write_set_from_changes(
-            _empty_changes(),
-            third_request,
-            prior=current,
-        ),
+        third_write_set_without_frontier,
         third_request,
         unchanged_prepared,
+        current_inputs=read_current_valuation_inputs(
+            connection,
+            third_write_set_without_frontier,
+        ),
     )
     third_plan = PublicationPlan(
         OperationClass.APPEND_SAFE_SMALL,
