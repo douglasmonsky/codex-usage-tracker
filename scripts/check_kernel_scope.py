@@ -591,6 +591,18 @@ CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS = frozenset(
     }
 )
 
+CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck07e/independent-fact-adapters-evidence.json",
+        "docs/roadmap/tasks/ck-07e-implement-independent-fact-adapters.md",
+        "tests/agent_kernel/fact_adapters/__init__.py",
+        "tests/agent_kernel/fact_adapters/database.py",
+        "tests/agent_kernel/fact_adapters/reference.py",
+        "tests/agent_kernel/fact_adapters/support.py",
+        "tests/agent_kernel/fact_adapters/test_contracts.py",
+    }
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -642,6 +654,7 @@ INTEGRATION_ADDITIONS = (
     | CK07B_FORMULA_PROVENANCE_ADDITIONS
     | CK07C_PLAN_OPERAND_FACT_ADDITIONS
     | CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS
+    | CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )

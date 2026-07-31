@@ -16,6 +16,7 @@ from scripts.check_kernel_scope import (
     CK07B_FORMULA_PROVENANCE_ADDITIONS,
     CK07C_PLAN_OPERAND_FACT_ADDITIONS,
     CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS,
+    CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS,
     CK08_PREREQUISITE_BLOCKER_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS,
@@ -551,6 +552,15 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/agent_kernel/publication/test_rate_cards.py",
     } == CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS
     assert {
+        "docs/decisions/evidence/ck07e/independent-fact-adapters-evidence.json",
+        "docs/roadmap/tasks/ck-07e-implement-independent-fact-adapters.md",
+        "tests/agent_kernel/fact_adapters/__init__.py",
+        "tests/agent_kernel/fact_adapters/database.py",
+        "tests/agent_kernel/fact_adapters/reference.py",
+        "tests/agent_kernel/fact_adapters/support.py",
+        "tests/agent_kernel/fact_adapters/test_contracts.py",
+    } == CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS
+    assert {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
     } == CK08_PREREQUISITE_BLOCKER_ADDITIONS
     assert INTEGRATION_ADDITIONS == (
@@ -586,6 +596,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK07B_FORMULA_PROVENANCE_ADDITIONS
         | CK07C_PLAN_OPERAND_FACT_ADDITIONS
         | CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS
+        | CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS
         | CK08_PREREQUISITE_BLOCKER_ADDITIONS
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )

@@ -241,9 +241,9 @@ source/capability coverage, entity counts, the latest accepted delta and
 bounded delta samples, active rate-card identity, and all selected facts.
 Writer-internal prior-state objects are not query/replay publication facts.
 
-## Evaluator independence and CK-07A handoff
+## Evaluator independence and CK-07E/CK-07A handoff
 
-CK-07A's reference evaluator converts one structural-v2 scenario declaration
+CK-07E's structural reference adapter converts one structural-v2 scenario declaration
 into `CanonicalFact` rows. Its database-v1 evaluator independently selects
 permitted rows from one query-only SQLite snapshot and normalizes those rows.
 
@@ -263,7 +263,9 @@ They may not share:
 - answer, oracle, grading, or comparison output; or
 - emitted expected rows.
 
-CK-07A compares normalized request digest; every answer value including
+CK-07E stops after proving normalized request, fact, owner, provenance, and
+lifecycle parity and claims 0 / 80 answer comparisons. CK-07A compares the
+normalized request digest; every answer value including
 `NULL`; grades; deterministic order; all 185 field bindings; and the exact
 ordered role-kind-selector-provenance sequence. This packet makes that replay
 executable but does not claim that any of the 80 variants has passed.
