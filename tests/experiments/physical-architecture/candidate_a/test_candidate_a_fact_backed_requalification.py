@@ -6,7 +6,11 @@ import json
 import sqlite3
 import sys
 from pathlib import Path
+from typing import Any
 
+import pytest
+
+from tests.agent_kernel.fixtures.oracles import database_replay
 from tests.agent_kernel.fixtures.oracles.cases_v2 import build_question_scenarios
 from tests.agent_kernel.fixtures.oracles.reference import evaluate_question_case
 from tests.agent_kernel.fixtures.published_v2 import (
@@ -24,6 +28,18 @@ queries = importlib.import_module("candidate_a.queries")
 CATALOG = json.loads(
     (ROOT / "config/agent-kernel/question-catalog-v1.json").read_text(encoding="utf-8")
 )
+
+
+class _LegacyAuthorizerConnection(sqlite3.Connection):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.authorizers: list[Any] = []
+
+    def set_authorizer(self, callback: Any) -> None:
+        if callback is None:
+            raise AssertionError("legacy sqlite3 cannot safely accept a None authorizer")
+        self.authorizers.append(callback)
+        super().set_authorizer(callback)
 
 
 def test_candidate_a_requalifies_all_80_from_permitted_database_v1_facts(
@@ -104,6 +120,65 @@ def test_candidate_a_requalifies_all_80_from_permitted_database_v1_facts(
     assert source_tables == set(queries.FACT_BACKED_SOURCE_TABLE_ALLOWLIST)
     assert max(response_bytes) <= 20_480
     assert plan_rows > 0
+
+
+def test_legacy_authorizer_stays_guarded_then_restores_normal_query_only_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = build_question_scenarios()["cases"][0]
+    profile = original["source_profile"]
+    mutation = original["semantic_mutation"]
+    database_path = tmp_path / "database-v1.sqlite3"
+    publish_structural_snapshot(
+        tmp_path / "fixture",
+        database_path,
+        include_late_call=profile["late_event"],
+        null_cached_tokens=profile["missing_cached_input"],
+        variant_native_turn_id=mutation["native_turn_id"],
+    )
+    connection = sqlite3.connect(database_path, factory=_LegacyAuthorizerConnection)
+    connection.row_factory = sqlite3.Row
+    case = published_question_case(connection, original)
+    questions = {question["question_id"]: question for question in CATALOG["questions"]}
+    question = questions[case["question_id"]]
+    guarded_probe_denied = False
+    evaluate = database_replay.evaluate_published_question_case
+
+    def evaluate_with_forbidden_probe(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        nonlocal guarded_probe_denied
+        guarded_connection = args[0]
+        with pytest.raises(sqlite3.DatabaseError, match="not authorized"):
+            guarded_connection.execute("SELECT 1 FROM source_diagnostics LIMIT 1").fetchall()
+        guarded_probe_denied = True
+        return evaluate(*args, **kwargs)
+
+    monkeypatch.setattr(queries, "_AUTHORIZER_NONE_SUPPORTED", False)
+    monkeypatch.setattr(
+        database_replay,
+        "evaluate_published_question_case",
+        evaluate_with_forbidden_probe,
+    )
+    connection.execute("PRAGMA query_only = ON")
+    result = queries.run_fact_backed_question(
+        connection,
+        request=case["request"],
+        required_evidence=tuple(case["required_evidence"]),
+        question_contract=question,
+        oracle_id=case["oracle_id"],
+        variant=case["variant"],
+    )
+
+    assert result.oracle_equivalent
+    assert guarded_probe_denied
+    assert len(connection.authorizers) == 2
+    assert connection.authorizers[-1] is queries._allow_all_authorizer  # noqa: SLF001
+    assert connection.execute(
+        "EXPLAIN QUERY PLAN SELECT 1 FROM source_diagnostics LIMIT 1"
+    ).fetchall()
+    with pytest.raises(sqlite3.DatabaseError):
+        connection.execute("DELETE FROM source_diagnostics")
+    connection.close()
 
 
 def test_fact_backed_candidate_has_no_generic_sql_or_refresh_parameter() -> None:

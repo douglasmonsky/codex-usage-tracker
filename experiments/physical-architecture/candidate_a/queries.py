@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -682,6 +683,25 @@ _SQLITE_WRITE_ACTIONS = frozenset(
     )
     if action is not None
 )
+_AUTHORIZER_NONE_SUPPORTED = sys.version_info >= (3, 11)
+
+
+def _allow_all_authorizer(
+    _action: int,
+    _first: str | None,
+    _second: str | None,
+    _database: str | None,
+    _trigger: str | None,
+) -> int:
+    return sqlite3.SQLITE_OK
+
+
+def _restore_normal_authorizer(connection: sqlite3.Connection) -> None:
+    # CPython 3.10 accepts None at the Python boundary but installs it as a
+    # callback, causing every later statement to fail with "not authorized".
+    # A no-op callback is the only supported way to restore normal reads there.
+    callback = None if _AUTHORIZER_NONE_SUPPORTED else _allow_all_authorizer
+    connection.set_authorizer(callback)
 
 
 def run_fact_backed_question(
@@ -758,10 +778,23 @@ def run_fact_backed_question(
             oracle_id=oracle_id,
             variant=variant,
         )
+        latency = time.perf_counter_ns() - started
+        connection.set_trace_callback(None)
+        read_statements = tuple(
+            statement
+            for statement in sql_statements
+            if statement.lstrip().upper().startswith(("SELECT ", "WITH "))
+        )
+        # Keep the restrictive authorizer installed while compiling plans so a
+        # traced statement can never escape the per-plan source allowlist.
+        query_plans = tuple(
+            str(row[3])
+            for statement in dict.fromkeys(read_statements)
+            for row in connection.execute("EXPLAIN QUERY PLAN " + statement)
+        )
     finally:
         connection.set_trace_callback(None)
-        connection.set_authorizer(None)
-    latency = time.perf_counter_ns() - started
+        _restore_normal_authorizer(connection)
     unexpected_sources = source_tables - allowed_sources
     if unexpected_sources:
         raise ValueError(
@@ -789,16 +822,6 @@ def run_fact_backed_question(
         ],
     }
     encoded = shared.canonical_json_bytes(payload)
-    read_statements = tuple(
-        statement
-        for statement in sql_statements
-        if statement.lstrip().upper().startswith(("SELECT ", "WITH "))
-    )
-    query_plans = tuple(
-        str(row[3])
-        for statement in dict.fromkeys(read_statements)
-        for row in connection.execute("EXPLAIN QUERY PLAN " + statement)
-    )
     full_scans, automatic_indexes, temporary_sorts = _plan_counts(query_plans)
     maximum_statements, maximum_plan_rows, maximum_scans, maximum_sorts = FACT_BACKED_PLAN_RULES[
         plan_id
@@ -810,7 +833,15 @@ def run_fact_backed_question(
         or automatic_indexes
         or temporary_sorts > maximum_sorts
     ):
-        raise ValueError(f"candidate A fact-backed query plan escaped bounds for {plan_id}")
+        raise ValueError(
+            "candidate A fact-backed query plan escaped bounds for "
+            f"{plan_id}: statements={len(read_statements)}/{maximum_statements}, "
+            f"plan_rows={len(query_plans)}/{maximum_plan_rows}, "
+            f"full_scans={full_scans}/{maximum_scans}, "
+            f"automatic_indexes={automatic_indexes}/0, "
+            f"temporary_sorts={temporary_sorts}/{maximum_sorts}, "
+            f"plans={query_plans!r}"
+        )
     return QueryResult(
         payload=payload,
         encoded=encoded,
