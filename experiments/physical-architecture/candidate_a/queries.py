@@ -704,7 +704,7 @@ def run_fact_backed_question(
     if len(matching_plans) != 1 or plan_id not in FACT_BACKED_PLAN_RULES:
         raise ValueError(f"candidate A has no fact-backed plan authority for {plan_id}")
     plan_sources = {str(source["relation"]) for source in matching_plans[0]["permitted_sources"]}
-    allowed_sources = set()
+    allowed_sources: set[str] = set()
     for relation in plan_sources:
         allowed_sources.update(_FACT_BACKED_RELATION_TABLES[relation])
     # Selected canonical rows resolve their own source ordering through these
@@ -720,7 +720,6 @@ def run_fact_backed_question(
     )
     for selection in required_evidence:
         allowed_sources.update(_FACT_BACKED_EVIDENCE_TABLES[str(selection["selector_kind"])])
-    allowed_sources = frozenset(allowed_sources)
 
     source_tables: set[str] = set()
     sql_statements: list[str] = []

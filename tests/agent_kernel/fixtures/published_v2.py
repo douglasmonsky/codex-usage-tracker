@@ -8,7 +8,7 @@ import sqlite3
 import time
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.ingest import ingest
 from codex_usage_tracker.agent_kernel.domain.identity import semantic_id
@@ -49,6 +49,17 @@ _EVENT_KIND_ORDER = {
     "allowance_observation": 70,
     "session_terminal": 80,
 }
+
+
+class StructuralPublication(TypedDict):
+    artifact_manifest_sha256: str
+    source_bytes: int
+    source_records: int
+    observations: int
+    occurrences: int
+    inserted_occurrences: int
+    ingestion_ns: int
+    publication_ns: int
 
 
 def _record(
@@ -394,7 +405,7 @@ def publish_structural_snapshot(
     include_late_call: bool = False,
     null_cached_tokens: bool = False,
     variant_native_turn_id: str = "root-turn",
-) -> dict[str, int]:
+) -> StructuralPublication:
     """Run real CK-06 ingestion and CK-07 publication into database-v1."""
 
     fixture_root.mkdir(parents=True, exist_ok=True)

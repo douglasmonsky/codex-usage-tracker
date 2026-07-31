@@ -51,6 +51,72 @@ EVIDENCE_PATH = (
     / "ck07a"
     / "fact-backed-oracle-and-seam-qualification-evidence.json"
 )
+PHASE_A_FOCUSED_COMMAND = (
+    ".venv/bin/python -m pytest "
+    "tests/agent_kernel/test_fact_backed_question_oracles.py "
+    "tests/agent_kernel/test_fact_backed_publication_v2.py "
+    "tests/agent_kernel/test_ck07a_evidence.py "
+    "tests/experiments/physical-architecture/candidate_a/"
+    "test_candidate_a_fact_backed_requalification.py "
+    "tests/agent_kernel/fact_adapters/test_contracts.py "
+    "tests/agent_kernel/publication/test_rate_cards.py -q"
+)
+PHASE_B_AFFECTED_COMMAND = (
+    ".venv/bin/python -m pytest "
+    "tests/agent_kernel/contracts tests/agent_kernel/storage "
+    "tests/agent_kernel/adapters tests/agent_kernel/publication "
+    "tests/agent_kernel/fact_adapters "
+    "tests/agent_kernel/test_fact_backed_question_oracles.py "
+    "tests/agent_kernel/test_fact_backed_publication_v2.py "
+    "tests/experiments/physical-architecture/candidate_a/"
+    "test_candidate_a_query_eligibility.py "
+    "tests/experiments/physical-architecture/candidate_a/"
+    "test_candidate_a_fact_backed_requalification.py "
+    "tests/experiments/physical-architecture/candidate_c/"
+    "test_candidate_c.py -q"
+)
+PHASE_B_FULL_FUNCTIONAL_COMMAND = (
+    ".venv/bin/python -m pytest -p no:tach "
+    "--ignore=tests/kernel/test_ingest_performance.py "
+    "--ignore=tests/kernel/allowance/test_performance.py "
+    "--ignore=tests/kernel/evidence/test_performance.py "
+    "--ignore=tests/kernel/interfaces/test_performance.py "
+    "--ignore=tests/kernel/query/test_performance.py "
+    "tests/kernel/test_agent_outcome_baseline.py "
+    "tests/kernel/test_ci_performance_qualification.py "
+    "tests/kernel/test_kernel_scope.py "
+    "tests/kernel/test_code_disposition_manifest.py "
+    "tests/kernel/test_retired_surface_manifest.py "
+    "tests/kernel/test_development_efficiency_policy.py "
+    "tests/kernel/test_documentation_authority.py "
+    "tests/kernel/test_fault_recovery_scale.py "
+    "tests/kernel/test_kernel_maintainability.py "
+    "tests/kernel/test_kernel_benchmark.py "
+    "tests/kernel/test_repository_quality_policy.py "
+    "tests/kernel/test_release_candidate.py "
+    "tests/kernel/test_release_028_qualification.py "
+    "tests/kernel/test_release_cutover.py "
+    "tests/kernel/test_schema.py tests/kernel/test_identity.py "
+    "tests/kernel/test_database_lifecycle.py "
+    "tests/kernel/test_cutover_control.py "
+    "tests/kernel/test_source_registry_privacy.py "
+    "tests/kernel/test_ingest_concurrency.py "
+    "tests/kernel/test_ingest_jobs.py "
+    "tests/kernel/test_ingest_lifecycle.py "
+    "tests/kernel/test_ingest_oracle.py "
+    "tests/kernel/test_ingest_pipeline.py "
+    "tests/kernel/test_ingest_privacy.py "
+    "tests/kernel/test_ingest_reconciliation.py "
+    "tests/kernel/test_oracle_equivalence.py "
+    "tests/kernel/test_privacy_oracle.py "
+    "tests/kernel/test_r5_analytical_primitives.py "
+    "tests/kernel/test_source_lifecycle_oracle.py "
+    "tests/kernel/test_stable_contract_028.py "
+    "tests/kernel/test_watcher.py tests/agent_kernel "
+    "tests/experiments/physical-architecture tests/kernel/allowance "
+    "tests/kernel/console tests/kernel/content tests/kernel/evidence "
+    "tests/kernel/interfaces tests/kernel/live tests/kernel/query tests/release -q"
+)
 
 
 def _bytes(payload: Any) -> bytes:
@@ -548,6 +614,56 @@ def collect() -> dict[str, Any]:
                     "recovery",
                 )
             ],
+            "validation_performance": {
+                "metric": "top_threads_p95_ms",
+                "budget_ms": 1_000.0,
+                "observations": [
+                    {
+                        "source": "earlier_just_v_noisy_excursion",
+                        "observed_ms": 1_584.698625,
+                        "passed": False,
+                    },
+                    {
+                        "source": "earlier_dedicated_rerun",
+                        "observed_ms": 555.074708,
+                        "passed": True,
+                    },
+                    {
+                        "source": "earlier_final_just_v",
+                        "observed_ms": 558.04175,
+                        "passed": True,
+                    },
+                    {
+                        "source": "earlier_final_just_vc",
+                        "observed_ms": 546.723792,
+                        "passed": True,
+                    },
+                    {
+                        "source": "phase_b_just_v",
+                        "observed_ms": 559.829542,
+                        "passed": True,
+                    },
+                    {
+                        "source": "phase_b_just_vc",
+                        "observed_ms": 557.664,
+                        "passed": True,
+                    },
+                    {
+                        "source": "phase_b_final_just_v",
+                        "observed_ms": 546.493292,
+                        "passed": True,
+                    },
+                    {
+                        "source": "phase_b_final_just_vc",
+                        "observed_ms": 551.52775,
+                        "passed": True,
+                    },
+                ],
+                "observed_breach_count": 1,
+                "waiver_applied": False,
+                "fresh_phase_b_required_profiles_passed": True,
+                "fresh_phase_b_gate_miss": False,
+            },
         },
         "requalifications": [
             {
@@ -560,20 +676,38 @@ def collect() -> dict[str, Any]:
         ],
         "validation": [
             {
-                "command": (
-                    ".venv/bin/python -m pytest "
-                    "tests/agent_kernel/test_fact_backed_question_oracles.py "
-                    "tests/agent_kernel/test_fact_backed_publication_v2.py "
-                    "tests/experiments/physical-architecture/candidate_a/"
-                    "test_candidate_a_fact_backed_requalification.py -q"
-                ),
-                "result": "passed",
+                "command": PHASE_A_FOCUSED_COMMAND,
+                "result": "passed: 63 tests in 9.77s (final Phase B rerun)",
             },
-            {"command": "just v", "result": "passed"},
-            {"command": "just vc", "result": "passed"},
+            {
+                "command": PHASE_B_AFFECTED_COMMAND,
+                "result": "passed: 414 tests in 26.87s (final Phase B rerun)",
+            },
+            {
+                "command": PHASE_B_FULL_FUNCTIONAL_COMMAND,
+                "result": "passed: 1267 tests in 102.63s",
+            },
+            {
+                "command": "just v",
+                "result": (
+                    "passed: 1267 functional tests; 17 performance observations; "
+                    "zero breaches; top_threads_p95_ms=546.493292"
+                ),
+            },
+            {
+                "command": "just vc",
+                "result": (
+                    "passed: 1267 functional tests; 17 performance observations; "
+                    "zero breaches; top_threads_p95_ms=551.52775; distribution and "
+                    "release-candidate checks passed"
+                ),
+            },
             {
                 "command": (".venv/bin/python scripts/run_performance_suite.py --lane invariants"),
-                "result": "passed_after_recorded_noisy_sample",
+                "result": (
+                    "passed: dedicated rerun top_threads_p95_ms=555.074708 after "
+                    "recorded noisy sample; no waiver applied"
+                ),
             },
         ],
         "review": {
@@ -605,8 +739,10 @@ def collect() -> dict[str, Any]:
             (
                 "One local just-v top_threads_p95_ms sample measured 1584.698625 "
                 "against the 1000 ms budget. A dedicated rerun measured 555.074708, "
-                "the final just-v run measured 558.04175, and just-vc measured "
-                "546.723792 with no breaches; the excursion is recorded as noisy, "
+                "the earlier final just-v and just-vc runs measured 558.04175 and "
+                "546.723792, and fresh Phase B just-v and just-vc measured "
+                "559.829542 and 557.664 before final verification at 546.493292 and "
+                "551.52775 with no breaches; the excursion is recorded as noisy, "
                 "not waived."
             ),
             (

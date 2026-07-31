@@ -285,15 +285,18 @@ commit; no C/D score is fabricated. The CK-04 current-commit growth repetitions
 3 and 4 remain explicitly waived, and no strict five-repetition aggregate is
 claimed.
 
-Local validation passed the focused 115-test profile, the affected 414-test
-profile, `just v` (1,256 functional tests plus static and performance gates),
-and `just vc` including distribution build/release checks. The fresh worktree
+Fresh post-review validation passed the focused 63-test correction profile,
+the affected 414-test profile, the standalone 1,267-test functional profile,
+`just v` (1,267 functional tests plus static and performance gates), and
+`just vc` including distribution build/release checks. The fresh worktree
 required repository-locked `npm ci --include=dev`; lockfiles were unchanged.
 One earlier `just v` sample measured `top_threads_p95_ms` at `1584.698625`
-against the `1000 ms` budget. It was not waived: the dedicated rerun, final
-`just v`, and `just vc` samples passed at `555.074708`, `558.04175`, and
-`546.723792` ms respectively, and the noisy excursion remains recorded in the
-canonical evidence.
+against the `1000 ms` budget. It was not waived: the dedicated rerun and
+earlier final `just v`/`just vc` samples passed at `555.074708`, `558.04175`,
+and `546.723792` ms, while fresh Phase B `just v`/`just vc` passed at
+`559.829542` and `557.664` ms before final verification passed at `546.493292`
+and `551.52775` ms. The noisy excursion remains recorded in the canonical
+evidence.
 
 **Parallelism:** The primary integrator first freezes the shared scenario,
 expected-row, selector, and seam-evidence schemas. Then these lanes may proceed
