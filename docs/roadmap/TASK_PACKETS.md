@@ -7,10 +7,10 @@ in the linked files under [`docs/roadmap/tasks/`](tasks/).
 
 ## Overall
 
-- Completed packets: **10 / 21**
-- In progress: **CK-07D implemented, validated, and reviewed locally; commit/merge acceptance pending**
+- Completed packets: **12 / 22**
+- In progress: **None**
 - Not started: **10**
-- Critical-path completion: **10 / 20**
+- Critical-path completion: **12 / 21**
 - Optional packets: **CK-15**
 
 A packet may be checked only after its acceptance criteria and required checks
@@ -28,8 +28,8 @@ corrective packet's executable producer-to-consumer seam checks.
 
 - [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
 - [x] **M1 — Architecture Selected** · 4 / 4 · CK-01–CK-04 complete
-- [ ] **M2 — Kernel Alpha** · 5 / 9 · CK-05–CK-07, CK-07B, and CK-07C
-  complete; CK-07D implemented locally with acceptance pending; CK-07A and
+- [ ] **M2 — Kernel Alpha** · 7 / 10 · CK-05–CK-07 and CK-07B–CK-07E
+  complete; CK-07A remains 0 / 80 requalified and
   CK-08 blocked; CK-09 not started
 - [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
 - [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
@@ -82,17 +82,22 @@ corrective packet's executable producer-to-consumer seam checks.
   the completion handoff** · corrective dependency discovered by CK-07A after CK-07B;
   depends on CK-07B and retained CK-07A blocker evidence
   · [packet](tasks/ck-07c-freeze-plan-operands-and-missing-facts.md)
-- [ ] **CK-07D — Implement effective-dated rate-card valuation** ·
-  **Implemented, validated, and reviewed locally; commit, CI, merge, and exact-main
-  acceptance pending** · corrective dependency discovered
+- [x] **CK-07D — Implement effective-dated rate-card valuation** ·
+  **Completed on merge via PR #385; exact-main verified at `e49531b`** · corrective dependency discovered
   after CK-07C; depends on merged CK-07C and retained CK-07A/CK-08 blocker
   evidence
   · [packet](tasks/ck-07d-implement-effective-dated-rate-card-valuation.md)
   · [gap evidence](../decisions/evidence/ck07d/effective-dated-valuation-gap.json)
   · [implementation evidence](../decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json)
+- [x] **CK-07E — Implement independent fact adapters** ·
+  **Completed on merge; exact-main verification is recorded in the completion
+  handoff; CK-07A remains 0 / 80 requalified** · prerequisite packet
+  discovered after merged CK-07D; depends on CK-07B, CK-07C, CK-07D, and
+  retained CK-07A/CK-08 blocker evidence
+  · [packet](tasks/ck-07e-implement-independent-fact-adapters.md)
 - [ ] **CK-07A — Reconcile fact-backed oracles and qualify packet seams** ·
-  **Blocked pending CK-07D; not requalified** · depends on CK-07, the CK-08
-  blocker evidence, CK-07B, CK-07C, and CK-07D
+  **Blocked pending CK-07E; 0 / 80 requalified** · depends on CK-07, the CK-08
+  blocker evidence, CK-07B, CK-07C, CK-07D, and CK-07E
   · [packet](tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md)
 - [ ] **CK-08 — Implement query and evidence** · **Blocked — the frozen CK-03
   question oracle rows are not derivable from database-v1 canonical facts;
@@ -139,7 +144,7 @@ corrective packet's executable producer-to-consumer seam checks.
 ## Critical path
 
 `CK-00 → CK-01 → CK-02 → CK-03 → CK-04 → CK-05 → CK-06 → CK-07 → CK-07B
-→ CK-07C → CK-07D → CK-07A → CK-08 → CK-09 → CK-10 → CK-11 → CK-12 → CK-13 →
+→ CK-07C → CK-07D → CK-07E → CK-07A → CK-08 → CK-09 → CK-10 → CK-11 → CK-12 → CK-13 →
 CK-14 → CK-16`
 
 CK-15 remains outside the critical path unless the maintainer explicitly

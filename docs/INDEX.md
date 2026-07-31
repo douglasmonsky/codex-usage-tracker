@@ -30,14 +30,18 @@ Review of its valuation seam then found that the pure compiler applies one
 selected revision to every call without using call event time. Corrective
 packet
 [CK-07D](roadmap/tasks/ck-07d-implement-effective-dated-rate-card-valuation.md)
-is implemented locally with the exact
+is merged through PR #385 at `e49531b` with the exact
 [gap evidence](decisions/evidence/ck07d/effective-dated-valuation-gap.json).
 Its
 [implementation evidence](decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json)
 records the effective-time compiler, immutable publication frontier, schema and
 plan-contract identities, focused requalification, validation, review, and
-remaining merge gates. CK-07A remains blocked and is not requalified or
-complete until CK-07D is merged and exact-main verified.
+historical pre-merge gates. Corrective prerequisite
+[CK-07E](roadmap/tasks/ck-07e-implement-independent-fact-adapters.md) now
+qualifies the two independent normalization paths from structural declarations
+and one query-only database-v1 snapshot into plan facts and ordered evidence.
+CK-07A remains blocked and is 0 / 80 requalified until CK-07E is merged and
+exact-main verified.
 It must still repair CK-03 oracle lineage,
 replace CK-04's candidate-only answer proof, and requalify the unchanged
 CK-05–CK-07 consumer seams before CK-08 may resume. CK-08 remains blocked and

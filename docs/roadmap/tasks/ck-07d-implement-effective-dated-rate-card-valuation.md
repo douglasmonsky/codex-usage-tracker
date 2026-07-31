@@ -1,6 +1,6 @@
 # CK-07D — Implement effective-dated rate-card valuation
 
-**Status:** Implemented, validated, and reviewed locally; commit, CI, merge, and exact-main verification pending
+**Status:** Completed on merge via PR #385; exact-main verified at `e49531b0775c5c7f1043497042c25a200b447bb7`
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -154,7 +154,7 @@ post-merge verification.
     affected match rules, dirties that historical interval, and preserves
     selected digests and values outside it through publication/recovery.
 
-## Local implementation record
+## Implementation and merge record
 
 The implementation and its coupled evidence are recorded in
 [effective-dated-valuation-implementation-evidence.json](../../decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json).
@@ -164,9 +164,12 @@ validation, bounded valuation dirty intervals, corrected pricing coverage, and
 the CK-05/CK-07/CK-07C focused requalification lane. Historical CK-07C evidence
 remains unchanged.
 
-This local state does not satisfy the packet's PR, CI, merge, or exact-main
-acceptance gates. CK-07A remains zero of 80 variants requalified and CK-08
-remains blocked until those gates pass.
+PR #385 passed required CI, merged as
+`e49531b0775c5c7f1043497042c25a200b447bb7`, and was verified as exact
+`origin/main`. The implementation evidence remains the immutable pre-merge
+record; this packet and CK-07E accounting record the merge acceptance. CK-07A
+remains zero of 80 variants requalified and CK-08 remains blocked pending the
+independent fact-adapter prerequisite.
 
 ## Requalification and acceptance
 

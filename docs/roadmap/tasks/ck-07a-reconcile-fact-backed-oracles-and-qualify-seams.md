@@ -1,6 +1,6 @@
 # CK-07A — Reconcile fact-backed oracles and qualify packet seams
 
-**Status:** Blocked pending CK-07D; not requalified
+**Status:** Blocked pending CK-07E; 0 / 80 requalified
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -21,8 +21,19 @@ answers from permitted facts.
 `FORMULA_AND_SELECTOR_CONTRACT.md`,
 `QUERY_EVIDENCE_PROJECTION_CONTRACTS.md`, `QUALIFICATION_PLAN.md`, and the
 [CK-08 blocker evidence](../../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json).
-**Dependencies:** CK-07, CK-07B, CK-07C, and CK-07D merged and verified;
+**Dependencies:** CK-07, CK-07B, CK-07C, CK-07D, and CK-07E merged and verified;
 CK-08 blocker evidence merged.
+
+## CK-07E resume authority
+
+Consume only CK-07E's merged `StructuralReferenceFactAdapter` and
+`DatabaseV1FactAdapter`, their frozen structural declaration/evidence
+interfaces, and their durable parity/provenance/lifecycle evidence. CK-07A
+must invoke each adapter through its own input lane and may compare normalized
+facts, requests, and references, but neither lane may consume computed output
+from the other. CK-07E proves adapter prerequisites only and contributes
+0 / 80 complete answer comparisons; CK-07A still owns all expected rows,
+Candidate A scoring/timing, and CK-03 through CK-07 evidence refresh.
 
 ## CK-07D resume authority
 

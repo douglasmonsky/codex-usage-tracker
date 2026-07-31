@@ -1,0 +1,171 @@
+{
+  "schema": "codex-usage-tracker.ck07e-independent-fact-adapters-evidence.v1",
+  "packet": "CK-07E",
+  "status": "complete_on_merge_exact_main_pending",
+  "base": {
+    "ref": "feature/ck07e-independent-fact-adapters",
+    "sha": "e49531b0775c5c7f1043497042c25a200b447bb7",
+    "authority_pr": "https://github.com/douglasmonsky/codex-usage-tracker/pull/385"
+  },
+  "authority": {
+    "database_v1_schema_contract_digest": "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5",
+    "logical_contract_sha256": "27981ec9bac8c245306e02784b8730e8ff9216b33a81da9efb8409403431fe3d",
+    "logical_vector_bundle_digest": "87b9d08a8d1186ab1e3eb794f58d17fd28b991e210fc0144713f1299ab224b2c",
+    "plan_operand_contract_sha256": "19b9c69f50f67b01321e1f269cee2f70370ca64c0c666ff4dac2cc52efa314b4",
+    "plan_operand_schema_sha256": "619b4f4e546def5a44bfd97d7ab9778fea204aca6cfc32cec3f7a92d54a037e8",
+    "plan_operand_vectors_sha256": "cc4d944354356136c45c6a22aa0a289849fe6c4804e4a5d5bd5574cac1ab72c2",
+    "selector_contract_sha256": "1a5ad492d7684b8050a71606af918d0e5964fffd32826c5ae0479d829131b41b",
+    "selector_schema_sha256": "c1ece7b92795a138a288b011139d1d238f8cdebb59368d45a76a4c1a3cb8b4af",
+    "ck07d_gap_evidence_sha256": "4e47170e4ffaa37bb85f6d0fdb79b6ab2d7a9e2a7c0c5c2e9d33fd6e82c5cd16",
+    "ck07d_implementation_evidence_sha256": "92947b3e956244370ce6b8b6250e365aca695802c8b57bdd9cf918714ce01872",
+    "analytical_sql_sha256": "4341ce05b119c44c83865b434751cd8569bad5445de26be2e8ceaa9345ada820"
+  },
+  "adapters": {
+    "reference": {
+      "path": "tests/agent_kernel/fact_adapters/reference.py",
+      "sha256": "03dbf06b3a3a6cc4590e7521bcb1a1bd7764ad989b45dcdf8591ef1b10fff19d",
+      "symbols": [
+        "StructuralReferenceFactAdapter",
+        "AdapterMaterialization",
+        "EvidenceReference",
+        "StructuralReferenceAdapterError"
+      ],
+      "sqlite_access": false,
+      "production_query_access": false
+    },
+    "database_v1": {
+      "path": "tests/agent_kernel/fact_adapters/database.py",
+      "sha256": "7005b1a06fdc1d866b5aa7d100eb5349f43fbb017aae6b876d60f1dd275f6e00",
+      "symbols": [
+        "DatabaseV1FactAdapter",
+        "DatabaseV1FactMaterialization",
+        "EvidenceReferenceV1",
+        "DatabaseAdapterContractError"
+      ],
+      "query_only_required": true,
+      "single_read_snapshot": true,
+      "persisted_relation_allowlist_count": 15,
+      "derived_relations": [
+        "valuation_match"
+      ],
+      "persisted_relation_allowlist": [
+        "allowance_observation",
+        "canonical_call",
+        "compaction_boundary",
+        "context_component",
+        "model_profile",
+        "project",
+        "publication",
+        "publication_delta",
+        "resource",
+        "session",
+        "source_manifestation",
+        "source_occurrence",
+        "state_change",
+        "tool_invocation",
+        "turn"
+      ]
+    },
+    "shared_computed_output": false,
+    "production_code_changed": false,
+    "database_v1_ddl_changed": false,
+    "synthetic_support": {
+      "path": "tests/agent_kernel/fact_adapters/support.py",
+      "sha256": "7ff92efd20ef7fe1226d1b04746b0d5b1efa40cb8cb98ad4c9f6b22441713e1d"
+    },
+    "contract_tests": {
+      "path": "tests/agent_kernel/fact_adapters/test_contracts.py",
+      "sha256": "43336e5bc22577dae47a7aaa3494e9443431d0c94e51ddda1a9bb1779a4de12c"
+    }
+  },
+  "qualification": {
+    "plan_contracts_compared": 40,
+    "normalized_plan_parity_failures": 0,
+    "fact_relations_covered": 16,
+    "fact_relations": [
+      "allowance_observation",
+      "canonical_call",
+      "compaction_boundary",
+      "context_component",
+      "model_profile",
+      "project",
+      "publication",
+      "publication_delta",
+      "resource",
+      "session",
+      "source_manifestation",
+      "source_occurrence",
+      "state_change",
+      "tool_invocation",
+      "turn",
+      "valuation_match"
+    ],
+    "selector_kinds": 14,
+    "provenance_kinds": 6,
+    "ordered_evidence_references_compared": 559,
+    "ordered_evidence_reference_failures": 0,
+    "lifecycle_variants": [
+      "initial",
+      "rebuild",
+      "replacement",
+      "late_event"
+    ],
+    "lifecycle_parity_failures": 0,
+    "ck07a_answer_comparisons": 0,
+    "ck04_scoring_or_timing_updated": false,
+    "ck03_through_ck07_evidence_refreshed": false
+  },
+  "valuation_reconciliation": {
+    "selection": "greatest matching captured revision with effective_at_us <= call.event_at_us",
+    "precedence": "effective-time recency first; exact profile before alias only at equal effective time",
+    "fetched_at_role": "provenance_only",
+    "selected_revision_digest_in_identity": true,
+    "typed_missing_measurement_proved": true,
+    "configured_estimate_excludes_unpriced": true,
+    "bounded_backdated_dirty_interval_proved": true,
+    "persisted_call_price_assignment": false,
+    "answer_cache": false,
+    "time_blind_singular_card_seam": false
+  },
+  "synthetic_privacy": {
+    "schema": "codex-usage-tracker.synthetic-structural-v2.v1",
+    "initial_declaration_rows": 52,
+    "initial_source_occurrences": 25,
+    "initial_jsonl_bytes": 24378,
+    "late_event_declaration_rows": 55,
+    "late_event_source_occurrences": 27,
+    "late_event_jsonl_bytes": 25898,
+    "real_codex_content_used": false,
+    "body_fields_used": false,
+    "expected_or_oracle_rows_emitted": false,
+    "grading_or_comparison_output_emitted": false,
+    "secrets_or_private_paths_emitted": false
+  },
+  "validation": {
+    "focused_ck07e": "31 passed in 1.19s after accepted review and follow-up corrections",
+    "coupled_kernel_storage_publication": "317 passed in 15.30s after accepted review and follow-up corrections",
+    "just_v": "passed final post-review state: 1241 tests in 111.31s, 13 performance invariants with zero breaches, lint, type, maintainability, frontend, and release-safety checks",
+    "just_vc": "passed final post-review state: 1241 tests in 102s, 13 performance invariants with zero breaches, then complete sdist and wheel checks",
+    "transient_nonblocking_breaches": [
+      "just vc repeated invariant sample observed allowance_read_p95_ms 627.07078 > 550.0; preceding just v measured 491.310506"
+    ],
+    "git_diff_check": "passed within both broad gates",
+    "gitnexus_bootstrap_check": "passed with repository-private GitNexus 1.6.9",
+    "gitnexus_detect_changes": "passed on the exact staged diff against origin/main: 19 files, 37 symbols, 0 affected processes, low risk",
+    "final_review": "eight findings accepted and corrected; four focused follow-up gaps corrected; final reviewer reports no actionable findings and safe to commit",
+    "review_measurement": "aggregate reviewer token attribution unavailable because installed usage tracker has no strict command; reviewer_calls and token totals unavailable without retry",
+    "required_ci": "pending",
+    "exact_main": "pending"
+  },
+  "completion": {
+    "pull_request": null,
+    "merged_sha": null,
+    "ck07a_resume_ready": "after merge and exact-main verification",
+    "ck08_status": "blocked"
+  },
+  "residual_risks": [
+    "Qualification is synthetic and test-only; CK-07A still owns all 80 complete answer comparisons.",
+    "Candidate A scoring and timing and CK-03 through CK-07 evidence remain intentionally unchanged.",
+    "CK-04 growth repetitions 3 and 4 remain waived; strict v2 aggregate success is not claimed."
+  ]
+}

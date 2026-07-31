@@ -80,6 +80,18 @@ recorded in
 That local evidence does not unblock CK-07A or CK-08 before merge and
 exact-main verification.
 
+CK-07E is the final L0 adapter prerequisite before CK-07A. A structural
+reference adapter and a separately implemented query-only database-v1 adapter
+must independently emit equivalent normalized `CanonicalFact` rows,
+`PlanRequest`, and exact ordered owner-specific evidence. Qualification covers
+every plan relation/fact family, all 14 selector owners, typed non-placeholder
+provenance, NULL/empty/ties/order/no-window behavior, effective-dated
+valuation and unpriced coverage, import/source independence, privacy, and
+clean rebuild/replacement/late-event stability. These comparisons stop at the
+fact/request/evidence boundary: CK-07E must record 0 / 80 CK-07A answer
+comparisons and cannot update CK-04 scoring or CK-03 through CK-07 seam
+evidence.
+
 ## Synthetic fixture strategy
 
 Fixtures contain no real local usage records or raw content. A deterministic
