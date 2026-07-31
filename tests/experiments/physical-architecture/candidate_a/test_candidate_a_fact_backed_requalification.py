@@ -183,7 +183,7 @@ def test_legacy_authorizer_stays_guarded_then_restores_normal_query_only_reads(
 
 def _latest_publication_delta_plan_fixture(
     publication_head_plan: tuple[str, ...],
-) -> tuple[tuple[str, ...], ...]:
+) -> tuple[tuple[str, ...], tuple[tuple[str, ...], ...]]:
     remaining_statements = tuple(
         (
             *((f"SEARCH approved_{index} USING INDEX approved_index_{index}",) * (2 if index < 13 else 1)),
@@ -191,7 +191,11 @@ def _latest_publication_delta_plan_fixture(
         )
         for index in range(19)
     )
-    return (publication_head_plan, *remaining_statements)
+    statements = (
+        queries._DETAILED_PUBLICATION_HEAD_SQL_PREFIX + "synthetic bounded fixture",  # noqa: SLF001
+        *(f"SELECT approved_{index}" for index in range(19)),
+    )
+    return statements, (publication_head_plan, *remaining_statements)
 
 
 @pytest.mark.parametrize(
@@ -201,12 +205,16 @@ def _latest_publication_delta_plan_fixture(
         (queries._LATEST_PUBLICATION_HEAD_PLAN_WITH_BOUNDED_SORT, 49, 7),  # noqa: SLF001
     ],
 )
-def test_latest_publication_delta_accepts_only_enumerated_bounded_planner_shapes(
+@pytest.mark.parametrize("plan_id", ["latest_publication_delta", "data_health"])
+def test_fact_backed_plans_accept_only_enumerated_bounded_publication_shapes(
+    plan_id: str,
     publication_head_plan: tuple[str, ...],
     raw_plan_rows: int,
     raw_temporary_sorts: int,
 ) -> None:
-    statement_plans = _latest_publication_delta_plan_fixture(publication_head_plan)
+    planned_statements, statement_plans = _latest_publication_delta_plan_fixture(
+        publication_head_plan
+    )
     (
         query_plans,
         bounded_plan_rows,
@@ -215,7 +223,8 @@ def test_latest_publication_delta_accepts_only_enumerated_bounded_planner_shapes
         observed_temporary_sorts,
         bounded_temporary_sorts,
     ) = queries._bounded_fact_backed_plan_metrics(  # noqa: SLF001
-        "latest_publication_delta",
+        plan_id,
+        planned_statements,
         statement_plans,
     )
 
@@ -233,11 +242,12 @@ def test_latest_publication_delta_rejects_unenumerated_planner_shape() -> None:
         *queries._LATEST_PUBLICATION_HEAD_PLAN,  # noqa: SLF001
         "SCAN publications",
     )
-    statement_plans = _latest_publication_delta_plan_fixture(unapproved)
+    planned_statements, statement_plans = _latest_publication_delta_plan_fixture(unapproved)
 
     with pytest.raises(ValueError, match="unapproved shape"):
         queries._bounded_fact_backed_plan_metrics(  # noqa: SLF001
             "latest_publication_delta",
+            planned_statements,
             statement_plans,
         )
 

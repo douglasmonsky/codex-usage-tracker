@@ -669,6 +669,7 @@ _LATEST_PUBLICATION_HEAD_PLAN_WITH_BOUNDED_SORT = (
     *_LATEST_PUBLICATION_HEAD_PLAN,
     "USE TEMP B-TREE FOR ORDER BY",
 )
+_DETAILED_PUBLICATION_HEAD_SQL_PREFIX = "SELECT p.publication_id, ( SELECT json_group_object("
 _SQLITE_WRITE_ACTIONS = frozenset(
     action
     for action in (
@@ -722,28 +723,33 @@ def _restore_normal_authorizer(connection: sqlite3.Connection) -> None:
 
 def _bounded_fact_backed_plan_metrics(
     plan_id: str,
+    planned_statements: tuple[str, ...],
     statement_plans: tuple[tuple[str, ...], ...],
 ) -> tuple[tuple[str, ...], int, int, int, int, int]:
     query_plans = tuple(plan for plans in statement_plans for plan in plans)
     full_scans, automatic_indexes, raw_temporary_sorts = _plan_counts(query_plans)
     bounded_plan_rows = len(query_plans)
     bounded_temporary_sorts = raw_temporary_sorts
-    if plan_id == "latest_publication_delta":
-        publication_head_plan = statement_plans[0] if statement_plans else ()
-        if publication_head_plan == _LATEST_PUBLICATION_HEAD_PLAN:
-            pass
-        elif publication_head_plan == _LATEST_PUBLICATION_HEAD_PLAN_WITH_BOUNDED_SORT:
-            # Some supported SQLite builds retain the ORDER BY sorter even
-            # though publication_head(singleton=1) and the publication PK make
-            # the input cardinality exactly one. Accept only that complete,
-            # explicitly enumerated indexed shape.
-            bounded_plan_rows -= 1
-            bounded_temporary_sorts -= 1
-        else:
-            raise ValueError(
-                "candidate A latest publication head plan has an unapproved shape: "
-                f"{publication_head_plan!r}"
-            )
+    publication_head_shapes = tuple(
+        statement_plans[index]
+        for index, statement in enumerate(planned_statements)
+        if statement.startswith(_DETAILED_PUBLICATION_HEAD_SQL_PREFIX)
+    )
+    if publication_head_shapes in ((), (_LATEST_PUBLICATION_HEAD_PLAN,)):
+        pass
+    elif publication_head_shapes == (_LATEST_PUBLICATION_HEAD_PLAN_WITH_BOUNDED_SORT,):
+        # Some supported SQLite builds retain the ORDER BY sorter even though
+        # publication_head(singleton=1) and the publication PK make the input
+        # cardinality exactly one. Normalize only that complete, explicitly
+        # enumerated indexed shape when the shared detailed-publication
+        # statement appears in the trace.
+        bounded_plan_rows -= 1
+        bounded_temporary_sorts -= 1
+    else:
+        raise ValueError(
+            f"candidate A publication head plan has an unapproved shape for {plan_id}: "
+            f"{publication_head_shapes!r}"
+        )
     return (
         query_plans,
         bounded_plan_rows,
@@ -837,9 +843,10 @@ def run_fact_backed_question(
         )
         # Keep the restrictive authorizer installed while compiling plans so a
         # traced statement can never escape the per-plan source allowlist.
+        planned_statements = tuple(dict.fromkeys(read_statements))
         statement_plans = tuple(
             tuple(str(row[3]) for row in connection.execute("EXPLAIN QUERY PLAN " + statement))
-            for statement in dict.fromkeys(read_statements)
+            for statement in planned_statements
         )
     finally:
         connection.set_trace_callback(None)
@@ -878,7 +885,7 @@ def run_fact_backed_question(
         automatic_indexes,
         temporary_sorts,
         bounded_temporary_sorts,
-    ) = _bounded_fact_backed_plan_metrics(plan_id, statement_plans)
+    ) = _bounded_fact_backed_plan_metrics(plan_id, planned_statements, statement_plans)
     maximum_statements, maximum_plan_rows, maximum_scans, maximum_sorts = FACT_BACKED_PLAN_RULES[
         plan_id
     ]
