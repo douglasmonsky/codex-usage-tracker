@@ -93,6 +93,12 @@ src/codex_usage_tracker/agent_kernel/
 └── qualification/
 ```
 
+CK-08 materializes the `query/` and `evidence/` ownership nodes as internal
+query-only services. Their dependencies point to domain contracts and storage
+read boundaries; they do not depend on application refresh/publication,
+interfaces, test adapters, or expected-answer artifacts. Public CLI/MCP
+exposure and physical projections remain later-packet work.
+
 ```mermaid
 flowchart TB
     IF[interfaces] --> APP[application]

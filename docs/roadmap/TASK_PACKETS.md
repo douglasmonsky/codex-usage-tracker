@@ -28,8 +28,8 @@ corrective packet's executable producer-to-consumer seam checks.
 
 - [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
 - [x] **M1 — Architecture Selected** · 4 / 4 · CK-01–CK-04 complete
-- [ ] **M2 — Kernel Alpha** · 8 / 10 · CK-05–CK-07, CK-07B–CK-07E, and
-  CK-07A complete; CK-08 is ready and CK-09 is not started
+- [ ] **M2 — Kernel Alpha** · 9 / 10 · CK-05–CK-08, CK-07B–CK-07E, and
+  CK-07A complete; CK-09 is ready and not started
 - [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
 - [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
 - [ ] **M5 — Public Release** · 0 / 1 required · CK-16 not started
@@ -98,13 +98,15 @@ corrective packet's executable producer-to-consumer seam checks.
   **Completed; 80 / 80 fact-backed variants requalified** · depends on CK-07, the CK-08
   blocker evidence, CK-07B, CK-07C, CK-07D, and CK-07E
   · [packet](tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md)
-- [ ] **CK-08 — Implement query and evidence** · **Ready — CK-07A replaced the
-  historical fact-backed oracle gap; the original
+- [x] **CK-08 — Implement query and evidence** · **Completed on merge; 21 plans
+  and 42 variants passed, with 3 fact-table-sufficient and 18 measured
+  projection-required classifications — CK-07A replaced the historical
+  fact-backed oracle gap; the original
   [gap evidence](../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)
   remains preserved** ·
   depends on CK-07A
   · [packet](tasks/ck-08-implement-query-and-evidence.md)
-- [ ] **CK-09 — Admit projections and named plans** · Not started ·
+- [ ] **CK-09 — Admit projections and named plans** · Ready; not started ·
   depends on CK-08
   · [packet](tasks/ck-09-admit-projections-and-named-plans.md)
 
