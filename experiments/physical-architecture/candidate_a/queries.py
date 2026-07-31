@@ -653,6 +653,22 @@ FACT_BACKED_PLAN_RULES = {
     "uncached_input_jumps": (9, 28, 5, 2),
     "weekly_review": (23, 75, 15, 8),
 }
+_LATEST_PUBLICATION_HEAD_PLAN = (
+    "SEARCH h USING PRIMARY KEY (singleton=?)",
+    "SEARCH p USING PRIMARY KEY (publication_id=?)",
+    "CORRELATED SCALAR SUBQUERY 1",
+    "SEARCH c USING PRIMARY KEY (publication_id=?)",
+    "CORRELATED SCALAR SUBQUERY 2",
+    "SEARCH e USING PRIMARY KEY (publication_id=?)",
+    "CORRELATED SCALAR SUBQUERY 3",
+    "SEARCH c USING PRIMARY KEY (publication_id=? AND capability_id=?)",
+    "CORRELATED SCALAR SUBQUERY 4",
+    "SEARCH c USING PRIMARY KEY (publication_id=? AND capability_id=?)",
+)
+_LATEST_PUBLICATION_HEAD_PLAN_WITH_BOUNDED_SORT = (
+    *_LATEST_PUBLICATION_HEAD_PLAN,
+    "USE TEMP B-TREE FOR ORDER BY",
+)
 _SQLITE_WRITE_ACTIONS = frozenset(
     action
     for action in (
@@ -702,6 +718,40 @@ def _restore_normal_authorizer(connection: sqlite3.Connection) -> None:
     # A no-op callback is the only supported way to restore normal reads there.
     callback = None if _AUTHORIZER_NONE_SUPPORTED else _allow_all_authorizer
     connection.set_authorizer(callback)
+
+
+def _bounded_fact_backed_plan_metrics(
+    plan_id: str,
+    statement_plans: tuple[tuple[str, ...], ...],
+) -> tuple[tuple[str, ...], int, int, int, int, int]:
+    query_plans = tuple(plan for plans in statement_plans for plan in plans)
+    full_scans, automatic_indexes, raw_temporary_sorts = _plan_counts(query_plans)
+    bounded_plan_rows = len(query_plans)
+    bounded_temporary_sorts = raw_temporary_sorts
+    if plan_id == "latest_publication_delta":
+        publication_head_plan = statement_plans[0] if statement_plans else ()
+        if publication_head_plan == _LATEST_PUBLICATION_HEAD_PLAN:
+            pass
+        elif publication_head_plan == _LATEST_PUBLICATION_HEAD_PLAN_WITH_BOUNDED_SORT:
+            # Some supported SQLite builds retain the ORDER BY sorter even
+            # though publication_head(singleton=1) and the publication PK make
+            # the input cardinality exactly one. Accept only that complete,
+            # explicitly enumerated indexed shape.
+            bounded_plan_rows -= 1
+            bounded_temporary_sorts -= 1
+        else:
+            raise ValueError(
+                "candidate A latest publication head plan has an unapproved shape: "
+                f"{publication_head_plan!r}"
+            )
+    return (
+        query_plans,
+        bounded_plan_rows,
+        full_scans,
+        automatic_indexes,
+        raw_temporary_sorts,
+        bounded_temporary_sorts,
+    )
 
 
 def run_fact_backed_question(
@@ -787,10 +837,9 @@ def run_fact_backed_question(
         )
         # Keep the restrictive authorizer installed while compiling plans so a
         # traced statement can never escape the per-plan source allowlist.
-        query_plans = tuple(
-            str(row[3])
+        statement_plans = tuple(
+            tuple(str(row[3]) for row in connection.execute("EXPLAIN QUERY PLAN " + statement))
             for statement in dict.fromkeys(read_statements)
-            for row in connection.execute("EXPLAIN QUERY PLAN " + statement)
         )
     finally:
         connection.set_trace_callback(None)
@@ -822,24 +871,32 @@ def run_fact_backed_question(
         ],
     }
     encoded = shared.canonical_json_bytes(payload)
-    full_scans, automatic_indexes, temporary_sorts = _plan_counts(query_plans)
+    (
+        query_plans,
+        bounded_plan_rows,
+        full_scans,
+        automatic_indexes,
+        temporary_sorts,
+        bounded_temporary_sorts,
+    ) = _bounded_fact_backed_plan_metrics(plan_id, statement_plans)
     maximum_statements, maximum_plan_rows, maximum_scans, maximum_sorts = FACT_BACKED_PLAN_RULES[
         plan_id
     ]
     if (
         len(read_statements) > maximum_statements
-        or len(query_plans) > maximum_plan_rows
+        or bounded_plan_rows > maximum_plan_rows
         or full_scans > maximum_scans
         or automatic_indexes
-        or temporary_sorts > maximum_sorts
+        or bounded_temporary_sorts > maximum_sorts
     ):
         raise ValueError(
             "candidate A fact-backed query plan escaped bounds for "
             f"{plan_id}: statements={len(read_statements)}/{maximum_statements}, "
-            f"plan_rows={len(query_plans)}/{maximum_plan_rows}, "
+            f"plan_rows={len(query_plans)} raw, {bounded_plan_rows}/{maximum_plan_rows} bounded, "
             f"full_scans={full_scans}/{maximum_scans}, "
             f"automatic_indexes={automatic_indexes}/0, "
-            f"temporary_sorts={temporary_sorts}/{maximum_sorts}, "
+            f"temporary_sorts={temporary_sorts} raw, "
+            f"{bounded_temporary_sorts}/{maximum_sorts} bounded, "
             f"plans={query_plans!r}"
         )
     return QueryResult(

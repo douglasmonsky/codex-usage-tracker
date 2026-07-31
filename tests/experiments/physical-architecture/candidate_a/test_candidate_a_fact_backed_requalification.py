@@ -181,6 +181,67 @@ def test_legacy_authorizer_stays_guarded_then_restores_normal_query_only_reads(
     connection.close()
 
 
+def _latest_publication_delta_plan_fixture(
+    publication_head_plan: tuple[str, ...],
+) -> tuple[tuple[str, ...], ...]:
+    remaining_statements = tuple(
+        (
+            *((f"SEARCH approved_{index} USING INDEX approved_index_{index}",) * (2 if index < 13 else 1)),
+            *(("USE TEMP B-TREE FOR ORDER BY",) if index < 6 else ()),
+        )
+        for index in range(19)
+    )
+    return (publication_head_plan, *remaining_statements)
+
+
+@pytest.mark.parametrize(
+    ("publication_head_plan", "raw_plan_rows", "raw_temporary_sorts"),
+    [
+        (queries._LATEST_PUBLICATION_HEAD_PLAN, 48, 6),  # noqa: SLF001
+        (queries._LATEST_PUBLICATION_HEAD_PLAN_WITH_BOUNDED_SORT, 49, 7),  # noqa: SLF001
+    ],
+)
+def test_latest_publication_delta_accepts_only_enumerated_bounded_planner_shapes(
+    publication_head_plan: tuple[str, ...],
+    raw_plan_rows: int,
+    raw_temporary_sorts: int,
+) -> None:
+    statement_plans = _latest_publication_delta_plan_fixture(publication_head_plan)
+    (
+        query_plans,
+        bounded_plan_rows,
+        full_scans,
+        automatic_indexes,
+        observed_temporary_sorts,
+        bounded_temporary_sorts,
+    ) = queries._bounded_fact_backed_plan_metrics(  # noqa: SLF001
+        "latest_publication_delta",
+        statement_plans,
+    )
+
+    assert len(statement_plans) == 20
+    assert len(query_plans) == raw_plan_rows
+    assert bounded_plan_rows == 48
+    assert full_scans == 0
+    assert automatic_indexes == 0
+    assert observed_temporary_sorts == raw_temporary_sorts
+    assert bounded_temporary_sorts == 6
+
+
+def test_latest_publication_delta_rejects_unenumerated_planner_shape() -> None:
+    unapproved = (
+        *queries._LATEST_PUBLICATION_HEAD_PLAN,  # noqa: SLF001
+        "SCAN publications",
+    )
+    statement_plans = _latest_publication_delta_plan_fixture(unapproved)
+
+    with pytest.raises(ValueError, match="unapproved shape"):
+        queries._bounded_fact_backed_plan_metrics(  # noqa: SLF001
+            "latest_publication_delta",
+            statement_plans,
+        )
+
+
 def test_fact_backed_candidate_has_no_generic_sql_or_refresh_parameter() -> None:
     parameters = inspect.signature(queries.run_fact_backed_question).parameters
     assert "sql" not in parameters
