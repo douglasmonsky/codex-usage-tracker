@@ -603,6 +603,32 @@ CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS = frozenset(
     }
 )
 
+CK07A_FACT_BACKED_REQUALIFICATION_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json",
+        "scripts/collect_ck07a_evidence.py",
+        "scripts/generate_ck07a_fixture.py",
+        "tests/agent_kernel/fixtures/oracles/cases_v2.py",
+        "tests/agent_kernel/fixtures/oracles/database_replay.py",
+        "tests/agent_kernel/fixtures/oracles/exact.py",
+        "tests/agent_kernel/fixtures/oracles/reference.py",
+        "tests/agent_kernel/fixtures/oracles/seam_evidence.py",
+        "tests/agent_kernel/fixtures/published_v2.py",
+        "tests/agent_kernel/fixtures/tiny-v2/manifest.json",
+        "tests/agent_kernel/fixtures/tiny-v2/oracle-bundle.json",
+        "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json",
+        "tests/agent_kernel/fixtures/tiny-v2/sources/base.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v2/sources/late-missing.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v2/sources/late.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v2/sources/missing.jsonl",
+        "tests/agent_kernel/fixtures/tiny-v2/sources/variant-mutations.jsonl",
+        "tests/agent_kernel/test_ck07a_evidence.py",
+        "tests/agent_kernel/test_fact_backed_publication_v2.py",
+        "tests/agent_kernel/test_fact_backed_question_oracles.py",
+        "tests/experiments/physical-architecture/candidate_a/test_candidate_a_fact_backed_requalification.py",
+    }
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -655,6 +681,7 @@ INTEGRATION_ADDITIONS = (
     | CK07C_PLAN_OPERAND_FACT_ADDITIONS
     | CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS
     | CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS
+    | CK07A_FACT_BACKED_REQUALIFICATION_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )

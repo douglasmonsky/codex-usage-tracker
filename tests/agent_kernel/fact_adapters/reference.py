@@ -32,6 +32,81 @@ class StructuralReferenceAdapterError(ValueError):
     """The structural declaration cannot satisfy the adapter contract."""
 
 
+def _attach_occurrence_event_coordinates(
+    facts: Sequence[CanonicalFact],
+) -> list[CanonicalFact]:
+    entity_coordinates = {
+        fact.logical_id: fact.coordinates
+        for fact in facts
+        if fact.relation != "source_occurrence"
+        and fact.coordinates is not None
+        and fact.coordinates.event_at_us is not None
+    }
+    manifestation_events: dict[str, int] = {}
+    for fact in facts:
+        if fact.relation != "source_occurrence":
+            continue
+        semantic_logical_id = fact.values.get("semantic_logical_id")
+        target = (
+            entity_coordinates.get(semantic_logical_id)
+            if isinstance(semantic_logical_id, str)
+            else None
+        )
+        manifestation_id = fact.values.get("source_manifestation_id")
+        if (
+            target is not None
+            and target.event_at_us is not None
+            and isinstance(manifestation_id, str)
+        ):
+            prior = manifestation_events.get(manifestation_id)
+            manifestation_events[manifestation_id] = (
+                target.event_at_us if prior is None else min(prior, target.event_at_us)
+            )
+    normalized: list[CanonicalFact] = []
+    for fact in facts:
+        coordinates = fact.coordinates
+        if fact.relation == "source_occurrence" and coordinates is not None:
+            semantic_logical_id = fact.values.get("semantic_logical_id")
+            target = (
+                entity_coordinates.get(semantic_logical_id)
+                if isinstance(semantic_logical_id, str)
+                else None
+            )
+            if target is None:
+                continue
+            coordinates = FactCoordinates(
+                event_at_us=target.event_at_us,
+                source_rank=coordinates.source_rank,
+                source_order=coordinates.source_order,
+                event_kind_order=coordinates.event_kind_order,
+                transition_rank=coordinates.transition_rank,
+            )
+        elif (
+            fact.relation == "source_manifestation"
+            and coordinates is not None
+            and coordinates.event_at_us is None
+        ):
+            event_at_us = manifestation_events.get(fact.logical_id)
+            if event_at_us is None:
+                continue
+            coordinates = FactCoordinates(
+                event_at_us=event_at_us,
+                source_rank=coordinates.source_rank,
+                source_order=coordinates.source_order,
+                event_kind_order=coordinates.event_kind_order,
+                transition_rank=coordinates.transition_rank,
+            )
+        normalized.append(
+            CanonicalFact(
+                relation=fact.relation,
+                logical_id=fact.logical_id,
+                values=fact.values,
+                coordinates=coordinates,
+            )
+        )
+    return normalized
+
+
 @dataclass(frozen=True, slots=True)
 class EvidenceReference:
     """One owner-resolved selector and its typed provenance."""
@@ -187,6 +262,13 @@ def _integer(value: Any, label: str, *, nullable: bool = False) -> int | None:
     return value
 
 
+def _required_integer(value: Any, label: str) -> int:
+    parsed = _integer(value, label)
+    if parsed is None:
+        raise StructuralReferenceAdapterError(f"{label} must be an integer")
+    return parsed
+
+
 def _coordinates(raw: Mapping[str, Any], label: str) -> FactCoordinates:
     source = raw.get("coordinates", raw)
     if source is None:
@@ -194,10 +276,14 @@ def _coordinates(raw: Mapping[str, Any], label: str) -> FactCoordinates:
     source = _mapping(source, f"{label}.coordinates")
     return FactCoordinates(
         event_at_us=_integer(source.get("event_at_us"), f"{label}.event_at_us", nullable=True),
-        source_rank=_integer(source.get("source_rank", 0), f"{label}.source_rank"),
-        source_order=_integer(source.get("source_order", 0), f"{label}.source_order"),
-        event_kind_order=_integer(source.get("event_kind_order", 0), f"{label}.event_kind_order"),
-        transition_rank=_integer(source.get("transition_rank", 0), f"{label}.transition_rank"),
+        source_rank=_required_integer(source.get("source_rank", 0), f"{label}.source_rank"),
+        source_order=_required_integer(source.get("source_order", 0), f"{label}.source_order"),
+        event_kind_order=_required_integer(
+            source.get("event_kind_order", 0), f"{label}.event_kind_order"
+        ),
+        transition_rank=_required_integer(
+            source.get("transition_rank", 0), f"{label}.transition_rank"
+        ),
     )
 
 
@@ -226,6 +312,11 @@ def _selected_fact_values(
     fields: frozenset[str],
 ) -> dict[str, Any]:
     selected = {key: value for key, value in values.items() if key in fields}
+    if relation == "allowance_observation":
+        for field in ("allowance_percent", "used_percent", "remaining_percent"):
+            value = selected.get(field)
+            if isinstance(value, str):
+                selected[field] = Decimal(value)
     if relation != "tool_invocation":
         return selected
     links = selected.get("resource_links")
@@ -400,8 +491,17 @@ class StructuralReferenceFactAdapter:
             raise StructuralReferenceAdapterError(
                 f"scenario has no permitted facts for {request.plan_id}"
             )
+        facts = _attach_occurrence_event_coordinates(facts)
         references = self._evidence(declarations, request, required_evidence, raw_facts)
-        ordered = tuple(sorted(facts, key=lambda fact: fact.coordinates.key(fact.logical_id)))
+
+        def fact_key(fact: CanonicalFact) -> tuple[int, int, int, int, int, str]:
+            if fact.coordinates is None:
+                raise StructuralReferenceAdapterError(
+                    f"{fact.relation} fact has no total-order coordinates"
+                )
+            return fact.coordinates.key(fact.logical_id)
+
+        ordered = tuple(sorted(facts, key=fact_key))
         return AdapterMaterialization(
             request=request,
             facts=ordered,
@@ -523,7 +623,12 @@ class StructuralReferenceFactAdapter:
                     validation_status=value["validation_status"],
                 )
             )
-        return RateCardFrontier(head_digest=raw.get("head_digest"), revisions=tuple(typed))
+        head_digest = raw.get("head_digest")
+        if not isinstance(head_digest, str) or not head_digest:
+            raise StructuralReferenceAdapterError(
+                "rate-card frontier head_digest must be a non-empty string"
+            )
+        return RateCardFrontier(head_digest=head_digest, revisions=tuple(typed))
 
     def _valuation_facts(
         self,
@@ -580,14 +685,22 @@ class StructuralReferenceFactAdapter:
         for match in matches:
             values = {
                 "call_id": match.call_id,
-                "configured_cost_usd": match.configured_cost_usd,
+                "configured_cost_usd": (
+                    Decimal(match.configured_cost_usd)
+                    if match.configured_cost_usd is not None
+                    else None
+                ),
                 "coverage_basis": {
                     "cost": match.cost_coverage,
                     "credit": match.credit_coverage,
                     "rate_card_digest": match.rate_card_digest,
                 },
                 "cost_grade": match.cost_grade,
-                "estimated_credits": match.estimated_credits,
+                "estimated_credits": (
+                    Decimal(match.estimated_credits)
+                    if match.estimated_credits is not None
+                    else None
+                ),
                 "match_basis": match.match_basis,
                 "rate_card_digest": match.rate_card_digest,
                 "unpriced_reason": match.cost_unpriced_reason or match.credit_unpriced_reason,
@@ -652,7 +765,7 @@ class StructuralReferenceFactAdapter:
                     )
                 selector = expected_selector
                 logical_id = derived_logical_id
-                provenance = {
+                provenance: Mapping[str, Any] = {
                     "end_us": window["end_us"],
                     "parameter_role": role,
                     "request_digest": request_digest,
@@ -713,8 +826,8 @@ class StructuralReferenceFactAdapter:
         value = request.parameters[role]
         if not isinstance(value, Mapping):
             raise StructuralReferenceAdapterError(f"{role} has no typed request window")
-        start = _integer(value.get("start_us"), f"{role}.start_us")
-        end = _integer(value.get("end_us"), f"{role}.end_us")
+        start = _required_integer(value.get("start_us"), f"{role}.start_us")
+        end = _required_integer(value.get("end_us"), f"{role}.end_us")
         timezone = value.get("timezone", "UTC")
         if not isinstance(timezone, str) or not timezone or end < start:
             raise StructuralReferenceAdapterError(f"{role} has an invalid request window")

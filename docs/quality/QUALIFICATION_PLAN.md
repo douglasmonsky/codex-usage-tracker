@@ -92,6 +92,15 @@ fact/request/evidence boundary: CK-07E must record 0 / 80 CK-07A answer
 comparisons and cannot update CK-04 scoring or CK-03 through CK-07 seam
 evidence.
 
+CK-07A completes that L0 chain with 80 / 80 exact answer comparisons through
+structural-v2 source JSONL, CK-06 ingestion, CK-07 publication/recovery,
+query-only database-v1, Candidate A's permitted fact-table/planner lane, and
+both independent adapters. Its durable evidence records all 185 answer-field
+bindings, 14 selector kinds, six provenance kinds, ordered references, SQL
+sources/plans, response bytes, timings, lifecycle replay, privacy, and CK-03
+through CK-07 requalification. CK-04's current-commit growth repetitions 3 and
+4 remain waived; the strict five-repetition aggregate remains unclaimed.
+
 ## Synthetic fixture strategy
 
 Fixtures contain no real local usage records or raw content. A deterministic

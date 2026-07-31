@@ -1,6 +1,6 @@
 # CK-07A — Reconcile fact-backed oracles and qualify packet seams
 
-**Status:** Blocked pending CK-07E; 0 / 80 requalified
+**Status:** Completed; 80 / 80 fact-backed variants requalified
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
@@ -208,6 +208,15 @@ the fact-backed proof, response payloads where applicable, privacy scan,
 review findings, reviewer token status, and the unchanged CK-04 growth waiver.
 Byte ratchets allow at most 25% headroom; exact counts remain strict.
 
+The compact source JSONL, oracle bundle, and candidate response retain that
+25% rule.  This packet explicitly authorizes only the complete
+`tests/agent_kernel/fixtures/tiny-v2/` tree up to 2,500,000 bytes because the
+required 80-case question-scenario authority is a new sidecar with no
+like-for-like tiny-v1 artifact.  Evidence must record
+`canonical_packet_explicit_complete_tree_authority`, the observed tree bytes,
+the 2,500,000-byte ceiling, and a passed comparison.  This authority does not
+waive or weaken any individual artifact ratchet or exact catalog count.
+
 **Acceptance:**
 
 1. All 80 expected rows are independently derived from canonical scenario
@@ -240,6 +249,75 @@ affected packet/evidence links, roadmap ledger, and current-boundary index.
 Retain the CK-08 blocker artifact as historical reproduction evidence. Record
 the merged SHA and create a separate CK-08 task only after exact-main
 verification.
+
+## Completion record
+
+CK-07A replaces CK-04's candidate-only `question_cases` correctness claim with
+the structural-v2 truth chain recorded in
+[`fact-backed-oracle-and-seam-qualification-evidence.json`](../../decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json).
+All 80 catalog variants independently reconcile exact normalized requests,
+complete rows including `NULL` and finite Decimal text, field grades, ordered
+ties, and ordered selector/provenance references through real CK-06 ingestion,
+CK-07 publication, one query-only database-v1 snapshot, and Candidate A's
+permitted fact-table/planner lane. The evidence records all 185 answer-field
+bindings, 14 selector kinds, six provenance kinds, exact source/contract
+identities, SQL sources and plans, response bytes, timings, lifecycle replay,
+privacy scan, and CK-03 through CK-07 requalification.
+
+Executable replay exposed one owned CK-07 deficiency: publication preparation
+did not emit authoritative capability-coverage rows. The narrow correction now
+publishes context coverage and fail-closed valuation coverage, then replaces
+valuation coverage with effective-dated frontier results only when the complete
+call inventory is present. Existing storage, ingestion, identity, accounting,
+publication, recovery, and pricing designs otherwise remain intact.
+
+The four frozen no-window cases retain owner-specific scope without a fabricated
+microsecond interval. Grading mutation leaves both consumers unchanged;
+canonical-fact mutation changes the relevant answer and breaks equivalence.
+Candidate A accepts no generic SQL, refresh, or write parameter and its
+qualification authorizer rejects expected-answer tables and writes.
+
+Candidate A remains the only eligible candidate, so the frozen eligible-only
+selection score is `100` at rank 1 and the standard, production, and growth
+sensitivity rows remain `["A"]`. Candidate C/D and shared implementation trees
+used by their elimination lanes are path-identical to the CK-04 decision
+commit; no C/D score is fabricated. The CK-04 current-commit growth repetitions
+3 and 4 remain explicitly waived, and no strict five-repetition aggregate is
+claimed.
+
+Fresh post-review validation passed the focused 70-test correction profile,
+the affected 420-test profile, the standalone 1,274-test functional profile,
+`just v` (1,274 functional tests plus static and performance gates), and
+`just vc` including distribution build/release checks. The fresh worktree
+required repository-locked `npm ci --include=dev`; lockfiles were unchanged.
+One earlier `just v` sample measured `top_threads_p95_ms` at `1584.698625`
+against the `1000 ms` budget. It was not waived: the dedicated rerun and
+earlier final `just v`/`just vc` samples passed at `555.074708`, `558.04175`,
+and `546.723792` ms, while fresh Phase B `just v`/`just vc` passed at
+`559.829542` and `557.664` ms before final verification passed at `546.493292`
+and `551.52775` ms. Phase C compatibility pre-evidence `just v`/`just vc`
+passed at `549.380541` and `564.002291` ms, and the final pair passed at
+`548.415834` and `547.88375` ms. The noisy excursion remains recorded in the
+canonical evidence.
+
+The first hosted Phase C run (`30604269619`) exposed two deterministic
+cross-runtime defects after the one-time final review: CPython 3.10 could not
+safely clear the SQLite authorizer with `None`, and Ubuntu SQLite retained one
+otherwise-elided `USE TEMP B-TREE FOR ORDER BY` node for the detailed
+publication-head query. Follow-up runs `30604883581` and `30605162039`
+captured the exact shared statement shape: the Ubuntu plan adds only that one
+sorter to the macOS ten-node primary-key plan, with no additional scan,
+automatic index, or source relation. Because `publication_head(singleton=1)`
+joins `publications` by primary key, the sorter input is exactly one row.
+
+The compatibility correction keeps the per-plan authorizer installed through
+execution and `EXPLAIN`, restores normal Python 3.10 reads with an explicit
+no-op callback, leaves query-only/write/refresh restrictions intact, and
+accepts only the two fully enumerated publication-head shapes. No numeric plan
+ceiling was raised. Hosted run `30605461230` then passed Focused Evidence
+Console and both Python 3.10/3.14 kernel jobs. This was deterministic CI
+follow-up after review; the final reviewer was not retried and its six resolved
+findings and `not_measured` token status remain unchanged.
 
 **Parallelism:** The primary integrator first freezes the shared scenario,
 expected-row, selector, and seam-evidence schemas. Then these lanes may proceed

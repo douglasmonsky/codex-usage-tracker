@@ -330,3 +330,15 @@ Stop instead of guessing if a worktree has unexpected changes, `origin/main`
 changes the dependency, result identities differ, a sample is profiled or
 shares output state, C/D evidence is absent, score formulas remain undefined,
 a watchdog expires, or any test would require real user data.
+
+## CK-07A requalification
+
+CK-07A replaced the invalid `question_cases` correctness lane with 80 / 80
+fact-backed structural-v2 comparisons through Candidate A's permitted
+database-v1 fact/planner path. Query sources/plans, response bytes, timings,
+eligible-only score `100`, rank 1, and standard/production/growth sensitivity
+are recorded in the
+[canonical CK-07A evidence](../../decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json).
+Candidate C/D remain eliminated before scoring; no score is fabricated. Growth
+repetitions 3 and 4 remain waived and the strict five-repetition aggregate is
+not claimed.

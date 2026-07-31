@@ -35,6 +35,88 @@ class DatabaseAdapterContractError(ValueError):
     """The database snapshot or supplied seam contract is not admissible."""
 
 
+def _attach_occurrence_event_coordinates(
+    facts: Sequence[CanonicalFact],
+) -> list[CanonicalFact]:
+    """Attach occurrence time from already selected plan facts only.
+
+    The database adapter must not scan every logical relation merely to recover
+    coordinates.  A plan that admits ``source_occurrence`` can bind it only to
+    another fact already selected by that same plan's relation allowlist.
+    """
+
+    entity_coordinates = {
+        fact.logical_id: fact.coordinates
+        for fact in facts
+        if fact.relation not in {"source_occurrence", "valuation_match"}
+        and fact.coordinates is not None
+        and fact.coordinates.event_at_us is not None
+    }
+    manifestation_events: dict[str, int] = {}
+    for fact in facts:
+        if fact.relation != "source_occurrence":
+            continue
+        semantic_logical_id = fact.values.get("semantic_logical_id")
+        target = (
+            entity_coordinates.get(semantic_logical_id)
+            if isinstance(semantic_logical_id, str)
+            else None
+        )
+        manifestation_id = fact.values.get("source_manifestation_id")
+        if (
+            target is not None
+            and target.event_at_us is not None
+            and isinstance(manifestation_id, str)
+        ):
+            prior = manifestation_events.get(manifestation_id)
+            manifestation_events[manifestation_id] = (
+                target.event_at_us if prior is None else min(prior, target.event_at_us)
+            )
+    normalized: list[CanonicalFact] = []
+    for fact in facts:
+        fact_coordinates = fact.coordinates
+        if fact.relation == "source_occurrence" and fact_coordinates is not None:
+            semantic_logical_id = fact.values.get("semantic_logical_id")
+            target = (
+                entity_coordinates.get(semantic_logical_id)
+                if isinstance(semantic_logical_id, str)
+                else None
+            )
+            if target is None:
+                continue
+            fact_coordinates = FactCoordinates(
+                event_at_us=target.event_at_us,
+                source_rank=fact_coordinates.source_rank,
+                source_order=fact_coordinates.source_order,
+                event_kind_order=fact_coordinates.event_kind_order,
+                transition_rank=fact_coordinates.transition_rank,
+            )
+        elif (
+            fact.relation == "source_manifestation"
+            and fact_coordinates is not None
+            and fact_coordinates.event_at_us is None
+        ):
+            event_at_us = manifestation_events.get(fact.logical_id)
+            if event_at_us is None:
+                continue
+            fact_coordinates = FactCoordinates(
+                event_at_us=event_at_us,
+                source_rank=fact_coordinates.source_rank,
+                source_order=fact_coordinates.source_order,
+                event_kind_order=fact_coordinates.event_kind_order,
+                transition_rank=fact_coordinates.transition_rank,
+            )
+        normalized.append(
+            CanonicalFact(
+                relation=fact.relation,
+                logical_id=fact.logical_id,
+                values=fact.values,
+                coordinates=fact_coordinates,
+            )
+        )
+    return normalized
+
+
 def _freeze(value: Any) -> Any:
     if isinstance(value, Mapping):
         return MappingProxyType({key: _freeze(item) for key, item in value.items()})
@@ -666,6 +748,7 @@ def _row_dict(row: Any, description: Sequence[Any] | None = None) -> dict[str, A
 
 
 def _typed_value(field: str, value: Any) -> Any:
+    boolean_fields = {"write_intent"}
     json_fields = {
         "capabilities",
         "measurements",
@@ -675,6 +758,12 @@ def _typed_value(field: str, value: Any) -> Any:
         "resource_links",
     }
     decimal_fields = {"allowance_percent", "used_percent", "remaining_percent"}
+    if field in boolean_fields and value is not None:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int) and value in (0, 1):
+            return bool(value)
+        raise DatabaseAdapterContractError(f"database field {field} must be a SQLite boolean")
     if field in json_fields and isinstance(value, str):
         try:
             return json.loads(value)
@@ -813,6 +902,7 @@ class DatabaseV1FactAdapter:
                 raise DatabaseAdapterContractError(
                     f"database snapshot produced no facts for {plan_request.plan_id}"
                 )
+            facts = _attach_occurrence_event_coordinates(facts)
             evidence = self._evidence(
                 connection,
                 plan_request,
@@ -870,8 +960,8 @@ class DatabaseV1FactAdapter:
         required_role_kinds: Any,
         selector_ids: Mapping[str, str] | None,
     ) -> tuple[PlanRequest, tuple[Mapping[str, Any], ...], Mapping[str, str], str, str]:
-        wrapper = request if hasattr(request, "plan_request") else None
-        plan_request = request.plan_request if wrapper is not None else request
+        wrapper = request if isinstance(request, AdapterRequest) else None
+        plan_request = wrapper.plan_request if wrapper is not None else request
         if not isinstance(plan_request, PlanRequest):
             raise DatabaseAdapterContractError("request must contain a PlanRequest")
         supplied_required = (
@@ -1329,11 +1419,13 @@ class DatabaseV1FactAdapter:
         ownership = self._selector_contract.get("ownership")
         if isinstance(ownership, (str, bytes)) or not isinstance(ownership, Sequence):
             raise DatabaseAdapterContractError("selector ownership contract is malformed")
-        rules = {
-            item.get("kind"): item
-            for item in ownership
-            if isinstance(item, Mapping) and isinstance(item.get("kind"), str)
-        }
+        rules: dict[str, Mapping[str, Any]] = {}
+        for item in ownership:
+            if not isinstance(item, Mapping):
+                continue
+            kind = item.get("kind")
+            if isinstance(kind, str):
+                rules[kind] = item
         if set(rules) != _SELECTOR_KINDS:
             raise DatabaseAdapterContractError(
                 "selector ownership contract does not cover all 14 kinds"
@@ -1380,13 +1472,21 @@ class DatabaseV1FactAdapter:
             )
             values = {
                 "call_id": match.call_id,
-                "configured_cost_usd": match.configured_cost_usd,
+                "configured_cost_usd": (
+                    Decimal(match.configured_cost_usd)
+                    if match.configured_cost_usd is not None
+                    else None
+                ),
                 "coverage_basis": {
                     "cost": match.cost_coverage,
                     "credit": match.credit_coverage,
                     "rate_card_digest": match.rate_card_digest,
                 },
-                "estimated_credits": match.estimated_credits,
+                "estimated_credits": (
+                    Decimal(match.estimated_credits)
+                    if match.estimated_credits is not None
+                    else None
+                ),
                 "match_basis": match.match_basis,
                 "rate_card_digest": match.rate_card_digest,
                 "cost_grade": match.cost_grade,
@@ -1559,7 +1659,7 @@ class DatabaseV1FactAdapter:
                         f"{role} window logical ID does not match its request parameter"
                     )
                 selected_logical_id = logical_id
-                provenance = {
+                provenance: Mapping[str, Any] = {
                     "end_us": end,
                     "parameter_role": role,
                     "request_digest": request_digest,
@@ -1584,17 +1684,21 @@ class DatabaseV1FactAdapter:
                 and requested_logical_id != entry_logical_id
             ):
                 raise DatabaseAdapterContractError(f"{role} has conflicting selected logical IDs")
-            logical_id = entry_logical_id or requested_logical_id
-            if not isinstance(logical_id, str) or not logical_id:
+            entity_logical_id = (
+                entry_logical_id if isinstance(entry_logical_id, str) else requested_logical_id
+            )
+            if not isinstance(entity_logical_id, str) or not entity_logical_id:
                 raise DatabaseAdapterContractError(f"{role} has no selected selector")
             selector = entry.get("selector")
             if selector is None:
-                selector = f"{_selector_prefix(kind)}:{logical_id}"
+                selector = f"{_selector_prefix(kind)}:{entity_logical_id}"
             _prefix, suffix = self._selector_parts(selector, kind)
             provenance_kind = rule.get("provenance_kind")
             if not isinstance(provenance_kind, str):
                 raise DatabaseAdapterContractError(f"{kind} owner provenance is malformed")
-            provenance = self._owner_provenance(connection, kind, logical_id, provenance_kind)
+            provenance = self._owner_provenance(
+                connection, kind, entity_logical_id, provenance_kind
+            )
             if kind == "rate_card":
                 resolved_digest = provenance.get("digest")
                 if not isinstance(resolved_digest, str) or not resolved_digest:
@@ -1606,8 +1710,8 @@ class DatabaseV1FactAdapter:
                     raise DatabaseAdapterContractError(
                         f"{role} rate-card selector does not identify its revision digest"
                     )
-                logical_id = resolved_digest
-            elif logical_id != suffix:
+                entity_logical_id = resolved_digest
+            elif entity_logical_id != suffix:
                 raise DatabaseAdapterContractError(
                     f"{role} selector does not identify its selected entity"
                 )
@@ -1616,7 +1720,7 @@ class DatabaseV1FactAdapter:
                     role,
                     kind,
                     selector,
-                    logical_id,
+                    entity_logical_id,
                     provenance_kind,
                     provenance,
                 )
@@ -1697,7 +1801,8 @@ class DatabaseV1FactAdapter:
                 raise DatabaseAdapterContractError("rate-card selector does not resolve")
             frontier, _digest = self._frontier(connection)
             if frontier is None or not any(
-                revision.rate_card_id == logical_id or revision.digest == logical_id
+                isinstance(revision, RateCardRevision)
+                and (revision.rate_card_id == logical_id or revision.digest == logical_id)
                 for revision in frontier.revisions
             ):
                 raise DatabaseAdapterContractError(
@@ -1780,7 +1885,7 @@ class DatabaseV1FactAdapter:
         connection: sqlite3.Connection, logical_id: str
     ) -> list[Mapping[str, Any]]:
         cursor = connection.execute(_SOURCE_OCCURRENCES_SQL, (logical_id,))
-        result = []
+        result: list[Mapping[str, Any]] = []
         for row in cursor:
             values = _row_dict(row, cursor.description)
             result.append(

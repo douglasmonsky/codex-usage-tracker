@@ -6,47 +6,25 @@ and none of the archived documents may override them.
 
 ## Current packet boundary
 
-CK-07 is complete with its
-[publication, refresh, and recovery evidence](decisions/evidence/ck07/publication-refresh-recovery-evidence.json)
-recorded. CK-05 canonical storage and CK-06 adapter/ingestion remain its
-verified dependencies. CK-08 began from the verified CK-07 merge and found a
-missing fact-backed oracle prerequisite: the frozen CK-03 question rows do not
-equal the canonical database-v1 facts for their own requests, while the CK-04
-query proof obtained those rows from a candidate-only `question_cases` table
-that database-v1 explicitly forbids. CK-08 is therefore blocked at its packet
-boundary with the exact
-[prerequisite evidence](decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)
-recorded. Corrective packet
-[CK-07A](roadmap/tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md)
-then found that the catalog's 45 formula IDs and owner-specific selector
-provenance had no executable authority.
-[CK-07B](roadmap/tasks/ck-07b-freeze-formula-and-provenance-contract.md)
-supplies that narrow decision contract through PR #383. Retained CK-07A
-analysis then proved the plan-to-operand mapping and several canonical fact
-representations were still not executable.
-[CK-07C](roadmap/tasks/ck-07c-freeze-plan-operands-and-missing-facts.md)
-supplied those bindings and facts through PR #384, merged as `dbf98ff4`.
-Review of its valuation seam then found that the pure compiler applies one
-selected revision to every call without using call event time. Corrective
-packet
-[CK-07D](roadmap/tasks/ck-07d-implement-effective-dated-rate-card-valuation.md)
-is merged through PR #385 at `e49531b` with the exact
-[gap evidence](decisions/evidence/ck07d/effective-dated-valuation-gap.json).
-Its
-[implementation evidence](decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json)
-records the effective-time compiler, immutable publication frontier, schema and
-plan-contract identities, focused requalification, validation, review, and
-historical pre-merge gates. Corrective prerequisite
-[CK-07E](roadmap/tasks/ck-07e-implement-independent-fact-adapters.md) now
-qualifies the two independent normalization paths from structural declarations
-and one query-only database-v1 snapshot into plan facts and ordered evidence.
-CK-07A remains blocked and is 0 / 80 requalified until CK-07E is merged and
-exact-main verified.
-It must still repair CK-03 oracle lineage,
-replace CK-04's candidate-only answer proof, and requalify the unchanged
-CK-05–CK-07 consumer seams before CK-08 may resume. CK-08 remains blocked and
-CK-09 is not admitted. The CK-04 growth exception remains explicit and the
-strict v2 aggregate is not claimed.
+CK-07A is complete after consuming the merged CK-07B formula/provenance,
+CK-07C plan/direct-fact, CK-07D effective-dated valuation, and CK-07E
+independent-adapter prerequisites. Its
+[canonical evidence](decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json)
+records 80 / 80 fact-backed comparisons through structural-v2 source JSONL,
+CK-06 ingestion, CK-07 publication/recovery, query-only database-v1, Candidate
+A's permitted fact-table/planner path, and two independent evaluators. All 185
+answer-field bindings, 14 selector kinds, six provenance kinds, exact ordered
+references, response bytes, timings, SQL sources/plans, lifecycle modes, and
+CK-03 through CK-07 requalifications are recorded.
+
+The historical
+[CK-08 prerequisite gap](decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)
+remains preserved as the reproduction that caused the stop, but it is no
+longer the current boundary blocker. CK-04's invalid `question_cases`
+correctness proof is replaced; its current-commit growth repetitions 3 and 4
+remain explicitly waived and no strict five-repetition aggregate is claimed.
+CK-08 is now ready as the next packet. CK-08 implementation has not begun, and
+CK-09 remains unadmitted.
 
 ## Authority set
 

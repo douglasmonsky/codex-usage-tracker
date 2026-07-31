@@ -822,9 +822,10 @@ def _derive_evidence_timeline(
             )
         )
     invocation = _call(use, {"records": records})
-    if groups:
-        first = groups[0]
-        groups[0] = _group(dict(first.key), first.direct_slots, [invocation], first.order_key)
+    groups = [
+        _group(dict(group.key), group.direct_slots, [invocation], group.order_key)
+        for group in groups
+    ]
     return PlanMaterialization(plan["plan_id"], tuple(groups))
 
 

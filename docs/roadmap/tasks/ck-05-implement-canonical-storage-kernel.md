@@ -82,3 +82,8 @@ reissued by
 [CK-07A](ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md) after the
 corrected canonical scenario fixture is frozen. A code change is admitted only
 if that unchanged consumer replay exposes a concrete storage deficiency.
+
+CK-07A requalified CK-05 storage against all 80 corrected variants without a
+storage implementation change. Historical CK-05 evidence remains preserved;
+current seam authority is the
+[CK-07A evidence](../../decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json).

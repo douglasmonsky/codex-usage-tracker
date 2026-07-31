@@ -93,3 +93,11 @@ no-change, tail, rebuild, replacement, late-event, and recovery behavior
 against the corrected fixture and refresh the linked evidence. A code change
 is admitted only if that unchanged replay exposes a concrete publication or
 recovery deficiency.
+
+CK-07A requalified CK-07 publication/recovery against all 80 corrected
+variants, clean rebuild, replacement, late-event, and recovery paths. Replay
+exposed one narrow deficiency: authoritative publication capability coverage
+was absent. CK-07A added exact context coverage and fail-closed/effective-dated
+valuation coverage while preserving the publication and recovery design.
+Historical CK-07 evidence remains preserved; current seam authority is the
+[CK-07A evidence](../../decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json).

@@ -36,14 +36,14 @@ C and D. The final read-only review found seven gaps that prevented acceptance.
 Six remediations remain accepted. CK-07B supplies executable formula and
 selector-provenance authority. CK-07C supplies the executable plan-to-operand
 and direct-fact bindings plus the smallest missing canonical fact surfaces
-discovered during CK-07A. The query-correctness remediation itself remains
-pending CK-07A because its
+discovered during CK-07A. CK-07A now replaces the query-correctness
+remediation because its
 database-resident answer source did not prove canonical-fact lineage:
 
 | Review gap | Remediation |
 | --- | --- |
 | Recovery used simulated outcomes | The 25-case matrix now observes real termination or injected faults, inspects persistent state, proves rollback, and performs a subsequent publication. |
-| Query results were assembled from oracle rows | The original remediation persisted `oracle_case.observed_facts` in candidate-only `question_cases` and read it through SQL. CK-08 later proved this was database-resident grading truth, not canonical-fact derivation. CK-07A replaces and requalifies this proof before CK-08 resumes. |
+| Query results were assembled from oracle rows | CK-07A replaced the candidate-only `question_cases` lane with 80 / 80 structural-v2 replays through permitted database-v1 facts, executable plans, and independent evaluators. |
 | Planner checks were aggregate-only | Every query case now fails on unapproved full scans, automatic indexes, or temporary sorts. |
 | Parser-worker cases ignored worker count | The worker cases now execute bounded spawned 1/2/4/8-worker parsing with deterministic parent-writer merge. |
 | CPU profile did not match the speed workload | Agent Perf now profiles the exact checked-in standard-build workload; repeated unprofiled runs remain the speed authority. |
@@ -56,8 +56,8 @@ exceeded the production 30-day `5 s` hard gate.
 
 Candidate A passed the current-commit standard, production, history, expansion,
 ordinary-tail, crash/recovery, Agent Perf, and DBHub lanes. Its query planner
-and performance measurements completed, but query correctness is not accepted
-until CK-07A replays the corrected fixture and recomputes affected selection
+and performance measurements completed; CK-07A now accepts query correctness
+after replaying the corrected fixture and recomputing affected selection
 evidence. The
 maintainer directed CK-04 to stop after growth repetition 2, yielding three
 successful current-commit growth samples. Repetitions 3 and 4 are explicitly
@@ -84,7 +84,7 @@ The accepted evidence at
 | Short history | 15 / 15 passed | `147a00de01af36a7349259582c81654fb4f5a3709ab9262a36da907d5ee30d9b` |
 | All-time history | 5 / 5 passed | `4a531a455b35b5b6d7f09b12bd4be242abb73fd41f1192646cf7e2c34b1c5157` |
 | History expansion | 15 / 15 passed | `2d65a5f2b420e14b496acf50ba45f1e9fcab5a0c3803e9f23076d597c5955ba2` |
-| Query correctness | Not accepted; pending CK-07A canonical-fact replay and affected score recomputation | historical query measurements retained only |
+| Query correctness | 80 / 80 fact-backed variants passed; eligible-only score `100`, rank 1; standard/production/growth sensitivity remains Candidate A | [CK-07A evidence](evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json) |
 | Crash and recovery | 25 / 25 passed | `9b697b6f882056a3cb393d3f10ac9f3954f933f6b74a86c23a39e4d3c0c1fc71` |
 | Candidate C elimination | Expected process-termination observation absent | retained current-commit artifact |
 | Candidate D elimination | Expected production build watchdog failure | retained current-commit artifact |
@@ -208,19 +208,17 @@ fsync, rollback, reconciliation, and protected-cleanup behavior.
 
 ## Query qualification
 
-The bake-off query adapter executes and profiles real Candidate A SQL, but its
-answer path reads candidate-only `question_cases` rows populated from
-`oracle_case.observed_facts`. Those rows are source-persisted grading metadata,
-not answers derived from canonical database-v1 facts. The planner and
-performance measurements remain historical physical evidence, but the query
-correctness claim is not accepted as a fact-lineage proof.
+The bake-off query adapter's original answer path read candidate-only
+`question_cases` rows populated from `oracle_case.observed_facts`. CK-07A
+replaced that invalid correctness lane with Candidate A's query-only,
+authorizer-enforced database-v1 fact/planner entry point and 80 / 80 exact
+structural-v2 comparisons. Historical planner/performance evidence remains
+physical evidence; current correctness authority is the CK-07A artifact.
 
-Candidate A remains an experimental physical-plan reference. CK-07A must
-consume CK-07B and CK-07C, replace this proof with permitted fact-backed qualification,
-and requalify
-CK-05–CK-07 before CK-08 may implement production query code. A false-zero,
-expected-answer table, or oracle-backed runtime answer remains a release
-blocker.
+Candidate A remains an experimental physical-plan reference, not production
+code to transplant. CK-08 may now implement production query code from the
+requalified contracts. Any false-zero, expected-answer table, or oracle-backed
+runtime answer remains a release blocker.
 
 ## Agent Perf result
 

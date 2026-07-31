@@ -1,6 +1,6 @@
 # CK-07E — Implement independent fact adapters
 
-**Status:** Completed on merge; exact-main verification is recorded in the completion handoff; CK-07A remains 0 / 80 requalified
+**Status:** Completed on merge; exact-main verification is recorded in the completion handoff; CK-07A subsequently completed 80 / 80
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
