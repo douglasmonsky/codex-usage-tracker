@@ -86,6 +86,54 @@ def validate_seam_evidence(payload: dict[str, Any]) -> None:
         or not all(item.get("passed") is True for item in lifecycle)
     ):
         raise ValueError("CK-07A lifecycle transitions did not all pass")
+    compatibility = payload["measurements"].get("ci_compatibility_followup", {})
+    failed_runs = compatibility.get("failed_runs", [])
+    passing_run = compatibility.get("passing_run", {})
+    correction = compatibility.get("correction", {})
+    macos_plan = correction.get("macos_detailed_publication_head_plan")
+    ubuntu_plan = correction.get("ubuntu_detailed_publication_head_plan")
+    expected_macos_plan = [
+        "SEARCH h USING PRIMARY KEY (singleton=?)",
+        "SEARCH p USING PRIMARY KEY (publication_id=?)",
+        "CORRELATED SCALAR SUBQUERY 1",
+        "SEARCH c USING PRIMARY KEY (publication_id=?)",
+        "CORRELATED SCALAR SUBQUERY 2",
+        "SEARCH e USING PRIMARY KEY (publication_id=?)",
+        "CORRELATED SCALAR SUBQUERY 3",
+        "SEARCH c USING PRIMARY KEY (publication_id=? AND capability_id=?)",
+        "CORRELATED SCALAR SUBQUERY 4",
+        "SEARCH c USING PRIMARY KEY (publication_id=? AND capability_id=?)",
+    ]
+    if (
+        compatibility.get("status") != "passed"
+        or compatibility.get("timing") != "post_review_deterministic_ci_followup"
+        or compatibility.get("reviewer_retried") is not False
+        or compatibility.get("numeric_plan_ceilings_changed") is not False
+        or [item.get("run_id") for item in failed_runs]
+        != [30_604_269_619, 30_604_883_581, 30_605_162_039]
+        or [item.get("head_sha") for item in failed_runs]
+        != [
+            "a04536110b7274920e8727083320bd7f1a394699",
+            "4fbec859c626528796db43f873f9c59d5a3336a5",
+            "f8df09b656dc8368edc004bd58cdf8ffd0ccec53",
+        ]
+        or any(item.get("result") != "failed" for item in failed_runs)
+        or correction.get("query_only_preserved") is not True
+        or correction.get("forbidden_sources_denied_during_execution") is not True
+        or correction.get("plan_ceiling_changes") != {}
+        or macos_plan != expected_macos_plan
+        or ubuntu_plan != [*macos_plan, "USE TEMP B-TREE FOR ORDER BY"]
+        or passing_run.get("run_id") != 30_605_461_230
+        or passing_run.get("head_sha") != "c97d230de412f6c05dfb469e9838548a09f30766"
+        or [item.get("name") for item in passing_run.get("jobs", [])]
+        != [
+            "Focused Evidence Console",
+            "Kernel phase and package isolation (3.10)",
+            "Kernel phase and package isolation (3.14)",
+        ]
+        or any(item.get("status") != "passed" for item in passing_run.get("jobs", []))
+    ):
+        raise ValueError("CK-07A deterministic CI compatibility follow-up is incomplete")
     response_bytes = payload["measurements"].get("response_bytes", {})
     if response_bytes.get("maximum", 1) > response_bytes.get("ratchet_maximum", 0):
         raise ValueError("CK-07A response byte ratchet failed")

@@ -658,11 +658,154 @@ def collect() -> dict[str, Any]:
                         "observed_ms": 551.52775,
                         "passed": True,
                     },
+                    {
+                        "source": "phase_c_compatibility_pre_evidence_just_v",
+                        "observed_ms": 549.380541,
+                        "passed": True,
+                    },
+                    {
+                        "source": "phase_c_compatibility_pre_evidence_just_vc",
+                        "observed_ms": 564.002291,
+                        "passed": True,
+                    },
+                    {
+                        "source": "phase_c_compatibility_final_just_v",
+                        "observed_ms": 548.415834,
+                        "passed": True,
+                    },
+                    {
+                        "source": "phase_c_compatibility_final_just_vc",
+                        "observed_ms": 547.88375,
+                        "passed": True,
+                    },
                 ],
                 "observed_breach_count": 1,
                 "waiver_applied": False,
                 "fresh_phase_b_required_profiles_passed": True,
                 "fresh_phase_b_gate_miss": False,
+                "fresh_phase_c_required_profiles_passed": True,
+                "fresh_phase_c_gate_miss": False,
+            },
+            "ci_compatibility_followup": {
+                "status": "passed",
+                "timing": "post_review_deterministic_ci_followup",
+                "reviewer_retried": False,
+                "numeric_plan_ceilings_changed": False,
+                "failed_runs": [
+                    {
+                        "run_id": 30_604_269_619,
+                        "head_sha": "a04536110b7274920e8727083320bd7f1a394699",
+                        "result": "failed",
+                        "python_310_root_cause": (
+                            "CPython 3.10 accepts set_authorizer(None) but leaves "
+                            "subsequent EXPLAIN QUERY PLAN statements unauthorized"
+                        ),
+                        "python_314_root_cause": (
+                            "Ubuntu SQLite retained one redundant publication-head "
+                            "ORDER BY sorter beyond the macOS-frozen boundary"
+                        ),
+                    },
+                    {
+                        "run_id": 30_604_883_581,
+                        "head_sha": "4fbec859c626528796db43f873f9c59d5a3336a5",
+                        "result": "failed",
+                        "purpose": "capture_exact_cross_runtime_plan_evidence",
+                        "plan_id": "latest_publication_delta",
+                        "observed": {
+                            "statements": 20,
+                            "plan_rows": 49,
+                            "full_scans": 0,
+                            "automatic_indexes": 0,
+                            "temporary_sorts": 7,
+                        },
+                    },
+                    {
+                        "run_id": 30_605_162_039,
+                        "head_sha": "f8df09b656dc8368edc004bd58cdf8ffd0ccec53",
+                        "result": "failed",
+                        "purpose": "locate_the_runtime_delta_at_the_shared_statement_boundary",
+                        "plan_id": "data_health",
+                        "observed": {
+                            "statements": 8,
+                            "plan_rows": 20,
+                            "full_scans": 1,
+                            "automatic_indexes": 0,
+                            "temporary_sorts": 1,
+                        },
+                    },
+                ],
+                "correction": {
+                    "authorizer_lifecycle": (
+                        "The per-plan allowlist remains installed through guarded "
+                        "execution and EXPLAIN; CPython 3.10 restores normal reads "
+                        "with an explicit no-op callback instead of unsupported None."
+                    ),
+                    "query_only_preserved": True,
+                    "forbidden_sources_denied_during_execution": True,
+                    "plan_ceiling_changes": {},
+                    "macos_detailed_publication_head_plan": [
+                        "SEARCH h USING PRIMARY KEY (singleton=?)",
+                        "SEARCH p USING PRIMARY KEY (publication_id=?)",
+                        "CORRELATED SCALAR SUBQUERY 1",
+                        "SEARCH c USING PRIMARY KEY (publication_id=?)",
+                        "CORRELATED SCALAR SUBQUERY 2",
+                        "SEARCH e USING PRIMARY KEY (publication_id=?)",
+                        "CORRELATED SCALAR SUBQUERY 3",
+                        (
+                            "SEARCH c USING PRIMARY KEY "
+                            "(publication_id=? AND capability_id=?)"
+                        ),
+                        "CORRELATED SCALAR SUBQUERY 4",
+                        (
+                            "SEARCH c USING PRIMARY KEY "
+                            "(publication_id=? AND capability_id=?)"
+                        ),
+                    ],
+                    "ubuntu_detailed_publication_head_plan": [
+                        "SEARCH h USING PRIMARY KEY (singleton=?)",
+                        "SEARCH p USING PRIMARY KEY (publication_id=?)",
+                        "CORRELATED SCALAR SUBQUERY 1",
+                        "SEARCH c USING PRIMARY KEY (publication_id=?)",
+                        "CORRELATED SCALAR SUBQUERY 2",
+                        "SEARCH e USING PRIMARY KEY (publication_id=?)",
+                        "CORRELATED SCALAR SUBQUERY 3",
+                        (
+                            "SEARCH c USING PRIMARY KEY "
+                            "(publication_id=? AND capability_id=?)"
+                        ),
+                        "CORRELATED SCALAR SUBQUERY 4",
+                        (
+                            "SEARCH c USING PRIMARY KEY "
+                            "(publication_id=? AND capability_id=?)"
+                        ),
+                        "USE TEMP B-TREE FOR ORDER BY",
+                    ],
+                    "ubuntu_sort_bound": (
+                        "publication_head singleton=1 joins publications by primary "
+                        "key, so the retained sorter has an exactly one-row input"
+                    ),
+                },
+                "passing_run": {
+                    "run_id": 30_605_461_230,
+                    "head_sha": "c97d230de412f6c05dfb469e9838548a09f30766",
+                    "jobs": [
+                        {
+                            "name": "Focused Evidence Console",
+                            "status": "passed",
+                            "duration": "1m35s",
+                        },
+                        {
+                            "name": "Kernel phase and package isolation (3.10)",
+                            "status": "passed",
+                            "duration": "3m19s",
+                        },
+                        {
+                            "name": "Kernel phase and package isolation (3.14)",
+                            "status": "passed",
+                            "duration": "4m13s",
+                        },
+                    ],
+                },
             },
         },
         "requalifications": [
@@ -677,28 +820,28 @@ def collect() -> dict[str, Any]:
         "validation": [
             {
                 "command": PHASE_A_FOCUSED_COMMAND,
-                "result": "passed: 63 tests in 9.77s (final Phase B rerun)",
+                "result": "passed: 70 tests in 9.27s (Phase C compatibility final tree)",
             },
             {
                 "command": PHASE_B_AFFECTED_COMMAND,
-                "result": "passed: 414 tests in 26.87s (final Phase B rerun)",
+                "result": "passed: 420 tests in 26.15s (Phase C compatibility final tree)",
             },
             {
                 "command": PHASE_B_FULL_FUNCTIONAL_COMMAND,
-                "result": "passed: 1267 tests in 102.63s",
+                "result": "passed: 1274 tests in 104.97s",
             },
             {
                 "command": "just v",
                 "result": (
-                    "passed: 1267 functional tests; 17 performance observations; "
-                    "zero breaches; top_threads_p95_ms=546.493292"
+                    "passed: 1274 functional tests; 17 performance observations; "
+                    "zero breaches; top_threads_p95_ms=548.415834"
                 ),
             },
             {
                 "command": "just vc",
                 "result": (
-                    "passed: 1267 functional tests; 17 performance observations; "
-                    "zero breaches; top_threads_p95_ms=551.52775; distribution and "
+                    "passed: 1274 functional tests; 17 performance observations; "
+                    "zero breaches; top_threads_p95_ms=547.88375; distribution and "
                     "release-candidate checks passed"
                 ),
             },
@@ -742,8 +885,10 @@ def collect() -> dict[str, Any]:
                 "the earlier final just-v and just-vc runs measured 558.04175 and "
                 "546.723792, and fresh Phase B just-v and just-vc measured "
                 "559.829542 and 557.664 before final verification at 546.493292 and "
-                "551.52775 with no breaches; the excursion is recorded as noisy, "
-                "not waived."
+                "551.52775. Phase C compatibility pre-evidence just-v and just-vc "
+                "measured 549.380541 and 564.002291, and final just-v and just-vc "
+                "measured 548.415834 and 547.88375, all with no breaches; the "
+                "excursion is recorded as noisy, not waived."
             ),
             (
                 "The historical CK-04 strict five-current-repetition growth "

@@ -285,9 +285,9 @@ commit; no C/D score is fabricated. The CK-04 current-commit growth repetitions
 3 and 4 remain explicitly waived, and no strict five-repetition aggregate is
 claimed.
 
-Fresh post-review validation passed the focused 63-test correction profile,
-the affected 414-test profile, the standalone 1,267-test functional profile,
-`just v` (1,267 functional tests plus static and performance gates), and
+Fresh post-review validation passed the focused 70-test correction profile,
+the affected 420-test profile, the standalone 1,274-test functional profile,
+`just v` (1,274 functional tests plus static and performance gates), and
 `just vc` including distribution build/release checks. The fresh worktree
 required repository-locked `npm ci --include=dev`; lockfiles were unchanged.
 One earlier `just v` sample measured `top_threads_p95_ms` at `1584.698625`
@@ -295,8 +295,29 @@ against the `1000 ms` budget. It was not waived: the dedicated rerun and
 earlier final `just v`/`just vc` samples passed at `555.074708`, `558.04175`,
 and `546.723792` ms, while fresh Phase B `just v`/`just vc` passed at
 `559.829542` and `557.664` ms before final verification passed at `546.493292`
-and `551.52775` ms. The noisy excursion remains recorded in the canonical
-evidence.
+and `551.52775` ms. Phase C compatibility pre-evidence `just v`/`just vc`
+passed at `549.380541` and `564.002291` ms, and the final pair passed at
+`548.415834` and `547.88375` ms. The noisy excursion remains recorded in the
+canonical evidence.
+
+The first hosted Phase C run (`30604269619`) exposed two deterministic
+cross-runtime defects after the one-time final review: CPython 3.10 could not
+safely clear the SQLite authorizer with `None`, and Ubuntu SQLite retained one
+otherwise-elided `USE TEMP B-TREE FOR ORDER BY` node for the detailed
+publication-head query. Follow-up runs `30604883581` and `30605162039`
+captured the exact shared statement shape: the Ubuntu plan adds only that one
+sorter to the macOS ten-node primary-key plan, with no additional scan,
+automatic index, or source relation. Because `publication_head(singleton=1)`
+joins `publications` by primary key, the sorter input is exactly one row.
+
+The compatibility correction keeps the per-plan authorizer installed through
+execution and `EXPLAIN`, restores normal Python 3.10 reads with an explicit
+no-op callback, leaves query-only/write/refresh restrictions intact, and
+accepts only the two fully enumerated publication-head shapes. No numeric plan
+ceiling was raised. Hosted run `30605461230` then passed Focused Evidence
+Console and both Python 3.10/3.14 kernel jobs. This was deterministic CI
+follow-up after review; the final reviewer was not retried and its six resolved
+findings and `not_measured` token status remain unchanged.
 
 **Parallelism:** The primary integrator first freezes the shared scenario,
 expected-row, selector, and seam-evidence schemas. Then these lanes may proceed

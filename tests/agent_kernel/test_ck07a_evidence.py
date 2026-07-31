@@ -99,6 +99,9 @@ def test_ck07a_evidence_is_complete_and_passed() -> None:
             "authority"
         ].update(maximum_authorized_bytes=1),
         lambda payload: payload["review"].update(unresolved_findings=["finding"]),
+        lambda payload: payload["measurements"]["ci_compatibility_followup"][
+            "passing_run"
+        ]["jobs"][0].update(status="failed"),
     ),
 )
 def test_ck07a_evidence_validation_fails_closed(mutation) -> None:
