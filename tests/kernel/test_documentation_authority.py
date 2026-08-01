@@ -52,6 +52,7 @@ _PACKET_IDS = {
     "CK-08R3",
     "CK-08R4",
     "CK-08RG",
+    "CK-QG1A0",
     "CK-QG1A",
     "CK-QG1",
     *(f"CK-09-{number:02d}" for number in range(1, 7)),
@@ -175,7 +176,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest["schema"] == "codex-usage-tracker.remaining-delegation-dag.v1"
     assert manifest["orchestration"]["spawn"] == "all_newly_ready_successors"
     conditional_ready = {"CK-08R1A", "CK-08R3A", "CK-07R1A", "CK-QG1A"}
-    assert manifest["completed"] == ["CK-08R0", "CK-08R2"]
+    assert manifest["completed"] == ["CK-08R0", "CK-08R2", "CK-QG1A0"]
     ready: set[str] = set()
     assert manifest["ready"] == []
     assert manifest["conditional_ready"] == [
@@ -183,8 +184,12 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "condition": (
                 "This serialized corrective authority correction accepted, merged, and exact-main verified"
             ),
-            "tasks": ["CK-08R1A", "CK-08R3A", "CK-07R1A", "CK-QG1A"],
-        }
+            "tasks": ["CK-08R1A", "CK-08R3A", "CK-07R1A"],
+        },
+        {
+            "condition": "CK-QG1A0 merged and exact-main verified",
+            "tasks": ["CK-QG1A"],
+        },
     ]
     assert "Completed packets: **14 / 22**" in ledger
     assert "Not started: **8**" in ledger
@@ -196,9 +201,9 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     )
 
     tasks = manifest["tasks"]
-    assert len(tasks) == 48
+    assert len(tasks) == 49
     manifest_by_id = {task["id"]: task for task in tasks}
-    assert len(manifest_by_id) == 48
+    assert len(manifest_by_id) == 49
     assert set(manifest_by_id) == _DELEGATED_PACKET_IDS
     assert manifest_by_id["CK-08R3A"]["dependencies"] == ["CK-08R0"]
     assert manifest_by_id["CK-08R3"]["dependencies"] == ["CK-08R3A"]
@@ -206,7 +211,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest_by_id["CK-08R1B"]["dependencies"] == ["CK-08R1A"]
     assert manifest_by_id["CK-08R1C"]["dependencies"] == ["CK-08R1A"]
     assert manifest_by_id["CK-08R1"]["dependencies"] == ["CK-08R1B", "CK-08R1C"]
-    assert manifest_by_id["CK-QG1A"]["dependencies"] == ["CK-08R2"]
+    assert manifest_by_id["CK-QG1A0"]["dependencies"] == ["CK-08R2"]
+    assert manifest_by_id["CK-QG1A"]["dependencies"] == ["CK-QG1A0"]
     assert manifest_by_id["CK-QG1"]["dependencies"] == ["CK-QG1A"]
     assert manifest_by_id["CK-07R1A"]["dependencies"] == ["CK-08R0"]
     assert manifest_by_id["CK-07R1"]["dependencies"] == ["CK-07R1A"]
@@ -220,7 +226,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
 
     release_budget = _json("config/kernel-release-candidate-budget.json")
     assert release_budget["sdist_bytes"] == 828000
-    for packet_id in ("CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R3A", "CK-07R1A", "CK-QG1A"):
+    for packet_id in ("CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R3A", "CK-07R1A", "CK-QG1A0", "CK-QG1A"):
         packet = _read(f"docs/roadmap/{manifest_by_id[packet_id]['file']}").replace(",", "")
         assert str(release_budget["sdist_bytes"]) in packet
 
@@ -257,7 +263,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             assert "**Status:** Conditional Ready after" in body
         elif packet_id in ready:
             assert "**Status:** Ready" in body
-        elif packet_id in {"CK-08R0", "CK-08R2"}:
+        elif packet_id in {"CK-08R0", "CK-08R2", "CK-QG1A0"}:
             assert "**Status:** Completed on merge" in body
         else:
             assert "**Status:** Blocked" in body
@@ -358,6 +364,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     ck08r1c = _read("docs/roadmap/tasks/ck-08r1c-build-independent-semantic-evaluator.md")
     ck08r1 = _read("docs/roadmap/tasks/ck-08r1-build-independent-answer-truth.md")
     ckqg1a = _read("docs/roadmap/tasks/ck-qg1a-correct-page-executor-complexity.md")
+    ckqg1a0 = _read("docs/roadmap/tasks/ck-qg1a0-authorize-page-executor-source-supersession.md")
     ckqg1 = _read("docs/roadmap/tasks/ck-qg1-enforce-agent-kernel-maintainability.md")
     ck07r1a = _read("docs/roadmap/tasks/ck-07r1a-correct-hosted-lifecycle-tail.md")
     ck07r1 = _read("docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md")
@@ -406,6 +413,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
             "828000",
         )
     )
+    assert "CK-QG1A0" in ckqg1a0
     assert "explicit growth-evidence exception" in physical_decision
     assert "two current repetitions were waived" in physical_decision
     assert "**Dependencies:** CK-07A merged with exact-main seam evidence." in ck08

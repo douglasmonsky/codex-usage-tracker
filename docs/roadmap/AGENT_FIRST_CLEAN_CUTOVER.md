@@ -49,7 +49,7 @@ CK-00 -> CK-01 -> CK-02 -> CK-03 -> CK-04 -> CK-05 -> CK-06
 -> CK-07 -> CK-07B -> CK-07C -> CK-07D -> CK-07E -> CK-07A -> CK-08
 -> CK-08R0 -> {CK-08R1A, CK-08R2, CK-08R3A, CK-07R1A}
 CK-08R1A -> {CK-08R1B, CK-08R1C} -> CK-08R1
-CK-08R2 -> CK-QG1A -> CK-QG1
+CK-08R2 -> CK-QG1A0 -> CK-QG1A -> CK-QG1
 CK-08R3A -> CK-08R3
 CK-07R1A -> CK-07R1
 {CK-08R1, CK-08R2, CK-08R3, CK-07R1} -> CK-08R4
@@ -65,7 +65,8 @@ flowchart LR
  R1B --> R1[CK-08R1]
  R1C --> R1
  R0 --> R2[CK-08R2]
- R2 --> QGA[CK-QG1A]
+ R2 --> QGA0[CK-QG1A0]
+ QGA0 --> QGA[CK-QG1A]
  QGA --> QG[CK-QG1]
  R0 --> R3A[CK-08R3A]
  R3A --> R3[CK-08R3]
@@ -89,7 +90,7 @@ CK-15 is optional and blocks CK-16 only if selected.
 | CK-04 | A/C/D experiment dirs; integrator owns harness/contracts/score |
 | CK-07B–E | Formula/provenance → operands/valuation → two fact adapters; one contract/evidence owner |
 | CK-07A/08 | Oracle replay and query/evidence implementations; public schemas single-owned |
-| Corrective wave | R1A→R1B/C→R1; R2→QG1A→QG1; R3A→R3; 07R1A→07R1; R4 joins |
+| Corrective wave | R1A→R1B/C→R1; R2→QG1A0→QG1A→QG1; R3A→R3; 07R1A→07R1; R4 joins |
 | CK-09 | Admitted projection families after registry freeze |
 | CK-10/11/12 | App/skill, installed trial lanes, then immutable qualification lanes |
 | CK-14 | Runtime and frontend deletion; package/CI joins |
@@ -129,7 +130,8 @@ consumer replay reconciles published database-v1 facts to independent truth.
 CK-08 history is provisional. R1A freezes Q-REV-03/Q-WF-02 and closure; R1B/C
 implement separately; R1 requalifies. R2 bounds two direct plans while 19 fail
 closed. R3A removes unbounded EvidenceService shape; R3 measures it. 07R1A
-materially corrects the exact hosted tail before PR #394 resumes. QG1A removes
+materially corrects the exact hosted tail before PR #394 resumes. QG1A0 authorizes
+only the exact R2 PageExecutor successor; QG1A then removes
 only R2's C/B/B findings before QG1 refreshes its baseline. R4 joins accepted
 R1/R2/R3/07R1; RG plus QG1 alone may unblock CK-09. Exact oracles, selectors,
 four tokens, cost/credits, allowance, SQL/MCP/byte/scale gates remain binding.

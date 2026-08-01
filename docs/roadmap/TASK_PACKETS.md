@@ -12,13 +12,11 @@ parents are accounting umbrellas.
 - Not started: **8**
 - Critical-path completion: **14 / 21**
 - Optional packets: **CK-15**
-- Completed corrective child tasks: **2 — CK-08R0, CK-08R2**
+- Completed corrective child tasks: **3 — CK-08R0, CK-08R2, CK-QG1A0**
 - Remaining delegable child tasks: **46**
 - Ready child tasks: **0**
-- Conditional-ready child tasks: **4 — CK-08R1A, CK-08R3A, CK-07R1A, CK-QG1A after this corrective authority exact-main verification**
+- Conditional-ready child tasks: **4 — CK-08R1A, CK-08R3A, CK-07R1A; CK-QG1A after CK-QG1A0 exact-main**
 - Blocked child tasks: **42**
-
-Acceptance requires checks, measurements, risks, and review.
 
 ## Parent packets
 
@@ -48,8 +46,8 @@ Acceptance requires checks, measurements, risks, and review.
 ## Remaining delegated child tasks
 
 Readiness is controlled by
-[the machine DAG](REMAINING_EXECUTION_PLAN.md). R1A, R3A, 07R1A, and QG1A
-are conditional on this authority exact-main.
+[the machine DAG](REMAINING_EXECUTION_PLAN.md). QG1A follows CK-QG1A0 exact-main;
+other corrective locks are unchanged.
 
 ### Corrective gates
 
@@ -59,11 +57,12 @@ are conditional on this authority exact-main.
 - [ ] **CK-08R1C — Build independent semantic evaluator** · Blocked on CK-08R1A · [packet](tasks/ck-08r1c-build-independent-semantic-evaluator.md)
 - [ ] **CK-08R1 — Requalify independent answer truth** · Blocked on CK-08R1B and CK-08R1C · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
 - [x] **CK-08R2 — Implement bounded physical keyset execution** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r2-implement-physical-keyset-execution.md)
+- [x] **CK-QG1A0 — Authorize PageExecutor source supersession** · Completed on merge; exact-main required before CK-QG1A · [packet](tasks/ck-qg1a0-authorize-page-executor-source-supersession.md)
 - [ ] **CK-08R3A — Implement bounded EvidenceService physical queries** · Conditional Ready after corrective authority exact-main verification; CK-08R0 remains accepted · [packet](tasks/ck-08r3a-implement-evidence-physical-query.md)
 - [ ] **CK-08R3 — Qualify evidence service scale** · Blocked on CK-08R3A accepted merge and exact-main verification · [packet](tasks/ck-08r3-qualify-evidence-scale.md)
 - [ ] **CK-07R1A — Correct hosted lifecycle tail** · Conditional Ready after this corrective authority exact-main verification · [packet](tasks/ck-07r1a-correct-hosted-lifecycle-tail.md)
 - [ ] **CK-07R1 — Correct lifecycle preparation scale** · Blocked on CK-07R1A and refresh of existing PR #394 on corrected main · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
-- [ ] **CK-QG1A — Correct page-executor complexity** · Conditional Ready after this corrective authority exact-main verification · [packet](tasks/ck-qg1a-correct-page-executor-complexity.md)
+- [ ] **CK-QG1A — Correct page-executor complexity** · Conditional Ready after CK-QG1A0 exact-main · [packet](tasks/ck-qg1a-correct-page-executor-complexity.md)
 - [ ] **CK-QG1 — Enforce replacement-kernel maintainability** · Blocked on CK-QG1A and refresh of existing PR #392 on corrected main · [packet](tasks/ck-qg1-enforce-agent-kernel-maintainability.md)
 - [ ] **CK-08R4 — Reclassify physical named plans** · Blocked on CK-08R1/R2/R3 and CK-07R1 · [packet](tasks/ck-08r4-reclassify-physical-plans.md)
 - [ ] **CK-08RG — Authorize CK-09 resumption** · Blocked on CK-08R4 and CK-QG1 · [packet](tasks/ck-08rg-authorize-ck09-resumption.md)
