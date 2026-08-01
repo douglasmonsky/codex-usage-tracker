@@ -20,7 +20,7 @@
       "recover_startup(pointer_path, selection=..., store=..., ...)"
     ],
     "planner": [
-      "plan_refresh(changes, intent, limits=..., dirty_keys=..., projection_rows=..., expected_wal_bytes=...)"
+      "plan_refresh(changes, intent, limits=approved_tail_limits, dirty_keys=..., projection_rows=..., expected_wal_bytes=...)"
     ],
     "small_publication": [
       "PublicationWriter.publish_with_pointer(plan, request, write_set, pointer_path=..., operational_store=..., pointer_request=..., validate_open=...)",
@@ -49,10 +49,25 @@
   "append_safe_small": {
     "operation_class": "append_safe_small",
     "selection_reason": "all_small_tail_bounds_proven",
+    "approved_tail_limits": {
+      "selected_bytes": 8388608,
+      "selected_records": 32,
+      "observations": 12000,
+      "occurrences": 12000,
+      "affected_sessions": 2000,
+      "affected_turns": 4000,
+      "affected_resources": 4000,
+      "affected_allowance_cycles": 512,
+      "dirty_keys": 16000,
+      "projection_rows": 16000,
+      "expected_wal_bytes": 16777216,
+      "planning_staleness_us": 5000000,
+      "model_call_tail_rows": 32000
+    },
     "selection_conditions": [
       "no_schema_adapter_identity_normalization_or_projection_compatibility_change",
       "no_no_change_history_expand_source_replace_or_valuation_only_classification_applies",
-      "estimate_change_set_has_no_limit_breaches_under_the_supplied_TailLimits",
+      "estimate_change_set_has_no_limit_breaches_under_approved_TailLimits",
       "the_selected_sources_and_refresh_intent are the inputs to plan_refresh"
     ],
     "breach_result": "any_limit_breach_selects_append_safe_large_and_small_writer_rejects_it",
@@ -86,7 +101,7 @@
       "a crash/retry is idempotent and does not duplicate or silently replace a publication",
       "owned artifacts and rollback protection remain intact until reconciliation completes"
     ],
-    "required_receipt_fields": ["run_id", "profile_identity", "planner_operation_class", "planner_reason", "publication_chain", "recovery_report", "independent_truth_digest", "postconditions"]
+    "required_receipt_fields": ["run_id", "profile_identity", "planner_operation_class", "planner_reason", "planner_tail_limits", "planner_change_estimate", "publication_chain", "recovery_report", "independent_truth_digest", "postconditions"]
   },
   "run_authorization": {
     "status": "not_executed_by_this_packet",

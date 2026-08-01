@@ -26,21 +26,14 @@
     "schema": {"const": "codex-usage-tracker.lifecycle-path-authority.v1"},
     "authority_version": {"const": 1},
     "owner": {"const": "CK-07R1A0"},
-    "authority_base_sha": {"$ref": "#/$defs/gitSha"},
+    "authority_base_sha": {"const": "979f88eca2f23f6225c0c7a530b8f36f793c5748"},
     "upstream_acceptance": {
       "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["packet", "sha", "status"],
-        "properties": {
-          "packet": {"type": "string", "pattern": "^CK-[A-Z0-9]+(?:-[A-Z0-9]+)*$"},
-          "sha": {"$ref": "#/$defs/gitSha"},
-          "status": {"const": "accepted_merged_exact_main_verified"}
-        }
-      }
+      "const": [
+        {"packet": "CK-QG1A0", "sha": "eb3ded92408d9549d4a4c15c69c045cc3845689c", "status": "accepted_merged_exact_main_verified"},
+        {"packet": "CK-07R1A", "sha": "4d8074952f679877f2b4fbb3e89c51015e96a197", "status": "accepted_merged_exact_main_verified"},
+        {"packet": "CK-08R0", "sha": "306cef37eea2ae017aca824d898cc435f7e1bea0", "status": "accepted_merged_exact_main_verified"}
+      ]
     },
     "blocked_requalification": {
       "type": "object",
@@ -68,7 +61,7 @@
         "planner": {
           "type": "array",
           "const": [
-            "plan_refresh(changes, intent, limits=..., dirty_keys=..., projection_rows=..., expected_wal_bytes=...)"
+            "plan_refresh(changes, intent, limits=approved_tail_limits, dirty_keys=..., projection_rows=..., expected_wal_bytes=...)"
           ]
         },
         "small_publication": {
@@ -113,16 +106,33 @@
     "append_safe_small": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["operation_class", "selection_reason", "selection_conditions", "breach_result", "writer_identity_rule"],
+      "required": ["operation_class", "selection_reason", "approved_tail_limits", "selection_conditions", "breach_result", "writer_identity_rule"],
       "properties": {
         "operation_class": {"const": "append_safe_small"},
         "selection_reason": {"const": "all_small_tail_bounds_proven"},
+        "approved_tail_limits": {
+          "const": {
+            "selected_bytes": 8388608,
+            "selected_records": 32,
+            "observations": 12000,
+            "occurrences": 12000,
+            "affected_sessions": 2000,
+            "affected_turns": 4000,
+            "affected_resources": 4000,
+            "affected_allowance_cycles": 512,
+            "dirty_keys": 16000,
+            "projection_rows": 16000,
+            "expected_wal_bytes": 16777216,
+            "planning_staleness_us": 5000000,
+            "model_call_tail_rows": 32000
+          }
+        },
         "selection_conditions": {
           "type": "array",
           "const": [
             "no_schema_adapter_identity_normalization_or_projection_compatibility_change",
             "no_no_change_history_expand_source_replace_or_valuation_only_classification_applies",
-            "estimate_change_set_has_no_limit_breaches_under_the_supplied_TailLimits",
+            "estimate_change_set_has_no_limit_breaches_under_approved_TailLimits",
             "the_selected_sources_and_refresh_intent are the inputs to plan_refresh"
           ]
         },
@@ -181,7 +191,7 @@
         },
         "required_receipt_fields": {
           "type": "array",
-          "const": ["run_id", "profile_identity", "planner_operation_class", "planner_reason", "publication_chain", "recovery_report", "independent_truth_digest", "postconditions"]
+          "const": ["run_id", "profile_identity", "planner_operation_class", "planner_reason", "planner_tail_limits", "planner_change_estimate", "publication_chain", "recovery_report", "independent_truth_digest", "postconditions"]
         }
       }
     },
@@ -285,15 +295,15 @@
       "required": ["source_path", "sha256", "dependency_sha", "branch", "status", "writer_only_receipt_digest", "fixture_digest", "implementation_sha256", "benchmark_sha256", "test_sha256"],
       "properties": {
         "source_path": {"const": "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json"},
-        "sha256": {"$ref": "#/$defs/sha256"},
-        "dependency_sha": {"$ref": "#/$defs/gitSha"},
+        "sha256": {"const": "9dcebcbd72e2bfd0eca25783bad97d9367a568f28f171cfa466cdbf8689a00ba"},
+        "dependency_sha": {"const": "4d8074952f679877f2b4fbb3e89c51015e96a197"},
         "branch": {"const": "feature/ck-07r1-lifecycle-preparation"},
         "status": {"const": "retained_uncommitted_read_only_evidence"},
         "writer_only_receipt_digest": {"const": "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d"},
-        "fixture_digest": {"$ref": "#/$defs/sha256"},
-        "implementation_sha256": {"$ref": "#/$defs/sha256"},
-        "benchmark_sha256": {"$ref": "#/$defs/sha256"},
-        "test_sha256": {"$ref": "#/$defs/sha256"}
+        "fixture_digest": {"const": "7d58cbdcda25fe98f42e8b896d0b3b064504cd564bc26c51f35cc1461666af9d"},
+        "implementation_sha256": {"const": "ab6f5ccc1524b1471857d2bff3a3fd4403a726fe67f154b3986846ac4f31fc52"},
+        "benchmark_sha256": {"const": "d619595aa96f6edd9b22605c573cc4607d04fe2702eecd300c8cb118e3c29e3a"},
+        "test_sha256": {"const": "da6f9a4ed619a6753e28661065eee88ebea91de4e695e90f4954e435b5e02c8d"}
       }
     },
     "scope_additions": {
@@ -320,8 +330,18 @@
     },
     "fail_closed_rules": {
       "type": "array",
-      "minItems": 8,
-      "items": {"type": "string"}
+      "const": [
+        "do not run production qualification in CK-07R1A0",
+        "do not accept a manually forced operation class as planner evidence",
+        "do not accept a direct writer call that bypasses plan_refresh or recovery",
+        "do not reuse or overwrite prior publication, operation, run, PID, or receipt identities",
+        "do not infer missing timestamps; retain unrecoverable precision as stated",
+        "do not weaken budgets, ceilings, first-sample requirements, or synthetic-only data rules",
+        "stop if the two scope additions cannot be proven from the retained diff",
+        "stop if any authority identity, schema, DAG, ledger, review, hosted CI, merge, or exact-main gate fails",
+        "do not update PR-394, historical worktrees, or downstream corrective packets",
+        "do not dispatch CK-07R1 or any dependent successor from this packet"
+      ]
     }
   },
   "$defs": {

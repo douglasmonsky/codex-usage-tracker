@@ -542,6 +542,23 @@ def test_ck07r1a0_authority_is_strict_and_preserves_attempt_identity() -> None:
     assert authority["reachable_path"]["ordering"] == (
         "recovery_read_first; planner_before_writer_lock; selected_plan_unchanged_through_writer"
     )
+    assert authority["append_safe_small"]["approved_tail_limits"] == {
+        "selected_bytes": 8_388_608,
+        "selected_records": 32,
+        "observations": 12_000,
+        "occurrences": 12_000,
+        "affected_sessions": 2_000,
+        "affected_turns": 4_000,
+        "affected_resources": 4_000,
+        "affected_allowance_cycles": 512,
+        "dirty_keys": 16_000,
+        "projection_rows": 16_000,
+        "expected_wal_bytes": 16_777_216,
+        "planning_staleness_us": 5_000_000,
+        "model_call_tail_rows": 32_000,
+    }
+    assert "planner_tail_limits" in authority["postconditions"]["required_receipt_fields"]
+    assert "planner_change_estimate" in authority["postconditions"]["required_receipt_fields"]
     assert authority["reachable_path"]["identity_binding"] == {
         "same_publication_identity": [
             "ReadSelection.head.publication_id == RefreshIntent.parent_publication_id",
@@ -574,6 +591,23 @@ def test_ck07r1a0_authority_is_strict_and_preserves_attempt_identity() -> None:
 
     changed = json.loads(json.dumps(authority))
     changed["reachable_path"]["identity_binding"]["same_publication_identity"][0] = "stitched"
+    assert list(validator.iter_errors(changed))
+
+    changed = json.loads(json.dumps(authority))
+    changed["append_safe_small"]["approved_tail_limits"]["selected_records"] += 1
+    assert list(validator.iter_errors(changed))
+    changed = json.loads(json.dumps(authority))
+    changed["postconditions"]["required_receipt_fields"].remove("planner_tail_limits")
+    assert list(validator.iter_errors(changed))
+
+    changed = json.loads(json.dumps(authority))
+    changed["upstream_acceptance"][0]["sha"] = "0" * 40
+    assert list(validator.iter_errors(changed))
+    changed = json.loads(json.dumps(authority))
+    changed["retained_evidence"]["fixture_digest"] = "0" * 64
+    assert list(validator.iter_errors(changed))
+    changed = json.loads(json.dumps(authority))
+    changed["fail_closed_rules"][0] = "allow production qualification"
     assert list(validator.iter_errors(changed))
 
     for path, value in (
