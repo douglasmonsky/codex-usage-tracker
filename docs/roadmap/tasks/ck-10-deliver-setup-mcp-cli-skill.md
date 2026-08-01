@@ -1,53 +1,32 @@
-# CK-10 — Deliver agent-led setup, MCP, CLI, and skill
+# CK-10 — Deliver setup, MCP, CLI, and skill
 
-**Status:** Not started
+**Status:** Blocked on CK-09-06; umbrella only
+
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
+
+**Central plan:** [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md)
+
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
-**Goal:** Make the kernel feel effortless through the installed Codex surface.
+**Goal:** Expose the qualified kernel through one typed application service and
+coherent CLI/MCP/plugin/skill bundle.
 
-**Why:** Millisecond SQL is useless if the agent polls, refreshes unnecessarily,
-or needs many discovery queries.
+**Dependencies:** CK-09-06. Child sequence: CK-10-01; CK-10-02 and bounded
+CK-10-04; CK-10-03; CK-10-05.
 
-**Controls:** `AGENT_SETUP_AND_MCP_EXPERIENCE.md`, CK-01/CK-07–CK-09.
-**Dependencies:** CK-09.
+**Non-goals:** This umbrella is never delegated directly; no Console, polling
+tool, implicit refresh, narrative findings, or second implementation.
 
-**Scope and expected files:**
+**Invariants:** Host-waited work, query-first warm path, closed schemas, one
+canonical result, exact versions/digests, bounded calls/bytes.
 
-- application setup/refresh/query/evidence/status services;
-- CLI commands and deterministic JSON codec;
-- proposed MCP catalog and closed schemas;
-- plugin manifest and usage skill;
-- host-wait helper/progress integration;
-- interface/plugin/skill contract tests.
+**Required tests/checks:** Child gates plus clean bundle install, fresh
+processes, complete setup/query/evidence flows, CI/review/exact-main.
 
-**Schema changes:** None beyond operational request hashes/results if already
-selected.
-**API changes:** New replacement CLI/MCP schemas, initially side-by-side and
-not the default public entry point.
+**Acceptance:** CK-10-05 accepts one exact side-by-side bundle.
 
-**Non-goals:** public model-polled job-status tool, Console, second adapter,
-Data Analytics dependency, narrative findings.
+**Failure/rollback:** Candidate remains disabled and public 0.28 unchanged.
 
-**Invariants:** Recommended 30-day question; one host-waited setup; query-first
-warm path; no implicit refresh; one canonical structured response; exact
-version/digest coherence; bounded schemas/bytes.
+**Cleanup/docs:** Reconcile setup, target architecture, roadmap, ledger, index.
 
-**Tests/benchmarks:** setup choices/estimates/results, warm reopen, expansion,
-moving tail, compatible operation reuse, worker-start failure, closed schemas,
-MCP transport, skill decision tree, copied request examples, response bytes.
-
-**Acceptance:** Fresh raw MCP clients expose intended tools; setup and warm
-questions fit call budgets; no polling instruction; skill maps every
-Foundation/Cutover prompt to correct plan; CLI and MCP share results.
-
-**Failure/rollback:** New surface stays disabled; spike remains public. Contract
-errors are corrected before installed harness.
-
-**Cleanup/docs:** Update MCP experience and machine schemas in one change.
-
-**Suggested commits:**
-
-1. `feat: add agent-led kernel setup`
-2. `feat: add bounded MCP and CLI surfaces`
-3. `docs: add installed usage skill`
+**Suggested commit:** `feat: deliver agent kernel interfaces`

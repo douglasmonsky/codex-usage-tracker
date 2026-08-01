@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -18,6 +19,7 @@ _AUTHORITY_PATHS = (
     "docs/product/AGENT_SETUP_AND_MCP_EXPERIENCE.md",
     "docs/quality/QUALIFICATION_PLAN.md",
     "docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md",
+    "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
     "docs/roadmap/TASK_PACKETS.md",
     "docs/roadmap/LINEAR_BACKLOG.md",
 )
@@ -29,6 +31,31 @@ _ARCHIVE_PATHS = (
     "docs/archive/spike/OVERLAY_ADAPTER_CONTRACT_0_28.md",
 )
 _PACKET_IDS = {
+    *(f"CK-{number:02d}" for number in range(17)),
+    "CK-07A",
+    "CK-07B",
+    "CK-07C",
+    "CK-07D",
+    "CK-07E",
+    "CK-07R1",
+    "CK-08R0",
+    "CK-08R1",
+    "CK-08R2",
+    "CK-08R3",
+    "CK-08R4",
+    "CK-08RG",
+    "CK-QG1",
+    *(f"CK-09-{number:02d}" for number in range(1, 7)),
+    *(f"CK-10-{number:02d}" for number in range(1, 6)),
+    *(f"CK-11-{number:02d}" for number in range(1, 5)),
+    *(f"CK-12-{number:02d}" for number in range(1, 7)),
+    *(f"CK-13-{number:02d}" for number in range(1, 4)),
+    *(f"CK-14-{number:02d}" for number in range(1, 5)),
+    *(f"CK-15-{number:02d}" for number in range(1, 3)),
+    *(f"CK-16-{number:02d}" for number in range(1, 5)),
+}
+
+_DELEGATED_PACKET_IDS = _PACKET_IDS - {
     *(f"CK-{number:02d}" for number in range(17)),
     "CK-07A",
     "CK-07B",
@@ -70,12 +97,12 @@ def test_master_ledger_links_exactly_one_file_per_packet() -> None:
     ledger_path = _DOCS / "roadmap" / "TASK_PACKETS.md"
     ledger = ledger_path.read_text(encoding="utf-8")
     packet_ids = re.findall(
-        r"^- \[[ xX]\] \*\*(CK-\d{2}[ABCDE]?)\b",
+        r"^- \[[ xX]\] \*\*(CK-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b",
         ledger,
         re.MULTILINE,
     )
     packet_links = re.findall(
-        r"\[packet\]\((tasks/ck-\d{2}[abcde]?-.*\.md)\)",
+        r"\[packet\]\((tasks/ck-[a-z0-9-]+\.md)\)",
         ledger,
     )
 
@@ -84,6 +111,7 @@ def test_master_ledger_links_exactly_one_file_per_packet() -> None:
     assert len(packet_links) == len(_PACKET_IDS)
     assert len(set(packet_links)) == len(_PACKET_IDS)
     assert all((ledger_path.parent / link).is_file() for link in packet_links)
+    ledger_by_id = dict(zip(packet_ids, packet_links, strict=True))
 
     task_files = sorted((_DOCS / "roadmap" / "tasks").glob("ck-*.md"))
     assert {path.name for path in task_files} == {
@@ -107,12 +135,105 @@ def test_master_ledger_links_exactly_one_file_per_packet() -> None:
                 "**Suggested commit",
             )
         )
+        heading = re.search(r"^# (CK-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b", body)
+        assert heading is not None
+        assert ledger_by_id[heading.group(1)] == f"tasks/{path.name}"
+        if heading.group(1) in _DELEGATED_PACKET_IDS:
+            assert all(
+                marker in body
+                for marker in (
+                    "[REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md)",
+                    "**Recommended owner:**",
+                    "**Owned files/interfaces:**",
+                    "**Produces:**",
+                    "**Independent truth source:**",
+                    "**Consumer seam:**",
+                    "**Parallelism:**",
+                    "**Handoff:**",
+                )
+            )
         assert (
             "**Required tests/checks:**" in body
             or "**Tests/benchmarks:**" in body
         )
 
 
+def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
+    central = _read("docs/roadmap/REMAINING_EXECUTION_PLAN.md")
+    ledger = _read("docs/roadmap/TASK_PACKETS.md")
+
+    manifest_match = re.search(
+        r"<!-- delegated-task-dag:start -->\s*```json\s*(.*?)\s*```"
+        r"\s*<!-- delegated-task-dag:end -->",
+        central,
+        re.DOTALL,
+    )
+    assert manifest_match is not None
+    manifest = json.loads(manifest_match.group(1))
+    assert manifest["schema"] == "codex-usage-tracker.remaining-delegation-dag.v1"
+    assert manifest["orchestration"]["spawn"] == "all_newly_ready_successors"
+    assert manifest["ready"] == ["CK-08R0"]
+
+    tasks = manifest["tasks"]
+    assert len(tasks) == 42
+    manifest_by_id = {task["id"]: task for task in tasks}
+    assert len(manifest_by_id) == 42
+    assert set(manifest_by_id) == _DELEGATED_PACKET_IDS
+
+    ledger_rows = re.findall(
+        r"^- \[[ xX]\] \*\*(CK-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b.*?"
+        r"\[packet\]\((tasks/ck-[a-z0-9-]+\.md)\)",
+        ledger,
+        re.MULTILINE,
+    )
+    ledger_by_id = dict(ledger_rows)
+    for packet_id, task in manifest_by_id.items():
+        file_path = task["file"]
+        assert ledger_by_id[packet_id] == file_path
+        assert set(task) == {"id", "file", "dependencies"}
+        assert len(task["dependencies"]) == len(set(task["dependencies"]))
+        assert set(task["dependencies"]) <= _PACKET_IDS
+
+        body = _read(f"docs/roadmap/{file_path}")
+        assert re.search(rf"^# {re.escape(packet_id)}\b", body, re.MULTILINE)
+        owner_match = re.search(
+            r"^\*\*Recommended owner:\*\* `([a-z_]+) [^`]+`;",
+            body,
+            re.MULTILINE,
+        )
+        assert owner_match is not None
+        assert owner_match.group(1) in {
+            "default",
+            "feature_worker",
+            "refactorer",
+            "test_engineer",
+            "worker",
+        }
+        if packet_id == "CK-08R0":
+            assert "**Status:** Ready" in body
+        else:
+            assert "**Status:** Blocked" in body
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(packet_id: str) -> None:
+        assert packet_id not in visiting, f"delegation cycle at {packet_id}"
+        if packet_id in visited:
+            return
+        visiting.add(packet_id)
+        for dependency in manifest_by_id[packet_id]["dependencies"]:
+            if dependency in manifest_by_id:
+                visit(dependency)
+        visiting.remove(packet_id)
+        visited.add(packet_id)
+
+    for packet_id in manifest_by_id:
+        visit(packet_id)
+
+    assert visited == _DELEGATED_PACKET_IDS
+    assert "architect / Sol" not in central
+    assert "feature worker / Sol" not in central
 def test_corrective_seam_packet_is_critical_path_authority() -> None:
     agents = _read("AGENTS.md")
     index = _read("docs/INDEX.md")

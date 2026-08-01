@@ -105,19 +105,25 @@ path, or read expected-answer/grading artifacts.
 
 Qualification executes all 21 Foundation/Cutover plans across 42 CK-07A
 fact-backed variants. Complete typed rows, grades, deterministic order,
-request/comparison digests, and required evidence sequences match the
-independent authority. Cursor serialization binds its version, request digest,
+request/comparison digests, and required evidence sequences match across the
+two fact-adapter consumers. A downstream audit found both consumers import
+production `evaluate_plan`; this proves fact-adapter and database replay parity,
+not independent answer semantics. CK-08R1 must replace that affected claim
+before CK-09. Cursor serialization still binds its version, request digest,
 plan, publication, and order; malformed, tampered, stale, replacement, and
 mismatched bindings fail closed.
 
-Measured standard and production query-only database-v1 fixtures admit direct
-fact-table execution for `latest_publication_delta`, `data_health`, and
-`resource_hotspots`. The other 18 plans retain correct fact-backed execution
-evidence but require a CK-09 projection to meet at least one latency or payload
-gate. Their measured deficiency, budget, candidate consumer, and bounded
-dirty-key inputs are recorded in
+CK-08 recorded standard and production-shaped query-only database-v1 fixtures
+and provisionally labeled `latest_publication_delta`, `data_health`, and
+`resource_hotspots` fact-table-sufficient and the other 18 plans
+projection-required. The recorded `sql_p95_ms` includes compiler and Python
+evaluation/materialization work, and runtime keyset slicing occurs after
+complete result materialization. Those labels are not projection admission and
+must be replaced by CK-08R2/CK-08R4 stage-separated physical measurements.
+The historical deficiency, budget, candidate consumer, and bounded dirty-key
+inputs remain recorded in
 `docs/decisions/evidence/ck08/fact-backed-query-and-evidence-qualification.json`.
-That list is admission evidence only; CK-08 adds no projection.
+CK-08 adds no projection and CK-09 remains blocked.
 
 Formula execution is governed by `formula-contract-v1.json`: 45 definitions,
 61 catalog uses, and 185 answer-field bindings. Evidence execution is governed
@@ -133,9 +139,20 @@ Plan materialization is governed by `plan-operand-contract-v1.json`. It binds
 every formula use and direct answer field to permitted logical relations,
 typed request/publication/selector gates, grouping, complete order, closed
 operand derivations, missing/empty behavior, and exact output extraction.
-`compile_plan_operands` and `evaluate_plan` are pure L0 authorities; a
-production plan still requires CK-07A's independent scenario and database-v1
-fact selection and exact consumer replay before admission.
+`compile_plan_operands` and `evaluate_plan` are production qualification seams,
+not independent expected-answer authorities. A production plan requires the
+CK-08R1 structural evaluator, database-v1 fact selection, and exact runtime
+consumer replay before admission.
+
+### Corrective physical admission boundary
+
+`REMAINING_EXECUTION_PLAN.md` controls the corrective sequence. CK-08R0 freezes
+the page-execution and benchmark-v2 contracts. CK-08R2 must apply complete
+order, keyset predicates, and `LIMIT page_size + 1` in SQL before Python row
+materialization. CK-08R3 must qualify evidence first/deep pages at both scales.
+CK-07R1 must qualify publication-valid lifecycle preparation. CK-08R4 alone may
+classify a plan as direct-page, evidence-page, or projection-required. CK-09
+may admit only the resulting measured residual list after CK-08RG.
 
 ## Typed compositional boundary
 

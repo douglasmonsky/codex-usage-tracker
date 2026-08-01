@@ -3,6 +3,7 @@
 **Status:** Only authoritative implementation roadmap
 **Program prefix:** `CK`
 **Execution accounting:** `docs/roadmap/TASK_PACKETS.md`
+**Remaining execution authority:** `docs/roadmap/REMAINING_EXECUTION_PLAN.md`
 **Packet contracts:** `docs/roadmap/tasks/`
 
 ## Outcome
@@ -29,8 +30,12 @@ spike and Console before the new public release.
 - The host waits; the model never polls.
 - Ordinary tails update bounded facts/lifecycle and current dirty projections.
 - Qualitative conclusions remain model-owned.
-- One task branch and one focused PR per packet unless a packet explicitly
-  defines measured commit boundaries.
+- Parent CK-09 through CK-16 packets are umbrellas. Delegate only a Ready child
+  task from `REMAINING_EXECUTION_PLAN.md`.
+- A task may challenge and freeze a premise or implement a frozen premise,
+  never both.
+- Use one task branch/worktree and one focused PR per delegated child unless
+  that child explicitly defines measured commit boundaries.
 - Parallel lanes require explicit authorization, named owners/worktrees, one
   base, disjoint file allowlists, and a single integrator for shared contracts.
 - Run one final read-only reviewer only after a meaningful diff is stable.
@@ -45,7 +50,7 @@ spike and Console before the new public release.
 | 1. Question and logical contracts | CK-01–CK-03 | Authority docs and catalog | Executable question registry, logical vectors, shared fixtures/oracles | Every supported question maps to facts, plans, evidence, budgets |
 | 2. Physical decision | CK-04 | Shared contracts/harness | A/C/D results and architecture decision | One candidate passes hard gates and selection rule |
 | 3. Canonical kernel | CK-05–CK-07, CK-07B/CK-07C/CK-07D contract corrections, CK-07E fact adapters, CK-07A seam correction | Selected design and executable seam contracts | Storage, identity, Codex adapter, ingestion, publication/recovery, executable formula/provenance/operand authority, effective-dated valuation, independent fact adapters, fact-lineage requalification | Exact facts and bounded tails survive lifecycle/crash matrix; pricing boundaries and published facts independently reconcile to question truth |
-| 4. Answers and evidence | CK-08–CK-09 | Published canonical kernel | Query/evidence grammar, projections, Foundation/Cutover named plans | Question oracles and performance gates pass |
+| 4. Answers and evidence | CK-08, CK-07R1/CK-08R*/CK-QG1, CK-09 | Published canonical kernel | Independent truth, physical keyset reads, qualified evidence/publication scale, measured projections, named plans | Corrective resume gate and all question/performance gates pass |
 | 5. Installed agent experience | CK-10–CK-12 | Queryable kernel | Setup, MCP/skill/CLI, exact installed harness, full qualification | Fresh CLI/Desktop tasks pass accuracy/call/token/latency gates |
 | 6. Clean cutover and retirement | CK-13–CK-14 | Fully qualified candidate | Cutover decision, clean package, spike/Console deletion | Replacement selected; prior public release remains reinstall rollback |
 | 7. Enhancement and release | CK-15–CK-16 | Clean MVP | Optional presentation/Data Analytics handoff, public docs, release | Exact public artifacts and clean install pass |
@@ -54,7 +59,9 @@ spike and Console before the new public release.
 
 ```text
 CK-00 -> CK-01 -> CK-02 -> CK-03 -> CK-04 -> CK-05 -> CK-06
-      -> CK-07 -> CK-07B -> CK-07C -> CK-07D -> CK-07E -> CK-07A -> CK-08 -> CK-09 -> CK-10 -> CK-11 -> CK-12
+      -> CK-07 -> CK-07B -> CK-07C -> CK-07D -> CK-07E -> CK-07A -> CK-08
+      -> CK-08R0 -> {CK-08R1, CK-08R2, CK-08R3, CK-07R1, CK-QG1}
+      -> CK-08R4 -> CK-08RG -> CK-09 -> CK-10 -> CK-11 -> CK-12
       -> CK-13 -> CK-14 -> CK-16
 ```
 
@@ -81,7 +88,11 @@ flowchart LR
     RATES --> ADAPTERS[CK-07E Independent fact adapters]
     ADAPTERS --> SEAM[CK-07A Fact-lineage seam repair]
     SEAM --> Q[CK-08 Query and evidence]
-    Q --> PR[CK-09 Projections and named plans]
+    Q --> CF[CK-08R0 Corrective freeze]
+    CF --> CT[CK-08R1/R2/R3 and CK-07R1/CK-QG1]
+    CT --> CR[CK-08R4 Reclassification]
+    CR --> RG[CK-08RG Resume gate]
+    RG --> PR[CK-09 Projections and named plans]
     PR --> UX[CK-10 Setup, MCP, skill]
     UX --> IH[CK-11 Installed harness]
     IH --> QUAL[CK-12 Qualification]
@@ -106,10 +117,13 @@ Parallel work is optional and never changes dependency order.
 | CK-07E after CK-07D | Structural-reference adapter; query-only database-v1 adapter; parity/provenance/lifecycle qualification | One integrator freezes adapter interfaces, structural declarations, exact evidence schema, and disjoint file ownership before implementation lanes begin. |
 | CK-07A after CK-07E | Expected-row generation; CK-04 proof replacement; CK-05–CK-07 replay | One integrator consumes the qualified CK-07E adapters and owns expected-row and seam-evidence schemas before disjoint lanes begin. |
 | After CK-07A | Fact-backed query compiler; evidence cursor service; installed harness skeleton | Public request/result schemas and registry have one owner. |
-| CK-09 | Disjoint projection families after dirty-key registry is frozen | Projection registry and publication call site have one owner. |
-| CK-12 | CLI and Desktop fresh-task runs; performance repetitions; crash matrix | Candidate artifacts, fixture digest, and scorecard schema are immutable. |
-| CK-14 | Runtime deletion; frontend/Node removal; package/CI cleanup | Package manifest and release checker have one owner. |
-| CK-16 | Public guide, examples, screenshots/native artifacts if any | README/brand/install wording has one owner. |
+| Corrective Wave 2 | Independent truth; physical query; evidence scale; lifecycle scale; maintainability | CK-08R0 freezes interfaces; lanes are disjoint; CK-08R4 alone integrates measurements. |
+| CK-09 | Admitted disjoint projection families after CK-09-01 freezes the registry | Projection registry, DDL, publication call site, and query bindings each have one integrator. |
+| CK-10 | Application implementation and skill draft after CK-10-01 | Public schemas and manifests remain integrator-owned. |
+| CK-11 | Artifact/CLI trials and Desktop/lower-model trials | Harness schema and scorecard aggregation remain integrator-owned. |
+| CK-12 | Correctness, performance, recovery, and installed-artifact lanes | Candidate artifacts, fixture digest, and evidence schemas are immutable. |
+| CK-14 | Runtime deletion and frontend/Node removal | Package/CI integration waits for both lanes and has one owner. |
+| CK-15/CK-16 | Presentation decision and release-scope decision; later docs may overlap selected presentation | Release metadata, workflow, version, and final wording have one owner. |
 
 Parallel candidate work should reduce elapsed time, not duplicate architecture
 reasoning. No agent edits another lane's files or the shared ledger.
@@ -171,15 +185,25 @@ Rollback: candidate database path is independent; spike remains untouched.
 
 ### Gate G4: answer kernel
 
-CK-08 completes the fact-backed half of this gate with three
-fact-table-sufficient plans and 18 measured CK-09 projection admissions.
-CK-09 is ready as the next packet and has not started.
+CK-08 historically completed a fact-backed mechanism lane, but it did not
+complete this gate. Its two fact adapters share production answer evaluation,
+runtime keyset slicing follows complete Python materialization, its SQL timing
+mixes compiler/evaluator work, and evidence/publication scale plus replacement
+maintainability remain corrective prerequisites. The three direct and 18
+projection-required labels are provisional. CK-09 stays blocked until
+CK-08R0 through CK-08RG merge and reclassify every plan from corrected evidence.
 
 - CK-07D effective-dated valuation and affected seam requalification evidence
   is complete;
 - CK-07E independent fact-adapter parity, provenance, independence, and
   lifecycle evidence is complete;
-- CK-07A fact-lineage and downstream seam requalification evidence is complete;
+- CK-07A fact-adapter parity remains historical evidence; CK-08R1 must add
+  semantically independent expected-answer truth;
+- CK-08R2 must prove physical keyset execution before materialization;
+- CK-08R3 and CK-07R1 must prove evidence and publication-valid scale;
+- CK-QG1 must enforce replacement-kernel maintainability;
+- CK-08R4 must issue measured projection-admission v2 and CK-08RG must authorize
+  exact-main resumption;
 - Foundation and Cutover named plans pass exact oracles;
 - admitted projections name consumers and bounded dirty updates;
 - evidence selectors/cursors survive rebuild/replacement/late events;

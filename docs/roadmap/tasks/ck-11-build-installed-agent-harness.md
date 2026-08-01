@@ -1,46 +1,32 @@
-# CK-11 — Build exact installed-agent qualification harness
+# CK-11 — Build exact installed-agent harness
 
-**Status:** Not started
+**Status:** Blocked on CK-10-05; umbrella only
+
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
+
+**Central plan:** [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md)
+
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
-**Goal:** Automate clean wheel/plugin/skill install and fresh Codex CLI/Desktop
-prompt trials.
+**Goal:** Automate exact artifact install and fresh CLI/Desktop/default/lower
+model trials into one closed scorecard.
 
-**Why:** The core metric is user-visible installed-agent behavior.
+**Dependencies:** CK-10-05. Child sequence: CK-11-01; parallel CK-11-02/03;
+CK-11-04.
 
-**Controls:** `QUALIFICATION_PLAN.md`, CK-01/CK-03/CK-10.
-**Dependencies:** CK-10.
+**Non-goals:** This umbrella is never delegated directly; fake-only or
+source-checkout results never count as installed qualification.
 
-**Scope and expected files:**
+**Invariants:** Exact hashes, isolated synthetic workspace, fresh tasks,
+deadlines/cancellation/cleanup, bounded body-free records.
 
-- `src/.../qualification/**` only if reusable runtime-independent helpers are
-  justified;
-- `scripts/qualify_installed_agent.py`;
-- closed scorecard/result schemas;
-- synthetic isolated source/cache setup;
-- fresh CLI and Desktop launcher adapters;
-- deterministic prompt/oracle suite and bounded retained evidence.
+**Required tests/checks:** Child gates plus complete matrix, deterministic
+scorecard, privacy checks, CI/review/exact-main.
 
-**Schema/API changes:** Qualification artifact schemas only.
-**Non-goals:** Product narrative logic, real user data, source-checkout
-fallback, automatic external publication.
+**Acceptance:** CK-11-04 emits a valid scorecard from one exact bundle.
 
-**Invariants:** Exact built artifacts; fresh tasks; separate install/handshake/
-exposure checks; MCP-only trials use only structured tracker evidence; no
-private prompts/results persisted beyond synthetic test records.
+**Failure/rollback:** Bundle remains unqualified and CK-12 blocked.
 
-**Tests/benchmarks:** Harness self-tests, fake-host lifecycle, timeout/cancel,
-tool ledger, token/byte counters, oracle scoring, lower-model lane, repeat
-determinism.
+**Cleanup/docs:** Reconcile qualification plan, roadmap, ledger, index.
 
-**Acceptance:** One command builds or accepts exact artifact hashes, installs,
-runs the full prompt matrix, and emits a closed aggregate scorecard with no
-manual transcript interpretation.
-
-**Failure/rollback:** Preserve bounded synthetic logs and terminal scorecard;
-do not retry by reinstalling or refreshing unless the scenario specifies it.
-
-**Cleanup/docs:** Document exact operator prerequisites and artifact locations.
-
-**Suggested commit:** `test: add installed Codex qualification harness`
+**Suggested commit:** `test: complete installed agent harness`

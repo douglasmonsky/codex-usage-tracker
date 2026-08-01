@@ -43,7 +43,7 @@ database-resident answer source did not prove canonical-fact lineage:
 | Review gap | Remediation |
 | --- | --- |
 | Recovery used simulated outcomes | The 25-case matrix now observes real termination or injected faults, inspects persistent state, proves rollback, and performs a subsequent publication. |
-| Query results were assembled from oracle rows | CK-07A replaced the candidate-only `question_cases` lane with 80 / 80 structural-v2 replays through permitted database-v1 facts, executable plans, and independent evaluators. |
+| Query results were assembled from oracle rows | Historical CK-07A evidence replaced the candidate-only `question_cases` lane with 80 / 80 structural-v2 replays through permitted database-v1 facts and two fact-adapter consumers. Both consumers share production `evaluate_plan`, so this is mechanism/parity evidence, not independent semantic truth; CK-08R1 supersedes that affected claim. |
 | Planner checks were aggregate-only | Every query case now fails on unapproved full scans, automatic indexes, or temporary sorts. |
 | Parser-worker cases ignored worker count | The worker cases now execute bounded spawned 1/2/4/8-worker parsing with deterministic parent-writer merge. |
 | CPU profile did not match the speed workload | Agent Perf now profiles the exact checked-in standard-build workload; repeated unprofiled runs remain the speed authority. |
@@ -214,12 +214,15 @@ The bake-off query adapter's original answer path read candidate-only
 replaced that invalid correctness lane with Candidate A's query-only,
 authorizer-enforced database-v1 fact/planner entry point and 80 / 80 exact
 structural-v2 comparisons. Historical planner/performance evidence remains
-physical evidence; current correctness authority is the CK-07A artifact.
+physical evidence. The CK-07A artifact is historical fact-adapter/mechanism
+evidence and cannot authorize CK-09 until CK-08RG.
 
 Candidate A remains an experimental physical-plan reference, not production
-code to transplant. CK-08 may now implement production query code from the
-requalified contracts. Any false-zero, expected-answer table, or oracle-backed
-runtime answer remains a release blocker.
+code to transplant. CK-08 implemented production query code against those
+contracts. Corrective CK-08R1/R2/R3/R4 and CK-08RG now own independent
+semantic truth, bounded physical execution, evidence scale, reclassification,
+and resumption. Any false-zero, expected-answer table, or oracle-backed runtime
+answer remains a release blocker.
 
 ## Agent Perf result
 
@@ -280,7 +283,7 @@ Typed contracts and adapter boundaries are retained ideas, not a dependency.
 | --- | --- |
 | Growth-scale build cost and I/O variance | Three current-commit repetitions and one prior complete bundle passed, but two current repetitions were waived. CK-05/CK-06 benchmark streaming, batching, compact SQLite, and truthful progress against the same fixture. |
 | Build RSS | CK-06 proves bounded streaming and queue depth; no whole-history materialization. |
-| Fact-backed query qualification | CK-07B freezes formula and provenance authority. CK-07C freezes executable plan operands/direct facts and the required valuation, context, allowance, hierarchy, total-order, and publication fact representations. CK-07D makes that valuation effective-dated per call and requalifies the affected CK-05/CK-07/CK-07C seams. CK-07A then replaces Candidate A's `question_cases` proof, reconciles independent expected rows to canonical published facts, and requalifies CK-03–CK-07 before CK-08/CK-09. |
+| Fact-backed query qualification | CK-07B freezes formula and provenance authority. CK-07C freezes executable plan operands/direct facts and required fact representations. CK-07D makes valuation effective-dated per call. CK-07A/CK-08 retain useful fact-adapter and database-replay evidence, but a downstream audit found both expected-answer consumers share production `evaluate_plan`, physical keyset paging follows complete Python materialization, and CK-08 physical timings combine stages. CK-08R0 through CK-08RG now own independent semantics, bounded physical paging, evidence/publication scale, corrected plan classification, and the CK-09 resume decision. |
 | Tail overlay has no production fold path | CK-07 implements and crash-qualifies threshold-driven fold or isolated-artifact selection. |
 | Experimental promotion is not durably atomic | CK-07 implements fsync, pointer, lease, rollback, reconciliation, and protected cleanup. |
 | Installed-model DBHub operability is deferred | CK-11 records exact model identity, host/runtime versions, reasoning effort, synthetic-prompt artifact identity/hash, token source, and authorization before any billed call. |

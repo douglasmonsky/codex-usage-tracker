@@ -1,44 +1,30 @@
-# CK-13 — Execute side-by-side clean cutover
+# CK-13 — Execute clean cutover
 
-**Status:** Not started
+**Status:** Blocked on CK-12-06; umbrella only
+
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
+
+**Central plan:** [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md)
+
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
-**Goal:** Select the qualified replacement as the only default entry point
-while preserving a tested pre-deletion rollback.
+**Goal:** Select the qualified replacement, prove rollback, and authorize
+runtime retirement.
 
-**Why:** Cutover must prove packaging and recovery, not merely switch imports.
+**Dependencies:** CK-12-06. Child sequence: CK-13-01, CK-13-02, CK-13-03.
 
-**Controls:** Roadmap Gate G6 and runtime-retirement gate, CK-12.
-**Dependencies:** CK-12.
+**Non-goals:** This umbrella is never delegated directly; no deletion,
+migration, dual-write, or release.
 
-**Scope and expected files:**
+**Invariants:** Separate databases, no spike fallback/import, untouched
+reinstallable 0.28 rollback, explicit maintainer deletion approval.
 
-- CLI/plugin/MCP entry-point selection;
-- new cache/database identity defaults;
-- cutover config and smoke tests;
-- previous-public-version reinstall rollback drill;
-- deprecation/upgrade message stating no DB migration.
+**Required tests/checks:** Child cutover/rollback matrix, CI/review/exact-main.
 
-**Schema/API changes:** Replacement v1 becomes public candidate; obsolete
-surface removal is completed in CK-14.
-**Non-goals:** Compatibility views, old DB migration, dual-write, hidden
-fallback.
+**Acceptance:** CK-13-03 passes and records explicit retirement approval.
 
-**Invariants:** Separate databases; exact candidate artifacts; failure never
-opens/mutates spike DB; user can reinstall prior public release before CK-14
-merge.
+**Failure/rollback:** Restore/select 0.28 and keep CK-14 blocked.
 
-**Tests/benchmarks:** Clean install, upgrade from public 0.28 with untouched old
-cache, two fresh MCP processes, all named smokes, candidate rollback/reinstall,
-publication failure.
+**Cleanup/docs:** Reconcile cutover messages, roadmap, ledger, index.
 
-**Acceptance:** Replacement handles every public path; rollback drill passes;
-maintainer approves deletion checkpoint.
-
-**Failure/rollback:** Revert entry points and reinstall/select public 0.28.
-
-**Cleanup/docs:** Record explicit no-migration behavior and user-facing
-cutover message.
-
-**Suggested commit:** `feat: cut over to agent-first kernel`
+**Suggested commit:** `feat: complete clean cutover`
