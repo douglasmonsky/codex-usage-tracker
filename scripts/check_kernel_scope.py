@@ -254,6 +254,7 @@ CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS = frozenset(
         "docs/roadmap/tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md",
         "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
         "docs/roadmap/tasks/ck-07r1a-correct-hosted-lifecycle-tail.md",
+        "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md",
         "docs/roadmap/tasks/ck-08-implement-query-and-evidence.md",
         "docs/roadmap/tasks/ck-08r0-freeze-corrective-contracts.md",
         "docs/roadmap/tasks/ck-08r1-build-independent-answer-truth.md",
@@ -737,6 +738,20 @@ CKQG1A0_AUTHORITY_ADDITIONS = frozenset(
     ]
 )
 
+CK07R1A0_AUTHORITY_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.schema.json",
+    }
+)
+
+CK07R1_LIFECYCLE_SCOPE_ADDITIONS = frozenset(
+    {
+        "scripts/benchmark_ck07r1_lifecycle_scale.py",
+        "tests/agent_kernel/publication/test_lifecycle_scale.py",
+    }
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -794,6 +809,8 @@ INTEGRATION_ADDITIONS = (
     | CK08R2_PHYSICAL_PAGE_ADDITIONS
     | CK08R3A_AUTHORITY_ADDITIONS
     | CKQG1A0_AUTHORITY_ADDITIONS
+    | CK07R1A0_AUTHORITY_ADDITIONS
+    | CK07R1_LIFECYCLE_SCOPE_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )

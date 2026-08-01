@@ -2,7 +2,7 @@
 
 **Release ceiling:** sdist remains at most 828000 bytes.
 
-**Status:** Conditional Ready after this corrective authority merge is exact-main verified
+**Status:** Completed on merge; exact-main verified at `4d8074952f679877f2b4fbb3e89c51015e96a197`
 
 **Parent:** Corrective prerequisite for CK-07R1
 
