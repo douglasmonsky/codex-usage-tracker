@@ -146,13 +146,17 @@ consumer replay before admission.
 
 ### Corrective physical admission boundary
 
-`REMAINING_EXECUTION_PLAN.md` controls the corrective sequence. CK-08R0 freezes
-the page-execution and benchmark-v2 contracts. CK-08R2 must apply complete
-order, keyset predicates, and `LIMIT page_size + 1` in SQL before Python row
-materialization. CK-08R3 must qualify evidence first/deep pages at both scales.
-CK-07R1 must qualify publication-valid lifecycle preparation. CK-08R4 alone may
-classify a plan as direct-page, evidence-page, or projection-required. CK-09
-may admit only the resulting measured residual list after CK-08RG.
+`REMAINING_EXECUTION_PLAN.md` controls the corrective sequence. CK-08R0 froze
+the exact inputs, page-execution request/result/stage contract, scale profiles,
+budgets, output evidence schemas, lane locks, failure rules, and
+requalification frontier in
+`docs/decisions/evidence/ck08r0/corrective-gates-v1.json`. CK-08R2 must apply
+complete order, keyset predicates, and `LIMIT page_size + 1` in SQL before
+Python row materialization and may not call complete-result `evaluate_plan`.
+CK-08R3 must qualify evidence first/deep pages at both scales. CK-07R1 must
+qualify publication-valid lifecycle preparation. CK-08R4 alone may classify a
+plan as direct-page, evidence-page, or projection-required. CK-09 may admit
+only the resulting measured residual list after CK-08RG.
 
 ## Typed compositional boundary
 

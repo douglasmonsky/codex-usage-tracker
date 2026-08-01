@@ -1,6 +1,6 @@
 # CK-08R1 — Build independent expected-answer truth
 
-**Status:** Blocked on CK-08R0
+**Status:** Conditional Ready after CK-08R0 merge and exact-main verification
 
 **Parent:** Corrective prerequisite for CK-09
 

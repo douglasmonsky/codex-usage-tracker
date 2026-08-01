@@ -1,6 +1,6 @@
 # CK-08R2 — Implement bounded physical keyset execution
 
-**Status:** Blocked on CK-08R0
+**Status:** Conditional Ready after CK-08R0 merge and exact-main verification
 
 **Parent:** Corrective prerequisite for CK-09
 

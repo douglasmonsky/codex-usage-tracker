@@ -1,0 +1,478 @@
+{
+  "schema": "codex-usage-tracker.corrective-gates.v1",
+  "version": 1,
+  "packet": "CK-08R0",
+  "status": "frozen",
+  "dependency_sha": "7fa6e57f1148ac205b530e1e53b0a88aca1bf379",
+  "authority_artifacts": [
+    {
+      "path": "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
+      "sha256": "c4a47cc04d357f29d9fdb3cb3cc9d775dd849b14d00a576d0fb7a6c36bac497e",
+      "claim": "Historical answer-table blocker reproduction; preserved, not current truth."
+    },
+    {
+      "path": "docs/decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json",
+      "sha256": "90aac6e1c05a0747bf904a251ef30ba9e22c7516f3188a4550931b8c0a4d9254",
+      "claim": "Historical 80-variant fact-adapter and database replay parity."
+    },
+    {
+      "path": "docs/decisions/evidence/ck08/fact-backed-query-and-evidence-qualification.json",
+      "sha256": "8196f731141c9f4198b3536ae53f02c580966978fcefa825f3b271a8b02a0585",
+      "claim": "Historical 21-plan and 42-variant query/evidence mechanism record."
+    },
+    {
+      "path": "docs/decisions/evidence/ck08/query-scale-raw-benchmark.json",
+      "sha256": "588bdd3ebc23daa89383f3d5db0b73a7e36cf56863e20d529281c09c5189e331",
+      "claim": "Historical mixed-stage scale reproduction; not projection admission."
+    },
+    {
+      "path": "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json",
+      "sha256": "f26fce4ba5bc75e2efb0e7bab698e2029af4152536dfc87a9c4329c749a347eb",
+      "claim": "Locked structural-v2 scenario declarations for independent answer truth."
+    },
+    {
+      "path": "tests/agent_kernel/fixtures/profiles/standard-v1.json",
+      "sha256": "ef0da880255a0b13ea6055e0f8d748870c075635aa6f199c9521462c681250f3",
+      "claim": "Exact 100,000-call standard corrective scale profile."
+    },
+    {
+      "path": "tests/agent_kernel/fixtures/profiles/production-v1.json",
+      "sha256": "2de0b4dc198603da6c1b0905b8d934e2cd5604e4036ef009d0cd07f1cc81f51b",
+      "claim": "Exact 1,316,864-call production corrective scale profile."
+    },
+    {
+      "path": "docs/decisions/evidence/ck08r0/corrective-lane-evidence-v1.schema.json",
+      "sha256": "a5e1013005ee85ab78c88a6a97bbaf7c13114c0f56e065b32fc7d4240911e4b2",
+      "claim": "Strict executable schemas for all seven corrective lane outputs."
+    },
+    {
+      "path": "config/agent-kernel/question-catalog-v1.json",
+      "sha256": "728645673260efbd59c025cbc0c0ff30353bb712a98676c500e08d9f49fde497",
+      "claim": "Question, plan, grade, row, byte, and performance-class authority."
+    },
+    {
+      "path": "config/agent-kernel/formula-contract-v1.json",
+      "sha256": "2e16599f244ac179313aa7bf7263caaddbd49f2c0984dbfa424ba89713e70ffa",
+      "claim": "Locked formula semantics shareable by independent and production evaluators."
+    },
+    {
+      "path": "config/agent-kernel/plan-operand-contract-v1.json",
+      "sha256": "19b9c69f50f67b01321e1f269cee2f70370ca64c0c666ff4dac2cc52efa314b4",
+      "claim": "Production permitted-fact and plan-binding authority; not independent truth."
+    },
+    {
+      "path": "config/agent-kernel/selector-provenance-v1.json",
+      "sha256": "1a5ad492d7684b8050a71606af918d0e5964fffd32826c5ae0479d829131b41b",
+      "claim": "Ordered selector-owner and provenance authority."
+    },
+    {
+      "path": "src/codex_usage_tracker/agent_kernel/query/service.py",
+      "sha256": "0dc6ea87e82648128e9271ff92f40664d284d635aff04e540c6e6ed624d378d8",
+      "claim": "Current runtime consumer and complete-materialization reproduction."
+    },
+    {
+      "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+      "sha256": "ea32223d1afd997f310419bff0b6b260193e527c8333c9f561bcab280447dfa3",
+      "claim": "Current evidence consumer and outer-UNION paging reproduction."
+    },
+    {
+      "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+      "claim": "Current repeated lifecycle-transition preparation reproduction."
+    }
+  ],
+  "successor_activation_gate": {
+    "condition": "CK-08R0 merged and exact-main verified",
+    "ready_before_gate": false
+  },
+  "ready_successors": [
+    "CK-08R1",
+    "CK-08R2",
+    "CK-08R3",
+    "CK-07R1",
+    "CK-QG1"
+  ],
+  "lanes": [
+    {
+      "id": "CK-08R1",
+      "owned_lock": [
+        "test-only structural independent evaluator",
+        "answer-truth requalification artifact"
+      ],
+      "producer_artifact": "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json at the frozen SHA-256",
+      "independent_truth": "Structural-v2 declarations evaluated through locked formulas without production plan assembly, SQLite, or grading rows.",
+      "consumer_seam": "Exact comparison with database-v1 facts consumed by the actual QueryService for all 80 variants.",
+    "evidence_schema": {
+      "schema": "codex-usage-tracker.answer-truth-requalification.v1",
+      "path": "docs/decisions/evidence/ck08r0/corrective-lane-evidence-v1.schema.json",
+      "sha256": "a5e1013005ee85ab78c88a6a97bbaf7c13114c0f56e065b32fc7d4240911e4b2",
+      "definition": "#/$defs/answerTruth"
+      },
+      "fail_closed": "Any unsupported semantic, import-boundary violation, or exact mismatch leaves CK-09 blocked."
+    },
+    {
+      "id": "CK-08R2",
+      "owned_lock": [
+        "query physical executor",
+        "query cursor and page-execution tests"
+      ],
+      "producer_artifact": "corrective-gates-v1 page-executor-benchmark.v2 request, result, and stage contract",
+      "independent_truth": "Typed page/order oracle over synthetic database-v1 facts and the authoritative complete order.",
+      "consumer_seam": "Actual QueryService snapshot path executes keyset SQL and LIMIT before decoding at most page_size plus one rows.",
+    "evidence_schema": {
+      "schema": "codex-usage-tracker.page-executor-benchmark.v2",
+      "path": "docs/decisions/evidence/ck08r0/corrective-lane-evidence-v1.schema.json",
+      "sha256": "a5e1013005ee85ab78c88a6a97bbaf7c13114c0f56e065b32fc7d4240911e4b2",
+      "definition": "#/$defs/pageExecutor"
+      },
+      "fail_closed": "An unsupported plan stays unimplemented and records its exact index or physical gap; no projection is added."
+    },
+    {
+      "id": "CK-08R3",
+      "owned_lock": [
+        "evidence scale tests",
+        "read-only evidence benchmark and artifact"
+      ],
+      "producer_artifact": "corrective-gates-v1 evidence budgets and publication-valid standard/production fixture receipts",
+      "independent_truth": "Typed selector and seven-part order oracle over synthetic occurrence facts.",
+      "consumer_seam": "Actual EvidenceService in one query-only publication snapshot for first and deep pages.",
+    "evidence_schema": {
+      "schema": "codex-usage-tracker.evidence-scale-qualification.v1",
+      "path": "docs/decisions/evidence/ck08r0/corrective-lane-evidence-v1.schema.json",
+      "sha256": "a5e1013005ee85ab78c88a6a97bbaf7c13114c0f56e065b32fc7d4240911e4b2",
+      "definition": "#/$defs/evidenceScale"
+      },
+      "fail_closed": "Any unbounded outer query, order mismatch, selector failure, or budget breach is retained for CK-08R4 and admits nothing."
+    },
+    {
+      "id": "CK-07R1",
+      "owned_lock": [
+        "lifecycle preparation implementation",
+        "focused publication scale evidence"
+      ],
+      "producer_artifact": "Frozen lifecycle-fold oracle plus publication-valid standard/production synthetic profiles",
+      "independent_truth": "Existing lifecycle transition vectors and committed database postconditions.",
+      "consumer_seam": "Preparation output consumed by PublicationWriter without changing writer, recovery, schema, or query paths.",
+    "evidence_schema": {
+      "schema": "codex-usage-tracker.lifecycle-scale-requalification.v1",
+      "path": "docs/decisions/evidence/ck08r0/corrective-lane-evidence-v1.schema.json",
+      "sha256": "a5e1013005ee85ab78c88a6a97bbaf7c13114c0f56e065b32fc7d4240911e4b2",
+      "definition": "#/$defs/lifecycleScale"
+      },
+      "fail_closed": "A new dominant blocker creates one narrow follow-up; no budget, lifecycle, or publication invariant is weakened."
+    },
+    {
+      "id": "CK-QG1",
+      "owned_lock": [
+        "replacement maintainability baseline",
+        "normalized maintainability CI gate"
+      ],
+      "producer_artifact": "Repository-private normalized maintainability findings at the exact merged CK-08R0 base",
+      "independent_truth": "Deterministic normalized tool output compared with an exact machine baseline.",
+      "consumer_seam": "CI fails every new or worsened replacement-kernel finding without text exemptions.",
+    "evidence_schema": {
+      "schema": "codex-usage-tracker.agent-kernel-maintainability-baseline.v1",
+      "path": "docs/decisions/evidence/ck08r0/corrective-lane-evidence-v1.schema.json",
+      "sha256": "a5e1013005ee85ab78c88a6a97bbaf7c13114c0f56e065b32fc7d4240911e4b2",
+      "definition": "#/$defs/maintainability"
+      },
+      "fail_closed": "Unstable tool output is normalized before enforcement; the gate is never broadly disabled and unrelated code is not refactored."
+    },
+    {
+      "id": "CK-08R4",
+      "owned_lock": [
+        "benchmark-v2 collector",
+        "projection-admission-v2 authority"
+      ],
+      "producer_artifact": "Merged exact-main CK-08R1, CK-08R2, CK-08R3, and CK-07R1 evidence digests",
+      "independent_truth": "CK-08R1 exact answers over publication-valid corrective fixtures.",
+      "consumer_seam": "Actual runtime query/evidence services measured with stage-separated physical work for all 21 plans.",
+    "evidence_schema": {
+      "schema": "codex-usage-tracker.projection-admission.v2",
+      "path": "docs/decisions/evidence/ck08r0/corrective-lane-evidence-v1.schema.json",
+      "sha256": "a5e1013005ee85ab78c88a6a97bbaf7c13114c0f56e065b32fc7d4240911e4b2",
+      "definition": "#/$defs/physicalReclassification"
+      },
+      "fail_closed": "An unmeasured, stale, or unbounded plan remains blocked and cannot enter the CK-09 candidate list."
+    },
+    {
+      "id": "CK-08RG",
+      "owned_lock": [
+        "corrective authority reconciliation",
+        "CK-09 resume gate"
+      ],
+      "producer_artifact": "Merged exact-main CK-08R4 projection-admission-v2 and CK-QG1 baseline digests",
+      "independent_truth": "Executable corrective evidence digests revalidated against their current producers and consumers.",
+      "consumer_seam": "Central DAG readiness and the exact CK-09-01 handoff.",
+    "evidence_schema": {
+      "schema": "codex-usage-tracker.ck09-resume-gate.v1",
+      "path": "docs/decisions/evidence/ck08r0/corrective-lane-evidence-v1.schema.json",
+      "sha256": "a5e1013005ee85ab78c88a6a97bbaf7c13114c0f56e065b32fc7d4240911e4b2",
+      "definition": "#/$defs/resumeGate"
+      },
+      "fail_closed": "Any stale digest, residual full materialization, unmeasured plan, or maintainability bypass keeps CK-09 blocked."
+    }
+  ],
+  "answer_truth": {
+    "schema": "codex-usage-tracker.answer-truth-requalification.v1",
+    "variant_count": 80,
+    "scenario_artifact": {
+      "path": "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json",
+      "sha256": "f26fce4ba5bc75e2efb0e7bab698e2029af4152536dfc87a9c4329c749a347eb",
+      "claim": "Canonical typed scenario declarations; not expected rows."
+    },
+    "reference_interface": "evaluate independently declared typed facts plus exact PlanRequest into typed rows, grades, total order, and ordered evidence",
+    "permitted_shared_authority": [
+      "formula-contract-v1 definitions",
+      "typed request and result contracts",
+      "selector-provenance-v1 ownership",
+      "exact Decimal and NULL rules"
+    ],
+    "production_imports_forbidden": true,
+    "sqlite_forbidden": true,
+    "computed_answer_sharing_forbidden": true,
+    "exact_comparison": [
+      "request",
+      "rows",
+      "grades",
+      "total_order",
+      "ordered_evidence"
+    ],
+    "mutation_checks": [
+      "grading mutation cannot change independent or production result",
+      "canonical-fact mutation changes production result and breaks parity",
+      "production evaluator mutation cannot change independent truth"
+    ]
+  },
+  "page_executor": {
+    "schema": "codex-usage-tracker.page-executor-benchmark.v2",
+    "request_fields": [
+      "plan_id",
+      "plan_version",
+      "publication_id",
+      "request_digest",
+      "complete_order",
+      "page_size",
+      "cursor_order",
+      "include_exact_count"
+    ],
+    "result_fields": [
+      "rows",
+      "returned_rows",
+      "has_more",
+      "next_order",
+      "exact_count",
+      "sql",
+      "parameters",
+      "explain",
+      "stage_measurements"
+    ],
+    "cursor_binding": [
+      "cursor version",
+      "plan and plan version",
+      "publication ID",
+      "request digest",
+      "last complete-order tuple",
+      "expiry"
+    ],
+    "sql_before_python": [
+      "complete total order",
+      "publication-bound keyset predicate",
+      "LIMIT page_size + 1"
+    ],
+    "complete_materialization_forbidden": true,
+    "production_evaluate_plan_forbidden": true,
+    "maximum_page_rows": 100,
+    "exact_count_default": false,
+    "stage_measurements": [
+      "request_bind_ms",
+      "sql_execute_ms",
+      "row_decode_ms",
+      "result_assembly_ms",
+      "serialize_ms",
+      "response_bytes",
+      "rows_examined",
+      "rows_decoded",
+      "peak_rss_bytes"
+    ],
+    "classifications": [
+      "direct_page",
+      "evidence_page",
+      "projection_required"
+    ],
+    "classification_owner": "CK-08R4"
+  },
+  "scale": {
+    "fixtures": {
+      "standard": {
+        "path": "tests/agent_kernel/fixtures/profiles/standard-v1.json",
+        "sha256": "ef0da880255a0b13ea6055e0f8d748870c075635aa6f199c9521462c681250f3",
+        "model_calls": 100000,
+        "seed": 20260728,
+        "history_days": 1095,
+        "semantic_cases": [
+          "context_deterioration",
+          "workflow_sequence_first_mutation",
+          "allowance_interval_accounting",
+          "parent_subagent_aggregation",
+          "evidence_source_lifecycle"
+        ]
+      },
+      "production": {
+        "path": "tests/agent_kernel/fixtures/profiles/production-v1.json",
+        "sha256": "2de0b4dc198603da6c1b0905b8d934e2cd5604e4036ef009d0cd07f1cc81f51b",
+        "model_calls": 1316864,
+        "seed": 20260728,
+        "history_days": 1095,
+        "semantic_cases": [
+          "context_deterioration",
+          "workflow_sequence_first_mutation",
+          "allowance_interval_accounting",
+          "parent_subagent_aggregation",
+          "evidence_source_lifecycle"
+        ]
+      },
+      "synthetic_only": true,
+      "same_semantic_case_library": true,
+      "publication_receipt_required": true
+    },
+    "sample_count": 5,
+    "plan_budgets": {
+      "authority": {
+        "path": "config/agent-kernel/question-catalog-v1.json",
+        "sha256": "728645673260efbd59c025cbc0c0ff30353bb712a98676c500e08d9f49fde497",
+        "claim": "Exact per-plan classes, response-byte limits, and unbuffered catalog counts."
+      },
+      "sql_p95_ms": {
+        "P0": 10,
+        "P1": 25,
+        "P2": 100,
+        "P3": 100,
+        "P4": 250
+      },
+      "service_p95_ms": {
+        "P0": 250,
+        "P1": 500,
+        "P2": 500,
+        "P3": 750,
+        "P4": 750
+      },
+      "response_bytes_policy": "Use each plan's exact catalog limit; any size ratchet may add no more than 25 percent measured headroom."
+    },
+    "evidence": {
+      "maximum_rows": 100,
+      "maximum_bytes": 16384,
+      "first_and_deep_pages_required": true,
+      "exact_count_forbidden": true
+    },
+    "lifecycle": {
+      "thirty_day_first_publication_p95_ms": 5000,
+      "production_all_time_p95_ms": 120000,
+      "no_change_p95_ms": 100,
+      "one_call_tail_p95_ms": 500,
+      "one_tool_tail_p95_ms": 500
+    },
+    "release_size_ratchets": {
+      "wheel_bytes": 383000,
+      "sdist_bytes": 820000,
+      "maximum_headroom_percent": 25,
+      "catalog_count_headroom": 0
+    }
+  },
+  "historical_evidence_policy": {
+      "preserve_packets": [
+        "CK-03",
+        "CK-04",
+      "CK-05",
+      "CK-06",
+      "CK-07",
+      "CK-07A",
+      "CK-08"
+    ],
+    "rewrite_historical_artifacts": false,
+    "amend_by_linked_requalification": true
+  },
+  "superseded_claims": [
+    "CK-07A/CK-08 independent answer semantics",
+    "CK-08 runtime keyset work is bounded before Python materialization",
+    "CK-08 sql_p95_ms is stage-separated physical SQL time",
+    "CK-08 three-direct/eighteen-projection physical classification"
+  ],
+  "preserved_claims": [
+    "CK-07A fact-adapter and database replay parity",
+    "CK-08 21-plan/42-variant mechanism coverage",
+    "CK-08 typed envelopes, selectors, signed cursor binding, and write denial",
+    "CK-08 adds no projection or public surface",
+    "CK-04 growth repetitions 3 and 4 remain waived"
+  ],
+  "requalification_frontier": [
+    {
+      "lane": "CK-08R1",
+      "requalifies": [
+        "CK-03 question truth",
+        "CK-04 query correctness",
+        "CK-05 storage consumer",
+        "CK-06 adapter consumer",
+        "CK-07 publication consumer",
+        "CK-07A answer parity",
+        "CK-08 answer semantics"
+      ]
+    },
+    {
+      "lane": "CK-08R2",
+      "requalifies": [
+        "CK-08 runtime query paging",
+        "CK-08 cursor and exact-count behavior",
+        "CK-08 SQL and plan measurements"
+      ]
+    },
+    {
+      "lane": "CK-08R3",
+      "requalifies": [
+        "CK-08 evidence paging",
+        "CK-08 selector and cursor scale"
+      ]
+    },
+    {
+      "lane": "CK-07R1",
+      "requalifies": [
+        "CK-07 lifecycle preparation",
+        "CK-08 publication-valid scale boundary"
+      ]
+    },
+    {
+      "lane": "CK-QG1",
+      "requalifies": [
+        "replacement-kernel maintainability gate"
+      ]
+    },
+    {
+      "lane": "CK-08R4",
+      "requalifies": [
+        "all 21 physical plan classifications"
+      ]
+    },
+    {
+      "lane": "CK-08RG",
+      "requalifies": [
+        "CK-09 resumption authority"
+      ]
+    }
+  ],
+  "failure_rules": {
+    "ck09_remains_blocked": true,
+    "projection_on_failure_forbidden": true,
+    "budget_waiver_forbidden": true,
+    "stale_or_missing_evidence": "Reject the lane artifact and preserve the exact first failure.",
+    "semantic_mismatch": "Stop every affected consumer and open only a narrowly owned corrective dependency.",
+    "physical_gap": "Keep the plan unimplemented or unclassified; do not add a projection in a corrective lane.",
+    "scale_breach": "Retain raw samples, environment, first irrecoverable breach, and noise; do not weaken the budget.",
+    "maintainability_instability": "Normalize deterministic tool output before enforcement; never replace the gate with text exemptions."
+  },
+  "privacy": {
+    "synthetic_only": true,
+    "real_codex_bodies_forbidden": true,
+    "local_database_forbidden": true,
+    "secrets_forbidden": true
+  }
+}

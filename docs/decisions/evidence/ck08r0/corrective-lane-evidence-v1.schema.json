@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://douglasmonsky.github.io/codex-usage-tracker/schemas/corrective-lane-evidence-v1.schema.json",
+  "title": "CK-08R corrective lane evidence",
+  "oneOf": [
+    {"$ref": "#/$defs/answerTruth"},
+    {"$ref": "#/$defs/pageExecutor"},
+    {"$ref": "#/$defs/evidenceScale"},
+    {"$ref": "#/$defs/lifecycleScale"},
+    {"$ref": "#/$defs/maintainability"},
+    {"$ref": "#/$defs/physicalReclassification"},
+    {"$ref": "#/$defs/resumeGate"}
+  ],
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "nonEmpty": {"type": "string", "minLength": 1},
+    "strings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonEmpty"}
+    },
+    "digests": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/sha"}
+    },
+    "fiveSamples": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {"type": "number", "minimum": 0}
+    },
+    "answerTruth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "dependency_sha", "authority_digests", "variant_results",
+        "mutation_results", "superseded_evidence_links"
+      ],
+      "properties": {
+        "schema": {"const": "codex-usage-tracker.answer-truth-requalification.v1"},
+        "dependency_sha": {"$ref": "#/$defs/gitSha"},
+        "authority_digests": {"$ref": "#/$defs/digests"},
+        "variant_results": {
+          "type": "array",
+          "minItems": 80,
+          "maxItems": 80,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "oracle_id", "request", "independent_rows", "production_rows",
+              "independent_grades", "production_grades", "total_order",
+              "ordered_evidence", "matches"
+            ],
+            "properties": {
+              "oracle_id": {"$ref": "#/$defs/nonEmpty"},
+              "request": {"type": "object"},
+              "independent_rows": {"type": "array"},
+              "production_rows": {"type": "array"},
+              "independent_grades": {"type": "object"},
+              "production_grades": {"type": "object"},
+              "total_order": {"type": "array"},
+              "ordered_evidence": {"type": "array"},
+              "matches": {"const": true}
+            }
+          }
+        },
+        "mutation_results": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["mutation", "passed"],
+            "properties": {
+              "mutation": {"$ref": "#/$defs/nonEmpty"},
+              "passed": {"const": true}
+            }
+          }
+        },
+        "superseded_evidence_links": {"$ref": "#/$defs/strings"}
+      }
+    },
+    "pageExecutor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "dependency_sha", "plan_id", "fixture_digest",
+        "publication_digest", "request_digest", "sql", "bound_parameters",
+        "explain", "first_page_order", "deep_page_order", "rows_decoded",
+        "stage_timings_ms", "rss_bytes", "response_bytes", "cursor_checks",
+        "exact_count_checks", "first_failure", "noise"
+      ],
+      "properties": {
+        "schema": {"const": "codex-usage-tracker.page-executor-benchmark.v2"},
+        "dependency_sha": {"$ref": "#/$defs/gitSha"},
+        "plan_id": {"$ref": "#/$defs/nonEmpty"},
+        "fixture_digest": {"$ref": "#/$defs/sha"},
+        "publication_digest": {"$ref": "#/$defs/sha"},
+        "request_digest": {"$ref": "#/$defs/sha"},
+        "sql": {"$ref": "#/$defs/nonEmpty"},
+        "bound_parameters": {"type": "array"},
+        "explain": {"type": "array", "minItems": 1},
+        "first_page_order": {"type": "array"},
+        "deep_page_order": {"type": "array"},
+        "rows_decoded": {"type": "integer", "minimum": 0, "maximum": 101},
+        "stage_timings_ms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bind", "sql", "decode", "assembly", "serialization"],
+          "properties": {
+            "bind": {"$ref": "#/$defs/fiveSamples"},
+            "sql": {"$ref": "#/$defs/fiveSamples"},
+            "decode": {"$ref": "#/$defs/fiveSamples"},
+            "assembly": {"$ref": "#/$defs/fiveSamples"},
+            "serialization": {"$ref": "#/$defs/fiveSamples"}
+          }
+        },
+        "rss_bytes": {"type": "integer", "minimum": 0},
+        "response_bytes": {"type": "integer", "minimum": 0},
+        "cursor_checks": {"type": "object"},
+        "exact_count_checks": {"type": "object"},
+        "first_failure": {"type": ["object", "null"]},
+        "noise": {"type": "array"}
+      }
+    },
+    "evidenceScale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "dependency_sha", "fixture_digest", "publication_digest",
+        "selector", "direction", "sql", "explain", "first_page_order",
+        "deep_page_order", "gap_duplicate_checks", "rows", "response_bytes",
+        "timing_samples_ms", "rss_bytes", "first_failure", "noise"
+      ],
+      "properties": {
+        "schema": {"const": "codex-usage-tracker.evidence-scale-qualification.v1"},
+        "dependency_sha": {"$ref": "#/$defs/gitSha"},
+        "fixture_digest": {"$ref": "#/$defs/sha"},
+        "publication_digest": {"$ref": "#/$defs/sha"},
+        "selector": {"$ref": "#/$defs/nonEmpty"},
+        "direction": {"enum": ["next", "previous"]},
+        "sql": {"$ref": "#/$defs/nonEmpty"},
+        "explain": {"type": "array", "minItems": 1},
+        "first_page_order": {"type": "array"},
+        "deep_page_order": {"type": "array"},
+        "gap_duplicate_checks": {"type": "object"},
+        "rows": {"type": "integer", "minimum": 0, "maximum": 100},
+        "response_bytes": {"type": "integer", "minimum": 0, "maximum": 16384},
+        "timing_samples_ms": {"$ref": "#/$defs/fiveSamples"},
+        "rss_bytes": {"type": "integer", "minimum": 0},
+        "first_failure": {"type": ["object", "null"]},
+        "noise": {"type": "array"}
+      }
+    },
+    "lifecycleScale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "dependency_sha", "fixture_digest", "publication_digest",
+        "fold_identity_matches", "linear_work_counters", "timing_samples_ms",
+        "attribution_profile", "rss_bytes", "lock_observations",
+        "linked_evidence_amendments", "first_failure", "noise"
+      ],
+      "properties": {
+        "schema": {"const": "codex-usage-tracker.lifecycle-scale-requalification.v1"},
+        "dependency_sha": {"$ref": "#/$defs/gitSha"},
+        "fixture_digest": {"$ref": "#/$defs/sha"},
+        "publication_digest": {"$ref": "#/$defs/sha"},
+        "fold_identity_matches": {"const": true},
+        "linear_work_counters": {"type": "object", "minProperties": 1},
+        "timing_samples_ms": {"$ref": "#/$defs/fiveSamples"},
+        "attribution_profile": {"type": "object"},
+        "rss_bytes": {"type": "integer", "minimum": 0},
+        "lock_observations": {"type": "array"},
+        "linked_evidence_amendments": {"$ref": "#/$defs/strings"},
+        "first_failure": {"type": ["object", "null"]},
+        "noise": {"type": "array"}
+      }
+    },
+    "maintainability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "dependency_sha", "tool_identity", "normalization_version",
+        "baseline_findings", "new_findings", "worsened_findings",
+        "improved_findings", "scope_ownership", "retirement_condition"
+      ],
+      "properties": {
+        "schema": {"const": "codex-usage-tracker.agent-kernel-maintainability-baseline.v1"},
+        "dependency_sha": {"$ref": "#/$defs/gitSha"},
+        "tool_identity": {"$ref": "#/$defs/nonEmpty"},
+        "normalization_version": {"$ref": "#/$defs/nonEmpty"},
+        "baseline_findings": {"type": "array"},
+        "new_findings": {"type": "array"},
+        "worsened_findings": {"type": "array"},
+        "improved_findings": {"type": "array"},
+        "scope_ownership": {"type": "object"},
+        "retirement_condition": {"$ref": "#/$defs/nonEmpty"}
+      }
+    },
+    "physicalReclassification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "dependency_shas", "evidence_digests", "plans",
+        "first_failure", "noise"
+      ],
+      "properties": {
+        "schema": {"const": "codex-usage-tracker.projection-admission.v2"},
+        "dependency_shas": {
+          "type": "object",
+          "minProperties": 4,
+          "additionalProperties": {"$ref": "#/$defs/gitSha"}
+        },
+        "evidence_digests": {"$ref": "#/$defs/digests"},
+        "plans": {
+          "type": "array",
+          "minItems": 21,
+          "maxItems": 21,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "plan_id", "classification", "sql", "explain", "stage_timings_ms",
+              "rss_bytes", "storage_bytes", "wal_bytes", "response_bytes"
+            ],
+            "properties": {
+              "plan_id": {"$ref": "#/$defs/nonEmpty"},
+              "classification": {
+                "enum": ["direct_page", "evidence_page", "projection_required"]
+              },
+              "sql": {"type": ["string", "null"]},
+              "explain": {"type": "array"},
+              "stage_timings_ms": {"type": "object"},
+              "rss_bytes": {"type": "integer", "minimum": 0},
+              "storage_bytes": {"type": "integer", "minimum": 0},
+              "wal_bytes": {"type": "integer", "minimum": 0},
+              "response_bytes": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "first_failure": {"type": ["object", "null"]},
+        "noise": {"type": "array"}
+      }
+    },
+    "resumeGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema", "dependency_shas", "corrective_evidence_digests",
+        "requalification_status", "residual_candidate_plans", "ci",
+        "exact_main", "residual_risks"
+      ],
+      "properties": {
+        "schema": {"const": "codex-usage-tracker.ck09-resume-gate.v1"},
+        "dependency_shas": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {"$ref": "#/$defs/gitSha"}
+        },
+        "corrective_evidence_digests": {"$ref": "#/$defs/digests"},
+        "requalification_status": {"type": "object", "minProperties": 1},
+        "residual_candidate_plans": {"type": "array"},
+        "ci": {"type": "object", "minProperties": 1},
+        "exact_main": {"type": "object", "minProperties": 1},
+        "residual_risks": {"type": "array"}
+      }
+    }
+  }
+}

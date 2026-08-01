@@ -129,8 +129,9 @@ consumers import production `evaluate_plan`. They also do not prove physical
 deep-page work is bounded before Python materialization. CK-08's
 `sql_p95_ms` combines compiler/Python evaluation and materialization, so its
 three-direct/eighteen-projection labels are provisional rather than CK-09
-admission. CK-08R1/R2/R3, CK-07R1, CK-QG1, CK-08R4, and CK-08RG own the
-corrective proof and CK-09 remains blocked.
+admission. CK-08R0's `corrective-gates-v1` controls CK-08R1/R2/R3, CK-07R1,
+CK-QG1, CK-08R4, and CK-08RG; stale evidence fails closed and CK-09 stays
+blocked.
 
 The remaining execution plan decomposes CK-12 into one candidate freeze, four
 read-only lanes, and one integration decision. Every lane consumes

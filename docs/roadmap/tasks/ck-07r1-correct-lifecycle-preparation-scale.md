@@ -1,6 +1,6 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** Blocked on CK-08R0
+**Status:** Conditional Ready after CK-08R0 merge and exact-main verification
 
 **Parent:** Corrective prerequisite for CK-09
 
