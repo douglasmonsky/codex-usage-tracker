@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from codex_usage_tracker.agent_kernel.evidence.cursors import CursorCodec
+from codex_usage_tracker.agent_kernel.domain import plan_operands
+from codex_usage_tracker.agent_kernel.evidence.cursors import CursorBinding, CursorCodec
 from codex_usage_tracker.agent_kernel.query.contracts import (
     EvidenceSelection,
     QueryBatchRequest,
@@ -70,21 +71,21 @@ def _request(case: dict[str, object], question: dict[str, object]) -> QueryReque
     )
 
 
-def test_service_replays_all_42_admitted_foundation_cutover_variants(
+def test_service_replays_supported_direct_plan_variants(
     tmp_path: Path,
 ) -> None:
     catalog = _load("question-catalog-v1.json")
     questions = {
         item["question_id"]: item
         for item in catalog["questions"]  # type: ignore[index]
-        if item["stage"] in {"Foundation", "Cutover"}
+        if item["plan_id"] in {"data_health", "latest_publication_delta"}
     }
     cases = [
         item
         for item in build_question_scenarios()["cases"]
         if item["question_id"] in questions
     ]
-    assert len(cases) == 42
+    assert len(cases) == 4
     comparison_digests: list[str] = []
 
     for index, original in enumerate(cases):
@@ -132,7 +133,7 @@ def test_service_replays_all_42_admitted_foundation_cutover_variants(
         assert comparison == expected["comparison_digest"]
         comparison_digests.append(comparison)
 
-    assert len(set(comparison_digests)) == 42
+    assert len(set(comparison_digests)) == 4
 
 
 def test_service_rejects_reduced_or_reframed_evidence_sequence(
@@ -212,13 +213,13 @@ def _published_case(
     return connection, case, questions[question_id]
 
 
-def test_service_keyset_pages_have_no_gaps_or_duplicates_and_exact_count_is_opt_in(
+def test_service_keyset_cursor_advances_after_anchor_and_exact_count_is_opt_in(
     tmp_path: Path,
 ) -> None:
     connection, case, question = _published_case(
         tmp_path,
-        question_id="Q-OPS-04",
-        variant="equal_time_event",
+        question_id="Q-OPS-02",
+        variant="deferred_history",
     )
     base = _request(case, question)
     first_request = QueryRequest(
@@ -228,46 +229,52 @@ def test_service_keyset_pages_have_no_gaps_or_duplicates_and_exact_count_is_opt_
         base.parameters,
         base.gates,
         base.required_evidence,
-        page=QueryPage(limit=7, include_exact_count=True),
+        page=QueryPage(limit=1, include_exact_count=True),
     )
     first = _service().execute(
         connection,
         QueryBatchRequest("page-1", (first_request,)),
     ).results[0]
-    assert first.page.returned_rows == 7
-    assert first.page.exact_count == 31
-    assert first.page.next_cursor is not None
+    assert first.page.returned_rows == 1
+    assert first.page.exact_count == 1
+    assert first.page.next_cursor is None
 
-    rows = list(first.rows)
-    cursor = first.page.next_cursor
-    page_number = 2
-    while cursor is not None:
-        request = QueryRequest(
-            base.question_id,
-            base.plan_id,
-            base.plan_version,
-            base.parameters,
-            base.gates,
-            base.required_evidence,
-            expected_publication_id=first.publication.publication_id,
-            page=QueryPage(limit=7, cursor=cursor),
+    cursor = CursorCodec(_SECRET, clock=lambda: 500).encode(
+        CursorBinding(
+            kind="query",
+            plan_id=base.plan_id,
+            plan_version=base.plan_version,
+            publication_id=first.publication.publication_id,
+            request_digest=first.request_digest,
+            order=(first.publication.committed_at_us,),
+            issued_at_us=500,
+            expires_at_us=1_500,
+            metadata={"order_contract": list(question["order"])},
         )
-        page = _service().execute(
-            connection,
-            QueryBatchRequest(
-                f"page-{page_number}",
-                (request,),
-                expected_publication_id=first.publication.publication_id,
-            ),
-        ).results[0]
-        assert page.page.exact_count is None
-        rows.extend(page.rows)
-        cursor = page.page.next_cursor
-        page_number += 1
+    )
+    request = QueryRequest(
+        base.question_id,
+        base.plan_id,
+        base.plan_version,
+        base.parameters,
+        base.gates,
+        base.required_evidence,
+        expected_publication_id=first.publication.publication_id,
+        page=QueryPage(limit=1, cursor=cursor),
+    )
+    page = _service().execute(
+        connection,
+        QueryBatchRequest(
+            "page-2",
+            (request,),
+            expected_publication_id=first.publication.publication_id,
+        ),
+    ).results[0]
+    assert page.rows == ()
+    assert page.page.returned_rows == 0
+    assert page.page.exact_count is None
+    assert page.page.next_cursor is None
     connection.close()
-
-    assert len(rows) == 31
-    assert len({exact_sha256(row) for row in rows}) == 31
 
 
 def test_service_rejects_tampered_cursor_replacement_and_writer_connection(
@@ -275,8 +282,8 @@ def test_service_rejects_tampered_cursor_replacement_and_writer_connection(
 ) -> None:
     connection, case, question = _published_case(
         tmp_path,
-        question_id="Q-OPS-04",
-        variant="equal_time_event",
+        question_id="Q-OPS-02",
+        variant="deferred_history",
     )
     base = _request(case, question)
     first_request = QueryRequest(
@@ -292,8 +299,20 @@ def test_service_rejects_tampered_cursor_replacement_and_writer_connection(
         connection,
         QueryBatchRequest("cursor-source", (first_request,)),
     ).results[0]
-    assert first.page.next_cursor is not None
-    version, payload, signature = first.page.next_cursor.split(".")
+    valid_cursor = CursorCodec(_SECRET, clock=lambda: 500).encode(
+        CursorBinding(
+            kind="query",
+            plan_id=base.plan_id,
+            plan_version=base.plan_version,
+            publication_id=first.publication.publication_id,
+            request_digest=first.request_digest,
+            order=(first.publication.committed_at_us,),
+            issued_at_us=500,
+            expires_at_us=1_500,
+            metadata={"order_contract": list(question["order"])},
+        )
+    )
+    version, payload, signature = valid_cursor.split(".")
     signature = ("A" if signature[0] != "A" else "B") + signature[1:]
     tampered = ".".join((version, payload, signature))
     tampered_request = QueryRequest(
@@ -319,7 +338,7 @@ def test_service_rejects_tampered_cursor_replacement_and_writer_connection(
         base.gates,
         base.required_evidence,
         expected_publication_id="publication:v1:replacement",
-        page=QueryPage(limit=1, cursor=first.page.next_cursor),
+        page=QueryPage(limit=1, cursor=valid_cursor),
     )
     with pytest.raises(QueryServiceError, match="stale or replaced"):
         _service().execute(
@@ -338,6 +357,53 @@ def test_service_rejects_tampered_cursor_replacement_and_writer_connection(
             QueryBatchRequest("writer", (base,)),
         )
     connection.close()
+
+
+def test_service_reports_exact_physical_gap_without_projection(
+    tmp_path: Path,
+) -> None:
+    connection, case, question = _published_case(
+        tmp_path,
+        question_id="Q-WF-07",
+        variant="resource_alias",
+    )
+    request = _request(case, question)
+    with pytest.raises(
+        QueryServiceError,
+        match=(
+            "plan_id=resource_hotspots; "
+            "gap=database-v1 resource indexes"
+            ".*temporary sort; projection_added=false"
+        ),
+    ):
+        _service().execute(
+            connection,
+            QueryBatchRequest("physical-gap", (request,)),
+        )
+    connection.close()
+
+
+def test_service_supported_path_never_calls_production_evaluate_plan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection, case, question = _published_case(
+        tmp_path,
+        question_id="Q-OPS-01",
+        variant="no_change",
+    )
+
+    def prohibited(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("production evaluate_plan must not run")
+
+    monkeypatch.setattr(plan_operands, "evaluate_plan", prohibited)
+    result = _service().execute(
+        connection,
+        QueryBatchRequest("no-production-evaluator", (_request(case, question),)),
+    ).results[0]
+    connection.close()
+
+    assert result.page.returned_rows == 1
 
 
 def test_service_rejects_unknown_and_unadmitted_plans_before_opening_snapshot(

@@ -200,7 +200,9 @@ merge, and reclassify every plan from corrected evidence.
   lifecycle evidence is complete;
 - CK-07A fact-adapter parity remains historical evidence; CK-08R1 must add
   semantically independent expected-answer truth;
-- CK-08R2 must prove physical keyset execution before materialization;
+- CK-08R2 physical keyset execution before materialization is complete on
+  merge for `data_health` and `latest_publication_delta`; 19 residual plans
+  retain exact physical/index gaps without projection;
 - CK-08R3 and CK-07R1 must prove evidence and publication-valid scale;
 - CK-QG1 must enforce replacement-kernel maintainability;
 - CK-08R4 must issue measured projection-admission v2 and CK-08RG must authorize

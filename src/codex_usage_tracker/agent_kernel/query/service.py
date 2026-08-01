@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import hashlib
 import sqlite3
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from ..domain.plan_operands import PlanRequest, evaluate_plan
+from ..domain.plan_operands import PlanRequest
 from ..evidence.cursors import CursorBinding, CursorCodec
 from ..storage.database import open_read_only
-from .compiler import DatabaseV1FactCompiler, FactCompilation
+from .compiler import request_digest
 from .contracts import (
     EvidenceSelection,
     Publication,
@@ -21,9 +20,13 @@ from .contracts import (
     QueryPage,
     QueryRequest,
     QueryResult,
-    canonical_json_bytes,
-    canonical_json_value,
     serialize_batch_result,
+)
+from .page_executor import (
+    PAGE_EXECUTOR_VERSION,
+    PageExecutionRequest,
+    PhysicalPageError,
+    PhysicalPageExecutor,
 )
 from .registry import QueryDefinition, QueryRegistry
 
@@ -89,24 +92,6 @@ def _evidence(reference: Any) -> EvidenceSelection:
         provenance_kind=reference.provenance_kind,
         provenance=reference.provenance,
     )
-
-
-def _row_key(row: Mapping[str, Any], entry: QueryDefinition) -> tuple[Any, ...]:
-    """Return a stable keyset identity for an already contract-sorted row."""
-
-    normalized = canonical_json_value(row)
-    digest = hashlib.sha256(canonical_json_bytes(normalized)).hexdigest()
-    values: list[Any] = []
-    for token in entry.order:
-        field = token.removesuffix("_asc").removesuffix("_desc")
-        aliases = (
-            field,
-            f"{field}_us",
-            "logical_id" if field == "entity_id" else field,
-        )
-        values.append(next((normalized[name] for name in aliases if name in normalized), None))
-    values.append(digest)
-    return tuple(values)
 
 
 class QueryService:
@@ -204,52 +189,8 @@ class QueryService:
             parameters=request.parameters,
             gates=request.gates,
         )
-        selector_ids = {
-            item.role: item.selector or f"{item.selector_kind.replace('_', '-')}:{item.selector_id}"
-            for item in request.required_evidence
-        }
-        compilation = DatabaseV1FactCompiler(
-            self._plan_operands,
-            self._selector_provenance,
-            tuple(item.to_mapping() for item in request.required_evidence),
-        ).compile(
-            connection,
-            plan_request,
-            selector_ids=selector_ids,
-        )
-        if compilation.publication_id != publication.publication_id:
-            raise QueryServiceError("compiler publication differs inside one snapshot")
-        evaluation = evaluate_plan(
-            self._plan_operands,
-            compilation.request,
-            compilation.facts,
-        )
-        rows = tuple(canonical_json_value(row) for row in evaluation.rows)
-        page_rows, page = self._page(rows, request, entry, compilation, publication)
-        return QueryResult(
-            question_id=request.question_id,
-            plan_id=request.plan_id,
-            plan_version=request.plan_version,
-            publication=publication,
-            grades=entry.grades,
-            rows=page_rows,
-            evidence_selectors=tuple(
-                _evidence(reference) for reference in compilation.evidence_references
-            ),
-            page=page,
-            request_digest=compilation.request_digest,
-        )
-
-    def _page(
-        self,
-        rows: tuple[Mapping[str, Any], ...],
-        request: QueryRequest,
-        entry: QueryDefinition,
-        compilation: FactCompilation,
-        publication: Publication,
-    ) -> tuple[tuple[Mapping[str, Any], ...], QueryPage]:
-        limit = request.page.limit or entry.default_rows
-        start = 0
+        digest = request_digest(plan_request)
+        cursor_order = None
         if request.page.cursor is not None:
             binding = self._cursor_codec.decode(
                 request.page.cursor,
@@ -257,19 +198,49 @@ class QueryService:
                 expected_plan_id=request.plan_id,
                 expected_plan_version=request.plan_version,
                 expected_publication_id=publication.publication_id,
-                expected_request_digest=compilation.request_digest,
+                expected_request_digest=digest,
             )
-            keys = tuple(_row_key(row, entry) for row in rows)
-            try:
-                start = keys.index(binding.order) + 1
-            except ValueError as error:
-                raise QueryServiceError(
-                    "cursor key is stale or replaced; restart from the first page"
-                ) from error
-        selected = rows[start : start + limit]
-        has_more = start + len(selected) < len(rows)
+            cursor_order = binding.order
+
+        limit = request.page.limit or entry.default_rows
+        try:
+            execution = PhysicalPageExecutor().execute(
+                connection,
+                PageExecutionRequest(
+                    plan_id=request.plan_id,
+                    plan_version=request.plan_version,
+                    publication_id=publication.publication_id,
+                    request_digest=digest,
+                    complete_order=entry.order,
+                    page_size=limit,
+                    cursor_order=cursor_order,
+                    include_exact_count=request.page.include_exact_count,
+                    parameters=request.parameters,
+                ),
+                plan_request,
+            )
+        except PhysicalPageError as error:
+            raise QueryServiceError(str(error)) from error
+
+        selector_ids = {
+            item.role: item.selector or f"{item.selector_kind.replace('_', '-')}:{item.selector_id}"
+            for item in request.required_evidence
+        }
+        # Selector resolution imports the query digest contract, so keep this
+        # runtime dependency out of package initialization to avoid a cycle.
+        from ..evidence.selectors import resolve_evidence_references
+
+        references = resolve_evidence_references(
+            connection,
+            plan_request,
+            self._selector_provenance,
+            tuple(item.to_mapping() for item in request.required_evidence),
+            selector_ids=selector_ids,
+            publication_id=publication.publication_id,
+        )
+
         next_cursor = None
-        if has_more and selected:
+        if execution.has_more and execution.next_order is not None:
             issued_at_us = self._clock()
             next_cursor = self._cursor_codec.encode(
                 CursorBinding(
@@ -277,20 +248,35 @@ class QueryService:
                     plan_id=request.plan_id,
                     plan_version=request.plan_version,
                     publication_id=publication.publication_id,
-                    request_digest=compilation.request_digest,
-                    order=_row_key(selected[-1], entry),
+                    request_digest=digest,
+                    order=execution.next_order,
                     issued_at_us=issued_at_us,
                     expires_at_us=issued_at_us + self._cursor_ttl_us,
-                    metadata={"order_contract": list(entry.order)},
+                    metadata={
+                        "order_contract": list(entry.order),
+                        "page_executor_version": PAGE_EXECUTOR_VERSION,
+                    },
                 )
             )
-        return selected, QueryPage(
-            limit=limit,
-            include_exact_count=request.page.include_exact_count,
-            returned_rows=len(selected),
-            has_more=has_more,
-            next_cursor=next_cursor,
-            exact_count=len(rows) if request.page.include_exact_count else None,
+        return QueryResult(
+            question_id=request.question_id,
+            plan_id=request.plan_id,
+            plan_version=request.plan_version,
+            publication=publication,
+            grades=entry.grades,
+            rows=execution.rows,
+            evidence_selectors=tuple(
+                _evidence(reference) for reference in references
+            ),
+            page=QueryPage(
+                limit=limit,
+                include_exact_count=request.page.include_exact_count,
+                returned_rows=execution.returned_rows,
+                has_more=execution.has_more,
+                next_cursor=next_cursor,
+                exact_count=execution.exact_count,
+            ),
+            request_digest=digest,
         )
 
 
