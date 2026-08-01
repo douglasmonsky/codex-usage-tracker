@@ -22,8 +22,10 @@ before scale on first/deep EvidenceService EXPLAIN. CK-08R3A owns that separate
 fix; CK-08R3 awaits its accepted merge/exact-main verification. Independent
 truth is now serialized as R1A contract freeze, disjoint R1B/R1C consumers,
 and final R1 requalification. CK-QG1A0 gates the selected R2 PageExecutor
-successor; QG1A fixes its two C/B/B findings. CK-07R1A separately corrects PR #394's exact hosted lifecycle-tail
-failure without a budget waiver. Reclassification and maintainability
+successor; QG1A fixes its two C/B/B findings. CK-07R1A separately corrected
+PR #394's exact hosted lifecycle-tail failure without a budget waiver.
+CK-07R1A0 now freezes the reachable planner/recovery path because the retained
+all-profile receipt was writer-only; CK-07R1 remains blocked. Reclassification and maintainability
 remain open. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
 

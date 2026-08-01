@@ -1,0 +1,221 @@
+{
+  "schema": "codex-usage-tracker.lifecycle-path-authority.v1",
+  "authority_version": 1,
+  "owner": "CK-07R1A0",
+  "authority_base_sha": "979f88eca2f23f6225c0c7a530b8f36f793c5748",
+  "upstream_acceptance": [
+    {"packet": "CK-QG1A0", "sha": "eb3ded92408d9549d4a4c15c69c045cc3845689c", "status": "accepted_merged_exact_main_verified"},
+    {"packet": "CK-07R1A", "sha": "4d8074952f679877f2b4fbb3e89c51015e96a197", "status": "accepted_merged_exact_main_verified"},
+    {"packet": "CK-08R0", "sha": "306cef37eea2ae017aca824d898cc435f7e1bea0", "status": "accepted_merged_exact_main_verified"}
+  ],
+  "blocked_requalification": {
+    "packet": "CK-07R1",
+    "status": "BLOCKED",
+    "reason": "planner_valid_lifecycle_receipt_and_this_authority",
+    "accepted_receipt_required": true
+  },
+  "reachable_path": {
+    "startup_recovery": [
+      "select_readable_artifact(pointer_path, validate_open=...)",
+      "recover_startup(pointer_path, selection=..., store=..., ...)"
+    ],
+    "planner": [
+      "plan_refresh(changes, intent, limits=approved_tail_limits, dirty_keys=..., projection_rows=..., expected_wal_bytes=...)"
+    ],
+    "small_publication": [
+      "PublicationWriter.publish_with_pointer(plan, request, write_set, pointer_path=..., operational_store=..., pointer_request=..., validate_open=...)",
+      "publish_small_with_pointer(..., commit_analytical=...)",
+      "PublicationWriter.publish(plan, request, write_set)"
+    ],
+    "ordering": "recovery_read_first; planner_before_writer_lock; selected_plan_unchanged_through_writer",
+    "forbidden_shortcuts": [
+      "manually_constructed_PublicationPlan",
+      "manual_OperationClass_APPEND_SAFE_SMALL_override",
+      "direct_PublicationWriter_publish_without_plan_refresh",
+      "publication_receipt_without_reachable_recovery_path"
+    ],
+    "identity_binding": {
+      "same_publication_identity": [
+        "ReadSelection.head.publication_id == RefreshIntent.parent_publication_id",
+        "RefreshIntent.parent_publication_id == PublicationPlan.parent_publication_id",
+        "PublicationPlan.parent_publication_id == SmallPublicationRequest.expected_active_publication_id",
+        "SmallPublicationRequest.expected_active_publication_id == pre_commit_pointer.active.publication_id",
+        "committed_AnalyticalHead.parent_publication_id == SmallPublicationRequest.expected_active_publication_id",
+        "post_commit_pointer.active.publication_id == committed_AnalyticalHead.publication_id"
+      ],
+      "mismatch_result": "fail_closed_before_acceptance_no_stitched_artifacts_or_cross_run_identity_binding"
+    }
+  },
+  "append_safe_small": {
+    "operation_class": "append_safe_small",
+    "selection_reason": "all_small_tail_bounds_proven",
+    "approved_tail_limits": {
+      "selected_bytes": 8388608,
+      "selected_records": 32,
+      "observations": 12000,
+      "occurrences": 12000,
+      "affected_sessions": 2000,
+      "affected_turns": 4000,
+      "affected_resources": 4000,
+      "affected_allowance_cycles": 512,
+      "dirty_keys": 16000,
+      "projection_rows": 16000,
+      "expected_wal_bytes": 16777216,
+      "planning_staleness_us": 5000000,
+      "model_call_tail_rows": 32000
+    },
+    "selection_conditions": [
+      "no_schema_adapter_identity_normalization_or_projection_compatibility_change",
+      "no_no_change_history_expand_source_replace_or_valuation_only_classification_applies",
+      "estimate_change_set_has_no_limit_breaches_under_approved_TailLimits",
+      "the_selected_sources_and_refresh_intent are the inputs to plan_refresh"
+    ],
+    "breach_result": "any_limit_breach_selects_append_safe_large_and_small_writer_rejects_it",
+    "writer_identity_rule": "the_plan_returned_by_plan_refresh_is passed unchanged to the pointer-coordinated writer"
+  },
+  "independent_truth": {
+    "oracle_path": "tests/agent_kernel/contracts/reference/lifecycle.py",
+    "oracle_symbol": "fold_lifecycle",
+    "derivation": "derive ordered transition vectors from synthetic observations plus prior transitions, then compare lifecycle identities, versions, folds, counts, and digests",
+    "forbidden_sources": [
+      "codex_usage_tracker.agent_kernel.publication.preparation",
+      "codex_usage_tracker.agent_kernel.publication.planner",
+      "codex_usage_tracker.agent_kernel.publication.writer",
+      "codex_usage_tracker.agent_kernel.publication.recovery",
+      "SQLite rows as expected answers"
+    ],
+    "comparisons": ["transition_identity_and_version", "fold_identity_and_digest", "publication_counts_and_chain"]
+  },
+  "postconditions": {
+    "publication": [
+      "publication_head is the final direct child and every parent_publication_id is the preceding head",
+      "source_occurrences equals inserted_occurrences with no duplicate occurrence identities",
+      "lifecycle transition/entity counts and fold digest equal independent truth",
+      "preparation transaction is closed before the writer begins and no analytical transaction remains open",
+      "artifact manifest, operation_id, publication_id, schema identity, and pointer head agree"
+    ],
+    "recovery": [
+      "select_readable_artifact validates the active artifact and falls back only to a validated rollback artifact",
+      "recover_startup runs only after readable selection and reconciles pending intents, stale leases, and dead jobs",
+      "pointer generation, active publication, analytical head, and recovery intent identities agree after reconciliation",
+      "a crash/retry is idempotent and does not duplicate or silently replace a publication",
+      "owned artifacts and rollback protection remain intact until reconciliation completes"
+    ],
+    "required_receipt_fields": ["run_id", "profile_identity", "planner_operation_class", "planner_reason", "planner_tail_limits", "planner_change_estimate", "publication_chain", "recovery_report", "independent_truth_digest", "postconditions"]
+  },
+  "run_authorization": {
+    "status": "not_executed_by_this_packet",
+    "maximum_new_end_to_end_runs": 1,
+    "scope": "one fresh synthetic all-profile CK-07R1 publication/recovery run after implementation correction",
+    "permitted_only_if": [
+      "this authority is accepted merged and exact-main verified",
+      "the implementation successor starts from that exact main and touches only its authorized files",
+      "the harness proves the reachable_path and append_safe_small rules without manual plan construction",
+      "the independent oracle and all publication/recovery postconditions pass on the same run",
+      "all five frozen budgets and the first hosted failure remain unchanged and visible",
+      "no prior run identity or receipt is reused and no concurrent production run exists"
+    ],
+    "failure_action": "retain the first new result, perform no retry, and keep CK-07R1 blocked"
+  },
+  "prior_attempts": [
+    {
+      "run_id": "all-profile-initial-serializer",
+      "classification": "failed_preserved",
+      "profile": "all-profile",
+      "timestamp_status": "output observed at local minute precision",
+      "observed_at_local": "2026-08-01T15:59",
+      "completed_at_local": null,
+      "pid": null,
+      "parent_pid": null,
+      "usable_final_json": false,
+      "publication_state": "none",
+      "failure_or_result": "TypeError: cannot pickle mappingproxy object during receipt serialization",
+      "receipt_digest": null,
+      "fold_digest": null,
+      "preservation": "retained_read_only_never_reused_overwritten_hidden_or_upgraded"
+    },
+    {
+      "run_id": "all-profile-corrected-serializer-tail-oracle",
+      "classification": "failed_preserved",
+      "profile": "all-profile",
+      "timestamp_status": "exact process timestamps are not recoverable from current task records",
+      "observed_at_local": null,
+      "completed_at_local": null,
+      "pid": null,
+      "parent_pid": null,
+      "usable_final_json": false,
+      "publication_state": "temporary database cleaned",
+      "failure_or_result": "independent lifecycle-fold truth omitted prior publication transitions",
+      "receipt_digest": null,
+      "fold_digest": null,
+      "preservation": "retained_read_only_never_reused_overwritten_hidden_or_upgraded"
+    },
+    {
+      "run_id": "all-profile-pid-60367-recovery",
+      "classification": "writer_only_not_publication_valid",
+      "profile": "all-profile",
+      "timestamp_status": "exact completion timestamp retained",
+      "observed_at_local": null,
+      "completed_at_local": "2026-08-01T16:26:43-04:00",
+      "pid": 60367,
+      "parent_pid": 1124,
+      "usable_final_json": true,
+      "publication_state": "writer_only_not_reachable_planner_recovery",
+      "failure_or_result": "full JSON produced; reviewer rejected publication-valid acceptance because the harness manually forced APPEND_SAFE_SMALL and called PublicationWriter directly",
+      "receipt_digest": "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d",
+      "fold_digest": "19ed24f6582e135bb2a90db36d080cebab0a7735886e451bd59d87a0b75e2357",
+      "preservation": "retained_read_only_never_reused_overwritten_hidden_or_upgraded"
+    },
+    {
+      "run_id": "production-only-valid-profile",
+      "classification": "distinct_packet_required_profile",
+      "profile": "production-only",
+      "timestamp_status": "exact completion timestamp retained",
+      "observed_at_local": null,
+      "completed_at_local": "2026-08-01T15:56:26-04:00",
+      "pid": null,
+      "parent_pid": null,
+      "usable_final_json": true,
+      "publication_state": "valid_for_distinct_production_only_profile_not_all_profile",
+      "failure_or_result": "five unprofiled all-time samples [18563.027, 18916.769, 19198.25, 18765.469, 18732.573] ms; max 19198.25 ms; fold digest 19ed24f6582e135bb2a90db36d080cebab0a7735886e451bd59d87a0b75e2357",
+      "receipt_digest": null,
+      "fold_digest": "19ed24f6582e135bb2a90db36d080cebab0a7735886e451bd59d87a0b75e2357",
+      "preservation": "retained_read_only_never_reused_overwritten_hidden_or_upgraded"
+    }
+  ],
+  "retained_evidence": {
+    "source_path": "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
+    "sha256": "9dcebcbd72e2bfd0eca25783bad97d9367a568f28f171cfa466cdbf8689a00ba",
+    "dependency_sha": "4d8074952f679877f2b4fbb3e89c51015e96a197",
+    "branch": "feature/ck-07r1-lifecycle-preparation",
+    "status": "retained_uncommitted_read_only_evidence",
+    "writer_only_receipt_digest": "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d",
+    "fixture_digest": "7d58cbdcda25fe98f42e8b896d0b3b064504cd564bc26c51f35cc1461666af9d",
+    "implementation_sha256": "ab6f5ccc1524b1471857d2bff3a3fd4403a726fe67f154b3986846ac4f31fc52",
+    "benchmark_sha256": "d619595aa96f6edd9b22605c573cc4607d04fe2702eecd300c8cb118e3c29e3a",
+    "test_sha256": "da6f9a4ed619a6753e28661065eee88ebea91de4e695e90f4954e435b5e02c8d"
+  },
+  "scope_additions": [
+    {"path": "scripts/benchmark_ck07r1_lifecycle_scale.py", "sha256": "d619595aa96f6edd9b22605c573cc4607d04fe2702eecd300c8cb118e3c29e3a", "source_of_proof": "retained CK-07R1 uncommitted diff at dependency_sha"},
+    {"path": "tests/agent_kernel/publication/test_lifecycle_scale.py", "sha256": "da6f9a4ed619a6753e28661065eee88ebea91de4e695e90f4954e435b5e02c8d", "source_of_proof": "retained CK-07R1 uncommitted diff at dependency_sha"}
+  ],
+  "dependencies": [
+    "CK-QG1A0@eb3ded92408d9549d4a4c15c69c045cc3845689c",
+    "CK-07R1A@4d8074952f679877f2b4fbb3e89c51015e96a197",
+    "CK-08R0 accepted",
+    "PR-394 retained read-only",
+    "no CK-08R4/CK-08RG/CK-09 successor"
+  ],
+  "fail_closed_rules": [
+    "do not run production qualification in CK-07R1A0",
+    "do not accept a manually forced operation class as planner evidence",
+    "do not accept a direct writer call that bypasses plan_refresh or recovery",
+    "do not reuse or overwrite prior publication, operation, run, PID, or receipt identities",
+    "do not infer missing timestamps; retain unrecoverable precision as stated",
+    "do not weaken budgets, ceilings, first-sample requirements, or synthetic-only data rules",
+    "stop if the two scope additions cannot be proven from the retained diff",
+    "stop if any authority identity, schema, DAG, ledger, review, hosted CI, merge, or exact-main gate fails",
+    "do not update PR-394, historical worktrees, or downstream corrective packets",
+    "do not dispatch CK-07R1 or any dependent successor from this packet"
+  ]
+}
