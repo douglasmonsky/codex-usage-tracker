@@ -1,6 +1,6 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** Blocked on CK-07R1A
+**Status:** **BLOCKED** on CK-07R1A0 and a planner-valid lifecycle receipt
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -21,8 +21,10 @@ production-shaped preparation attempt exceeded 15 minutes.
 **Controls:** Publication/recovery, lifecycle, canonical fact, and benchmark
 contracts.
 
-**Dependencies:** CK-07R1A accepted, merged, and exact-main verified; existing
-PR #394 refreshed from corrected main and all required CI rerun.
+**Dependencies:** CK-07R1A accepted, merged, and exact-main verified at
+`4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 accepted, merged, and
+exact-main verified; existing PR #394 refreshed from corrected main and all
+required CI rerun.
 
 **Owned files/interfaces:** Lifecycle preparation implementation, focused
 publication tests, profile/benchmark, and linked CK-07 evidence amendment.
@@ -49,7 +51,8 @@ standard/production fixtures, five unprofiled samples, 30-day/all-time gates,
 `just v/vc`.
 
 **Acceptance:** Work is linear in observations plus prior transitions and all
-publication-valid scale gates pass.
+publication-valid scale gates pass through the CK-07R1A0 reachable path. Until
+then this packet remains **BLOCKED**, not Ready, active, or accepted.
 
 **Failure/rollback:** Retain the profile and create one narrow follow-up for a
 new dominant blocker; never weaken the gate.

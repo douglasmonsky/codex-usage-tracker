@@ -42,6 +42,7 @@ _PACKET_IDS = {
     "CK-07E",
     "CK-07R1",
     "CK-07R1A",
+    "CK-07R1A0",
     "CK-08R0",
     "CK-08R1A",
     "CK-08R1B",
@@ -175,16 +176,22 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     manifest = json.loads(manifest_match.group(1))
     assert manifest["schema"] == "codex-usage-tracker.remaining-delegation-dag.v1"
     assert manifest["orchestration"]["spawn"] == "all_newly_ready_successors"
-    conditional_ready = {"CK-08R1A", "CK-08R3A", "CK-07R1A", "CK-QG1A"}
-    assert manifest["completed"] == ["CK-08R0", "CK-08R2", "CK-QG1A0"]
+    conditional_ready = {"CK-08R1A", "CK-08R3A", "CK-QG1A"}
+    assert manifest["completed"] == [
+        "CK-08R0",
+        "CK-08R2",
+        "CK-QG1A0",
+        "CK-07R1A",
+        "CK-07R1A0",
+    ]
     ready: set[str] = set()
     assert manifest["ready"] == []
     assert manifest["conditional_ready"] == [
         {
             "condition": (
-                "This serialized corrective authority correction accepted, merged, and exact-main verified"
+                "Each lane's serialized corrective authority correction accepted, merged, and exact-main verified"
             ),
-            "tasks": ["CK-08R1A", "CK-08R3A", "CK-07R1A"],
+            "tasks": ["CK-08R1A", "CK-08R3A"],
         },
         {
             "condition": "CK-QG1A0 merged and exact-main verified",
@@ -201,9 +208,9 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     )
 
     tasks = manifest["tasks"]
-    assert len(tasks) == 49
+    assert len(tasks) == 50
     manifest_by_id = {task["id"]: task for task in tasks}
-    assert len(manifest_by_id) == 49
+    assert len(manifest_by_id) == 50
     assert set(manifest_by_id) == _DELEGATED_PACKET_IDS
     assert manifest_by_id["CK-08R3A"]["dependencies"] == ["CK-08R0"]
     assert manifest_by_id["CK-08R3"]["dependencies"] == ["CK-08R3A"]
@@ -215,7 +222,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest_by_id["CK-QG1A"]["dependencies"] == ["CK-QG1A0"]
     assert manifest_by_id["CK-QG1"]["dependencies"] == ["CK-QG1A"]
     assert manifest_by_id["CK-07R1A"]["dependencies"] == ["CK-08R0"]
-    assert manifest_by_id["CK-07R1"]["dependencies"] == ["CK-07R1A"]
+    assert manifest_by_id["CK-07R1A0"]["dependencies"] == ["CK-QG1A0", "CK-07R1A"]
+    assert manifest_by_id["CK-07R1"]["dependencies"] == ["CK-07R1A0"]
     assert manifest_by_id["CK-08R4"]["dependencies"] == [
         "CK-08R1",
         "CK-08R2",
@@ -226,7 +234,16 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
 
     release_budget = _json("config/kernel-release-candidate-budget.json")
     assert release_budget["sdist_bytes"] == 828000
-    for packet_id in ("CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R3A", "CK-07R1A", "CK-QG1A0", "CK-QG1A"):
+    for packet_id in (
+        "CK-08R1A",
+        "CK-08R1B",
+        "CK-08R1C",
+        "CK-08R3A",
+        "CK-07R1A",
+        "CK-07R1A0",
+        "CK-QG1A0",
+        "CK-QG1A",
+    ):
         packet = _read(f"docs/roadmap/{manifest_by_id[packet_id]['file']}").replace(",", "")
         assert str(release_budget["sdist_bytes"]) in packet
 
@@ -263,8 +280,10 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             assert "**Status:** Conditional Ready after" in body
         elif packet_id in ready:
             assert "**Status:** Ready" in body
-        elif packet_id in {"CK-08R0", "CK-08R2", "CK-QG1A0"}:
+        elif packet_id in {"CK-08R0", "CK-08R2", "CK-QG1A0", "CK-07R1A", "CK-07R1A0"}:
             assert "**Status:** Completed on merge" in body
+        elif packet_id == "CK-07R1":
+            assert "**Status:** **BLOCKED**" in body
         else:
             assert "**Status:** Blocked" in body
 
@@ -367,6 +386,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     ckqg1a0 = _read("docs/roadmap/tasks/ck-qg1a0-authorize-page-executor-source-supersession.md")
     ckqg1 = _read("docs/roadmap/tasks/ck-qg1-enforce-agent-kernel-maintainability.md")
     ck07r1a = _read("docs/roadmap/tasks/ck-07r1a-correct-hosted-lifecycle-tail.md")
+    ck07r1a0 = _read("docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md")
     ck07r1 = _read("docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md")
 
     assert "## Cross-packet semantic continuity" in agents
@@ -474,10 +494,94 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
                 "019fbb41-804b-7fe2-8987-3d2b9e94a4d5",
             ),
         ),
+        (
+            ck07r1a0,
+            (
+                "plan_refresh",
+                "PublicationWriter.publish_with_pointer",
+                "fold_lifecycle",
+                "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d",
+                "one-run authorization condition",
+                "CK-07R1 remains",
+                "**BLOCKED**",
+            ),
+        ),
     ):
         assert all(token in body for token in tokens)
+    assert "exact-main verification required before CK-07R1" in ck07r1a0
     assert "Blocked on CK-QG1A" in ckqg1
-    assert "Blocked on CK-07R1A" in ck07r1
+    assert "**BLOCKED** on CK-07R1A0" in ck07r1
+
+
+def test_ck07r1a0_authority_is_strict_and_preserves_attempt_identity() -> None:
+    authority_path = "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.json"
+    schema = _json("docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.schema.json")
+    authority = _json(authority_path)
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema)
+    validator.validate(authority)
+
+    assert authority["owner"] == "CK-07R1A0"
+    assert authority["authority_base_sha"] == "eb3ded92408d9549d4a4c15c69c045cc3845689c"
+    assert authority["blocked_requalification"]["status"] == "BLOCKED"
+    assert authority["run_authorization"]["status"] == "not_executed_by_this_packet"
+    assert authority["run_authorization"]["maximum_new_end_to_end_runs"] == 1
+    assert authority["reachable_path"]["ordering"] == (
+        "recovery_read_first; planner_before_writer_lock; selected_plan_unchanged_through_writer"
+    )
+    assert authority["reachable_path"]["identity_binding"] == {
+        "same_publication_identity": [
+            "ReadSelection.head.publication_id == RefreshIntent.parent_publication_id",
+            "RefreshIntent.parent_publication_id == PublicationPlan.parent_publication_id",
+            "PublicationPlan.parent_publication_id == SmallPublicationRequest.expected_active_publication_id",
+            "SmallPublicationRequest.expected_active_publication_id == pre_commit_pointer.active.publication_id",
+            "committed_AnalyticalHead.parent_publication_id == SmallPublicationRequest.expected_active_publication_id",
+            "post_commit_pointer.active.publication_id == committed_AnalyticalHead.publication_id",
+        ],
+        "mismatch_result": "fail_closed_before_acceptance_no_stitched_artifacts_or_cross_run_identity_binding",
+    }
+    assert authority["independent_truth"]["oracle_symbol"] == "fold_lifecycle"
+    assert authority["retained_evidence"]["writer_only_receipt_digest"] == (
+        "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d"
+    )
+    assert {attempt["run_id"] for attempt in authority["prior_attempts"]} == {
+        "all-profile-initial-serializer",
+        "all-profile-corrected-serializer-tail-oracle",
+        "all-profile-pid-60367-recovery",
+        "production-only-valid-profile",
+    }
+    assert [item["path"] for item in authority["scope_additions"]] == [
+        "scripts/benchmark_ck07r1_lifecycle_scale.py",
+        "tests/agent_kernel/publication/test_lifecycle_scale.py",
+    ]
+
+    changed = json.loads(json.dumps(authority))
+    changed["run_authorization"]["status"] = "authorized"
+    assert list(validator.iter_errors(changed))
+
+    changed = json.loads(json.dumps(authority))
+    changed["reachable_path"]["identity_binding"]["same_publication_identity"][0] = "stitched"
+    assert list(validator.iter_errors(changed))
+
+    for path, value in (
+        ("observed_at_local", "2026-08-01T16:00"),
+        ("failure_or_result", "changed historical cause"),
+    ):
+        changed = json.loads(json.dumps(authority))
+        changed["prior_attempts"][0][path] = value
+        assert list(validator.iter_errors(changed))
+    changed = json.loads(json.dumps(authority))
+    changed["prior_attempts"][2]["pid"] = 60368
+    assert list(validator.iter_errors(changed))
+    changed = json.loads(json.dumps(authority))
+    changed["prior_attempts"][2]["receipt_digest"] = "0" * 64
+    assert list(validator.iter_errors(changed))
+    changed = json.loads(json.dumps(authority))
+    changed["scope_additions"][1] = json.loads(json.dumps(changed["scope_additions"][0]))
+    assert list(validator.iter_errors(changed))
+    changed = json.loads(json.dumps(authority))
+    changed["scope_additions"][0]["sha256"] = "0" * 64
+    assert list(validator.iter_errors(changed))
 
 
 def test_question_catalog_and_diagram_inventory_are_complete() -> None:
