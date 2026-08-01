@@ -257,6 +257,7 @@ CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS = frozenset(
         "docs/roadmap/tasks/ck-08r1-build-independent-answer-truth.md",
         "docs/roadmap/tasks/ck-08r2-implement-physical-keyset-execution.md",
         "docs/roadmap/tasks/ck-08r3-qualify-evidence-scale.md",
+        "docs/roadmap/tasks/ck-08r3a-implement-evidence-physical-query.md",
         "docs/roadmap/tasks/ck-08r4-reclassify-physical-plans.md",
         "docs/roadmap/tasks/ck-08rg-authorize-ck09-resumption.md",
         "docs/roadmap/tasks/ck-qg1-enforce-agent-kernel-maintainability.md",

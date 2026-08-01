@@ -12,6 +12,11 @@ CK-09 remains blocked until CK-08R independently proves semantics, physical
 paging, measurements, and scale. CK-08R0 freezes the exact contracts and
 requalification frontier in `docs/decisions/evidence/ck08r0/corrective-gates-v1.json`.
 Preserve CK-03–CK-08 history and supersede only its four named claims.
+Retained CK-08R3 pre-scale evidence at commit
+`a28e9cdbff8e48d334712a449fdcee111c725673` proves the EvidenceService outer
+query physically unbounded independent of scale profile. CK-08R3A owns that
+production fix. CK-08R3 must not become Ready or be redelegated until CK-08R3A
+is accepted, merged, and exact-main verified.
 
 ## Delegation law
 
@@ -37,6 +42,7 @@ Only one integrator may own a lock at a time:
 | --- | --- |
 | Authority | `AGENTS.md`, `docs/INDEX.md`, roadmap, this plan, ledger, qualification plan, parent packets |
 | Query physical | request/result contracts, query registry/compiler bindings, cursor version |
+| Evidence physical | `EvidenceService` fixed page SQL, scope-to-branch selection, bound parameters, focused physical tests |
 | Publication physical | analytical DDL, projection registry, writer/preparation integration ports |
 | Installed surface | application envelope, MCP catalog, plugin manifest, `.mcp.json`, entry points |
 | Qualification | candidate hashes, fixture identity, scorecard/evidence schemas, final aggregates |
@@ -46,7 +52,8 @@ Only one integrator may own a lock at a time:
 
 The machine DAG below controls readiness and dependencies; each child packet controls its owner and scope. Only these fan-outs are allowed:
 
-- CK-08R0 -> CK-08R1, CK-08R2, CK-08R3, CK-07R1, CK-QG1; join at CK-08R4/CK-08RG.
+- CK-08R0 -> CK-08R1, CK-08R2, CK-08R3A, CK-07R1, CK-QG1;
+  CK-08R3A -> CK-08R3; join at CK-08R4/CK-08RG.
 - CK-09-01 -> CK-09-02/03/04; join at CK-09-05.
 - CK-10-01 -> CK-10-02 and CK-10-04; CK-10-03 follows 10-02; join at 10-05.
 - CK-11-01 -> CK-11-02/03; join at CK-11-04.
@@ -74,16 +81,17 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
   "completed": ["CK-08R0", "CK-08R2"],
-  "ready": [],
+  "ready": ["CK-08R3A"],
   "conditional_ready": [{
     "condition": "CK-08R0 merged and exact-main verified",
-    "tasks": ["CK-08R1", "CK-08R3", "CK-07R1", "CK-QG1"]
+    "tasks": ["CK-08R1", "CK-07R1", "CK-QG1"]
   }],
   "tasks": [
     {"id": "CK-08R0", "file": "tasks/ck-08r0-freeze-corrective-contracts.md", "dependencies": []},
     {"id": "CK-08R1", "file": "tasks/ck-08r1-build-independent-answer-truth.md", "dependencies": ["CK-08R0"]},
     {"id": "CK-08R2", "file": "tasks/ck-08r2-implement-physical-keyset-execution.md", "dependencies": ["CK-08R0"]},
-    {"id": "CK-08R3", "file": "tasks/ck-08r3-qualify-evidence-scale.md", "dependencies": ["CK-08R0"]},
+    {"id": "CK-08R3A", "file": "tasks/ck-08r3a-implement-evidence-physical-query.md", "dependencies": ["CK-08R0"]},
+    {"id": "CK-08R3", "file": "tasks/ck-08r3-qualify-evidence-scale.md", "dependencies": ["CK-08R3A"]},
     {"id": "CK-07R1", "file": "tasks/ck-07r1-correct-lifecycle-preparation-scale.md", "dependencies": ["CK-08R0"]},
     {"id": "CK-QG1", "file": "tasks/ck-qg1-enforce-agent-kernel-maintainability.md", "dependencies": ["CK-08R0"]},
     {"id": "CK-08R4", "file": "tasks/ck-08r4-reclassify-physical-plans.md", "dependencies": ["CK-08R1", "CK-08R2", "CK-08R3", "CK-07R1"]},

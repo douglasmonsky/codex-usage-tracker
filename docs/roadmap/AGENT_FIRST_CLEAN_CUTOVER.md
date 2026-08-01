@@ -59,49 +59,32 @@ spike and Console before the new public release.
 
 ```text
 CK-00 -> CK-01 -> CK-02 -> CK-03 -> CK-04 -> CK-05 -> CK-06
-      -> CK-07 -> CK-07B -> CK-07C -> CK-07D -> CK-07E -> CK-07A -> CK-08
-      -> CK-08R0 -> {CK-08R1, CK-08R2, CK-08R3, CK-07R1, CK-QG1}
-      -> CK-08R4 -> CK-08RG -> CK-09 -> CK-10 -> CK-11 -> CK-12
-      -> CK-13 -> CK-14 -> CK-16
+-> CK-07 -> CK-07B -> CK-07C -> CK-07D -> CK-07E -> CK-07A -> CK-08
+-> CK-08R0 -> {CK-08R1, CK-08R2, CK-08R3A, CK-07R1, CK-QG1}
+CK-08R3A -> CK-08R3
+{CK-08R1, CK-08R2, CK-08R3, CK-07R1} -> CK-08R4
+{CK-08R4, CK-QG1} -> CK-08RG -> CK-09 -> CK-10 -> CK-11 -> CK-12
+-> CK-13 -> CK-14 -> CK-16
+```
+
+```mermaid
+flowchart LR
+    R0[CK-08R0] --> R1[CK-08R1]
+    R0 --> R2[CK-08R2]
+    R0 --> R3A[CK-08R3A]
+    R0 --> R7[CK-07R1]
+    R0 --> QG[CK-QG1]
+    R3A --> R3[CK-08R3]
+    R1 --> R4[CK-08R4]
+    R2 --> R4
+    R3 --> R4
+    R7 --> R4
+    R4 --> RG[CK-08RG]
+    QG --> RG
 ```
 
 CK-15 is post-MVP enhancement and does not block CK-16 unless the maintainer
 explicitly includes it in the release scope.
-
-```mermaid
-flowchart LR
-    C0[CK-00 Authority cleanup] --> C1[CK-01 Question registry]
-    C1 --> C2[CK-02 Logical vectors]
-    C2 --> C3[CK-03 Fixtures and oracles]
-    C3 --> A[CK-04A Candidate A]
-    C3 --> C[CK-04C Candidate C]
-    C3 --> D[CK-04D Candidate D]
-    A --> DEC[CK-04 Decision]
-    C --> DEC
-    D --> DEC
-    DEC --> K[CK-05 Selected kernel]
-    K --> AD[CK-06 Codex adapter and ingest]
-    AD --> P[CK-07 Publication and recovery]
-    P --> CONTRACT[CK-07B Formula and provenance contract]
-    CONTRACT --> OPERANDS[CK-07C Plan operands and missing facts]
-    OPERANDS --> RATES[CK-07D Effective-dated valuation]
-    RATES --> ADAPTERS[CK-07E Independent fact adapters]
-    ADAPTERS --> SEAM[CK-07A Fact-lineage seam repair]
-    SEAM --> Q[CK-08 Query and evidence]
-    Q --> CF[CK-08R0 Corrective freeze]
-    CF --> CT[CK-08R1/R2/R3 and CK-07R1/CK-QG1]
-    CT --> CR[CK-08R4 Reclassification]
-    CR --> RG[CK-08RG Resume gate]
-    RG --> PR[CK-09 Projections and named plans]
-    PR --> UX[CK-10 Setup, MCP, skill]
-    UX --> IH[CK-11 Installed harness]
-    IH --> QUAL[CK-12 Qualification]
-    QUAL --> CUT[CK-13 Cutover]
-    CUT --> DEL[CK-14 Delete spike]
-    DEL --> REL[CK-16 Public docs and release]
-    DEL --> ENH[CK-15 Optional presentation]
-    ENH -. optional .-> REL
-```
 
 ## Parallel opportunities
 
@@ -117,7 +100,7 @@ Parallel work is optional and never changes dependency order.
 | CK-07E after CK-07D | Structural-reference adapter; query-only database-v1 adapter; parity/provenance/lifecycle qualification | One integrator freezes adapter interfaces, structural declarations, exact evidence schema, and disjoint file ownership before implementation lanes begin. |
 | CK-07A after CK-07E | Expected-row generation; CK-04 proof replacement; CK-05–CK-07 replay | One integrator consumes the qualified CK-07E adapters and owns expected-row and seam-evidence schemas before disjoint lanes begin. |
 | After CK-07A | Fact-backed query compiler; evidence cursor service; installed harness skeleton | Public request/result schemas and registry have one owner. |
-| Corrective Wave 2 | Independent truth; physical query; evidence scale; lifecycle scale; maintainability | CK-08R0 froze `corrective-gates-v1`; its five successor lanes have disjoint locks/evidence schemas; CK-08R4 alone integrates measurements. |
+| Corrective Wave 2 | Independent truth; query paging; EvidenceService physical query then evidence scale; lifecycle scale; maintainability | CK-08R0 froze `corrective-gates-v1`; five parallel lanes have disjoint locks, CK-08R3 is serialized after CK-08R3A, and CK-08R4 alone integrates measurements. |
 | CK-09 | Admitted disjoint projection families after CK-09-01 freezes the registry | Projection registry, DDL, publication call site, and query bindings each have one integrator. |
 | CK-10 | Application implementation and skill draft after CK-10-01 | Public schemas and manifests remain integrator-owned. |
 | CK-11 | Artifact/CLI trials and Desktop/lower-model trials | Harness schema and scorecard aggregation remain integrator-owned. |
@@ -185,126 +168,73 @@ Rollback: candidate database path is independent; spike remains untouched.
 
 ### Gate G4: answer kernel
 
-CK-08 historically completed a fact-backed mechanism lane, but it did not
-complete this gate. Its two fact adapters share production answer evaluation,
-runtime keyset slicing follows complete Python materialization, its SQL timing
-mixes compiler/evaluator work, and evidence/publication scale plus replacement
-maintainability remain corrective prerequisites. The three direct and 18
-projection-required labels are provisional. CK-09 stays blocked until
-CK-08R0 froze `corrective-gates-v1`; CK-08R1 through CK-08RG must consume it,
-merge, and reclassify every plan from corrected evidence.
-
-- CK-07D effective-dated valuation and affected seam requalification evidence
-  is complete;
-- CK-07E independent fact-adapter parity, provenance, independence, and
-  lifecycle evidence is complete;
-- CK-07A fact-adapter parity remains historical evidence; CK-08R1 must add
-  semantically independent expected-answer truth;
-- CK-08R2 physical keyset execution before materialization is complete on
-  merge for `data_health` and `latest_publication_delta`; 19 residual plans
-  retain exact physical/index gaps without projection;
-- CK-08R3 and CK-07R1 must prove evidence and publication-valid scale;
-- CK-QG1 must enforce replacement-kernel maintainability;
-- CK-08R4 must issue measured projection-admission v2 and CK-08RG must authorize
-  exact-main resumption;
-- Foundation and Cutover named plans pass exact oracles;
-- admitted projections name consumers and bounded dirty updates;
-- evidence selectors/cursors survive rebuild/replacement/late events;
-- complete-result sorting, exact counts, labels, four token columns,
-  cost/credits, and allowance coverage behave as contracted;
-- SQL/MCP/byte gates pass at both scales.
+CK-08's shared evaluator, post-materialization keyset, mixed SQL timing and
+unproved scale/maintainability leave its three/18 labels provisional. CK-08R0
+`corrective-gates-v1` keeps CK-09 blocked through CK-08RG: R1 supplies
+independent truth; completed R2 bounds `data_health` and
+`latest_publication_delta` keyset work while 19 plans retain exact gaps; R3A
+removes the unbounded EvidenceService shape without semantic/budget change; R3/07R1 prove
+evidence/publication scale; QG1 enforces maintainability; R4 emits measured
+admission v2; RG authorizes exact-main resumption. Foundation/Cutover plans,
+projection consumers/dirty bounds, lifecycle-stable evidence cursors, sorting,
+counts, labels, four token columns, cost/credits, allowance and SQL/MCP/byte
+gates must all pass their exact oracles at both scales.
 
 Rollback: remove failing projection/plan or fall back to a fact-backed plan only
 if it meets the named contract.
 
 ### Gate G5: installed Codex MVP
 
-- exact wheel/plugin/skill bundle installed cleanly;
-- fresh CLI and Desktop tool exposure coherent;
-- recommended setup and warm reopen pass;
-- every Foundation/Cutover prompt has 100% oracle accuracy;
-- call/poll/refresh, latency, response, and model-token budgets pass;
-- less-capable model passes;
-- no source-checkout or side-channel fallback.
-
-Rollback: keep the new runtime disabled and continue using public 0.28.
+Exact wheel/plugin/skill clean install, coherent fresh CLI/Desktop exposure,
+recommended setup/reopen, 100% Foundation/Cutover oracle accuracy,
+call/poll/refresh/latency/response/token budgets, and the less-capable lane must
+pass without checkout/side channel. Rollback: disable it and use public 0.28.
 
 ### Gate G6: clean cutover
 
-- side-by-side candidate drill passes;
-- rollback by reinstalling/selecting the prior public release is documented and
-  tested before deletion;
-- replacement becomes the only packaged/runtime path;
-- spike, Console, old schemas/tools/routes/tests/assets/Node dependencies, and
-  compatibility code are absent;
-- package and CI ratchets decrease.
-
-Rollback before merge: restore from the clean cutover base. Rollback after
-release: install the previous public version and its independent database; no
-legacy runtime is bundled.
+The side-by-side drill and tested prior-release rollback precede deletion; only
+the replacement remains packaged/runnable, with spike/Console/old schemas,
+tools, routes, tests, assets, Node dependencies and compatibility code absent,
+and package/CI ratchets lower. Before merge restore the cutover base; after
+release install the prior version and independent database—never bundle legacy.
 
 ### Gate G7: public release
 
-- public-facing name transition retains searchable Codex Usage Tracker
-  references;
-- setup examples, supported questions, grades, limitations, and Data Analytics
-  handoff are accurate;
-- one build-once artifact set passes exact hashes, clean/public install, fresh
-  task smoke, and release checks;
-- release evidence is recorded.
+The name transition retains searchable Codex Usage Tracker references; setup,
+questions, grades, limits and Data Analytics handoff stay accurate; one
+build-once artifact set passes hashes, clean/public install, fresh-task smoke
+and release checks; evidence is recorded.
 
 ## Performance objectives
 
-Hard budgets live in the bake-off and qualification documents. Program targets:
-
-- 30-day first useful publication p95 `<=5 s`, stretch `<=2 s`;
-- 90-day `<=15 s`;
-- one-year `<=45 s`;
-- 1.3-million-call all-time `<=120 s`, stretch `<=60 s`;
-- no-change `<=100 ms`;
-- one-call and one-tool complete-history tails `<=500 ms`;
-- named P1/P2 local MCP `<=500 ms`;
-- normal Tier 1 answer one tracker call and `<=16 KB`;
-- fresh installed answer p95 `<=15 s`, with tracker and host/model portions
-  reported separately.
+Hard budgets remain in bake-off/qualification: 30-day publication p95 `<=5 s`
+(stretch `<=2 s`); 90-day `<=15 s`; one-year `<=45 s`; 1.3-million-call
+all-time `<=120 s` (stretch `<=60 s`); no-change `<=100 ms`; one-call/tool
+tails and named P1/P2 local MCP `<=500 ms`; normal Tier 1 one tracker call and
+`<=16 KB`; fresh installed answer p95 `<=15 s`, split tracker/host-model.
 
 These are gates, not estimates to be weakened after implementation.
 
 ## Cutover criteria
 
-The maintainer may approve CK-13 only when:
-
-- every locked logical contract is implemented;
-- every Foundation/Cutover question passes;
-- all crash and source-lifecycle cases pass;
-- selected history and expansion are honest and monotonic;
-- public data is separate from the spike path;
-- exact installed artifacts pass both Codex hosts and lower-capability lane;
-- package/DB/WAL/response/model-token ratchets pass;
-- one final reviewer has no unresolved accepted finding;
-- the previous public release can be reinstalled without touching the new
-  database.
+CK-13 requires every locked contract and Foundation/Cutover question; all
+crash/lifecycle cases; honest monotonic history/expansion; public/spike data
+separation; exact artifacts on both Codex hosts and the lower-capability lane;
+package/DB/WAL/response/token ratchets; no unresolved accepted review finding;
+and reinstall of the prior public release without touching the new database.
 
 ## Runtime-retirement gate
 
-CK-14 may delete the spike runtime only after all of these active conditions
-are true:
-
-1. The A/C/D bake-off has a recorded winner and complete decision artifact.
-2. The replacement passes every Foundation and Cutover question oracle at
-   100,000-call and production-shaped scale.
-3. Cold setup, ordinary tail, no-change, query, evidence, payload, and
-   installed-agent budgets pass on the exact wheel/plugin/skill candidate.
-4. Crash, recovery, late-event, source-replacement, recanonicalization,
-   valuation-only, and cross-publication lifecycle tests pass.
-5. A side-by-side cutover drill proves the spike remains untouched and rollback
-   can reinstall/select public 0.28 without database conversion.
-6. Fresh Codex CLI and Desktop tasks meet accuracy, usefulness, call-count,
-   latency, and token budgets, including the less-capable-model lane.
-7. The exact locally built candidate artifacts are byte-identified and pass
-   clean-install smoke without source-checkout fallback.
-8. The maintainer approves the final deletion checkpoint and no accepted review
-   finding remains unresolved.
+CK-14 deletion requires: (1) recorded A/C/D winner/decision; (2) every
+Foundation/Cutover oracle at 100,000 and production scale; (3) exact
+wheel/plugin/skill cold/tail/no-change/query/evidence/payload/installed-agent
+budgets; (4) crash/recovery/late/replacement/recanonicalization/valuation/
+cross-publication lifecycle; (5) side-by-side drill with untouched spike and
+public-0.28 rollback without conversion; (6) fresh CLI/Desktop accuracy,
+usefulness, calls, latency and tokens including the less-capable lane; (7)
+exact locally built candidate artifacts byte-identified and passing clean
+install without checkout; and (8) maintainer deletion approval with no
+unresolved accepted finding.
 
 Public-index download/install verification is a CK-16 post-publication check,
 not a prerequisite for CK-14. CK-14 must leave the tree capable of producing
@@ -313,34 +243,19 @@ build and release.
 
 ## Definition of done
 
-The clean-cutover program is complete when:
-
-- the new agent kernel is the only packaged implementation;
-- the old runtime and Console are deleted;
-- the product answers the supported catalog within correctness/evidence/
-  performance/call/token budgets;
-- setup and reopen feel immediate for recommended history;
-- ordinary tails are incremental and lock-bounded;
-- fresh installed Codex tasks are the release gate;
-- public artifacts are verified and released;
-- the roadmap ledger and Linear backlog mark all blocking packets complete;
-- every dependency used as truth has producer identity, consumer replay,
-  independent truth, and current requalification evidence;
-- optional future seams add no current runtime burden.
+Done means: only the new kernel is packaged; old runtime/Console are deleted;
+the catalog meets correctness/evidence/performance/call/token budgets; setup/
+reopen is immediate and tails incremental/lock-bounded; fresh installed Codex
+tasks gate verified public artifacts; ledger/backlog blocking work is complete;
+every truth edge has producer identity, consumer replay, independent truth and
+current requalification; future seams add no runtime burden.
 
 ## Explicit future items
 
-Design seams exist, but MVP does not implement:
-
-- Claude Code and other agent adapters;
-- Evidence Viewer and Live Watch;
-- MCP Apps/native Codex widgets;
-- Claude Artifacts;
-- bring-your-own question packs;
-- cross-agent/team/hosted comparisons;
-- automated recommendations;
-- live overlay/DOM integration;
-- shareable reports and historical rate cards.
+MVP excludes Claude Code/other adapters, Evidence Viewer/Live Watch, MCP Apps/
+native widgets, Claude Artifacts, bring-your-own packs, cross-agent/team/hosted
+comparisons, automated recommendations, live overlay/DOM, shareable reports
+and historical rate cards.
 
 Admission requires a new question/experience contract, measured consumer value,
 and no regression to the Codex-first core.
