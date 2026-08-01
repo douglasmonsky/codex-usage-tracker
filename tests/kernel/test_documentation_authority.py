@@ -179,15 +179,15 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest["orchestration"]["spawn"] == "all_newly_ready_successors"
     conditional_ready = {
         "CK-08R1",
-        "CK-08R2",
         "CK-08R3",
         "CK-07R1",
         "CK-QG1",
     }
+    assert manifest["completed"] == ["CK-08R0", "CK-08R2"]
     assert manifest["ready"] == []
     assert manifest["conditional_ready"] == [{
         "condition": "CK-08R0 merged and exact-main verified",
-        "tasks": ["CK-08R1", "CK-08R2", "CK-08R3", "CK-07R1", "CK-QG1"],
+        "tasks": ["CK-08R1", "CK-08R3", "CK-07R1", "CK-QG1"],
     }]
 
     tasks = manifest["tasks"]
@@ -227,7 +227,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         }
         if packet_id in conditional_ready:
             assert "**Status:** Conditional Ready after CK-08R0 merge" in body
-        elif packet_id == "CK-08R0":
+        elif packet_id in {"CK-08R0", "CK-08R2"}:
             assert "**Status:** Completed on merge" in body
         else:
             assert "**Status:** Blocked" in body
@@ -238,9 +238,20 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         _json(f"{path.removesuffix('.json')}.schema.json")
     )
     contract_validator.validate(contract)
+    r2_evidence = _json(
+        "docs/decisions/evidence/ck08r2/physical-page-executor-evidence.json"
+    )
+    superseded = {
+        item["path"]: item for item in r2_evidence["superseded_authority_artifacts"]
+    }
     for artifact in contract["authority_artifacts"]:
         source = _REPO_ROOT / artifact["path"]
-        assert hashlib.sha256(source.read_bytes()).hexdigest() == artifact["sha256"]
+        actual = hashlib.sha256(source.read_bytes()).hexdigest()
+        if replacement := superseded.get(artifact["path"]):
+            assert replacement["from_sha256"] == artifact["sha256"]
+            assert actual == replacement["to_sha256"]
+        else:
+            assert actual == artifact["sha256"]
     locks = [lock for lane in contract["lanes"] for lock in lane["owned_lock"]]
     assert len(locks) == len(set(locks))
     changed = json.loads(json.dumps(contract))

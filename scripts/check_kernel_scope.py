@@ -704,6 +704,18 @@ CK08_QUERY_EVIDENCE_ADDITIONS = frozenset(
     }
 )
 
+CK08R2_PHYSICAL_PAGE_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck08r2/data-health-page-executor-benchmark-v2.json",
+        "docs/decisions/evidence/ck08r2/latest-publication-delta-page-executor-benchmark-v2.json",
+        "docs/decisions/evidence/ck08r2/physical-page-executor-evidence.json",
+        "scripts/collect_ck08r2_page_executor_evidence.py",
+        "src/codex_usage_tracker/agent_kernel/query/page_executor.py",
+        "tests/agent_kernel/query/test_page_executor.py",
+        "tests/agent_kernel/query/test_page_executor_evidence.py",
+    }
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -758,6 +770,7 @@ INTEGRATION_ADDITIONS = (
     | CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS
     | CK07A_FACT_BACKED_REQUALIFICATION_ADDITIONS
     | CK08_QUERY_EVIDENCE_ADDITIONS
+    | CK08R2_PHYSICAL_PAGE_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )

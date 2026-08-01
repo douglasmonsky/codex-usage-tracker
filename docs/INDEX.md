@@ -29,12 +29,13 @@ variants reconcile through the shared evaluator, every plan received a
 provisional physical classification, and no projection or public surface was
 added. Its single final reviewer findings were all accepted and corrected.
 
-A downstream architecture audit reproduced four current gaps: the
-expected-answer path is not semantically independent; runtime keyset
-pagination occurs after full Python materialization; CK-08's reported SQL
-timing includes compiler/Python work and cannot admit 18 projections; and
-publication/evidence scale plus replacement maintainability need corrective
-proof. [`corrective-gates-v1`](decisions/evidence/ck08r0/corrective-gates-v1.json)
+A downstream architecture audit reproduced four corrective gaps. CK-08R2 is
+complete on merge and replaces full-result Python slicing with bounded
+physical keyset SQL for the two supported direct plans; 19 plans retain exact
+physical/index gaps without projection. Independent expected-answer truth,
+projection reclassification, publication/evidence scale, and replacement
+maintainability remain open.
+[`corrective-gates-v1`](decisions/evidence/ck08r0/corrective-gates-v1.json)
 preserves history and keeps CK-09 blocked.
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md) is the
 central execution authority.

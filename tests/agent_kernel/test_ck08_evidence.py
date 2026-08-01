@@ -18,16 +18,29 @@ EVIDENCE = (
     / "ck08"
     / "fact-backed-query-and-evidence-qualification.json"
 )
+R2_EVIDENCE = (
+    ROOT
+    / "docs"
+    / "decisions"
+    / "evidence"
+    / "ck08r2"
+    / "physical-page-executor-evidence.json"
+)
 
 
 def _payload() -> dict[str, object]:
     return json.loads(EVIDENCE.read_text(encoding="utf-8"))
 
 
-def test_ck08_collector_replays_and_classifies_all_admitted_variants() -> None:
-    payload = collect()
-
+def test_ck08_historical_evidence_is_preserved_and_r2_supersedes_runtime() -> None:
+    payload = _payload()
     validate_evidence(payload)
+    with pytest.raises(
+        ValueError,
+        match="raw scale benchmark does not match reviewed source",
+    ):
+        collect()
+
     assert payload["status"] == "passed"
     assert payload["completion_claimed"] is True
     assert payload["counts"]["admitted_plans"] == 21
@@ -51,6 +64,14 @@ def test_ck08_collector_replays_and_classifies_all_admitted_variants() -> None:
         "fact_table_sufficient",
         "projection_required",
     }
+    r2 = json.loads(R2_EVIDENCE.read_text(encoding="utf-8"))
+    assert r2["dependency_sha"] == "306cef37eea2ae017aca824d898cc435f7e1bea0"
+    assert r2["supported_direct_plans"] == [
+        "data_health",
+        "latest_publication_delta",
+    ]
+    assert r2["unsupported_plan_count"] == 19
+    assert r2["projection_added"] is False
 
 
 def test_ck08_durable_evidence_matches_bounded_contract() -> None:

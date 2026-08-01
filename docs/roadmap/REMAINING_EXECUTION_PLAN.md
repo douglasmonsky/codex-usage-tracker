@@ -73,10 +73,11 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "duplicate_policy": "one_active_task_per_packet_and_dependency_frontier",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
+  "completed": ["CK-08R0", "CK-08R2"],
   "ready": [],
   "conditional_ready": [{
     "condition": "CK-08R0 merged and exact-main verified",
-    "tasks": ["CK-08R1", "CK-08R2", "CK-08R3", "CK-07R1", "CK-QG1"]
+    "tasks": ["CK-08R1", "CK-08R3", "CK-07R1", "CK-QG1"]
   }],
   "tasks": [
     {"id": "CK-08R0", "file": "tasks/ck-08r0-freeze-corrective-contracts.md", "dependencies": []},

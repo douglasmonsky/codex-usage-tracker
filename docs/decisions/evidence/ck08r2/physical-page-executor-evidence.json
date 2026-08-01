@@ -1,0 +1,88 @@
+{
+  "schema": "codex-usage-tracker.ck08r2-physical-page-executor-evidence.v1",
+  "dependency_sha": "306cef37eea2ae017aca824d898cc435f7e1bea0",
+  "producer_contract": "corrective-gates-v1 page-executor-benchmark.v2",
+  "page_executor_version": 2,
+  "supported_direct_plans": [
+    "data_health",
+    "latest_publication_delta"
+  ],
+  "unsupported_plan_count": 19,
+  "projection_added": false,
+  "superseded_authority_artifacts": [
+    {
+      "path": "src/codex_usage_tracker/agent_kernel/query/service.py",
+      "from_sha256": "0dc6ea87e82648128e9271ff92f40664d284d635aff04e540c6e6ed624d378d8",
+      "to_sha256": "e465b2ed85c233d58d0553486fc3e7717d339fb86226d05c23dead9dc8fd5f08",
+      "superseded_claim": "complete Python materialization followed by tuple slicing is bounded physical paging"
+    }
+  ],
+  "source_artifacts": [
+    {
+      "path": "config/kernel-release-candidate-budget.json",
+      "sha256": "be2754c9b198b9c6f80c9213a4a22c9086285fdf551077dcd7585e7bcea5623b"
+    },
+    {
+      "path": "src/codex_usage_tracker/agent_kernel/query/page_executor.py",
+      "sha256": "2a48a63e0fbb18173b8e0abe09d65309f76bf59b4796e35d6b2f97dea95df305"
+    },
+    {
+      "path": "src/codex_usage_tracker/agent_kernel/query/__init__.py",
+      "sha256": "99c04cafa76ce696e04dff2552b0c12ce3725d332300fe69007eac3f8718979a"
+    }
+  ],
+  "page_executor_artifacts": [
+    {
+      "path": "docs/decisions/evidence/ck08r2/data-health-page-executor-benchmark-v2.json",
+      "sha256": "8ca52e40ad03d8bb8056ec2ca0d8a3ac7f58d3a4f1adf8daad7d8df6d87a0a3f"
+    },
+    {
+      "path": "docs/decisions/evidence/ck08r2/latest-publication-delta-page-executor-benchmark-v2.json",
+      "sha256": "6f897a9ca6f7c52f39c31d56e7943a621758feac3df22d0f0b6dbdc50f0d5604"
+    }
+  ],
+  "profile": {
+    "workload": "synthetic CK-08R2 page-executor evidence collector",
+    "unprofiled_wall_seconds": 0.3,
+    "agent_perf_run_id": "20260801T032354Z-9cb681f6",
+    "reported_application_hotspot": "PhysicalPageExecutor.execute",
+    "reported_share_percent": 2.03,
+    "interpretation": "attribution evidence only; no speedup claim"
+  },
+  "release_size_ratchet": {
+    "config_path": "config/kernel-release-candidate-budget.json",
+    "from_sha256": "c410712d323968264cfe7a32cd1a7656eea4e701c3f25152fb2dce7f223fc48c",
+    "to_sha256": "be2754c9b198b9c6f80c9213a4a22c9086285fdf551077dcd7585e7bcea5623b",
+    "wheel_ceiling_before_and_after": 383000,
+    "sdist_ceiling_before": 820000,
+    "sdist_observed_bytes": [
+      826506,
+      826604,
+      826628,
+      826653,
+      826659,
+      826720
+    ],
+    "sdist_qualification_max_bytes": 826720,
+    "sdist_ceiling_after": 828000,
+    "minimum_headroom_percent": 0.154829,
+    "maximum_headroom_percent": 25,
+    "semantic_reason": "versioned physical page executor and linked corrective documentation",
+    "measurement_note": "Embedded byte-count metadata changes compressed output; qualification uses the largest observed acceptance artifact rather than a self-referential final-byte claim."
+  },
+  "known_noise": {
+    "candidate_a_first_failure": "one isolated mandatory-workload timing failure; focused rerun and all later comprehensive runs passed",
+    "allowance_read_p95_ms": {
+      "just_v": 651.459,
+      "just_vc": 614.754,
+      "current_branch_just_v": 661.660762,
+      "current_branch_just_vc": 641.246173,
+      "outcome": "invariants_only"
+    },
+    "active_writer_p95_ms": {
+      "current_branch_just_vc": 34.133708,
+      "budget": 50,
+      "outcome": "invariants_only"
+    }
+  }
+}
