@@ -69,42 +69,17 @@ affected seam against the actual downstream implementation.
 
 ## Packet task handoff
 
-Keep each delegated child packet in its own user-owned Codex task. A task may
-freeze a premise or implement a frozen premise, never both. The machine-readable
-DAG in `docs/roadmap/REMAINING_EXECUTION_PLAN.md` is the orchestration authority.
+Keep each child packet in a user-owned Codex task; freezing and implementation
+are separate. Follow the machine DAG in
+`docs/roadmap/REMAINING_EXECUTION_PLAN.md`.
 
-After a task is fully accepted, merged, and verified on exact `origin/main`, the
-completing task must:
-
-1. reconcile the task file, central DAG, and ledger on exact `main`;
-2. find every not-yet-created successor whose complete dependency set is now
-   accepted, merged, and exact-main verified;
-3. create one new Codex task for every such newly Ready successor by using the
-   product's `create_thread` operation in the same saved Git repository project;
-4. fan out independent successors as separate tasks, but never create an
-   integration or join task until all of its dependencies are complete;
-5. verify each created task started in the intended project worktree and
-   received its handoff before ending the completing task.
-
-Successor creation must be idempotent: inspect existing roadmap tasks and the
-completion handoff before creating anything, and never create a second active
-task for the same packet and exact dependency frontier. Use the packet's
-`<role> <short-scope>` recommended task name. Do not use an internal sub-agent
-as a substitute for a roadmap task.
-
-Each created task receives a clean, decision-complete handoff naming the exact
-merged `origin/main` SHA, repository and task file, central plan, acceptance
-criteria, owned files and locks, admitted producer artifacts and digests,
-consumer seam, independent truth source, required validation and
-requalification, known risks and first failing/noisy measurements, stop
-conditions, and the source/orchestrator task ID. The completing task must not
-begin implementation of a successor; ownership transfers at the task boundary.
-
-If the current task is blocked, fails acceptance, is not merged, or lacks
-exact-main verification, it must create no successor. It records the blocker
-and sends a bounded handoff to the source/orchestrator task instead. Conditional
-or approval-gated successors remain blocked until their explicit gate is
-satisfied.
+After acceptance, merge, and exact-main verification, reconcile packet/DAG/
+ledger and `create_thread` every uncreated newly Ready successor in the saved
+project. Fan out independent work; hold joins; deduplicate packet/frontier.
+Use `<role> <short-scope>` names, never sub-agents. Hand off exact SHA, packet,
+acceptance, locks, artifacts/digests, consumer/truth seams, checks, failures,
+risks, stop conditions, and orchestrator task ID. Verify delivery; do not
+implement successors. Blocked, gated, or unverified work spawns none.
 
 ## Implementation boundary
 
