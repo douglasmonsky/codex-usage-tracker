@@ -471,6 +471,7 @@ class _WriteSetPreparer:
                 for logical_id in self.observations_by_id
             }
         )
+        transitions_by_entity: dict[str, list[LifecycleTransition]] = defaultdict(list)
         for observation in self.changes.observations:
             lifecycle_kind = _LIFECYCLE_KINDS.get(observation.observation_type)
             if lifecycle_kind is None:
@@ -485,35 +486,35 @@ class _WriteSetPreparer:
             ]
             transition_id = semantic_id("lifecycle-transition", transition_identity)
             self._identity(transition_id, "lifecycle-transition", transition_identity)
-            self.transitions.append(
-                LifecycleTransition(
-                    transition_id=transition_id,
-                    entity_logical_id=observation.logical_id,
-                    entity_kind=lifecycle_kind,
-                    lifecycle_state=_state(observation),
-                    state_basis=observation.basis,
-                    transition_version=version,
-                    transition_at_us=observation.event_at_us,
-                    source_rank=observation.source_rank,
-                    source_order=observation.source_order,
-                    event_kind_order=observation.event_kind_order,
-                    transition_rank=observation.transition_rank,
-                    occurrence_id=observation.occurrence_id,
-                    terminal_error_category=(
-                        str(observation.payload["error_category"])
-                        if observation.payload.get("error_category") is not None
-                        else None
-                    ),
-                    measurement_mask=observation.measurement_mask,
-                    first_seen_publication_id=self.publication_id,
-                )
+            transition = LifecycleTransition(
+                transition_id=transition_id,
+                entity_logical_id=observation.logical_id,
+                entity_kind=lifecycle_kind,
+                lifecycle_state=_state(observation),
+                state_basis=observation.basis,
+                transition_version=version,
+                transition_at_us=observation.event_at_us,
+                source_rank=observation.source_rank,
+                source_order=observation.source_order,
+                event_kind_order=observation.event_kind_order,
+                transition_rank=observation.transition_rank,
+                occurrence_id=observation.occurrence_id,
+                terminal_error_category=(
+                    str(observation.payload["error_category"])
+                    if observation.payload.get("error_category") is not None
+                    else None
+                ),
+                measurement_mask=observation.measurement_mask,
+                first_seen_publication_id=self.publication_id,
             )
+            self.transitions.append(transition)
+            transitions_by_entity[observation.logical_id].append(transition)
         self.folds = {
             logical_id: fold_lifecycle(
                 tuple(self.prior.lifecycle.get(logical_id, ()))
-                + tuple(item for item in self.transitions if item.entity_logical_id == logical_id)
+                + tuple(transitions)
             )
-            for logical_id in {item.entity_logical_id for item in self.transitions}
+            for logical_id, transitions in transitions_by_entity.items()
         }
 
     def _add_observation_rows(self) -> None:

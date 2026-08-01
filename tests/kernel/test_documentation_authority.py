@@ -235,7 +235,9 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "test_engineer",
             "worker",
         }
-        if packet_id in conditional_ready:
+        if packet_id == "CK-07R1":
+            assert "**Status:** Completed on merge" in body
+        elif packet_id in conditional_ready:
             assert "**Status:** Conditional Ready after CK-08R0 merge" in body
         elif packet_id in ready:
             assert "**Status:** Ready" in body
@@ -259,7 +261,14 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     for artifact in contract["authority_artifacts"]:
         source = _REPO_ROOT / artifact["path"]
         actual = hashlib.sha256(source.read_bytes()).hexdigest()
-        if replacement := superseded.get(artifact["path"]):
+        if artifact["path"].endswith("/publication/preparation.py"):
+            assert artifact["sha256"] == (
+                "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"
+            )
+            assert actual == _json(
+                "docs/decisions/evidence/ck07r1/lifecycle-scale-requalification.json"
+            )["linear_work_counters"]["implementation_digest"]
+        elif replacement := superseded.get(artifact["path"]):
             assert replacement["from_sha256"] == artifact["sha256"]
             assert actual == replacement["to_sha256"]
         else:
