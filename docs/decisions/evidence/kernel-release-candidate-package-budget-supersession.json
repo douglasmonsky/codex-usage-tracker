@@ -1,0 +1,68 @@
+{
+  "schema": "codex-usage-tracker.kernel-package-budget-supersession.v1",
+  "authority_version": 1,
+  "status": "maintainer-approved",
+  "effective_date": "2026-08-01",
+  "scope": {
+    "policy": "replacement-kernel release-candidate package-size ceilings",
+    "config_path": "config/kernel-release-candidate-budget.json",
+    "included_budget_keys": ["wheel_bytes", "sdist_bytes"],
+    "excluded_budget_class": "all non-package budgets and runtime/product behavior"
+  },
+  "rationale": "Package-size micro-optimization is no longer a roadmap objective, while exact package member/source fidelity and build correctness remain required.",
+  "package_ceilings": {
+    "wheel_bytes": {
+      "historical_ceiling_bytes": 383000,
+      "active_ceiling_bytes": 1000000
+    },
+    "sdist_bytes": {
+      "historical_ceiling_bytes": 828000,
+      "active_ceiling_bytes": 2000000
+    }
+  },
+  "historical_active_config": {
+    "path": "config/kernel-release-candidate-budget.json",
+    "sha256": "be2754c9b198b9c6f80c9213a4a22c9086285fdf551077dcd7585e7bcea5623b"
+  },
+  "preserved_non_package_budget": {
+    "schema": "codex-usage-tracker.kernel-rc-budget.v1",
+    "headroom_percent": 25,
+    "kernel_source_bytes": 815624,
+    "console_asset_bytes": 99205,
+    "analytical_tables": 17,
+    "analytical_indexes": 15,
+    "required_schema_objects": 9,
+    "mcp_tools": 6,
+    "http_routes": 7,
+    "cli_commands": 11,
+    "plugin_bundle_bytes": 7022,
+    "mcp_golden_prompt": {
+      "mcp_calls": 3,
+      "measured_response_bytes": [889, 21630, 1023],
+      "response_byte_ceilings": [915, 22278, 1053],
+      "measured_total_bytes": 23542,
+      "total_byte_ceiling": 24248
+    }
+  },
+  "fail_closed_invariants": [
+    "Only wheel_bytes and sdist_bytes may be superseded by this authority.",
+    "Every preserved non-package budget field must match the snapshot above exactly.",
+    "Exact package member/source fidelity and build correctness remain required.",
+    "Historical evidence and its old measured ceilings remain verifiable and are not rewritten.",
+    "This authority changes no runtime behavior, lifecycle implementation, qualification gate, or downstream task state."
+  ],
+  "historical_evidence": [
+    {
+      "path": "docs/decisions/evidence/ck08r0/corrective-gates-v1.json",
+      "sha256": "8f2bc6762b3b12f3c42ad72fb23ccaa49bfde3124280082fa65766bb9ceb9936"
+    },
+    {
+      "path": "docs/decisions/evidence/ck08r0/corrective-gates-v1.schema.json",
+      "sha256": "6f2213ae1eb31b0ffb6b3fc46b53361824c9520d905b91b165f2c196f5f42d33"
+    },
+    {
+      "path": "docs/decisions/evidence/ck08r2/physical-page-executor-evidence.json",
+      "sha256": "0a1f9ee919e065ba707826fc7c308748a7b6810a358f957aa6608ee0ff4d3c08"
+    }
+  ]
+}

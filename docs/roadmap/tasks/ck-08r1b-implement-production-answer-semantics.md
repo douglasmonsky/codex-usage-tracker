@@ -10,7 +10,7 @@
 **Consumer seam:** `compile_plan_operands` emits final-R1 materializations.
 **Parallelism:** R1C after R1A; disjoint locks.
 **Non-goals:** Query/public/projection/R3/R4/RG/09.
-**Invariants:** No placeholders; unsupported fails closed; CK-08R2 and 19 fail-closed residual plans unchanged; synthetic; sdist <=828000.
+**Invariants:** No placeholders; unsupported fails closed; CK-08R2 and 19 fail-closed residual plans unchanged; synthetic; sdist <=2,000,000.
 **Required tests/checks:** R1A vectors; formula/operand/query/closure; `just v/vc`; reviewer/CI/merge/exact-main.
 **Acceptance:** Facts alone drive output; no grading source.
 **Failure/rollback:** Revert lock; keep R1 blocked.

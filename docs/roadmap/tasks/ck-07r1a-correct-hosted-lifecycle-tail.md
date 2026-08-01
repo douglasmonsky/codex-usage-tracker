@@ -1,6 +1,7 @@
 # CK-07R1A — Correct hosted lifecycle tail
 
-**Release ceiling:** sdist remains at most 828000 bytes.
+**Release-candidate package ceilings:** sdist remains at most 2,000,000 bytes;
+wheel remains at most 1,000,000 bytes.
 
 **Status:** Conditional Ready after this corrective authority merge is exact-main verified
 

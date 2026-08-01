@@ -10,7 +10,7 @@
 **Consumer seam:** R1 compares identical database-v1 declarations.
 **Parallelism:** R1B after R1A; disjoint locks.
 **Non-goals:** Production/query/SQLite/answers/projections/R3/R4/RG/09.
-**Invariants:** Closure excludes production/formula, database/replay, grading/oracle rows, R1B; exact Decimal/`null`/order/grade/provenance; sdist <=828000.
+**Invariants:** Closure excludes production/formula, database/replay, grading/oracle rows, R1B; exact Decimal/`null`/order/grade/provenance; sdist <=2,000,000.
 **Required tests/checks:** Import guards; 80/R1A vectors; closure/grading drift/inaccessible; production mutation; `just v/vc`; reviewer/CI/merge/exact-main.
 **Acceptance:** Declared facts/contracts alone decide results; production mutation cannot affect truth.
 **Failure/rollback:** Remove lock; keep R1 blocked.

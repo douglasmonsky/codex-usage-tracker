@@ -41,6 +41,7 @@ from scripts.check_kernel_scope import (
     K14_ADDITIONS,
     K15_ADDITIONS,
     K16_ADDITIONS,
+    PACKAGE_BUDGET_POLICY_ADDITIONS,
     R1_ADDITIONS,
     R2_ADDITIONS,
     R3_ADDITIONS,
@@ -211,6 +212,9 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "scripts/check_kernel_release_candidate.py",
         "tests/kernel/test_release_candidate.py",
     } == K9_ADDITIONS
+    assert {
+        "docs/decisions/evidence/kernel-release-candidate-package-budget-supersession.json",
+    } == PACKAGE_BUDGET_POLICY_ADDITIONS
     assert {
         "config/kernel-release-cutover-v1.json",
         ".agents/plugins/marketplace.json",
@@ -666,6 +670,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK08R2_PHYSICAL_PAGE_ADDITIONS
         | CK08R3A_AUTHORITY_ADDITIONS
         | CKQG1A0_AUTHORITY_ADDITIONS
+        | PACKAGE_BUDGET_POLICY_ADDITIONS
         | CK08_PREREQUISITE_BLOCKER_ADDITIONS
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )

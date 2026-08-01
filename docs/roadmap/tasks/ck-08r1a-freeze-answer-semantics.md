@@ -41,7 +41,7 @@ Each lane records sorted path/SHA-256 roots, harness, consumer, all transitive l
 
 Evaluator closure forbids production derivation/formula/helpers, QueryService, SQLite/database/replay, grading/expected rows, R1B. Both lanes run sentinel-mutated grading rows (grading sentinels) and grading data inaccessible with baseline unchanged. Canonical-fact mutation changes both; production-source mutation cannot alter independent truth.
 
-**Invariants:** Synthetic; exact Decimal/`null`/order/grade/provenance; missing != empty; R2 unchanged; sdist <=828000.
+**Invariants:** Synthetic; exact Decimal/`null`/order/grade/provenance; missing != empty; R2 unchanged; sdist <=2,000,000.
 **Required tests/checks:** Schema/vectors; closure drift/inaccessible; both grading conditions both lanes; fact/production mutations; authority/DAG; `just v/vc`; reviewer/CI/exact-main.
 **Acceptance:** Every field/source/join/missingness/boundary/exclusion/digest/mutation rule bound without implementation.
 **Failure/rollback:** Ambiguity/unenforceable closure keeps R1B/C,R1,R4/RG/09 blocked.

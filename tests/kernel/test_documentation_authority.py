@@ -225,7 +225,18 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest_by_id["CK-08RG"]["dependencies"] == ["CK-08R4", "CK-QG1"]
 
     release_budget = _json("config/kernel-release-candidate-budget.json")
-    assert release_budget["sdist_bytes"] == 828000
+    package_policy = _json(
+        "docs/decisions/evidence/kernel-release-candidate-package-budget-supersession.json"
+    )
+    assert release_budget["wheel_bytes"] == 1_000_000
+    assert release_budget["sdist_bytes"] == 2_000_000
+    assert release_budget["policy_artifact"] == (
+        "docs/decisions/evidence/kernel-release-candidate-package-budget-supersession.json"
+    )
+    assert package_policy["status"] == "maintainer-approved"
+    assert "Package-size micro-optimization is no longer a roadmap objective" in package_policy[
+        "rationale"
+    ]
     for packet_id in ("CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R3A", "CK-07R1A", "CK-QG1A0", "CK-QG1A"):
         packet = _read(f"docs/roadmap/{manifest_by_id[packet_id]['file']}").replace(",", "")
         assert str(release_budget["sdist_bytes"]) in packet
@@ -410,7 +421,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
             "718ff7032d050b13cb7fac1f857d0c99879d0ef3b13c57c39b55514fc610a88b",
             "permitted_not_accepted",
             "generic_digest_drift_forbidden",
-            "828000",
+            "2,000,000",
         )
     )
     assert "CK-QG1A0" in ckqg1a0
