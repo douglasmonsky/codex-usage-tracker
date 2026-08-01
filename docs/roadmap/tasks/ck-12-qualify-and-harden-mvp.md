@@ -1,42 +1,32 @@
-# CK-12 — Qualify and harden the complete MVP
+# CK-12 — Qualify and harden the MVP
 
-**Status:** Not started
+**Status:** Blocked on CK-11-04; umbrella only
+
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
+
+**Central plan:** [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md)
+
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
-**Goal:** Run every correctness, performance, concurrency, recovery, packaging,
-and installed-agent gate and fix only demonstrated defects.
+**Goal:** Qualify one immutable candidate across correctness, performance,
+recovery, packaging, and fresh-agent gates.
 
-**Why:** This is the decision point where the replacement becomes credible.
+**Dependencies:** CK-11-04. Child sequence: CK-12-01; parallel
+CK-12-02/03/04/05; CK-12-06.
 
-**Controls:** `QUALIFICATION_PLAN.md`, all prior contracts.
-**Dependencies:** CK-11.
+**Non-goals:** This umbrella is never delegated directly; lanes do not modify
+their candidate or weaken gates.
 
-**Scope and expected files:** Focused fixes within prior owners, measured
-ratchet configs, qualification evidence artifact, release-check integration.
+**Invariants:** Identical bytes/fixtures, first failures preserved, only
+demonstrated defects fixed, affected lanes rerun, one final reviewer.
 
-**Schema/API changes:** None unless a failed locked contract requires a recorded
-amendment and rerun of affected gates.
-**Non-goals:** New question surface, UI, branding, gate weakening.
+**Required tests/checks:** Complete L0-L5, recovery, artifact, installed-agent,
+`just v/vc`, hosted CI, exact-main.
 
-**Invariants:** Identical workloads for speed claims; agent-perf attribution;
-early stop; full matrix rerun after accepted semantic fixes; one final
-reviewer.
+**Acceptance:** CK-12-06 records every hard gate passing.
 
-**Tests/benchmarks:** Entire L0–L5 qualification plan, 100k/1.316M/growth,
-all history ranges, concurrency/lock reproduction, crash matrix, exact wheel,
-fresh CLI/Desktop default/lower model.
+**Failure/rollback:** Candidate stays disabled; create a narrow corrective task.
 
-**Acceptance:** Every hard gate passes; residual host/model latency is
-separated and within release criteria; no unresolved accepted review finding;
-byte-size ratchets have <=25% headroom while exact catalog counts remain
-unbuffered.
+**Cleanup/docs:** Reconcile qualification, roadmap, ledger, index.
 
-**Failure/rollback:** Keep replacement disabled and create a narrowly owned
-follow-up packet. A hard-gate failure cannot be converted to a caveat.
-
-**Cleanup/docs:** Record final measurements, artifact hashes, review metrics,
-and remaining non-blocking risks.
-
-**Suggested commits:** One focused fix per demonstrated owner, then
-`test: qualify agent-first kernel candidate`.
+**Suggested commit:** `test: qualify agent kernel mvp`

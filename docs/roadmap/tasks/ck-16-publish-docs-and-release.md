@@ -1,52 +1,34 @@
-# CK-16 — Publish public documentation and release
+# CK-16 — Publish documentation and release
 
-**Status:** Not started
+**Status:** Blocked on CK-14-04; umbrella only
+
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
+
+**Central plan:** [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md)
+
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
-**Goal:** Explain and release the clean agent-first product with compelling
-examples and exact artifact evidence.
+**Goal:** Document, build once, promote, and verify the clean agent-first
+release.
 
-**Why:** The public should understand the pivot, setup magic, supported
-questions, evidence/grade discipline, and future direction.
+**Dependencies:** CK-14-04; selected CK-15 only. Child sequence: CK-16-01,
+CK-16-02, CK-16-03, approval-gated CK-16-04.
 
-**Controls:** CK-14 (and CK-15 only if selected), release policy.
-**Dependencies:** CK-14.
+**Non-goals:** This umbrella is never delegated directly; no unsupported
+claims, local rebuild per target, or source repair during publication.
 
-**Scope and expected files:**
+**Invariants:** Synthetic assets, exact candidate behavior, byte-identical
+promotion, protected publication, normal patch release after publication.
 
-- README hero, badges, agent-install copy/paste prompt, product narrative;
-- setup guide, conversation examples, supported/deferred/unsupported guide;
-- screenshots or native artifact captures from synthetic data only;
-- Data Analytics recommendation and optional handoff;
-- gradual naming language that preserves “Codex Usage Tracker” discovery;
-- changelog, version, release notes, exact release evidence.
+**Required tests/checks:** Docs/commands, full release qualification, clean
+public install, fresh-task smoke, CI/review/exact-main.
+CK-16-04 owns the post-publication public-index download/install smoke.
 
-**Schema/API changes:** None except final version constants.
-**Non-goals:** Abrupt repository/package/plugin rename, unsupported feature
-claims, hosted/Claude launch.
+**Acceptance:** CK-16-04 records verified public bytes and installs.
 
-**Invariants:** Every screenshot/example matches the exact installed candidate;
-no Console imagery after retirement; install commands use public artifacts;
-release built once from merged main/tag through protected workflow.
+**Failure/rollback:** Stop before publication on any preflight failure; never
+mutate published artifacts.
 
-**Tests/benchmarks:** Link/command/docs checks, exact protected build and
-distribution checks, pre-publication clean-install smoke of the downloaded
-workflow artifacts, post-publication public-index download/install smoke,
-fresh CLI/Desktop prompts, synthetic image inspection, and
-package/DB/response ratchets.
+**Cleanup/docs:** Final evidence, URLs, hashes, roadmap and release status.
 
-**Acceptance:** Public page makes purpose/value/setup clear; artifact
-hashes/sizes and public URLs recorded; byte-identical public install smoke
-passes; no authority doc remains “planned” for implemented behavior.
-
-**Failure/rollback:** Do not publish. Correct docs/artifacts on a focused branch.
-After publication, use a normal patch release; never mutate artifacts.
-
-**Cleanup/docs:** Mark roadmap release evidence and future CK-15/Claude items
-appropriately.
-
-**Suggested commits:**
-
-1. `docs: explain the agent-first usage kernel`
-2. `chore: prepare clean-cutover release`
+**Suggested commit:** `chore: publish clean cutover release`

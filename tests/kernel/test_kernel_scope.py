@@ -241,8 +241,8 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         for path in CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS
         if path.startswith("docs/roadmap/tasks/")
     }
-    assert len(CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS) == 41
-    assert len(task_packets) == 18
+    assert len(CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS) == 85
+    assert len(task_packets) == 61
     assert {
         "docs/INDEX.md",
         "docs/architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md",
@@ -253,8 +253,10 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "docs/architecture/LOGICAL_KERNEL_CONTRACT.md",
         "docs/quality/QUALIFICATION_PLAN.md",
         "docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md",
+        "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
         "docs/roadmap/TASK_PACKETS.md",
         "docs/roadmap/LINEAR_BACKLOG.md",
+        "docs/roadmap/tasks/DELEGATED_TASK_TEMPLATE.md",
         "tests/kernel/test_documentation_authority.py",
     } <= CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS
     assert {

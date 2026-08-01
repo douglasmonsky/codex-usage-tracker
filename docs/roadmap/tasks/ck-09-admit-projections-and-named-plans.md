@@ -1,57 +1,33 @@
 # CK-09 — Admit projections and complete named plans
 
-**Status:** Not started
+**Status:** Blocked on CK-08R0 through CK-08RG; umbrella only
+
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
+
+**Central plan:** [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md)
+
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
-**Goal:** Add only measured current projections required for Foundation and
-Cutover presets and bind optimized plans to them.
+**Goal:** Admit only measured residual projections and qualify every named plan.
 
-**Why:** Common answers must be fast without rebuilding a broad derived-state
-system.
+**Dependencies:** CK-08RG. Child sequence: CK-09-01; eligible CK-09-02/03/04;
+CK-09-05; CK-09-06.
 
-**Controls:** CK-08 admission report,
-`QUERY_EVIDENCE_PROJECTION_CONTRACTS.md`.
-**Dependencies:** CK-08.
+**Non-goals:** This umbrella is never delegated or implemented directly.
+Provisional 18-plan classification is not admission.
 
-**Scope and expected files:**
+**Invariants:** Exact fact-backed equivalence, bounded dirty maintenance,
+current-only projections, attributed storage/WAL/fanout/tail, no generic SQL.
 
-- `publication/projections.py` and per-family maintainers;
-- projection registry/versions/dependencies;
-- optimized compiler modules;
-- complete Foundation/Cutover plan implementations;
-- projection/query/performance tests.
+**Required tests/checks:** Child packet gates plus final all-plan, publication,
+recovery, performance, payload, CI, review, and exact-main qualification.
 
-**Schema changes:** Only projections named in the CK-09 admission artifact.
-Each has consumers, dirty keys, validation, storage/WAL/fanout budgets.
-**API changes:** Plan registry marks optimized compiler/version.
+**Acceptance:** CK-09-06 accepts every admitted projection and all named plans;
+otherwise this parent remains blocked.
 
-**Non-goals:** dashboard aggregates, speculative future projections, historical
-generation copies, inference fields.
+**Failure/rollback:** Remove failed admissions/bindings, preserve evidence, and
+do not start CK-10.
 
-**Invariants:** Current-only; exact fact-backed equivalence; bounded dirty
-updates; rate-card dependence isolated; no full tail rebuild; projection can be
-removed when last consumer disappears.
+**Cleanup/docs:** Reconcile query/physical contracts, roadmap, ledger, index.
 
-**Tests/benchmarks:** Fact/projection equivalence, all mutation types, one-call/
-tool tails, hierarchy/late parent, lifecycle completion, valuation-only, source
-replacement, storage attribution, named-plan SQL/MCP/payload gates.
-
-**Acceptance:** All Foundation/Cutover question oracles and hard budgets pass;
-projection DB/WAL and tail costs within ratchets; every plan normally needs one
-query call.
-
-**Failure/rollback:** Remove failing projection and use fact plan only if it
-meets contract; otherwise return to physical decision rather than broadening
-write amplification.
-
-**Cleanup/docs:** Freeze admitted projection table and measured consumer
-rationale.
-
-**Parallelism:** Disjoint projection families may run in parallel after registry
-and publication port freeze; one owner integrates writer call sites.
-
-**Suggested commits:**
-
-1. `feat: add measured current projections`
-2. `perf: bind optimized named question plans`
+**Suggested commit:** `feat: complete qualified projection plans`

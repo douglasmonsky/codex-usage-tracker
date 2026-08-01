@@ -11,9 +11,11 @@ recommendations.
 
 Start at `docs/INDEX.md`. The only implementation roadmap is
 `docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md`; its checkbox ledger is
-`docs/roadmap/TASK_PACKETS.md`, and each complete contract is one file under
-`docs/roadmap/tasks/`. Archived documents and historical release notes are
-evidence, not authority.
+`docs/roadmap/TASK_PACKETS.md`. The remaining dependency graph, delegation
+readiness, ownership locks, and allowed parallelism are controlled by
+`docs/roadmap/REMAINING_EXECUTION_PLAN.md`. Each delegable unit has one file
+under `docs/roadmap/tasks/`. Archived documents and historical release notes
+are evidence, not authority.
 
 CK-07C additionally owns
 `docs/architecture/PLAN_OPERAND_AND_FACT_CONTRACT.md` and the versioned
@@ -22,13 +24,19 @@ effective-dated rate-card valuation correction at `e49531b`. CK-07E is the
 admitted test-only prerequisite for independent structural and query-only
 database-v1 fact adapters. CK-07A consumed CK-07B through CK-07E and is
 complete with 80 / 80 structural-v2 variants requalified. CK-08 is complete on
-merge with all 21 plans and 42 variants qualified. CK-09 is the current ready
-packet but has not started.
+merge with all 21 plans and 42 variants qualified as fact-backed mechanism
+evidence. A downstream architecture audit found that the expected-answer lane
+shares production evaluation, runtime keyset pagination follows complete
+Python materialization, projection classification combines execution stages,
+and publication/evidence scale plus replacement maintainability need
+corrective proof. CK-09 is blocked. CK-08R0 is the only current Ready task.
 
-Advance CK packets in dependency order. Do not begin a dependent packet before
-its prerequisites are checked complete. Update the packet status, master
-checkbox ledger, measurements, deviations, and residual risks in the same
-change that completes a packet.
+Advance only child tasks marked Ready in
+`docs/roadmap/REMAINING_EXECUTION_PLAN.md`. Parent CK-09 through CK-16 packets
+are umbrellas and must never be delegated directly. Do not begin a dependent
+task before its prerequisites are merged and exact-main verified. Update the
+task status, master ledger, measurements, deviations, and residual risks in
+the same change that completes a task.
 
 ## Cross-packet semantic continuity
 
@@ -61,16 +69,17 @@ affected seam against the actual downstream implementation.
 
 ## Packet task handoff
 
-Keep each CK packet in its own Codex task. After a packet is fully accepted,
+Keep each delegated child packet in its own Codex task. A task may freeze a
+premise or implement a frozen premise, never both. After a task is fully accepted,
 merged, and verified on `main`, the completing task must create a new Codex
-task in the same project folder for the next admitted packet. Give the new task
+task in the same project folder only for the next Ready child packet. Give it
 a clean, decision-complete handoff that names the canonical repository and
 `main` commit, packet authority and acceptance criteria, completed evidence,
 remaining approval gates, relevant commands, and any known risks or
 pre-existing failures. Verify that the new task started in the intended project
 folder with the handoff before ending the completing task. The completing task
 must not begin implementation of the next packet; ownership transfers at the
-packet boundary. The handoff must also name the admitted producer artifacts,
+task boundary. The handoff must also name the admitted producer artifacts,
 consumer seam checks, independent truth source, and requalification set.
 
 ## Implementation boundary

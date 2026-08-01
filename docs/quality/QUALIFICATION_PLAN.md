@@ -92,16 +92,18 @@ fact/request/evidence boundary: CK-07E must record 0 / 80 CK-07A answer
 comparisons and cannot update CK-04 scoring or CK-03 through CK-07 seam
 evidence.
 
-CK-07A completes that L0 chain with 80 / 80 exact answer comparisons through
+Historical CK-07A evidence records 80 / 80 fact-adapter comparisons through
 structural-v2 source JSONL, CK-06 ingestion, CK-07 publication/recovery,
 query-only database-v1, Candidate A's permitted fact-table/planner lane, and
-both independent adapters. Its durable evidence records all 185 answer-field
+two fact-adapter consumers that share production `evaluate_plan`. Its durable
+evidence records all 185 answer-field
 bindings, 14 selector kinds, six provenance kinds, ordered references, SQL
 sources/plans, response bytes, timings, lifecycle replay, privacy, and CK-03
 through CK-07 requalification. CK-04's current-commit growth repetitions 3 and
 4 remain waived; the strict five-repetition aggregate remains unclaimed.
 
-CK-08 adds L2 query/evidence qualification and bounded L3 scale classification.
+Historical CK-08 evidence adds L2 mechanism qualification and provisional L3
+scale classification.
 Its durable evidence executes 21 Foundation/Cutover plans across 42 fact-backed
 variants through the real internal query service, compares complete typed rows,
 grades, order, request/comparison digests, and evidence references, and records
@@ -112,12 +114,30 @@ write denial, and rebuild/replacement/late-event behavior.
 The standard query-only database-v1 fixture contains 100,000 synthetic calls;
 the production fixture contains 1,316,864. Repeated standard and production
 measurements classify three plans as fact-table-sufficient. Eighteen plans stop
-after a retained required-gate breach and carry measured CK-09 projection
-admission evidence. Classification is a passing CK-08 outcome because every
-plan is either fact-table-sufficient or explicitly projection-required; it is
-not a waiver and CK-08 implements no projection. The separate full
+after a retained required-gate breach and carry provisional
+projection-candidate evidence that cannot authorize CK-09. That classification
+was a historical CK-08 outcome; it is not current admission, and CK-08
+implements no projection. The separate full
 publication-path attempt is retained as a bounded predecessor-path failure and
 is not mislabeled as a publication-valid scale result.
+
+### Corrective interpretation and immutable parallel qualification
+
+CK-07A/CK-08 remain historical fact-adapter and mechanism evidence. They do
+not currently prove independent answer semantics because both expected-answer
+consumers import production `evaluate_plan`. They also do not prove physical
+deep-page work is bounded before Python materialization. CK-08's
+`sql_p95_ms` combines compiler/Python evaluation and materialization, so its
+three-direct/eighteen-projection labels are provisional rather than CK-09
+admission. CK-08R1/R2/R3, CK-07R1, CK-QG1, CK-08R4, and CK-08RG own the
+corrective proof and CK-09 remains blocked.
+
+The remaining execution plan decomposes CK-12 into one candidate freeze, four
+read-only lanes, and one integration decision. Every lane consumes
+byte-identical artifacts, fixtures, catalogs, registry, and budgets. A lane
+does not repair the candidate it measures. A failure is retained and routed by
+the integrator to a new narrowly owned corrective task; semantic repair creates
+a new candidate identity and reruns every affected lane.
 
 ## Synthetic fixture strategy
 

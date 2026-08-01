@@ -12,7 +12,8 @@ independent-adapter prerequisites. Its
 [canonical evidence](decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json)
 records 80 / 80 fact-backed comparisons through structural-v2 source JSONL,
 CK-06 ingestion, CK-07 publication/recovery, query-only database-v1, Candidate
-A's permitted fact-table/planner path, and two independent evaluators. All 185
+A's permitted fact-table/planner path, and two fact-adapter consumers of the
+same production answer evaluator. All 185
 answer-field bindings, 14 selector kinds, six provenance kinds, exact ordered
 references, response bytes, timings, SQL sources/plans, lifecycle modes, and
 CK-03 through CK-07 requalifications are recorded.
@@ -23,10 +24,19 @@ remains preserved as the reproduction that caused the stop, but it is no
 longer the current boundary blocker. CK-04's invalid `question_cases`
 correctness proof is replaced; its current-commit growth repetitions 3 and 4
 remain explicitly waived and no strict five-repetition aggregate is claimed.
-CK-08 is complete on merge: all 21 plans and 42 fact-backed variants reconcile,
-every plan is classified, and no projection or public surface was added. Its
-single final reviewer findings were all accepted and corrected. CK-09 is ready
-as the next packet but has not started.
+CK-08 is historically complete on merge: all 21 plans and 42 fact-backed
+variants reconcile through the shared evaluator, every plan received a
+provisional physical classification, and no projection or public surface was
+added. Its single final reviewer findings were all accepted and corrected.
+
+A downstream architecture audit reproduced four current gaps: the
+expected-answer path is not semantically independent; runtime keyset
+pagination occurs after full Python materialization; CK-08's reported SQL
+timing includes compiler/Python work and cannot admit 18 projections; and
+publication/evidence scale plus replacement maintainability need corrective
+proof. Historical evidence is preserved, but CK-09 is blocked.
+[REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md) is the
+central execution authority and CK-08R0 is the only Ready task.
 
 ## Authority set
 
@@ -45,8 +55,9 @@ as the next packet but has not started.
 | 11 | `docs/product/AGENT_SETUP_AND_MCP_EXPERIENCE.md` | First use, history selection, host waiting, reopen, refresh/expansion, call budgets, and skill behavior. |
 | 12 | `docs/quality/QUALIFICATION_PLAN.md` | Synthetic truth, production-shape profiling, benchmarks, installed-agent trials, crash tests, and ratchets. |
 | 13 | `docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md` | The only authoritative implementation roadmap, dependencies, gates, cutover, and release. |
-| 14 | `docs/roadmap/TASK_PACKETS.md` and `docs/roadmap/tasks/` | Checkbox completion accounting and one agent-executable contract file per packet. |
-| 15 | `docs/roadmap/LINEAR_BACKLOG.md` | Linear-ready initiative, project, milestone, issue, dependency, and label mapping. |
+| 14 | `docs/roadmap/REMAINING_EXECUTION_PLAN.md` | Remaining task graph, readiness, role routing, ownership locks, and allowed/forbidden parallelism. |
+| 15 | `docs/roadmap/TASK_PACKETS.md` and `docs/roadmap/tasks/` | Completion accounting and one agent-executable contract file per delegated task. |
+| 16 | `docs/roadmap/LINEAR_BACKLOG.md` | Historical Linear-ready mapping; no Linear change is authorized by the decomposition. |
 
 ## Area ownership
 
@@ -64,15 +75,15 @@ as the next packet but has not started.
 | May this query, selector, or projection exist? | `QUERY_EVIDENCE_PROJECTION_CONTRACTS.md` |
 | How should an installed agent set up and call the kernel? | `AGENT_SETUP_AND_MCP_EXPERIENCE.md` |
 | What proves the implementation? | `QUALIFICATION_PLAN.md` |
-| What happens next? | `AGENT_FIRST_CLEAN_CUTOVER.md` and its task packets |
+| What happens next, and what may run in parallel? | `REMAINING_EXECUTION_PLAN.md`, constrained by `AGENT_FIRST_CLEAN_CUTOVER.md` |
 | Where does work get tracked? | `LINEAR_BACKLOG.md`; Linear is intended after maintainer issue creation. |
 
 ## Required reading paths
 
 ### Implementing a task packet
 
-1. Open the packet from the master checkbox ledger and read its controlling
-   documents.
+1. Open the Ready child task from `REMAINING_EXECUTION_PLAN.md`, confirm its
+   exact dependencies and ownership lock, then read its controlling documents.
 2. Read the relevant question IDs and logical entities.
 3. Read the publication/query/adapter contract that owns the touched boundary.
 4. Read the qualification cases and budgets before writing code.
