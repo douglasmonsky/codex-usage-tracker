@@ -1,0 +1,66 @@
+{
+  "schema": "codex-usage-tracker.page-executor-source-supersession-authority.v1",
+  "authority_version": 1,
+  "owner": "CK-QG1A0",
+  "authority_base_sha": "e26d7d5bfa32bf74c0855ed87266aca83a7ebce1",
+  "source_path": "src/codex_usage_tracker/agent_kernel/query/page_executor.py",
+  "predecessor": {
+    "sha256": "2a48a63e0fbb18173b8e0abe09d65309f76bf59b4796e35d6b2f97dea95df305",
+    "accepted_merge_sha": "53ab22cb54b9a6f30009caeb6bb22a3a57033261",
+    "manifest": {
+      "path": "docs/decisions/evidence/ck08r2/physical-page-executor-evidence.json",
+      "sha256": "0a1f9ee919e065ba707826fc7c308748a7b6810a358f957aa6608ee0ff4d3c08"
+    }
+  },
+  "selected_successor": {
+    "sha256": "9e80c8677dd4ceadc4fbd66681aedef78528b1ad4f50edc7a04f4b1c7ac12f31",
+    "status": "permitted_not_accepted",
+    "blocked_task": "019fbe2b-cce0-7ed2-87c5-71f5aff5594a",
+    "retained_branch": "fix/ck-qg1a-page-executor-complexity"
+  },
+  "r2_artifacts": [
+    {
+      "path": "docs/decisions/evidence/ck08r2/data-health-page-executor-benchmark-v2.json",
+      "sha256": "8ca52e40ad03d8bb8056ec2ca0d8a3ac7f58d3a4f1adf8daad7d8df6d87a0a3f"
+    },
+    {
+      "path": "docs/decisions/evidence/ck08r2/latest-publication-delta-page-executor-benchmark-v2.json",
+      "sha256": "6f897a9ca6f7c52f39c31d56e7943a621758feac3df22d0f0b6dbdc50f0d5604"
+    }
+  ],
+  "maintainability_baseline": {
+    "pr": 392,
+    "head_sha": "29f18ae178a4d048e9d4bd1ae49a4307dd8472dd",
+    "path": "config/agent-kernel/maintainability-baseline-v1.json",
+    "sha256": "c490d954a5e9d09c61f884d51e3b9d3196af5615887f409c36f8469d1b2b6cf9",
+    "schema": "codex-usage-tracker.agent-kernel-maintainability-baseline.v1",
+    "tool_identity": "xenon==0.9.3;radon==6.0.1",
+    "normalization_version": "xenon-threshold-findings-v1",
+    "thresholds": {"block": "C", "module": "B", "average": "B"}
+  },
+  "consumer_test_seam": {
+    "path": "tests/agent_kernel/query/test_page_executor_evidence.py",
+    "test": "test_ck08r2_manifest_binds_superseded_and_current_artifacts"
+  },
+  "preserved_semantics": [
+    "request_validation",
+    "optional_entity_kind_and_limit",
+    "typed_request_digest_binding",
+    "keyset_cursor_and_total_order",
+    "query_only_sqlite",
+    "limit_page_size_plus_one",
+    "exact_count_default_false_opt_in",
+    "indexed_explain_gates",
+    "two_supported_direct_plans",
+    "nineteen_other_plans_fail_closed",
+    "no_projection"
+  ],
+  "constraints": [
+    "predecessor_remains_historically_verifiable",
+    "selected_successor_only",
+    "third_digest_fails",
+    "missing_predecessor_fails",
+    "mismatched_manifest_or_baseline_fails",
+    "generic_source_drift_forbidden"
+  ]
+}

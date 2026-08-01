@@ -161,11 +161,9 @@ qualify publication-valid lifecycle preparation. CK-08R4 alone may classify a
 plan as direct-page, evidence-page, or projection-required. CK-09 may admit
 only the resulting measured residual list after CK-08RG.
 
-CK-QG1A is a separate behavior-preserving R2 source lock: it may reduce only
-the two page-executor rank-D findings and may not alter request validation,
-query-only access, cursor/order semantics, support, evidence, C/B/B threshold,
-or frozen baseline. Existing QG1 PR #392 resumes from QG1A exact main; no
-exemption or baseline broadening is admissible.
+CK-QG1A0 gates the selected PageExecutor successor. Exact-main QG1A then fixes
+R2 rank-D findings; R2 semantics, evidence, thresholds, baseline, and generic-drift
+prohibition remain binding.
 
 CK-07R1A is a separate lifecycle-performance lock: preserve the first hosted
 Python 3.14 `ordinary.2000_call_tail` failure, frozen five budgets, fold and

@@ -1,6 +1,6 @@
 # CK-QG1A — Correct page-executor complexity
 
-**Status:** Conditional Ready after this corrective authority merge is exact-main verified
+**Status:** Conditional Ready after CK-QG1A0 merge is exact-main verified
 
 **Parent:** Corrective prerequisite for CK-QG1
 
@@ -14,7 +14,7 @@
 
 **Goal:** Remove only R2's two Xenon C/B/B violations, preserving behavior.
 
-**Dependencies:** CK-08R2 and this authority correction accepted, merged, exact-main verified.
+**Dependencies:** CK-08R2 plus CK-QG1A0 accepted, merged, and exact-main verified.
 
 **Owned files/interfaces:** Only `agent_kernel/query/page_executor.py` and its
 focused tests; no baseline/checker, registry/compiler, cursor version, R1/R3,

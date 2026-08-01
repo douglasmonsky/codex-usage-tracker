@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://douglasmonsky.github.io/codex-usage-tracker/schemas/page-executor-source-supersession-authority.v1.schema.json",
+  "title": "CK-QG1A0 PageExecutor source supersession authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "authority_version", "owner", "authority_base_sha", "source_path",
+    "predecessor", "selected_successor", "r2_artifacts", "maintainability_baseline",
+    "consumer_test_seam", "preserved_semantics", "constraints"
+  ],
+  "properties": {
+    "schema": {"const": "codex-usage-tracker.page-executor-source-supersession-authority.v1"},
+    "authority_version": {"const": 1},
+    "owner": {"const": "CK-QG1A0"},
+    "authority_base_sha": {"$ref": "#/$defs/gitSha"},
+    "source_path": {"$ref": "#/$defs/nonEmpty"},
+    "predecessor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "accepted_merge_sha", "manifest"],
+      "properties": {
+        "sha256": {"$ref": "#/$defs/sha"},
+        "accepted_merge_sha": {"$ref": "#/$defs/gitSha"},
+        "manifest": {"$ref": "#/$defs/artifact"}
+      }
+    },
+    "selected_successor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "status", "blocked_task", "retained_branch"],
+      "properties": {
+        "sha256": {"$ref": "#/$defs/sha"},
+        "status": {"const": "permitted_not_accepted"},
+        "blocked_task": {"$ref": "#/$defs/nonEmpty"},
+        "retained_branch": {"$ref": "#/$defs/nonEmpty"}
+      }
+    },
+    "r2_artifacts": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "maintainability_baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pr", "head_sha", "path", "sha256", "schema", "tool_identity",
+        "normalization_version", "thresholds"
+      ],
+      "properties": {
+        "pr": {"const": 392},
+        "head_sha": {"$ref": "#/$defs/gitSha"},
+        "path": {"$ref": "#/$defs/nonEmpty"},
+        "sha256": {"$ref": "#/$defs/sha"},
+        "schema": {"$ref": "#/$defs/nonEmpty"},
+        "tool_identity": {"$ref": "#/$defs/nonEmpty"},
+        "normalization_version": {"$ref": "#/$defs/nonEmpty"},
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["block", "module", "average"],
+          "properties": {
+            "block": {"const": "C"},
+            "module": {"const": "B"},
+            "average": {"const": "B"}
+          }
+        }
+      }
+    },
+    "consumer_test_seam": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "test"],
+      "properties": {
+        "path": {"$ref": "#/$defs/nonEmpty"},
+        "test": {"$ref": "#/$defs/nonEmpty"}
+      }
+    },
+    "preserved_semantics": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 11,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonEmpty"}
+    },
+    "constraints": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonEmpty"}
+    }
+  },
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "nonEmpty": {"type": "string", "minLength": 1},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/nonEmpty"},
+        "sha256": {"$ref": "#/$defs/sha"}
+      }
+    }
+  }
+}

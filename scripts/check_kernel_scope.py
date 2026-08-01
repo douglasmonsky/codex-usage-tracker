@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
+_GENERATED_TOOL_PATHS = frozenset({"tools/gitnexus/node_modules"})
 K1A_ADDITIONS = frozenset(
     {
         "scripts/check_kernel_scope.py",
@@ -265,6 +266,7 @@ CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS = frozenset(
         "docs/roadmap/tasks/ck-08r4-reclassify-physical-plans.md",
         "docs/roadmap/tasks/ck-08rg-authorize-ck09-resumption.md",
         "docs/roadmap/tasks/ck-qg1-enforce-agent-kernel-maintainability.md",
+        "docs/roadmap/tasks/ck-qg1a0-authorize-page-executor-source-supersession.md",
         "docs/roadmap/tasks/ck-qg1a-correct-page-executor-complexity.md",
         "docs/roadmap/tasks/ck-09-admit-projections-and-named-plans.md",
         "docs/roadmap/tasks/ck-09-01-freeze-residual-projection-registry.md",
@@ -728,6 +730,13 @@ CK08R3A_AUTHORITY_ADDITIONS = frozenset(
     }
 )
 
+CKQG1A0_AUTHORITY_ADDITIONS = frozenset(
+    [
+        "docs/decisions/evidence/ckqg1a0/page-executor-source-supersession-authority.json",
+        "docs/decisions/evidence/ckqg1a0/page-executor-source-supersession-authority.schema.json",
+    ]
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -784,6 +793,7 @@ INTEGRATION_ADDITIONS = (
     | CK08_QUERY_EVIDENCE_ADDITIONS
     | CK08R2_PHYSICAL_PAGE_ADDITIONS
     | CK08R3A_AUTHORITY_ADDITIONS
+    | CKQG1A0_AUTHORITY_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )
@@ -813,7 +823,7 @@ def active_paths(repo_root: Path) -> set[str]:
         capture_output=True,
         text=True,
     )
-    paths = {line for line in result.stdout.splitlines() if line}
+    paths = {line for line in result.stdout.splitlines() if line} - _GENERATED_TOOL_PATHS
     return {
         path for path in paths if (repo_root / path).exists() or (repo_root / path).is_symlink()
     }
