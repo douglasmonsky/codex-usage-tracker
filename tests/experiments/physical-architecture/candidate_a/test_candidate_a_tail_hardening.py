@@ -166,37 +166,51 @@ def test_pending_tool_lookup_stays_indexed_with_closed_history(
     # The contract is that closed history is never scanned.
 
 
-def test_bulk_call_tail_uses_one_set_sized_bounded_tail_insert(
+def test_bulk_call_tail_uses_bounded_set_inserts(
     fixture: Any,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     artifact = candidate_a.build_artifact(fixture, tmp_path / "bulk-tail.sqlite")
-    statements: list[str] = []
     original_open_database = maintenance_module.open_database
 
-    def traced_open_database(*args: Any, **kwargs: Any) -> Any:
+    def bounded_open_database(*args: Any, **kwargs: Any) -> Any:
         connection = original_open_database(*args, **kwargs)
-
-        def capture_bulk_insert(statement: str) -> None:
-            if not statements and "INSERT INTO MODEL_CALL_TAIL" in " ".join(
-                statement.upper().split()
-            ):
-                statements.append(statement)
-                connection.set_trace_callback(None)
-
-        connection.set_trace_callback(capture_bulk_insert)
+        setlimit = getattr(connection, "setlimit", None)
+        if callable(setlimit):
+            setlimit(9, 30_000)  # SQLITE_LIMIT_VARIABLE_NUMBER
         return connection
 
-    monkeypatch.setattr(maintenance_module, "open_database", traced_open_database)
+    monkeypatch.setattr(maintenance_module, "open_database", bounded_open_database)
     stats = apply_ordinary_change(artifact.path, "2000_call_tail")
-    model_call_inserts = [
-        statement
-        for statement in statements
-        if "INSERT INTO MODEL_CALL_TAIL" in " ".join(statement.upper().split())
-    ]
 
-    assert len(model_call_inserts) == 1
+    assert stats.facts_inserted == 2_000
+    assert stats.dirty_keys == 6
+
+
+def test_bulk_call_tail_respects_runtime_sql_variable_limit(
+    fixture: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact = candidate_a.build_artifact(fixture, tmp_path / "bounded-variables.sqlite")
+    original_open_database = maintenance_module.open_database
+
+    def constrained_open_database(*args: Any, **kwargs: Any) -> Any:
+        connection = original_open_database(*args, **kwargs)
+        setlimit = getattr(connection, "setlimit", None)
+        if callable(setlimit):
+            setlimit(9, 999)  # SQLITE_LIMIT_VARIABLE_NUMBER
+        return connection
+
+    monkeypatch.setattr(
+        maintenance_module,
+        "open_database",
+        constrained_open_database,
+    )
+
+    stats = apply_ordinary_change(artifact.path, "2000_call_tail")
+
     assert stats.facts_inserted == 2_000
     assert stats.dirty_keys == 6
 
@@ -228,6 +242,28 @@ def test_model_call_tail_is_append_only_and_cross_table_unique(
             ).fetchone()[0]
             == 2_000
         )
+        for ordinal in (0, 1_999):
+            row = connection.execute(
+                """
+                SELECT call_id, session_id, event_at_us
+                FROM model_call_tail
+                ORDER BY event_at_us, source_order
+                LIMIT 1 OFFSET ?
+                """,
+                (ordinal,),
+            ).fetchone()
+            assert row["call_id"] == (
+                "call:candidate-a:"
+                + shared.canonical_sha256(
+                    {
+                        "candidate": "A",
+                        "change": "tail",
+                        "session": row["session_id"],
+                        "ordinal": ordinal,
+                        "event_at_us": row["event_at_us"],
+                    }
+                )
+            )
         with pytest.raises(sqlite3.IntegrityError, match="cross-table"):
             connection.execute("INSERT INTO model_call_tail SELECT * FROM model_calls LIMIT 1")
         with pytest.raises(sqlite3.IntegrityError, match="append-only"):

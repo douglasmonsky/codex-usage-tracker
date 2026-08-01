@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import time
@@ -425,17 +426,29 @@ def _insert_calls(
     else:
         event_at = int(tail_state["maximum_event_at_us"]) + 1
     source_order = int(tail_state["maximum_source_order"]) + 1
+    change_name = "late" if late else "tail"
+    session_json = json.dumps(
+        session_id,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    identity_prefix = (
+        f'{{"candidate":"A","change":"{change_name}","event_at_us":'.encode()
+    )
+    identity_middle = b',"ordinal":'
+    identity_suffix = f',"session":{session_json}}}\n'.encode()
     rows = []
     for ordinal in range(count):
-        digest = shared.canonical_sha256(
-            {
-                "candidate": "A",
-                "change": "late" if late else "tail",
-                "session": session_id,
-                "ordinal": ordinal,
-                "event_at_us": event_at + ordinal,
-            }
+        # Preserve the exact sorted-key canonical JSON identity without paying
+        # for a full JSON encoder invocation for every row in the timed tail.
+        identity = (
+            identity_prefix
+            + str(event_at + ordinal).encode()
+            + identity_middle
+            + str(ordinal).encode()
+            + identity_suffix
         )
+        digest = hashlib.sha256(identity).hexdigest()
         rows.append(
             (
                 f"call:candidate-a:{digest}",
@@ -458,19 +471,29 @@ def _insert_calls(
                 int(source["byte_count"]),
             )
         )
+    width = len(rows[0])
+    sqlite_variable_limit = 999
+    getlimit = getattr(connection, "getlimit", None)
+    if callable(getlimit):
+        runtime_limit = getlimit(9)  # SQLITE_LIMIT_VARIABLE_NUMBER
+        if isinstance(runtime_limit, int):
+            sqlite_variable_limit = runtime_limit
+    per_statement = max(1, min(sqlite_variable_limit, 30_000) // width)
     row_placeholders = "(" + ", ".join("?" for _ in rows[0]) + ")"
-    connection.execute(
-        f"""
-        INSERT INTO model_call_tail(
-            call_id, session_id, turn_id, model, reasoning_effort,
-            context_window_tokens, uncached_input_tokens, cached_input_tokens,
-            reasoning_tokens, output_tokens, event_at_us, source_rank,
-            occurrence_source_key, source_order, event_kind_order,
-            record_ordinal, byte_start, byte_end
-        ) VALUES {", ".join(row_placeholders for _ in rows)}
-        """,
-        tuple(value for row in rows for value in row),
-    )
+    for start in range(0, len(rows), per_statement):
+        batch = rows[start : start + per_statement]
+        connection.execute(
+            f"""
+            INSERT INTO model_call_tail(
+                call_id, session_id, turn_id, model, reasoning_effort,
+                context_window_tokens, uncached_input_tokens, cached_input_tokens,
+                reasoning_tokens, output_tokens, event_at_us, source_rank,
+                occurrence_source_key, source_order, event_kind_order,
+                record_ordinal, byte_start, byte_end
+            ) VALUES {", ".join(row_placeholders for _ in batch)}
+            """,
+            tuple(value for row in batch for value in row),
+        )
     return (
         len(rows),
         _UsageDelta(
