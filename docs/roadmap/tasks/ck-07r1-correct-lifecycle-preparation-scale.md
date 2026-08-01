@@ -1,6 +1,6 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** Conditional Ready after CK-08R0 merge and exact-main verification
+**Status:** Blocked on CK-07R1A
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -21,7 +21,8 @@ production-shaped preparation attempt exceeded 15 minutes.
 **Controls:** Publication/recovery, lifecycle, canonical fact, and benchmark
 contracts.
 
-**Dependencies:** CK-08R0 merged and exact-main verified.
+**Dependencies:** CK-07R1A accepted, merged, and exact-main verified; existing
+PR #394 refreshed from corrected main and all required CI rerun.
 
 **Owned files/interfaces:** Lifecycle preparation implementation, focused
 publication tests, profile/benchmark, and linked CK-07 evidence amendment.
@@ -33,8 +34,9 @@ database postconditions.
 
 **Consumer seam:** Preparation to `PublicationWriter` to read-only publication.
 
-**Parallelism:** May run with other Wave-2 lanes; must not edit writer,
-recovery, query, evidence, or shared authority.
+**Parallelism:** Resume existing task
+`019fbb41-804b-7fe2-8987-3d2b9e94a4d5` only after CK-07R1A handoff; other
+corrective locks stay disjoint.
 
 **Non-goals:** Writer/pointer/schema redesign, facts, projections, or budget
 waivers.
@@ -52,7 +54,8 @@ publication-valid scale gates pass.
 **Failure/rollback:** Retain the profile and create one narrow follow-up for a
 new dominant blocker; never weaken the gate.
 
-**Handoff:** Evidence digest, profiles, first failure if any, and CK-08R4 input.
+**Handoff:** Evidence digest, profiles, retained first hosted failure, PR #394
+CI, exact-main result, and CK-08R4 input.
 
 **Cleanup/docs:** Supersede only affected CK-07/08 scale claims.
 

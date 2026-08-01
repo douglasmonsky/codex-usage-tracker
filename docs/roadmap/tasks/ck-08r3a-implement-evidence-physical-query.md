@@ -1,86 +1,20 @@
 # CK-08R3A — Implement bounded EvidenceService physical queries
-
-**Status:** Ready; CK-08R0 accepted/merged/exact-main verified at `306cef37eea2ae017aca824d898cc435f7e1bea0`
-
-**Parent:** CK-08R3 implementation prerequisite
-
-**Recommended owner:** `worker evidence-physical-query`; Sol
-
-**Authority:** [TASK_PACKETS.md](../TASK_PACKETS.md),
-[REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md),
-[AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
-
-**Goal:** Apply scope/order/keyset and `LIMIT request.limit + 1` in SQLite
-before decode, without semantic/budget changes.
-
-**Blocker:** Retained commit `a28e9cdbff8e48d334712a449fdcee111c725673`
-artifact `docs/decisions/evidence/ck08r3/evidence-scale-qualification.json`,
-SHA-256 `ae9107eda155a21b9bd9ef5a77971007d00864b772c3a23bc521652b5b17d471`,
-stopped first/deep session `pre_scale_explain`: `SCAN stream`,
-`MATERIALIZE model_calls_visible`, `AUTOMATIC COVERING INDEX`, and outer
-`USE TEMP B-TREE FOR ORDER BY` preceded `LIMIT`. No scale/admission or
-production edit ran.
-
-**Dependencies:** Accepted CK-08R0. Consume `corrective-gates-v1` and current
-request/page, selector/provenance, cursor/publication contracts from exact main;
-never cherry-pick CK-08R3.
-
-**Owned files/interfaces:** Evidence physical lock only:
-`src/codex_usage_tracker/agent_kernel/evidence/service.py`, focused
-`tests/agent_kernel/evidence/test_service.py` plus optional sibling; page SQL/
-branches/parameters/decode. Forbid QueryService, registry/compiler/
-contracts, cursor codec/version, selectors, DDL/index/publication, R3 evidence,
-schema/projection and public/package APIs.
-
-**Produces:** Physical fix plus structural/EXPLAIN tests; no scale/admission.
-
-**Independent truth source:** Test-only relation evaluator uses no production
-query/helper; it forms typed events, applies selector/view/cursor,
-orders by `(time_missing, COALESCE(event_at_us,0), source_rank, source_order,
-event_kind_order, logical_id, transition_rank)`, slices `limit + 1`, and
-compares rows/order.
-
-**Consumer seam:** `EvidenceService.read()` keeps one query-only snapshot;
-`_page_rows()` applies scope/view/order/publication-bound keyset and final
-`LIMIT ?` before decoding `limit + 1`. Byte shrink/CursorCodec stay.
-
-**Parallelism:** R1/R2/07R1/QG1 stay independent; R3/R4/RG/09 stay blocked.
-
-**Non-goals:** R3 scale, R2 paging, DDL/index/schema/backbone,
-`evidence_timeline_current`, projections/counts/APIs/budgets, R4 and CK-09.
-
-**Invariants:** Preserve 14 selectors, six provenance kinds, boundary pairs,
-seven views/directions and that order. Cursor binds version, plan/version,
-publication, request digest, last order and expiry; tamper/replacement/stale
-fail closed. Tie/missing/late/replacement/base/tail cases stay gap-free.
-No-refresh/query-only/one-snapshot/exact-count-off, 100 rows, 16,384 bytes,
-catalog counts and 820,000-byte sdist remain fixed.
-
-**EXPLAIN acceptance:** First/deep session pages both directions plus other
-representative scopes omit all four blocker details. High-cardinality branches
-use existing named PK/scope-order indexes; singleton lookups may use PKs.
-Assert keyset, final `LIMIT ?`, bound/decode `limit + 1`, normalized failure
-and no permissive version wildcard.
-
-**Required tests/checks:** CK-07A builders plus synthetic tie/missing/base-tail/
-lifecycle/late/replacement/selector/direction cases; no scale/real data.
-Bootstrap/GitNexus; focused service/structural/EXPLAIN/semantic/cursor/byte/
-authority; diff/release; `just v/vc`; staged `detect_changes`; one reviewer/PR;
-hosted CI; squash merge; attached exact-main.
-
-**Acceptance:** Truth/production rows/order match; reversible gap-free pages
-are bounded; query-only/cursor/byte/release gates and lock hold.
-Authorizes only R3, never scale/projections.
-
-**Failure/rollback:** On forbidden plan/mismatch or lock/budget need, retain
-SQL/parameters/plan/fixture digest, stop/create no R3; revert service/tests
-without migration.
-
-**Handoff:** After accepted merge/CI/exact-main, create exactly one user-owned
-`test_engineer evidence-scale` task from new main with merge SHA, blocker
-artifact/digest, lock, fixtures/budgets, truth/seam, EXPLAIN/order/cursor,
-checks/risks/stops. It may create R4 only after R1/R2/R3/07R1 complete.
-
-**Cleanup/docs:** Link merge/exact-main from R3; keep blocker historical.
-
+**Status:** Conditional Ready after this authority merge exact-main
+**Recommended owner:** `worker evidence-physical-query`; Sol-class
+**Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md); [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md); [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
+**Goal:** Independently reinspect/reapply bounded EvidenceService SQL.
+**Blocker:** R3 commit `a28e9cdbff8e48d334712a449fdcee111c725673`/artifact `ae9107eda155a21b9bd9ef5a77971007d00864b772c3a23bc521652b5b17d471` exposed unbounded plans. R3A task `019fbbc0-cd25-7041-a847-b0098dfae29d` changed frozen `service.py` `ea32223d1afd997f310419bff0b6b260193e527c8333c9f561bcab280447dfa3` to selected `718ff7032d050b13cb7fac1f857d0c99879d0ef3b13c57c39b55514fc610a88b`; focused/release passed, `just v` stopped 1391/1 on authority, rollback followed; no review/PR/merge/exact-main/R3.
+**Dependencies:** Accepted R0 plus this merge/exact-main. [Supersession authority](../../decisions/evidence/ck08r3a/evidence-service-supersession-authority.json) keeps predecessor exact and successor permitted_not_accepted until evidence.
+**Owned files/interfaces:** EvidenceService, focused tests, R3A evidence only; query/contracts/cursor/selectors/DDL/index/publication/schema/projection/public/package/authority forbidden.
+**Produces:** Bounded SQL/tests and bound digest evidence; no R3 scale.
+**Independent truth source:** Test evaluator imports no production query/helper; applies selector/view/cursor, seven-part order, `limit + 1`.
+**Consumer seam:** `EvidenceService.read()` stays one query-only snapshot; keyset/order/limit precede decode.
+**Parallelism:** Disjoint from R1A,07R1A,QG1A; fresh task; blocked run is reproduction.
+**Non-goals:** DDL/schema/projection/API/budget/timing/R1/QG1/07R1/R3/R4/RG/09.
+**Invariants:** Preserve selector/version/view/direction/cursor/publication, ties/missing/late/base/tail, gap-free/query-only/one-snapshot, <=100 rows/16384 bytes; synthetic; wheel <=383000, sdist <=828000.
+**Required tests/checks:** First/deep EXPLAIN rejects `SCAN stream`, `MATERIALIZE model_calls_visible`, `AUTOMATIC COVERING INDEX`, `USE TEMP B-TREE FOR ORDER BY`; independent rows/order/decode bound; regressions/authority/GitNexus; `just v/vc`; reviewer/PR/CI/merge/exact-main.
+**Acceptance:** Selected source/evidence identity and all bounds pass; generic drift forbidden.
+**Failure/rollback:** Divergence/gate/broader-authority need stops; no retry-only/blind copy.
+**Handoff:** SHA/PR/digests/plans/measurements/review/CI/exact-main/risks; then fresh `test_engineer evidence-scale` R3.
+**Cleanup/docs:** Retain blocker; preserve R3A→R3 and R4 join.
 **Suggested commit:** `fix: bound evidence physical queries`

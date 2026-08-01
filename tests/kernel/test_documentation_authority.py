@@ -41,13 +41,18 @@ _PACKET_IDS = {
     "CK-07D",
     "CK-07E",
     "CK-07R1",
+    "CK-07R1A",
     "CK-08R0",
+    "CK-08R1A",
+    "CK-08R1B",
+    "CK-08R1C",
     "CK-08R1",
     "CK-08R2",
     "CK-08R3A",
     "CK-08R3",
     "CK-08R4",
     "CK-08RG",
+    "CK-QG1A",
     "CK-QG1",
     *(f"CK-09-{number:02d}" for number in range(1, 7)),
     *(f"CK-10-{number:02d}" for number in range(1, 6)),
@@ -67,6 +72,8 @@ _DELEGATED_PACKET_IDS = _PACKET_IDS - {
     "CK-07D",
     "CK-07E",
 }
+
+
 def _read(path: str) -> str:
     return (_REPO_ROOT / path).read_text(encoding="utf-8")
 
@@ -76,11 +83,7 @@ def _json(path: str):
 
 
 def _active_markdown() -> list[Path]:
-    return [
-        path
-        for path in _DOCS.rglob("*.md")
-        if "archive" not in path.relative_to(_DOCS).parts
-    ]
+    return [path for path in _DOCS.rglob("*.md") if "archive" not in path.relative_to(_DOCS).parts]
 
 
 def test_authority_set_exists_and_has_one_roadmap() -> None:
@@ -89,9 +92,7 @@ def test_authority_set_exists_and_has_one_roadmap() -> None:
 
     roadmap_marker = "**Status:** Only authoritative implementation roadmap"
     marked = [
-        path
-        for path in _active_markdown()
-        if roadmap_marker in path.read_text(encoding="utf-8")
+        path for path in _active_markdown() if roadmap_marker in path.read_text(encoding="utf-8")
     ]
     assert marked == [_DOCS / "roadmap" / "AGENT_FIRST_CLEAN_CUTOVER.md"]
 
@@ -120,9 +121,7 @@ def test_master_ledger_links_exactly_one_file_per_packet() -> None:
     ledger_by_id = dict(zip(packet_ids, packet_links, strict=True))
 
     task_files = sorted((_DOCS / "roadmap" / "tasks").glob("ck-*.md"))
-    assert {path.name for path in task_files} == {
-        Path(link).name for link in packet_links
-    }
+    assert {path.name for path in task_files} == {Path(link).name for link in packet_links}
     for path in task_files:
         body = path.read_text(encoding="utf-8")
         assert "**Status:**" in body
@@ -158,10 +157,7 @@ def test_master_ledger_links_exactly_one_file_per_packet() -> None:
                     "**Handoff:**",
                 )
             )
-        assert (
-            "**Required tests/checks:**" in body
-            or "**Tests/benchmarks:**" in body
-        )
+        assert "**Required tests/checks:**" in body or "**Tests/benchmarks:**" in body
 
 
 def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
@@ -178,26 +174,42 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     manifest = json.loads(manifest_match.group(1))
     assert manifest["schema"] == "codex-usage-tracker.remaining-delegation-dag.v1"
     assert manifest["orchestration"]["spawn"] == "all_newly_ready_successors"
-    conditional_ready = {
-        "CK-08R1",
-        "CK-07R1",
-        "CK-QG1",
-    }
+    conditional_ready = {"CK-08R1A", "CK-08R3A", "CK-07R1A", "CK-QG1A"}
     assert manifest["completed"] == ["CK-08R0", "CK-08R2"]
-    ready = {"CK-08R3A"}
-    assert manifest["ready"] == ["CK-08R3A"]
-    assert manifest["conditional_ready"] == [{
-        "condition": "CK-08R0 merged and exact-main verified",
-        "tasks": ["CK-08R1", "CK-07R1", "CK-QG1"],
-    }]
+    ready: set[str] = set()
+    assert manifest["ready"] == []
+    assert manifest["conditional_ready"] == [
+        {
+            "condition": (
+                "This serialized corrective authority correction accepted, merged, and exact-main verified"
+            ),
+            "tasks": ["CK-08R1A", "CK-08R3A", "CK-07R1A", "CK-QG1A"],
+        }
+    ]
+    assert "Completed packets: **14 / 22**" in ledger
+    assert "Not started: **8**" in ledger
+    assert "Critical-path completion: **14 / 21**" in ledger
+    assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
+    assert (
+        f"Conditional-ready child tasks: **{sum(len(item['tasks']) for item in manifest['conditional_ready'])}"
+        in ledger
+    )
 
     tasks = manifest["tasks"]
-    assert len(tasks) == 43
+    assert len(tasks) == 48
     manifest_by_id = {task["id"]: task for task in tasks}
-    assert len(manifest_by_id) == 43
+    assert len(manifest_by_id) == 48
     assert set(manifest_by_id) == _DELEGATED_PACKET_IDS
     assert manifest_by_id["CK-08R3A"]["dependencies"] == ["CK-08R0"]
     assert manifest_by_id["CK-08R3"]["dependencies"] == ["CK-08R3A"]
+    assert manifest_by_id["CK-08R1A"]["dependencies"] == ["CK-08R0"]
+    assert manifest_by_id["CK-08R1B"]["dependencies"] == ["CK-08R1A"]
+    assert manifest_by_id["CK-08R1C"]["dependencies"] == ["CK-08R1A"]
+    assert manifest_by_id["CK-08R1"]["dependencies"] == ["CK-08R1B", "CK-08R1C"]
+    assert manifest_by_id["CK-QG1A"]["dependencies"] == ["CK-08R2"]
+    assert manifest_by_id["CK-QG1"]["dependencies"] == ["CK-QG1A"]
+    assert manifest_by_id["CK-07R1A"]["dependencies"] == ["CK-08R0"]
+    assert manifest_by_id["CK-07R1"]["dependencies"] == ["CK-07R1A"]
     assert manifest_by_id["CK-08R4"]["dependencies"] == [
         "CK-08R1",
         "CK-08R2",
@@ -205,6 +217,12 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "CK-07R1",
     ]
     assert manifest_by_id["CK-08RG"]["dependencies"] == ["CK-08R4", "CK-QG1"]
+
+    release_budget = _json("config/kernel-release-candidate-budget.json")
+    assert release_budget["sdist_bytes"] == 828000
+    for packet_id in ("CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R3A", "CK-07R1A", "CK-QG1A"):
+        packet = _read(f"docs/roadmap/{manifest_by_id[packet_id]['file']}").replace(",", "")
+        assert str(release_budget["sdist_bytes"]) in packet
 
     ledger_rows = re.findall(
         r"^- \[[ xX]\] \*\*(CK-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b.*?"
@@ -236,7 +254,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "worker",
         }
         if packet_id in conditional_ready:
-            assert "**Status:** Conditional Ready after CK-08R0 merge" in body
+            assert "**Status:** Conditional Ready after" in body
         elif packet_id in ready:
             assert "**Status:** Ready" in body
         elif packet_id in {"CK-08R0", "CK-08R2"}:
@@ -246,22 +264,34 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
 
     path = "docs/decisions/evidence/ck08r0/corrective-gates-v1.json"
     contract = _json(path)
-    contract_validator = Draft202012Validator(
-        _json(f"{path.removesuffix('.json')}.schema.json")
-    )
+    contract_validator = Draft202012Validator(_json(f"{path.removesuffix('.json')}.schema.json"))
     contract_validator.validate(contract)
-    r2_evidence = _json(
-        "docs/decisions/evidence/ck08r2/physical-page-executor-evidence.json"
+    r2_evidence = _json("docs/decisions/evidence/ck08r2/physical-page-executor-evidence.json")
+    superseded = {item["path"]: item for item in r2_evidence["superseded_authority_artifacts"]}
+    r3a = _json(
+        "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json"
     )
-    superseded = {
-        item["path"]: item for item in r2_evidence["superseded_authority_artifacts"]
-    }
+    assert r3a["owner"] == "CK-08R3A"
+    assert r3a["source_path"] == "src/codex_usage_tracker/agent_kernel/evidence/service.py"
+    assert r3a["selected_successor"]["status"] == "permitted_not_accepted"
+    assert r3a["constraints"][-1] == "generic_digest_drift_forbidden"
     for artifact in contract["authority_artifacts"]:
         source = _REPO_ROOT / artifact["path"]
         actual = hashlib.sha256(source.read_bytes()).hexdigest()
         if replacement := superseded.get(artifact["path"]):
             assert replacement["from_sha256"] == artifact["sha256"]
             assert actual == replacement["to_sha256"]
+        elif artifact["path"] == r3a["source_path"]:
+            assert r3a["predecessor"]["sha256"] == artifact["sha256"]
+            successor = r3a["selected_successor"]
+            assert actual in {artifact["sha256"], successor["sha256"]}
+            if actual == successor["sha256"]:
+                evidence = _json(successor["required_evidence"]["path"])
+                assert evidence["schema"] == successor["required_evidence"]["schema"]
+                assert evidence["owner"] == "CK-08R3A"
+                assert evidence["source_path"] == artifact["path"]
+                assert evidence["predecessor_sha256"] == artifact["sha256"]
+                assert evidence["successor_sha256"] == successor["sha256"]
         else:
             assert actual == artifact["sha256"]
     locks = [lock for lane in contract["lanes"] for lock in lane["owned_lock"]]
@@ -275,8 +305,9 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     )
     Draft202012Validator.check_schema(evidence_bundle)
     bound = {
-        evidence_bundle["$defs"][lane["evidence_schema"]["definition"].removeprefix("#/$defs/")]
-        ["properties"]["schema"]["const"]
+        evidence_bundle["$defs"][lane["evidence_schema"]["definition"].removeprefix("#/$defs/")][
+            "properties"
+        ]["schema"]["const"]
         for lane in contract["lanes"]
     }
     assert bound == {lane["evidence_schema"]["schema"] for lane in contract["lanes"]}
@@ -302,6 +333,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert visited == _DELEGATED_PACKET_IDS
     assert "architect / Sol" not in central
     assert "feature worker / Sol" not in central
+
+
 def test_corrective_seam_packet_is_critical_path_authority() -> None:
     agents = _read("AGENTS.md")
     index = _read("docs/INDEX.md")
@@ -309,50 +342,38 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     ledger = _read("docs/roadmap/TASK_PACKETS.md")
     backlog = _read("docs/roadmap/LINEAR_BACKLOG.md")
     qualification = _read("docs/quality/QUALIFICATION_PLAN.md")
-    query_contract = _read(
-        "docs/architecture/QUERY_EVIDENCE_PROJECTION_CONTRACTS.md"
-    )
-    physical_decision = _read(
-        "docs/decisions/PHYSICAL_ARCHITECTURE_DECISION.md"
-    )
-    ck07a = _read(
-        "docs/roadmap/tasks/"
-        "ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md"
-    )
-    ck07d = _read(
-        "docs/roadmap/tasks/"
-        "ck-07d-implement-effective-dated-rate-card-valuation.md"
-    )
-    ck07e = _read(
-        "docs/roadmap/tasks/ck-07e-implement-independent-fact-adapters.md"
-    )
+    query_contract = _read("docs/architecture/QUERY_EVIDENCE_PROJECTION_CONTRACTS.md")
+    physical_decision = _read("docs/decisions/PHYSICAL_ARCHITECTURE_DECISION.md")
+    ck07a = _read("docs/roadmap/tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md")
+    ck07d = _read("docs/roadmap/tasks/ck-07d-implement-effective-dated-rate-card-valuation.md")
+    ck07e = _read("docs/roadmap/tasks/ck-07e-implement-independent-fact-adapters.md")
     ck08 = _read("docs/roadmap/tasks/ck-08-implement-query-and-evidence.md")
-    ck08r3a = _read(
-        "docs/roadmap/tasks/ck-08r3a-implement-evidence-physical-query.md"
+    ck08r3a = _read("docs/roadmap/tasks/ck-08r3a-implement-evidence-physical-query.md")
+    ck08r3a_digest = _read(
+        "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json"
     )
     ck08r3 = _read("docs/roadmap/tasks/ck-08r3-qualify-evidence-scale.md")
+    ck08r1a = _read("docs/roadmap/tasks/ck-08r1a-freeze-answer-semantics.md")
+    ck08r1b = _read("docs/roadmap/tasks/ck-08r1b-implement-production-answer-semantics.md")
+    ck08r1c = _read("docs/roadmap/tasks/ck-08r1c-build-independent-semantic-evaluator.md")
+    ck08r1 = _read("docs/roadmap/tasks/ck-08r1-build-independent-answer-truth.md")
+    ckqg1a = _read("docs/roadmap/tasks/ck-qg1a-correct-page-executor-complexity.md")
+    ckqg1 = _read("docs/roadmap/tasks/ck-qg1-enforce-agent-kernel-maintainability.md")
+    ck07r1a = _read("docs/roadmap/tasks/ck-07r1a-correct-hosted-lifecycle-tail.md")
+    ck07r1 = _read("docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md")
 
     assert "## Cross-packet semantic continuity" in agents
     assert "producer artifact and exact identity" in agents
     assert "independent truth source or reference evaluator" in agents
     assert "CK-07A" in index
-    assert (
-        "CK-07 -> CK-07B -> CK-07C -> CK-07D -> CK-07E -> CK-07A -> CK-08"
-        in roadmap
-    )
-    assert (
-        "CK-07 → CK-07B\n→ CK-07C → CK-07D → CK-07E → CK-07A → CK-08"
-        in ledger
-    )
+    assert "CK-07 -> CK-07B -> CK-07C -> CK-07D -> CK-07E -> CK-07A -> CK-08" in roadmap
+    assert "CK-07 → CK-07B\n→ CK-07C → CK-07D → CK-07E → CK-07A → CK-08" in ledger
     assert "| CK-07D |" in backlog
     assert "| CK-07E |" in backlog
     assert "| CK-07A |" in backlog
     assert "### Evidence claim classes" in qualification
     assert "### Fact-backed plan admission" in query_contract
-    assert (
-        "**Dependencies:** CK-07, CK-07B, CK-07C, CK-07D, and CK-07E merged"
-        in ck07a
-    )
+    assert "**Dependencies:** CK-07, CK-07B, CK-07C, CK-07D, and CK-07E merged" in ck07a
     assert "greatest eligible" in ck07d
     assert "fetched_at_us" in ck07d
     assert "late-ingested" in ck07d
@@ -375,6 +396,16 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert "all 80 question variants" in ck07a
     assert "aggregate score/sensitivity evidence" in ck07a
     assert "80 / 80 fact-backed variants passed" in physical_decision
+    assert all(
+        token in ck08r3a + ck08r3a_digest
+        for token in (
+            "ea32223d1afd997f310419bff0b6b260193e527c8333c9f561bcab280447dfa3",
+            "718ff7032d050b13cb7fac1f857d0c99879d0ef3b13c57c39b55514fc610a88b",
+            "permitted_not_accepted",
+            "generic_digest_drift_forbidden",
+            "828000",
+        )
+    )
     assert "explicit growth-evidence exception" in physical_decision
     assert "two current repetitions were waived" in physical_decision
     assert "**Dependencies:** CK-07A merged with exact-main seam evidence." in ck08
@@ -390,6 +421,55 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
         )
     )
     assert "**Dependencies:** CK-08R3A accepted, merged, and exact-main verified." in ck08r3
+    for body, tokens in (
+        (
+            ck08r1a,
+            (
+                "tool_metrics",
+                "state_change_metrics",
+                "resource_metrics",
+                "completion_state",
+                "context_features",
+                "delegation_metrics",
+                "token_deltas",
+                "turn_call_counts",
+                "Open sessions remain explicitly open",
+                "strict descendants",
+                "terminal succeeded transition",
+                "canonical call between one tool's start",
+                "strictly",
+                "reasoning",
+                "sentinels",
+                "inaccessible",
+                "canonical closure digest",
+            ),
+        ),
+        (ck08r1b, ("compile_plan_operands", "19 fail-closed residual plans")),
+        (ck08r1c, ("Recursive closure", "production mutation cannot affect")),
+        (ck08r1, ("sentinel-mutated",)),
+        (
+            ckqg1a,
+            (
+                "PageExecutionRequest",
+                "23/count 1",
+                "22/count 1",
+                "c490d954a5e9d09c61f884d51e3b9d3196af5615887f409c36f8469d1b2b6cf9",
+                "019fbb41-79b6-7760-8e7f-e68fc381422a",
+            ),
+        ),
+        (
+            ck07r1a,
+            (
+                "ordinary.2000_call_tail",
+                "5000/120000/100/500/500",
+                "30685780055",
+                "019fbb41-804b-7fe2-8987-3d2b9e94a4d5",
+            ),
+        ),
+    ):
+        assert all(token in body for token in tokens)
+    assert "Blocked on CK-QG1A" in ckqg1
+    assert "Blocked on CK-07R1A" in ck07r1
 
 
 def test_question_catalog_and_diagram_inventory_are_complete() -> None:
@@ -399,8 +479,7 @@ def test_question_catalog_and_diagram_inventory_are_complete() -> None:
     assert len(set(question_ids)) == 40
 
     mermaid_blocks = sum(
-        path.read_text(encoding="utf-8").count("```mermaid")
-        for path in _active_markdown()
+        path.read_text(encoding="utf-8").count("```mermaid") for path in _active_markdown()
     )
     assert mermaid_blocks >= 16
 
@@ -428,9 +507,7 @@ def test_frozen_spike_guidance_points_replacement_work_to_active_packets() -> No
 
 def test_runtime_retirement_and_public_install_have_distinct_owners() -> None:
     roadmap = _read("docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md")
-    ck14 = _read(
-        "docs/roadmap/tasks/ck-14-delete-spike-console-obsolete-surfaces.md"
-    )
+    ck14 = _read("docs/roadmap/tasks/ck-14-delete-spike-console-obsolete-surfaces.md")
     ck16 = _read("docs/roadmap/tasks/ck-16-publish-docs-and-release.md")
 
     assert "## Runtime-retirement gate" in roadmap
@@ -445,9 +522,7 @@ def test_linear_issue_rows_use_only_declared_labels() -> None:
     backlog = _read("docs/roadmap/LINEAR_BACKLOG.md")
     labels_section, issues_section = backlog.split("## Issue backlog", maxsplit=1)
     issue_table, _ = issues_section.split("## Linear issue template", maxsplit=1)
-    declared = set(
-        re.findall(r"^\| `([^`]+)` \|", labels_section, re.MULTILINE)
-    )
+    declared = set(re.findall(r"^\| `([^`]+)` \|", labels_section, re.MULTILINE))
     used: set[str] = set()
     for line in issue_table.splitlines():
         if not line.startswith("| CK-"):
@@ -474,15 +549,11 @@ def test_obsolete_planning_framework_is_absent_from_active_authority() -> None:
         *_active_markdown(),
     ]
     assert all(
-        retired_root not in path.read_text(encoding="utf-8").lower()
-        for path in active_paths
+        retired_root not in path.read_text(encoding="utf-8").lower() for path in active_paths
     )
 
     resolved_pull_request_refs = ("#" + "314", "pull/" + "314")
     assert all(
-        not any(
-            marker in path.read_text(encoding="utf-8")
-            for marker in resolved_pull_request_refs
-        )
+        not any(marker in path.read_text(encoding="utf-8") for marker in resolved_pull_request_refs)
         for path in active_paths
     )

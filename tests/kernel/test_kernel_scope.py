@@ -21,6 +21,7 @@ from scripts.check_kernel_scope import (
     CK08_PREREQUISITE_BLOCKER_ADDITIONS,
     CK08_QUERY_EVIDENCE_ADDITIONS,
     CK08R2_PHYSICAL_PAGE_ADDITIONS,
+    CK08R3A_AUTHORITY_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS,
     INTEGRATION_ADDITIONS,
@@ -242,8 +243,8 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         for path in CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS
         if path.startswith("docs/roadmap/tasks/")
     }
-    assert len(CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS) == 89
-    assert len(task_packets) == 62
+    assert len(CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS) == 94
+    assert len(task_packets) == 67
     assert {
         "docs/INDEX.md",
         "docs/architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md",
@@ -662,9 +663,16 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK07A_FACT_BACKED_REQUALIFICATION_ADDITIONS
         | CK08_QUERY_EVIDENCE_ADDITIONS
         | CK08R2_PHYSICAL_PAGE_ADDITIONS
+        | CK08R3A_AUTHORITY_ADDITIONS
         | CK08_PREREQUISITE_BLOCKER_ADDITIONS
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )
+
+
+def test_ck08r3a_authority_additions_are_explicit_and_bounded() -> None:
+    assert {
+        "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json",
+    } == CK08R3A_AUTHORITY_ADDITIONS
 
 
 def test_kernel_skeleton_imports_without_legacy_runtime() -> None:

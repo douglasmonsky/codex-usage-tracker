@@ -1,6 +1,6 @@
 # CK-QG1 — Enforce replacement-kernel maintainability
 
-**Status:** Conditional Ready after CK-08R0 merge and exact-main verification
+**Status:** Blocked on CK-QG1A
 
 **Parent:** Corrective quality gate for all remaining packets
 
@@ -20,7 +20,9 @@ the replacement implementation.
 
 **Controls:** Repository validation profiles and measured Radon/Xenon output.
 
-**Dependencies:** CK-08R0 merged and exact-main verified.
+**Dependencies:** CK-QG1A accepted, merged, and exact-main verified, then
+existing PR #392 refreshed from that corrected main with the exact frozen
+baseline.
 
 **Owned files/interfaces:** Maintainability checker, machine-readable baseline,
 tests, and validation wiring.
@@ -32,19 +34,22 @@ over exact source.
 
 **Consumer seam:** `just vp`, `just v`, `just vc`, and later packet CI.
 
-**Parallelism:** May run with other Wave-2 lanes; no production refactor beyond
-checker cohesion.
+**Parallelism:** Resume existing task
+`019fbb41-79b6-7760-8e7f-e68fc381422a` only after QG1A handoff; other
+corrective locks stay disjoint.
 
 **Non-goals:** Clearing all historical findings or exempting new complexity.
 
 **Invariants:** Spike checks remain through CK-14; improvements shrink the
 baseline; new unlisted code meets the active thresholds.
 
-**Required tests/checks:** Baseline match/mismatch/improvement/new-finding
-tests, all repository profiles, exact staged GitNexus analysis.
+**Required tests/checks:** Refresh PR #392 (retained commit `29f18ae`, failed
+run `30684568886`) on QG1A exact main; baseline
+`c490d954a5e9d09c61f884d51e3b9d3196af5615887f409c36f8469d1b2b6cf9`
+match/mismatch/improvement/new-finding tests; all profiles; GitNexus.
 
-**Acceptance:** Every new/worsened replacement finding fails deterministically
-without brittle text exemptions.
+**Acceptance:** Refreshed PR #392 passes exact C/B/B baseline enforcement and
+every new/worsened replacement finding fails without exemptions.
 
 **Failure/rollback:** Normalize tool output before enforcement if unstable;
 never disable the gate or broadly refactor unrelated code.
