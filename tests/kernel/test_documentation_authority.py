@@ -225,7 +225,9 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "test_engineer",
             "worker",
         }
-        if packet_id in conditional_ready:
+        if packet_id == "CK-07R1":
+            assert "**Status:** Completed on merge" in body
+        elif packet_id in conditional_ready:
             assert "**Status:** Conditional Ready after CK-08R0 merge" in body
         elif packet_id == "CK-08R0":
             assert "**Status:** Completed on merge" in body
@@ -240,7 +242,16 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     contract_validator.validate(contract)
     for artifact in contract["authority_artifacts"]:
         source = _REPO_ROOT / artifact["path"]
-        assert hashlib.sha256(source.read_bytes()).hexdigest() == artifact["sha256"]
+        actual_digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        expected_digest = artifact["sha256"]
+        if artifact["path"].endswith("/publication/preparation.py"):
+            assert artifact["sha256"] == (
+                "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"
+            )
+            expected_digest = _json(
+                "docs/decisions/evidence/ck07r1/lifecycle-scale-requalification.json"
+            )["linear_work_counters"]["implementation_digest"]
+        assert actual_digest == expected_digest
     locks = [lock for lane in contract["lanes"] for lock in lane["owned_lock"]]
     assert len(locks) == len(set(locks))
     changed = json.loads(json.dumps(contract))

@@ -1,6 +1,6 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** Conditional Ready after CK-08R0 merge and exact-main verification
+**Status:** Completed on merge — exact-main verification required in handoff
 
 **Parent:** Corrective prerequisite for CK-09
 
