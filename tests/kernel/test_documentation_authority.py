@@ -535,7 +535,7 @@ def test_ck07r1a0_authority_is_strict_and_preserves_attempt_identity() -> None:
     validator.validate(authority)
 
     assert authority["owner"] == "CK-07R1A0"
-    assert authority["authority_base_sha"] == "eb3ded92408d9549d4a4c15c69c045cc3845689c"
+    assert authority["authority_base_sha"] == "979f88eca2f23f6225c0c7a530b8f36f793c5748"
     assert authority["blocked_requalification"]["status"] == "BLOCKED"
     assert authority["run_authorization"]["status"] == "not_executed_by_this_packet"
     assert authority["run_authorization"]["maximum_new_end_to_end_runs"] == 1
