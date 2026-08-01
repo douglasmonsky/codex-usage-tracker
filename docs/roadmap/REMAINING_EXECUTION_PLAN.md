@@ -8,11 +8,10 @@ This file controls readiness, ownership, and parallelism. The phase roadmap is
 
 ## Current decision
 
-CK-09 is blocked until CK-08R independently proves answer evaluation, physical
-keyset execution, SQL/plan admission measurements, and evidence/lifecycle/
-maintainability scale. Preserve CK-04–CK-08 history; supersede only affected
-claims. Candidate A, database-v1 identity/facts, envelopes, selectors, cursors,
-and accepted scope remain authoritative.
+CK-09 remains blocked until CK-08R independently proves semantics, physical
+paging, measurements, and scale. CK-08R0 freezes the exact contracts and
+requalification frontier in `docs/decisions/evidence/ck08r0/corrective-gates-v1.json`.
+Preserve CK-03–CK-08 history and supersede only its four named claims.
 
 ## Delegation law
 
@@ -54,7 +53,7 @@ The machine DAG below controls readiness and dependencies; each child packet con
 - CK-12-01 -> CK-12-02/03/04/05; join at CK-12-06.
 - CK-14-01 -> CK-14-02/03; join at CK-14-04. CK-15 is optional and CK-16 remains gated.
 
-All other edges are serialized. `Ready` authorizes creation; `Blocked` forbids creation and implementation.
+All other edges are serialized. `Ready` authorizes creation; `Conditional Ready` requires its machine gate; `Blocked` forbids creation and implementation.
 
 ## Machine-readable delegation DAG
 
@@ -74,7 +73,11 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "duplicate_policy": "one_active_task_per_packet_and_dependency_frontier",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
- "ready": ["CK-08R0"],
+  "ready": [],
+  "conditional_ready": [{
+    "condition": "CK-08R0 merged and exact-main verified",
+    "tasks": ["CK-08R1", "CK-08R2", "CK-08R3", "CK-07R1", "CK-QG1"]
+  }],
   "tasks": [
     {"id": "CK-08R0", "file": "tasks/ck-08r0-freeze-corrective-contracts.md", "dependencies": []},
     {"id": "CK-08R1", "file": "tasks/ck-08r1-build-independent-answer-truth.md", "dependencies": ["CK-08R0"]},

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
+
+from jsonschema import Draft202012Validator
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DOCS = _REPO_ROOT / "docs"
@@ -63,10 +66,12 @@ _DELEGATED_PACKET_IDS = _PACKET_IDS - {
     "CK-07D",
     "CK-07E",
 }
-
-
 def _read(path: str) -> str:
     return (_REPO_ROOT / path).read_text(encoding="utf-8")
+
+
+def _json(path: str):
+    return json.loads(_read(path))
 
 
 def _active_markdown() -> list[Path]:
@@ -172,7 +177,18 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     manifest = json.loads(manifest_match.group(1))
     assert manifest["schema"] == "codex-usage-tracker.remaining-delegation-dag.v1"
     assert manifest["orchestration"]["spawn"] == "all_newly_ready_successors"
-    assert manifest["ready"] == ["CK-08R0"]
+    conditional_ready = {
+        "CK-08R1",
+        "CK-08R2",
+        "CK-08R3",
+        "CK-07R1",
+        "CK-QG1",
+    }
+    assert manifest["ready"] == []
+    assert manifest["conditional_ready"] == [{
+        "condition": "CK-08R0 merged and exact-main verified",
+        "tasks": ["CK-08R1", "CK-08R2", "CK-08R3", "CK-07R1", "CK-QG1"],
+    }]
 
     tasks = manifest["tasks"]
     assert len(tasks) == 42
@@ -209,10 +225,39 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "test_engineer",
             "worker",
         }
-        if packet_id == "CK-08R0":
-            assert "**Status:** Ready" in body
+        if packet_id in conditional_ready:
+            assert "**Status:** Conditional Ready after CK-08R0 merge" in body
+        elif packet_id == "CK-08R0":
+            assert "**Status:** Completed on merge" in body
         else:
             assert "**Status:** Blocked" in body
+
+    path = "docs/decisions/evidence/ck08r0/corrective-gates-v1.json"
+    contract = _json(path)
+    contract_validator = Draft202012Validator(
+        _json(f"{path.removesuffix('.json')}.schema.json")
+    )
+    contract_validator.validate(contract)
+    for artifact in contract["authority_artifacts"]:
+        source = _REPO_ROOT / artifact["path"]
+        assert hashlib.sha256(source.read_bytes()).hexdigest() == artifact["sha256"]
+    locks = [lock for lane in contract["lanes"] for lock in lane["owned_lock"]]
+    assert len(locks) == len(set(locks))
+    changed = json.loads(json.dumps(contract))
+    changed["lanes"][1]["id"] = "CK-08R1"
+    assert list(contract_validator.iter_errors(changed))
+
+    evidence_bundle = _json(
+        "docs/decisions/evidence/ck08r0/corrective-lane-evidence-v1.schema.json"
+    )
+    Draft202012Validator.check_schema(evidence_bundle)
+    bound = {
+        evidence_bundle["$defs"][lane["evidence_schema"]["definition"].removeprefix("#/$defs/")]
+        ["properties"]["schema"]["const"]
+        for lane in contract["lanes"]
+    }
+    assert bound == {lane["evidence_schema"]["schema"] for lane in contract["lanes"]}
+    assert list(Draft202012Validator(evidence_bundle).iter_errors({"schema": next(iter(bound))}))
 
     visiting: set[str] = set()
     visited: set[str] = set()

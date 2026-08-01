@@ -34,9 +34,10 @@ expected-answer path is not semantically independent; runtime keyset
 pagination occurs after full Python materialization; CK-08's reported SQL
 timing includes compiler/Python work and cannot admit 18 projections; and
 publication/evidence scale plus replacement maintainability need corrective
-proof. Historical evidence is preserved, but CK-09 is blocked.
+proof. [`corrective-gates-v1`](decisions/evidence/ck08r0/corrective-gates-v1.json)
+preserves history and keeps CK-09 blocked.
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md) is the
-central execution authority and CK-08R0 is the only Ready task.
+central execution authority.
 
 ## Authority set
 
