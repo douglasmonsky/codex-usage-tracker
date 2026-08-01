@@ -759,6 +759,10 @@ INTEGRATION_ADDITIONS = (
     | CK07A_FACT_BACKED_REQUALIFICATION_ADDITIONS
     | CK08_QUERY_EVIDENCE_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
+    | {
+        "config/agent-kernel/maintainability-baseline-v1.json",
+        "tests/agent_kernel/test_maintainability_ratchet.py",
+    }
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )
 _BLOCKED_TASK_REF = re.compile(r"^refs/heads/kernel/(?:0\.26-integration|k(?:1a|[2-9])(?:-|$))")

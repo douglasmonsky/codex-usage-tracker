@@ -652,6 +652,10 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK07A_FACT_BACKED_REQUALIFICATION_ADDITIONS
         | CK08_QUERY_EVIDENCE_ADDITIONS
         | CK08_PREREQUISITE_BLOCKER_ADDITIONS
+        | {
+            "config/agent-kernel/maintainability-baseline-v1.json",
+            "tests/agent_kernel/test_maintainability_ratchet.py",
+        }
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )
 

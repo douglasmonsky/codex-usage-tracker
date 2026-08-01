@@ -41,11 +41,12 @@ dev = [
   "psutil==7.2.2",
   "pytest>=8.0",
   "pyright>=1.1.405",
+  "radon==6.0.1",
   "ruff>=0.8",
   "scalene==2.3.0",
   "tomli>=2.0; python_version < '3.11'",
   "types-jsonschema>=4.23",
-  "xenon>=0.9.3",
+  "xenon==0.9.3",
 ]
 
 [tool.setuptools]
