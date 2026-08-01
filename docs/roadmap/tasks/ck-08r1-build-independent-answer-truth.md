@@ -1,10 +1,10 @@
-# CK-08R1 — Build independent expected-answer truth
+# CK-08R1 — Requalify independent answer truth
 
-**Status:** Conditional Ready after CK-08R0 merge and exact-main verification
+**Status:** Blocked on CK-08R1B and CK-08R1C
 
 **Parent:** Corrective prerequisite for CK-09
 
-**Recommended owner:** `default independent-truth`; write-capable Sol-class
+**Recommended owner:** `test_engineer answer-requalification`; Luna-class
 
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 
@@ -12,48 +12,54 @@
 
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
-**Goal:** Calculate all supported expected answers from structural scenario
-declarations without production plan assembly or evaluation imports.
+**Goal:** Requalify all 80 variants through separately merged production and
+independent semantics, executable transitive closure, and grading isolation.
 
-**Why:** Two consumers of one production evaluator prove adapter parity, not
-independent answer semantics.
+**Controls:** Exact R1A/B/C identities and digests, CK-07A contracts, CK-08R2
+support matrix, and answer-truth requalification v2.
 
-**Controls:** CK-07A scenario, formula, operand, selector, valuation, and
-comparison contracts.
+**Dependencies:** CK-08R1B/C accepted, merged, and exact-main verified from the
+same R1A contract frontier.
 
-**Dependencies:** CK-08R0 merged and exact-main verified.
+**Owned files/interfaces:** Cross-lane query-only harness, closure verifier,
+grading mutation/inaccessibility tests, v2 collector/artifact, scope allowlist,
+and linked accounting. Neither implementation is editable.
 
-**Owned files/interfaces:** Test-only oracle evaluator, reference adapter,
-import denylist and mutation tests, linked CK-07A/CK-08 amendments.
+**Produces:** Schema-valid `answer-truth-requalification.v2` for 80 variants.
 
-**Produces:** Independent-truth evidence v2 for all 80 variants.
+**Independent truth source:** Exact merged R1C closure over structural-v2 and
+R1A. Computed operands/rows, grading, production code, and SQLite are forbidden.
 
-**Independent truth source:** Structural-v2 declarations plus locked formulas;
-shared formula definitions are allowed, shared plan assembly is not.
+**Consumer seam:** Compare R1C with R1B `compile_plan_operands` /
+`evaluate_plan` over database-v1 facts for all 80. Also run QueryService for
+R2's two supported plans and prove the 19 residuals still fail closed.
 
-**Consumer seam:** Compare independent rows against database-v1 replay and the
-actual runtime query service.
+**Parallelism:** Serialized join after B/C; disjoint R3, 07R1, and QG1 work may
+continue.
 
-**Parallelism:** May run with CK-08R2/R3, CK-07R1, and CK-QG1. It owns no
-production query or publication files.
+**Non-goals:** Editing implementations, physical support, R2 changes,
+projections, public surfaces, R3/R4/RG, or 09.
 
-**Non-goals:** Production storage/query changes, SQLite in the truth lane,
-copied expected rows, projections, or grading output as truth.
+**Invariants:** Exact Decimal/`NULL`/grade/order/selector/valuation, no
+production import of truth, executable closure rejection, synthetic privacy,
+and 828000-byte sdist ceiling.
 
-**Invariants:** Exact Decimal text, NULL, grades, order, selector sequences,
-valuation, and no production import of test truth.
+**Required tests/checks:** Enforce every closure/authority digest before 80
+comparisons; corrected vectors; rerun both lanes with grading sentinel-mutated
+and inaccessible; fact and production mutations; R2 support matrix; focused
+oracles; `just v`; `just vc`.
 
-**Required tests/checks:** Import denylist, mutation sensitivity, all 80
-variants, focused adapters/oracles, `just v`, and `just vc`.
+**Acceptance:** 80/80 exact rows/grades/order/evidence; closure current; both
+lanes grading-independent; facts change both; production mutation cannot
+change independent truth; R2 remains unchanged.
 
-**Acceptance:** 80/80 exact rows and evidence; production evaluator mutation
-cannot change truth; canonical-fact mutation breaks consumer parity.
+**Failure/rollback:** Preserve the first mismatch, stale closure, forbidden
+dependency, or mutation failure; keep R4/RG/09 blocked and spawn none.
 
-**Failure/rollback:** Record the exact unsupported semantic contract and keep
-CK-09 blocked.
+**Handoff:** Exact SHA and implementation SHAs, semantic/closure/artifact
+digests, 80/mutation/R2 results, CI/review/exact-main, and join readiness.
 
-**Handoff:** Evidence digest and affected prior-claim requalification map.
+**Cleanup/docs:** Preserve CK-03–CK-08 and dirty blocker history; link only the
+new v2 amendment.
 
-**Cleanup/docs:** Preserve old evidence and link its superseding amendment.
-
-**Suggested commit:** `test: add independent answer truth`
+**Suggested commit:** `test: requalify independent answer truth`

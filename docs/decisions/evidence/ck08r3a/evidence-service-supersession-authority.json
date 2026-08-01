@@ -1,0 +1,22 @@
+{
+  "schema": "codex-usage-tracker.ck08r3a-evidence-service-supersession-authority.v1",
+  "owner": "CK-08R3A",
+  "source_path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+  "predecessor": {
+    "authority_path": "docs/decisions/evidence/ck08r0/corrective-gates-v1.json",
+    "authority_base_sha": "bbd9eb990969a659376ea584c6d696d1715cc007",
+    "sha256": "ea32223d1afd997f310419bff0b6b260193e527c8333c9f561bcab280447dfa3"
+  },
+  "selected_successor": {
+    "sha256": "718ff7032d050b13cb7fac1f857d0c99879d0ef3b13c57c39b55514fc610a88b",
+    "status": "permitted_not_accepted",
+    "blocked_task": "019fbbc0-cd25-7041-a847-b0098dfae29d",
+    "required_evidence": {
+      "path": "docs/decisions/evidence/ck08r3a/evidence-physical-query-requalification.json",
+      "schema": "codex-usage-tracker.ck08r3a-evidence-physical-query-requalification.v1"
+    }
+  },
+  "constraints": [
+    "generic_digest_drift_forbidden"
+  ]
+}

@@ -20,8 +20,12 @@ physical keyset SQL; 19 plans retain explicit gaps without projection.
 Retained CK-08R3 `a28e9cdbff8e48d334712a449fdcee111c725673` then stopped
 before scale on first/deep EvidenceService EXPLAIN. CK-08R3A owns that separate
 fix; CK-08R3 awaits its accepted merge/exact-main verification. Independent
-truth, reclassification, publication/evidence scale and maintainability remain
-open. The central authority is
+truth is now serialized as R1A contract freeze, disjoint R1B/R1C consumers,
+and final R1 requalification. QG1A separately corrects only the two R2
+page-executor C/B/B findings before PR #392 may refresh its unchanged frozen
+baseline. CK-07R1A separately corrects PR #394's exact hosted lifecycle-tail
+failure without a budget waiver. Reclassification and maintainability
+remain open. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
 
 ## Authority set

@@ -16,7 +16,15 @@ Retained CK-08R3 pre-scale evidence at commit
 `a28e9cdbff8e48d334712a449fdcee111c725673` proves the EvidenceService outer
 query physically unbounded independent of scale profile. CK-08R3A owns that
 production fix. CK-08R3 must not become Ready or be redelegated until CK-08R3A
-is accepted, merged, and exact-main verified.
+is accepted, merged, and exact-main verified. Retained CK-08R1 work reached
+80/80 parity by copying unsupported Q-REV-03/Q-WF-02 semantics; R1A freezes
+their meaning, R1B/C implement disjoint consumers, and R1 is their
+requalification join. CK-QG1 PR #392 also stays blocked: R2 introduced two
+page-executor C/B/B violations, so QG1A must correct them without changing R2
+behavior or the frozen maintainability baseline.
+CK-07R1 PR #394 likewise stays blocked on CK-07R1A after hosted Python 3.14
+failed the frozen `ordinary.2000_call_tail` case; the first sample and all five
+budgets remain binding.
 
 ## Delegation law
 
@@ -52,8 +60,10 @@ Only one integrator may own a lock at a time:
 
 The machine DAG below controls readiness and dependencies; each child packet controls its owner and scope. Only these fan-outs are allowed:
 
-- CK-08R0 -> CK-08R1, CK-08R2, CK-08R3A, CK-07R1, CK-QG1;
-  CK-08R3A -> CK-08R3; join at CK-08R4/CK-08RG.
+- CK-08R0 -> CK-08R2/CK-08R3A; CK-08R1A -> CK-08R1B/R1C
+  -> CK-08R1; CK-08R2 -> CK-QG1A -> CK-QG1; CK-08R3A -> CK-08R3;
+  CK-07R1A -> CK-07R1;
+  join at CK-08R4/CK-08RG.
 - CK-09-01 -> CK-09-02/03/04; join at CK-09-05.
 - CK-10-01 -> CK-10-02 and CK-10-04; CK-10-03 follows 10-02; join at 10-05.
 - CK-11-01 -> CK-11-02/03; join at CK-11-04.
@@ -81,19 +91,24 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
   "completed": ["CK-08R0", "CK-08R2"],
-  "ready": ["CK-08R3A"],
+  "ready": [],
   "conditional_ready": [{
-    "condition": "CK-08R0 merged and exact-main verified",
-    "tasks": ["CK-08R1", "CK-07R1", "CK-QG1"]
+    "condition": "This serialized corrective authority correction accepted, merged, and exact-main verified",
+    "tasks": ["CK-08R1A", "CK-08R3A", "CK-07R1A", "CK-QG1A"]
   }],
   "tasks": [
     {"id": "CK-08R0", "file": "tasks/ck-08r0-freeze-corrective-contracts.md", "dependencies": []},
-    {"id": "CK-08R1", "file": "tasks/ck-08r1-build-independent-answer-truth.md", "dependencies": ["CK-08R0"]},
+    {"id": "CK-08R1A", "file": "tasks/ck-08r1a-freeze-answer-semantics.md", "dependencies": ["CK-08R0"]},
+    {"id": "CK-08R1B", "file": "tasks/ck-08r1b-implement-production-answer-semantics.md", "dependencies": ["CK-08R1A"]},
+    {"id": "CK-08R1C", "file": "tasks/ck-08r1c-build-independent-semantic-evaluator.md", "dependencies": ["CK-08R1A"]},
+    {"id": "CK-08R1", "file": "tasks/ck-08r1-build-independent-answer-truth.md", "dependencies": ["CK-08R1B", "CK-08R1C"]},
     {"id": "CK-08R2", "file": "tasks/ck-08r2-implement-physical-keyset-execution.md", "dependencies": ["CK-08R0"]},
     {"id": "CK-08R3A", "file": "tasks/ck-08r3a-implement-evidence-physical-query.md", "dependencies": ["CK-08R0"]},
     {"id": "CK-08R3", "file": "tasks/ck-08r3-qualify-evidence-scale.md", "dependencies": ["CK-08R3A"]},
-    {"id": "CK-07R1", "file": "tasks/ck-07r1-correct-lifecycle-preparation-scale.md", "dependencies": ["CK-08R0"]},
-    {"id": "CK-QG1", "file": "tasks/ck-qg1-enforce-agent-kernel-maintainability.md", "dependencies": ["CK-08R0"]},
+    {"id": "CK-07R1A", "file": "tasks/ck-07r1a-correct-hosted-lifecycle-tail.md", "dependencies": ["CK-08R0"]},
+    {"id": "CK-07R1", "file": "tasks/ck-07r1-correct-lifecycle-preparation-scale.md", "dependencies": ["CK-07R1A"]},
+    {"id": "CK-QG1A", "file": "tasks/ck-qg1a-correct-page-executor-complexity.md", "dependencies": ["CK-08R2"]},
+    {"id": "CK-QG1", "file": "tasks/ck-qg1-enforce-agent-kernel-maintainability.md", "dependencies": ["CK-QG1A"]},
     {"id": "CK-08R4", "file": "tasks/ck-08r4-reclassify-physical-plans.md", "dependencies": ["CK-08R1", "CK-08R2", "CK-08R3", "CK-07R1"]},
     {"id": "CK-08RG", "file": "tasks/ck-08rg-authorize-ck09-resumption.md", "dependencies": ["CK-08R4", "CK-QG1"]},
     {"id": "CK-09-01", "file": "tasks/ck-09-01-freeze-residual-projection-registry.md", "dependencies": ["CK-08RG"]},

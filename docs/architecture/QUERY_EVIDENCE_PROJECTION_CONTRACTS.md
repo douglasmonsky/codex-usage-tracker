@@ -108,8 +108,9 @@ fact-backed variants. Complete typed rows, grades, deterministic order,
 request/comparison digests, and required evidence sequences match across the
 two fact-adapter consumers. A downstream audit found both consumers import
 production `evaluate_plan`; this proves fact-adapter and database replay parity,
-not independent answer semantics. CK-08R1 must replace that affected claim
-before CK-09. Cursor serialization still binds its version, request digest,
+not independent answer semantics. CK-08R1A must freeze corrected
+Q-REV-03/Q-WF-02 meaning and executable transitive closure; R1B/R1C then build
+separate consumers and final R1 replays both. Cursor serialization still binds its version, request digest,
 plan, publication, and order; malformed, tampered, stale, replacement, and
 mismatched bindings fail closed.
 
@@ -139,10 +140,10 @@ Plan materialization is governed by `plan-operand-contract-v1.json`. It binds
 every formula use and direct answer field to permitted logical relations,
 typed request/publication/selector gates, grouping, complete order, closed
 operand derivations, missing/empty behavior, and exact output extraction.
-`compile_plan_operands` and `evaluate_plan` are production qualification seams,
-not independent expected-answer authorities. A production plan requires the
-CK-08R1 structural evaluator, database-v1 fact selection, and exact runtime
-consumer replay before admission.
+`compile_plan_operands` and `evaluate_plan` are production semantic seams, not
+independent expected-answer authorities. Final R1 compares them with R1C for
+all 80 variants. QueryService remains CK-08R2-bounded: its two direct plans
+execute and 19 residual plans fail closed; R1 cannot invent physical support.
 
 ### Corrective physical admission boundary
 
@@ -159,6 +160,17 @@ must then qualify evidence first/deep pages at both scales. CK-07R1 must
 qualify publication-valid lifecycle preparation. CK-08R4 alone may classify a
 plan as direct-page, evidence-page, or projection-required. CK-09 may admit
 only the resulting measured residual list after CK-08RG.
+
+CK-QG1A is a separate behavior-preserving R2 source lock: it may reduce only
+the two page-executor rank-D findings and may not alter request validation,
+query-only access, cursor/order semantics, support, evidence, C/B/B threshold,
+or frozen baseline. Existing QG1 PR #392 resumes from QG1A exact main; no
+exemption or baseline broadening is admissible.
+
+CK-07R1A is a separate lifecycle-performance lock: preserve the first hosted
+Python 3.14 `ordinary.2000_call_tail` failure, frozen five budgets, fold and
+publication semantics, and require attributable material correction before
+PR #394 reruns the exact profile.
 
 ## Typed compositional boundary
 

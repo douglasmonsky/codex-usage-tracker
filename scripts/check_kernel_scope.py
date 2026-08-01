@@ -252,15 +252,20 @@ CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS = frozenset(
         "docs/roadmap/tasks/ck-07-implement-publication-refresh-recovery.md",
         "docs/roadmap/tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md",
         "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
+        "docs/roadmap/tasks/ck-07r1a-correct-hosted-lifecycle-tail.md",
         "docs/roadmap/tasks/ck-08-implement-query-and-evidence.md",
         "docs/roadmap/tasks/ck-08r0-freeze-corrective-contracts.md",
         "docs/roadmap/tasks/ck-08r1-build-independent-answer-truth.md",
+        "docs/roadmap/tasks/ck-08r1a-freeze-answer-semantics.md",
+        "docs/roadmap/tasks/ck-08r1b-implement-production-answer-semantics.md",
+        "docs/roadmap/tasks/ck-08r1c-build-independent-semantic-evaluator.md",
         "docs/roadmap/tasks/ck-08r2-implement-physical-keyset-execution.md",
         "docs/roadmap/tasks/ck-08r3-qualify-evidence-scale.md",
         "docs/roadmap/tasks/ck-08r3a-implement-evidence-physical-query.md",
         "docs/roadmap/tasks/ck-08r4-reclassify-physical-plans.md",
         "docs/roadmap/tasks/ck-08rg-authorize-ck09-resumption.md",
         "docs/roadmap/tasks/ck-qg1-enforce-agent-kernel-maintainability.md",
+        "docs/roadmap/tasks/ck-qg1a-correct-page-executor-complexity.md",
         "docs/roadmap/tasks/ck-09-admit-projections-and-named-plans.md",
         "docs/roadmap/tasks/ck-09-01-freeze-residual-projection-registry.md",
         "docs/roadmap/tasks/ck-09-02-implement-usage-time-hierarchy-projections.md",
@@ -717,6 +722,12 @@ CK08R2_PHYSICAL_PAGE_ADDITIONS = frozenset(
     }
 )
 
+CK08R3A_AUTHORITY_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json",
+    }
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -772,6 +783,7 @@ INTEGRATION_ADDITIONS = (
     | CK07A_FACT_BACKED_REQUALIFICATION_ADDITIONS
     | CK08_QUERY_EVIDENCE_ADDITIONS
     | CK08R2_PHYSICAL_PAGE_ADDITIONS
+    | CK08R3A_AUTHORITY_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )

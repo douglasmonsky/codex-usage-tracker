@@ -1,177 +1,70 @@
 # Clean-Cutover Task Accounting
 
-This file is the master completion ledger for the
-[Agent-First Clean-Cutover Roadmap](AGENT_FIRST_CLEAN_CUTOVER.md). Detailed
-scope, contracts, checks, acceptance criteria, and rollback instructions live
-in the linked files under [`docs/roadmap/tasks/`](tasks/).
-
-[REMAINING_EXECUTION_PLAN.md](REMAINING_EXECUTION_PLAN.md) controls readiness,
-dependency waves, owner class, and allowed/forbidden parallelism. Parent CK-09
-through CK-16 packets are accounting umbrellas and are never delegated
-directly.
+Master ledger for the [roadmap](AGENT_FIRST_CLEAN_CUTOVER.md); linked
+[task files](tasks/) own scope and acceptance. The
+[machine DAG](REMAINING_EXECUTION_PLAN.md) controls delegation; CK-09–16
+parents are accounting umbrellas.
 
 ## Overall
 
-- Completed packets: **13 / 22**
+- Completed packets: **14 / 22**
 - In progress: **None**
-- Not started: **9**
-- Critical-path completion: **13 / 21**
+- Not started: **8**
+- Critical-path completion: **14 / 21**
 - Optional packets: **CK-15**
 - Completed corrective child tasks: **2 — CK-08R0, CK-08R2**
-- Remaining delegable child tasks: **41**
-- Ready child tasks: **1 — CK-08R3A**
-- Conditional-ready child tasks: **3 — CK-08R1, CK-07R1, CK-QG1 after CK-08R0 exact-main verification**
-- Blocked child tasks: **37**
+- Remaining delegable child tasks: **46**
+- Ready child tasks: **0**
+- Conditional-ready child tasks: **4 — CK-08R1A, CK-08R3A, CK-07R1A, CK-QG1A after this corrective authority exact-main verification**
+- Blocked child tasks: **42**
 
-A packet may be checked only after its acceptance criteria and required checks
-pass, measurements and residual risks are recorded, and any required review is
-resolved. Updating a checkbox also requires updating the packet's `Status`
-line and the milestone accounting below.
+Acceptance requires checks, measurements, risks, and review.
 
-Historical completion is preserved when a later consumer finds a semantic
-mismatch. The corrective packet becomes a new dependency and must publish
-linked requalification evidence for every affected prior packet. A digest,
-formula-consistent oracle, or prior completion status cannot replace the
-corrective packet's executable producer-to-consumer seam checks.
+## Parent packets
 
-## Milestones
-
-- [x] **M0 — Authority Ready** · 1 / 1 · CK-00 complete
-- [x] **M1 — Architecture Selected** · 4 / 4 · CK-01–CK-04 complete
-- [ ] **M2 — Kernel Alpha** · 9 / 10 · CK-05–CK-08, CK-07B–CK-07E, and
-  CK-07A historically complete; CK-09 is blocked on corrective Waves 1–4
-- [ ] **M3 — Codex MVP Qualified** · 0 / 3 · CK-10–CK-12 not started
-- [ ] **M4 — Clean Cutover** · 0 / 2 · CK-13–CK-14 not started
-- [ ] **M5 — Public Release** · 0 / 1 required · CK-16 not started
-- [ ] **Optional enhancement** · 0 / 1 · CK-15 not started
-
-## Packet checklist
-
-### M0 — Authority Ready
-
-- [x] **CK-00 — Clean authority and freeze the spike** · **Completed** ·
-  depends on frozen `origin/main`
-  · [packet](tasks/ck-00-clean-authority-and-freeze-spike.md)
-
-### M1 — Architecture Selected
-
-- [x] **CK-01 — Make the question catalog executable** · **Completed** ·
-  depends on CK-00
-  · [packet](tasks/ck-01-make-question-catalog-executable.md)
-- [x] **CK-02 — Freeze logical contract vectors** · **Completed** ·
-  depends on CK-01
-  · [packet](tasks/ck-02-freeze-logical-contract-vectors.md)
-- [x] **CK-03 — Build synthetic fixtures and oracles** · **Completed** ·
-  depends on CK-02
-  · [packet](tasks/ck-03-build-synthetic-fixtures-and-oracles.md)
-- [x] **CK-04 — Run the physical-architecture bakeoff** · **Completed with an
-  explicit growth-evidence exception** ·
-  depends on CK-03
-  · [packet](tasks/ck-04-run-physical-architecture-bakeoff.md)
-
-### M2 — Kernel Alpha
-
-- [x] **CK-05 — Implement the canonical storage kernel** · **Completed** ·
-  depends on CK-04
-  · [packet](tasks/ck-05-implement-canonical-storage-kernel.md)
-- [x] **CK-06 — Implement the Codex adapter and ingestion** · **Completed** ·
-  depends on CK-05
-  · [packet](tasks/ck-06-implement-codex-adapter-and-ingestion.md)
-- [x] **CK-07 — Implement publication, refresh, and recovery** · **Completed** ·
-  depends on CK-06
-  · [packet](tasks/ck-07-implement-publication-refresh-recovery.md)
-- [x] **CK-07B — Freeze formula and provenance contract** · **Completed on
-  merge via PR #383; exact-main verification is recorded in the completion
-  handoff** ·
-  corrective dependency discovered by CK-07A; depends on CK-07 and CK-07A
-  blocker evidence
-  · [packet](tasks/ck-07b-freeze-formula-and-provenance-contract.md)
-- [x] **CK-07C — Freeze plan operands and missing canonical facts** ·
-  **Completed on merge via PR #384; exact-main verification is recorded in
-  the completion handoff** · corrective dependency discovered by CK-07A after CK-07B;
-  depends on CK-07B and retained CK-07A blocker evidence
-  · [packet](tasks/ck-07c-freeze-plan-operands-and-missing-facts.md)
-- [x] **CK-07D — Implement effective-dated rate-card valuation** ·
-  **Completed on merge via PR #385; exact-main verified at `e49531b`** · corrective dependency discovered
-  after CK-07C; depends on merged CK-07C and retained CK-07A/CK-08 blocker
-  evidence
-  · [packet](tasks/ck-07d-implement-effective-dated-rate-card-valuation.md)
-  · [gap evidence](../decisions/evidence/ck07d/effective-dated-valuation-gap.json)
-  · [implementation evidence](../decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json)
-- [x] **CK-07E — Implement independent fact adapters** ·
-  **Completed on merge; exact-main verification is recorded in the completion
-  handoff** · prerequisite packet
-  discovered after merged CK-07D; depends on CK-07B, CK-07C, CK-07D, and
-  retained CK-07A/CK-08 blocker evidence
-  · [packet](tasks/ck-07e-implement-independent-fact-adapters.md)
-- [x] **CK-07A — Reconcile fact-backed oracles and qualify packet seams** ·
-  **Completed; 80 / 80 fact-backed variants requalified** · depends on CK-07, the CK-08
-  blocker evidence, CK-07B, CK-07C, CK-07D, and CK-07E
-  · [packet](tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md)
-- [x] **CK-08 — Implement query and evidence** · **Completed on merge; 21 plans
-  and 42 variants passed, with 3 fact-table-sufficient and 18 measured
-  projection-required classifications — CK-07A replaced the historical
-  fact-backed oracle gap; the original
-  [gap evidence](../decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)
-  remains preserved** ·
-  depends on CK-07A
-  · [packet](tasks/ck-08-implement-query-and-evidence.md)
-- [ ] **CK-09 — Admit projections and named plans** · Blocked; umbrella only ·
-  depends on CK-08RG
-  · [packet](tasks/ck-09-admit-projections-and-named-plans.md)
-
-### M3 — Codex MVP Qualified
-
-- [ ] **CK-10 — Deliver setup, MCP, CLI, and skill** · Not started ·
-  depends on CK-09
-  · [packet](tasks/ck-10-deliver-setup-mcp-cli-skill.md)
-- [ ] **CK-11 — Build the installed-agent harness** · Not started ·
-  depends on CK-10
-  · [packet](tasks/ck-11-build-installed-agent-harness.md)
-- [ ] **CK-12 — Qualify and harden the MVP** · Not started ·
-  depends on CK-11
-  · [packet](tasks/ck-12-qualify-and-harden-mvp.md)
-
-### M4 — Clean Cutover
-
-- [ ] **CK-13 — Execute the clean cutover** · Not started ·
-  depends on CK-12
-  · [packet](tasks/ck-13-execute-clean-cutover.md)
-- [ ] **CK-14 — Delete the spike, Console, and obsolete surfaces** ·
-  Not started · depends on CK-13
-  · [packet](tasks/ck-14-delete-spike-console-obsolete-surfaces.md)
-
-### M5 — Public Release
-
-- [ ] **CK-16 — Publish documentation and release** · Not started ·
-  depends on CK-14
-  · [packet](tasks/ck-16-publish-docs-and-release.md)
-
-### Optional enhancement
-
-- [ ] **CK-15 — Add optional native presentation** · Not started ·
-  depends on CK-14; does not block CK-16 unless explicitly selected
-  · [packet](tasks/ck-15-add-optional-native-presentation.md)
+- [x] **CK-00 — Clean authority and freeze the spike** · Completed · [packet](tasks/ck-00-clean-authority-and-freeze-spike.md)
+- [x] **CK-01 — Make the question catalog executable** · Completed · [packet](tasks/ck-01-make-question-catalog-executable.md)
+- [x] **CK-02 — Freeze logical contract vectors** · Completed · [packet](tasks/ck-02-freeze-logical-contract-vectors.md)
+- [x] **CK-03 — Build synthetic fixtures and oracles** · Completed · [packet](tasks/ck-03-build-synthetic-fixtures-and-oracles.md)
+- [x] **CK-04 — Run the physical-architecture bakeoff** · Completed with growth-evidence exception · [packet](tasks/ck-04-run-physical-architecture-bakeoff.md)
+- [x] **CK-05 — Implement the canonical storage kernel** · Completed · [packet](tasks/ck-05-implement-canonical-storage-kernel.md)
+- [x] **CK-06 — Implement the Codex adapter and ingestion** · Completed · [packet](tasks/ck-06-implement-codex-adapter-and-ingestion.md)
+- [x] **CK-07 — Implement publication, refresh, and recovery** · Completed · [packet](tasks/ck-07-implement-publication-refresh-recovery.md)
+- [x] **CK-07B — Freeze formula and provenance contract** · PR #383 merged/exact-main verified · [packet](tasks/ck-07b-freeze-formula-and-provenance-contract.md)
+- [x] **CK-07C — Freeze plan operands and missing canonical facts** · PR #384 merged/exact-main verified · [packet](tasks/ck-07c-freeze-plan-operands-and-missing-facts.md)
+- [x] **CK-07D — Implement effective-dated rate-card valuation** · PR #385 merged/exact-main `e49531b` · [packet](tasks/ck-07d-implement-effective-dated-rate-card-valuation.md)
+- [x] **CK-07E — Implement independent fact adapters** · Merged/exact-main verified · [packet](tasks/ck-07e-implement-independent-fact-adapters.md)
+- [x] **CK-07A — Reconcile fact-backed oracles and qualify packet seams** · 80/80 requalified · [packet](tasks/ck-07a-reconcile-fact-backed-oracles-and-qualify-seams.md)
+- [x] **CK-08 — Implement query and evidence** · 21 plans/42 variants historical · [packet](tasks/ck-08-implement-query-and-evidence.md)
+- [ ] **CK-09 — Admit projections and named plans** · Blocked umbrella on CK-08RG · [packet](tasks/ck-09-admit-projections-and-named-plans.md)
+- [ ] **CK-10 — Deliver setup, MCP, CLI, and skill** · Blocked on CK-09 · [packet](tasks/ck-10-deliver-setup-mcp-cli-skill.md)
+- [ ] **CK-11 — Build the installed-agent harness** · Blocked on CK-10 · [packet](tasks/ck-11-build-installed-agent-harness.md)
+- [ ] **CK-12 — Qualify and harden the MVP** · Blocked on CK-11 · [packet](tasks/ck-12-qualify-and-harden-mvp.md)
+- [ ] **CK-13 — Execute the clean cutover** · Blocked on CK-12 · [packet](tasks/ck-13-execute-clean-cutover.md)
+- [ ] **CK-14 — Delete the spike, Console, and obsolete surfaces** · Blocked on CK-13 · [packet](tasks/ck-14-delete-spike-console-obsolete-surfaces.md)
+- [ ] **CK-15 — Add optional native presentation** · Optional after CK-14 · [packet](tasks/ck-15-add-optional-native-presentation.md)
+- [ ] **CK-16 — Publish documentation and release** · Blocked on CK-14 · [packet](tasks/ck-16-publish-docs-and-release.md)
 
 ## Remaining delegated child tasks
 
-Readiness and parallelism are controlled by
-[REMAINING_EXECUTION_PLAN.md](REMAINING_EXECUTION_PLAN.md). CK-08R0 is
-complete on merge; CK-08R2 is also complete. Three Wave-2 successors remain
-Conditional Ready after exact-main verification. CK-08R3A is the separately owned Ready
-implementation dependency discovered by the retained CK-08R3 pre-scale
-blocker; every join and later child remains blocked on its stated
-dependencies.
+Readiness is controlled by
+[the machine DAG](REMAINING_EXECUTION_PLAN.md). R1A, R3A, 07R1A, and QG1A
+are conditional on this authority exact-main.
 
 ### Corrective gates
 
 - [x] **CK-08R0 — Freeze corrective query and scale contracts** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r0-freeze-corrective-contracts.md)
-- [ ] **CK-08R1 — Build independent expected-answer truth** · Conditional Ready after CK-08R0 exact-main verification · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
+- [ ] **CK-08R1A — Freeze answer semantics and evidence closure** · Conditional Ready after this corrective authority exact-main verification · [packet](tasks/ck-08r1a-freeze-answer-semantics.md)
+- [ ] **CK-08R1B — Implement production answer semantics** · Blocked on CK-08R1A · [packet](tasks/ck-08r1b-implement-production-answer-semantics.md)
+- [ ] **CK-08R1C — Build independent semantic evaluator** · Blocked on CK-08R1A · [packet](tasks/ck-08r1c-build-independent-semantic-evaluator.md)
+- [ ] **CK-08R1 — Requalify independent answer truth** · Blocked on CK-08R1B and CK-08R1C · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
 - [x] **CK-08R2 — Implement bounded physical keyset execution** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r2-implement-physical-keyset-execution.md)
-- [ ] **CK-08R3A — Implement bounded EvidenceService physical queries** · Ready; depends on accepted CK-08R0 · [packet](tasks/ck-08r3a-implement-evidence-physical-query.md)
+- [ ] **CK-08R3A — Implement bounded EvidenceService physical queries** · Conditional Ready after corrective authority exact-main verification; CK-08R0 remains accepted · [packet](tasks/ck-08r3a-implement-evidence-physical-query.md)
 - [ ] **CK-08R3 — Qualify evidence service scale** · Blocked on CK-08R3A accepted merge and exact-main verification · [packet](tasks/ck-08r3-qualify-evidence-scale.md)
-- [ ] **CK-07R1 — Correct lifecycle preparation scale** · Conditional Ready after CK-08R0 exact-main verification · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
-- [ ] **CK-QG1 — Enforce replacement-kernel maintainability** · Conditional Ready after CK-08R0 exact-main verification · [packet](tasks/ck-qg1-enforce-agent-kernel-maintainability.md)
+- [ ] **CK-07R1A — Correct hosted lifecycle tail** · Conditional Ready after this corrective authority exact-main verification · [packet](tasks/ck-07r1a-correct-hosted-lifecycle-tail.md)
+- [ ] **CK-07R1 — Correct lifecycle preparation scale** · Blocked on CK-07R1A and refresh of existing PR #394 on corrected main · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
+- [ ] **CK-QG1A — Correct page-executor complexity** · Conditional Ready after this corrective authority exact-main verification · [packet](tasks/ck-qg1a-correct-page-executor-complexity.md)
+- [ ] **CK-QG1 — Enforce replacement-kernel maintainability** · Blocked on CK-QG1A and refresh of existing PR #392 on corrected main · [packet](tasks/ck-qg1-enforce-agent-kernel-maintainability.md)
 - [ ] **CK-08R4 — Reclassify physical named plans** · Blocked on CK-08R1/R2/R3 and CK-07R1 · [packet](tasks/ck-08r4-reclassify-physical-plans.md)
 - [ ] **CK-08RG — Authorize CK-09 resumption** · Blocked on CK-08R4 and CK-QG1 · [packet](tasks/ck-08rg-authorize-ck09-resumption.md)
 
