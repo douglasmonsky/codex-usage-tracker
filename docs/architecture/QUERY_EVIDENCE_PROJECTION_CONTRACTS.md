@@ -150,10 +150,12 @@ consumer replay before admission.
 the exact inputs, page-execution request/result/stage contract, scale profiles,
 budgets, output evidence schemas, lane locks, failure rules, and
 requalification frontier in
-`docs/decisions/evidence/ck08r0/corrective-gates-v1.json`. CK-08R2 must apply
+`docs/decisions/evidence/ck08r0/corrective-gates-v1.json`. Completed CK-08R2 applies
 complete order, keyset predicates, and `LIMIT page_size + 1` in SQL before
 Python row materialization and may not call complete-result `evaluate_plan`.
-CK-08R3 must qualify evidence first/deep pages at both scales. CK-07R1 must
+CK-08R3A must first replace the physically unbounded EvidenceService outer
+query while preserving selector, cursor, order, and budget semantics; CK-08R3
+must then qualify evidence first/deep pages at both scales. CK-07R1 must
 qualify publication-valid lifecycle preparation. CK-08R4 alone may classify a
 plan as direct-page, evidence-page, or projection-required. CK-09 may admit
 only the resulting measured residual list after CK-08RG.
@@ -509,3 +511,23 @@ Requests for productivity, proven waste, causal tool impact, counterfactual
 subagent savings, semantic task success, exact raw context, or an unqualified
 allowance forecast return a compact supported reframing from the question
 catalog. They do not synthesize a numeric answer.
+
+## CK-08R2 physical page-execution amendment
+
+`PhysicalPageExecutor` version 2 is the only admitted production answer path
+for R2-supported direct plans. `QueryService` decodes and validates the signed
+cursor before execution, keeps the publication binding inside the same
+query-only snapshot, and runs the complete keyset predicate, total `ORDER BY`,
+and `LIMIT page_size + 1` before decoding. The page size remains bounded to
+100, so at most 101 rows cross the SQLite/Python boundary. The default
+`include_exact_count=false` path executes no count statement.
+
+The supported direct set is `data_health` and
+`latest_publication_delta`. Their committed
+[`pageExecutor`](../decisions/evidence/ck08r0/corrective-lane-evidence-v1.schema.json)
+artifacts are under
+[`docs/decisions/evidence/ck08r2/`](../decisions/evidence/ck08r2/).
+Every other admitted plan remains unimplemented and reports its exact
+complete-order physical/index gap with `projection_added=false`. This
+amendment does not admit a projection, revise provisional plan
+classification, or authorize CK-09.

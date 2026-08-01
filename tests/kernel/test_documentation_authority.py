@@ -44,6 +44,7 @@ _PACKET_IDS = {
     "CK-08R0",
     "CK-08R1",
     "CK-08R2",
+    "CK-08R3A",
     "CK-08R3",
     "CK-08R4",
     "CK-08RG",
@@ -179,22 +180,31 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest["orchestration"]["spawn"] == "all_newly_ready_successors"
     conditional_ready = {
         "CK-08R1",
-        "CK-08R2",
-        "CK-08R3",
         "CK-07R1",
         "CK-QG1",
     }
-    assert manifest["ready"] == []
+    assert manifest["completed"] == ["CK-08R0", "CK-08R2"]
+    ready = {"CK-08R3A"}
+    assert manifest["ready"] == ["CK-08R3A"]
     assert manifest["conditional_ready"] == [{
         "condition": "CK-08R0 merged and exact-main verified",
-        "tasks": ["CK-08R1", "CK-08R2", "CK-08R3", "CK-07R1", "CK-QG1"],
+        "tasks": ["CK-08R1", "CK-07R1", "CK-QG1"],
     }]
 
     tasks = manifest["tasks"]
-    assert len(tasks) == 42
+    assert len(tasks) == 43
     manifest_by_id = {task["id"]: task for task in tasks}
-    assert len(manifest_by_id) == 42
+    assert len(manifest_by_id) == 43
     assert set(manifest_by_id) == _DELEGATED_PACKET_IDS
+    assert manifest_by_id["CK-08R3A"]["dependencies"] == ["CK-08R0"]
+    assert manifest_by_id["CK-08R3"]["dependencies"] == ["CK-08R3A"]
+    assert manifest_by_id["CK-08R4"]["dependencies"] == [
+        "CK-08R1",
+        "CK-08R2",
+        "CK-08R3",
+        "CK-07R1",
+    ]
+    assert manifest_by_id["CK-08RG"]["dependencies"] == ["CK-08R4", "CK-QG1"]
 
     ledger_rows = re.findall(
         r"^- \[[ xX]\] \*\*(CK-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b.*?"
@@ -229,7 +239,9 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             assert "**Status:** Completed on merge" in body
         elif packet_id in conditional_ready:
             assert "**Status:** Conditional Ready after CK-08R0 merge" in body
-        elif packet_id == "CK-08R0":
+        elif packet_id in ready:
+            assert "**Status:** Ready" in body
+        elif packet_id in {"CK-08R0", "CK-08R2"}:
             assert "**Status:** Completed on merge" in body
         else:
             assert "**Status:** Blocked" in body
@@ -240,18 +252,27 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         _json(f"{path.removesuffix('.json')}.schema.json")
     )
     contract_validator.validate(contract)
+    r2_evidence = _json(
+        "docs/decisions/evidence/ck08r2/physical-page-executor-evidence.json"
+    )
+    superseded = {
+        item["path"]: item for item in r2_evidence["superseded_authority_artifacts"]
+    }
     for artifact in contract["authority_artifacts"]:
         source = _REPO_ROOT / artifact["path"]
-        actual_digest = hashlib.sha256(source.read_bytes()).hexdigest()
-        expected_digest = artifact["sha256"]
+        actual = hashlib.sha256(source.read_bytes()).hexdigest()
         if artifact["path"].endswith("/publication/preparation.py"):
             assert artifact["sha256"] == (
                 "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"
             )
-            expected_digest = _json(
+            assert actual == _json(
                 "docs/decisions/evidence/ck07r1/lifecycle-scale-requalification.json"
             )["linear_work_counters"]["implementation_digest"]
-        assert actual_digest == expected_digest
+        elif replacement := superseded.get(artifact["path"]):
+            assert replacement["from_sha256"] == artifact["sha256"]
+            assert actual == replacement["to_sha256"]
+        else:
+            assert actual == artifact["sha256"]
     locks = [lock for lane in contract["lanes"] for lock in lane["owned_lock"]]
     assert len(locks) == len(set(locks))
     changed = json.loads(json.dumps(contract))
@@ -315,6 +336,10 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
         "docs/roadmap/tasks/ck-07e-implement-independent-fact-adapters.md"
     )
     ck08 = _read("docs/roadmap/tasks/ck-08-implement-query-and-evidence.md")
+    ck08r3a = _read(
+        "docs/roadmap/tasks/ck-08r3a-implement-evidence-physical-query.md"
+    )
+    ck08r3 = _read("docs/roadmap/tasks/ck-08r3-qualify-evidence-scale.md")
 
     assert "## Cross-packet semantic continuity" in agents
     assert "producer artifact and exact identity" in agents
@@ -362,6 +387,18 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert "explicit growth-evidence exception" in physical_decision
     assert "two current repetitions were waived" in physical_decision
     assert "**Dependencies:** CK-07A merged with exact-main seam evidence." in ck08
+    assert "a28e9cdbff8e48d334712a449fdcee111c725673" in ck08r3a
+    assert "ae9107eda155a21b9bd9ef5a77971007d00864b772c3a23bc521652b5b17d471" in ck08r3a
+    assert all(
+        plan_shape in ck08r3a
+        for plan_shape in (
+            "SCAN stream",
+            "MATERIALIZE model_calls_visible",
+            "AUTOMATIC COVERING INDEX",
+            "USE TEMP B-TREE FOR ORDER BY",
+        )
+    )
+    assert "**Dependencies:** CK-08R3A accepted, merged, and exact-main verified." in ck08r3
 
 
 def test_question_catalog_and_diagram_inventory_are_complete() -> None:

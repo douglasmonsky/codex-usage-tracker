@@ -146,3 +146,19 @@ still admits no projection, public API, or CK-09 work.
 
 1. `feat: add bounded agent-kernel query compiler`
 2. `feat: add stable evidence service`
+
+## CK-08R2 corrective amendment
+
+CK-08R2 supersedes only CK-08's claim that complete Python materialization
+followed by tuple slicing constituted bounded runtime paging.
+`PhysicalPageExecutor` version 2 now executes publication-bound keyset SQL,
+the complete order, and `LIMIT page_size + 1` before decoding for
+`latest_publication_delta` and `data_health`. Production `QueryService` no
+longer calls `evaluate_plan`.
+
+The historical 21-plan/42-variant mechanism evidence remains preserved.
+Nineteen plans now fail closed at the actual runtime seam with exact
+physical/index gaps and `projection_added=false`; their provisional CK-08
+classification remains for CK-08R4 to replace. The versioned evidence lives
+under [`docs/decisions/evidence/ck08r2/`](../../decisions/evidence/ck08r2/).
+This amendment adds no projection, join, public surface, or CK-09 work.

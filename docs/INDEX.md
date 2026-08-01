@@ -6,38 +6,23 @@ and none of the archived documents may override them.
 
 ## Current packet boundary
 
-CK-07A is complete after consuming the merged CK-07B formula/provenance,
-CK-07C plan/direct-fact, CK-07D effective-dated valuation, and CK-07E
-independent-adapter prerequisites. Its
-[canonical evidence](decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json)
-records 80 / 80 fact-backed comparisons through structural-v2 source JSONL,
-CK-06 ingestion, CK-07 publication/recovery, query-only database-v1, Candidate
-A's permitted fact-table/planner path, and two fact-adapter consumers of the
-same production answer evaluator. All 185
-answer-field bindings, 14 selector kinds, six provenance kinds, exact ordered
-references, response bytes, timings, SQL sources/plans, lifecycle modes, and
-CK-03 through CK-07 requalifications are recorded.
+CK-07A's [evidence](decisions/evidence/ck07a/fact-backed-oracle-and-seam-qualification-evidence.json)
+records 80 / 80 variants after CK-07B/C/D/E and CK-03–07 replay. The
+[CK-08 gap](decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)
+is preserved/superseded; CK-04 runs 3/4 remain waived and five-run success
+unclaimed. Historical CK-08 covers 21 plans/42 variants, but shared truth,
+post-materialization paging, mixed timing and unproved scale cannot admit
+projections; [`corrective-gates-v1`](decisions/evidence/ck08r0/corrective-gates-v1.json)
+keeps CK-09 blocked.
 
-The historical
-[CK-08 prerequisite gap](decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json)
-remains preserved as the reproduction that caused the stop, but it is no
-longer the current boundary blocker. CK-04's invalid `question_cases`
-correctness proof is replaced; its current-commit growth repetitions 3 and 4
-remain explicitly waived and no strict five-repetition aggregate is claimed.
-CK-08 is historically complete on merge: all 21 plans and 42 fact-backed
-variants reconcile through the shared evaluator, every plan received a
-provisional physical classification, and no projection or public surface was
-added. Its single final reviewer findings were all accepted and corrected.
-
-A downstream architecture audit reproduced four current gaps: the
-expected-answer path is not semantically independent; runtime keyset
-pagination occurs after full Python materialization; CK-08's reported SQL
-timing includes compiler/Python work and cannot admit 18 projections; and
-publication/evidence scale plus replacement maintainability need corrective
-proof. [`corrective-gates-v1`](decisions/evidence/ck08r0/corrective-gates-v1.json)
-preserves history and keeps CK-09 blocked.
-[REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md) is the
-central execution authority.
+CK-08R2 is complete on merge: two supported direct plans now use bounded
+physical keyset SQL; 19 plans retain explicit gaps without projection.
+Retained CK-08R3 `a28e9cdbff8e48d334712a449fdcee111c725673` then stopped
+before scale on first/deep EvidenceService EXPLAIN. CK-08R3A owns that separate
+fix; CK-08R3 awaits its accepted merge/exact-main verification. Independent
+truth, reclassification, publication/evidence scale and maintainability remain
+open. The central authority is
+[REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
 
 ## Authority set
 

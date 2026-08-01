@@ -17,11 +17,11 @@ directly.
 - Not started: **9**
 - Critical-path completion: **13 / 21**
 - Optional packets: **CK-15**
-- Completed corrective child tasks: **1 — CK-08R0**
+- Completed corrective child tasks: **2 — CK-08R0, CK-08R2**
 - Remaining delegable child tasks: **41**
-- Ready child tasks: **0**
-- Conditional-ready child tasks: **5 — CK-08R1, CK-08R2, CK-08R3, CK-07R1, CK-QG1 after CK-08R0 exact-main verification**
-- Blocked child tasks: **36**
+- Ready child tasks: **1 — CK-08R3A**
+- Conditional-ready child tasks: **3 — CK-08R1, CK-07R1, CK-QG1 after CK-08R0 exact-main verification**
+- Blocked child tasks: **37**
 
 A packet may be checked only after its acceptance criteria and required checks
 pass, measurements and residual risks are recorded, and any required review is
@@ -157,16 +157,19 @@ corrective packet's executable producer-to-consumer seam checks.
 
 Readiness and parallelism are controlled by
 [REMAINING_EXECUTION_PLAN.md](REMAINING_EXECUTION_PLAN.md). CK-08R0 is
-complete on merge. Its five disjoint Wave-2 successors are Conditional Ready after
-exact-main verification; every join and later child remains blocked on its
-stated dependencies.
+complete on merge; CK-08R2 is also complete. Three Wave-2 successors remain
+Conditional Ready after exact-main verification. CK-08R3A is the separately owned Ready
+implementation dependency discovered by the retained CK-08R3 pre-scale
+blocker; every join and later child remains blocked on its stated
+dependencies.
 
 ### Corrective gates
 
 - [x] **CK-08R0 — Freeze corrective query and scale contracts** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r0-freeze-corrective-contracts.md)
 - [ ] **CK-08R1 — Build independent expected-answer truth** · Conditional Ready after CK-08R0 exact-main verification · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
-- [ ] **CK-08R2 — Implement bounded physical keyset execution** · Conditional Ready after CK-08R0 exact-main verification · [packet](tasks/ck-08r2-implement-physical-keyset-execution.md)
-- [ ] **CK-08R3 — Qualify evidence service scale** · Conditional Ready after CK-08R0 exact-main verification · [packet](tasks/ck-08r3-qualify-evidence-scale.md)
+- [x] **CK-08R2 — Implement bounded physical keyset execution** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r2-implement-physical-keyset-execution.md)
+- [ ] **CK-08R3A — Implement bounded EvidenceService physical queries** · Ready; depends on accepted CK-08R0 · [packet](tasks/ck-08r3a-implement-evidence-physical-query.md)
+- [ ] **CK-08R3 — Qualify evidence service scale** · Blocked on CK-08R3A accepted merge and exact-main verification · [packet](tasks/ck-08r3-qualify-evidence-scale.md)
 - [ ] **CK-07R1 — Correct lifecycle preparation scale** · Conditional Ready after CK-08R0 exact-main verification · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
 - [ ] **CK-QG1 — Enforce replacement-kernel maintainability** · Conditional Ready after CK-08R0 exact-main verification · [packet](tasks/ck-qg1-enforce-agent-kernel-maintainability.md)
 - [ ] **CK-08R4 — Reclassify physical named plans** · Blocked on CK-08R1/R2/R3 and CK-07R1 · [packet](tasks/ck-08r4-reclassify-physical-plans.md)

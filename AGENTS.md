@@ -29,9 +29,12 @@ evidence. A downstream architecture audit found that the expected-answer lane
 shares production evaluation, runtime keyset pagination follows complete
 Python materialization, projection classification combines execution stages,
 and publication/evidence scale plus replacement maintainability need
-corrective proof. CK-08R0 has frozen `corrective-gates-v1`; CK-09 remains
-blocked. CK-08R1, CK-08R2, CK-08R3, CK-07R1, and CK-QG1 become Ready only
-after the CK-08R0 merge is exact-main verified.
+corrective proof. CK-08R0 has frozen `corrective-gates-v1`; CK-08R2 is complete
+on merge, and CK-09 remains blocked. CK-08R1, CK-07R1, and CK-QG1 become Ready
+only after the CK-08R0 merge is exact-main verified. Retained CK-08R3 pre-scale evidence
+proved the EvidenceService outer query physically unbounded, so CK-08R3A now
+owns the isolated production fix and CK-08R3 remains blocked on its accepted,
+merged, exact-main-verified result.
 
 Advance only child tasks marked Ready in
 `docs/roadmap/REMAINING_EXECUTION_PLAN.md`. Parent CK-09 through CK-16 packets
