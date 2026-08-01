@@ -242,8 +242,8 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         for path in CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS
         if path.startswith("docs/roadmap/tasks/")
     }
-    assert len(CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS) == 88
-    assert len(task_packets) == 61
+    assert len(CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS) == 89
+    assert len(task_packets) == 62
     assert {
         "docs/INDEX.md",
         "docs/architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md",

@@ -1,10 +1,10 @@
 # CK-08R3 — Qualify evidence service scale
 
-**Status:** Conditional Ready after CK-08R0 merge and exact-main verification
+**Status:** Blocked on CK-08R3A acceptance, merge, and exact-main verification
 
 **Parent:** Corrective prerequisite for CK-09
 
-**Recommended owner:** `test_engineer evidence-scale`; Luna-class
+**Recommended owner:** `test_engineer evidence-scale`; Luna
 
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 
@@ -12,49 +12,39 @@
 
 **Roadmap:** [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 
-**Goal:** Prove bounded first/deep evidence pages at standard and
-production-shaped scale.
+**Goal:** Prove bounded first/deep pages at both frozen scales.
 
-**Why:** Current response bounds do not prove the outer UNION query remains
-bounded physically.
+**Dependencies:** CK-08R3A accepted, merged, and exact-main verified. CK-08R3A
+itself depends on accepted CK-08R0.
 
-**Controls:** Evidence selector/cursor, logical ordering, payload, index, and
-query-only contracts.
+**Owned files/interfaces:** Evidence tests/workload/artifact; never production.
 
-**Dependencies:** CK-08R0 merged and exact-main verified.
+**Produces:** Evidence-scale v1: SQL, EXPLAIN, rows/bytes/RSS, five p95 samples.
 
-**Owned files/interfaces:** Focused evidence tests, read-only benchmark
-workloads, and the dedicated evidence artifact. Production evidence helpers and
-service files are forbidden in this qualification task.
+**Independent truth source:** Typed selector/seven-part-order synthetic oracle.
 
-**Produces:** Evidence-scale qualification v1 with SQL, EXPLAIN, rows, bytes,
-RSS, and p95 samples.
+**Consumer seam:** Actual EvidenceService, one query-only snapshot; consume
+CK-08R3A's exact blocker identity, which ran no scale/admission.
 
-**Independent truth source:** Typed selector/order oracle over synthetic facts.
+**Parallelism:** Read-only after CK-08R3A; disjoint from Wave 2.
 
-**Consumer seam:** Actual `EvidenceService` in one query-only snapshot.
+**Non-goals:** Production fix, projection/backbone/API, index, or new budget.
 
-**Parallelism:** May run with other Wave-2 lanes; owns only evidence reads.
+**Invariants:** Typed provenance, stable late/replacement events, no
+gaps/duplicates, <=100 rows, <=16,384 bytes, exact count off.
 
-**Non-goals:** Evidence projection, event backbone, public evidence API, new
-indexes without a physical-contract amendment.
+**Required tests/checks:** Every view/scope/direction, ties/late/replacement/
+byte truncation, 100,000 and 1,316,864-call fixtures, first/deep plans and
+budgets at both scales, `just v/vc`.
 
-**Invariants:** Seven-part cursor order, typed non-placeholder provenance,
-stable replacement/late-event behavior, at most 100 rows and 16 KB.
+**Acceptance:** All preceding invariants/tests pass at both scales.
 
-**Required tests/checks:** Every view/scope/direction, ties, late insertion,
-replacement, byte truncation, 100k and 1,316,864-call fixtures, `just v/vc`.
+**Failure/rollback:** Retain first failure; stop scale/admission and route
+physical defects separately. Never weaken gates, create R4, or invent
+`evidence_timeline_current`.
 
-**Acceptance:** No gaps/duplicates; first/deep pages and SQL plans meet frozen
-budgets at both scales.
+**Handoff:** Evidence digest and classification input.
 
-**Failure/rollback:** Preserve the first failure. Create a separate
-implementation child with its own file and owner, merge it, then rerun this
-qualification task. Request a narrow physical amendment when needed; do not
-invent `evidence_timeline_current`.
-
-**Handoff:** Evidence digest and direct-versus-projection classification input.
-
-**Cleanup/docs:** Link measurements from CK-08R4 and qualification authority.
+**Cleanup/docs:** CK-08R4 links the result.
 
 **Suggested commit:** `test: qualify evidence service scale`

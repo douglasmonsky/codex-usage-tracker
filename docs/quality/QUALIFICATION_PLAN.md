@@ -24,152 +24,83 @@ No lower level substitutes for a required higher level.
 
 ### Evidence claim classes
 
-Evidence must state the exact class proved; these claims are not
-interchangeable:
+Claims are not interchangeable:
 
 | Claim | Required proof |
 | --- | --- |
-| Structural validity | Schema, identity, ordering, and digest checks pass. |
-| Formula consistency | Values inside one oracle record satisfy its declared formulas. |
-| Canonical-fact lineage | The exact typed request selects canonical typed facts emitted by its scenario, and an independent evaluator derives the expected result from those facts. |
-| Consumer replay | The actual downstream adapter, storage, publication, or query path produces the same result from only its permitted inputs. |
+| Structural validity | Schema, identity, order and digests pass. |
+| Formula consistency | One oracle record satisfies its formulas. |
+| Canonical-fact lineage | A typed request selects scenario facts; independent truth derives the result. |
+| Consumer replay | The real downstream path matches from permitted inputs only. |
 
-A packet may claim only the classes it executed. A prior packet's completion,
-matching hashes, or internal oracle reconciliation cannot substitute for
-canonical-fact lineage or consumer replay.
+A packet claims only executed classes; completion, hashes or internal
+reconciliation never substitute for lineage/replay.
 
 Every dependency edge used as truth records a seam contract with:
 
 ```text
-producer artifact path, schema, revision, and digest
-consumer packet and executable path
-independent truth source or reference evaluator
-executable seam check
-exact request/result comparison
-affected evidence and packets to requalify after change
+producer path/schema/revision/digest
+consumer packet/executable
+independent truth
+executable exact request/result seam check
+affected requalification
 ```
 
-If consumer replay disproves an upstream claim, the dependent packet stops.
-The roadmap admits a corrective packet, preserves the historical record, and
-requires current requalification evidence before the dependency may be
-consumed again.
+Failed replay stops dependents; a corrective packet preserves history and
+requires current requalification before reuse.
 
-CK-07C adds an L0 prerequisite for CK-07A: the versioned plan-operand artifact
-must schema-validate and reconcile exactly 40 plans, 61 formula uses, 112
-direct bindings, 73 formula-output bindings, and all 185 answer fields. Its
-pure compiler/evaluator vectors cover request and fact typing, gates, grouping,
-total order, `NULL` and empty behavior, exact decimal serialization, missing
-operands, output extraction, and internal-only formula consumption. These
-contract vectors prove executability only; they do not substitute for
-CK-07A's 80-case canonical-fact lineage and database consumer replay.
+Prior L0 remains exact: CK-07C validates 40 plans, 61 formula uses, 112
+direct/73 formula bindings and 185 fields but not lineage; CK-07D selects the
+greatest publication-captured `effective_at_us <= call.event_at_us` revision
+and replays boundary/late/subset/future/missing/invalid/ambiguous and unpriced
+cases through pure/database-v1 truth, with CK-05/07/07C requalification;
+CK-07E independently matches structural/query-only `CanonicalFact`,
+`PlanRequest` and ordered evidence across every family, 14 selectors,
+provenance, ordering, valuation, privacy and lifecycle, while recording 0 / 80
+answers and changing no prior evidence. CK-07D's twelve proofs are
+`docs/decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json`;
+local evidence alone did not unblock CK-07A/08.
 
-CK-07D adds the remaining L0 valuation prerequisite. Synthetic calls before,
-at, and after an explicit pricing boundary must select the greatest matching
-publication-captured revision effective at each call's `event_at_us`.
-Late-ingested historical calls, model-subset changes, future revisions, missing
-times, invalid lineages, and ambiguous equal-effective matches must replay
-identically through the pure reference boundary and database-v1 publication
-path. Typed unpriced valuation rows must remain unpriced in coverage. CK-05,
-CK-07, and CK-07C valuation seams require linked requalification before CK-07A
-may resume.
-
-CK-07D's local implementation results, artifact identities, twelve acceptance
-proofs, validation measurements, review state, and residual merge gates are
-recorded in
-`docs/decisions/evidence/ck07d/effective-dated-valuation-implementation-evidence.json`.
-That local evidence does not unblock CK-07A or CK-08 before merge and
-exact-main verification.
-
-CK-07E is the final L0 adapter prerequisite before CK-07A. A structural
-reference adapter and a separately implemented query-only database-v1 adapter
-must independently emit equivalent normalized `CanonicalFact` rows,
-`PlanRequest`, and exact ordered owner-specific evidence. Qualification covers
-every plan relation/fact family, all 14 selector owners, typed non-placeholder
-provenance, NULL/empty/ties/order/no-window behavior, effective-dated
-valuation and unpriced coverage, import/source independence, privacy, and
-clean rebuild/replacement/late-event stability. These comparisons stop at the
-fact/request/evidence boundary: CK-07E must record 0 / 80 CK-07A answer
-comparisons and cannot update CK-04 scoring or CK-03 through CK-07 seam
-evidence.
-
-Historical CK-07A evidence records 80 / 80 fact-adapter comparisons through
-structural-v2 source JSONL, CK-06 ingestion, CK-07 publication/recovery,
-query-only database-v1, Candidate A's permitted fact-table/planner lane, and
-two fact-adapter consumers that share production `evaluate_plan`. Its durable
-evidence records all 185 answer-field
-bindings, 14 selector kinds, six provenance kinds, ordered references, SQL
-sources/plans, response bytes, timings, lifecycle replay, privacy, and CK-03
-through CK-07 requalification. CK-04's current-commit growth repetitions 3 and
-4 remain waived; the strict five-repetition aggregate remains unclaimed.
-
-Historical CK-08 evidence adds L2 mechanism qualification and provisional L3
-scale classification.
-Its durable evidence executes 21 Foundation/Cutover plans across 42 fact-backed
-variants through the real internal query service, compares complete typed rows,
-grades, order, request/comparison digests, and evidence references, and records
-all SQL sources and exact `EXPLAIN` structures. It separately proves signed
-keyset pagination, exact-count opt-in, response-byte accounting, query-only
-write denial, and rebuild/replacement/late-event behavior.
-
-The standard query-only database-v1 fixture contains 100,000 synthetic calls;
-the production fixture contains 1,316,864. Repeated standard and production
-measurements classify three plans as fact-table-sufficient. Eighteen plans stop
-after a retained required-gate breach and carry provisional
-projection-candidate evidence that cannot authorize CK-09. That classification
-was a historical CK-08 outcome; it is not current admission, and CK-08
-implements no projection. The separate full
-publication-path attempt is retained as a bounded predecessor-path failure and
-is not mislabeled as a publication-valid scale result.
+Historical CK-07A records 80 / 80 structural-v2→CK-06/07→database-v1→Candidate
+A comparisons, 185 bindings, 14 selectors, six provenance kinds, SQL/plans,
+bytes/timings, lifecycle/privacy and CK-03–07 replay, but both truth consumers
+share `evaluate_plan`; CK-04 runs 3/4 remain waived and five-run success is
+unclaimed. Historical CK-08 records L2/provisional L3 for 21 plans/42 variants,
+signed keysets, exact count, bytes, write denial and lifecycle. Its
+100,000/1,316,864-call fixtures provisionally label three fact-table plans; 18
+stopped and cannot authorize CK-09. It added no projection, and its retained
+publication-path failure is not publication-valid scale.
 
 ### Corrective interpretation and immutable parallel qualification
 
-CK-07A/CK-08 remain historical fact-adapter and mechanism evidence. They do
-not currently prove independent answer semantics because both expected-answer
-consumers import production `evaluate_plan`. They also do not prove physical
-deep-page work is bounded before Python materialization. CK-08's
-`sql_p95_ms` combines compiler/Python evaluation and materialization, so its
-three-direct/eighteen-projection labels are provisional rather than CK-09
-admission. CK-08R0's `corrective-gates-v1` controls CK-08R1/R2/R3, CK-07R1,
-CK-QG1, CK-08R4, and CK-08RG; stale evidence fails closed and CK-09 stays
-blocked.
+CK-07A/08 remain historical: shared `evaluate_plan`, post-materialization
+paging and mixed `sql_p95_ms` leave truth, bounds and labels unproved. CK-08R0
+controls R1/R2/R3A/R3, 07R1, QG1 and R4/RG. Retained R3 EXPLAIN requires
+merged/exact-main R3A before scale; stale evidence blocks CK-09.
 
-The remaining execution plan decomposes CK-12 into one candidate freeze, four
-read-only lanes, and one integration decision. Every lane consumes
-byte-identical artifacts, fixtures, catalogs, registry, and budgets. A lane
-does not repair the candidate it measures. A failure is retained and routed by
-the integrator to a new narrowly owned corrective task; semantic repair creates
-a new candidate identity and reruns every affected lane.
+CK-12 freezes one candidate, runs four read-only lanes on byte-identical
+inputs/budgets, then integrates. Lanes never repair candidates; retained
+failure creates a narrow correction, new identity and affected-lane replay.
 
 ## Synthetic fixture strategy
 
-Fixtures contain no real local usage records or raw content. A deterministic
-generator emits:
-
-- Codex-shaped JSONL structural records;
-- source layouts, copies, archives, truncations, replacements, malformed lines,
-  uncertain dates, and moving tails;
-- sessions, turns, calls, tools, resources, activities, compactions, observed
-  mutations, hierarchy, allowance observations, and rate cards;
-- exact four token classes and deliberate missing fields;
-- expected canonical identities, counts, totals, lifecycle states, coverage,
-  selectors, occurrence coordinates, and question answers.
+Fixtures contain no real usage/raw content. Deterministic generation covers
+Codex-shaped structural JSONL; layouts/copies/archives/truncation/replacement/
+malformation/uncertain dates/tails; sessions through rate cards; four token
+classes/missing fields; and expected identities, counts, totals, lifecycle,
+coverage, selectors, occurrences and answers.
 
 Every fixture has a manifest:
 
 ```text
-schema and generator version
-seed and manifest digest
-history range and timezone
-source/file/byte counts
-event-kind and missingness distributions
-duplicate/replacement/late-event cases
-capabilities and rate-card revision
-expected canonical/projection counts
-question oracle IDs
+schema/generator/seed/digest
+history/timezone and source/file/byte counts
+event/missingness/duplicate/replacement/late distributions
+capabilities/rate-card revision
+expected canonical/projection counts and oracle IDs
 ```
 
-Tiny fixtures are hand-auditable. Scale fixtures are generated from the same
-semantic case library, not a separate simplified benchmark model.
+Tiny fixtures are auditable; scale uses the same semantic cases.
 
 CK-03 freezes the source revision as `agent-kernel-structural-v1`. Source
 records are compact canonical JSON Lines; manifests and oracle bundles use
