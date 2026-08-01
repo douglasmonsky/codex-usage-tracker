@@ -48,8 +48,14 @@ under test.
 
 **Failure/rollback:** Fail-closed stop rule and recoverable state.
 
-**Handoff:** Exact base/head, PR/CI, evidence digests, residuals, and newly Ready
-tasks.
+**Handoff:** Exact base/head, PR/CI, evidence digests, residuals,
+source/orchestrator task ID, and newly Ready tasks. After merge and exact-main
+verification, use `create_thread` to create one user-owned task for every newly
+Ready successor in the central DAG; fan out independent successors, hold joins
+until all dependencies complete, verify startup and handoff delivery, and
+record created task/host IDs. Check for an existing task first. On a blocker,
+failure, unmerged result, or missing exact-main verification, create no
+successor and report back to the source/orchestrator task.
 
 **Cleanup/docs:** Authorities and evidence that must be reconciled.
 

@@ -41,6 +41,16 @@ selectors, cursor identity, and accepted product scope remain authoritative.
   qualification lane after the controlling freeze is merged on exact `main`.
 - Every task starts from the exact merged `origin/main` SHA containing all
   dependencies, uses its own branch/worktree, and normally produces one PR.
+- Completion is self-propagating. After merge and exact-main verification, the
+  completing task creates separate user-owned Codex tasks for every newly Ready
+  successor in the machine-readable DAG. Independent successors fan out
+  together; a join successor waits for every dependency.
+- Successor creation is idempotent. Check existing roadmap tasks and the
+  completion handoff before using `create_thread`; never create two active tasks
+  for the same packet and exact dependency frontier.
+- A blocked, unmerged, or unverified task creates no successor. It reports the
+  blocker to its source/orchestrator task. Conditional and approval-gated edges
+  remain subject to their packet prose.
 - The primary integrator alone edits shared authorities, shared schemas and
   registries, publication integration call sites, package/release manifests,
   and final evidence aggregates.
@@ -159,8 +169,15 @@ conditions in the table and child files; they are not unconditional DAG edges.
 <!-- delegated-task-dag:start -->
 ```json
 {
-  "schema": "codex-usage-tracker.remaining-delegation-dag.v1",
-  "ready": ["CK-08R0"],
+ "schema": "codex-usage-tracker.remaining-delegation-dag.v1",
+ "orchestration": {
+  "mode": "self-propagating",
+  "spawn": "all_newly_ready_successors",
+  "join": "all_dependencies_complete",
+  "duplicate_policy": "one_active_task_per_packet_and_dependency_frontier",
+  "blocked_policy": "spawn_none_and_report_to_orchestrator"
+ },
+ "ready": ["CK-08R0"],
   "tasks": [
     {"id": "CK-08R0", "file": "tasks/ck-08r0-freeze-corrective-contracts.md", "dependencies": []},
     {"id": "CK-08R1", "file": "tasks/ck-08r1-build-independent-answer-truth.md", "dependencies": ["CK-08R0"]},
@@ -236,5 +253,7 @@ presentation, CK-15-02 closes the same way and does not block CK-16.
 Every task handoff records: exact base and merged SHA, PR and hosted CI, owned
 files, produced artifact plus digest, consumer seam, independent truth,
 complete validation, first noisy/failing measurements, reviewer status,
-residual risks, and the exact next tasks made Ready. The receiving task must
+residual risks, source/orchestrator task ID, and exact next tasks made Ready.
+The completing task creates all newly Ready successor tasks and records their
+task IDs, host IDs, names, and dependency frontier. The receiving task must
 verify the base and authority before semantic work.

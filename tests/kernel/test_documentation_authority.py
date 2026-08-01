@@ -171,6 +171,13 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest_match is not None
     manifest = json.loads(manifest_match.group(1))
     assert manifest["schema"] == "codex-usage-tracker.remaining-delegation-dag.v1"
+    assert manifest["orchestration"] == {
+        "mode": "self-propagating",
+        "spawn": "all_newly_ready_successors",
+        "join": "all_dependencies_complete",
+        "duplicate_policy": "one_active_task_per_packet_and_dependency_frontier",
+        "blocked_policy": "spawn_none_and_report_to_orchestrator",
+    }
     assert manifest["ready"] == ["CK-08R0"]
 
     tasks = manifest["tasks"]
@@ -259,6 +266,32 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert visited == _DELEGATED_PACKET_IDS
     assert "architect / Sol" not in central
     assert "feature worker / Sol" not in central
+
+
+def test_delegated_tasks_self_propagate_without_bypassing_gates() -> None:
+    agents = _read("AGENTS.md")
+    central = _read("docs/roadmap/REMAINING_EXECUTION_PLAN.md")
+    template = _read("docs/roadmap/tasks/DELEGATED_TASK_TEMPLATE.md")
+
+    for body in (agents, central, template):
+        assert "create_thread" in body
+        assert re.search(r"newly\s+Ready successor", body)
+        assert "source/orchestrator task" in body
+
+    normalized_agents = " ".join(agents.split())
+    normalized_central = " ".join(central.split())
+    assert "every such newly Ready successor" in normalized_agents
+    assert (
+        "never create an integration or join task until all of its dependencies"
+        in normalized_agents
+    )
+    assert (
+        "never create a second active task for the same packet"
+        in normalized_agents
+    )
+    assert "If the current task is blocked" in normalized_agents
+    assert "Independent successors fan out" in normalized_central
+    assert "a join successor waits for every dependency" in normalized_central
 
 
 def test_corrective_seam_packet_is_critical_path_authority() -> None:
