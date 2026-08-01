@@ -22,9 +22,11 @@ their meaning, R1B/C implement disjoint consumers, and R1 is their
 requalification join. CK-QG1 PR #392 also stays blocked: R2 introduced two
 page-executor C/B/B violations, so QG1A must correct them without changing R2
 behavior or the frozen maintainability baseline.
-CK-07R1 PR #394 likewise stays blocked on CK-07R1A after hosted Python 3.14
-failed the frozen `ordinary.2000_call_tail` case; the first sample and all five
-budgets remain binding.
+CK-07R1A is accepted, merged, and exact-main verified at
+`4d8074952f679877f2b4fbb3e89c51015e96a197`. CK-07R1 PR #394 likewise stays
+blocked on CK-07R1A0 because the retained all-profile receipt was writer-only:
+the first sample and all five budgets remain binding, and a planner-valid
+lifecycle receipt is still required.
 
 ## Delegation law
 
@@ -63,7 +65,7 @@ The machine DAG below controls readiness and dependencies; each child packet con
 - CK-08R0 -> CK-08R2/CK-08R3A; CK-08R1A -> CK-08R1B/R1C
   -> CK-08R1; CK-08R2 -> CK-QG1A0 -> CK-QG1A -> CK-QG1;
   CK-08R3A -> CK-08R3;
-  CK-07R1A -> CK-07R1;
+  CK-07R1A -> CK-07R1A0 -> CK-07R1;
   join at CK-08R4/CK-08RG.
 - CK-09-01 -> CK-09-02/03/04; join at CK-09-05.
 - CK-10-01 -> CK-10-02 and CK-10-04; CK-10-03 follows 10-02; join at 10-05.
@@ -91,11 +93,11 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "duplicate_policy": "one_active_task_per_packet_and_dependency_frontier",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
-  "completed": ["CK-08R0", "CK-08R2", "CK-QG1A0"],
+  "completed": ["CK-08R0", "CK-08R2", "CK-QG1A0", "CK-07R1A", "CK-07R1A0"],
   "ready": [],
   "conditional_ready": [{
-    "condition": "This serialized corrective authority correction accepted, merged, and exact-main verified",
-    "tasks": ["CK-08R1A", "CK-08R3A", "CK-07R1A"]
+    "condition": "Each lane's serialized corrective authority correction accepted, merged, and exact-main verified",
+    "tasks": ["CK-08R1A", "CK-08R3A"]
   }, {
     "condition": "CK-QG1A0 merged and exact-main verified",
     "tasks": ["CK-QG1A"]
@@ -110,7 +112,8 @@ conditions in the table and child files; they are not unconditional DAG edges.
     {"id": "CK-08R3A", "file": "tasks/ck-08r3a-implement-evidence-physical-query.md", "dependencies": ["CK-08R0"]},
     {"id": "CK-08R3", "file": "tasks/ck-08r3-qualify-evidence-scale.md", "dependencies": ["CK-08R3A"]},
     {"id": "CK-07R1A", "file": "tasks/ck-07r1a-correct-hosted-lifecycle-tail.md", "dependencies": ["CK-08R0"]},
-    {"id": "CK-07R1", "file": "tasks/ck-07r1-correct-lifecycle-preparation-scale.md", "dependencies": ["CK-07R1A"]},
+    {"id": "CK-07R1A0", "file": "tasks/ck-07r1a0-freeze-lifecycle-path-authority.md", "dependencies": ["CK-QG1A0", "CK-07R1A"]},
+    {"id": "CK-07R1", "file": "tasks/ck-07r1-correct-lifecycle-preparation-scale.md", "dependencies": ["CK-07R1A0"]},
     {"id": "CK-QG1A0", "file": "tasks/ck-qg1a0-authorize-page-executor-source-supersession.md", "dependencies": ["CK-08R2"]},
     {"id": "CK-QG1A", "file": "tasks/ck-qg1a-correct-page-executor-complexity.md", "dependencies": ["CK-QG1A0"]},
     {"id": "CK-QG1", "file": "tasks/ck-qg1-enforce-agent-kernel-maintainability.md", "dependencies": ["CK-QG1A"]},

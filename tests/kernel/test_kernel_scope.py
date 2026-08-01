@@ -18,6 +18,8 @@ from scripts.check_kernel_scope import (
     CK07C_PLAN_OPERAND_FACT_ADDITIONS,
     CK07D_EFFECTIVE_DATED_VALUATION_ADDITIONS,
     CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS,
+    CK07R1_LIFECYCLE_SCOPE_ADDITIONS,
+    CK07R1A0_AUTHORITY_ADDITIONS,
     CK08_PREREQUISITE_BLOCKER_ADDITIONS,
     CK08_QUERY_EVIDENCE_ADDITIONS,
     CK08R2_PHYSICAL_PAGE_ADDITIONS,
@@ -248,8 +250,8 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         for path in CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS
         if path.startswith("docs/roadmap/tasks/")
     }
-    assert len(CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS) == 95
-    assert len(task_packets) == 68
+    assert len(CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS) == 96
+    assert len(task_packets) == 69
     assert {
         "docs/INDEX.md",
         "docs/architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md",
@@ -671,6 +673,8 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK08R3A_AUTHORITY_ADDITIONS
         | CKQG1A0_AUTHORITY_ADDITIONS
         | PACKAGE_BUDGET_POLICY_ADDITIONS
+        | CK07R1A0_AUTHORITY_ADDITIONS
+        | CK07R1_LIFECYCLE_SCOPE_ADDITIONS
         | CK08_PREREQUISITE_BLOCKER_ADDITIONS
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )
@@ -680,6 +684,17 @@ def test_ck08r3a_authority_additions_are_explicit_and_bounded() -> None:
     assert {
         "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json",
     } == CK08R3A_AUTHORITY_ADDITIONS
+
+
+def test_ck07r1a0_authority_and_lifecycle_scope_additions_are_explicit() -> None:
+    assert {
+        "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.schema.json",
+    } == CK07R1A0_AUTHORITY_ADDITIONS
+    assert {
+        "scripts/benchmark_ck07r1_lifecycle_scale.py",
+        "tests/agent_kernel/publication/test_lifecycle_scale.py",
+    } == CK07R1_LIFECYCLE_SCOPE_ADDITIONS
 
 
 def test_kernel_skeleton_imports_without_legacy_runtime() -> None:
