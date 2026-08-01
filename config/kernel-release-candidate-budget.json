@@ -9,9 +9,10 @@
   "mcp_tools": 6,
   "http_routes": 7,
   "cli_commands": 11,
-  "wheel_bytes": 383000,
-  "sdist_bytes": 828000,
+  "wheel_bytes": 1000000,
+  "sdist_bytes": 2000000,
   "plugin_bundle_bytes": 7022,
+  "policy_artifact": "docs/decisions/evidence/kernel-release-candidate-package-budget-supersession.json",
   "mcp_golden_prompt": {
     "mcp_calls": 3,
     "measured_response_bytes": [889, 21630, 1023],

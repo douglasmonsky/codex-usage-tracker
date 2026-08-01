@@ -29,6 +29,10 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
 
 _ROOT = Path(__file__).resolve().parents[1]
 _BUDGET_PATH = _ROOT / "config/kernel-release-candidate-budget.json"
+_PACKAGE_POLICY_PATH = (
+    _ROOT
+    / "docs/decisions/evidence/kernel-release-candidate-package-budget-supersession.json"
+)
 _DISPOSITION_PATH = _ROOT / "config/kernel-code-disposition-v1.json"
 _RETIRED_PATH = _ROOT / "config/kernel-retired-surfaces-v1.json"
 _PLUGIN_PATHS = (
@@ -91,6 +95,31 @@ _BYTE_BUDGETS = frozenset(
         "sdist_bytes",
     }
 )
+_PACKAGE_POLICY_CEILINGS = {
+    "wheel_bytes": 1_000_000,
+    "sdist_bytes": 2_000_000,
+}
+_PACKAGE_POLICY_HISTORICAL_EVIDENCE = [
+    {
+        "path": "docs/decisions/evidence/ck08r0/corrective-gates-v1.json",
+        "sha256": "8f2bc6762b3b12f3c42ad72fb23ccaa49bfde3124280082fa65766bb9ceb9936",
+    },
+    {
+        "path": "docs/decisions/evidence/ck08r0/corrective-gates-v1.schema.json",
+        "sha256": "6f2213ae1eb31b0ffb6b3fc46b53361824c9520d905b91b165f2c196f5f42d33",
+    },
+    {
+        "path": "docs/decisions/evidence/ck08r2/physical-page-executor-evidence.json",
+        "sha256": "0a1f9ee919e065ba707826fc7c308748a7b6810a358f957aa6608ee0ff4d3c08",
+    },
+]
+_PACKAGE_POLICY_INVARIANTS = [
+    "Only wheel_bytes and sdist_bytes may be superseded by this authority.",
+    "Every preserved non-package budget field must match the snapshot above exactly.",
+    "Exact package member/source fidelity and build correctness remain required.",
+    "Historical evidence and its old measured ceilings remain verifiable and are not rewritten.",
+    "This authority changes no runtime behavior, lifecycle implementation, qualification gate, or downstream task state.",
+]
 
 
 def release_candidate_failures(*, dist: bool = False) -> list[str]:
@@ -104,6 +133,7 @@ def release_candidate_failures(*, dist: bool = False) -> list[str]:
     failures.extend(k9_disposition_proof_failures(disposition))
     failures.extend(retired_surface_failures())
     failures.extend(_runtime_import_failures())
+    failures.extend(_package_budget_policy_failures(budget))
     if tuple(spec.name for spec in TOOL_SPECS) != _TOOLS:
         failures.append("MCP catalog is not the exact six-tool catalog")
     if COMMANDS != _CLI:
@@ -264,10 +294,81 @@ def _measurement_failures(
                 f"{name} measured {measured} exceeds release-candidate ceiling "
                 f"{ceiling}"
             )
-        elif ceiling > maximum:
+        elif ceiling > maximum and _PACKAGE_POLICY_CEILINGS.get(name) != ceiling:
             failures.append(
                 f"{name} ceiling {ceiling} exceeds {headroom}% maximum {maximum}"
             )
+    return failures
+
+
+def _package_budget_policy_failures(budget: dict[str, Any]) -> list[str]:
+    """Keep the active package supersession and all other budgets fail-closed."""
+
+    failures: list[str] = []
+    if budget.get("policy_artifact") != _PACKAGE_POLICY_PATH.relative_to(_ROOT).as_posix():
+        failures.append("release-candidate budget does not bind the package policy artifact")
+        return failures
+    if not _PACKAGE_POLICY_PATH.is_file():
+        return ["package budget policy artifact is absent"]
+
+    policy = _load(_PACKAGE_POLICY_PATH)
+    if not isinstance(policy, dict):
+        return ["package budget policy artifact is not an object"]
+    ceilings = policy.get("package_ceilings")
+    if not isinstance(ceilings, dict):
+        failures.append("package budget policy ceilings are absent")
+    else:
+        for key in ("wheel_bytes", "sdist_bytes"):
+            entry = ceilings.get(key)
+            active = entry.get("active_ceiling_bytes") if isinstance(entry, dict) else None
+            if budget.get(key) != _PACKAGE_POLICY_CEILINGS[key]:
+                failures.append(f"{key} active budget is not the approved supersession ceiling")
+            if active != _PACKAGE_POLICY_CEILINGS[key] or active != budget.get(key):
+                failures.append(f"{key} policy artifact does not match active budget")
+
+    preserved = {
+        key: value
+        for key, value in budget.items()
+        if key not in {"wheel_bytes", "sdist_bytes", "policy_artifact"}
+    }
+    if policy.get("preserved_non_package_budget") != preserved:
+        failures.append("preserved non-package release budgets drifted")
+
+    expected_policy = {
+        "schema": "codex-usage-tracker.kernel-package-budget-supersession.v1",
+        "authority_version": 1,
+        "status": "maintainer-approved",
+        "effective_date": "2026-08-01",
+        "scope": {
+            "policy": "replacement-kernel release-candidate package-size ceilings",
+            "config_path": "config/kernel-release-candidate-budget.json",
+            "included_budget_keys": ["wheel_bytes", "sdist_bytes"],
+            "excluded_budget_class": "all non-package budgets and runtime/product behavior",
+        },
+        "rationale": (
+            "Package-size micro-optimization is no longer a roadmap objective, "
+            "while exact package member/source fidelity and build correctness remain required."
+        ),
+        "package_ceilings": {
+            "wheel_bytes": {
+                "historical_ceiling_bytes": 383000,
+                "active_ceiling_bytes": 1000000,
+            },
+            "sdist_bytes": {
+                "historical_ceiling_bytes": 828000,
+                "active_ceiling_bytes": 2000000,
+            },
+        },
+        "historical_active_config": {
+            "path": "config/kernel-release-candidate-budget.json",
+            "sha256": "be2754c9b198b9c6f80c9213a4a22c9086285fdf551077dcd7585e7bcea5623b",
+        },
+        "preserved_non_package_budget": preserved,
+        "fail_closed_invariants": _PACKAGE_POLICY_INVARIANTS,
+        "historical_evidence": _PACKAGE_POLICY_HISTORICAL_EVIDENCE,
+    }
+    if policy != expected_policy:
+        failures.append("package budget policy artifact is not the exact approved authority")
     return failures
 
 

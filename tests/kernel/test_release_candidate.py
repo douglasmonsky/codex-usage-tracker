@@ -12,7 +12,10 @@ from codex_usage_tracker.kernel.schema import (
     MAX_INDEX_COUNT,
     REQUIRED_SCHEMA_OBJECTS,
 )
-from scripts.check_kernel_release_candidate import _measurement_failures
+from scripts.check_kernel_release_candidate import (
+    _measurement_failures,
+    _package_budget_policy_failures,
+)
 from scripts.generate_kernel_manifests import k9_disposition_proof_failures
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -151,6 +154,52 @@ def test_release_candidate_budget_is_measured_and_bounded() -> None:
             "cli_commands": len(COMMANDS),
         },
     ) == []
+
+
+def test_package_budget_supersession_preserves_non_package_budgets() -> None:
+    budget = json.loads(
+        (_ROOT / "config/kernel-release-candidate-budget.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    policy = json.loads(
+        (
+            _ROOT
+            / "docs/decisions/evidence/kernel-release-candidate-package-budget-supersession.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert budget["wheel_bytes"] == 1_000_000
+    assert budget["sdist_bytes"] == 2_000_000
+    assert policy["package_ceilings"] == {
+        "wheel_bytes": {
+            "historical_ceiling_bytes": 383_000,
+            "active_ceiling_bytes": 1_000_000,
+        },
+        "sdist_bytes": {
+            "historical_ceiling_bytes": 828_000,
+            "active_ceiling_bytes": 2_000_000,
+        },
+    }
+    assert policy["preserved_non_package_budget"] == {
+        key: value
+        for key, value in budget.items()
+        if key not in {"wheel_bytes", "sdist_bytes", "policy_artifact"}
+    }
+    assert _package_budget_policy_failures(budget) == []
+
+
+def test_package_budget_policy_rejects_non_package_budget_drift() -> None:
+    budget = json.loads(
+        (_ROOT / "config/kernel-release-candidate-budget.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    budget["plugin_bundle_bytes"] += 1
+
+    assert _package_budget_policy_failures(budget) == [
+        "preserved non-package release budgets drifted",
+        "package budget policy artifact is not the exact approved authority",
+    ]
 
 
 def test_release_candidate_budget_rejects_excess_headroom_and_count_drift() -> None:

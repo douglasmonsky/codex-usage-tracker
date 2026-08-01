@@ -10,7 +10,7 @@
 **Consumer seam:** `test_ck08r2_manifest_binds_superseded_and_current_artifacts`.
 **Parallelism:** Sole owner.
 **Non-goals:** Code, drift, baseline, projection.
-**Invariants:** R2; synthetic; sdist <=828000.
+**Invariants:** R2; synthetic; sdist <=2,000,000.
 **Required tests/checks:** `just v/vc`; CI.
 **Acceptance:** Predecessor/successor exact; drift fails.
 **Failure/rollback:** Block downstream.

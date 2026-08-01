@@ -737,6 +737,12 @@ CKQG1A0_AUTHORITY_ADDITIONS = frozenset(
     ]
 )
 
+PACKAGE_BUDGET_POLICY_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/kernel-release-candidate-package-budget-supersession.json",
+    }
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -794,6 +800,7 @@ INTEGRATION_ADDITIONS = (
     | CK08R2_PHYSICAL_PAGE_ADDITIONS
     | CK08R3A_AUTHORITY_ADDITIONS
     | CKQG1A0_AUTHORITY_ADDITIONS
+    | PACKAGE_BUDGET_POLICY_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )

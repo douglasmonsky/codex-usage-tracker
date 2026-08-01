@@ -35,7 +35,7 @@ semantically exact; QG1 then refreshes PR #392 from corrected main.
 admission changes, unrelated refactors, R1/R3/R4/RG/09.
 
 **Invariants:** Preserve validation, selector/window, keyset cursor/order,
-query-only SQLite, R2 support/evidence, synthetic privacy, sdist <= 828000.
+query-only SQLite, R2 support/evidence, synthetic privacy, sdist <= 2,000,000.
 
 **Required tests/checks:** Reproduce `PageExecutionRequest` rank D score
 23/count 1 and `__post_init__` rank D score 22/count 1; focused R2

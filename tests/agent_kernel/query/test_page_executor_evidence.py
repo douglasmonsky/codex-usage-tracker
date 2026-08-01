@@ -24,6 +24,9 @@ _SUCCESSOR = "9e80c8677dd4ceadc4fbd66681aedef78528b1ad4f50edc7a04f4b1c7ac12f31"
 _R2_MANIFEST = "docs/decisions/evidence/ck08r2/physical-page-executor-evidence.json"
 _R2_MANIFEST_SHA = "0a1f9ee919e065ba707826fc7c308748a7b6810a358f957aa6608ee0ff4d3c08"
 _BASELINE_SHA = "c490d954a5e9d09c61f884d51e3b9d3196af5615887f409c36f8469d1b2b6cf9"
+_PACKAGE_BUDGET_PATH = "config/kernel-release-candidate-budget.json"
+_PACKAGE_BUDGET_HISTORICAL_SHA = "be2754c9b198b9c6f80c9213a4a22c9086285fdf551077dcd7585e7bcea5623b"
+_PACKAGE_POLICY = _EVIDENCE_ROOT / "kernel-release-candidate-package-budget-supersession.json"
 
 
 def _assert_indexed_explain(payload: dict[str, object]) -> None:
@@ -143,14 +146,30 @@ def test_ck08r2_manifest_binds_superseded_and_current_artifacts() -> None:
     assert manifest["unsupported_plan_count"] == 19
 
     authority = _json(_AUTHORITY)
+    package_policy = _json(_PACKAGE_POLICY)
     source_artifacts = {item["path"]: item for item in manifest["source_artifacts"]}
     assert source_artifacts[_SOURCE_PATH]["sha256"] == _PREDECESSOR
+    assert source_artifacts[_PACKAGE_BUDGET_PATH]["sha256"] == _PACKAGE_BUDGET_HISTORICAL_SHA
+    assert package_policy["historical_active_config"] == {
+        "path": _PACKAGE_BUDGET_PATH,
+        "sha256": _PACKAGE_BUDGET_HISTORICAL_SHA,
+    }
     for artifact in [
         *manifest["page_executor_artifacts"],
         *[item for path, item in source_artifacts.items() if path != _SOURCE_PATH],
     ]:
         source = _ROOT / artifact["path"]
-        assert hashlib.sha256(source.read_bytes()).hexdigest() == artifact["sha256"]
+        if artifact["path"] == _PACKAGE_BUDGET_PATH:
+            assert package_policy["package_ceilings"]["wheel_bytes"] == {
+                "historical_ceiling_bytes": 383000,
+                "active_ceiling_bytes": 1000000,
+            }
+            assert package_policy["package_ceilings"]["sdist_bytes"] == {
+                "historical_ceiling_bytes": 828000,
+                "active_ceiling_bytes": 2000000,
+            }
+        else:
+            assert hashlib.sha256(source.read_bytes()).hexdigest() == artifact["sha256"]
     assert hashlib.sha256(
         (_ROOT / _R2_MANIFEST).read_bytes()
     ).hexdigest() == _R2_MANIFEST_SHA

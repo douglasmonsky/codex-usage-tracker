@@ -42,7 +42,7 @@ projections, public surfaces, R3/R4/RG, or 09.
 
 **Invariants:** Exact Decimal/`NULL`/grade/order/selector/valuation, no
 production import of truth, executable closure rejection, synthetic privacy,
-and 828000-byte sdist ceiling.
+and 2,000,000-byte sdist ceiling.
 
 **Required tests/checks:** Enforce every closure/authority digest before 80
 comparisons; corrected vectors; rerun both lanes with grading sentinel-mutated

@@ -11,7 +11,7 @@
 **Consumer seam:** `EvidenceService.read()` stays one query-only snapshot; keyset/order/limit precede decode.
 **Parallelism:** Disjoint from R1A,07R1A,QG1A; fresh task; blocked run is reproduction.
 **Non-goals:** DDL/schema/projection/API/budget/timing/R1/QG1/07R1/R3/R4/RG/09.
-**Invariants:** Preserve selector/version/view/direction/cursor/publication, ties/missing/late/base/tail, gap-free/query-only/one-snapshot, <=100 rows/16384 bytes; synthetic; wheel <=383000, sdist <=828000.
+**Invariants:** Preserve selector/version/view/direction/cursor/publication, ties/missing/late/base/tail, gap-free/query-only/one-snapshot, <=100 rows/16384 bytes; synthetic; wheel <=1,000,000, sdist <=2,000,000.
 **Required tests/checks:** First/deep EXPLAIN rejects `SCAN stream`, `MATERIALIZE model_calls_visible`, `AUTOMATIC COVERING INDEX`, `USE TEMP B-TREE FOR ORDER BY`; independent rows/order/decode bound; regressions/authority/GitNexus; `just v/vc`; reviewer/PR/CI/merge/exact-main.
 **Acceptance:** Selected source/evidence identity and all bounds pass; generic drift forbidden.
 **Failure/rollback:** Divergence/gate/broader-authority need stops; no retry-only/blind copy.

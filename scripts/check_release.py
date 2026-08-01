@@ -249,6 +249,10 @@ def _expected_sdist_names() -> set[str]:
         path.relative_to(_REPO_ROOT).as_posix()
         for root, patterns in (
             (_REPO_ROOT / "config", ("kernel-*.json",)),
+            (
+                _REPO_ROOT / "docs" / "decisions" / "evidence",
+                ("kernel-release-candidate-package-budget-supersession.json",),
+            ),
             (_REPO_ROOT / "docs", ("**/*.md",)),
             (_REPO_ROOT / "scripts", (
                 "benchmark_kernel.py",

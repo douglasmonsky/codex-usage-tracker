@@ -10,6 +10,7 @@ include config/kernel-fault-recovery-scale-v1.json
 include config/kernel-overlay-adapter-v1.json
 include config/kernel-performance-budget.json
 include config/kernel-release-candidate-budget.json
+include docs/decisions/evidence/kernel-release-candidate-package-budget-supersession.json
 include config/kernel-release-cutover-v1.json
 include config/kernel-release-qualification-v1.json
 include config/kernel-retired-surfaces-v1.json
