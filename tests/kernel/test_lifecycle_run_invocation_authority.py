@@ -11,7 +11,6 @@ from jsonschema import Draft202012Validator
 
 from scripts.check_kernel_scope import CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS
 
-
 _ROOT = Path(__file__).resolve().parents[2]
 _AUTHORITY_PATH = _ROOT / "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json"
 _SCHEMA_PATH = _ROOT / "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json"
