@@ -1,14 +1,14 @@
 # CK-08R1A — Freeze answer semantics and evidence closure
-**Status:** Conditional Ready after this authority merge exact-main
+**Status:** Completed on merge — exact-main verification required in handoff
 **Recommended owner:** `default answer-contracts`; Sol-class
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md); [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md); [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 **Goal:** Freeze `answer-semantics.v1` and `answer-truth-requalification.v2` before implementation.
 **Dependencies:** This correction accepted/merged/exact-main.
 **Owned files/interfaces:** New semantic/evidence contracts/schemas, Q-REV-03/Q-WF-02 operand sources, vectors/tests/links; no consumer/evaluator.
-**Produces:** Exact semantics, lane exclusions, recursive digest closure, drift/grading enforcement.
+**Produces:** [`answer-semantics.v1`](../../../config/agent-kernel/answer-semantics-v1.json), its schema/vectors, and [`answer-truth-requalification.v2`](../../decisions/evidence/ck08r1a/answer-truth-requalification-v2.schema.json).
 **Independent truth source:** Existing contracts plus retained reproductions; dirty code/grading is non-authoritative.
-**Consumer seam:** R1B/C independently consume one digest; R1 recomputes both closures.
-**Parallelism:** Serialized freeze; R1B/C fan out after merge/exact-main.
+**Consumer seam:** R1B/C independently consume the exact semantic/vector digests; R1 recomputes both closures.
+**Parallelism:** Serialized freeze complete; R1B/C fan out after merge/exact-main.
 **Non-goals:** Implementations, stored answers, SQLite/query, projections/public/R3/R4/RG/09.
 
 ## Q-REV-03

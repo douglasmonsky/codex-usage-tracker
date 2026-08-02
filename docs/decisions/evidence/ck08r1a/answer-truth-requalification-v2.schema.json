@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://douglasmonsky.github.io/codex-usage-tracker/schemas/answer-truth-requalification-v2.schema.json",
+  "title": "CK-08R1 answer truth requalification v2",
+  "$ref": "#/$defs/answerTruth",
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "nonEmpty": {"type": "string", "minLength": 1},
+    "pathDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/nonEmpty"},
+        "sha256": {"$ref": "#/$defs/sha"}
+      }
+    },
+    "rootDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "role", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/nonEmpty"},
+        "role": {
+          "enum": [
+            "harness",
+            "consumer",
+            "r1b_root",
+            "r1b_data_source"
+          ]
+        },
+        "sha256": {"$ref": "#/$defs/sha"}
+      }
+    },
+    "lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lane",
+        "harness",
+        "consumer",
+        "roots",
+        "transitive_local_imports",
+        "closure_digest",
+        "closure_checks",
+        "grading_checks"
+      ],
+      "properties": {
+        "lane": {"enum": ["production", "independent"]},
+        "harness": {"$ref": "#/$defs/nonEmpty"},
+        "consumer": {"$ref": "#/$defs/nonEmpty"},
+        "roots": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/rootDigest"}
+        },
+        "transitive_local_imports": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/pathDigest"}
+        },
+        "closure_digest": {"$ref": "#/$defs/sha"},
+        "closure_checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "membership_recomputed",
+            "digests_recomputed",
+            "all_files_accessible",
+            "forbidden_dependencies_absent",
+            "passed_before_grading"
+          ],
+          "properties": {
+            "membership_recomputed": {"const": true},
+            "digests_recomputed": {"const": true},
+            "all_files_accessible": {"const": true},
+            "forbidden_dependencies_absent": {"const": true},
+            "passed_before_grading": {"const": true}
+          }
+        },
+        "grading_checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sentinel_mutated", "inaccessible"],
+          "properties": {
+            "sentinel_mutated": {"const": "baseline_answers_unchanged"},
+            "inaccessible": {"const": "baseline_answers_unchanged"}
+          }
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "oracle_id",
+        "request",
+        "independent_rows",
+        "production_rows",
+        "independent_grades",
+        "production_grades",
+        "total_order",
+        "ordered_evidence",
+        "provenance",
+        "matches"
+      ],
+      "properties": {
+        "oracle_id": {"$ref": "#/$defs/nonEmpty"},
+        "request": {"type": "object"},
+        "independent_rows": {"type": "array"},
+        "production_rows": {"type": "array"},
+        "independent_grades": {"type": "object"},
+        "production_grades": {"type": "object"},
+        "total_order": {"type": "array"},
+        "ordered_evidence": {"type": "array"},
+        "provenance": {"type": "array"},
+        "matches": {"const": true}
+      }
+    },
+    "answerTruth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "dependency_shas",
+        "authority_digests",
+        "gate_order",
+        "lanes",
+        "variant_results",
+        "mutation_results",
+        "superseded_evidence_links"
+      ],
+      "properties": {
+        "schema": {
+          "const": "codex-usage-tracker.answer-truth-requalification.v2"
+        },
+        "dependency_shas": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["CK-08R1A", "CK-08R1B", "CK-08R1C"],
+          "properties": {
+            "CK-08R1A": {"$ref": "#/$defs/gitSha"},
+            "CK-08R1B": {"$ref": "#/$defs/gitSha"},
+            "CK-08R1C": {"$ref": "#/$defs/gitSha"}
+          }
+        },
+        "authority_digests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "answer_semantics",
+            "answer_semantics_schema",
+            "answer_semantics_vectors",
+            "evidence_schema"
+          ],
+          "properties": {
+            "answer_semantics": {"$ref": "#/$defs/sha"},
+            "answer_semantics_schema": {"$ref": "#/$defs/sha"},
+            "answer_semantics_vectors": {"$ref": "#/$defs/sha"},
+            "evidence_schema": {"$ref": "#/$defs/sha"}
+          }
+        },
+        "gate_order": {
+          "const": [
+            "closure_membership",
+            "closure_digest",
+            "closure_accessibility",
+            "grading_independence",
+            "answer_comparison"
+          ]
+        },
+        "lanes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {
+              "allOf": [
+                {"$ref": "#/$defs/lane"},
+                {"properties": {"lane": {"const": "production"}}}
+              ]
+            },
+            {
+              "allOf": [
+                {"$ref": "#/$defs/lane"},
+                {"properties": {"lane": {"const": "independent"}}}
+              ]
+            }
+          ],
+          "items": false
+        },
+        "variant_results": {
+          "type": "array",
+          "minItems": 80,
+          "maxItems": 80,
+          "items": {"$ref": "#/$defs/variant"}
+        },
+        "mutation_results": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["canonical_fact", "production_source"],
+          "properties": {
+            "canonical_fact": {
+              "const": {
+                "production_changed": true,
+                "independent_changed": true
+              }
+            },
+            "production_source": {
+              "const": {
+                "production_changed": true,
+                "independent_unchanged": true
+              }
+            }
+          }
+        },
+        "superseded_evidence_links": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonEmpty"}
+        }
+      }
+    }
+  }
+}

@@ -731,6 +731,16 @@ CK08R3A_AUTHORITY_ADDITIONS = frozenset(
     }
 )
 
+CK08R1A_ANSWER_SEMANTICS_ADDITIONS = frozenset(
+    {
+        "config/agent-kernel/answer-semantics-v1.json",
+        "config/agent-kernel/answer-semantics-v1.schema.json",
+        "docs/decisions/evidence/ck08r1a/answer-truth-requalification-v2.schema.json",
+        "tests/agent_kernel/contracts/test_answer_semantics_contract.py",
+        "tests/agent_kernel/fixtures/contracts/answer-semantics-v1-vectors.json",
+    }
+)
+
 CKQG1A0_AUTHORITY_ADDITIONS = frozenset(
     [
         "docs/decisions/evidence/ckqg1a0/page-executor-source-supersession-authority.json",
@@ -823,6 +833,7 @@ INTEGRATION_ADDITIONS = (
     | CK07A_FACT_BACKED_REQUALIFICATION_ADDITIONS
     | CK08_QUERY_EVIDENCE_ADDITIONS
     | CK08R2_PHYSICAL_PAGE_ADDITIONS
+    | CK08R1A_ANSWER_SEMANTICS_ADDITIONS
     | CK08R3A_AUTHORITY_ADDITIONS
     | CKQG1A0_AUTHORITY_ADDITIONS
     | PACKAGE_BUDGET_POLICY_ADDITIONS

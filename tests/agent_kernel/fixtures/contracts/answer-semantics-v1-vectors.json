@@ -1,0 +1,350 @@
+{
+  "schema": "codex-usage-tracker.answer-semantics-vectors.v1",
+  "version": 1,
+  "contract_sha256": "4754ef287a704e6c9d41baa1f11e1cd4ef11aad1aefa1fb3b222e4760121ac2f",
+  "q_rev_03": {
+    "field_isolation": [
+      {
+        "id": "completion_state_side_swap",
+        "field": "completion_state",
+        "action": "swap_source_value_between_sides",
+        "relation": "session",
+        "stable_ids": ["session-left", "session-right"],
+        "source_fields": ["lifecycle_state", "completion_basis"],
+        "expected_changed_fields": ["completion_state"],
+        "expected_unchanged_fields": [
+          "context_features",
+          "delegation_metrics",
+          "resource_metrics",
+          "state_change_metrics",
+          "token_deltas",
+          "tool_metrics",
+          "turn_call_counts"
+        ]
+      },
+      {
+        "id": "context_features_side_swap",
+        "field": "context_features",
+        "action": "swap_source_value_between_sides",
+        "relation": "canonical_call",
+        "stable_ids": ["call-left-context", "call-right-context"],
+        "source_fields": ["context_window_tokens"],
+        "expected_changed_fields": ["context_features"],
+        "expected_unchanged_fields": [
+          "completion_state",
+          "delegation_metrics",
+          "resource_metrics",
+          "state_change_metrics",
+          "token_deltas",
+          "tool_metrics",
+          "turn_call_counts"
+        ]
+      },
+      {
+        "id": "delegation_metrics_side_swap",
+        "field": "delegation_metrics",
+        "action": "swap_source_value_between_sides_with_compensated_counts",
+        "relation": "session",
+        "stable_ids": ["child-left", "child-right"],
+        "source_fields": ["parent_session_id", "delegation_depth"],
+        "expected_changed_fields": ["delegation_metrics"],
+        "expected_unchanged_fields": [
+          "completion_state",
+          "context_features",
+          "resource_metrics",
+          "state_change_metrics",
+          "token_deltas",
+          "tool_metrics",
+          "turn_call_counts"
+        ]
+      },
+      {
+        "id": "resource_metrics_side_swap",
+        "field": "resource_metrics",
+        "action": "swap_source_value_between_sides",
+        "relation": "resource",
+        "stable_ids": ["resource-left", "resource-right"],
+        "source_fields": ["resource_kind"],
+        "expected_changed_fields": ["resource_metrics"],
+        "expected_unchanged_fields": [
+          "completion_state",
+          "context_features",
+          "delegation_metrics",
+          "state_change_metrics",
+          "token_deltas",
+          "tool_metrics",
+          "turn_call_counts"
+        ]
+      },
+      {
+        "id": "state_change_metrics_side_swap",
+        "field": "state_change_metrics",
+        "action": "swap_source_value_between_sides",
+        "relation": "state_change",
+        "stable_ids": ["state-left", "state-right"],
+        "source_fields": ["mutation_kind"],
+        "expected_changed_fields": ["state_change_metrics"],
+        "expected_unchanged_fields": [
+          "completion_state",
+          "context_features",
+          "delegation_metrics",
+          "resource_metrics",
+          "token_deltas",
+          "tool_metrics",
+          "turn_call_counts"
+        ]
+      },
+      {
+        "id": "token_deltas_side_swap",
+        "field": "token_deltas",
+        "action": "swap_source_value_between_sides",
+        "relation": "canonical_call",
+        "stable_ids": ["call-left-tokens", "call-right-tokens"],
+        "source_fields": [
+          "uncached_input_tokens",
+          "cached_input_tokens",
+          "reasoning_tokens",
+          "output_tokens"
+        ],
+        "expected_changed_fields": ["token_deltas"],
+        "expected_unchanged_fields": [
+          "completion_state",
+          "context_features",
+          "delegation_metrics",
+          "resource_metrics",
+          "state_change_metrics",
+          "tool_metrics",
+          "turn_call_counts"
+        ]
+      },
+      {
+        "id": "tool_metrics_side_swap",
+        "field": "tool_metrics",
+        "action": "swap_source_value_between_sides",
+        "relation": "tool_invocation",
+        "stable_ids": ["tool-left", "tool-right"],
+        "source_fields": ["lifecycle"],
+        "expected_changed_fields": ["tool_metrics"],
+        "expected_unchanged_fields": [
+          "completion_state",
+          "context_features",
+          "delegation_metrics",
+          "resource_metrics",
+          "state_change_metrics",
+          "token_deltas",
+          "turn_call_counts"
+        ]
+      },
+      {
+        "id": "turn_call_counts_side_swap",
+        "field": "turn_call_counts",
+        "action": "swap_membership_between_sides_with_compensated_metrics",
+        "relation": "turn_and_canonical_call",
+        "stable_ids": ["turn-left", "turn-right", "call-left-count", "call-right-count"],
+        "source_fields": ["session_id"],
+        "expected_changed_fields": ["turn_call_counts"],
+        "expected_unchanged_fields": [
+          "completion_state",
+          "context_features",
+          "delegation_metrics",
+          "resource_metrics",
+          "state_change_metrics",
+          "token_deltas",
+          "tool_metrics"
+        ]
+      }
+    ],
+    "missing_empty": [
+      {"id": "available_empty", "outcome": "typed_zero_or_empty"},
+      {"id": "context_capability_unavailable", "outcome": "context_side_null"},
+      {"id": "mixed_context_missing", "outcome": "fail_closed"},
+      {"id": "missing_hierarchy", "outcome": "affected_delegation_value_null"},
+      {"id": "missing_token_class", "outcome": "class_and_total_null"},
+      {"id": "absent_session", "outcome": "fail_closed"},
+      {"id": "duplicate_session", "outcome": "fail_closed"},
+      {"id": "malformed_session", "outcome": "fail_closed"},
+      {"id": "dangling_resource", "outcome": "fail_closed"},
+      {"id": "conflicting_resource", "outcome": "fail_closed"},
+      {"id": "unknown_tool_lifecycle", "outcome": "fail_closed"}
+    ]
+  },
+  "q_wf_02": [
+    {
+      "id": "between_start_success",
+      "events": [
+        {"kind": "call", "coordinate": [false, 1, 0, 1, 30, "call-0", 0], "tokens": [1, 1, 1, 1]},
+        {"kind": "tool_start", "coordinate": [false, 2, 0, 2, 40, "tool-0", 0]},
+        {"kind": "call", "coordinate": [false, 3, 0, 3, 30, "call-1", 0], "tokens": [2, 2, 2, 2]},
+        {"kind": "tool_terminal", "coordinate": [false, 4, 0, 4, 40, "tool-0", 1], "lifecycle": "succeeded"},
+        {"kind": "state_change", "coordinate": [false, 5, 0, 5, 60, "state-0", 0]}
+      ],
+      "expected": {
+        "first_action_tokens": 4,
+        "first_success_tokens": 12,
+        "first_mutation_tokens": 12,
+        "mutation_observed": true
+      }
+    },
+    {
+      "id": "failed_then_success",
+      "events": [
+        {"kind": "call", "coordinate": [false, 1, 0, 1, 30, "call-0", 0], "tokens": [1, 1, 1, 1]},
+        {"kind": "tool_start", "coordinate": [false, 2, 0, 2, 40, "tool-failed", 0]},
+        {"kind": "tool_terminal", "coordinate": [false, 3, 0, 3, 40, "tool-failed", 1], "lifecycle": "failed"},
+        {"kind": "call", "coordinate": [false, 4, 0, 4, 30, "call-1", 0], "tokens": [2, 2, 2, 2]},
+        {"kind": "tool_start", "coordinate": [false, 5, 0, 5, 40, "tool-success", 0]},
+        {"kind": "tool_terminal", "coordinate": [false, 6, 0, 6, 40, "tool-success", 1], "lifecycle": "succeeded"},
+        {"kind": "state_change", "coordinate": [false, 7, 0, 7, 60, "state-0", 0]}
+      ],
+      "expected": {
+        "first_action_tokens": 4,
+        "first_success_tokens": 12,
+        "first_mutation_tokens": 12,
+        "mutation_observed": true
+      }
+    },
+    {
+      "id": "absent_boundaries",
+      "events": [
+        {"kind": "call", "coordinate": [false, 1, 0, 1, 30, "call-0", 0], "tokens": [1, 1, 1, 1]}
+      ],
+      "expected": {
+        "first_action_tokens": null,
+        "first_success_tokens": null,
+        "first_mutation_tokens": null,
+        "mutation_observed": false
+      }
+    },
+    {
+      "id": "present_without_prior_call",
+      "events": [
+        {"kind": "tool_start", "coordinate": [false, 1, 0, 1, 40, "tool-0", 0]},
+        {"kind": "tool_terminal", "coordinate": [false, 2, 0, 2, 40, "tool-0", 1], "lifecycle": "succeeded"},
+        {"kind": "state_change", "coordinate": [false, 3, 0, 3, 60, "state-0", 0]}
+      ],
+      "expected": {
+        "first_action_tokens": 0,
+        "first_success_tokens": 0,
+        "first_mutation_tokens": 0,
+        "mutation_observed": true
+      }
+    },
+    {
+      "id": "missing_prior_token",
+      "events": [
+        {"kind": "call", "coordinate": [false, 1, 0, 1, 30, "call-0", 0], "tokens": [1, 1, null, 1]},
+        {"kind": "tool_start", "coordinate": [false, 2, 0, 2, 40, "tool-0", 0]},
+        {"kind": "tool_terminal", "coordinate": [false, 3, 0, 3, 40, "tool-0", 1], "lifecycle": "succeeded"},
+        {"kind": "state_change", "coordinate": [false, 4, 0, 4, 60, "state-0", 0]}
+      ],
+      "expected": {
+        "first_action_tokens": null,
+        "first_success_tokens": null,
+        "first_mutation_tokens": null,
+        "mutation_observed": true
+      }
+    },
+    {
+      "id": "seven_part_tie",
+      "events": [
+        {"kind": "call", "coordinate": [false, 1, 0, 1, 30, "call-0", 0], "tokens": [1, 1, 1, 1]},
+        {"kind": "tool_start", "coordinate": [false, 2, 0, 2, 40, "tool-b", 0]},
+        {"kind": "tool_start", "coordinate": [false, 2, 0, 2, 40, "tool-a", 0]},
+        {"kind": "tool_terminal", "coordinate": [false, 3, 0, 3, 40, "tool-a", 1], "lifecycle": "failed"},
+        {"kind": "tool_terminal", "coordinate": [false, 3, 0, 3, 40, "tool-b", 2], "lifecycle": "succeeded"},
+        {"kind": "state_change", "coordinate": [false, 4, 0, 4, 60, "state-0", 0]}
+      ],
+      "expected": {
+        "first_action_tokens": 4,
+        "first_success_tokens": 4,
+        "first_mutation_tokens": 4,
+        "mutation_observed": true,
+        "action_boundary_id": "tool-a",
+        "success_boundary_id": "tool-b"
+      }
+    },
+    {
+      "id": "delayed_mutation",
+      "events": [
+        {"kind": "call", "coordinate": [false, 1, 0, 1, 30, "call-0", 0], "tokens": [1, 1, 1, 1]},
+        {"kind": "tool_start", "coordinate": [false, 2, 0, 2, 40, "tool-0", 0]},
+        {"kind": "tool_terminal", "coordinate": [false, 3, 0, 3, 40, "tool-0", 1], "lifecycle": "succeeded"},
+        {"kind": "call", "coordinate": [false, 4, 0, 4, 30, "call-1", 0], "tokens": [2, 2, 2, 2]},
+        {"kind": "state_change", "coordinate": [false, 5, 0, 5, 60, "state-0", 0]}
+      ],
+      "expected": {
+        "first_action_tokens": 4,
+        "first_success_tokens": 4,
+        "first_mutation_tokens": 12,
+        "mutation_observed": true
+      }
+    }
+  ],
+  "grading": {
+    "sentinel_mutated": [
+      {
+        "id": "production_grading_sentinel",
+        "lane": "production",
+        "outcome": "baseline_answers_unchanged"
+      },
+      {
+        "id": "independent_grading_sentinel",
+        "lane": "independent",
+        "outcome": "baseline_answers_unchanged"
+      }
+    ],
+    "inaccessible": [
+      {
+        "id": "production_grading_inaccessible",
+        "lane": "production",
+        "outcome": "baseline_answers_unchanged"
+      },
+      {
+        "id": "independent_grading_inaccessible",
+        "lane": "independent",
+        "outcome": "baseline_answers_unchanged"
+      }
+    ],
+    "mutations": [
+      {
+        "id": "canonical_fact",
+        "production": "changed",
+        "independent": "changed"
+      },
+      {
+        "id": "production_source",
+        "production": "changed",
+        "independent": "unchanged"
+      }
+    ]
+  },
+  "closure": {
+    "canonical": {
+      "consumer": "b/consumer.py",
+      "harness": "a/harness.py",
+      "roots": [
+        {
+          "path": "a/harness.py",
+          "role": "harness",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "path": "b/consumer.py",
+          "role": "consumer",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "imports": [
+        {
+          "path": "c/import.py",
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      ],
+      "closure_digest": "8b4642a25a8802771eab683cd632b0a029203f3d06f6594e57faa7e50f15dc42"
+    },
+    "negative": [
+      {"id": "drift", "outcome": "reject_before_grading"},
+      {"id": "inaccessible", "outcome": "reject_before_grading"}
+    ]
+  }
+}

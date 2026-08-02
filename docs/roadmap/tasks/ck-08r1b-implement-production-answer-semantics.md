@@ -1,5 +1,5 @@
 # CK-08R1B — Implement production answer semantics
-**Status:** Blocked on CK-08R1A
+**Status:** Ready after CK-08R1A merge exact-main verification
 **Recommended owner:** `worker production-semantics`; Sol-class
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md); [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md); [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 **Goal:** Implement R1A Q-REV-03/Q-WF-02 semantics.
