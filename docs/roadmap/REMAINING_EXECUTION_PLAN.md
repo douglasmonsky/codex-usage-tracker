@@ -23,28 +23,39 @@ requalification join. CK-QG1 PR #392 also stays blocked: R2 introduced two
 page-executor C/B/B violations, so QG1A must correct them without changing R2
 behavior or the frozen maintainability baseline.
 CK-07R1A is accepted, merged, and exact-main verified at
-`4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 is accepted at the
-current exact main `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked
-path authority remains preserved read-only while the finite source/runtime
-state authority reconciles the no-run candidate from exact main
-`955272c68548b82ea11eb65226ba0e6f3f570785`. PR #394 is a stale failed witness: head
+`4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 was accepted at
+`519b503aa3b23019033b6481687c08b23fc6c31e`; its linked
+path authority remains preserved read-only. The finite source/runtime,
+run-invocation authority, and argv-correction authority are merged through
+`479cbdbfdd39604fc90eb94777ea0270474adde2`. PR #394 is a stale failed witness: head
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` failed the hosted Python 3.14
 `ordinary.2000_call_tail` gate and is superseded read-only. It must not be
 updated, rerun, or merged. The planner-valid lifecycle receipt is an
-acceptance output of the existing CK-07R1 worker only after it revalidates the
-retained candidate on the source-digest and run-invocation authorities' exact
-merged main; the run-invocation authority is not a pre-dispatch dependency.
+acceptance output of the existing CK-07R1 worker only after the coordinator
+records the preserved prelaunch-incident disposition and the worker
+revalidates the candidate from a clean exact-main worktree. The accepted
+authorities do not authorize a launch by themselves.
 The old frozen-command attempt is preserved exactly as a terminal
 `pre_child_argv_guard_failure` (exit 2 after `0.075241709` seconds, no child or
 runtime evidence), and its old benchmark/test identities cannot be reused.
 Only `(sys.argv[0], *sys.argv[1:]) == LAUNCH_COMMAND[1:]` is authoritative.
+The argv-correction authority is accepted and merged at
+`479cbdbfdd39604fc90eb94777ea0270474adde2`. During its local proof, an
+instrumentation mistake invoked the corrected candidate from the retained V5
+witness and stopped at the child-handshake boundary. It produced only the
+preserved `prelaunch_failed` launch-token ledger, with
+`token_consumed=false`, no successful child/PID/receipt/runtime evidence, and
+no retry. The witness remains read-only. CK-07R1 stays Conditional Ready until
+the coordinator records an incident disposition and a clean exact-main
+reapplication path; the incident does not authorize a launch or a replacement
+worker.
 The first sample, 720-second wrapper timeout, all five underlying budgets,
 one-run ceiling, and every fail-closed rule remain binding. CK-07R1 is
-Conditional Ready only after both authorities are accepted, merged, and
-exact-main verified; until then its current authority state is `authority_main`
-and no worker may resume. After that exact-main handoff only the existing
-stopped worker may be resumed for required revalidation of the corrected exact
-candidate. The worker may enter
+Conditional Ready pending the incident disposition and clean exact-main
+reapplication path; until then its current authority state is `authority_main`
+and no worker may resume. After that handoff only the existing stopped worker
+may be resumed for required revalidation of the corrected exact candidate. The
+worker may enter
 `worker_prequalification` only with the exact selected successor,
 `post_single_run` only with a complete planner-valid receipt and bound dynamic
 evidence identity, and `final_accepted` only after worker merge and exact-main
@@ -59,11 +70,32 @@ authorize action.
 ## Delegation law
 
 - Delegate only **Ready** child packets; CK-09–CK-16 parents are umbrellas.
-- Sol/default owns freezes, integration, and gates; bounded post-freeze or
-  immutable qualification lanes may use Luna. `architect` is read-only.
+- Use one durable coordinator, one existing task per active packet, and at most
+  one shared-authority task. Sol at medium reasoning owns readiness,
+  integration, collision handling, and gates; bounded deterministic workers
+  normally use the less costly Luna profile at max reasoning. `architect` is
+  read-only.
 - Start at exact dependency-complete `origin/main`, one worktree/branch/PR.
-- After verified merge, `create_thread` each newly Ready successor; fan out,
-  hold joins, deduplicate packet/frontier, and report blocked/gated work.
+- After verified merge, create only uncreated newly Ready distinct packets.
+  Reuse the existing packet task for implementation defects, tests,
+  environment setup, validation corrections, review findings, and exact-main
+  reapplication. A new authority task requires a genuinely new policy or
+  contract decision.
+- Every task proactively messages its parent on completion, blocking, or a
+  fail-closed stop. The handoff triggers continuation; do not create polling or
+  wait-only tasks.
+- Exact-main plus repository-relative artifact paths are authoritative.
+  Receivers recompute digests and exact commands from committed manifests
+  instead of trusting multi-hop prompt transcription.
+- Before a one-shot or irreversible operation, prove the exact entry point and
+  process boundary with a real non-consuming integration preflight. Stubbed or
+  in-process tests alone are insufficient.
+- Use bounded subagents inside the active task for focused read-only research,
+  tests, or one independent review. Durable tasks represent independent
+  ownership, not every intermediate correction.
+- Classify blockers as implementation, authority, environment, or external.
+  Once crash integrity is restored, leave recovery mode and return to this
+  convergence topology.
 - One integrator owns shared authority/schema/registry/publication/package/
   release/final evidence; parallel writes are disjoint.
 - Producers name artifact, consumer seam, independent truth, and executable
@@ -115,10 +147,16 @@ conditions in the table and child files; they are not unconditional DAG edges.
 {
  "schema": "codex-usage-tracker.remaining-delegation-dag.v1",
  "orchestration": {
-  "mode": "self-propagating",
-  "spawn": "all_newly_ready_successors",
+  "mode": "self-propagating-convergence",
+  "spawn": "newly_ready_distinct_packets_only",
   "join": "all_dependencies_complete",
   "duplicate_policy": "one_active_task_per_packet_and_dependency_frontier",
+  "continuation_policy": "reuse_existing_task_for_same_packet",
+  "authority_policy": "new_task_only_for_new_policy_or_contract_decision",
+  "handoff_policy": "proactive_parent_handoff_from_repository_verified_state",
+  "identity_policy": "exact_main_and_repository_paths_receiver_recomputes_digests",
+  "one_shot_policy": "real_non_consuming_preflight_before_authorized_attempt",
+  "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
   "completed": ["CK-08R0", "CK-08R2", "CK-QG1A0", "CK-07R1A", "CK-07R1A0"],
@@ -130,7 +168,7 @@ conditions in the table and child files; they are not unconditional DAG edges.
     "condition": "CK-QG1A0 merged and exact-main verified",
     "tasks": ["CK-QG1A"]
   }, {
-    "condition": "Finite CK-07R1 source/runtime authority accepted, merged, and exact-main verified; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; no replacement or downstream task",
+    "condition": "ARGV authority accepted at 479cbdb; coordinator records the preserved prelaunch incident disposition and a clean exact-main reapplication path; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; no replacement, launch, or downstream task",
     "tasks": ["CK-07R1"]
   }],
   "blocked": [],
