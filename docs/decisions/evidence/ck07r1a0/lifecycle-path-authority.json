@@ -1,6 +1,6 @@
 {
-  "schema": "codex-usage-tracker.lifecycle-path-authority.v1",
-  "authority_version": 1,
+  "schema": "codex-usage-tracker.lifecycle-path-authority.v2",
+  "authority_version": 2,
   "owner": "CK-07R1A0",
   "authority_base_sha": "979f88eca2f23f6225c0c7a530b8f36f793c5748",
   "upstream_acceptance": [
@@ -10,9 +10,36 @@
   ],
   "blocked_requalification": {
     "packet": "CK-07R1",
-    "status": "BLOCKED",
-    "reason": "planner_valid_lifecycle_receipt_and_this_authority",
-    "accepted_receipt_required": true
+    "status": "CONDITIONAL_READY",
+    "reason": "planner_valid_lifecycle_receipt_is_successor_acceptance_output",
+    "accepted_receipt_required": true,
+    "receipt_required_before_dispatch": false
+  },
+  "readiness_transition": {
+    "packet": "CK-07R1",
+    "from_status": "BLOCKED",
+    "conditional_status": "CONDITIONAL_READY",
+    "effective_ready_status": "READY",
+    "activation": "this authority accepted merged and exact-main verified",
+    "authority_base_sha": "519b503aa3b23019033b6481687c08b23fc6c31e",
+    "receipt_role": "successor_acceptance_output_not_pre_dispatch_dependency",
+    "receipt_required_before_dispatch": false,
+    "receipt_required_for_acceptance": true,
+    "maximum_new_end_to_end_runs": 1,
+    "dispatch_rule": "create_exactly_one_fresh_CK-07R1_successor_from_activation_exact_main",
+    "downstream_ready_tasks": []
+  },
+  "pr_394_policy": {
+    "number": 394,
+    "head_sha": "98a9b5b82951d136644a5fe5f8a70d320131ba08",
+    "base_sha": "bbd9eb990969a659376ea584c6d696d1715cc007",
+    "workflow_run_id": "30685780055",
+    "failed_job_id": "91331138768",
+    "failed_check": "Kernel phase and package isolation (3.14)",
+    "failure": "ordinary.2000_call_tail",
+    "status": "stale_failed_superseded_read_only",
+    "policy": "do_not_update_rerun_merge_or_reinterpret",
+    "future_requalification": "fresh_CK-07R1_successor_from_authority_exact_main"
   },
   "reachable_path": {
     "startup_recovery": [
@@ -216,6 +243,8 @@
     "stop if the two scope additions cannot be proven from the retained diff",
     "stop if any authority identity, schema, DAG, ledger, review, hosted CI, merge, or exact-main gate fails",
     "do not update PR-394, historical worktrees, or downstream corrective packets",
-    "do not dispatch CK-07R1 or any dependent successor from this packet"
+    "do not dispatch CK-07R1 or any dependent successor from this packet",
+    "do not treat receipt absence before dispatch as a blocker; receipt absence or invalidity at successor acceptance remains fail-closed",
+    "do not make any downstream packet ready from this transition"
   ]
 }

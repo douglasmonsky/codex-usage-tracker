@@ -24,9 +24,13 @@ truth is now serialized as R1A contract freeze, disjoint R1B/R1C consumers,
 and final R1 requalification. CK-QG1A0 gates the selected R2 PageExecutor
 successor; QG1A fixes its two C/B/B findings. CK-07R1A separately corrected
 PR #394's exact hosted lifecycle-tail failure without a budget waiver.
-CK-07R1A0 now freezes the reachable planner/recovery path because the retained
-all-profile receipt was writer-only; CK-07R1 remains blocked. Reclassification and maintainability
-remain open. The central authority is
+CK-07R1A0 is accepted at exact main `519b503aa3b23019033b6481687c08b23fc6c31e`.
+Its transition authority makes the planner-valid receipt a CK-07R1 successor
+acceptance output rather than a pre-dispatch dependency. PR #394 remains a
+stale failed read-only witness; it is not updated, rerun, or merged. CK-07R1
+is Conditional Ready only after this authority merges and exact-main verifies;
+no other successor is advanced. Reclassification and maintainability remain
+open. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
 
 ## Authority set

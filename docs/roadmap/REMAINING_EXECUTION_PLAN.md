@@ -23,10 +23,18 @@ requalification join. CK-QG1 PR #392 also stays blocked: R2 introduced two
 page-executor C/B/B violations, so QG1A must correct them without changing R2
 behavior or the frozen maintainability baseline.
 CK-07R1A is accepted, merged, and exact-main verified at
-`4d8074952f679877f2b4fbb3e89c51015e96a197`. CK-07R1 PR #394 likewise stays
-blocked on CK-07R1A0 because the retained all-profile receipt was writer-only:
-the first sample and all five budgets remain binding, and a planner-valid
-lifecycle receipt is still required.
+`4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 is accepted at the
+current exact main `519b503aa3b23019033b6481687c08b23fc6c31e`. PR #394 is a
+stale failed witness: head `98a9b5b82951d136644a5fe5f8a70d320131ba08` failed
+the hosted Python 3.14 `ordinary.2000_call_tail` gate and is superseded
+read-only. It must not be updated, rerun, or merged. The planner-valid
+lifecycle receipt is an acceptance output of the fresh CK-07R1 successor, not
+a pre-dispatch dependency; the first sample, all five budgets, and every
+fail-closed rule remain binding. CK-07R1 is Conditional Ready only after this
+authority is accepted, merged, and exact-main verified. This current authority
+supersedes earlier CK-07R1 wording that says to resume, refresh, or rerun PR
+#394; those retained references are historical provenance and do not authorize
+action.
 
 ## Delegation law
 
@@ -101,6 +109,9 @@ conditions in the table and child files; they are not unconditional DAG edges.
   }, {
     "condition": "CK-QG1A0 merged and exact-main verified",
     "tasks": ["CK-QG1A"]
+  }, {
+    "condition": "CK-07R1 transition authority accepted, merged, and exact-main verified",
+    "tasks": ["CK-07R1"]
   }],
   "tasks": [
     {"id": "CK-08R0", "file": "tasks/ck-08r0-freeze-corrective-contracts.md", "dependencies": []},

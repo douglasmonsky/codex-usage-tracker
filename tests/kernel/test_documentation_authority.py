@@ -176,7 +176,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     manifest = json.loads(manifest_match.group(1))
     assert manifest["schema"] == "codex-usage-tracker.remaining-delegation-dag.v1"
     assert manifest["orchestration"]["spawn"] == "all_newly_ready_successors"
-    conditional_ready = {"CK-08R1A", "CK-08R3A", "CK-QG1A"}
+    conditional_ready = {"CK-08R1A", "CK-08R3A", "CK-QG1A", "CK-07R1"}
     assert manifest["completed"] == [
         "CK-08R0",
         "CK-08R2",
@@ -197,10 +197,15 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "condition": "CK-QG1A0 merged and exact-main verified",
             "tasks": ["CK-QG1A"],
         },
+        {
+            "condition": "CK-07R1 transition authority accepted, merged, and exact-main verified",
+            "tasks": ["CK-07R1"],
+        },
     ]
     assert "Completed packets: **14 / 22**" in ledger
     assert "Not started: **8**" in ledger
     assert "Critical-path completion: **14 / 21**" in ledger
+    assert "Blocked child tasks: **41**" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
         f"Conditional-ready child tasks: **{sum(len(item['tasks']) for item in manifest['conditional_ready'])}"
@@ -295,8 +300,6 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             assert "**Status:** Ready" in body
         elif packet_id in {"CK-08R0", "CK-08R2", "CK-QG1A0", "CK-07R1A", "CK-07R1A0"}:
             assert "**Status:** Completed on merge" in body
-        elif packet_id == "CK-07R1":
-            assert "**Status:** **BLOCKED**" in body
         else:
             assert "**Status:** Blocked" in body
 
@@ -377,6 +380,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     agents = _read("AGENTS.md")
     index = _read("docs/INDEX.md")
     roadmap = _read("docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md")
+    central = _read("docs/roadmap/REMAINING_EXECUTION_PLAN.md")
     ledger = _read("docs/roadmap/TASK_PACKETS.md")
     backlog = _read("docs/roadmap/LINEAR_BACKLOG.md")
     qualification = _read("docs/quality/QUALIFICATION_PLAN.md")
@@ -515,15 +519,19 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
                 "fold_lifecycle",
                 "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d",
                 "one-run authorization condition",
-                "CK-07R1 remains",
-                "**BLOCKED**",
+                "CK-07R1 becomes",
+                "Conditional Ready",
+                "The planner-valid receipt is a future successor acceptance",
+                "stale failed PR #394 is explicitly superseded read-only",
             ),
         ),
     ):
         assert all(token in body for token in tokens)
-    assert "exact-main verification required before CK-07R1" in ck07r1a0
+    assert "exact-main verified at `519b503aa3b23019033b6481687c08b23fc6c31e`" in ck07r1a0
+    assert "strict Authority v2" in ck07r1a0
+    assert "supersedes earlier CK-07R1 wording" in central
     assert "Blocked on CK-QG1A" in ckqg1
-    assert "**BLOCKED** on CK-07R1A0" in ck07r1
+    assert "Conditional Ready after this authority merges and exact-main verifies" in ck07r1
 
 
 def test_ck07r1a0_authority_is_strict_and_preserves_attempt_identity() -> None:
@@ -535,8 +543,42 @@ def test_ck07r1a0_authority_is_strict_and_preserves_attempt_identity() -> None:
     validator.validate(authority)
 
     assert authority["owner"] == "CK-07R1A0"
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-path-authority.v2"
+    assert authority["authority_version"] == 2
     assert authority["authority_base_sha"] == "979f88eca2f23f6225c0c7a530b8f36f793c5748"
-    assert authority["blocked_requalification"]["status"] == "BLOCKED"
+    assert authority["blocked_requalification"] == {
+        "packet": "CK-07R1",
+        "status": "CONDITIONAL_READY",
+        "reason": "planner_valid_lifecycle_receipt_is_successor_acceptance_output",
+        "accepted_receipt_required": True,
+        "receipt_required_before_dispatch": False,
+    }
+    assert authority["readiness_transition"] == {
+        "packet": "CK-07R1",
+        "from_status": "BLOCKED",
+        "conditional_status": "CONDITIONAL_READY",
+        "effective_ready_status": "READY",
+        "activation": "this authority accepted merged and exact-main verified",
+        "authority_base_sha": "519b503aa3b23019033b6481687c08b23fc6c31e",
+        "receipt_role": "successor_acceptance_output_not_pre_dispatch_dependency",
+        "receipt_required_before_dispatch": False,
+        "receipt_required_for_acceptance": True,
+        "maximum_new_end_to_end_runs": 1,
+        "dispatch_rule": "create_exactly_one_fresh_CK-07R1_successor_from_activation_exact_main",
+        "downstream_ready_tasks": [],
+    }
+    assert authority["pr_394_policy"] == {
+        "number": 394,
+        "head_sha": "98a9b5b82951d136644a5fe5f8a70d320131ba08",
+        "base_sha": "bbd9eb990969a659376ea584c6d696d1715cc007",
+        "workflow_run_id": "30685780055",
+        "failed_job_id": "91331138768",
+        "failed_check": "Kernel phase and package isolation (3.14)",
+        "failure": "ordinary.2000_call_tail",
+        "status": "stale_failed_superseded_read_only",
+        "policy": "do_not_update_rerun_merge_or_reinterpret",
+        "future_requalification": "fresh_CK-07R1_successor_from_authority_exact_main",
+    }
     assert authority["run_authorization"]["status"] == "not_executed_by_this_packet"
     assert authority["run_authorization"]["maximum_new_end_to_end_runs"] == 1
     assert authority["reachable_path"]["ordering"] == (
@@ -587,6 +629,14 @@ def test_ck07r1a0_authority_is_strict_and_preserves_attempt_identity() -> None:
 
     changed = json.loads(json.dumps(authority))
     changed["run_authorization"]["status"] = "authorized"
+    assert list(validator.iter_errors(changed))
+
+    changed = json.loads(json.dumps(authority))
+    changed["readiness_transition"]["receipt_required_before_dispatch"] = True
+    assert list(validator.iter_errors(changed))
+
+    changed = json.loads(json.dumps(authority))
+    changed["pr_394_policy"]["head_sha"] = "0" * 40
     assert list(validator.iter_errors(changed))
 
     changed = json.loads(json.dumps(authority))

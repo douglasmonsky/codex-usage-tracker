@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-path-authority-v1.schema.json",
-  "title": "CK-07R1A0 lifecycle path authority",
+  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-path-authority-v2.schema.json",
+  "title": "CK-07R1A0 lifecycle path authority and CK-07R1 readiness transition",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,6 +11,8 @@
     "authority_base_sha",
     "upstream_acceptance",
     "blocked_requalification",
+    "readiness_transition",
+    "pr_394_policy",
     "reachable_path",
     "append_safe_small",
     "independent_truth",
@@ -23,8 +25,8 @@
     "fail_closed_rules"
   ],
   "properties": {
-    "schema": {"const": "codex-usage-tracker.lifecycle-path-authority.v1"},
-    "authority_version": {"const": 1},
+    "schema": {"const": "codex-usage-tracker.lifecycle-path-authority.v2"},
+    "authority_version": {"const": 2},
     "owner": {"const": "CK-07R1A0"},
     "authority_base_sha": {"const": "979f88eca2f23f6225c0c7a530b8f36f793c5748"},
     "upstream_acceptance": {
@@ -38,12 +40,73 @@
     "blocked_requalification": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["packet", "status", "reason", "accepted_receipt_required"],
+      "required": ["packet", "status", "reason", "accepted_receipt_required", "receipt_required_before_dispatch"],
       "properties": {
         "packet": {"const": "CK-07R1"},
-        "status": {"const": "BLOCKED"},
-        "reason": {"const": "planner_valid_lifecycle_receipt_and_this_authority"},
-        "accepted_receipt_required": {"const": true}
+        "status": {"const": "CONDITIONAL_READY"},
+        "reason": {"const": "planner_valid_lifecycle_receipt_is_successor_acceptance_output"},
+        "accepted_receipt_required": {"const": true},
+        "receipt_required_before_dispatch": {"const": false}
+      }
+    },
+    "readiness_transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packet",
+        "from_status",
+        "conditional_status",
+        "effective_ready_status",
+        "activation",
+        "authority_base_sha",
+        "receipt_role",
+        "receipt_required_before_dispatch",
+        "receipt_required_for_acceptance",
+        "maximum_new_end_to_end_runs",
+        "dispatch_rule",
+        "downstream_ready_tasks"
+      ],
+      "properties": {
+        "packet": {"const": "CK-07R1"},
+        "from_status": {"const": "BLOCKED"},
+        "conditional_status": {"const": "CONDITIONAL_READY"},
+        "effective_ready_status": {"const": "READY"},
+        "activation": {"const": "this authority accepted merged and exact-main verified"},
+        "authority_base_sha": {"const": "519b503aa3b23019033b6481687c08b23fc6c31e"},
+        "receipt_role": {"const": "successor_acceptance_output_not_pre_dispatch_dependency"},
+        "receipt_required_before_dispatch": {"const": false},
+        "receipt_required_for_acceptance": {"const": true},
+        "maximum_new_end_to_end_runs": {"const": 1},
+        "dispatch_rule": {"const": "create_exactly_one_fresh_CK-07R1_successor_from_activation_exact_main"},
+        "downstream_ready_tasks": {"const": []}
+      }
+    },
+    "pr_394_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "number",
+        "head_sha",
+        "base_sha",
+        "workflow_run_id",
+        "failed_job_id",
+        "failed_check",
+        "failure",
+        "status",
+        "policy",
+        "future_requalification"
+      ],
+      "properties": {
+        "number": {"const": 394},
+        "head_sha": {"const": "98a9b5b82951d136644a5fe5f8a70d320131ba08"},
+        "base_sha": {"const": "bbd9eb990969a659376ea584c6d696d1715cc007"},
+        "workflow_run_id": {"const": "30685780055"},
+        "failed_job_id": {"const": "91331138768"},
+        "failed_check": {"const": "Kernel phase and package isolation (3.14)"},
+        "failure": {"const": "ordinary.2000_call_tail"},
+        "status": {"const": "stale_failed_superseded_read_only"},
+        "policy": {"const": "do_not_update_rerun_merge_or_reinterpret"},
+        "future_requalification": {"const": "fresh_CK-07R1_successor_from_authority_exact_main"}
       }
     },
     "reachable_path": {
@@ -339,9 +402,11 @@
         "do not weaken budgets, ceilings, first-sample requirements, or synthetic-only data rules",
         "stop if the two scope additions cannot be proven from the retained diff",
         "stop if any authority identity, schema, DAG, ledger, review, hosted CI, merge, or exact-main gate fails",
-        "do not update PR-394, historical worktrees, or downstream corrective packets",
-        "do not dispatch CK-07R1 or any dependent successor from this packet"
-      ]
+          "do not update PR-394, historical worktrees, or downstream corrective packets",
+          "do not dispatch CK-07R1 or any dependent successor from this packet",
+          "do not treat receipt absence before dispatch as a blocker; receipt absence or invalidity at successor acceptance remains fail-closed",
+          "do not make any downstream packet ready from this transition"
+        ]
     }
   },
   "$defs": {
