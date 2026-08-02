@@ -73,7 +73,10 @@ def test_selected_candidate_and_aggregate_timeout_are_reconciled_without_runtime
     assert authority["status"] == "authority_reconciled_no_run"
     assert authority["selected_candidate"] == {
         "status": "reconciled_no_run",
-        "base_sha": "d911b1f0d17596890a6a0a608be904330c96e9a6",
+        "base_sha": "bdf545127b9cda20d22e00e9e9abb74c9550a470",
+        "retained_branch": "feature/ck-07r1-lifecycle-requalification-v3",
+        "retained_worktree": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v3",
+        "witness_status": "retained_uncommitted_read_only",
         "source_predecessor_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
         "source_successor_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
         "runtime_acceptance": "not_claimed",
@@ -326,6 +329,20 @@ def test_dag_ledger_index_and_scope_bind_the_authority_without_new_task() -> Non
     assert "run-invocation authority" in ledger
     assert "CK-07R1" in central and "CK-07R1" in ledger
     assert authority["scope"]["authority_only_files"]
+    assert set(authority["scope"]["authority_only_files"]) == {
+        "docs/INDEX.md",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
+        "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md",
+        "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
+        "scripts/check_kernel_scope.py",
+        "tests/kernel/test_documentation_authority.py",
+        "tests/kernel/test_lifecycle_run_invocation_authority.py",
+    }
     assert "scripts/benchmark_ck07r1_lifecycle_scale.py" in authority["scope"]["forbidden"]
     assert CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS == {
         "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",

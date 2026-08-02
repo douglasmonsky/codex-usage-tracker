@@ -29,9 +29,9 @@
     "sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
     "status": "permitted_not_accepted",
     "blocked_task": "019fbfe2-8fe4-7de2-9264-d58572366727",
-    "retained_branch": "feature/ck-07r1-lifecycle-path-requalification",
-    "retained_worktree": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-path-requalification",
-    "base_sha": "d911b1f0d17596890a6a0a608be904330c96e9a6",
+    "retained_branch": "feature/ck-07r1-lifecycle-requalification-v3",
+    "retained_worktree": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v3",
+    "base_sha": "bdf545127b9cda20d22e00e9e9abb74c9550a470",
     "witness_status": "retained_uncommitted_read_only",
     "diff_identity": {
       "modified": [

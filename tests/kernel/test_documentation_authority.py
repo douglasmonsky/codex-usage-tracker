@@ -700,6 +700,9 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
         "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1"
     )
     assert authority["selected_successor"]["status"] == "permitted_not_accepted"
+    assert authority["selected_successor"]["retained_branch"] == "feature/ck-07r1-lifecycle-requalification-v3"
+    assert authority["selected_successor"]["retained_worktree"] == "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v3"
+    assert authority["selected_successor"]["base_sha"] == "bdf545127b9cda20d22e00e9e9abb74c9550a470"
     assert authority["acceptance_state"] == {
         "status": "reconciled_no_run",
         "live_source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
