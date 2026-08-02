@@ -25,8 +25,8 @@ behavior or the frozen maintainability baseline.
 CK-07R1A is accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 was accepted at
 `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked
-path authority remains preserved read-only. The finite source/runtime and
-argv-correction authorities are merged through
+path authority remains preserved read-only. The finite source/runtime,
+run-invocation authority, and argv-correction authority are merged through
 `479cbdbfdd39604fc90eb94777ea0270474adde2`. PR #394 is a stale failed witness: head
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` failed the hosted Python 3.14
 `ordinary.2000_call_tail` gate and is superseded read-only. It must not be
