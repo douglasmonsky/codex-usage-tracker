@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from copy import deepcopy
 from pathlib import Path
 
+import pytest
 from jsonschema import Draft202012Validator
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -339,7 +341,30 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     )
     assert r3a["owner"] == "CK-08R3A"
     assert r3a["source_path"] == "src/codex_usage_tracker/agent_kernel/evidence/service.py"
+    assert r3a["authority_base_sha"] == "f3f376fc644a2e3d23c313dd6b7ca4b707c2998b"
     assert r3a["selected_successor"]["status"] == "permitted_not_accepted"
+    assert r3a["selected_successor"]["required_artifacts"] == [
+        {
+            "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+            "role": "source",
+            "sha256": r3a["selected_successor"]["sha256"],
+        },
+        {
+            "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+            "role": "evidence_order_indexes",
+            "sha256": "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc",
+        },
+        {
+            "path": "src/codex_usage_tracker/agent_kernel/storage/schema.py",
+            "role": "schema_contract_digest",
+            "sha256": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0",
+        },
+    ]
+    assert len(r3a["rejected_successors"]) == 1
+    assert r3a["rejected_successors"][0]["sha256"] == (
+        "718ff7032d050b13cb7fac1f857d0c99879d0ef3b13c57c39b55514fc610a88b"
+    )
+    assert r3a["rejected_successors"][0]["status"] == "rejected_non_acceptable"
     assert r3a["constraints"][-1] == "generic_digest_drift_forbidden"
     for artifact in contract["authority_artifacts"]:
         source = _REPO_ROOT / artifact["path"]
@@ -352,12 +377,9 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             successor = r3a["selected_successor"]
             assert actual in {artifact["sha256"], successor["sha256"]}
             if actual == successor["sha256"]:
-                evidence = _json(successor["required_evidence"]["path"])
-                assert evidence["schema"] == successor["required_evidence"]["schema"]
-                assert evidence["owner"] == "CK-08R3A"
-                assert evidence["source_path"] == artifact["path"]
-                assert evidence["predecessor_sha256"] == artifact["sha256"]
-                assert evidence["successor_sha256"] == successor["sha256"]
+                for required in successor["required_artifacts"]:
+                    required_path = _REPO_ROOT / required["path"]
+                    assert hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
         else:
             assert actual == artifact["sha256"]
     locks = [lock for lane in contract["lanes"] for lock in lane["owned_lock"]]
@@ -399,6 +421,48 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert visited == _DELEGATED_PACKET_IDS
     assert "architect / Sol" not in central
     assert "feature worker / Sol" not in central
+
+
+def _assert_ck08r3a_identity_binding(authority: dict) -> None:
+    selected = authority["selected_successor"]
+    artifacts = selected["required_artifacts"]
+    assert authority["source_path"] == artifacts[0]["path"]
+    assert selected["sha256"] == artifacts[0]["sha256"]
+    assert artifacts[1]["path"] == "src/codex_usage_tracker/agent_kernel/storage/analytical.sql"
+    assert artifacts[1]["role"] == "evidence_order_indexes"
+    assert artifacts[1]["sha256"] == (
+        "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc"
+    )
+    assert artifacts[2]["path"] == "src/codex_usage_tracker/agent_kernel/storage/schema.py"
+    assert artifacts[2]["role"] == "schema_contract_digest"
+    assert artifacts[2]["sha256"] == (
+        "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0"
+    )
+    assert authority["predecessor"]["sha256"] != selected["sha256"]
+    assert authority["rejected_successors"][0]["sha256"] != selected["sha256"]
+    assert authority["rejected_successors"][0]["status"] == "rejected_non_acceptable"
+    assert "generic_digest_drift_forbidden" in authority["constraints"]
+
+
+def test_ck08r3a_authority_rejects_identity_mutations() -> None:
+    authority = _json(
+        "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json"
+    )
+    _assert_ck08r3a_identity_binding(authority)
+
+    for mutate in (
+        lambda value: value["selected_successor"].__setitem__("sha256", "0" * 64),
+        lambda value: value["selected_successor"]["required_artifacts"][1].__setitem__(
+            "sha256", "0" * 64
+        ),
+        lambda value: value["rejected_successors"][0].__setitem__(
+            "status", "permitted_not_accepted"
+        ),
+    ):
+        mutated = deepcopy(authority)
+        mutate(mutated)
+        with pytest.raises(AssertionError):
+            _assert_ck08r3a_identity_binding(mutated)
 
 
 def test_corrective_seam_packet_is_critical_path_authority() -> None:
@@ -487,7 +551,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
             "SCAN stream",
             "MATERIALIZE model_calls_visible",
             "AUTOMATIC COVERING INDEX",
-            "USE TEMP B-TREE FOR ORDER BY",
+                "USE TEMP B-TREE FOR ORDER BY",
         )
     )
     assert "**Dependencies:** CK-08R3A accepted, merged, and exact-main verified." in ck08r3
