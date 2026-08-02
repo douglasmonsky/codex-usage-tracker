@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-source-digest-authority-v1.schema.json",
-  "title": "CK-07R1A0 lifecycle source-digest supersession authority",
+  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-source-digest-authority-v2.schema.json",
+  "title": "CK-07R1A0 lifecycle source-digest and runtime state authority",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,6 +11,7 @@
     "authority_base_sha",
     "source_path",
     "acceptance_state",
+    "state_machine_binding",
     "predecessor",
     "selected_successor",
     "allowed_scope",
@@ -26,10 +27,10 @@
     "constraints"
   ],
   "properties": {
-    "schema": {"const": "codex-usage-tracker.lifecycle-source-digest-authority.v1"},
-    "authority_version": {"const": 1},
+    "schema": {"const": "codex-usage-tracker.lifecycle-source-digest-authority.v2"},
+    "authority_version": {"const": 2},
     "owner": {"const": "CK-07R1A0"},
-    "authority_base_sha": {"const": "d911b1f0d17596890a6a0a608be904330c96e9a6"},
+    "authority_base_sha": {"const": "a0d8770bad7d59b92b3f299186bfefa28bd5457c"},
     "source_path": {"const": "src/codex_usage_tracker/agent_kernel/publication/preparation.py"},
     "acceptance_state": {
       "type": "object",
@@ -56,6 +57,57 @@
             "sha256": {"const": "36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb"}
           }
         }
+      }
+    },
+    "state_machine_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_authority_path",
+        "run_authority_schema_path",
+        "current_state",
+        "states",
+        "source_digest_rule",
+        "other_digest",
+        "preserved_path_authority",
+        "current_runtime_claim"
+      ],
+      "properties": {
+        "run_authority_path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json"},
+        "run_authority_schema_path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json"},
+        "current_state": {"const": "authority_main"},
+        "states": {
+          "const": [
+            {
+              "name": "authority_main",
+              "source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+              "source_role": "live_predecessor",
+              "runtime_acceptance": "not_claimed"
+            },
+            {
+              "name": "worker_prequalification",
+              "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+              "source_role": "selected_successor",
+              "runtime_acceptance": "not_claimed"
+            },
+            {
+              "name": "post_single_run",
+              "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+              "source_role": "selected_successor",
+              "runtime_acceptance": "qualified_only_with_complete_planner_valid_receipt"
+            },
+            {
+              "name": "final_accepted",
+              "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+              "source_role": "selected_successor",
+              "runtime_acceptance": "accepted_only_with_worker_merge_and_exact_main"
+            }
+          ]
+        },
+        "source_digest_rule": {"const": "authority_main may retain only the live predecessor; worker_prequalification and every later state permit only the exact selected successor"},
+        "other_digest": {"const": "fail_closed"},
+        "preserved_path_authority": {"const": "lifecycle-path-authority remains retained read-only path semantics and does not advance the current worker state"},
+        "current_runtime_claim": {"const": "not_claimed"}
       }
     },
     "predecessor": {

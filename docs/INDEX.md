@@ -39,10 +39,19 @@ revoked malformed dispatch value, 720-second wrapper timeout, evidence, token,
 and no-retry contract while preserving the 5000/120000/100/500/500 ms budgets.
 The candidate remains runtime-unqualified until the existing worker
 revalidates it from the accepted exact main and produces the planner-valid
-receipt. CK-07R1 remains blocked, no run token is consumed, no other successor
-is advanced, and the one-run gate remains unspent. Reclassification and
-maintainability remain open. The central authority is
+receipt. CK-07R1 is Conditional Ready after this authority's accepted
+merge/exact-main handoff, but no worker resumes from this authority task; no
+run token is consumed, no other successor is advanced, and the one-run gate
+remains unspent. Reclassification and maintainability remain open. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
+
+The finite source/runtime state machine is currently `authority_main`: the live
+predecessor may remain on authority main, while only the exact selected
+successor may enter worker prequalification. `post_single_run` is unavailable
+without a complete planner-valid receipt bound to its exact dynamic receipt and
+evidence identity, and `final_accepted` additionally requires the worker PR to
+be squash-merged and exact-main verified. No state transition claims runtime
+qualification in this authority.
 
 ## Authority set
 
