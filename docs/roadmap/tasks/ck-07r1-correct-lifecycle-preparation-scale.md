@@ -1,6 +1,6 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** **BLOCKED** on CK-07R1A0 and a planner-valid lifecycle receipt
+**Status:** Conditional Ready after this authority merges and exact-main verifies
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -22,9 +22,11 @@ production-shaped preparation attempt exceeded 15 minutes.
 contracts.
 
 **Dependencies:** CK-07R1A accepted, merged, and exact-main verified at
-`4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 accepted, merged, and
-exact-main verified; existing PR #394 refreshed from corrected main and all
-required CI rerun.
+`4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 accepted at exact main
+`519b503aa3b23019033b6481687c08b23fc6c31e`; and this transition authority
+accepted, merged, and exact-main verified. PR #394 head
+`98a9b5b82951d136644a5fe5f8a70d320131ba08` is a stale failed read-only
+witness and is not refreshed, rerun, or merged.
 
 **Owned files/interfaces:** Lifecycle preparation implementation, focused
 publication tests, profile/benchmark, and linked CK-07 evidence amendment.
@@ -36,9 +38,11 @@ database postconditions.
 
 **Consumer seam:** Preparation to `PublicationWriter` to read-only publication.
 
-**Parallelism:** Resume existing task
-`019fbb41-804b-7fe2-8987-3d2b9e94a4d5` only after CK-07R1A handoff; other
-corrective locks stay disjoint.
+**Parallelism:** Create exactly one fresh CK-07R1 successor only after this
+authority merges and exact-main verifies, starting from that exact main. The
+planner-valid receipt is produced by that successor and is required for its
+acceptance, not for its creation or dispatch; other corrective locks stay
+disjoint and no downstream packet becomes Ready here.
 
 **Non-goals:** Writer/pointer/schema redesign, facts, projections, or budget
 waivers.
@@ -51,8 +55,11 @@ standard/production fixtures, five unprofiled samples, 30-day/all-time gates,
 `just v/vc`.
 
 **Acceptance:** Work is linear in observations plus prior transitions and all
-publication-valid scale gates pass through the CK-07R1A0 reachable path. Until
-then this packet remains **BLOCKED**, not Ready, active, or accepted.
+publication-valid scale gates pass through the CK-07R1A0 reachable path. The
+successor must produce the planner-valid receipt, bind every frozen path and
+prior identity, and consume at most one new end-to-end run. Receipt absence
+before dispatch is not a blocker; receipt absence or invalidity at successor
+acceptance remains fail-closed.
 
 **Failure/rollback:** Retain the profile and create one narrow follow-up for a
 new dominant blocker; never weaken the gate.
