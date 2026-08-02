@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -76,33 +77,86 @@ def test_command_cwd_interpreter_environment_and_output_are_exact() -> None:
     assert "fail closed" in launch["output"]["overwrite_rule"]
 
 
-def test_corrected_argv_guard_accepts_exact_command_in_real_non_launching_subprocess(
+def test_corrected_argv_guard_accepts_exact_candidate_in_real_non_launching_subprocess(
     tmp_path: Path,
 ) -> None:
-    script = tmp_path / "argv_guard.py"
-    script.write_text(
-        "import sys\n"
-        "LAUNCH_COMMAND = (\"python\", sys.argv[0], \"--profile\", \"all\", \"--samples\", \"5\")\n"
-        "raw_argv = tuple(sys.argv[1:])\n"
-        "if raw_argv == LAUNCH_COMMAND[1:]:\n"
-        "    raise SystemExit(91)\n"
-        "if (sys.argv[0], *raw_argv) != LAUNCH_COMMAND[1:]:\n"
-        "    raise SystemExit(2)\n"
-        "print(\"launch suppressed\")\n",
-        encoding="utf-8",
+    authority = _authority()
+    relative_candidate = Path("scripts/benchmark_ck07r1_lifecycle_scale.py")
+    candidate_roots = [
+        _ROOT,
+        _ROOT.parents[1] / authority["selected_candidate"]["retained_worktree"],
+    ]
+    candidate = next(
+        (root / relative_candidate for root in candidate_roots if (root / relative_candidate).is_file()),
+        None,
     )
+    if candidate is None:
+        pytest.skip("the retained candidate is unavailable until the worker reapplies it")
+    assert hashlib.sha256(candidate.read_bytes()).hexdigest() == authority["selected_candidate"]["artifacts"][1]["sha256"]
+    candidate_copy = tmp_path / relative_candidate
+    candidate_copy.parent.mkdir(parents=True)
+    candidate_copy.write_bytes(candidate.read_bytes())
 
+    frozen_args = [
+        "--profile",
+        "all",
+        "--samples",
+        "5",
+        "--output",
+        "output/ck07r1/lifecycle-requalification-v1.json",
+    ]
+    exact_paths = [
+        _ROOT / "output/ck07r1/lifecycle-requalification-v1.json",
+        _ROOT / "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+        _ROOT / "output/ck07r1/lifecycle-requalification-v1.stdout.txt",
+        _ROOT / "output/ck07r1/lifecycle-requalification-v1.stderr.txt",
+    ]
+    assert all(not path.exists() for path in exact_paths)
+
+    wrapper = """
+import runpy
+import sys
+
+candidate_path = sys.argv[1]
+sys.argv = ["scripts/benchmark_ck07r1_lifecycle_scale.py", *sys.argv[2:]]
+candidate = runpy.run_path(candidate_path, run_name="ck07r1_candidate")
+calls = []
+
+def suppress_launch():
+    calls.append("_launch_exact")
+    return 0
+
+candidate["main"].__globals__["_launch_exact"] = suppress_launch
+result = candidate["main"]()
+if result != 0 or calls != ["_launch_exact"]:
+    raise SystemExit(91)
+print("exact argv accepted; launch boundary suppressed")
+"""
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "LC_ALL": "C.UTF-8",
+            "PYTHONHASHSEED": "0",
+            "PYTHONUNBUFFERED": "1",
+            "TZ": "UTC",
+        }
+    )
+    environment.pop("PYTHONPATH", None)
+    environment.pop("CODEX_HOME", None)
     result = subprocess.run(
-        [sys.executable, str(script), "--profile", "all", "--samples", "5"],
-        cwd=tmp_path,
+        [sys.executable, "-c", wrapper, str(candidate_copy), *frozen_args],
+        cwd=_ROOT,
+        env=environment,
         capture_output=True,
         text=True,
         check=False,
+        timeout=30,
     )
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout == "launch suppressed\n"
-    assert not (tmp_path / "child-launched").exists()
+    assert result.stdout == "exact argv accepted; launch boundary suppressed\n"
+    assert result.stderr == ""
+    assert all(not path.exists() for path in exact_paths)
 
 
 def test_argv_correction_preserves_first_failure_and_one_run_gate() -> None:
