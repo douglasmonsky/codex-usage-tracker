@@ -1,0 +1,459 @@
+{
+  "schema": "codex-usage-tracker.answer-semantics.v1",
+  "version": 1,
+  "packet": "CK-08R1A",
+  "status": "frozen",
+  "source_authority": {
+    "question_catalog": "config/agent-kernel/question-catalog-v1.json",
+    "formula_contract": "config/agent-kernel/formula-contract-v1.json",
+    "logical_contract": "config/agent-kernel/logical-contract-v1.json",
+    "operand_contract": "config/agent-kernel/plan-operand-contract-v1.json",
+    "selector_contract": "config/agent-kernel/selector-provenance-v1.json"
+  },
+  "questions": {
+    "Q-REV-03": {
+      "plan_id": "compare_sessions",
+      "side_scope": {
+        "identity": "requested_stable_session_id",
+        "window": "[start_us,end_us)"
+      },
+      "required_gates": [
+        "capability",
+        "comparison",
+        "completion",
+        "hierarchy",
+        "measurement",
+        "publication"
+      ],
+      "available_empty": "typed_zero_or_empty",
+      "missing_required": "fail_closed",
+      "fields": {
+        "completion_state": {
+          "shape": {
+            "left": ["lifecycle_state", "completion_basis"],
+            "right": ["lifecycle_state", "completion_basis"]
+          },
+          "sources": [
+            {
+              "relation": "session",
+              "fields": ["session_id", "lifecycle_state", "completion_basis"]
+            }
+          ],
+          "joins": ["exactly_one_session_row_per_requested_session_id"],
+          "missing_empty": {
+            "open": "preserve_exact_open_lifecycle_and_basis",
+            "absent_duplicate_malformed": "fail_closed"
+          },
+          "sensitivity": "swap_session_lifecycle_and_basis_between_sides"
+        },
+        "context_features": {
+          "shape": {
+            "left": ["observed_call_count", "distinct_context_window_tokens"],
+            "right": ["observed_call_count", "distinct_context_window_tokens"]
+          },
+          "sources": [
+            {
+              "relation": "publication",
+              "fields": ["publication_id", "capabilities.structural_context"]
+            },
+            {
+              "relation": "canonical_call",
+              "fields": [
+                "call_id",
+                "session_id",
+                "context_window_tokens",
+                "measurement_mask.context_window_tokens"
+              ]
+            }
+          ],
+          "joins": [
+            "publication_capability_is_global_empty_cohort_authority",
+            "canonical_call.session_id_equals_selected_session_id",
+            "per_side_measurement_mask_is_context_availability_authority"
+          ],
+          "missing_empty": {
+            "capability_unavailable": "side_null",
+            "capability_available_empty": {
+              "observed_call_count": 0,
+              "distinct_context_window_tokens": []
+            },
+            "mixed_missing_context_window_tokens": "fail_closed"
+          },
+          "sensitivity": "swap_context_window_token_value_between_sides"
+        },
+        "delegation_metrics": {
+          "shape": {
+            "left": ["exclusive_tokens", "descendant_tokens", "inclusive_tokens"],
+            "right": ["exclusive_tokens", "descendant_tokens", "inclusive_tokens"]
+          },
+          "sources": [
+            {
+              "relation": "session",
+              "fields": [
+                "session_id",
+                "root_session_id",
+                "parent_session_id",
+                "delegation_depth"
+              ]
+            },
+            {
+              "relation": "canonical_call",
+              "fields": [
+                "call_id",
+                "session_id",
+                "uncached_input_tokens",
+                "cached_input_tokens",
+                "reasoning_tokens",
+                "output_tokens"
+              ]
+            }
+          ],
+          "joins": [
+            "exclusive_is_selected_session_calls",
+            "descendant_is_transitive_strict_session_descendants",
+            "inclusive_uses_exclusive_inclusive_scope_v1"
+          ],
+          "missing_empty": {
+            "empty": {
+              "exclusive_tokens": 0,
+              "descendant_tokens": 0,
+              "inclusive_tokens": 0
+            },
+            "missing_hierarchy_or_affected_token_class": "affected_value_null",
+            "malformed_or_cyclic_hierarchy": "fail_closed"
+          },
+          "sensitivity": "swap_parent_edge_and_compensated_descendant_tokens_between_sides"
+        },
+        "resource_metrics": {
+          "shape": {
+            "left": ["count", "by_kind"],
+            "right": ["count", "by_kind"]
+          },
+          "sources": [
+            {
+              "relation": "tool_invocation",
+              "fields": ["tool_id", "session_id", "resource_id", "resource_links"]
+            },
+            {
+              "relation": "state_change",
+              "fields": ["state_change_id", "session_id", "resource_id"]
+            },
+            {
+              "relation": "resource",
+              "fields": ["resource_id", "resource_kind"]
+            }
+          ],
+          "joins": [
+            "union_distinct_resource_ids_linked_by_side_tools_or_state_changes",
+            "exactly_one_resource_kind_per_resource_id"
+          ],
+          "missing_empty": {
+            "empty": {"count": 0, "by_kind": {}},
+            "dangling_or_conflicting_resource_join": "fail_closed",
+            "by_kind_key_order": "unicode_codepoint_ascending"
+          },
+          "sensitivity": "swap_linked_resource_kind_between_sides"
+        },
+        "state_change_metrics": {
+          "shape": {
+            "left": ["count", "by_mutation_kind"],
+            "right": ["count", "by_mutation_kind"]
+          },
+          "sources": [
+            {
+              "relation": "state_change",
+              "fields": ["state_change_id", "session_id", "mutation_kind"]
+            }
+          ],
+          "joins": [
+            "state_change.session_id_equals_selected_session_id",
+            "count_distinct_state_change_id"
+          ],
+          "missing_empty": {
+            "empty": {"count": 0, "by_mutation_kind": {}},
+            "absent_duplicate_malformed_id_or_kind": "fail_closed",
+            "by_mutation_kind_key_order": "unicode_codepoint_ascending"
+          },
+          "sensitivity": "swap_state_change_mutation_kind_between_sides"
+        },
+        "token_deltas": {
+          "shape": [
+            "uncached_input_tokens",
+            "cached_input_tokens",
+            "reasoning_tokens",
+            "output_tokens",
+            "total_tokens"
+          ],
+          "sources": [
+            {
+              "relation": "canonical_call",
+              "fields": [
+                "call_id",
+                "session_id",
+                "uncached_input_tokens",
+                "cached_input_tokens",
+                "reasoning_tokens",
+                "output_tokens"
+              ]
+            }
+          ],
+          "joins": [
+            "sum_each_class_per_selected_session",
+            "right_minus_left_via_side_by_side_delta_v1",
+            "total_is_sum_of_all_four_classes"
+          ],
+          "missing_empty": {
+            "empty": {
+              "uncached_input_tokens": 0,
+              "cached_input_tokens": 0,
+              "reasoning_tokens": 0,
+              "output_tokens": 0,
+              "total_tokens": 0
+            },
+            "missing_class": "that_class_and_total_null",
+            "malformed_token": "fail_closed"
+          },
+          "sensitivity": "swap_one_token_class_value_between_sides"
+        },
+        "tool_metrics": {
+          "shape": {
+            "left": [
+              "invocation_count",
+              "succeeded_count",
+              "failed_count",
+              "open_count"
+            ],
+            "right": [
+              "invocation_count",
+              "succeeded_count",
+              "failed_count",
+              "open_count"
+            ]
+          },
+          "sources": [
+            {
+              "relation": "tool_invocation",
+              "fields": ["tool_id", "session_id", "lifecycle"]
+            }
+          ],
+          "joins": [
+            "tool_invocation.session_id_equals_selected_session_id",
+            "count_distinct_tool_id"
+          ],
+          "missing_empty": {
+            "empty": {
+              "invocation_count": 0,
+              "succeeded_count": 0,
+              "failed_count": 0,
+              "open_count": 0
+            },
+            "succeeded": ["succeeded"],
+            "failed": ["failed"],
+            "open": ["pending", "running", "open"],
+            "cancelled_rolled_back_unknown_or_malformed": "fail_closed"
+          },
+          "sensitivity": "swap_supported_tool_lifecycle_between_sides"
+        },
+        "turn_call_counts": {
+          "shape": {
+            "left": ["turn_count", "call_count"],
+            "right": ["turn_count", "call_count"]
+          },
+          "sources": [
+            {"relation": "turn", "fields": ["turn_id", "session_id"]},
+            {
+              "relation": "canonical_call",
+              "fields": ["call_id", "session_id"]
+            }
+          ],
+          "joins": [
+            "turn.session_id_equals_selected_session_id",
+            "canonical_call.session_id_equals_selected_session_id",
+            "count_distinct_stable_ids"
+          ],
+          "missing_empty": {
+            "empty": {"turn_count": 0, "call_count": 0},
+            "absent_duplicate_malformed_stable_id": "fail_closed"
+          },
+          "sensitivity": "swap_compensated_turn_and_call_membership_between_sides"
+        }
+      }
+    },
+    "Q-WF-02": {
+      "plan_id": "first_action_mutation",
+      "selected_cohort": "request_gated_half_open_window_and_optional_session_selector",
+      "boundary_order": [
+        "event_at_us_is_null",
+        "event_at_us",
+        "source_rank",
+        "source_order",
+        "event_kind_order",
+        "logical_id",
+        "transition_rank"
+      ],
+      "boundaries": {
+        "action": "earliest_tool_start",
+        "success": "earliest_terminal_succeeded_transition",
+        "mutation": "earliest_state_change"
+      },
+      "tool_coordinates": {
+        "start": "complete_seven_part_coordinate",
+        "terminal": "complete_seven_part_coordinate"
+      },
+      "coordinate_sources": {
+        "tool_start": {
+          "relation": "tool_invocation",
+          "logical_id": "tool_id",
+          "fields": [
+            "start_at_us",
+            "start_source_rank",
+            "start_source_order",
+            "start_event_kind_order",
+            "start_transition_rank"
+          ]
+        },
+        "tool_terminal": {
+          "relation": "tool_invocation",
+          "logical_id": "tool_id",
+          "fields": [
+            "terminal_at_us",
+            "terminal_source_rank",
+            "terminal_source_order",
+            "terminal_event_kind_order",
+            "terminal_transition_rank",
+            "lifecycle"
+          ]
+        },
+        "state_change": {
+          "relation": "state_change",
+          "logical_id": "state_change_id",
+          "fields": [
+            "event_at_us",
+            "source_rank",
+            "source_order",
+            "event_kind_order",
+            "transition_rank"
+          ]
+        }
+      },
+      "token_sum": {
+        "relation": "canonical_call",
+        "identity": "call_id",
+        "classes": [
+          "uncached_input_tokens",
+          "cached_input_tokens",
+          "reasoning_tokens",
+          "output_tokens"
+        ],
+        "comparison": "strictly_before_boundary",
+        "present_boundary_without_prior_call": 0,
+        "absent_boundary": null,
+        "missing_prior_token_class": null
+      },
+      "output_fields": [
+        "first_action_tokens",
+        "first_success_tokens",
+        "first_mutation_tokens",
+        "mutation_observed"
+      ],
+      "fail_closed": [
+        "incomplete_start_coordinate",
+        "incomplete_terminal_coordinate",
+        "terminal_without_start",
+        "succeeded_without_terminal_coordinate",
+        "malformed_lifecycle",
+        "malformed_or_duplicate_logical_id",
+        "malformed_order_coordinate",
+        "missing_required_gate_or_fact"
+      ]
+    }
+  },
+  "closure": {
+    "membership": "harness_consumer_roots_and_recursive_transitive_local_imports",
+    "roots_required": ["harness", "consumer"],
+    "path_order": "unicode_codepoint_ascending",
+    "file_digest": "sha256_exact_bytes",
+    "canonical_json": "utf8_sort_keys_no_whitespace_ensure_ascii_false",
+    "closure_digest": "sha256_canonical_json_utf8",
+    "recompute_before_grading": true,
+    "drift": "fail_before_grading",
+    "inaccessible": "fail_before_grading",
+    "unlisted_transitive_import": "fail_before_grading"
+  },
+  "lanes": {
+    "production": {
+      "producer": "answer-semantics-v1_and_vectors",
+      "consumer_role": "r1b_production_derivation",
+      "required_root_roles": ["harness", "consumer", "r1b_root"],
+      "records_all_recursive_local_imports": true,
+      "grading_inputs_forbidden": true
+    },
+    "independent": {
+      "producer": "answer-semantics-v1_and_vectors",
+      "consumer_role": "r1c_independent_evaluator",
+      "required_root_roles": ["harness", "consumer"],
+      "records_all_recursive_local_imports": true,
+      "forbidden_module_prefixes": [
+        "codex_usage_tracker.agent_kernel.domain.formulas",
+        "codex_usage_tracker.agent_kernel.domain.plan_derivations",
+        "codex_usage_tracker.agent_kernel.domain.plan_operands",
+        "codex_usage_tracker.agent_kernel.query",
+        "codex_usage_tracker.agent_kernel.storage",
+        "sqlite3",
+        "tests.agent_kernel.fact_adapters.database",
+        "tests.agent_kernel.fixtures.oracles.database",
+        "tests.agent_kernel.fixtures.oracles.reference"
+      ],
+      "forbidden_data_keys": [
+        "answer_rows",
+        "comparison_rows",
+        "expected_rows",
+        "grades",
+        "grading",
+        "oracle_case"
+      ],
+      "forbidden_overlap_roles": [
+        "r1b_root",
+        "r1b_transitive_import",
+        "r1b_data_source"
+      ],
+      "only_shared_authority": [
+        "config/agent-kernel/answer-semantics-v1.json",
+        "config/agent-kernel/answer-semantics-v1.schema.json",
+        "tests/agent_kernel/fixtures/contracts/answer-semantics-v1-vectors.json",
+        "typed_request_and_result_contracts"
+      ]
+    }
+  },
+  "gate_order": [
+    "closure_membership",
+    "closure_digest",
+    "closure_accessibility",
+    "grading_independence",
+    "answer_comparison"
+  ],
+  "grading_checks": {
+    "lanes": ["production", "independent"],
+    "sentinel_mutated": "baseline_answers_unchanged",
+    "inaccessible": "baseline_answers_unchanged"
+  },
+  "mutation_checks": {
+    "canonical_fact": "both_lanes_change",
+    "production_source": "independent_truth_unchanged"
+  },
+  "privacy": {
+    "synthetic_only": true,
+    "real_codex_bodies_forbidden": true,
+    "local_database_forbidden": true,
+    "secrets_forbidden": true
+  },
+  "preserved_boundaries": [
+    "CK-08R2",
+    "CK-08R3A",
+    "CK-08R3",
+    "CK-07R1A",
+    "CK-QG1A",
+    "public_and_projection_boundaries"
+  ],
+  "sdist_ceiling_bytes": 2000000
+}

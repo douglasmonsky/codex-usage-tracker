@@ -23,6 +23,7 @@ from scripts.check_kernel_scope import (
     CK07R1A0_AUTHORITY_ADDITIONS,
     CK08_PREREQUISITE_BLOCKER_ADDITIONS,
     CK08_QUERY_EVIDENCE_ADDITIONS,
+    CK08R1A_ANSWER_SEMANTICS_ADDITIONS,
     CK08R2_PHYSICAL_PAGE_ADDITIONS,
     CK08R3A_AUTHORITY_ADDITIONS,
     CKQG1A0_AUTHORITY_ADDITIONS,
@@ -671,6 +672,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK07A_FACT_BACKED_REQUALIFICATION_ADDITIONS
         | CK08_QUERY_EVIDENCE_ADDITIONS
         | CK08R2_PHYSICAL_PAGE_ADDITIONS
+        | CK08R1A_ANSWER_SEMANTICS_ADDITIONS
         | CK08R3A_AUTHORITY_ADDITIONS
         | CKQG1A0_AUTHORITY_ADDITIONS
         | PACKAGE_BUDGET_POLICY_ADDITIONS
@@ -686,6 +688,16 @@ def test_ck08r3a_authority_additions_are_explicit_and_bounded() -> None:
     assert {
         "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json",
     } == CK08R3A_AUTHORITY_ADDITIONS
+
+
+def test_ck08r1a_answer_semantics_additions_are_explicit_and_bounded() -> None:
+    assert {
+        "config/agent-kernel/answer-semantics-v1.json",
+        "config/agent-kernel/answer-semantics-v1.schema.json",
+        "docs/decisions/evidence/ck08r1a/answer-truth-requalification-v2.schema.json",
+        "tests/agent_kernel/contracts/test_answer_semantics_contract.py",
+        "tests/agent_kernel/fixtures/contracts/answer-semantics-v1-vectors.json",
+    } == CK08R1A_ANSWER_SEMANTICS_ADDITIONS
 
 
 def test_ck07r1a0_authority_and_lifecycle_scope_additions_are_explicit() -> None:

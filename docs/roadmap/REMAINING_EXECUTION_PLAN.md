@@ -17,8 +17,8 @@ Retained CK-08R3 pre-scale evidence at commit
 query physically unbounded independent of scale profile. CK-08R3A owns that
 production fix. CK-08R3 must not become Ready or be redelegated until CK-08R3A
 is accepted, merged, and exact-main verified. Retained CK-08R1 work reached
-80/80 parity by copying unsupported Q-REV-03/Q-WF-02 semantics; R1A freezes
-their meaning, R1B/C implement disjoint consumers, and R1 is their
+80/80 parity by copying unsupported Q-REV-03/Q-WF-02 semantics; R1A now freezes
+their meaning and closure, R1B/C are Ready as disjoint consumers, and R1 is their
 requalification join. CK-QG1 PR #392 also stays blocked: R2 introduced two
 page-executor C/B/B violations, so QG1A must correct them without changing R2
 behavior or the frozen maintainability baseline.
@@ -159,11 +159,11 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
-  "completed": ["CK-08R0", "CK-08R2", "CK-QG1A0", "CK-07R1A", "CK-07R1A0"],
-  "ready": [],
+  "completed": ["CK-08R0", "CK-08R1A", "CK-08R2", "CK-QG1A0", "CK-07R1A", "CK-07R1A0"],
+  "ready": ["CK-08R1B", "CK-08R1C"],
   "conditional_ready": [{
-    "condition": "Each lane's serialized corrective authority correction accepted, merged, and exact-main verified",
-    "tasks": ["CK-08R1A", "CK-08R3A"]
+    "condition": "CK-08R3A's serialized corrective authority correction accepted, merged, and exact-main verified",
+    "tasks": ["CK-08R3A"]
   }, {
     "condition": "CK-QG1A0 merged and exact-main verified",
     "tasks": ["CK-QG1A"]

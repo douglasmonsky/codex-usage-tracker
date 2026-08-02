@@ -188,23 +188,24 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
         "blocked_policy": "spawn_none_and_report_to_orchestrator",
     }
-    conditional_ready = {"CK-07R1", "CK-08R1A", "CK-08R3A", "CK-QG1A"}
+    conditional_ready = {"CK-07R1", "CK-08R3A", "CK-QG1A"}
     blocked: set[str] = set()
     assert manifest["completed"] == [
         "CK-08R0",
+        "CK-08R1A",
         "CK-08R2",
         "CK-QG1A0",
         "CK-07R1A",
         "CK-07R1A0",
     ]
-    ready: set[str] = set()
-    assert manifest["ready"] == []
+    ready = {"CK-08R1B", "CK-08R1C"}
+    assert manifest["ready"] == ["CK-08R1B", "CK-08R1C"]
     assert manifest["conditional_ready"] == [
         {
             "condition": (
-                "Each lane's serialized corrective authority correction accepted, merged, and exact-main verified"
+                "CK-08R3A's serialized corrective authority correction accepted, merged, and exact-main verified"
             ),
-            "tasks": ["CK-08R1A", "CK-08R3A"],
+            "tasks": ["CK-08R3A"],
         },
         {
             "condition": "CK-QG1A0 merged and exact-main verified",
@@ -223,7 +224,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert "Completed packets: **14 / 22**" in ledger
     assert "Not started: **8**" in ledger
     assert "Critical-path completion: **14 / 21**" in ledger
-    assert "Blocked child tasks: **41" in ledger
+    assert "Blocked child tasks: **39" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
         f"Conditional-ready child tasks: **{sum(len(item['tasks']) for item in manifest['conditional_ready'])}"
@@ -318,7 +319,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             assert "**Status:** Ready" in body
         elif packet_id in blocked:
             assert "**Status:** Blocked" in body
-        elif packet_id in {"CK-08R0", "CK-08R2", "CK-QG1A0", "CK-07R1A", "CK-07R1A0"}:
+        elif packet_id in {"CK-08R0", "CK-08R1A", "CK-08R2", "CK-QG1A0", "CK-07R1A", "CK-07R1A0"}:
             assert "**Status:** Completed on merge" in body
         else:
             assert "**Status:** Blocked" in body

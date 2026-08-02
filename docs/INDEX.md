@@ -20,8 +20,9 @@ physical keyset SQL; 19 plans retain explicit gaps without projection.
 Retained CK-08R3 `a28e9cdbff8e48d334712a449fdcee111c725673` then stopped
 before scale on first/deep EvidenceService EXPLAIN. CK-08R3A owns that separate
 fix; CK-08R3 awaits its accepted merge/exact-main verification. Independent
-truth is now serialized as R1A contract freeze, disjoint R1B/R1C consumers,
-and final R1 requalification. CK-QG1A0 gates the selected R2 PageExecutor
+truth now consumes [`answer-semantics.v1`](../config/agent-kernel/answer-semantics-v1.json);
+disjoint R1B/R1C consumers are Ready before final R1 requalification.
+CK-QG1A0 gates the selected R2 PageExecutor
 successor; QG1A fixes its two C/B/B findings. CK-07R1A separately corrected
 PR #394's exact hosted lifecycle-tail failure without a budget waiver.
 CK-07R1A0 is accepted at exact main `519b503aa3b23019033b6481687c08b23fc6c31e`.

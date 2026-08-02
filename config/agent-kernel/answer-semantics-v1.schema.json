@@ -1,0 +1,373 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://douglasmonsky.github.io/codex-usage-tracker/schemas/answer-semantics-v1.schema.json",
+  "title": "CK-08R1A answer semantics and vectors",
+  "oneOf": [
+    {"$ref": "#/$defs/contract"},
+    {"$ref": "#/$defs/vectors"}
+  ],
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "nonEmpty": {"type": "string", "minLength": 1},
+    "strings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonEmpty"}
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relation", "fields"],
+      "properties": {
+        "relation": {"$ref": "#/$defs/nonEmpty"},
+        "fields": {"$ref": "#/$defs/strings"}
+      }
+    },
+    "fieldSemantic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape", "sources", "joins", "missing_empty", "sensitivity"],
+      "properties": {
+        "shape": {"type": ["object", "array"]},
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/source"}
+        },
+        "joins": {"$ref": "#/$defs/strings"},
+        "missing_empty": {"type": "object", "minProperties": 1},
+        "sensitivity": {"$ref": "#/$defs/nonEmpty"}
+      }
+    },
+    "qRev": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan_id",
+        "side_scope",
+        "required_gates",
+        "available_empty",
+        "missing_required",
+        "fields"
+      ],
+      "properties": {
+        "plan_id": {"const": "compare_sessions"},
+        "side_scope": {
+          "const": {
+            "identity": "requested_stable_session_id",
+            "window": "[start_us,end_us)"
+          }
+        },
+        "required_gates": {"$ref": "#/$defs/strings"},
+        "available_empty": {"const": "typed_zero_or_empty"},
+        "missing_required": {"const": "fail_closed"},
+        "fields": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "completion_state",
+            "context_features",
+            "delegation_metrics",
+            "resource_metrics",
+            "state_change_metrics",
+            "token_deltas",
+            "tool_metrics",
+            "turn_call_counts"
+          ],
+          "properties": {
+            "completion_state": {"$ref": "#/$defs/fieldSemantic"},
+            "context_features": {"$ref": "#/$defs/fieldSemantic"},
+            "delegation_metrics": {"$ref": "#/$defs/fieldSemantic"},
+            "resource_metrics": {"$ref": "#/$defs/fieldSemantic"},
+            "state_change_metrics": {"$ref": "#/$defs/fieldSemantic"},
+            "token_deltas": {"$ref": "#/$defs/fieldSemantic"},
+            "tool_metrics": {"$ref": "#/$defs/fieldSemantic"},
+            "turn_call_counts": {"$ref": "#/$defs/fieldSemantic"}
+          }
+        }
+      }
+    },
+    "qWf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan_id",
+        "selected_cohort",
+        "boundary_order",
+        "boundaries",
+        "tool_coordinates",
+        "coordinate_sources",
+        "token_sum",
+        "output_fields",
+        "fail_closed"
+      ],
+      "properties": {
+        "plan_id": {"const": "first_action_mutation"},
+        "selected_cohort": {"$ref": "#/$defs/nonEmpty"},
+        "boundary_order": {
+          "const": [
+            "event_at_us_is_null",
+            "event_at_us",
+            "source_rank",
+            "source_order",
+            "event_kind_order",
+            "logical_id",
+            "transition_rank"
+          ]
+        },
+        "boundaries": {
+          "const": {
+            "action": "earliest_tool_start",
+            "success": "earliest_terminal_succeeded_transition",
+            "mutation": "earliest_state_change"
+          }
+        },
+        "tool_coordinates": {
+          "const": {
+            "start": "complete_seven_part_coordinate",
+            "terminal": "complete_seven_part_coordinate"
+          }
+        },
+        "coordinate_sources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tool_start", "tool_terminal", "state_change"],
+          "properties": {
+            "tool_start": {"type": "object"},
+            "tool_terminal": {"type": "object"},
+            "state_change": {"type": "object"}
+          }
+        },
+        "token_sum": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relation",
+            "identity",
+            "classes",
+            "comparison",
+            "present_boundary_without_prior_call",
+            "absent_boundary",
+            "missing_prior_token_class"
+          ],
+          "properties": {
+            "relation": {"const": "canonical_call"},
+            "identity": {"const": "call_id"},
+            "classes": {
+              "const": [
+                "uncached_input_tokens",
+                "cached_input_tokens",
+                "reasoning_tokens",
+                "output_tokens"
+              ]
+            },
+            "comparison": {"const": "strictly_before_boundary"},
+            "present_boundary_without_prior_call": {"const": 0},
+            "absent_boundary": {"type": "null"},
+            "missing_prior_token_class": {"type": "null"}
+          }
+        },
+        "output_fields": {"$ref": "#/$defs/strings"},
+        "fail_closed": {"$ref": "#/$defs/strings"}
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "version",
+        "packet",
+        "status",
+        "source_authority",
+        "questions",
+        "closure",
+        "lanes",
+        "gate_order",
+        "grading_checks",
+        "mutation_checks",
+        "privacy",
+        "preserved_boundaries",
+        "sdist_ceiling_bytes"
+      ],
+      "properties": {
+        "schema": {"const": "codex-usage-tracker.answer-semantics.v1"},
+        "version": {"const": 1},
+        "packet": {"const": "CK-08R1A"},
+        "status": {"const": "frozen"},
+        "source_authority": {
+          "type": "object",
+          "minProperties": 5,
+          "additionalProperties": {"$ref": "#/$defs/nonEmpty"}
+        },
+        "questions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Q-REV-03", "Q-WF-02"],
+          "properties": {
+            "Q-REV-03": {"$ref": "#/$defs/qRev"},
+            "Q-WF-02": {"$ref": "#/$defs/qWf"}
+          }
+        },
+        "closure": {"type": "object", "minProperties": 10},
+        "lanes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["production", "independent"],
+          "properties": {
+            "production": {"type": "object", "minProperties": 5},
+            "independent": {"type": "object", "minProperties": 8}
+          }
+        },
+        "gate_order": {
+          "const": [
+            "closure_membership",
+            "closure_digest",
+            "closure_accessibility",
+            "grading_independence",
+            "answer_comparison"
+          ]
+        },
+        "grading_checks": {
+          "const": {
+            "lanes": ["production", "independent"],
+            "sentinel_mutated": "baseline_answers_unchanged",
+            "inaccessible": "baseline_answers_unchanged"
+          }
+        },
+        "mutation_checks": {
+          "const": {
+            "canonical_fact": "both_lanes_change",
+            "production_source": "independent_truth_unchanged"
+          }
+        },
+        "privacy": {
+          "const": {
+            "synthetic_only": true,
+            "real_codex_bodies_forbidden": true,
+            "local_database_forbidden": true,
+            "secrets_forbidden": true
+          }
+        },
+        "preserved_boundaries": {"$ref": "#/$defs/strings"},
+        "sdist_ceiling_bytes": {"const": 2000000}
+      }
+    },
+    "vectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "version",
+        "contract_sha256",
+        "q_rev_03",
+        "q_wf_02",
+        "grading",
+        "closure"
+      ],
+      "properties": {
+        "schema": {"const": "codex-usage-tracker.answer-semantics-vectors.v1"},
+        "version": {"const": 1},
+        "contract_sha256": {"$ref": "#/$defs/sha"},
+        "q_rev_03": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["field_isolation", "missing_empty"],
+          "properties": {
+            "field_isolation": {
+              "type": "array",
+              "minItems": 8,
+              "maxItems": 8,
+              "items": {"type": "object", "minProperties": 7}
+            },
+            "missing_empty": {
+              "type": "array",
+              "minItems": 11,
+              "maxItems": 11,
+              "items": {"type": "object", "minProperties": 2}
+            }
+          }
+        },
+        "q_wf_02": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "events", "expected"],
+            "properties": {
+              "id": {"$ref": "#/$defs/nonEmpty"},
+              "events": {"type": "array"},
+              "expected": {"type": "object", "minProperties": 4}
+            }
+          }
+        },
+        "grading": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sentinel_mutated", "inaccessible", "mutations"],
+          "properties": {
+            "sentinel_mutated": {
+              "const": [
+                {
+                  "id": "production_grading_sentinel",
+                  "lane": "production",
+                  "outcome": "baseline_answers_unchanged"
+                },
+                {
+                  "id": "independent_grading_sentinel",
+                  "lane": "independent",
+                  "outcome": "baseline_answers_unchanged"
+                }
+              ]
+            },
+            "inaccessible": {
+              "const": [
+                {
+                  "id": "production_grading_inaccessible",
+                  "lane": "production",
+                  "outcome": "baseline_answers_unchanged"
+                },
+                {
+                  "id": "independent_grading_inaccessible",
+                  "lane": "independent",
+                  "outcome": "baseline_answers_unchanged"
+                }
+              ]
+            },
+            "mutations": {
+              "const": [
+                {
+                  "id": "canonical_fact",
+                  "production": "changed",
+                  "independent": "changed"
+                },
+                {
+                  "id": "production_source",
+                  "production": "changed",
+                  "independent": "unchanged"
+                }
+              ]
+            }
+          }
+        },
+        "closure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["canonical", "negative"],
+          "properties": {
+            "canonical": {"type": "object", "minProperties": 5},
+            "negative": {
+              "const": [
+                {"id": "drift", "outcome": "reject_before_grading"},
+                {"id": "inaccessible", "outcome": "reject_before_grading"}
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

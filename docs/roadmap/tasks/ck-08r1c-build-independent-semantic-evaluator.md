@@ -1,5 +1,5 @@
 # CK-08R1C — Build independent semantic evaluator
-**Status:** Blocked on CK-08R1A
+**Status:** Ready after CK-08R1A merge exact-main verification
 **Recommended owner:** `worker independent-evaluator`; Sol-class
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md); [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md); [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 **Goal:** Independently evaluate all 80 variants.
