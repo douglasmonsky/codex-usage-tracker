@@ -21,7 +21,9 @@ Retained CK-08R3 `a28e9cdbff8e48d334712a449fdcee111c725673` then stopped
 before scale on first/deep EvidenceService EXPLAIN. CK-08R3A owns that separate
 fix; CK-08R3 awaits its accepted merge/exact-main verification. Independent
 truth now consumes [`answer-semantics.v1`](../config/agent-kernel/answer-semantics-v1.json);
-disjoint R1B/R1C consumers are Ready before final R1 requalification.
+R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`;
+R1B remains held on shared query/evidence/grading integration before final R1
+requalification.
 CK-QG1A0 gated the selected R2 PageExecutor successor; QG1A removed its two
 C/B/B findings and is accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`;
 existing QG1 PR #392 is Ready to resume from corrected main. CK-07R1A separately corrected
