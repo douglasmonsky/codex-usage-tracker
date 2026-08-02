@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -64,19 +66,87 @@ def test_command_cwd_interpreter_environment_and_output_are_exact() -> None:
         "TZ": "UTC",
     }
     assert launch["output"]["relative_path"] == "output/ck07r1/lifecycle-requalification-v1.json"
-    assert "must not exist" in launch["output"]["prelaunch_rule"]
+    assert launch["output"]["exclusive_paths"] == {
+        "output": "output/ck07r1/lifecycle-requalification-v1.json",
+        "ledger": "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+        "stdout": "output/ck07r1/lifecycle-requalification-v1.stdout.txt",
+        "stderr": "output/ck07r1/lifecycle-requalification-v1.stderr.txt",
+    }
+    assert "all four exact" in launch["output"]["prelaunch_rule"]
     assert "fail closed" in launch["output"]["overwrite_rule"]
+
+
+def test_corrected_argv_guard_accepts_exact_command_in_real_non_launching_subprocess(
+    tmp_path: Path,
+) -> None:
+    script = tmp_path / "argv_guard.py"
+    script.write_text(
+        "import sys\n"
+        "LAUNCH_COMMAND = (\"python\", sys.argv[0], \"--profile\", \"all\", \"--samples\", \"5\")\n"
+        "raw_argv = tuple(sys.argv[1:])\n"
+        "if raw_argv == LAUNCH_COMMAND[1:]:\n"
+        "    raise SystemExit(91)\n"
+        "if (sys.argv[0], *raw_argv) != LAUNCH_COMMAND[1:]:\n"
+        "    raise SystemExit(2)\n"
+        "print(\"launch suppressed\")\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(script), "--profile", "all", "--samples", "5"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "launch suppressed\n"
+    assert not (tmp_path / "child-launched").exists()
+
+
+def test_argv_correction_preserves_first_failure_and_one_run_gate() -> None:
+    authority = _authority()
+    correction = authority["argv_correction"]
+    assert correction["old_guard"] == "sys.argv[1:] == LAUNCH_COMMAND[1:]"
+    assert correction["corrected_guard"] == "(sys.argv[0], *sys.argv[1:]) == LAUNCH_COMMAND[1:]"
+    assert correction["corrected_candidate_artifacts"] == {
+        "benchmark_sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
+        "lifecycle_test_sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed",
+    }
+    assert correction["old_candidate_artifacts"]["reuse"] == "forbidden"
+    assert correction["non_launching_subprocess_test"]["required"] is True
+
+    failure = authority["first_failure"]
+    assert failure["classification"] == "pre_child_argv_guard_failure"
+    assert failure["attempted_once"] is True
+    assert failure["exit_code"] == 2
+    assert failure["elapsed_seconds"] == 0.075241709
+    assert set(failure["evidence"].values()) == {"absent", "absent_and_unconsumed"}
+    assert failure["retry"] == failure["restart"] == failure["replacement"] == "none"
+    assert authority["run_token"]["first_successful_launch"].startswith(
+        "exactly one first successful child launch"
+    )
+    assert authority["run_token"]["old_candidate_reuse"] == "forbidden"
+    assert authority["change_control"] == {
+        "exactly_one_pr": True,
+        "hosted_ci_required": True,
+        "merge_policy": "squash merge only when all required hosted CI jobs pass",
+        "exact_main_verification": "attach verification against the exact merged main contents before acceptance",
+        "merged_sha": None,
+        "downstream": "blocked_until_authority_merge_and_exact_main_verification",
+    }
 
 
 def test_selected_candidate_and_aggregate_timeout_are_reconciled_without_runtime_acceptance() -> None:
     authority = _authority()
     assert authority["status"] == "authority_reconciled_no_run"
-    assert authority["authority_base_sha"] == "a0d8770bad7d59b92b3f299186bfefa28bd5457c"
+    assert authority["authority_base_sha"] == "955272c68548b82ea11eb65226ba0e6f3f570785"
     assert authority["selected_candidate"] == {
         "status": "reconciled_no_run",
-        "base_sha": "bdf545127b9cda20d22e00e9e9abb74c9550a470",
-        "retained_branch": "feature/ck-07r1-lifecycle-requalification-v3",
-        "retained_worktree": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v3",
+        "base_sha": "955272c68548b82ea11eb65226ba0e6f3f570785",
+        "retained_branch": "feature/ck-07r1-lifecycle-requalification-v5",
+        "retained_worktree": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v5",
         "witness_status": "retained_uncommitted_read_only",
         "source_predecessor_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
         "source_successor_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
@@ -89,12 +159,12 @@ def test_selected_candidate_and_aggregate_timeout_are_reconciled_without_runtime
             },
             {
                 "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-                "sha256": "6a864c74a403da3edb671d9750fc2b2a59b73899102075ee0cec89fbb429b783",
+                "sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
                 "role": "benchmark",
             },
             {
                 "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-                "sha256": "a033e1c31f30784e321fdfe6dcce75460f89a02bc29beecfa40475f604deffac",
+                "sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed",
                 "role": "lifecycle_test",
             },
             {
@@ -385,6 +455,9 @@ def test_process_exclusion_launch_token_and_evidence_capture_are_required() -> N
         "refund": False,
         "prior_identities_reused": False,
         "concurrent_processes_allowed": False,
+        "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker deliberately reapplies only the corrected exact candidate, and all gates pass",
+        "first_successful_launch": "exactly one first successful child launch may consume the still-unspent token; this is not a retry, restart, or replacement of a launched process",
+        "old_candidate_reuse": "forbidden",
     }
 
 
@@ -399,7 +472,7 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
         after_launch["failures"]
     )
     feasibility = authority["feasibility"]
-    assert feasibility["candidate_status"] == "remediated_no_run_runtime_unqualified"
+    assert feasibility["candidate_status"] == "corrected_no_run_runtime_unqualified"
     assert "planner-valid receipt" in feasibility["exact_blocker"]
     assert feasibility["run_action"].startswith("do not execute")
 
@@ -407,6 +480,14 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
 @pytest.mark.parametrize(
     ("label", "path", "replacement"),
     [
+        ("old-argv-guard", ("argv_correction", "old_guard"), "sys.argv == LAUNCH_COMMAND"),
+        ("corrected-argv-guard", ("argv_correction", "corrected_guard"), "sys.argv[1:] == LAUNCH_COMMAND[1:]"),
+        ("first-failure-classification", ("first_failure", "classification"), "successful_process_launch"),
+        ("first-failure-exit", ("first_failure", "exit_code"), 0),
+        ("first-failure-token-evidence", ("first_failure", "evidence", "token"), "consumed"),
+        ("exclusive-output-path", ("launch_contract", "output", "exclusive_paths", "ledger"), "output/other.json"),
+        ("old-candidate-reuse", ("run_token", "old_candidate_reuse"), "allowed"),
+        ("merge-sha-invention", ("change_control", "merged_sha"), "0" * 40),
         ("command", ("launch_contract", "repository_relative_command", 1), "wrong.py"),
         ("cwd", ("launch_contract", "required_cwd"), "scripts"),
         ("fixture-vocabulary", ("launch_contract", "fixture_identity", "vocabulary", "fixture_file_sha256"), "manifest"),
@@ -415,7 +496,7 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
         ("candidate-benchmark", ("selected_candidate", "artifacts", 1, "sha256"), "0" * 64),
         ("rejected-dispatch", ("launch_contract", "fixture_identity", "rejected_dispatch_values", 0, "status"), "used"),
         ("output-overwrite", ("launch_contract", "output", "overwrite_rule"), "overwrite"),
-        ("process-exclusion", ("launch_gates", "prelaunch", "required", 2), "process check omitted"),
+        ("process-exclusion", ("launch_gates", "prelaunch", "required", 3), "process check omitted"),
         ("run-token-timing", ("run_token", "consumption"), "before launch"),
         ("no-retry", ("failure_matrix", "after_launch", "no_retry"), False),
         ("tail-limit", ("launch_contract", "tail_limits", "values", "observations"), 12001),

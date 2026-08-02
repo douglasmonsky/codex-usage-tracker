@@ -35,13 +35,14 @@ contract is
 with its schema. The linked [source-digest authority](../../decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json)
 and its schema freeze the exact predecessor/successor transition. The retained
 CK-07R1 implementation/profile/evidence diff is read-only evidence;
-the reconciled candidate binds preparation `d192c858…`, benchmark
-`6a864c74…`, lifecycle test `a033e1c3…`, linked evidence `36eb76ca…`, and
+the reconciled candidate binds preparation `d192c858…`, corrected benchmark
+`f173837d…`, corrected lifecycle test `b6468b60…`, linked evidence `36eb76ca…`, and
 canonical fixture identities without claiming runtime acceptance.
 The linked run-invocation authority is
 `docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json`;
-it adds no runtime implementation, freezes the 720-second wrapper timeout, and
-keeps the retained candidate runtime-unqualified.
+it adds no runtime implementation, freezes the corrected argv guard,
+720-second wrapper timeout, four-path non-overwriting preflight, and keeps the
+retained candidate runtime-unqualified.
 
 **Produces:** A frozen entry-path contract, finite source/runtime state machine,
 APPEND_SAFE_SMALL selection rule,
@@ -67,7 +68,7 @@ artifacts.
 **Parallelism:** Sole authority owner. Do not create or dispatch CK-07R1,
 CK-08R4, CK-08RG, CK-09, or any other dependent task from this packet.
 
-**Non-goals:** Lifecycle implementation, benchmark correction, production
+**Non-goals:** Lifecycle implementation, benchmark execution, production
 qualification, PR #394 changes, writer/planner/recovery code, budgets,
 schemas/DDL/query/evidence services, projections, releases, or real/private
 Codex data.
@@ -86,16 +87,22 @@ run-invocation authorities must be accepted, merged, and exact-main verified
 before CK-07R1 is Conditional Ready; every prior attempt and its
 identity/timestamp/failure remains visible; receipt
 `935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d` remains
-writer-only evidence and is never reused or upgraded.
+writer-only evidence and is never reused or upgraded. The old argv-guard
+attempt is preserved as `pre_child_argv_guard_failure`, not a launch; no old
+candidate invocation may recur, and the corrected candidate must be the only
+candidate re-applied after exact-main verification.
 The current finite state is `authority_main`; no worker resumes from this
 packet, no receipt can claim qualification, and final acceptance additionally
 requires worker PR merge and exact-main verification.
 
-**Required tests/checks:** Strict authority-schema and negative-mutation tests;
-DAG/ledger/status tests; exact scope-manifest tests; evidence identity and
-`git diff --check`; `just v` and `just vc` as required by repository packet
-rules; one final read-only review; hosted CI; squash merge; attached
-exact-main verification.
+**Required tests/checks:** Real non-launching subprocess argv integration test;
+strict authority-schema and exact-record negative-mutation tests; DAG/ledger/
+status tests; exact scope-manifest tests; evidence identity and `git diff
+--check`; `just v` and `just vc` as required by repository packet rules; one
+independent read-only review maximum; exactly one PR; hosted CI; squash merge
+only when every required job passes; attached exact-main verification. No E2E,
+benchmark, worker resume, token consumption, or downstream dispatch occurs in
+this authority.
 
 **Acceptance:** The authority artifact validates, exact identities and run
 accounting are preserved, only the retained CK-07R1 authority additions are
@@ -113,7 +120,7 @@ attempts; stop closed on any identity, scope, DAG, schema, review, CI, merge,
 or exact-main mismatch. Do not weaken a budget or infer publication-validity
 from a manually forced plan.
 
-**Handoff:** Coordinator `019fbeb3-00d5-7f22-ba65-ae4672838140` and parent
+**Handoff:** Coordinator `019fbeb3-00d5-7f80-a8c2-c8f469385312` and parent
 `019fbea6-66b5-71e0-b85a-b6654fd414c5` receive the merged SHA, source-digest
 and run-invocation authority paths, exact candidate source/diff identity, preserved
 attempts/digests, validation/reviewer/CI/exact-main results, and unchanged

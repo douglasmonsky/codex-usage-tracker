@@ -27,23 +27,30 @@ CK-07R1A is accepted, merged, and exact-main verified at
 current exact main `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked
 path authority remains preserved read-only while the finite source/runtime
 state authority reconciles the no-run candidate from exact main
-`bdf545127b9cda20d22e00e9e9abb74c9550a470`. PR #394 is a stale failed witness: head
+`955272c68548b82ea11eb65226ba0e6f3f570785`. PR #394 is a stale failed witness: head
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` failed the hosted Python 3.14
 `ordinary.2000_call_tail` gate and is superseded read-only. It must not be
 updated, rerun, or merged. The planner-valid lifecycle receipt is an
 acceptance output of the existing CK-07R1 worker only after it revalidates the
 retained candidate on the source-digest and run-invocation authorities' exact
 merged main; the run-invocation authority is not a pre-dispatch dependency.
+The old frozen-command attempt is preserved exactly as a terminal
+`pre_child_argv_guard_failure` (exit 2 after `0.075241709` seconds, no child or
+runtime evidence), and its old benchmark/test identities cannot be reused.
+Only `(sys.argv[0], *sys.argv[1:]) == LAUNCH_COMMAND[1:]` is authoritative.
 The first sample, 720-second wrapper timeout, all five underlying budgets,
 one-run ceiling, and every fail-closed rule remain binding. CK-07R1 is
 Conditional Ready only after both authorities are accepted, merged, and
 exact-main verified; until then its current authority state is `authority_main`
 and no worker may resume. After that exact-main handoff only the existing
-worker may be resumed for its required revalidation. The worker may enter
+stopped worker may be resumed for required revalidation of the corrected exact
+candidate. The worker may enter
 `worker_prequalification` only with the exact selected successor,
 `post_single_run` only with a complete planner-valid receipt and bound dynamic
 evidence identity, and `final_accepted` only after worker merge and exact-main
-verification. Earlier wording that says to resume, refresh, or rerun PR #394 is
+verification. The still-unspent one-run token may fund exactly one first
+successful child launch after all gates pass; this is not a retry, restart, or
+replacement of a launched process. Earlier wording that says to resume, refresh, or rerun PR #394 is
 historical provenance and does not authorize action. This source-digest
 authority supersedes earlier CK-07R1 wording that says to resume, refresh, or
 rerun PR #394; those retained references are historical provenance and do not
