@@ -32,9 +32,9 @@ and publication/evidence scale plus replacement maintainability need
 corrective proof. CK-08R0 froze `corrective-gates-v1`; CK-08R2 is complete and
 CK-09 remains blocked. CK-08R1A froze corrected answer meaning and recursive
 closure; disjoint R1B/R1C implementation is Ready before final R1 requalification.
-CK-QG1A must
-remove two R2 page-executor complexity findings without changing behavior or
-the frozen baseline before existing QG1 PR #392 resumes. CK-07R1A corrected
+CK-QG1A removed the two R2 page-executor complexity findings without changing
+behavior or the frozen baseline and is accepted at exact main `30983d4`;
+existing QG1 PR #392 is Ready to resume from corrected main. CK-07R1A corrected
 the exact hosted Python 3.14 lifecycle-tail blocker; the linked CK-07R1A0
 authorities, including argv correction, are merged through `479cbdb`. The
 existing CK-07R1 worker remains stopped pending coordinator disposition of the

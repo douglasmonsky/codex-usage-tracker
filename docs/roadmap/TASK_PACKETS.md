@@ -12,11 +12,11 @@ parents are accounting umbrellas.
 - Not started: **8**
 - Critical-path completion: **14 / 21**
 - Optional packets: **CK-15**
-- Completed corrective child tasks: **6 — CK-08R0, CK-08R1A, CK-08R2, CK-QG1A0, CK-07R1A, CK-07R1A0**
-- Remaining delegable child tasks: **44**
-- Ready child tasks: **2 — CK-08R1B, CK-08R1C**
-- Conditional-ready child tasks: **3 — CK-07R1 after coordinator disposition of the preserved prelaunch incident and a clean exact-main reapplication path; CK-08R3A; CK-QG1A after CK-QG1A0 exact-main**
-- Blocked child tasks: **39**
+- Completed corrective child tasks: **7 — CK-08R0, CK-08R1A, CK-08R2, CK-QG1A0, CK-QG1A, CK-07R1A, CK-07R1A0**
+- Remaining delegable child tasks: **43**
+- Ready child tasks: **3 — CK-08R1B, CK-08R1C, CK-QG1**
+- Conditional-ready child tasks: **2 — CK-07R1 after coordinator disposition of the preserved prelaunch incident and a clean exact-main reapplication path; CK-08R3A**
+- Blocked child tasks: **38**
 - Orchestration mode: **convergence — one coordinator, one existing task per active packet, at most one shared-authority task**
 - Continuation policy: **reuse the active packet task for ordinary corrections; create a task only for a newly Ready distinct packet or a genuinely new authority decision**
 - Handoff policy: **tasks proactively message the parent; no polling or wait-only tasks**
@@ -68,8 +68,8 @@ unchanged.
 - [x] **CK-07R1A — Correct hosted lifecycle tail** · Accepted/merged at `4d807495`; exact-main verified · [packet](tasks/ck-07r1a-correct-hosted-lifecycle-tail.md)
 - [x] **CK-07R1A0 — Freeze lifecycle planner/recovery path authority** · Path, finite source/runtime, run-invocation authority, and argv-correction authority merged through `479cbdb`; retained witnesses remain read-only · [packet](tasks/ck-07r1a0-freeze-lifecycle-path-authority.md)
 - [ ] **CK-07R1 — Correct lifecycle preparation scale** · Conditional Ready after argv authority merge `479cbdb`, coordinator disposition of the preserved `prelaunch_failed` witness incident, and a clean exact-main reapplication path; only the existing worker may resume and no launch is yet authorized; PR #394 is stale read-only · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
-- [ ] **CK-QG1A — Correct page-executor complexity** · Conditional Ready after CK-QG1A0 exact-main · [packet](tasks/ck-qg1a-correct-page-executor-complexity.md)
-- [ ] **CK-QG1 — Enforce replacement-kernel maintainability** · Blocked on CK-QG1A and refresh of existing PR #392 on corrected main · [packet](tasks/ck-qg1-enforce-agent-kernel-maintainability.md)
+- [x] **CK-QG1A — Correct page-executor complexity** · PR #408 merged/exact-main `30983d4`; authorized successor `9e80c867…` accepted without behavior or baseline change · [packet](tasks/ck-qg1a-correct-page-executor-complexity.md)
+- [ ] **CK-QG1 — Enforce replacement-kernel maintainability** · Ready to refresh existing PR #392 from corrected exact main with the frozen baseline unchanged · [packet](tasks/ck-qg1-enforce-agent-kernel-maintainability.md)
 - [ ] **CK-08R4 — Reclassify physical named plans** · Blocked on CK-08R1/R2/R3 and CK-07R1 · [packet](tasks/ck-08r4-reclassify-physical-plans.md)
 - [ ] **CK-08RG — Authorize CK-09 resumption** · Blocked on CK-08R4 and CK-QG1 · [packet](tasks/ck-08rg-authorize-ck09-resumption.md)
 

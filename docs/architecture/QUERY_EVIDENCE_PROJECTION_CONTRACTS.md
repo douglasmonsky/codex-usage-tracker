@@ -161,8 +161,10 @@ qualify publication-valid lifecycle preparation. CK-08R4 alone may classify a
 plan as direct-page, evidence-page, or projection-required. CK-09 may admit
 only the resulting measured residual list after CK-08RG.
 
-CK-QG1A0 gates the selected PageExecutor successor. Exact-main QG1A then fixes
-R2 rank-D findings; R2 semantics, evidence, thresholds, baseline, and generic-drift
+CK-QG1A0 gated the selected PageExecutor successor. CK-QG1A removed R2's
+rank-D findings and is accepted at exact main
+`30983d4b5005e7e2a507757c76a3c05ab56281e6`; existing QG1 PR #392 is Ready
+to resume. R2 semantics, evidence, thresholds, baseline, and generic-drift
 prohibition remain binding.
 
 CK-07R1A is a separate lifecycle-performance lock: preserve the first hosted

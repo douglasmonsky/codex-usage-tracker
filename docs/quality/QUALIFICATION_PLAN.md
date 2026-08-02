@@ -47,7 +47,7 @@ paging, so they admit neither projections nor CK-09.
 
 R1A freezes Q-REV-03/Q-WF-02 and executable transitive closure before parallel
 R1B/C and final two-lane R1 replay. R3 scale awaits merged/exact-main R3A.
-QG1 PR #392 awaits CK-QG1A0 exact-main, then QG1A fixes only R2's two rank-D findings against its unchanged baseline. CK-07R1A preserves the first hosted Python
+CK-QG1A removed only R2's two rank-D findings against its unchanged baseline and is accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`; existing QG1 PR #392 is Ready to resume from corrected main. CK-07R1A preserves the first hosted Python
 3.14 `ordinary.2000_call_tail` failure and
 `5000/120000/100/500/500` budgets; only a controlled material correction can
 resume PR #394. Stale, grading-dependent, retried-only, or waived evidence
