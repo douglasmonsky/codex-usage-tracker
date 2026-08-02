@@ -58,6 +58,25 @@ class PhysicalPlanGapError(PhysicalPageError):
     """A named plan has no admitted bounded direct-page implementation."""
 
 
+def _validate_request_identity(
+    plan_id: str,
+    publication_id: str,
+    request_digest: str,
+) -> None:
+    for label, value in (
+        ("plan_id", plan_id),
+        ("publication_id", publication_id),
+        ("request_digest", request_digest),
+    ):
+        if not isinstance(value, str) or not value:
+            raise PhysicalPageError(f"{label} must be non-empty text")
+    if (
+        len(request_digest) != 64
+        or any(character not in "0123456789abcdef" for character in request_digest)
+    ):
+        raise PhysicalPageError("request_digest must be a lowercase SHA-256 digest")
+
+
 @dataclass(frozen=True, slots=True)
 class PageExecutionRequest:
     """The frozen CK-08R0 physical page request plus typed plan parameters."""
@@ -73,18 +92,11 @@ class PageExecutionRequest:
     parameters: Mapping[str, Any] = MappingProxyType({})
 
     def __post_init__(self) -> None:
-        for label, value in (
-            ("plan_id", self.plan_id),
-            ("publication_id", self.publication_id),
-            ("request_digest", self.request_digest),
-        ):
-            if not isinstance(value, str) or not value:
-                raise PhysicalPageError(f"{label} must be non-empty text")
-        if (
-            len(self.request_digest) != 64
-            or any(character not in "0123456789abcdef" for character in self.request_digest)
-        ):
-            raise PhysicalPageError("request_digest must be a lowercase SHA-256 digest")
+        _validate_request_identity(
+            self.plan_id,
+            self.publication_id,
+            self.request_digest,
+        )
         if (
             isinstance(self.plan_version, bool)
             or not isinstance(self.plan_version, int)
