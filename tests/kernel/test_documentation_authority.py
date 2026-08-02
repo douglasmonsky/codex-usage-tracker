@@ -175,7 +175,19 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest_match is not None
     manifest = json.loads(manifest_match.group(1))
     assert manifest["schema"] == "codex-usage-tracker.remaining-delegation-dag.v1"
-    assert manifest["orchestration"]["spawn"] == "all_newly_ready_successors"
+    assert manifest["orchestration"] == {
+        "mode": "self-propagating-convergence",
+        "spawn": "newly_ready_distinct_packets_only",
+        "join": "all_dependencies_complete",
+        "duplicate_policy": "one_active_task_per_packet_and_dependency_frontier",
+        "continuation_policy": "reuse_existing_task_for_same_packet",
+        "authority_policy": "new_task_only_for_new_policy_or_contract_decision",
+        "handoff_policy": "proactive_parent_handoff_from_repository_verified_state",
+        "identity_policy": "exact_main_and_repository_paths_receiver_recomputes_digests",
+        "one_shot_policy": "real_non_consuming_preflight_before_authorized_attempt",
+        "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
+        "blocked_policy": "spawn_none_and_report_to_orchestrator",
+    }
     conditional_ready = {"CK-07R1", "CK-08R1A", "CK-08R3A", "CK-QG1A"}
     blocked: set[str] = set()
     assert manifest["completed"] == [
@@ -200,8 +212,9 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         },
         {
             "condition": (
-                "Finite CK-07R1 source/runtime authority accepted, merged, and exact-main verified; "
-                "resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; no replacement or downstream task"
+                "ARGV authority accepted at 479cbdb; coordinator records the preserved prelaunch incident "
+                "disposition and a clean exact-main reapplication path; resume only existing worker "
+                "019fbfe2-8fe4-7de2-9264-d58572366727; no replacement, launch, or downstream task"
             ),
             "tasks": ["CK-07R1"],
         },

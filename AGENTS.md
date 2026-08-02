@@ -35,8 +35,10 @@ disjoint R1B/R1C implementation and final R1 requalification. CK-QG1A must
 remove two R2 page-executor complexity findings without changing behavior or
 the frozen baseline before existing QG1 PR #392 resumes. CK-07R1A corrected
 the exact hosted Python 3.14 lifecycle-tail blocker; the linked CK-07R1A0
-source-digest authority must be merged and exact-main verified before the
-existing CK-07R1 worker may resume. PR #394 remains stale failed read-only.
+authorities, including argv correction, are merged through `479cbdb`. The
+existing CK-07R1 worker remains stopped pending coordinator disposition of the
+preserved `prelaunch_failed` witness incident and a clean exact-main
+reapplication path. PR #394 remains stale failed read-only.
 Retained R3 evidence proved the EvidenceService outer query
 physically unbounded; CK-08R3A owns that isolated fix and R3 awaits its
 accepted, merged, exact-main-verified result.
@@ -79,17 +81,48 @@ affected seam against the actual downstream implementation.
 
 ## Packet task handoff
 
-Keep each child packet in a user-owned Codex task; freezing and implementation
-are separate. Follow the machine DAG in
-`docs/roadmap/REMAINING_EXECUTION_PLAN.md`.
+Operate in convergence mode: one durable coordinator, one existing user-owned
+task per active child packet, and at most one shared-authority task. A new
+user-owned task is justified only for a newly Ready distinct packet, a
+genuinely independent parallel lane, or a new policy/contract decision that
+cannot be resolved inside the active packet's accepted authority. Reuse the
+existing packet task for ordinary implementation defects, tests, environment
+setup, validation corrections, review findings, and exact-main reapplication.
+Do not split freezing and implementation mechanically.
 
-After acceptance, merge, and exact-main verification, reconcile packet/DAG/
-ledger and `create_thread` every uncreated newly Ready successor in the saved
-project. Fan out independent work; hold joins; deduplicate packet/frontier.
-Use `<role> <short-scope>` names, never sub-agents. Hand off exact SHA, packet,
-acceptance, locks, artifacts/digests, consumer/truth seams, checks, failures,
-risks, stop conditions, and orchestrator task ID. Verify delivery; do not
-implement successors. Blocked, gated, or unverified work spawns none.
+Follow the machine DAG in `docs/roadmap/REMAINING_EXECUTION_PLAN.md`. After
+acceptance, merge, and exact-main verification, the coordinator reconciles the
+packet/DAG/ledger and creates only uncreated newly Ready distinct packets.
+Fan out only disjoint work, hold joins, and deduplicate packet/frontier.
+Blocked, gated, incident-pending, or unverified work creates no successor.
+
+Use bounded subagents inside an active task for focused read-only research,
+tests, or one independent review when they materially help. Keep durable
+cross-task ownership with the coordinator. Sol at medium reasoning is the
+default coordinator profile for collision handling and readiness judgment;
+bounded deterministic workers should normally use the less costly Luna profile
+at max reasoning, escalating only when ambiguity requires it.
+
+Use `<role> <short-scope>` task names. Every delegation names its parent thread
+ID. As its final action on completion, blocking, or fail-closed stop, the task
+must proactively message the parent with outcome, exact base/head and
+worktree, changed scope, validation, PR/merge/exact-main state, blockers, and
+the next authorized action. The parent treats that handoff as a continuation
+trigger; it does not create polling or wait-only tasks.
+
+Repository exact-main state and repository-relative artifact paths are the
+identity source of truth. The receiving task recomputes hashes from those paths
+before acting. Do not relay long hashes, commands, or fixture identities
+through multiple task prompts when they can be verified from committed
+manifests. Before a one-shot or irreversible operation, run a real
+non-consuming integration preflight through the exact entry point and process
+boundary, not only a stubbed or in-process proof.
+
+Classify blockers as implementation, authority, environment, or external. An
+implementation bug stays in the active packet task. Create a corrective
+authority task only when a genuinely new policy or contract decision is
+required. Once crash integrity is restored, leave recovery mode and return to
+this convergence topology.
 
 ## Implementation boundary
 
