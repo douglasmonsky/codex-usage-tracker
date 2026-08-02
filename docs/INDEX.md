@@ -28,13 +28,16 @@ CK-07R1A0 is accepted at exact main `519b503aa3b23019033b6481687c08b23fc6c31e`.
 Its transition authority makes the planner-valid receipt a CK-07R1 successor
 acceptance output rather than a pre-dispatch dependency. PR #394 remains a
 stale failed read-only witness; it is not updated, rerun, or merged. CK-07R1
-is held behind the linked [source-digest authority](decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json),
-which freezes predecessor `408d18e4…` to the permitted successor
-`d192c858…` and requires exact-main worker revalidation before any one-run
-gate can be considered. CK-07R1 is Conditional Ready only after that
-source-digest authority merges and exact-main verifies; no other successor is
-advanced and the one-run gate remains unspent. Reclassification and
-maintainability remain open. The central authority is
+is held behind the linked [source-digest authority](decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json)
+and [run-invocation authority](decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json)
+(`docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json`).
+The source authority freezes predecessor `408d18e4…` to the permitted
+successor `d192c858…`; the run authority freezes the exact launch, fixture,
+evidence, token, and no-retry contract. The retained candidate is explicitly
+blocked because it cannot support that launch contract without behavioral
+implementation. CK-07R1 remains blocked, no run token is consumed, no other
+successor is advanced, and the one-run gate remains unspent. Reclassification
+and maintainability remain open. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
 
 ## Authority set
