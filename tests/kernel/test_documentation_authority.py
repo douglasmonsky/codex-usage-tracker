@@ -195,6 +195,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest["completed"] == [
         "CK-08R0",
         "CK-08R1A",
+        "CK-08R1C",
         "CK-08R2",
         "CK-QG1A0",
         "CK-QG1A",
@@ -208,8 +209,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert hashlib.sha256(qg1a_source.read_bytes()).hexdigest() == (
         qg1a_authority["selected_successor"]["sha256"]
     )
-    ready = {"CK-08R1B", "CK-08R1C", "CK-QG1"}
-    assert manifest["ready"] == ["CK-08R1B", "CK-08R1C", "CK-QG1"]
+    ready = {"CK-QG1"}
+    assert manifest["ready"] == ["CK-QG1"]
     assert manifest["conditional_ready"] == [
         {
             "condition": (
@@ -230,7 +231,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert "Completed packets: **14 / 22**" in ledger
     assert "Not started: **8**" in ledger
     assert "Critical-path completion: **14 / 21**" in ledger
-    assert "Blocked child tasks: **38" in ledger
+    assert "Blocked child tasks: **39" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
         f"Conditional-ready child tasks: **{sum(len(item['tasks']) for item in manifest['conditional_ready'])}"
@@ -325,7 +326,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             assert "**Status:** Ready" in body
         elif packet_id in blocked:
             assert "**Status:** Blocked" in body
-        elif packet_id in {"CK-08R0", "CK-08R1A", "CK-08R2", "CK-QG1A0", "CK-QG1A", "CK-07R1A", "CK-07R1A0"}:
+        elif packet_id in {"CK-08R0", "CK-08R1A", "CK-08R1C", "CK-08R2", "CK-QG1A0", "CK-QG1A", "CK-07R1A", "CK-07R1A0"}:
             assert "**Status:** Completed on merge" in body
         else:
             assert "**Status:** Blocked" in body

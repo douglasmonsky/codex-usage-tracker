@@ -1,6 +1,6 @@
 # CK-08R1 — Requalify independent answer truth
 
-**Status:** Blocked on CK-08R1B and CK-08R1C
+**Status:** Blocked on CK-08R1B; CK-08R1C accepted
 
 **Parent:** Corrective prerequisite for CK-09
 

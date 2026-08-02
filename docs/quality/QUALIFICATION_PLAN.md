@@ -46,7 +46,9 @@ paging, so they admit neither projections nor CK-09.
 ### Corrective interpretation and immutable parallel qualification
 
 R1A freezes Q-REV-03/Q-WF-02 and executable transitive closure before parallel
-R1B/C and final two-lane R1 replay. R3 scale awaits merged/exact-main R3A.
+R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`;
+R1B remains held on shared query/evidence/grading integration before final
+two-lane R1 replay. R3 scale awaits merged/exact-main R3A.
 CK-QG1A removed only R2's two rank-D findings against its unchanged baseline and is accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`; existing QG1 PR #392 is Ready to resume from corrected main. CK-07R1A preserves the first hosted Python
 3.14 `ordinary.2000_call_tail` failure and
 `5000/120000/100/500/500` budgets; only a controlled material correction can
