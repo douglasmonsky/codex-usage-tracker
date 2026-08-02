@@ -748,6 +748,8 @@ CK07R1A0_AUTHORITY_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.json",
         "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.schema.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
     }
 )
 

@@ -33,8 +33,10 @@ corrective proof. CK-08R0 froze `corrective-gates-v1`; CK-08R2 is complete and
 CK-09 remains blocked. CK-08R1A freezes corrected answer meaning before
 disjoint R1B/R1C implementation and final R1 requalification. CK-QG1A must
 remove two R2 page-executor complexity findings without changing behavior or
-the frozen baseline before existing QG1 PR #392 resumes. CK-07R1A must correct
-the exact hosted Python 3.14 lifecycle-tail blocker before PR #394 resumes.
+the frozen baseline before existing QG1 PR #392 resumes. CK-07R1A corrected
+the exact hosted Python 3.14 lifecycle-tail blocker; the linked CK-07R1A0
+source-digest authority must be merged and exact-main verified before the
+existing CK-07R1 worker may resume. PR #394 remains stale failed read-only.
 Retained R3 evidence proved the EvidenceService outer query
 physically unbounded; CK-08R3A owns that isolated fix and R3 awaits its
 accepted, merged, exact-main-verified result.

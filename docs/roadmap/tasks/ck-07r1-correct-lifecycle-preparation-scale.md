@@ -1,6 +1,6 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** Conditional Ready after this authority merges and exact-main verifies
+**Status:** Conditional Ready after the source-digest authority merges and exact-main verifies; worker pre-run gates remain required
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -22,9 +22,11 @@ production-shaped preparation attempt exceeded 15 minutes.
 contracts.
 
 **Dependencies:** CK-07R1A accepted, merged, and exact-main verified at
-`4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 accepted at exact main
-`519b503aa3b23019033b6481687c08b23fc6c31e`; and this transition authority
-accepted, merged, and exact-main verified. PR #394 head
+`4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 path authority accepted
+at exact main `519b503aa3b23019033b6481687c08b23fc6c31e`; and the linked
+source-digest authority accepted, merged, and exact-main verified. The worker
+must then start from that exact merged main and reapply the retained candidate,
+revalidating predecessor and successor digests before any end-to-end run. PR #394 head
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` is a stale failed read-only
 witness and is not refreshed, rerun, or merged.
 
@@ -38,11 +40,13 @@ database postconditions.
 
 **Consumer seam:** Preparation to `PublicationWriter` to read-only publication.
 
-**Parallelism:** Create exactly one fresh CK-07R1 successor only after this
-authority merges and exact-main verifies, starting from that exact main. The
-planner-valid receipt is produced by that successor and is required for its
-acceptance, not for its creation or dispatch; other corrective locks stay
-disjoint and no downstream packet becomes Ready here.
+**Parallelism:** Resume only the existing CK-07R1 worker after this authority
+merges and exact-main verifies, using an exact-main START, a fresh worktree,
+and deliberate reapplication of the retained candidate. Never rebase, stash,
+reset, clean, delete, overwrite, or mutate the witness; do not create a
+replacement worker task. The planner-valid receipt is produced by that worker
+and is required for acceptance, not for authority completion; other corrective
+locks stay disjoint and no downstream packet becomes Ready here.
 
 **Non-goals:** Writer/pointer/schema redesign, facts, projections, or budget
 waivers.
@@ -56,10 +60,11 @@ standard/production fixtures, five unprofiled samples, 30-day/all-time gates,
 
 **Acceptance:** Work is linear in observations plus prior transitions and all
 publication-valid scale gates pass through the CK-07R1A0 reachable path. The
-successor must produce the planner-valid receipt, bind every frozen path and
-prior identity, and consume at most one new end-to-end run. Receipt absence
-before dispatch is not a blocker; receipt absence or invalidity at successor
-acceptance remains fail-closed.
+existing worker must revalidate the exact predecessor-to-successor digest
+transition, bind every frozen path and prior identity, produce the
+planner-valid receipt, and consume at most one new end-to-end run. Receipt
+absence before dispatch is not a blocker; receipt absence or invalidity at
+successor acceptance remains fail-closed.
 
 **Failure/rollback:** Retain the profile and create one narrow follow-up for a
 new dominant blocker; never weaken the gate.

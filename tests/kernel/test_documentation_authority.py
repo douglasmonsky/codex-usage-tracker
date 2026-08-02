@@ -198,7 +198,10 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "tasks": ["CK-QG1A"],
         },
         {
-            "condition": "CK-07R1 transition authority accepted, merged, and exact-main verified",
+            "condition": (
+                "CK-07R1/CK-07R1A0 source-digest authority accepted, merged, and "
+                "exact-main verified; worker pre-run gates remain required"
+            ),
             "tasks": ["CK-07R1"],
         },
     ]
@@ -531,7 +534,10 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert "strict Authority v2" in ck07r1a0
     assert "supersedes earlier CK-07R1 wording" in central
     assert "Blocked on CK-QG1A" in ckqg1
-    assert "Conditional Ready after this authority merges and exact-main verifies" in ck07r1
+    assert (
+        "Conditional Ready after the source-digest authority merges and exact-main verifies"
+        in ck07r1
+    )
 
 
 def test_ck07r1a0_authority_is_strict_and_preserves_attempt_identity() -> None:
@@ -678,6 +684,74 @@ def test_ck07r1a0_authority_is_strict_and_preserves_attempt_identity() -> None:
     assert list(validator.iter_errors(changed))
     changed = json.loads(json.dumps(authority))
     changed["scope_additions"][0]["sha256"] = "0" * 64
+    assert list(validator.iter_errors(changed))
+
+
+def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
+    authority_path = "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json"
+    schema = _json(
+        "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json"
+    )
+    authority = _json(authority_path)
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema)
+    validator.validate(authority)
+
+    assert authority["predecessor"]["sha256"] == (
+        "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"
+    )
+    assert authority["selected_successor"]["sha256"] == (
+        "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1"
+    )
+    assert authority["selected_successor"]["status"] == "permitted_not_accepted"
+    assert authority["allowed_scope"]["lifecycle_symbols"] == [
+        "codex_usage_tracker.agent_kernel.publication.preparation._WriteSetPreparer._build_lifecycle"
+    ]
+    assert authority["reachable_consumer_path"]["mismatch_result"].startswith(
+        "fail_closed"
+    )
+    assert authority["independent_truth"]["reference_symbol"] == "fold_lifecycle"
+    assert authority["worker_revalidation"]["required"] is True
+    assert authority["worker_revalidation"]["different_digest"] == "fail_closed"
+    assert authority["maximum_new_end_to_end_runs"] == 1
+    assert authority["run_status"] == "unspent_unavailable"
+    assert authority["preserved_authority"]["writer_only_receipt_digest"] == (
+        "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d"
+    )
+    assert authority["runtime_budgets_ms"] == {
+        "first_publication_30_day": 5000,
+        "production_all_time": 120000,
+        "no_change": 100,
+        "one_call_tail": 500,
+        "one_tool_tail": 500,
+    }
+    assert authority["package_ceilings_bytes"] == {"sdist": 2_000_000, "wheel": 1_000_000}
+
+    source = _REPO_ROOT / authority["source_path"]
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == authority["predecessor"]["sha256"]
+    preserved = _REPO_ROOT / authority["preserved_authority"]["path"]
+    assert hashlib.sha256(preserved.read_bytes()).hexdigest() == authority["preserved_authority"]["sha256"]
+
+    for section, field, value in (
+        ("predecessor", "sha256", "0" * 64),
+        ("selected_successor", "sha256", "0" * 64),
+        ("selected_successor", "status", "accepted"),
+        ("selected_successor", "base_sha", "0" * 40),
+        ("worker_revalidation", "different_digest", "allow"),
+        ("preserved_authority", "writer_only_receipt_digest", "0" * 64),
+        ("run_status", None, "authorized"),
+    ):
+        changed = json.loads(json.dumps(authority))
+        if field is None:
+            changed[section] = value
+        else:
+            changed[section][field] = value
+        assert list(validator.iter_errors(changed))
+
+    changed = json.loads(json.dumps(authority))
+    changed["allowed_scope"]["files"].append(
+        "src/codex_usage_tracker/agent_kernel/publication/writer.py"
+    )
     assert list(validator.iter_errors(changed))
 
 
