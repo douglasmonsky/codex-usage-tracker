@@ -176,8 +176,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     manifest = json.loads(manifest_match.group(1))
     assert manifest["schema"] == "codex-usage-tracker.remaining-delegation-dag.v1"
     assert manifest["orchestration"]["spawn"] == "all_newly_ready_successors"
-    conditional_ready = {"CK-08R1A", "CK-08R3A", "CK-QG1A"}
-    blocked = {"CK-07R1"}
+    conditional_ready = {"CK-07R1", "CK-08R1A", "CK-08R3A", "CK-QG1A"}
+    blocked: set[str] = set()
     assert manifest["completed"] == [
         "CK-08R0",
         "CK-08R2",
@@ -198,12 +198,19 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "condition": "CK-QG1A0 merged and exact-main verified",
             "tasks": ["CK-QG1A"],
         },
+        {
+            "condition": (
+                "Finite CK-07R1 source/runtime authority accepted, merged, and exact-main verified; "
+                "resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; no replacement or downstream task"
+            ),
+            "tasks": ["CK-07R1"],
+        },
     ]
-    assert manifest["blocked"] == ["CK-07R1"]
+    assert manifest["blocked"] == []
     assert "Completed packets: **14 / 22**" in ledger
     assert "Not started: **8**" in ledger
     assert "Critical-path completion: **14 / 21**" in ledger
-    assert "Blocked child tasks: **42" in ledger
+    assert "Blocked child tasks: **41" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
         f"Conditional-ready child tasks: **{sum(len(item['tasks']) for item in manifest['conditional_ready'])}"
@@ -519,7 +526,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
                 "fold_lifecycle",
                 "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d",
                 "one-run authorization condition",
-                "CK-07R1 remains blocked",
+                "CK-07R1 is Conditional Ready",
                 "run-invocation authority",
                 "The planner-valid receipt is a future successor acceptance",
                 "stale failed PR #394 is explicitly superseded read-only",
@@ -531,7 +538,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert "strict Authority v2" in ck07r1a0
     assert "supersedes earlier CK-07R1 wording" in central
     assert "Blocked on CK-QG1A" in ckqg1
-    assert "Blocked pending the reconciled source-digest/run-invocation authority" in ck07r1
+    assert "Conditional Ready after the finite source/runtime state authority" in ck07r1
     assert "720-second wrapper timeout" in ck07r1a0
     assert "revoked, never authoritative, and never used" in ck07r1a0
 
@@ -693,6 +700,9 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     validator = Draft202012Validator(schema)
     validator.validate(authority)
 
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-source-digest-authority.v2"
+    assert authority["authority_version"] == 2
+    assert authority["authority_base_sha"] == "a0d8770bad7d59b92b3f299186bfefa28bd5457c"
     assert authority["predecessor"]["sha256"] == (
         "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"
     )
@@ -749,6 +759,21 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     }
     assert authority["package_ceilings_bytes"] == {"sdist": 2_000_000, "wheel": 1_000_000}
 
+    binding = authority["state_machine_binding"]
+    assert binding["current_state"] == "authority_main"
+    assert [state["name"] for state in binding["states"]] == [
+        "authority_main",
+        "worker_prequalification",
+        "post_single_run",
+        "final_accepted",
+    ]
+    assert binding["states"][0]["source_sha256"] == authority["predecessor"]["sha256"]
+    assert binding["states"][1]["source_sha256"] == authority["selected_successor"]["sha256"]
+    assert binding["states"][1]["runtime_acceptance"] == "not_claimed"
+    assert binding["other_digest"] == "fail_closed"
+    assert binding["current_runtime_claim"] == "not_claimed"
+    assert "does not advance" in binding["preserved_path_authority"]
+
     source = _REPO_ROOT / authority["source_path"]
     assert hashlib.sha256(source.read_bytes()).hexdigest() == authority["acceptance_state"]["live_source_sha256"]
     assert authority["acceptance_state"]["live_source_sha256"] == authority["predecessor"]["sha256"]
@@ -768,6 +793,8 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
         ("worker_revalidation", "different_digest", "allow"),
         ("preserved_authority", "writer_only_receipt_digest", "0" * 64),
         ("run_status", None, "authorized"),
+        ("state_machine_binding", "current_state", "worker_prequalification"),
+        ("state_machine_binding", "other_digest", "allow"),
     ):
         changed = json.loads(json.dumps(authority))
         if field is None:
@@ -775,6 +802,14 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
         else:
             changed[section][field] = value
         assert list(validator.iter_errors(changed))
+
+    changed = json.loads(json.dumps(authority))
+    changed["state_machine_binding"]["states"][0]["source_sha256"] = authority["selected_successor"]["sha256"]
+    assert list(validator.iter_errors(changed))
+
+    changed = json.loads(json.dumps(authority))
+    changed["state_machine_binding"]["states"][1]["source_sha256"] = "0" * 64
+    assert list(validator.iter_errors(changed))
 
     changed = json.loads(json.dumps(authority))
     changed["allowed_scope"]["files"].append(

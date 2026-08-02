@@ -71,6 +71,7 @@ def test_command_cwd_interpreter_environment_and_output_are_exact() -> None:
 def test_selected_candidate_and_aggregate_timeout_are_reconciled_without_runtime_acceptance() -> None:
     authority = _authority()
     assert authority["status"] == "authority_reconciled_no_run"
+    assert authority["authority_base_sha"] == "a0d8770bad7d59b92b3f299186bfefa28bd5457c"
     assert authority["selected_candidate"] == {
         "status": "reconciled_no_run",
         "base_sha": "bdf545127b9cda20d22e00e9e9abb74c9550a470",
@@ -120,6 +121,124 @@ def test_selected_candidate_and_aggregate_timeout_are_reconciled_without_runtime
             "one_tool_tail": 500,
         },
     }
+
+
+def test_finite_source_runtime_state_machine_is_exact_and_currently_unlaunched() -> None:
+    machine = _authority()["lifecycle_state_machine"]
+    assert machine["current_state"] == "authority_main"
+    assert [state["name"] for state in machine["states"]] == [
+        "authority_main",
+        "worker_prequalification",
+        "post_single_run",
+        "final_accepted",
+    ]
+    assert machine["states"][0] == {
+        "name": "authority_main",
+        "source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+        "source_role": "live_predecessor",
+        "runtime_acceptance": "not_claimed",
+        "receipt_policy": "receipt_absent_and_non_qualifying",
+        "evidence_identity_policy": "not_available",
+        "merge_policy": "current_authority_state",
+    }
+    assert machine["states"][1]["source_sha256"] == (
+        "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1"
+    )
+    assert machine["states"][1]["runtime_acceptance"] == "not_claimed"
+    assert machine["states"][2]["receipt_policy"] == "complete_planner_valid_receipt_required"
+    assert machine["states"][2]["evidence_identity_policy"] == (
+        "bind_exact_dynamic_receipt_and_evidence_identity"
+    )
+    assert machine["states"][3]["merge_policy"] == (
+        "worker_pr_squash_merge_and_exact_main_verification_required"
+    )
+    assert [transition["from"] + "->" + transition["to"] for transition in machine["transitions"]] == [
+        "authority_main->worker_prequalification",
+        "worker_prequalification->post_single_run",
+        "post_single_run->final_accepted",
+    ]
+    assert machine["dynamic_receipt_identity"]["required_fields"] == [
+        "run_token_id",
+        "receipt_schema",
+        "workload_transition_digest",
+        "publication_digest",
+        "ledger_file_sha256",
+        "stdout_sha256",
+        "stderr_sha256",
+        "output_sha256",
+        "launch_pid",
+        "launch_cwd",
+        "launch_argv",
+    ]
+    assert machine["dynamic_receipt_identity"]["ledger_path"] == (
+        "output/ck07r1/lifecycle-requalification-v1.launch-token.json"
+    )
+    assert machine["dynamic_receipt_identity"]["identity_paths"] == {
+        "run_token_id": "ledger.run_token_id",
+        "receipt_schema": "ledger.receipt.schema",
+        "workload_transition_digest": "ledger.receipt.workload_transition_digest",
+        "publication_digest": "ledger.receipt.publication_digest",
+        "ledger_file_sha256": (
+            "sha256(exact ledger file bytes at "
+            "output/ck07r1/lifecycle-requalification-v1.launch-token.json)"
+        ),
+        "stdout_sha256": "ledger.evidence.stdout_sha256",
+        "stderr_sha256": "ledger.evidence.stderr_sha256",
+        "output_sha256": "ledger.evidence.output_sha256",
+        "launch_pid": "ledger.process.pid",
+        "launch_cwd": "ledger.process.cwd",
+        "launch_argv": "ledger.process.argv",
+    }
+    assert machine["dynamic_receipt_identity"]["mismatch"] == "fail_closed"
+    assert "authority_main->final_accepted" in machine["forbidden_transitions"]
+
+
+def test_dynamic_receipt_identity_uses_only_frozen_ledger_paths() -> None:
+    identity = _authority()["lifecycle_state_machine"]["dynamic_receipt_identity"]
+    ledger = {
+        "run_token_id": "synthetic-run-token",
+        "receipt": {
+            "schema": "synthetic-receipt-schema",
+            "workload_transition_digest": "a" * 64,
+            "publication_digest": "b" * 64,
+        },
+        "evidence": {
+            "stdout_sha256": "c" * 64,
+            "stderr_sha256": "d" * 64,
+            "output_sha256": "e" * 64,
+        },
+        "process": {
+            "pid": 123,
+            "cwd": "/synthetic/repository",
+            "argv": [".venv/bin/python", "scripts/benchmark_ck07r1_lifecycle_scale.py"],
+        },
+    }
+    resolved_fields = {
+        "run_token_id": ledger["run_token_id"],
+        "receipt_schema": ledger["receipt"]["schema"],
+        "workload_transition_digest": ledger["receipt"]["workload_transition_digest"],
+        "publication_digest": ledger["receipt"]["publication_digest"],
+        "stdout_sha256": ledger["evidence"]["stdout_sha256"],
+        "stderr_sha256": ledger["evidence"]["stderr_sha256"],
+        "output_sha256": ledger["evidence"]["output_sha256"],
+        "launch_pid": ledger["process"]["pid"],
+        "launch_cwd": ledger["process"]["cwd"],
+        "launch_argv": ledger["process"]["argv"],
+    }
+    assert resolved_fields == {
+        "run_token_id": "synthetic-run-token",
+        "receipt_schema": "synthetic-receipt-schema",
+        "workload_transition_digest": "a" * 64,
+        "publication_digest": "b" * 64,
+        "stdout_sha256": "c" * 64,
+        "stderr_sha256": "d" * 64,
+        "output_sha256": "e" * 64,
+        "launch_pid": 123,
+        "launch_cwd": "/synthetic/repository",
+        "launch_argv": [".venv/bin/python", "scripts/benchmark_ck07r1_lifecycle_scale.py"],
+    }
+    assert "ledger_file_sha256" not in ledger
+    assert identity["source"].startswith("the frozen launch ledger")
 
 
 def test_fixture_identity_vocabulary_and_static_file_shas_are_distinct_and_proven() -> None:
@@ -304,13 +423,28 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
         ("seed", ("launch_contract", "profiles", "seed"), 42),
         ("reachable-path", ("launch_contract", "reachable_path", "ordered_steps", 2), "direct writer"),
         ("generic-drift", ("preserved_history", "source_predecessor_sha256"), "0" * 64),
+        ("current-state", ("lifecycle_state_machine", "current_state"), "worker_prequalification"),
+        ("successor-drift", ("lifecycle_state_machine", "states", 1, "source_sha256"), "0" * 64),
+        ("receipt-bypass", ("lifecycle_state_machine", "states", 2, "receipt_policy"), "optional"),
+        ("post-run-no-receipt-qualification", ("lifecycle_state_machine", "states", 2, "runtime_acceptance"), "accepted"),
+        ("final-no-receipt-acceptance", ("lifecycle_state_machine", "states", 3, "receipt_policy"), "optional"),
+        ("final-no-evidence-acceptance", ("lifecycle_state_machine", "states", 3, "evidence_identity_policy"), "not_available"),
+        ("final-merge-bypass", ("lifecycle_state_machine", "states", 3, "merge_policy"), "optional"),
+        ("transition-bypass", ("lifecycle_state_machine", "transitions", 0, "to"), "final_accepted"),
+        ("receipt-path-drift", ("lifecycle_state_machine", "dynamic_receipt_identity", "identity_paths", "output_sha256"), "receipt.output_file_sha256"),
+        ("receipt-ledger-drift", ("lifecycle_state_machine", "dynamic_receipt_identity", "ledger_path"), "output/other.json"),
+        ("fixture-inventory-omission", ("launch_contract", "fixture_identity", "fixture_files", 0), None),
+        ("fixture-inventory-digest", ("launch_contract", "fixture_identity", "fixture_files", 1, "fixture_file_sha256"), "0" * 64),
     ],
 )
 def test_negative_contract_mutations_fail_closed(
     label: str, path: tuple[str | int, ...], replacement: Any
 ) -> None:
     mutated = copy.deepcopy(_authority())
-    _set_path(mutated, path, replacement)
+    if replacement is None:
+        del mutated[path[0]][path[1]][path[2]][path[3]]
+    else:
+        _set_path(mutated, path, replacement)
     assert _errors(mutated), label
 
 

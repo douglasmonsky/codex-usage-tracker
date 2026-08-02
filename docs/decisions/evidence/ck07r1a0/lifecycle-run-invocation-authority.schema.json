@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-run-invocation-authority-v1.schema.json",
-  "title": "CK-07R1A0 lifecycle run-invocation authority",
+  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-run-invocation-authority-v2.schema.json",
+  "title": "CK-07R1A0 finite lifecycle source/runtime authority",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,6 +10,7 @@
     "owner",
     "authority_base_sha",
     "status",
+    "lifecycle_state_machine",
     "selected_candidate",
     "preserved_authorities",
     "launch_contract",
@@ -21,11 +22,123 @@
     "scope"
   ],
   "properties": {
-    "schema": {"const": "codex-usage-tracker.lifecycle-run-invocation-authority.v1"},
-    "authority_version": {"const": 1},
+    "schema": {"const": "codex-usage-tracker.lifecycle-run-invocation-authority.v2"},
+    "authority_version": {"const": 2},
     "owner": {"const": "CK-07R1A0"},
-    "authority_base_sha": {"const": "e0ee9f2cf442399633d93e402d17f527da604f0f"},
+    "authority_base_sha": {"const": "a0d8770bad7d59b92b3f299186bfefa28bd5457c"},
     "status": {"const": "authority_reconciled_no_run"},
+    "lifecycle_state_machine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["current_state", "states", "transitions", "dynamic_receipt_identity", "forbidden_transitions"],
+      "properties": {
+        "current_state": {"const": "authority_main"},
+        "states": {
+          "const": [
+            {
+              "name": "authority_main",
+              "source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+              "source_role": "live_predecessor",
+              "runtime_acceptance": "not_claimed",
+              "receipt_policy": "receipt_absent_and_non_qualifying",
+              "evidence_identity_policy": "not_available",
+              "merge_policy": "current_authority_state"
+            },
+            {
+              "name": "worker_prequalification",
+              "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+              "source_role": "selected_successor",
+              "runtime_acceptance": "not_claimed",
+              "receipt_policy": "not_yet_available",
+              "evidence_identity_policy": "not_available",
+              "merge_policy": "authority_merge_and_exact_main_required_before_entry"
+            },
+            {
+              "name": "post_single_run",
+              "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+              "source_role": "selected_successor",
+              "runtime_acceptance": "qualified_only_with_complete_planner_valid_receipt",
+              "receipt_policy": "complete_planner_valid_receipt_required",
+              "evidence_identity_policy": "bind_exact_dynamic_receipt_and_evidence_identity",
+              "merge_policy": "worker_merge_and_exact_main_required_for_final_acceptance"
+            },
+            {
+              "name": "final_accepted",
+              "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+              "source_role": "selected_successor",
+              "runtime_acceptance": "accepted_only_with_worker_merge_and_exact_main",
+              "receipt_policy": "same_complete_planner_valid_receipt_identity_required",
+              "evidence_identity_policy": "same_exact_dynamic_receipt_and_evidence_identity",
+              "merge_policy": "worker_pr_squash_merge_and_exact_main_verification_required"
+            }
+          ]
+        },
+        "transitions": {
+          "const": [
+            {
+              "from": "authority_main",
+              "to": "worker_prequalification",
+              "requires": [
+                "this authority is merged and exact-main verified",
+                "the existing worker starts from that exact main in a fresh worktree",
+                "the worker deliberately reapplies only the exact selected successor over the live predecessor",
+                "runtime_acceptance remains not_claimed",
+                "authority-integrity and prelaunch gates pass",
+                "maximum_new_end_to_end_runs remains 1 and unspent"
+              ]
+            },
+            {
+              "from": "worker_prequalification",
+              "to": "post_single_run",
+              "requires": [
+                "only the exact selected successor digest is present",
+                "exact prelaunch gates pass and one child launch consumes the run token",
+                "a complete planner-valid receipt is produced",
+                "receipt schema, static identities, workload_transition_digest, and stdout/stderr/output evidence identities validate",
+                "no retry, restart, or replacement occurs"
+              ]
+            },
+            {
+              "from": "post_single_run",
+              "to": "final_accepted",
+              "requires": [
+                "the worker PR is squash-merged",
+                "exact-main verification matches the merged worker contents",
+                "the same complete receipt and evidence identity remains bound"
+              ]
+            }
+          ]
+        },
+        "dynamic_receipt_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required_fields", "identity_paths", "ledger_path", "source", "binding", "mismatch"],
+          "properties": {
+            "required_fields": {"const": ["run_token_id", "receipt_schema", "workload_transition_digest", "publication_digest", "ledger_file_sha256", "stdout_sha256", "stderr_sha256", "output_sha256", "launch_pid", "launch_cwd", "launch_argv"]},
+            "identity_paths": {
+              "const": {
+                "run_token_id": "ledger.run_token_id",
+                "receipt_schema": "ledger.receipt.schema",
+                "workload_transition_digest": "ledger.receipt.workload_transition_digest",
+                "publication_digest": "ledger.receipt.publication_digest",
+                "ledger_file_sha256": "sha256(exact ledger file bytes at output/ck07r1/lifecycle-requalification-v1.launch-token.json)",
+                "stdout_sha256": "ledger.evidence.stdout_sha256",
+                "stderr_sha256": "ledger.evidence.stderr_sha256",
+                "output_sha256": "ledger.evidence.output_sha256",
+                "launch_pid": "ledger.process.pid",
+                "launch_cwd": "ledger.process.cwd",
+                "launch_argv": "ledger.process.argv"
+              }
+            },
+            "ledger_path": {"const": "output/ck07r1/lifecycle-requalification-v1.launch-token.json"},
+            "source": {"const": "the frozen launch ledger plus exact stdout, stderr, and output evidence; ledger_file_sha256 is computed from the final ledger bytes"},
+            "binding": {"const": "post_single_run is unavailable until every required field is present and validated"},
+            "mismatch": {"const": "fail_closed"}
+          }
+        },
+        "forbidden_transitions": {"const": ["authority_main->post_single_run", "authority_main->final_accepted", "worker_prequalification->final_accepted", "any state with an unbound or incomplete receipt->post_single_run", "any state without worker PR merge and exact-main verification->final_accepted"]}
+      }
+    },
     "selected_candidate": {
       "type": "object",
       "additionalProperties": false,
@@ -93,9 +206,9 @@
           "required": ["path", "sha256", "schema_path", "schema_sha256"],
           "properties": {
             "path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json"},
-            "sha256": {"const": "ca5391783df001447a1399c78113fcc26ef818c4bfdfd59e5a28e6e80f81ce16"},
+            "sha256": {"const": "d2c30e11792589c1c66016a253aeaa410247b75f26f5e7be9b258bf7784447d4"},
             "schema_path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json"},
-            "schema_sha256": {"const": "e8cc1f0ab316fcb840339c8ce607c8170e94c00f2627bb99a6905f34feff50b2"}
+            "schema_sha256": {"const": "4a171e1ba4d626998a9846cec3c314b304b823e9242e27054a306c2560ddd97c"}
           }
         }
       }
@@ -192,15 +305,60 @@
               }
             },
             "fixture_files": {
-              "type": "array", "minItems": 13, "maxItems": 13,
-              "items": {
-                "type": "object", "additionalProperties": false,
-                "required": ["path", "fixture_file_sha256"],
-                "properties": {
-                  "path": {"type": "string"},
-                  "fixture_file_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+              "const": [
+                {
+                  "path": "tests/agent_kernel/fixtures/profiles/standard-v1.json",
+                  "fixture_file_sha256": "ef0da880255a0b13ea6055e0f8d748870c075635aa6f199c9521462c681250f3"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/profiles/production-v1.json",
+                  "fixture_file_sha256": "2de0b4dc198603da6c1b0905b8d934e2cd5604e4036ef009d0cd07f1cc81f51b"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0000.jsonl",
+                  "fixture_file_sha256": "bad29500048dcff994d4211ff6de446c48d51184ab00caa134a7d668a6e57191"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0001.jsonl",
+                  "fixture_file_sha256": "d3ddb9592d67f058b7b7b354c7e01ff159d195c3963e0780be7a4cf35ec9a5eb"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0002.jsonl",
+                  "fixture_file_sha256": "114dadd49888fe77bfa1690b0fb810820950dea80d04ff11b233cd14bab54605"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0003.jsonl",
+                  "fixture_file_sha256": "12ccb3114f5f4583e98e6e0d8a485b2c1479762b93cd8e6008c9be14edfd2a5d"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0004.jsonl",
+                  "fixture_file_sha256": "0729952c7d2c250608ac0913a9d4a879c09b3bf252d86ee84b6b333000b66514"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0005.jsonl",
+                  "fixture_file_sha256": "cbfdfbb7f0f463c087c058b0f49cfdb6ec0ff72da5afa14d293b06a3f2ee817f"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0006.jsonl",
+                  "fixture_file_sha256": "f7693618223a2de73d5dcfc0c645f13455c480a721641b4d790c278744283729"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/tiny-v1/sources/archived/exact-copy.jsonl",
+                  "fixture_file_sha256": "34709a9e5b6c52438f7c5710c9480db9a2641fbd33e25d8e6c767c383502a65f"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/tiny-v1/sources/malformed/malformed.jsonl",
+                  "fixture_file_sha256": "cdfbf46b0d9524c5c9b16b6672eb98cd9f1b413703cd75f8ca9b833e96e5ac4d"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/tiny-v1/sources/replaced/revision-1.jsonl",
+                  "fixture_file_sha256": "de66394d849cab6e4936af84b4991e36c1cdf6746f0ab90c7c39dd1ca10761e1"
+                },
+                {
+                  "path": "tests/agent_kernel/fixtures/tiny-v1/sources/truncated/truncated.jsonl",
+                  "fixture_file_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                 }
-              }
+              ]
             },
             "dynamic_digest": {
               "type": "object", "additionalProperties": false,

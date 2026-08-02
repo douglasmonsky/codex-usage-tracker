@@ -15,8 +15,8 @@ parents are accounting umbrellas.
 - Completed corrective child tasks: **5 — CK-08R0, CK-08R2, CK-QG1A0, CK-07R1A, CK-07R1A0**
 - Remaining delegable child tasks: **45**
 - Ready child tasks: **0**
-- Conditional-ready child tasks: **3 — CK-08R1A, CK-08R3A; CK-QG1A after CK-QG1A0 exact-main**
-- Blocked child tasks: **42 — CK-07R1 pending this reconciled source-digest/run-invocation authority merge and exact-main handoff**
+- Conditional-ready child tasks: **4 — CK-07R1 after finite source/runtime authority exact-main verification; CK-08R1A, CK-08R3A; CK-QG1A after CK-QG1A0 exact-main**
+- Blocked child tasks: **41**
 
 ## Parent packets
 
@@ -61,8 +61,8 @@ other corrective locks are unchanged.
 - [ ] **CK-08R3A — Implement bounded EvidenceService physical queries** · Conditional Ready after corrective authority exact-main verification; CK-08R0 remains accepted · [packet](tasks/ck-08r3a-implement-evidence-physical-query.md)
 - [ ] **CK-08R3 — Qualify evidence service scale** · Blocked on CK-08R3A accepted merge and exact-main verification · [packet](tasks/ck-08r3-qualify-evidence-scale.md)
 - [x] **CK-07R1A — Correct hosted lifecycle tail** · Accepted/merged at `4d807495`; exact-main verified · [packet](tasks/ck-07r1a-correct-hosted-lifecycle-tail.md)
-- [x] **CK-07R1A0 — Freeze lifecycle planner/recovery path authority** · Completed on merge; exact-main verified at `519b503a`; reconciled source-digest/run-invocation authority is pending its own merge/exact-main verification · [packet](tasks/ck-07r1a0-freeze-lifecycle-path-authority.md)
-- [ ] **CK-07R1 — Correct lifecycle preparation scale** · Blocked pending this authority's merge/exact-main handoff; revalidate the retained candidate only on exact merged main; planner-valid receipt is a successor acceptance output and PR #394 is stale read-only · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
+- [x] **CK-07R1A0 — Freeze lifecycle planner/recovery path authority** · Path authority completed on merge; finite source/runtime state remains pending, and the run-invocation authority remains pending its own merge/exact-main verification · [packet](tasks/ck-07r1a0-freeze-lifecycle-path-authority.md)
+- [ ] **CK-07R1 — Correct lifecycle preparation scale** · Conditional Ready after this authority's merge/exact-main handoff; current state remains `authority_main`; revalidate the retained candidate only on exact merged main; planner-valid receipt is a successor acceptance output and PR #394 is stale read-only · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
 - [ ] **CK-QG1A — Correct page-executor complexity** · Conditional Ready after CK-QG1A0 exact-main · [packet](tasks/ck-qg1a-correct-page-executor-complexity.md)
 - [ ] **CK-QG1 — Enforce replacement-kernel maintainability** · Blocked on CK-QG1A and refresh of existing PR #392 on corrected main · [packet](tasks/ck-qg1-enforce-agent-kernel-maintainability.md)
 - [ ] **CK-08R4 — Reclassify physical named plans** · Blocked on CK-08R1/R2/R3 and CK-07R1 · [packet](tasks/ck-08r4-reclassify-physical-plans.md)

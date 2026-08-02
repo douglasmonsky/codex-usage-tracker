@@ -1,8 +1,8 @@
 {
-  "schema": "codex-usage-tracker.lifecycle-source-digest-authority.v1",
-  "authority_version": 1,
+  "schema": "codex-usage-tracker.lifecycle-source-digest-authority.v2",
+  "authority_version": 2,
   "owner": "CK-07R1A0",
-  "authority_base_sha": "d911b1f0d17596890a6a0a608be904330c96e9a6",
+  "authority_base_sha": "a0d8770bad7d59b92b3f299186bfefa28bd5457c",
   "source_path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
   "acceptance_state": {
     "status": "reconciled_no_run",
@@ -16,6 +16,41 @@
       "path": "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
       "sha256": "36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb"
     }
+  },
+  "state_machine_binding": {
+    "run_authority_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
+    "run_authority_schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
+    "current_state": "authority_main",
+    "states": [
+      {
+        "name": "authority_main",
+        "source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+        "source_role": "live_predecessor",
+        "runtime_acceptance": "not_claimed"
+      },
+      {
+        "name": "worker_prequalification",
+        "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+        "source_role": "selected_successor",
+        "runtime_acceptance": "not_claimed"
+      },
+      {
+        "name": "post_single_run",
+        "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+        "source_role": "selected_successor",
+        "runtime_acceptance": "qualified_only_with_complete_planner_valid_receipt"
+      },
+      {
+        "name": "final_accepted",
+        "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+        "source_role": "selected_successor",
+        "runtime_acceptance": "accepted_only_with_worker_merge_and_exact_main"
+      }
+    ],
+    "source_digest_rule": "authority_main may retain only the live predecessor; worker_prequalification and every later state permit only the exact selected successor",
+    "other_digest": "fail_closed",
+    "preserved_path_authority": "lifecycle-path-authority remains retained read-only path semantics and does not advance the current worker state",
+    "current_runtime_claim": "not_claimed"
   },
   "predecessor": {
     "sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",

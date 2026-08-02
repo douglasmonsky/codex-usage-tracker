@@ -1,6 +1,6 @@
 # CK-07R1A0 — Freeze lifecycle planner/recovery path authority
 
-**Status:** Completed on merge; exact-main verified at `519b503aa3b23019033b6481687c08b23fc6c31e`; reconciled source-digest and run-invocation authority is pending merge and exact-main verification, so the existing CK-07R1 worker remains held
+**Status:** Completed on merge; path authority exact-main verified at `519b503aa3b23019033b6481687c08b23fc6c31e`; finite source/runtime state authority is pending merge and exact-main verification, so the existing CK-07R1 worker remains held
 
 **Release-candidate package ceilings:** sdist remains at most 2,000,000
 bytes and wheel remains at most 1,000,000 bytes. The historical 828000/383000
@@ -43,7 +43,8 @@ The linked run-invocation authority is
 it adds no runtime implementation, freezes the 720-second wrapper timeout, and
 keeps the retained candidate runtime-unqualified.
 
-**Produces:** A frozen entry-path contract, APPEND_SAFE_SMALL selection rule,
+**Produces:** A frozen entry-path contract, finite source/runtime state machine,
+APPEND_SAFE_SMALL selection rule,
 independent lifecycle oracle/postconditions, exact source/diff identity,
 allowed lifecycle symbol/file scope, one-run authorization condition,
 preserved attempt ledger, and exact worker revalidation requirements.
@@ -80,12 +81,15 @@ or different digest drift fails closed; linked evidence is
 `36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb`; the
 wrapper timeout is exactly 720 seconds while the five budgets remain
 `5000/120000/100/500/500` ms; the malformed 62-character dispatch value is
-revoked, never authoritative, and never used; CK-07R1 remains blocked until
-the source-digest and run-invocation authorities are accepted, merged, and
-exact-main verified; every prior
-attempt and its identity/timestamp/failure remains visible; receipt
+revoked, never authoritative, and never used; the source-digest and
+run-invocation authorities must be accepted, merged, and exact-main verified
+before CK-07R1 is Conditional Ready; every prior attempt and its
+identity/timestamp/failure remains visible; receipt
 `935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d` remains
 writer-only evidence and is never reused or upgraded.
+The current finite state is `authority_main`; no worker resumes from this
+packet, no receipt can claim qualification, and final acceptance additionally
+requires worker PR merge and exact-main verification.
 
 **Required tests/checks:** Strict authority-schema and negative-mutation tests;
 DAG/ledger/status tests; exact scope-manifest tests; evidence identity and
@@ -96,7 +100,7 @@ exact-main verification.
 **Acceptance:** The authority artifact validates, exact identities and run
 accounting are preserved, only the retained CK-07R1 authority additions are
 bound, the stale failed PR #394 is explicitly superseded read-only, and CK-07R1
-remains blocked until the linked authorities merge and exact-main
+is Conditional Ready only after the linked authorities merge and exact-main
 verification. The planner-valid receipt is a future successor acceptance
 output, not a pre-dispatch dependency. This packet does not run or authorize a
 production qualification run by itself.

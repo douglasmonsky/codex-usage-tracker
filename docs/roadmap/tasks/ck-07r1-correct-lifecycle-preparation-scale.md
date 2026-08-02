@@ -1,6 +1,6 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** Blocked pending the reconciled source-digest/run-invocation authority merging and exact-main verification; worker pre-run gates remain required
+**Status:** Conditional Ready after the finite source/runtime state authority is accepted, merged, and exact-main verified; current state remains `authority_main` and worker pre-run gates remain required
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -23,9 +23,9 @@ contracts.
 
 **Dependencies:** CK-07R1A accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 path authority accepted
-at exact main `519b503aa3b23019033b6481687c08b23fc6c31e`; and the linked
-reconciled source-digest/run-invocation authority accepted, merged, and
-exact-main verified. The worker
+at exact main `519b503aa3b23019033b6481687c08b23fc6c31e`; and the linked finite
+source/runtime state authority (including the run-invocation authority) accepted,
+merged, and exact-main verified. The worker
 must then start from that exact merged main and reapply the retained candidate,
 revalidating predecessor and successor digests before any end-to-end run. PR #394 head
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` is a stale failed read-only
@@ -35,7 +35,9 @@ witness and is not refreshed, rerun, or merged.
 publication tests, profile/benchmark, and linked CK-07 evidence amendment;
 the authority reconciliation binds preparation `d192c858…`, benchmark
 `6a864c74…`, lifecycle test `a033e1c3…`, linked evidence `36eb76ca…`, and the
-720-second wrapper timeout without executing the worker.
+720-second wrapper timeout without executing the worker. The authority state is
+currently `authority_main`; worker prequalification accepts only the exact
+selected successor and does not claim runtime acceptance.
 
 **Produces:** Publication-scale requalification with equivalent fold identity.
 
@@ -60,7 +62,8 @@ bounded RSS; synthetic data; no writer recovery regression.
 
 **Required tests/checks:** Focused lifecycle/publication, equivalent results,
 standard/production fixtures, five unprofiled samples, 30-day/all-time gates,
-`just v/vc`; authority/schema/DAG/scope negative checks; no E2E run in the
+`just v/vc`; authority/schema/DAG/scope negative checks covering the finite
+state transitions; no E2E run in the
 authority reconciliation.
 
 **Acceptance:** Work is linear in observations plus prior transitions and all

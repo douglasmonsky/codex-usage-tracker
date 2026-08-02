@@ -1,9 +1,123 @@
 {
-  "schema": "codex-usage-tracker.lifecycle-run-invocation-authority.v1",
-  "authority_version": 1,
+  "schema": "codex-usage-tracker.lifecycle-run-invocation-authority.v2",
+  "authority_version": 2,
   "owner": "CK-07R1A0",
-  "authority_base_sha": "e0ee9f2cf442399633d93e402d17f527da604f0f",
+  "authority_base_sha": "a0d8770bad7d59b92b3f299186bfefa28bd5457c",
   "status": "authority_reconciled_no_run",
+  "lifecycle_state_machine": {
+    "current_state": "authority_main",
+    "states": [
+      {
+        "name": "authority_main",
+        "source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+        "source_role": "live_predecessor",
+        "runtime_acceptance": "not_claimed",
+        "receipt_policy": "receipt_absent_and_non_qualifying",
+        "evidence_identity_policy": "not_available",
+        "merge_policy": "current_authority_state"
+      },
+      {
+        "name": "worker_prequalification",
+        "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+        "source_role": "selected_successor",
+        "runtime_acceptance": "not_claimed",
+        "receipt_policy": "not_yet_available",
+        "evidence_identity_policy": "not_available",
+        "merge_policy": "authority_merge_and_exact_main_required_before_entry"
+      },
+      {
+        "name": "post_single_run",
+        "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+        "source_role": "selected_successor",
+        "runtime_acceptance": "qualified_only_with_complete_planner_valid_receipt",
+        "receipt_policy": "complete_planner_valid_receipt_required",
+        "evidence_identity_policy": "bind_exact_dynamic_receipt_and_evidence_identity",
+        "merge_policy": "worker_merge_and_exact_main_required_for_final_acceptance"
+      },
+      {
+        "name": "final_accepted",
+        "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+        "source_role": "selected_successor",
+        "runtime_acceptance": "accepted_only_with_worker_merge_and_exact_main",
+        "receipt_policy": "same_complete_planner_valid_receipt_identity_required",
+        "evidence_identity_policy": "same_exact_dynamic_receipt_and_evidence_identity",
+        "merge_policy": "worker_pr_squash_merge_and_exact_main_verification_required"
+      }
+    ],
+    "transitions": [
+      {
+        "from": "authority_main",
+        "to": "worker_prequalification",
+        "requires": [
+          "this authority is merged and exact-main verified",
+          "the existing worker starts from that exact main in a fresh worktree",
+          "the worker deliberately reapplies only the exact selected successor over the live predecessor",
+          "runtime_acceptance remains not_claimed",
+          "authority-integrity and prelaunch gates pass",
+          "maximum_new_end_to_end_runs remains 1 and unspent"
+        ]
+      },
+      {
+        "from": "worker_prequalification",
+        "to": "post_single_run",
+        "requires": [
+          "only the exact selected successor digest is present",
+          "exact prelaunch gates pass and one child launch consumes the run token",
+          "a complete planner-valid receipt is produced",
+          "receipt schema, static identities, workload_transition_digest, and stdout/stderr/output evidence identities validate",
+          "no retry, restart, or replacement occurs"
+        ]
+      },
+      {
+        "from": "post_single_run",
+        "to": "final_accepted",
+        "requires": [
+          "the worker PR is squash-merged",
+          "exact-main verification matches the merged worker contents",
+          "the same complete receipt and evidence identity remains bound"
+        ]
+      }
+    ],
+    "dynamic_receipt_identity": {
+      "required_fields": [
+        "run_token_id",
+        "receipt_schema",
+        "workload_transition_digest",
+        "publication_digest",
+        "ledger_file_sha256",
+        "stdout_sha256",
+        "stderr_sha256",
+        "output_sha256",
+        "launch_pid",
+        "launch_cwd",
+        "launch_argv"
+      ],
+      "identity_paths": {
+        "run_token_id": "ledger.run_token_id",
+        "receipt_schema": "ledger.receipt.schema",
+        "workload_transition_digest": "ledger.receipt.workload_transition_digest",
+        "publication_digest": "ledger.receipt.publication_digest",
+        "ledger_file_sha256": "sha256(exact ledger file bytes at output/ck07r1/lifecycle-requalification-v1.launch-token.json)",
+        "stdout_sha256": "ledger.evidence.stdout_sha256",
+        "stderr_sha256": "ledger.evidence.stderr_sha256",
+        "output_sha256": "ledger.evidence.output_sha256",
+        "launch_pid": "ledger.process.pid",
+        "launch_cwd": "ledger.process.cwd",
+        "launch_argv": "ledger.process.argv"
+      },
+      "ledger_path": "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+      "source": "the frozen launch ledger plus exact stdout, stderr, and output evidence; ledger_file_sha256 is computed from the final ledger bytes",
+      "binding": "post_single_run is unavailable until every required field is present and validated",
+      "mismatch": "fail_closed"
+    },
+    "forbidden_transitions": [
+      "authority_main->post_single_run",
+      "authority_main->final_accepted",
+      "worker_prequalification->final_accepted",
+      "any state with an unbound or incomplete receipt->post_single_run",
+      "any state without worker PR merge and exact-main verification->final_accepted"
+    ]
+  },
   "selected_candidate": {
     "status": "reconciled_no_run",
     "base_sha": "bdf545127b9cda20d22e00e9e9abb74c9550a470",
@@ -47,9 +161,9 @@
     },
     "lifecycle_source_digest": {
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
-      "sha256": "ca5391783df001447a1399c78113fcc26ef818c4bfdfd59e5a28e6e80f81ce16",
+      "sha256": "d2c30e11792589c1c66016a253aeaa410247b75f26f5e7be9b258bf7784447d4",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
-      "schema_sha256": "e8cc1f0ab316fcb840339c8ce607c8170e94c00f2627bb99a6905f34feff50b2"
+      "schema_sha256": "4a171e1ba4d626998a9846cec3c314b304b823e9242e27054a306c2560ddd97c"
     }
   },
   "launch_contract": {
