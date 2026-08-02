@@ -31,10 +31,11 @@ worker implementation. PR #394 is a stale failed witness: head
 `ordinary.2000_call_tail` gate and is superseded read-only. It must not be
 updated, rerun, or merged. The planner-valid lifecycle receipt is an
 acceptance output of the existing CK-07R1 worker only after it revalidates the
-retained candidate on this authority's exact merged main; it is not a
-pre-dispatch dependency. The first sample, all five budgets, one-run ceiling,
-and every fail-closed rule remain binding. CK-07R1 is Conditional Ready only
-after the source-digest authority is accepted, merged, and exact-main
+retained candidate on the source-digest and run-invocation authorities' exact
+merged main; the run-invocation authority is not a pre-dispatch dependency.
+The first sample, all five
+budgets, one-run ceiling, and every fail-closed rule remain binding. CK-07R1
+is blocked until both authorities are accepted, merged, and exact-main
 verified. Earlier wording that says to resume, refresh, or rerun PR #394 is
 historical provenance and does not authorize action. This source-digest
 authority supersedes earlier CK-07R1 wording that says to resume, refresh, or
@@ -114,10 +115,8 @@ conditions in the table and child files; they are not unconditional DAG edges.
   }, {
     "condition": "CK-QG1A0 merged and exact-main verified",
     "tasks": ["CK-QG1A"]
-  }, {
-    "condition": "CK-07R1/CK-07R1A0 source-digest authority accepted, merged, and exact-main verified; worker pre-run gates remain required",
-    "tasks": ["CK-07R1"]
   }],
+  "blocked": ["CK-07R1"],
   "tasks": [
     {"id": "CK-08R0", "file": "tasks/ck-08r0-freeze-corrective-contracts.md", "dependencies": []},
     {"id": "CK-08R1A", "file": "tasks/ck-08r1a-freeze-answer-semantics.md", "dependencies": ["CK-08R0"]},

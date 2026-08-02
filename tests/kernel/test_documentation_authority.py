@@ -176,7 +176,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     manifest = json.loads(manifest_match.group(1))
     assert manifest["schema"] == "codex-usage-tracker.remaining-delegation-dag.v1"
     assert manifest["orchestration"]["spawn"] == "all_newly_ready_successors"
-    conditional_ready = {"CK-08R1A", "CK-08R3A", "CK-QG1A", "CK-07R1"}
+    conditional_ready = {"CK-08R1A", "CK-08R3A", "CK-QG1A"}
+    blocked = {"CK-07R1"}
     assert manifest["completed"] == [
         "CK-08R0",
         "CK-08R2",
@@ -197,18 +198,12 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "condition": "CK-QG1A0 merged and exact-main verified",
             "tasks": ["CK-QG1A"],
         },
-        {
-            "condition": (
-                "CK-07R1/CK-07R1A0 source-digest authority accepted, merged, and "
-                "exact-main verified; worker pre-run gates remain required"
-            ),
-            "tasks": ["CK-07R1"],
-        },
     ]
+    assert manifest["blocked"] == ["CK-07R1"]
     assert "Completed packets: **14 / 22**" in ledger
     assert "Not started: **8**" in ledger
     assert "Critical-path completion: **14 / 21**" in ledger
-    assert "Blocked child tasks: **41**" in ledger
+    assert "Blocked child tasks: **42" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
         f"Conditional-ready child tasks: **{sum(len(item['tasks']) for item in manifest['conditional_ready'])}"
@@ -301,6 +296,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             assert "**Status:** Conditional Ready after" in body
         elif packet_id in ready:
             assert "**Status:** Ready" in body
+        elif packet_id in blocked:
+            assert "**Status:** Blocked" in body
         elif packet_id in {"CK-08R0", "CK-08R2", "CK-QG1A0", "CK-07R1A", "CK-07R1A0"}:
             assert "**Status:** Completed on merge" in body
         else:
@@ -522,8 +519,8 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
                 "fold_lifecycle",
                 "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d",
                 "one-run authorization condition",
-                "CK-07R1 becomes",
-                "Conditional Ready",
+                "CK-07R1 remains blocked",
+                "run-invocation authority",
                 "The planner-valid receipt is a future successor acceptance",
                 "stale failed PR #394 is explicitly superseded read-only",
             ),
@@ -534,10 +531,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert "strict Authority v2" in ck07r1a0
     assert "supersedes earlier CK-07R1 wording" in central
     assert "Blocked on CK-QG1A" in ckqg1
-    assert (
-        "Conditional Ready after the source-digest authority merges and exact-main verifies"
-        in ck07r1
-    )
+    assert "Blocked pending the source-digest and run-invocation authorities" in ck07r1
 
 
 def test_ck07r1a0_authority_is_strict_and_preserves_attempt_identity() -> None:

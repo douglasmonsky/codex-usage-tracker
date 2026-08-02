@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-run-invocation-authority-v1.schema.json",
+  "title": "CK-07R1A0 lifecycle run-invocation authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "authority_version",
+    "owner",
+    "authority_base_sha",
+    "status",
+    "preserved_authorities",
+    "launch_contract",
+    "launch_gates",
+    "run_token",
+    "failure_matrix",
+    "preserved_history",
+    "feasibility",
+    "scope"
+  ],
+  "properties": {
+    "schema": {"const": "codex-usage-tracker.lifecycle-run-invocation-authority.v1"},
+    "authority_version": {"const": 1},
+    "owner": {"const": "CK-07R1A0"},
+    "authority_base_sha": {"const": "e0ee9f2cf442399633d93e402d17f527da604f0f"},
+    "status": {"const": "authority_only_harness_blocked"},
+    "preserved_authorities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lifecycle_path", "lifecycle_source_digest"],
+      "properties": {
+        "lifecycle_path": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256", "schema_path", "schema_sha256"],
+          "properties": {
+            "path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.json"},
+            "sha256": {"const": "315f143661efa89f572484a7fc1e17754be5537c143fa2be1d97a041ad7b44b1"},
+            "schema_path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.schema.json"},
+            "schema_sha256": {"const": "181fa2290457e1149764b5f5952559838e70d4f81a512bc920aeb52592fc7856"}
+          }
+        },
+        "lifecycle_source_digest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256", "schema_path", "schema_sha256"],
+          "properties": {
+            "path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json"},
+            "sha256": {"const": "9c9898a05d618c9f14cd0bcc5403987a5029c684ae53dfadaf28ddea77170c58"},
+            "schema_path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json"},
+            "schema_sha256": {"const": "d524b987f76ff534ee3430e26299a574802f19a8cb8ef27322fb7fc3aed1a87f"}
+          }
+        }
+      }
+    },
+    "launch_contract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository_relative_command", "required_cwd", "cwd_rule", "interpreter", "environment", "output", "fixture_identity", "profiles", "tail_limits", "reachable_path"],
+      "properties": {
+        "repository_relative_command": {
+          "const": [".venv/bin/python", "scripts/benchmark_ck07r1_lifecycle_scale.py", "--profile", "all", "--samples", "5", "--output", "output/ck07r1/lifecycle-requalification-v1.json"]
+        },
+        "required_cwd": {"const": "repository_root"},
+        "cwd_rule": {"const": "pwd -P is the fresh retained worker worktree root containing pyproject.toml; do not run from scripts, a canonical dirty checkout, or a witness worktree"},
+        "interpreter": {
+          "type": "object", "additionalProperties": false,
+          "required": ["executable", "version_min_inclusive", "version_max_exclusive", "resolution", "system_fallback"],
+          "properties": {
+            "executable": {"const": ".venv/bin/python"},
+            "version_min_inclusive": {"const": "3.10"},
+            "version_max_exclusive": {"const": "3.15"},
+            "resolution": {"const": "sys.executable resolves to the repository .venv/bin/python"},
+            "system_fallback": {"const": false}
+          }
+        },
+        "environment": {
+          "type": "object", "additionalProperties": false,
+          "required": ["required", "forbidden", "data_policy"],
+          "properties": {
+            "required": {"const": {"LC_ALL": "C.UTF-8", "PYTHONHASHSEED": "0", "PYTHONUNBUFFERED": "1", "TZ": "UTC"}},
+            "forbidden": {"const": ["PYTHONPATH", "CODEX_HOME", "real Codex log or database paths"]},
+            "data_policy": {"const": "synthetic fixtures only; no private or production inputs"}
+          }
+        },
+        "output": {
+          "type": "object", "additionalProperties": false,
+          "required": ["relative_path", "format", "parent_rule", "prelaunch_rule", "overwrite_rule", "write_rule"],
+          "properties": {
+            "relative_path": {"const": "output/ck07r1/lifecycle-requalification-v1.json"},
+            "format": {"const": "one canonical UTF-8 JSON document followed by LF"},
+            "parent_rule": {"const": "the output parent must exist before launch"},
+            "prelaunch_rule": {"const": "the exact output path must not exist before launch"},
+            "overwrite_rule": {"const": "if the path exists, fail closed before launch; never truncate, append, replace, or reuse it"},
+            "write_rule": {"const": "the child creates the output only for this launch and the authority records its final file SHA-256"}
+          }
+        },
+        "fixture_identity": {
+          "type": "object", "additionalProperties": false,
+          "required": ["vocabulary", "manifest", "fixture_files", "dynamic_digest"],
+          "properties": {
+            "vocabulary": {
+              "const": {
+                "fixture_manifest_digest": "the manifest's declared manifest_digest value; it is not a file SHA and is not a workload digest",
+                "fixture_file_sha256": "SHA-256 of exact fixture file bytes at the required relative path; it is not the manifest digest and is not a dynamic digest",
+                "workload_transition_digest": "SHA-256 computed during this run from the canonical generated workload and emitted transition vector; it is not supplied as a static fixture identity"
+              }
+            },
+            "manifest": {
+              "type": "object", "additionalProperties": false,
+              "required": ["path", "schema", "fixture_manifest_digest", "fixture_file_sha256", "seed"],
+              "properties": {
+                "path": {"const": "tests/agent_kernel/fixtures/tiny-v1/manifest.json"},
+                "schema": {"const": "codex-usage-tracker.synthetic-fixture-manifest.v1"},
+                "fixture_manifest_digest": {"const": "91e0658f913c917bd8ce69fac9a1d75e881f41630eccc0f30f68bd9b6a972a35"},
+                "fixture_file_sha256": {"const": "e8c79373697ebe2af5385dbb2899ae49cec6104637c4a3b0909f91225128e0bc"},
+                "seed": {"const": 20260728}
+              }
+            },
+            "fixture_files": {
+              "type": "array", "minItems": 13, "maxItems": 13,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["path", "fixture_file_sha256"],
+                "properties": {
+                  "path": {"type": "string"},
+                  "fixture_file_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+                }
+              }
+            },
+            "dynamic_digest": {
+              "type": "object", "additionalProperties": false,
+              "required": ["field", "algorithm", "canonicalization", "source", "supplied_before_launch", "recorded_after", "verified_at", "mismatch"],
+              "properties": {
+                "field": {"const": "workload_transition_digest"},
+                "algorithm": {"const": "sha256"},
+                "canonicalization": {"const": "sort_keys=true; separators=(',', ':'); ensure_ascii=true; UTF-8"},
+                "source": {"const": "generated workload descriptor plus ordered lifecycle transition vector, excluding receipt metadata and expected-answer/grading fields"},
+                "supplied_before_launch": {"const": false},
+                "recorded_after": {"const": "successful process launch and workload/transition production"},
+                "verified_at": {"const": "acceptance after receipt schema validation"},
+                "mismatch": {"const": "fail_closed"}
+              }
+            }
+          }
+        },
+        "profiles": {
+          "type": "object", "additionalProperties": false,
+          "required": ["sample_count", "warmup_count", "profiled", "seed", "workloads"],
+          "properties": {
+            "sample_count": {"const": 5},
+            "warmup_count": {"const": 0},
+            "profiled": {"const": false},
+            "seed": {"const": 20260728},
+            "workloads": {
+              "const": [
+                {"name": "standard_30_day", "source_profile": "standard", "history_preset": "30_days", "model_calls": 2740, "entities": 685, "observations": 1369, "seed": 20260728, "profile_file_sha256": "ef0da880255a0b13ea6055e0f8d748870c075635aa6f199c9521462c681250f3"},
+                {"name": "production_all_time", "source_profile": "production", "history_preset": "all_time", "model_calls": 1316864, "entities": 329216, "observations": 658431, "seed": 20260728, "profile_file_sha256": "2de0b4dc198603da6c1b0905b8d934e2cd5604e4036ef009d0cd07f1cc81f51b"},
+                {"name": "no_change", "source_profile": "synthetic_tail", "history_preset": "all_time", "model_calls": 0, "entities": 0, "observations": 0, "seed": 20260728, "profile_file_sha256": null},
+                {"name": "one_call_tail", "source_profile": "synthetic_tail", "history_preset": "all_time", "model_calls": 0, "entities": 1, "observations": 1, "seed": 20260728, "profile_file_sha256": null},
+                {"name": "one_tool_tail", "source_profile": "synthetic_tail", "history_preset": "all_time", "model_calls": 0, "entities": 1, "observations": 1, "seed": 20260728, "profile_file_sha256": null}
+              ]
+            }
+          }
+        },
+        "tail_limits": {
+          "type": "object", "additionalProperties": false,
+          "required": ["source_symbol", "construction", "values", "verification"],
+          "properties": {
+            "source_symbol": {"const": "codex_usage_tracker.agent_kernel.publication.planner.TailLimits"},
+            "construction": {"const": "TailLimits() with no overrides"},
+            "values": {"const": {"selected_bytes": 8388608, "selected_records": 32, "observations": 12000, "occurrences": 12000, "affected_sessions": 2000, "affected_turns": 4000, "affected_resources": 4000, "affected_allowance_cycles": 512, "dirty_keys": 16000, "projection_rows": 16000, "expected_wal_bytes": 16777216, "planning_staleness_us": 5000000, "model_call_tail_rows": 32000}},
+            "verification": {"const": "receipt planner_tail_limits equals these values and plan_refresh receives the same values"}
+          }
+        },
+        "reachable_path": {
+          "type": "object", "additionalProperties": false,
+          "required": ["ordered_steps", "selection", "unchanged_plan", "identity_binding", "failure"],
+          "properties": {
+            "ordered_steps": {"const": ["select_readable_artifact(pointer_path, validate_open=...)", "recover_startup(pointer_path, selection=..., store=..., ...)", "plan_refresh(changes, intent, limits=TailLimits(), dirty_keys=0, projection_rows=0, expected_wal_bytes=None)", "selected_plan_unchanged", "PublicationWriter.publish_with_pointer(plan, request, write_set, pointer_path=..., operational_store=..., pointer_request=..., validate_open=...)", "publish_small_with_pointer(..., commit_analytical=...)", "PublicationWriter.publish(plan, request, write_set)"]},
+            "selection": {"const": "plan_refresh alone selects append_safe_small; no manually constructed PublicationPlan or operation-class override"},
+            "unchanged_plan": {
+              "type": "object", "additionalProperties": false,
+              "required": ["identity", "record", "verify"],
+              "properties": {
+                "identity": {"const": "the exact object returned by plan_refresh is passed to the writer"},
+                "record": {"const": ["planner_operation_class", "planner_reason", "planner_tail_limits", "planner_change_estimate", "plan_digest_before_writer", "plan_digest_at_writer"]},
+                "verify": {"const": "plan_digest_before_writer equals plan_digest_at_writer and all serialized plan fields remain unchanged"}
+              }
+            },
+            "identity_binding": {"const": ["ReadSelection.head.publication_id == RefreshIntent.parent_publication_id", "RefreshIntent.parent_publication_id == PublicationPlan.parent_publication_id", "PublicationPlan.parent_publication_id == SmallPublicationRequest.expected_active_publication_id", "SmallPublicationRequest.expected_active_publication_id == pre_commit_pointer.active.publication_id", "committed_AnalyticalHead.parent_publication_id == SmallPublicationRequest.expected_active_publication_id", "post_commit_pointer.active.publication_id == committed_AnalyticalHead.publication_id"]},
+            "failure": {"const": "any path, ordering, plan identity, or publication identity mismatch is fail_closed with no stitched artifacts"}
+          }
+        }
+      }
+    },
+  "launch_gates": {
+    "type": "object", "additionalProperties": false,
+    "required": ["prelaunch", "successful_process_launch", "runtime_and_completion"],
+    "properties": {
+      "prelaunch": {"type": "object", "additionalProperties": false, "required": ["required", "token"], "properties": {"required": {"const": ["exact command, cwd, interpreter, environment, output path, fixture manifest digest, and fixture file SHA values supplied", "exact output path is absent", "no matching process exists for exact argv, exact cwd, and current owner", "disk available bytes are captured", "maximum_new_end_to_end_runs remains 1 and run token is unspent_unavailable"]}, "token": {"const": "not consumed"}}},
+      "successful_process_launch": {"type": "object", "additionalProperties": false, "required": ["definition", "record", "token"], "properties": {"definition": {"const": "child creation returns a PID and the child is observed with the exact command and required cwd"}, "record": {"const": ["pid", "parent_pid", "launched_at_utc", "launched_monotonic_ns", "argv", "cwd", "interpreter", "run_token_id"]}, "token": {"const": "consume exactly one run token at this stage and only at this stage"}}},
+      "runtime_and_completion": {"type": "object", "additionalProperties": false, "required": ["record", "verification"], "properties": {"record": {"const": ["start and completion UTC timestamps", "monotonic elapsed time", "peak RSS bytes", "disk available bytes before launch, after launch, and after completion", "stdout and stderr evidence paths and SHA-256 values", "output path and output file SHA-256", "exit code or terminating signal", "receipt schema and workload_transition_digest", "planner path, selected-plan identity, publication/recovery identity bindings, budgets, counts, and postconditions", "process state transitions and no-retry outcome"]}, "verification": {"const": "all required receipt fields, exact static identities, dynamic digest, planner path, budgets, counts, and postconditions are independently checked before acceptance"}}}
+    }
+  },
+  "run_token": {"type": "object", "additionalProperties": false, "required": ["maximum_new_end_to_end_runs", "status", "consumption", "refund", "prior_identities_reused", "concurrent_processes_allowed"], "properties": {"maximum_new_end_to_end_runs": {"const": 1}, "status": {"const": "unspent_unavailable"}, "consumption": {"const": "successful_process_launch_only"}, "refund": {"const": false}, "prior_identities_reused": {"const": false}, "concurrent_processes_allowed": {"const": false}}},
+  "failure_matrix": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["after_launch", "before_successful_launch"],
+    "properties": {
+      "after_launch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["no_retry", "no_restart", "no_replacement", "retain_first_result", "token_remains_consumed", "failures"],
+        "properties": {
+          "no_retry": {"const": true},
+          "no_restart": {"const": true},
+          "no_replacement": {"const": true},
+          "retain_first_result": {"const": true},
+          "token_remains_consumed": {"const": true},
+          "failures": {"const": ["process launch failure after token consumption", "interruption", "timeout", "nonzero exit or signal", "incomplete receipt", "invalid receipt", "budget miss", "planner or publication identity-binding miss", "postcondition failure"]}
+        }
+      },
+      "before_successful_launch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["token_consumed", "automatic_retry_or_replacement", "action"],
+        "properties": {
+          "token_consumed": {"const": false},
+          "automatic_retry_or_replacement": {"const": false},
+          "action": {"const": "retain the exact blocker and keep the one-run gate unavailable"}
+        }
+      }
+    }
+  },
+  "preserved_history": {"type": "object", "additionalProperties": false, "required": ["writer_only_receipt_digest", "source_predecessor_sha256", "source_successor_sha256", "runtime_budgets_ms", "package_ceilings_bytes", "pr_394", "prior_attempt_ids", "preservation"], "properties": {"writer_only_receipt_digest": {"const": "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d"}, "source_predecessor_sha256": {"const": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"}, "source_successor_sha256": {"const": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1"}, "runtime_budgets_ms": {"const": {"first_publication_30_day": 5000, "production_all_time": 120000, "no_change": 100, "one_call_tail": 500, "one_tool_tail": 500}}, "package_ceilings_bytes": {"const": {"sdist": 2000000, "wheel": 1000000}}, "pr_394": {"const": {"number": 394, "head_sha": "98a9b5b82951d136644a5fe5f8a70d320131ba08", "workflow_run_id": "30685780055", "failed_job_id": "91331138768", "failure": "ordinary.2000_call_tail", "status": "stale_failed_superseded_read_only", "policy": "do_not_update_rerun_merge_or_reinterpret"}}, "prior_attempt_ids": {"const": ["all-profile-initial-serializer", "all-profile-corrected-serializer-tail-oracle", "all-profile-pid-60367-recovery", "production-only-valid-profile"]}, "preservation": {"const": "all prior run identities, attempts, timestamps, failures, receipts, and digests remain visible and read-only; no old receipt is upgraded"}}},
+  "feasibility": {"type": "object", "additionalProperties": false, "required": ["candidate_script", "candidate_status", "exact_blocker", "authority_action", "run_action", "fixture_identity_status"], "properties": {"candidate_script": {"const": "scripts/benchmark_ck07r1_lifecycle_scale.py"}, "candidate_status": {"const": "cannot_support_one_explicit_launch_without_behavioral_implementation"}, "exact_blocker": {"const": "the retained candidate exposes an optional output argument and an in-process run path, but does not implement the required prelaunch process exclusion, exclusive non-overwrite output preflight, launch-token ledger, child PID/parent PID/timestamp/RSS/disk/evidence capture, or post-launch no-retry/restart/replacement state machine"}, "authority_action": {"const": "freeze contract only; do not implement runtime or harness behavior in this authority"}, "run_action": {"const": "do not execute production or end-to-end qualification; do not consume the run token; keep CK-07R1 blocked"}, "fixture_identity_status": {"const": "proven_for_static_manifest_and_file_values; workload_transition_digest remains a required runtime-produced value"}}},
+  "scope": {"type": "object", "additionalProperties": false, "required": ["authority_only_files", "forbidden"], "properties": {"authority_only_files": {"const": ["docs/INDEX.md", "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json", "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json", "docs/roadmap/REMAINING_EXECUTION_PLAN.md", "docs/roadmap/TASK_PACKETS.md", "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md", "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md", "scripts/check_kernel_scope.py", "tests/kernel/test_lifecycle_run_invocation_authority.py"]}, "forbidden": {"const": ["src/codex_usage_tracker/agent_kernel/", "scripts/benchmark_ck07r1_lifecycle_scale.py", "tests/agent_kernel/publication/test_lifecycle_scale.py", "the two retained witness worktrees", "PR #394", "downstream packets"]}}}
+  }
+}

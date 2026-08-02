@@ -760,6 +760,14 @@ CK07R1_LIFECYCLE_SCOPE_ADDITIONS = frozenset(
     }
 )
 
+CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
+        "tests/kernel/test_lifecycle_run_invocation_authority.py",
+    }
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -820,6 +828,7 @@ INTEGRATION_ADDITIONS = (
     | PACKAGE_BUDGET_POLICY_ADDITIONS
     | CK07R1A0_AUTHORITY_ADDITIONS
     | CK07R1_LIFECYCLE_SCOPE_ADDITIONS
+    | CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
 )

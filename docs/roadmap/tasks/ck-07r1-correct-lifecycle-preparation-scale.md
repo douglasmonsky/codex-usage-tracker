@@ -1,6 +1,6 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** Conditional Ready after the source-digest authority merges and exact-main verifies; worker pre-run gates remain required
+**Status:** Blocked pending the source-digest and run-invocation authorities merging and exact-main verification; worker pre-run gates remain required
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -24,7 +24,8 @@ contracts.
 **Dependencies:** CK-07R1A accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 path authority accepted
 at exact main `519b503aa3b23019033b6481687c08b23fc6c31e`; and the linked
-source-digest authority accepted, merged, and exact-main verified. The worker
+source-digest and the run-invocation authority accepted, merged, and exact-main
+verified. The worker
 must then start from that exact merged main and reapply the retained candidate,
 revalidating predecessor and successor digests before any end-to-end run. PR #394 head
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` is a stale failed read-only
@@ -59,8 +60,9 @@ standard/production fixtures, five unprofiled samples, 30-day/all-time gates,
 `just v/vc`.
 
 **Acceptance:** Work is linear in observations plus prior transitions and all
-publication-valid scale gates pass through the CK-07R1A0 reachable path. The
-existing worker must revalidate the exact predecessor-to-successor digest
+publication-valid scale gates pass through the CK-07R1A0 reachable path and
+the frozen CK-07R1A0 run-invocation contract. The existing worker must
+revalidate the exact predecessor-to-successor digest
 transition, bind every frozen path and prior identity, produce the
 planner-valid receipt, and consume at most one new end-to-end run. Receipt
 absence before dispatch is not a blocker; receipt absence or invalidity at
