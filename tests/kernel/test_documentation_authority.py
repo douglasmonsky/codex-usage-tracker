@@ -341,7 +341,12 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     )
     assert r3a["owner"] == "CK-08R3A"
     assert r3a["source_path"] == "src/codex_usage_tracker/agent_kernel/evidence/service.py"
-    assert r3a["authority_base_sha"] == "f3f376fc644a2e3d23c313dd6b7ca4b707c2998b"
+    assert r3a["authority_base_sha"] == "fb0c57886097a6b985d2f321b2de858cbdfc0a97"
+    assert r3a["base_transition"] == {
+        "original_authority_base_sha": "f3f376fc644a2e3d23c313dd6b7ca4b707c2998b",
+        "integrated_origin_main_sha": "fb0c57886097a6b985d2f321b2de858cbdfc0a97",
+        "upstream_change": "CK-08R1C PR #411; disjoint evaluator and scope-test additions",
+    }
     assert r3a["selected_successor"]["status"] == "permitted_not_accepted"
     assert r3a["selected_successor"]["required_artifacts"] == [
         {

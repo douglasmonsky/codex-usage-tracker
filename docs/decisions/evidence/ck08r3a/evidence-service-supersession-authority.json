@@ -1,11 +1,17 @@
 {
   "schema": "codex-usage-tracker.ck08r3a-evidence-service-supersession-authority.v2",
   "owner": "CK-08R3A",
-  "authority_base_sha": "f3f376fc644a2e3d23c313dd6b7ca4b707c2998b",
+  "authority_base_sha": "fb0c57886097a6b985d2f321b2de858cbdfc0a97",
+  "base_transition": {
+    "original_authority_base_sha": "f3f376fc644a2e3d23c313dd6b7ca4b707c2998b",
+    "integrated_origin_main_sha": "fb0c57886097a6b985d2f321b2de858cbdfc0a97",
+    "upstream_change": "CK-08R1C PR #411; disjoint evaluator and scope-test additions"
+  },
   "source_path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
   "predecessor": {
     "authority_path": "docs/decisions/evidence/ck08r0/corrective-gates-v1.json",
-    "authority_base_sha": "f3f376fc644a2e3d23c313dd6b7ca4b707c2998b",
+    "authority_base_sha": "fb0c57886097a6b985d2f321b2de858cbdfc0a97",
+    "source_reproduction_base_sha": "f3f376fc644a2e3d23c313dd6b7ca4b707c2998b",
     "sha256": "ea32223d1afd997f310419bff0b6b260193e527c8333c9f561bcab280447dfa3"
   },
   "rejected_successors": [
