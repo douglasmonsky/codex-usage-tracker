@@ -24,17 +24,22 @@ page-executor C/B/B violations, so QG1A must correct them without changing R2
 behavior or the frozen maintainability baseline.
 CK-07R1A is accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 is accepted at the
-current exact main `519b503aa3b23019033b6481687c08b23fc6c31e`. PR #394 is a
-stale failed witness: head `98a9b5b82951d136644a5fe5f8a70d320131ba08` failed
-the hosted Python 3.14 `ordinary.2000_call_tail` gate and is superseded
-read-only. It must not be updated, rerun, or merged. The planner-valid
-lifecycle receipt is an acceptance output of the fresh CK-07R1 successor, not
-a pre-dispatch dependency; the first sample, all five budgets, and every
-fail-closed rule remain binding. CK-07R1 is Conditional Ready only after this
-authority is accepted, merged, and exact-main verified. This current authority
-supersedes earlier CK-07R1 wording that says to resume, refresh, or rerun PR
-#394; those retained references are historical provenance and do not authorize
-action.
+current exact main `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked
+source-digest correction is frozen from exact main `d911b1f` and is not a
+worker implementation. PR #394 is a stale failed witness: head
+`98a9b5b82951d136644a5fe5f8a70d320131ba08` failed the hosted Python 3.14
+`ordinary.2000_call_tail` gate and is superseded read-only. It must not be
+updated, rerun, or merged. The planner-valid lifecycle receipt is an
+acceptance output of the existing CK-07R1 worker only after it revalidates the
+retained candidate on this authority's exact merged main; it is not a
+pre-dispatch dependency. The first sample, all five budgets, one-run ceiling,
+and every fail-closed rule remain binding. CK-07R1 is Conditional Ready only
+after the source-digest authority is accepted, merged, and exact-main
+verified. Earlier wording that says to resume, refresh, or rerun PR #394 is
+historical provenance and does not authorize action. This source-digest
+authority supersedes earlier CK-07R1 wording that says to resume, refresh, or
+rerun PR #394; those retained references are historical provenance and do not
+authorize action.
 
 ## Delegation law
 
@@ -110,7 +115,7 @@ conditions in the table and child files; they are not unconditional DAG edges.
     "condition": "CK-QG1A0 merged and exact-main verified",
     "tasks": ["CK-QG1A"]
   }, {
-    "condition": "CK-07R1 transition authority accepted, merged, and exact-main verified",
+    "condition": "CK-07R1/CK-07R1A0 source-digest authority accepted, merged, and exact-main verified; worker pre-run gates remain required",
     "tasks": ["CK-07R1"]
   }],
   "tasks": [

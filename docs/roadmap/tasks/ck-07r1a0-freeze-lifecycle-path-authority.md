@@ -1,6 +1,6 @@
 # CK-07R1A0 — Freeze lifecycle planner/recovery path authority
 
-**Status:** Completed on merge; exact-main verified at `519b503aa3b23019033b6481687c08b23fc6c31e`; CK-07R1 is Conditional Ready after this transition authority exact-main
+**Status:** Completed on merge; exact-main verified at `519b503aa3b23019033b6481687c08b23fc6c31e`; linked source-digest correction is pending merge and exact-main verification, so the existing CK-07R1 worker remains held
 
 **Release-candidate package ceilings:** sdist remains at most 2,000,000
 bytes and wheel remains at most 1,000,000 bytes. The historical 828000/383000
@@ -32,12 +32,14 @@ remains accepted.
 **Owned files/interfaces:** Authority/docs/tests only. The strict Authority v2
 contract is
 [lifecycle-path-authority.json](../../decisions/evidence/ck07r1a0/lifecycle-path-authority.json)
-with its schema. The retained CK-07R1 implementation/profile/evidence diff is
-read-only evidence.
+with its schema. The linked [source-digest authority](../../decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json)
+and its schema freeze the exact predecessor/successor transition. The retained
+CK-07R1 implementation/profile/evidence diff is read-only evidence.
 
 **Produces:** A frozen entry-path contract, APPEND_SAFE_SMALL selection rule,
-independent lifecycle oracle/postconditions, one-run authorization condition,
-preserved attempt ledger, and exact scope bindings.
+independent lifecycle oracle/postconditions, exact source/diff identity,
+allowed lifecycle symbol/file scope, one-run authorization condition,
+preserved attempt ledger, and exact worker revalidation requirements.
 
 **Independent truth source:**
 `tests/agent_kernel/contracts/reference/lifecycle.py::fold_lifecycle`,
@@ -62,8 +64,13 @@ qualification, PR #394 changes, writer/planner/recovery code, budgets,
 schemas/DDL/query/evidence services, projections, releases, or real/private
 Codex data.
 
-**Invariants:** CK-07R1A remains accepted at `4d807495…`; CK-07R1 becomes
-Conditional Ready only after this authority is accepted, merged, and exact-main
+**Invariants:** CK-07R1A remains accepted at `4d807495…`; the exact
+predecessor digest is
+`408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872` and the
+permitted-not-accepted retained successor digest is
+`d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1`; generic
+or different digest drift fails closed; CK-07R1 becomes Conditional Ready only
+after this source-digest authority is accepted, merged, and exact-main
 verified; the five budgets remain `5000/120000/100/500/500` ms; every prior
 attempt and its identity/timestamp/failure remains visible; receipt
 `935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d` remains
@@ -92,12 +99,13 @@ or exact-main mismatch. Do not weaken a budget or infer publication-validity
 from a manually forced plan.
 
 **Handoff:** Coordinator `019fbeb3-00d5-7f22-ba65-ae4672838140` and parent
-`019fbea6-66b5-71e0-b85a-b6654fd414c5` receive the merged SHA, Authority v2
-path, exact scope additions, preserved attempts/digests, validation/reviewer/
-CI/exact-main results, and unchanged downstream gates.
+`019fbea6-66b5-71e0-b85a-b6654fd414c5` receive the merged SHA, source-digest
+authority path, exact candidate source/diff identity, preserved
+attempts/digests, validation/reviewer/CI/exact-main results, and unchanged
+downstream gates.
 
 **Cleanup/docs:** CK-07R1 owns the implementation/requalification successor;
 the retained CK-07R1 worktree, PR #394, and historical worktrees remain
 read-only evidence.
 
-**Suggested commit:** `docs: freeze lifecycle path authority`
+**Suggested commit:** `docs: freeze lifecycle source digest authority`

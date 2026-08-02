@@ -690,6 +690,8 @@ def test_ck07r1a0_authority_and_lifecycle_scope_additions_are_explicit() -> None
     assert {
         "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.json",
         "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.schema.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
     } == CK07R1A0_AUTHORITY_ADDITIONS
     assert {
         "scripts/benchmark_ck07r1_lifecycle_scale.py",
