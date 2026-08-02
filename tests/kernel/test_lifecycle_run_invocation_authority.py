@@ -68,6 +68,60 @@ def test_command_cwd_interpreter_environment_and_output_are_exact() -> None:
     assert "fail closed" in launch["output"]["overwrite_rule"]
 
 
+def test_selected_candidate_and_aggregate_timeout_are_reconciled_without_runtime_acceptance() -> None:
+    authority = _authority()
+    assert authority["status"] == "authority_reconciled_no_run"
+    assert authority["selected_candidate"] == {
+        "status": "reconciled_no_run",
+        "base_sha": "bdf545127b9cda20d22e00e9e9abb74c9550a470",
+        "retained_branch": "feature/ck-07r1-lifecycle-requalification-v3",
+        "retained_worktree": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v3",
+        "witness_status": "retained_uncommitted_read_only",
+        "source_predecessor_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+        "source_successor_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+        "runtime_acceptance": "not_claimed",
+        "artifacts": [
+            {
+                "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+                "sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+                "role": "source",
+            },
+            {
+                "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+                "sha256": "6a864c74a403da3edb671d9750fc2b2a59b73899102075ee0cec89fbb429b783",
+                "role": "benchmark",
+            },
+            {
+                "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+                "sha256": "a033e1c31f30784e321fdfe6dcce75460f89a02bc29beecfa40475f604deffac",
+                "role": "lifecycle_test",
+            },
+            {
+                "path": "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
+                "sha256": "36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb",
+                "role": "linked_evidence",
+            },
+        ],
+        "binding": "live_source_predecessor_to_selected_successor",
+        "worker_revalidation_required": True,
+    }
+    assert authority["launch_contract"]["aggregate_timeout"] == {
+        "seconds": 720,
+        "formula": "5 * 120 + 120",
+        "production_sample_count": 5,
+        "production_sample_budget_seconds": 120,
+        "publication_recovery_overhead_seconds": 120,
+        "scope": "wrapper_only",
+        "underlying_runtime_budgets_ms": {
+            "first_publication_30_day": 5000,
+            "production_all_time": 120000,
+            "no_change": 100,
+            "one_call_tail": 500,
+            "one_tool_tail": 500,
+        },
+    }
+
+
 def test_fixture_identity_vocabulary_and_static_file_shas_are_distinct_and_proven() -> None:
     identity = _authority()["launch_contract"]["fixture_identity"]
     assert set(identity["vocabulary"]) == {
@@ -76,6 +130,15 @@ def test_fixture_identity_vocabulary_and_static_file_shas_are_distinct_and_prove
         "workload_transition_digest",
     }
     assert identity["manifest"]["fixture_manifest_digest"] != identity["manifest"]["fixture_file_sha256"]
+    assert identity["rejected_dispatch_values"] == [
+        {
+            "value": "e8c79373697ebe2af5385dbb2899ae49cec61037c4a3b0909f91225128e0bc",
+            "length": 62,
+            "status": "revoked_never_authoritative",
+            "use": "never_used",
+            "reason": "malformed dispatch value; the canonical fixture file SHA-256 is 64 hexadecimal characters",
+        }
+    ]
     for item in identity["fixture_files"]:
         path = _ROOT / item["path"]
         assert path.is_file()
@@ -217,8 +280,8 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
         after_launch["failures"]
     )
     feasibility = authority["feasibility"]
-    assert feasibility["candidate_status"] == "cannot_support_one_explicit_launch_without_behavioral_implementation"
-    assert "prelaunch process exclusion" in feasibility["exact_blocker"]
+    assert feasibility["candidate_status"] == "remediated_no_run_runtime_unqualified"
+    assert "planner-valid receipt" in feasibility["exact_blocker"]
     assert feasibility["run_action"].startswith("do not execute")
 
 
@@ -229,6 +292,9 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
         ("cwd", ("launch_contract", "required_cwd"), "scripts"),
         ("fixture-vocabulary", ("launch_contract", "fixture_identity", "vocabulary", "fixture_file_sha256"), "manifest"),
         ("fixture-digest-binding", ("launch_contract", "fixture_identity", "manifest", "fixture_file_sha256"), "0" * 64),
+        ("aggregate-timeout", ("launch_contract", "aggregate_timeout", "seconds"), 120),
+        ("candidate-benchmark", ("selected_candidate", "artifacts", 1, "sha256"), "0" * 64),
+        ("rejected-dispatch", ("launch_contract", "fixture_identity", "rejected_dispatch_values", 0, "status"), "used"),
         ("output-overwrite", ("launch_contract", "output", "overwrite_rule"), "overwrite"),
         ("process-exclusion", ("launch_gates", "prelaunch", "required", 2), "process check omitted"),
         ("run-token-timing", ("run_token", "consumption"), "before launch"),
@@ -263,6 +329,20 @@ def test_dag_ledger_index_and_scope_bind_the_authority_without_new_task() -> Non
     assert "run-invocation authority" in ledger
     assert "CK-07R1" in central and "CK-07R1" in ledger
     assert authority["scope"]["authority_only_files"]
+    assert set(authority["scope"]["authority_only_files"]) == {
+        "docs/INDEX.md",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
+        "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md",
+        "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
+        "scripts/check_kernel_scope.py",
+        "tests/kernel/test_documentation_authority.py",
+        "tests/kernel/test_lifecycle_run_invocation_authority.py",
+    }
     assert "scripts/benchmark_ck07r1_lifecycle_scale.py" in authority["scope"]["forbidden"]
     assert CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS == {
         "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",

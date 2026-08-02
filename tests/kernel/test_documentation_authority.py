@@ -531,7 +531,9 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert "strict Authority v2" in ck07r1a0
     assert "supersedes earlier CK-07R1 wording" in central
     assert "Blocked on CK-QG1A" in ckqg1
-    assert "Blocked pending the source-digest and run-invocation authorities" in ck07r1
+    assert "Blocked pending the reconciled source-digest/run-invocation authority" in ck07r1
+    assert "720-second wrapper timeout" in ck07r1a0
+    assert "revoked, never authoritative, and never used" in ck07r1a0
 
 
 def test_ck07r1a0_authority_is_strict_and_preserves_attempt_identity() -> None:
@@ -698,6 +700,32 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
         "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1"
     )
     assert authority["selected_successor"]["status"] == "permitted_not_accepted"
+    assert authority["selected_successor"]["retained_branch"] == "feature/ck-07r1-lifecycle-requalification-v3"
+    assert authority["selected_successor"]["retained_worktree"] == "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v3"
+    assert authority["selected_successor"]["base_sha"] == "bdf545127b9cda20d22e00e9e9abb74c9550a470"
+    assert authority["acceptance_state"] == {
+        "status": "reconciled_no_run",
+        "live_source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+        "predecessor_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+        "selected_successor_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+        "binding": "live_source_predecessor_to_selected_successor",
+        "runtime_acceptance": "not_claimed",
+        "worker_revalidation_required": True,
+        "linked_evidence": {
+            "path": "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
+            "sha256": "36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb",
+        },
+    }
+    assert authority["selected_successor"]["diff_identity"]["untracked"] == [
+        {
+            "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+            "sha256": "6a864c74a403da3edb671d9750fc2b2a59b73899102075ee0cec89fbb429b783",
+        },
+        {
+            "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+            "sha256": "a033e1c31f30784e321fdfe6dcce75460f89a02bc29beecfa40475f604deffac",
+        },
+    ]
     assert authority["allowed_scope"]["lifecycle_symbols"] == [
         "codex_usage_tracker.agent_kernel.publication.preparation._WriteSetPreparer._build_lifecycle"
     ]
@@ -722,7 +750,10 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     assert authority["package_ceilings_bytes"] == {"sdist": 2_000_000, "wheel": 1_000_000}
 
     source = _REPO_ROOT / authority["source_path"]
-    assert hashlib.sha256(source.read_bytes()).hexdigest() == authority["predecessor"]["sha256"]
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == authority["acceptance_state"]["live_source_sha256"]
+    assert authority["acceptance_state"]["live_source_sha256"] == authority["predecessor"]["sha256"]
+    evidence = _REPO_ROOT / authority["acceptance_state"]["linked_evidence"]["path"]
+    assert hashlib.sha256(evidence.read_bytes()).hexdigest() == authority["acceptance_state"]["linked_evidence"]["sha256"]
     preserved = _REPO_ROOT / authority["preserved_authority"]["path"]
     assert hashlib.sha256(preserved.read_bytes()).hexdigest() == authority["preserved_authority"]["sha256"]
 
@@ -731,6 +762,9 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
         ("selected_successor", "sha256", "0" * 64),
         ("selected_successor", "status", "accepted"),
         ("selected_successor", "base_sha", "0" * 40),
+        ("acceptance_state", "status", "accepted"),
+        ("acceptance_state", "selected_successor_sha256", "0" * 64),
+        ("acceptance_state", "runtime_acceptance", "accepted"),
         ("worker_revalidation", "different_digest", "allow"),
         ("preserved_authority", "writer_only_receipt_digest", "0" * 64),
         ("run_status", None, "authorized"),

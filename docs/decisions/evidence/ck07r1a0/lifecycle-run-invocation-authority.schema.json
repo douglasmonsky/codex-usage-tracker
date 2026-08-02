@@ -10,6 +10,7 @@
     "owner",
     "authority_base_sha",
     "status",
+    "selected_candidate",
     "preserved_authorities",
     "launch_contract",
     "launch_gates",
@@ -24,7 +25,52 @@
     "authority_version": {"const": 1},
     "owner": {"const": "CK-07R1A0"},
     "authority_base_sha": {"const": "e0ee9f2cf442399633d93e402d17f527da604f0f"},
-    "status": {"const": "authority_only_harness_blocked"},
+    "status": {"const": "authority_reconciled_no_run"},
+    "selected_candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status", "base_sha", "retained_branch", "retained_worktree", "witness_status",
+        "source_predecessor_sha256", "source_successor_sha256", "runtime_acceptance", "artifacts",
+        "binding", "worker_revalidation_required"
+      ],
+      "properties": {
+        "status": {"const": "reconciled_no_run"},
+        "base_sha": {"const": "bdf545127b9cda20d22e00e9e9abb74c9550a470"},
+        "retained_branch": {"const": "feature/ck-07r1-lifecycle-requalification-v3"},
+        "retained_worktree": {"const": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v3"},
+        "witness_status": {"const": "retained_uncommitted_read_only"},
+        "source_predecessor_sha256": {"const": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"},
+        "source_successor_sha256": {"const": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1"},
+        "runtime_acceptance": {"const": "not_claimed"},
+        "artifacts": {
+          "const": [
+            {
+              "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+              "sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+              "role": "source"
+            },
+            {
+              "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+              "sha256": "6a864c74a403da3edb671d9750fc2b2a59b73899102075ee0cec89fbb429b783",
+              "role": "benchmark"
+            },
+            {
+              "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+              "sha256": "a033e1c31f30784e321fdfe6dcce75460f89a02bc29beecfa40475f604deffac",
+              "role": "lifecycle_test"
+            },
+            {
+              "path": "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
+              "sha256": "36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb",
+              "role": "linked_evidence"
+            }
+          ]
+        },
+        "binding": {"const": "live_source_predecessor_to_selected_successor"},
+        "worker_revalidation_required": {"const": true}
+      }
+    },
     "preserved_authorities": {
       "type": "object",
       "additionalProperties": false,
@@ -47,17 +93,34 @@
           "required": ["path", "sha256", "schema_path", "schema_sha256"],
           "properties": {
             "path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json"},
-            "sha256": {"const": "9c9898a05d618c9f14cd0bcc5403987a5029c684ae53dfadaf28ddea77170c58"},
+            "sha256": {"const": "ca5391783df001447a1399c78113fcc26ef818c4bfdfd59e5a28e6e80f81ce16"},
             "schema_path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json"},
-            "schema_sha256": {"const": "d524b987f76ff534ee3430e26299a574802f19a8cb8ef27322fb7fc3aed1a87f"}
+            "schema_sha256": {"const": "e8cc1f0ab316fcb840339c8ce607c8170e94c00f2627bb99a6905f34feff50b2"}
           }
         }
       }
     },
     "launch_contract": {
       "type": "object", "additionalProperties": false,
-      "required": ["repository_relative_command", "required_cwd", "cwd_rule", "interpreter", "environment", "output", "fixture_identity", "profiles", "tail_limits", "reachable_path"],
+      "required": ["aggregate_timeout", "repository_relative_command", "required_cwd", "cwd_rule", "interpreter", "environment", "output", "fixture_identity", "profiles", "tail_limits", "reachable_path"],
       "properties": {
+        "aggregate_timeout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "seconds", "formula", "production_sample_count", "production_sample_budget_seconds",
+            "publication_recovery_overhead_seconds", "scope", "underlying_runtime_budgets_ms"
+          ],
+          "properties": {
+            "seconds": {"const": 720},
+            "formula": {"const": "5 * 120 + 120"},
+            "production_sample_count": {"const": 5},
+            "production_sample_budget_seconds": {"const": 120},
+            "publication_recovery_overhead_seconds": {"const": 120},
+            "scope": {"const": "wrapper_only"},
+            "underlying_runtime_budgets_ms": {"const": {"first_publication_30_day": 5000, "production_all_time": 120000, "no_change": 100, "one_call_tail": 500, "one_tool_tail": 500}}
+          }
+        },
         "repository_relative_command": {
           "const": [".venv/bin/python", "scripts/benchmark_ck07r1_lifecycle_scale.py", "--profile", "all", "--samples", "5", "--output", "output/ck07r1/lifecycle-requalification-v1.json"]
         },
@@ -97,7 +160,7 @@
         },
         "fixture_identity": {
           "type": "object", "additionalProperties": false,
-          "required": ["vocabulary", "manifest", "fixture_files", "dynamic_digest"],
+          "required": ["vocabulary", "rejected_dispatch_values", "manifest", "fixture_files", "dynamic_digest"],
           "properties": {
             "vocabulary": {
               "const": {
@@ -105,6 +168,17 @@
                 "fixture_file_sha256": "SHA-256 of exact fixture file bytes at the required relative path; it is not the manifest digest and is not a dynamic digest",
                 "workload_transition_digest": "SHA-256 computed during this run from the canonical generated workload and emitted transition vector; it is not supplied as a static fixture identity"
               }
+            },
+            "rejected_dispatch_values": {
+              "const": [
+                {
+                  "value": "e8c79373697ebe2af5385dbb2899ae49cec61037c4a3b0909f91225128e0bc",
+                  "length": 62,
+                  "status": "revoked_never_authoritative",
+                  "use": "never_used",
+                  "reason": "malformed dispatch value; the canonical fixture file SHA-256 is 64 hexadecimal characters"
+                }
+              ]
             },
             "manifest": {
               "type": "object", "additionalProperties": false,
@@ -235,7 +309,7 @@
     }
   },
   "preserved_history": {"type": "object", "additionalProperties": false, "required": ["writer_only_receipt_digest", "source_predecessor_sha256", "source_successor_sha256", "runtime_budgets_ms", "package_ceilings_bytes", "pr_394", "prior_attempt_ids", "preservation"], "properties": {"writer_only_receipt_digest": {"const": "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d"}, "source_predecessor_sha256": {"const": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"}, "source_successor_sha256": {"const": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1"}, "runtime_budgets_ms": {"const": {"first_publication_30_day": 5000, "production_all_time": 120000, "no_change": 100, "one_call_tail": 500, "one_tool_tail": 500}}, "package_ceilings_bytes": {"const": {"sdist": 2000000, "wheel": 1000000}}, "pr_394": {"const": {"number": 394, "head_sha": "98a9b5b82951d136644a5fe5f8a70d320131ba08", "workflow_run_id": "30685780055", "failed_job_id": "91331138768", "failure": "ordinary.2000_call_tail", "status": "stale_failed_superseded_read_only", "policy": "do_not_update_rerun_merge_or_reinterpret"}}, "prior_attempt_ids": {"const": ["all-profile-initial-serializer", "all-profile-corrected-serializer-tail-oracle", "all-profile-pid-60367-recovery", "production-only-valid-profile"]}, "preservation": {"const": "all prior run identities, attempts, timestamps, failures, receipts, and digests remain visible and read-only; no old receipt is upgraded"}}},
-  "feasibility": {"type": "object", "additionalProperties": false, "required": ["candidate_script", "candidate_status", "exact_blocker", "authority_action", "run_action", "fixture_identity_status"], "properties": {"candidate_script": {"const": "scripts/benchmark_ck07r1_lifecycle_scale.py"}, "candidate_status": {"const": "cannot_support_one_explicit_launch_without_behavioral_implementation"}, "exact_blocker": {"const": "the retained candidate exposes an optional output argument and an in-process run path, but does not implement the required prelaunch process exclusion, exclusive non-overwrite output preflight, launch-token ledger, child PID/parent PID/timestamp/RSS/disk/evidence capture, or post-launch no-retry/restart/replacement state machine"}, "authority_action": {"const": "freeze contract only; do not implement runtime or harness behavior in this authority"}, "run_action": {"const": "do not execute production or end-to-end qualification; do not consume the run token; keep CK-07R1 blocked"}, "fixture_identity_status": {"const": "proven_for_static_manifest_and_file_values; workload_transition_digest remains a required runtime-produced value"}}},
-  "scope": {"type": "object", "additionalProperties": false, "required": ["authority_only_files", "forbidden"], "properties": {"authority_only_files": {"const": ["docs/INDEX.md", "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json", "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json", "docs/roadmap/REMAINING_EXECUTION_PLAN.md", "docs/roadmap/TASK_PACKETS.md", "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md", "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md", "scripts/check_kernel_scope.py", "tests/kernel/test_lifecycle_run_invocation_authority.py"]}, "forbidden": {"const": ["src/codex_usage_tracker/agent_kernel/", "scripts/benchmark_ck07r1_lifecycle_scale.py", "tests/agent_kernel/publication/test_lifecycle_scale.py", "the two retained witness worktrees", "PR #394", "downstream packets"]}}}
+  "feasibility": {"type": "object", "additionalProperties": false, "required": ["candidate_script", "candidate_status", "exact_blocker", "authority_action", "run_action", "fixture_identity_status"], "properties": {"candidate_script": {"const": "scripts/benchmark_ck07r1_lifecycle_scale.py"}, "candidate_status": {"const": "remediated_no_run_runtime_unqualified"}, "exact_blocker": {"const": "the no-run remediation is identity-reconciled but the worker has not revalidated the selected candidate on exact merged main or produced the planner-valid receipt; the sole end-to-end gate remains unconsumed"}, "authority_action": {"const": "freeze contract only; do not implement runtime or harness behavior in this authority"}, "run_action": {"const": "do not execute production or end-to-end qualification; do not consume the run token; keep CK-07R1 blocked"}, "fixture_identity_status": {"const": "proven_for_static_manifest_and_file_values; workload_transition_digest remains a required runtime-produced value"}}},
+  "scope": {"type": "object", "additionalProperties": false, "required": ["authority_only_files", "forbidden"], "properties": {"authority_only_files": {"const": ["docs/INDEX.md", "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json", "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json", "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json", "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json", "docs/roadmap/REMAINING_EXECUTION_PLAN.md", "docs/roadmap/TASK_PACKETS.md", "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md", "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md", "scripts/check_kernel_scope.py", "tests/kernel/test_documentation_authority.py", "tests/kernel/test_lifecycle_run_invocation_authority.py"]}, "forbidden": {"const": ["src/codex_usage_tracker/agent_kernel/", "scripts/benchmark_ck07r1_lifecycle_scale.py", "tests/agent_kernel/publication/test_lifecycle_scale.py", "the two retained witness worktrees", "PR #394", "downstream packets"]}}}
   }
 }
