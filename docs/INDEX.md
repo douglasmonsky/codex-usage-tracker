@@ -31,13 +31,17 @@ stale failed read-only witness; it is not updated, rerun, or merged. CK-07R1
 is held behind the linked [source-digest authority](decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json)
 and [run-invocation authority](decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json)
 (`docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json`).
-The source authority freezes predecessor `408d18e4…` to the permitted
-successor `d192c858…`; the run authority freezes the exact launch, fixture,
-evidence, token, and no-retry contract. The retained candidate is explicitly
-blocked because it cannot support that launch contract without behavioral
-implementation. CK-07R1 remains blocked, no run token is consumed, no other
-successor is advanced, and the one-run gate remains unspent. Reclassification
-and maintainability remain open. The central authority is
+The source authority reconciles the live predecessor `408d18e4…` to the
+retained successor `d192c858…` without claiming runtime acceptance and binds
+the corrected benchmark `6a864c…`, lifecycle test `a033e1…`, and linked CK-07
+evidence `36eb76…`. The run authority freezes the exact launch, fixture,
+revoked malformed dispatch value, 720-second wrapper timeout, evidence, token,
+and no-retry contract while preserving the 5000/120000/100/500/500 ms budgets.
+The candidate remains runtime-unqualified until the existing worker
+revalidates it from the accepted exact main and produces the planner-valid
+receipt. CK-07R1 remains blocked, no run token is consumed, no other successor
+is advanced, and the one-run gate remains unspent. Reclassification and
+maintainability remain open. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
 
 ## Authority set

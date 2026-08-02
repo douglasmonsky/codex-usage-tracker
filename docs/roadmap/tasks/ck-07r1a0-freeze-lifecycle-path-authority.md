@@ -1,6 +1,6 @@
 # CK-07R1A0 — Freeze lifecycle planner/recovery path authority
 
-**Status:** Completed on merge; exact-main verified at `519b503aa3b23019033b6481687c08b23fc6c31e`; linked source-digest and run-invocation authorities are pending merge and exact-main verification, so the existing CK-07R1 worker remains held
+**Status:** Completed on merge; exact-main verified at `519b503aa3b23019033b6481687c08b23fc6c31e`; reconciled source-digest and run-invocation authority is pending merge and exact-main verification, so the existing CK-07R1 worker remains held
 
 **Release-candidate package ceilings:** sdist remains at most 2,000,000
 bytes and wheel remains at most 1,000,000 bytes. The historical 828000/383000
@@ -34,10 +34,14 @@ contract is
 [lifecycle-path-authority.json](../../decisions/evidence/ck07r1a0/lifecycle-path-authority.json)
 with its schema. The linked [source-digest authority](../../decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json)
 and its schema freeze the exact predecessor/successor transition. The retained
-CK-07R1 implementation/profile/evidence diff is read-only evidence.
+CK-07R1 implementation/profile/evidence diff is read-only evidence;
+the reconciled candidate binds preparation `d192c858…`, benchmark
+`6a864c74…`, lifecycle test `a033e1c3…`, linked evidence `36eb76ca…`, and
+canonical fixture identities without claiming runtime acceptance.
 The linked run-invocation authority is
 `docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json`;
-it adds no runtime implementation and keeps the retained candidate blocked.
+it adds no runtime implementation, freezes the 720-second wrapper timeout, and
+keeps the retained candidate runtime-unqualified.
 
 **Produces:** A frozen entry-path contract, APPEND_SAFE_SMALL selection rule,
 independent lifecycle oracle/postconditions, exact source/diff identity,
@@ -72,9 +76,13 @@ predecessor digest is
 `408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872` and the
 permitted-not-accepted retained successor digest is
 `d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1`; generic
-or different digest drift fails closed; CK-07R1 remains blocked until the
-source-digest and run-invocation authorities are accepted, merged, and
-exact-main verified; the five budgets remain `5000/120000/100/500/500` ms; every prior
+or different digest drift fails closed; linked evidence is
+`36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb`; the
+wrapper timeout is exactly 720 seconds while the five budgets remain
+`5000/120000/100/500/500` ms; the malformed 62-character dispatch value is
+revoked, never authoritative, and never used; CK-07R1 remains blocked until
+the source-digest and run-invocation authorities are accepted, merged, and
+exact-main verified; every prior
 attempt and its identity/timestamp/failure remains visible; receipt
 `935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d` remains
 writer-only evidence and is never reused or upgraded.

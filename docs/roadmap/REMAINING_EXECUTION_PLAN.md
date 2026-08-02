@@ -25,18 +25,20 @@ behavior or the frozen maintainability baseline.
 CK-07R1A is accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 is accepted at the
 current exact main `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked
-source-digest correction is frozen from exact main `d911b1f` and is not a
-worker implementation. PR #394 is a stale failed witness: head
+source-digest and run-invocation authorities reconcile the no-run candidate
+from exact main `bdf545127b9cda20d22e00e9e9abb74c9550a470` and are authority
+documentation only. PR #394 is a stale failed witness: head
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` failed the hosted Python 3.14
 `ordinary.2000_call_tail` gate and is superseded read-only. It must not be
 updated, rerun, or merged. The planner-valid lifecycle receipt is an
 acceptance output of the existing CK-07R1 worker only after it revalidates the
 retained candidate on the source-digest and run-invocation authorities' exact
 merged main; the run-invocation authority is not a pre-dispatch dependency.
-The first sample, all five
-budgets, one-run ceiling, and every fail-closed rule remain binding. CK-07R1
-is blocked until both authorities are accepted, merged, and exact-main
-verified. Earlier wording that says to resume, refresh, or rerun PR #394 is
+The first sample, 720-second wrapper timeout, all five underlying budgets,
+one-run ceiling, and every fail-closed rule remain binding. CK-07R1 is blocked
+until both authorities are accepted, merged, and exact-main verified; after
+that exact-main handoff only the existing worker may be resumed for its
+required revalidation. Earlier wording that says to resume, refresh, or rerun PR #394 is
 historical provenance and does not authorize action. This source-digest
 authority supersedes earlier CK-07R1 wording that says to resume, refresh, or
 rerun PR #394; those retained references are historical provenance and do not

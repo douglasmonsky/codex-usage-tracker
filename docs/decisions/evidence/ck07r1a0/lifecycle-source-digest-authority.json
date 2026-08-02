@@ -4,6 +4,19 @@
   "owner": "CK-07R1A0",
   "authority_base_sha": "d911b1f0d17596890a6a0a608be904330c96e9a6",
   "source_path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+  "acceptance_state": {
+    "status": "reconciled_no_run",
+    "live_source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+    "predecessor_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+    "selected_successor_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+    "binding": "live_source_predecessor_to_selected_successor",
+    "runtime_acceptance": "not_claimed",
+    "worker_revalidation_required": true,
+    "linked_evidence": {
+      "path": "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
+      "sha256": "36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb"
+    }
+  },
   "predecessor": {
     "sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
     "accepted_merge_sha": "d911b1f0d17596890a6a0a608be904330c96e9a6",
@@ -32,11 +45,11 @@
       "untracked": [
         {
           "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-          "sha256": "c0cd2d64109b4b39340699b153d6645dc11aaa6185151cd4b38c9320244eaea5"
+          "sha256": "6a864c74a403da3edb671d9750fc2b2a59b73899102075ee0cec89fbb429b783"
         },
         {
           "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-          "sha256": "66d464a4348ef83ced7c2bff20c218393e7e2485ca11d40ef84630e06efce608"
+          "sha256": "a033e1c31f30784e321fdfe6dcce75460f89a02bc29beecfa40475f604deffac"
         }
       ]
     }
@@ -150,6 +163,8 @@
   "constraints": [
     "generic_digest_drift_forbidden",
     "any_different_preparation_digest_fails_closed",
+    "authority_reconciled_no_run",
+    "live_source_predecessor_binding_required",
     "selected_successor_is_permitted_not_accepted",
     "candidate_witness_is_retained_uncommitted_read_only",
     "worker_must_revalidate_on_exact_merged_main_before_any_end_to_end_run",
