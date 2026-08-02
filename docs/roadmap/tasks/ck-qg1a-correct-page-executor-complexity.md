@@ -1,6 +1,6 @@
 # CK-QG1A — Correct page-executor complexity
 
-**Status:** Conditional Ready after CK-QG1A0 merge is exact-main verified
+**Status:** Completed on merge; PR #408 exact-main verified at `30983d4b5005e7e2a507757c76a3c05ab56281e6`
 
 **Parent:** Corrective prerequisite for CK-QG1
 

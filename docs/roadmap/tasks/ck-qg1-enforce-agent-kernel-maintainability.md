@@ -1,6 +1,6 @@
 # CK-QG1 — Enforce replacement-kernel maintainability
 
-**Status:** Blocked on CK-QG1A
+**Status:** Ready after CK-QG1A merge exact-main verification
 
 **Parent:** Corrective quality gate for all remaining packets
 

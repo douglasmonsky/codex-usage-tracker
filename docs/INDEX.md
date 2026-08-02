@@ -22,8 +22,9 @@ before scale on first/deep EvidenceService EXPLAIN. CK-08R3A owns that separate
 fix; CK-08R3 awaits its accepted merge/exact-main verification. Independent
 truth now consumes [`answer-semantics.v1`](../config/agent-kernel/answer-semantics-v1.json);
 disjoint R1B/R1C consumers are Ready before final R1 requalification.
-CK-QG1A0 gates the selected R2 PageExecutor
-successor; QG1A fixes its two C/B/B findings. CK-07R1A separately corrected
+CK-QG1A0 gated the selected R2 PageExecutor successor; QG1A removed its two
+C/B/B findings and is accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`;
+existing QG1 PR #392 is Ready to resume from corrected main. CK-07R1A separately corrected
 PR #394's exact hosted lifecycle-tail failure without a budget waiver.
 CK-07R1A0 is accepted at exact main `519b503aa3b23019033b6481687c08b23fc6c31e`.
 Its transition authority makes the planner-valid receipt a CK-07R1 successor

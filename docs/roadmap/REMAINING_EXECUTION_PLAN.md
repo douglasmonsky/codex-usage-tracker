@@ -19,9 +19,10 @@ production fix. CK-08R3 must not become Ready or be redelegated until CK-08R3A
 is accepted, merged, and exact-main verified. Retained CK-08R1 work reached
 80/80 parity by copying unsupported Q-REV-03/Q-WF-02 semantics; R1A now freezes
 their meaning and closure, R1B/C are Ready as disjoint consumers, and R1 is their
-requalification join. CK-QG1 PR #392 also stays blocked: R2 introduced two
-page-executor C/B/B violations, so QG1A must correct them without changing R2
-behavior or the frozen maintainability baseline.
+requalification join. CK-QG1A removed R2's two page-executor C/B/B violations
+without changing behavior or the frozen maintainability baseline and is
+accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`.
+Existing CK-QG1 PR #392 is Ready to resume from that corrected main.
 CK-07R1A is accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 was accepted at
 `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked
@@ -159,14 +160,11 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
-  "completed": ["CK-08R0", "CK-08R1A", "CK-08R2", "CK-QG1A0", "CK-07R1A", "CK-07R1A0"],
-  "ready": ["CK-08R1B", "CK-08R1C"],
+  "completed": ["CK-08R0", "CK-08R1A", "CK-08R2", "CK-QG1A0", "CK-QG1A", "CK-07R1A", "CK-07R1A0"],
+  "ready": ["CK-08R1B", "CK-08R1C", "CK-QG1"],
   "conditional_ready": [{
     "condition": "CK-08R3A's serialized corrective authority correction accepted, merged, and exact-main verified",
     "tasks": ["CK-08R3A"]
-  }, {
-    "condition": "CK-QG1A0 merged and exact-main verified",
-    "tasks": ["CK-QG1A"]
   }, {
     "condition": "ARGV authority accepted at 479cbdb; coordinator records the preserved prelaunch incident disposition and a clean exact-main reapplication path; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; no replacement, launch, or downstream task",
     "tasks": ["CK-07R1"]
