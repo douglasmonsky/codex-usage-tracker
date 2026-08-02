@@ -1,9 +1,75 @@
 {
-  "schema": "codex-usage-tracker.lifecycle-run-invocation-authority.v2",
-  "authority_version": 2,
+  "schema": "codex-usage-tracker.lifecycle-run-invocation-authority.v3",
+  "authority_version": 3,
   "owner": "CK-07R1A0",
-  "authority_base_sha": "a0d8770bad7d59b92b3f299186bfefa28bd5457c",
+  "authority_base_sha": "955272c68548b82ea11eb65226ba0e6f3f570785",
   "status": "authority_reconciled_no_run",
+  "argv_correction": {
+    "old_guard": "sys.argv[1:] == LAUNCH_COMMAND[1:]",
+    "old_guard_effect": "the frozen shell command is rejected because flags-only argv is compared with script path plus flags",
+    "corrected_guard": "(sys.argv[0], *sys.argv[1:]) == LAUNCH_COMMAND[1:]",
+    "corrected_candidate_status": "frozen_not_run",
+    "corrected_candidate_artifacts": {
+      "benchmark_sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
+      "lifecycle_test_sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed"
+    },
+    "old_candidate_artifacts": {
+      "benchmark_sha256": "6a864c74a403da3edb671d9750fc2b2a59b73899102075ee0cec89fbb429b783",
+      "lifecycle_test_sha256": "a033e1c31f30784e321fdfe6dcce75460f89a02bc29beecfa40475f604deffac",
+      "status": "historical_rejected_not_authoritative",
+      "reuse": "forbidden"
+    },
+    "non_launching_subprocess_test": {
+      "required": true,
+      "test_path": "tests/kernel/test_lifecycle_run_invocation_authority.py",
+      "contract": "run a real subprocess with the exact script path and flags, exercise the corrected guard, suppress the launcher, and assert success with no child launch",
+      "launch_side_effect": "none"
+    },
+    "old_candidate_invocation": "forbidden"
+  },
+  "first_failure": {
+    "classification": "pre_child_argv_guard_failure",
+    "status": "historical_terminal_attempt_of_rejected_old_candidate",
+    "attempted_once": true,
+    "command": [
+      ".venv/bin/python",
+      "scripts/benchmark_ck07r1_lifecycle_scale.py",
+      "--profile",
+      "all",
+      "--samples",
+      "5",
+      "--output",
+      "output/ck07r1/lifecycle-requalification-v1.json"
+    ],
+    "guard_phase": "raw_argv_guard_before_launch_exact",
+    "comparison": "sys.argv[1:] compared to LAUNCH_COMMAND[1:]",
+    "exit_code": 2,
+    "elapsed_seconds": 0.075241709,
+    "evidence": {
+      "child": "absent",
+      "pid": "absent",
+      "handshake": "absent",
+      "token": "absent_and_unconsumed",
+      "output": "absent",
+      "ledger": "absent",
+      "stdout": "absent",
+      "stderr": "absent",
+      "receipt": "absent",
+      "runtime": "absent"
+    },
+    "retry": "none",
+    "restart": "none",
+    "replacement": "none",
+    "preservation": "retain exactly as historical evidence; do not upgrade, retry, restart, replace, or reinterpret as a successful process launch"
+  },
+  "change_control": {
+    "exactly_one_pr": true,
+    "hosted_ci_required": true,
+    "merge_policy": "squash merge only when all required hosted CI jobs pass",
+    "exact_main_verification": "attach verification against the exact merged main contents before acceptance",
+    "merged_sha": null,
+    "downstream": "blocked_until_authority_merge_and_exact_main_verification"
+  },
   "lifecycle_state_machine": {
     "current_state": "authority_main",
     "states": [
@@ -54,18 +120,20 @@
           "the worker deliberately reapplies only the exact selected successor over the live predecessor",
           "runtime_acceptance remains not_claimed",
           "authority-integrity and prelaunch gates pass",
-          "maximum_new_end_to_end_runs remains 1 and unspent"
+          "maximum_new_end_to_end_runs remains 1 and unspent_unavailable",
+          "the first successful child launch is exactly one new qualification launch, not a retry, restart, or replacement of a launched process",
+          "no old-candidate invocation may recur"
         ]
       },
       {
         "from": "worker_prequalification",
         "to": "post_single_run",
         "requires": [
-          "only the exact selected successor digest is present",
+          "only the exact corrected selected successor digest is present",
           "exact prelaunch gates pass and one child launch consumes the run token",
           "a complete planner-valid receipt is produced",
           "receipt schema, static identities, workload_transition_digest, and stdout/stderr/output evidence identities validate",
-          "no retry, restart, or replacement occurs"
+          "no retry, restart, or replacement occurs and no old-candidate invocation recurs"
         ]
       },
       {
@@ -120,9 +188,9 @@
   },
   "selected_candidate": {
     "status": "reconciled_no_run",
-    "base_sha": "bdf545127b9cda20d22e00e9e9abb74c9550a470",
-    "retained_branch": "feature/ck-07r1-lifecycle-requalification-v3",
-    "retained_worktree": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v3",
+    "base_sha": "955272c68548b82ea11eb65226ba0e6f3f570785",
+    "retained_branch": "feature/ck-07r1-lifecycle-requalification-v5",
+    "retained_worktree": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v5",
     "witness_status": "retained_uncommitted_read_only",
     "source_predecessor_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
     "source_successor_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
@@ -135,12 +203,12 @@
       },
       {
         "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-        "sha256": "6a864c74a403da3edb671d9750fc2b2a59b73899102075ee0cec89fbb429b783",
+        "sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
         "role": "benchmark"
       },
       {
         "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-        "sha256": "a033e1c31f30784e321fdfe6dcce75460f89a02bc29beecfa40475f604deffac",
+        "sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed",
         "role": "lifecycle_test"
       },
       {
@@ -161,9 +229,9 @@
     },
     "lifecycle_source_digest": {
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
-      "sha256": "d2c30e11792589c1c66016a253aeaa410247b75f26f5e7be9b258bf7784447d4",
+      "sha256": "0cda5ea3d44ed1e5726735a34d1a73a81635b068121015f81b85b128bf35c47f",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
-      "schema_sha256": "4a171e1ba4d626998a9846cec3c314b304b823e9242e27054a306c2560ddd97c"
+      "schema_sha256": "d6c6611f94bd89f1080712271529542b21d6c5634278f7d5e21b2f7a9138672f"
     }
   },
   "launch_contract": {
@@ -217,10 +285,16 @@
     },
     "output": {
       "relative_path": "output/ck07r1/lifecycle-requalification-v1.json",
+      "exclusive_paths": {
+        "output": "output/ck07r1/lifecycle-requalification-v1.json",
+        "ledger": "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+        "stdout": "output/ck07r1/lifecycle-requalification-v1.stdout.txt",
+        "stderr": "output/ck07r1/lifecycle-requalification-v1.stderr.txt"
+      },
       "format": "one canonical UTF-8 JSON document followed by LF",
-      "parent_rule": "the output parent must exist before launch",
-      "prelaunch_rule": "the exact output path must not exist before launch",
-      "overwrite_rule": "if the path exists, fail closed before launch; never truncate, append, replace, or reuse it",
+      "parent_rule": "worker may create only the local ignored output/ck07r1 directory immediately before preflight",
+      "prelaunch_rule": "all four exact output, ledger, stdout, and stderr paths must be absent before preflight and launch",
+      "overwrite_rule": "if any of the four exact paths exists, fail closed before launch; never truncate, append, replace, or reuse any of them",
       "write_rule": "the child creates the output only for this launch and the authority records its final file SHA-256"
     },
     "fixture_identity": {
@@ -335,10 +409,12 @@
     "prelaunch": {
       "required": [
         "exact command, cwd, interpreter, environment, output path, fixture manifest digest, and fixture file SHA values supplied",
-        "exact output path is absent",
+        "worker may create only the local ignored output/ck07r1 directory immediately before preflight",
+        "all four exact output, ledger, stdout, and stderr paths are absent and non-overwriting",
         "no matching process exists for exact argv, exact cwd, and current owner",
         "disk available bytes are captured",
-        "maximum_new_end_to_end_runs remains 1 and run token is unspent_unavailable"
+        "maximum_new_end_to_end_runs remains 1 and run token is unspent_unavailable",
+        "no old-candidate invocation may recur"
       ],
       "token": "not consumed"
     },
@@ -369,7 +445,10 @@
     "consumption": "successful_process_launch_only",
     "refund": false,
     "prior_identities_reused": false,
-    "concurrent_processes_allowed": false
+    "concurrent_processes_allowed": false,
+    "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker deliberately reapplies only the corrected exact candidate, and all gates pass",
+    "first_successful_launch": "exactly one first successful child launch may consume the still-unspent token; this is not a retry, restart, or replacement of a launched process",
+    "old_candidate_reuse": "forbidden"
   },
   "failure_matrix": {
     "after_launch": {
@@ -408,8 +487,8 @@
   },
   "feasibility": {
     "candidate_script": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-    "candidate_status": "remediated_no_run_runtime_unqualified",
-    "exact_blocker": "the no-run remediation is identity-reconciled but the worker has not revalidated the selected candidate on exact merged main or produced the planner-valid receipt; the sole end-to-end gate remains unconsumed",
+    "candidate_status": "corrected_no_run_runtime_unqualified",
+    "exact_blocker": "the corrected no-run candidate is identity-reconciled but the stopped worker has not deliberately reapplied it on exact merged main or produced the planner-valid receipt; the sole end-to-end gate remains unconsumed",
     "authority_action": "freeze contract only; do not implement runtime or harness behavior in this authority",
     "run_action": "do not execute production or end-to-end qualification; do not consume the run token; keep CK-07R1 blocked",
     "fixture_identity_status": "proven_for_static_manifest_and_file_values; workload_transition_digest remains a required runtime-produced value"

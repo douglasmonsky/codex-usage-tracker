@@ -700,9 +700,9 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     validator = Draft202012Validator(schema)
     validator.validate(authority)
 
-    assert authority["schema"] == "codex-usage-tracker.lifecycle-source-digest-authority.v2"
-    assert authority["authority_version"] == 2
-    assert authority["authority_base_sha"] == "a0d8770bad7d59b92b3f299186bfefa28bd5457c"
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-source-digest-authority.v3"
+    assert authority["authority_version"] == 3
+    assert authority["authority_base_sha"] == "955272c68548b82ea11eb65226ba0e6f3f570785"
     assert authority["predecessor"]["sha256"] == (
         "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"
     )
@@ -710,9 +710,9 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
         "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1"
     )
     assert authority["selected_successor"]["status"] == "permitted_not_accepted"
-    assert authority["selected_successor"]["retained_branch"] == "feature/ck-07r1-lifecycle-requalification-v3"
-    assert authority["selected_successor"]["retained_worktree"] == "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v3"
-    assert authority["selected_successor"]["base_sha"] == "bdf545127b9cda20d22e00e9e9abb74c9550a470"
+    assert authority["selected_successor"]["retained_branch"] == "feature/ck-07r1-lifecycle-requalification-v5"
+    assert authority["selected_successor"]["retained_worktree"] == "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v5"
+    assert authority["selected_successor"]["base_sha"] == "955272c68548b82ea11eb65226ba0e6f3f570785"
     assert authority["acceptance_state"] == {
         "status": "reconciled_no_run",
         "live_source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
@@ -729,11 +729,11 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     assert authority["selected_successor"]["diff_identity"]["untracked"] == [
         {
             "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-            "sha256": "6a864c74a403da3edb671d9750fc2b2a59b73899102075ee0cec89fbb429b783",
+            "sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
         },
         {
             "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-            "sha256": "a033e1c31f30784e321fdfe6dcce75460f89a02bc29beecfa40475f604deffac",
+            "sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed",
         },
     ]
     assert authority["allowed_scope"]["lifecycle_symbols"] == [

@@ -33,16 +33,22 @@ and [run-invocation authority](decisions/evidence/ck07r1a0/lifecycle-run-invocat
 (`docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json`).
 The source authority reconciles the live predecessor `408d18e4…` to the
 retained successor `d192c858…` without claiming runtime acceptance and binds
-the corrected benchmark `6a864c…`, lifecycle test `a033e1…`, and linked CK-07
-evidence `36eb76…`. The run authority freezes the exact launch, fixture,
-revoked malformed dispatch value, 720-second wrapper timeout, evidence, token,
-and no-retry contract while preserving the 5000/120000/100/500/500 ms budgets.
-The candidate remains runtime-unqualified until the existing worker
-revalidates it from the accepted exact main and produces the planner-valid
-receipt. CK-07R1 is Conditional Ready after this authority's accepted
-merge/exact-main handoff, but no worker resumes from this authority task; no
-run token is consumed, no other successor is advanced, and the one-run gate
-remains unspent. Reclassification and maintainability remain open. The central authority is
+the corrected benchmark `f173837d…`, lifecycle test `b6468b60…`, and linked CK-07
+evidence `36eb76…`. The old argv-guard attempt remains the historical
+`pre_child_argv_guard_failure`: exit 2 after `0.075241709` seconds, with no
+child, PID, handshake, token, output, ledger, stdout, stderr, receipt, or
+runtime evidence. The corrected guard is
+`(sys.argv[0], *sys.argv[1:]) == LAUNCH_COMMAND[1:]`. The run authority freezes
+the exact launch, fixture, revoked malformed dispatch value, 720-second wrapper
+timeout, four-path non-overwriting preflight, evidence, token, and no-retry
+contract while preserving the 5000/120000/100/500/500 ms budgets. The candidate
+remains runtime-unqualified until the stopped existing worker deliberately
+reapplies only the corrected exact candidate from accepted exact main and
+produces the planner-valid receipt. CK-07R1 is Conditional Ready after this
+authority's accepted merge/exact-main handoff, but no worker resumes from this
+authority task; no run token is consumed, no other successor is advanced, and
+the one-run gate remains unspent. Reclassification and maintainability remain
+open. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
 
 The finite source/runtime state machine is currently `authority_main`: the live

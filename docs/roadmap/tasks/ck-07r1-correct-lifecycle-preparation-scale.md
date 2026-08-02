@@ -34,7 +34,7 @@ witness and is not refreshed, rerun, or merged.
 **Owned files/interfaces:** Lifecycle preparation implementation, focused
 publication tests, profile/benchmark, and linked CK-07 evidence amendment;
 the authority reconciliation binds preparation `d192c858…`, benchmark
-`6a864c74…`, lifecycle test `a033e1c3…`, linked evidence `36eb76ca…`, and the
+`f173837d…`, lifecycle test `b6468b60…`, linked evidence `36eb76ca…`, and the
 720-second wrapper timeout without executing the worker. The authority state is
 currently `authority_main`; worker prequalification accepts only the exact
 selected successor and does not claim runtime acceptance.
@@ -46,9 +46,10 @@ database postconditions.
 
 **Consumer seam:** Preparation to `PublicationWriter` to read-only publication.
 
-**Parallelism:** Resume only the existing CK-07R1 worker after this authority
-merges and exact-main verifies, using an exact-main START, a fresh worktree,
-and deliberate reapplication of the retained candidate. Never rebase, stash,
+**Parallelism:** Resume only the existing stopped CK-07R1 worker after this
+authority merges and exact-main verifies, using an exact-main START, a fresh
+worktree, and deliberate reapplication of only the corrected exact candidate.
+Never rebase, stash,
 reset, clean, delete, overwrite, or mutate the witness; do not create a
 replacement worker task. The planner-valid receipt is produced by that worker
 and is required for acceptance, not for authority completion; other corrective
@@ -62,16 +63,20 @@ bounded RSS; synthetic data; no writer recovery regression.
 
 **Required tests/checks:** Focused lifecycle/publication, equivalent results,
 standard/production fixtures, five unprofiled samples, 30-day/all-time gates,
-`just v/vc`; authority/schema/DAG/scope negative checks covering the finite
-state transitions; no E2E run in the
-authority reconciliation.
+`just v/vc`; authority/schema/DAG/scope exact-record negative checks covering
+the finite state transitions and real non-launching subprocess argv guard; no
+E2E or benchmark run in the authority reconciliation.
 
 **Acceptance:** Work is linear in observations plus prior transitions and all
 publication-valid scale gates pass through the CK-07R1A0 reachable path and
 the frozen CK-07R1A0 run-invocation contract. The existing worker must
 revalidate the exact predecessor-to-successor digest
 transition, bind every frozen path and prior identity, produce the
-planner-valid receipt, and consume at most one new end-to-end run. Receipt
+planner-valid receipt, and consume at most one new end-to-end run. The still-
+unspent `maximum_new_end_to_end_runs=1` token can fund exactly one first
+successful child launch only after the authority merge/exact-main gate and all
+worker gates pass; this is not a retry, restart, or replacement of a launched
+process. Receipt
 absence before dispatch is not a blocker; receipt absence or invalidity at
 successor acceptance remains fail-closed.
 
