@@ -1,22 +1,135 @@
 {
-  "schema": "codex-usage-tracker.ck08r3a-evidence-service-supersession-authority.v1",
+  "schema": "codex-usage-tracker.ck08r3a-evidence-service-supersession-authority.v2",
   "owner": "CK-08R3A",
+  "authority_base_sha": "fb0c57886097a6b985d2f321b2de858cbdfc0a97",
+  "base_transition": {
+    "original_authority_base_sha": "f3f376fc644a2e3d23c313dd6b7ca4b707c2998b",
+    "integrated_origin_main_sha": "fb0c57886097a6b985d2f321b2de858cbdfc0a97",
+    "upstream_change": "CK-08R1C PR #411; disjoint evaluator and scope-test additions"
+  },
   "source_path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
   "predecessor": {
     "authority_path": "docs/decisions/evidence/ck08r0/corrective-gates-v1.json",
-    "authority_base_sha": "bbd9eb990969a659376ea584c6d696d1715cc007",
+    "authority_base_sha": "fb0c57886097a6b985d2f321b2de858cbdfc0a97",
+    "source_reproduction_base_sha": "f3f376fc644a2e3d23c313dd6b7ca4b707c2998b",
     "sha256": "ea32223d1afd997f310419bff0b6b260193e527c8333c9f561bcab280447dfa3"
   },
+  "rejected_successors": [
+    {
+      "sha256": "718ff7032d050b13cb7fac1f857d0c99879d0ef3b13c57c39b55514fc610a88b",
+      "status": "rejected_non_acceptable",
+      "task": "019fbbc0-cd25-7041-a847-b0098dfae29d",
+      "reason_codes": [
+        "inner_use_temp_b_tree_before_limit",
+        "scale_growth_with_activity_cardinality",
+        "rate_card_paged_scope_rejected"
+      ],
+      "evidence_status": "preserved_read_only"
+    }
+  ],
   "selected_successor": {
-    "sha256": "718ff7032d050b13cb7fac1f857d0c99879d0ef3b13c57c39b55514fc610a88b",
+    "sha256": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c",
     "status": "permitted_not_accepted",
+    "implementation_task": "019fbe2b-20e8-78b2-a687-0231b159d0c7",
     "blocked_task": "019fbbc0-cd25-7041-a847-b0098dfae29d",
+    "required_artifacts": [
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+        "role": "source",
+        "sha256": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+        "role": "evidence_order_indexes",
+        "sha256": "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/storage/schema.py",
+        "role": "schema_contract_digest",
+        "sha256": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0"
+      }
+    ],
     "required_evidence": {
-      "path": "docs/decisions/evidence/ck08r3a/evidence-physical-query-requalification.json",
-      "schema": "codex-usage-tracker.ck08r3a-evidence-physical-query-requalification.v1"
+      "test_path": "tests/agent_kernel/evidence/test_service.py",
+      "schema": "codex-usage-tracker.evidence-scale-qualification.v1",
+      "status": "must_be_regenerated_by_implementation_worker"
     }
   },
+  "physical_decision": {
+    "strategy": "branch_pruned_union_all_with_exact_evidence_order_indexes",
+    "source_only_candidate": "insufficient_under_strict_no_temp_sort_gate",
+    "ddl_required": true,
+    "scope": "session-scoped first/deep EvidenceService pages, all supported page views and directions, plus valid-empty rate_card pages",
+    "required_index_names": [
+      "evidence_model_calls_by_session_order",
+      "evidence_model_call_tail_by_session_order",
+      "evidence_tools_by_session_order",
+      "evidence_activities_by_session_order",
+      "evidence_state_changes_by_session_order",
+      "evidence_compactions_by_session_order",
+      "evidence_context_components_by_session_order",
+      "evidence_turns_by_session_order",
+      "evidence_lifecycle_timeline_order",
+      "evidence_source_occurrences_by_logical_order",
+      "evidence_tools_by_resource_order",
+      "evidence_state_changes_by_resource_order",
+      "evidence_allowance_observations_order"
+    ],
+    "forbidden_explain_markers": [
+      "SCAN stream",
+      "MATERIALIZE model_calls_visible",
+      "AUTOMATIC COVERING INDEX",
+      "USE TEMP B-TREE"
+    ],
+    "physical_bounds": {
+      "publication_binding": true,
+      "scope_and_view_predicates_in_each_branch": true,
+      "seven_part_keyset_order": true,
+      "limit_plus_one_before_decode": true,
+      "maximum_rows": 100,
+      "maximum_response_bytes": 16384,
+      "one_query_only_publication_snapshot": true
+    }
+  },
+  "reproduced_findings": {
+    "synthetic_only": true,
+    "predecessor_activity_scale": {
+      "timeline_limit": 7,
+      "activity_rows": [2000, 10000],
+      "progress_callbacks": [990, 4750],
+      "forbidden_plan_markers": [
+        "MATERIALIZE model_calls_visible",
+        "SCAN stream",
+        "USE TEMP B-TREE"
+      ]
+    },
+    "rejected_successor_selector": {
+      "summary": "valid empty page",
+      "timeline": "unsupported evidence scope",
+      "calls": "unsupported evidence scope"
+    },
+    "selected_successor_recheck": {
+      "activity_rows": [2000, 10000],
+      "decoded_rows": [8, 8],
+      "progress_callbacks_per_100_vm_ops": [27, 25],
+      "forbidden_plan_markers": []
+    }
+  },
+  "compatibility": {
+    "valid_active_rate_card_summary": true,
+    "valid_active_rate_card_timeline_empty": true,
+    "valid_active_rate_card_calls_empty": true,
+    "base_and_tail_calls": true,
+    "forward_and_backward_keyset_pages": true,
+    "publication_bound_query_only_snapshot": true
+  },
   "constraints": [
+    "predecessor_remains_historically_verifiable",
+    "rejected_successor_is_not_a_retry_candidate",
+    "selected_successor_only",
+    "candidate_implementation_not_accepted",
+    "exact_required_artifact_paths_and_digests",
+    "no_ck08r3_scale_or_downstream_dispatch_before_acceptance",
     "generic_digest_drift_forbidden"
   ]
 }
