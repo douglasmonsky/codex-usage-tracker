@@ -741,6 +741,15 @@ CK08R1A_ANSWER_SEMANTICS_ADDITIONS = frozenset(
     }
 )
 
+CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS = frozenset(
+    {
+        "tests/agent_kernel/fixtures/independent/__init__.py",
+        "tests/agent_kernel/fixtures/independent/closure.py",
+        "tests/agent_kernel/fixtures/independent/semantic.py",
+        "tests/agent_kernel/test_ck08r1c_independent_evaluator.py",
+    }
+)
+
 CKQG1A0_AUTHORITY_ADDITIONS = frozenset(
     [
         "docs/decisions/evidence/ckqg1a0/page-executor-source-supersession-authority.json",
@@ -834,6 +843,7 @@ INTEGRATION_ADDITIONS = (
     | CK08_QUERY_EVIDENCE_ADDITIONS
     | CK08R2_PHYSICAL_PAGE_ADDITIONS
     | CK08R1A_ANSWER_SEMANTICS_ADDITIONS
+    | CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS
     | CK08R3A_AUTHORITY_ADDITIONS
     | CKQG1A0_AUTHORITY_ADDITIONS
     | PACKAGE_BUDGET_POLICY_ADDITIONS
