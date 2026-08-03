@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import sqlite3
@@ -35,6 +36,27 @@ from codex_usage_tracker.agent_kernel.storage.schema import (
 
 _ROOT = Path(__file__).resolve().parents[3]
 _CONTRACT = _ROOT / "docs" / "architecture" / "AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md"
+_PREDECESSOR_SCHEMA_DIGEST = (
+    "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5"
+)
+_SELECTED_SCHEMA_DIGEST = (
+    "e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35"
+)
+_CK08R3A_INDEX_NAMES = (
+    "evidence_model_calls_by_session_order",
+    "evidence_model_call_tail_by_session_order",
+    "evidence_tools_by_session_order",
+    "evidence_activities_by_session_order",
+    "evidence_state_changes_by_session_order",
+    "evidence_compactions_by_session_order",
+    "evidence_context_components_by_session_order",
+    "evidence_turns_by_session_order",
+    "evidence_lifecycle_timeline_order",
+    "evidence_source_occurrences_by_logical_order",
+    "evidence_tools_by_resource_order",
+    "evidence_state_changes_by_resource_order",
+    "evidence_allowance_observations_order",
+)
 
 
 def _contract_ddl(name: str) -> str:
@@ -56,24 +78,66 @@ def _contract_ddl(name: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _selected_analytical_ddl() -> str:
+    return _contract_ddl("analytical") + "\n" + _contract_ddl("ck08r3a-evidence-indexes")
+
+
 def _pragma(connection: sqlite3.Connection, name: str) -> object:
     return connection.execute(f"PRAGMA {name}").fetchone()[0]  # noqa: S608
 
 
 def test_packaged_ddl_is_exact_contract_and_inventory_locked() -> None:
-    assert ANALYTICAL_DDL == _contract_ddl("analytical")
+    predecessor = _contract_ddl("analytical")
+    selected = _selected_analytical_ddl()
+    assert ANALYTICAL_DDL in {predecessor, selected}
     assert OPERATIONAL_DDL == _contract_ddl("operational")
-    assert canonical_schema_digest() == SCHEMA_CONTRACT_SHA256
+    if ANALYTICAL_DDL == predecessor:
+        assert canonical_schema_digest() == SCHEMA_CONTRACT_SHA256 == _PREDECESSOR_SCHEMA_DIGEST
+    else:
+        assert ANALYTICAL_DDL == selected
+        assert canonical_schema_digest() == SCHEMA_CONTRACT_SHA256 == _SELECTED_SCHEMA_DIGEST
 
     analytical = schema_objects("analytical")
     operational = schema_objects("operational")
     assert sum(item.object_type == "table" for item in analytical) == 42
-    assert sum(item.object_type == "index" for item in analytical) == 44
+    expected_index_count = 44 if ANALYTICAL_DDL == predecessor else 57
+    assert sum(item.object_type == "index" for item in analytical) == expected_index_count
     assert [item.name for item in analytical if item.object_type == "view"] == [
         "model_calls_visible"
     ]
     assert sum(item.object_type == "table" for item in operational) == 6
     assert sum(item.object_type == "index" for item in operational) == 6
+
+
+def test_ck08r3a_selected_schema_transition_is_exact_and_fail_closed() -> None:
+    predecessor = _contract_ddl("analytical")
+    selected = _selected_analytical_ddl()
+    assert predecessor != selected
+    assert hashlib.sha256(
+        (
+            "codex-usage-tracker.agent-kernel.schema-contract.v1\n"
+            f"analytical\n{selected}"
+            f"operational\n{_contract_ddl('operational')}"
+        ).encode()
+    ).hexdigest() == _SELECTED_SCHEMA_DIGEST
+
+    selected_connection = sqlite3.connect(":memory:")
+    try:
+        selected_connection.executescript(selected)
+        index_names = {
+            str(row[0])
+            for row in selected_connection.execute(
+                """
+                SELECT name
+                FROM sqlite_schema
+                WHERE type = 'index' AND name NOT LIKE 'sqlite_%'
+                """
+            )
+        }
+    finally:
+        selected_connection.close()
+    assert set(_CK08R3A_INDEX_NAMES) <= index_names
+    assert len(index_names) == 57
 
 
 def test_connection_modes_checks_and_database_size(tmp_path: Path) -> None:

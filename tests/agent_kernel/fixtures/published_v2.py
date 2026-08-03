@@ -32,10 +32,21 @@ from codex_usage_tracker.agent_kernel.publication.writer import (
     prepare_write_set_from_changes,
 )
 from codex_usage_tracker.agent_kernel.storage.database import initialize_analytical
+from tests.agent_kernel.fixtures.oracles.cases_v2 import (
+    EXPECTED_ARTIFACT_MANIFESTS,
+    ORACLE_AUTHORITY_ORDER,
+    PREDECESSOR_ARTIFACT_MANIFESTS,
+)
 
 PUBLICATION_ID = "publication:ck07a-structural-v2"
 OLD_DIGEST = "1" * 64
 HEAD_DIGEST = "2" * 64
+PREDECESSOR_SCHEMA_CONTRACT_SHA256 = (
+    "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5"
+)
+SELECTED_SCHEMA_CONTRACT_SHA256 = (
+    "e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35"
+)
 
 _EVENT_KIND_ORDER = {
     "session_start": 10,
@@ -494,9 +505,42 @@ def publish_structural_snapshot(
     }
 
 
+def case_for_schema_contract(
+    connection: sqlite3.Connection,
+    case: dict[str, Any],
+) -> dict[str, Any]:
+    """Bind expected synthetic publication facts to one exact schema state."""
+
+    result = copy.deepcopy(case)
+    row = connection.execute(
+        """
+        SELECT schema_contract_sha256
+        FROM publications
+        WHERE publication_id = ?
+        """,
+        (PUBLICATION_ID,),
+    ).fetchone()
+    actual_schema = None if row is None else str(row[0])
+    try:
+        ordinal = ORACLE_AUTHORITY_ORDER.index(str(result["oracle_id"]))
+    except (KeyError, ValueError) as exc:
+        raise ValueError("published variant is outside frozen CK-07A authority") from exc
+    if actual_schema == PREDECESSOR_SCHEMA_CONTRACT_SHA256:
+        expected_artifact = PREDECESSOR_ARTIFACT_MANIFESTS[ordinal]
+        result["semantic_mutation"]["expected_artifact_manifest_sha256"] = expected_artifact
+        for fact in result["declaration"]["facts"]:
+            if fact.get("relation") == "publication":
+                fact["values"]["artifact_manifest_sha256"] = expected_artifact
+    elif actual_schema != SELECTED_SCHEMA_CONTRACT_SHA256:
+        raise ValueError("publication uses an unauthorized schema-contract digest")
+    return result
+
+
 def published_question_case(
     connection: sqlite3.Connection,
     case: dict[str, Any],
+    *,
+    preserve_frozen_authority: bool = False,
 ) -> dict[str, Any]:
     """Verify a publication against, but never derive, frozen structural truth."""
 
@@ -512,14 +556,32 @@ def published_question_case(
         raise ValueError("published CK-07A snapshot is missing")
     artifact = connection.execute(
         """
-        SELECT artifact_manifest_sha256
+        SELECT artifact_manifest_sha256, schema_contract_sha256
         FROM publications
         WHERE publication_id = ?
         """,
         (PUBLICATION_ID,),
     ).fetchone()
+    try:
+        ordinal = ORACLE_AUTHORITY_ORDER.index(str(result["oracle_id"]))
+    except (KeyError, ValueError) as exc:
+        raise ValueError("published variant is outside frozen CK-07A authority") from exc
     expected_artifact = result["semantic_mutation"]["expected_artifact_manifest_sha256"]
-    if artifact is None or str(artifact[0]) != expected_artifact:
+    if expected_artifact != EXPECTED_ARTIFACT_MANIFESTS[ordinal]:
+        raise ValueError("frozen CK-07A artifact transition is not selected")
+    expected_by_schema = {
+        PREDECESSOR_SCHEMA_CONTRACT_SHA256: PREDECESSOR_ARTIFACT_MANIFESTS,
+        SELECTED_SCHEMA_CONTRACT_SHA256: EXPECTED_ARTIFACT_MANIFESTS,
+    }
+    actual_schema = None if artifact is None else str(artifact[1])
+    expected_by_variant = (
+        expected_by_schema.get(actual_schema) if actual_schema is not None else None
+    )
+    if (
+        artifact is None
+        or expected_by_variant is None
+        or str(artifact[0]) != expected_by_variant[ordinal]
+    ):
         raise ValueError("published artifact manifest differs from frozen authority")
     for predicate in result.get("variant_predicates", ()):
         if predicate.get("predicate") != "published_call_canonical_identity":
@@ -534,13 +596,18 @@ def published_question_case(
         ).fetchone()
         if row is None or str(row[0]) != str(predicate["asserted_value"]):
             raise ValueError("published variant predicate failed")
-    return result
+    if preserve_frozen_authority:
+        return result
+    return case_for_schema_contract(connection, result)
 
 
 __all__ = [
     "HEAD_DIGEST",
     "OLD_DIGEST",
+    "case_for_schema_contract",
+    "PREDECESSOR_SCHEMA_CONTRACT_SHA256",
     "PUBLICATION_ID",
+    "SELECTED_SCHEMA_CONTRACT_SHA256",
     "publish_structural_snapshot",
     "published_question_case",
     "rate_card_frontier",

@@ -24,6 +24,14 @@ from codex_usage_tracker.agent_kernel.storage.schema import (
 
 PUBLICATION_ID = "publication:accounting"
 _ORACLE_PATH = Path(__file__).parents[1] / "fixtures" / "tiny-v1" / "oracle-bundle.json"
+_TINY_ACCOUNTING_INDEX_BY_SCHEMA = {
+    "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5": (
+        "source_occurrences_by_logical_id"
+    ),
+    "e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35": (
+        "evidence_source_occurrences_by_logical_order"
+    ),
+}
 
 
 def _accounting_oracle() -> dict[str, Any]:
@@ -606,7 +614,8 @@ def test_tiny_accounting_counts_canonical_calls_not_source_copies() -> None:
           ON call.call_id = occurrence.semantic_logical_id
         """
     ).fetchall()
-    assert any("source_occurrences_by_logical_id" in str(row[3]) for row in occurrence_plan)
+    expected_index = _TINY_ACCOUNTING_INDEX_BY_SCHEMA[SCHEMA_CONTRACT_SHA256]
+    assert any(expected_index in str(row[3]) for row in occurrence_plan)
 
 
 def test_accounting_operation_timing_uses_a_deterministic_observer_seam() -> None:

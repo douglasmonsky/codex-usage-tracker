@@ -728,6 +728,8 @@ CK08R2_PHYSICAL_PAGE_ADDITIONS = frozenset(
 CK08R3A_AUTHORITY_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json",
+        "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.json",
+        "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.schema.json",
     }
 )
 

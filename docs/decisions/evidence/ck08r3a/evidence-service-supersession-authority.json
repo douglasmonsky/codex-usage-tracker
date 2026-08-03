@@ -55,6 +55,12 @@
       "status": "must_be_regenerated_by_implementation_worker"
     }
   },
+  "schema_publication_transition_authority": {
+    "path": "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.json",
+    "status": "permitted_not_accepted",
+    "authority_base_sha": "3391244ca07287e90fe5eba296d4a2d11e4f8918",
+    "scope": "exact selected 13-index DDL/schema identities, linked synthetic publication fixtures, and tiny-accounting EXPLAIN transition"
+  },
   "physical_decision": {
     "strategy": "branch_pruned_union_all_with_exact_evidence_order_indexes",
     "source_only_candidate": "insufficient_under_strict_no_temp_sort_gate",

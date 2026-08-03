@@ -40,6 +40,7 @@ from tests.agent_kernel.fixtures.oracles.database_replay import (
 from tests.agent_kernel.fixtures.oracles.reference import evaluate_question_case
 from tests.agent_kernel.fixtures.published_v2 import (
     PUBLICATION_ID,
+    case_for_schema_contract,
     publish_structural_snapshot,
     published_question_case,
     rate_card_frontier,
@@ -92,7 +93,7 @@ def test_all_80_cases_replay_through_real_ingestion_and_publication(
         connection = sqlite3.connect(database_path)
         case = published_question_case(connection, original)
         question = questions[case["question_id"]]
-        expected = evaluate_question_case(case, question)
+        expected = evaluate_question_case(case_for_schema_contract(connection, original), question)
         connection.execute("PRAGMA query_only = ON")
         actual = evaluate_published_question_case(
             connection,

@@ -28,6 +28,172 @@ inventory is unchanged. `active_rate_card` remains the publication-selected
 head; publication validation must reproduce its complete predecessor chain
 before promotion.
 
+## CK-08R3A schema/publication transition authority
+
+The canonical database-v1 contract above remains the predecessor contract
+until the CK-08R3A implementation is accepted. The selected EvidenceService
+candidate is permitted to requalify only with the exact transition below. It
+adds 13 evidence-order indexes, changes the resulting digest to
+`e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35`, and
+does not authorize any other schema, publication, selector, cursor, or query
+semantic change. The transition is a contract fixture, not an active DDL
+replacement on this authority branch.
+
+<!-- ck08r3a-evidence-indexes-ddl:start -->
+```sql
+-- CK-08R3A EvidenceService branch order.  These indexes mirror the
+-- seven-part keyset tuple exactly, including the normalized NULL-time
+-- expression and the transition tie-breaker.  The turn constants are part
+-- of the persisted stream contract for turn boundary rows.
+CREATE INDEX evidence_model_calls_by_session_order
+  ON model_calls(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    call_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_model_call_tail_by_session_order
+  ON model_call_tail(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    call_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_tools_by_session_order
+  ON tool_invocations(
+    session_id ASC,
+    (start_at_us IS NULL) ASC,
+    COALESCE(start_at_us, 0) ASC,
+    start_source_rank ASC,
+    start_source_order ASC,
+    start_event_kind_order ASC,
+    tool_id ASC,
+    start_transition_rank ASC
+  );
+CREATE INDEX evidence_activities_by_session_order
+  ON activities(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    activity_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_state_changes_by_session_order
+  ON state_changes(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    change_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_compactions_by_session_order
+  ON compaction_boundaries(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    compaction_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_context_components_by_session_order
+  ON context_components(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    component_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_turns_by_session_order
+  ON turns(
+    session_id ASC,
+    (start_at_us IS NULL) ASC,
+    COALESCE(start_at_us, 0) ASC,
+    0 ASC,
+    COALESCE(start_source_order, 0) ASC,
+    20 ASC,
+    turn_id ASC,
+    0 ASC
+  );
+CREATE INDEX evidence_lifecycle_timeline_order
+  ON lifecycle_transitions(
+    (transition_at_us IS NULL) ASC,
+    COALESCE(transition_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    transition_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_source_occurrences_by_logical_order
+  ON source_occurrences(
+    semantic_logical_id ASC,
+    record_ordinal ASC,
+    byte_start ASC,
+    byte_end ASC,
+    occurrence_id ASC
+  );
+CREATE INDEX evidence_tools_by_resource_order
+  ON tool_invocations(
+    primary_resource_id ASC,
+    (start_at_us IS NULL) ASC,
+    COALESCE(start_at_us, 0) ASC,
+    start_source_rank ASC,
+    start_source_order ASC,
+    start_event_kind_order ASC,
+    tool_id ASC,
+    start_transition_rank ASC
+  )
+  WHERE primary_resource_id IS NOT NULL;
+CREATE INDEX evidence_state_changes_by_resource_order
+  ON state_changes(
+    resource_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    change_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_allowance_observations_order
+  ON allowance_observations(
+    (observed_at_us IS NULL) ASC,
+    COALESCE(observed_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    observation_id ASC,
+    transition_rank ASC
+  );
+```
+<!-- ck08r3a-evidence-indexes-ddl:end -->
+
+The selected block is composed after the canonical `analytical-ddl` payload
+and before the unchanged operational payload only when the linked
+schema/publication authority is accepted. Its exact 57-index inventory,
+publication manifest bindings, frozen synthetic fixture digests, and the
+tiny-accounting covering-index expectation are recorded in
+`docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.json`.
+
 ## Contract boundaries
 
 The analytical artifact and operational sidecar are separate SQLite databases.
