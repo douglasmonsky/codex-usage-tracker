@@ -1,12 +1,12 @@
 {
-  "schema": "codex-usage-tracker.lifecycle-run-invocation-authority.v4",
-  "authority_version": 4,
+  "schema": "codex-usage-tracker.lifecycle-run-invocation-authority.v5",
+  "authority_version": 5,
   "owner": "CK-07R1A0",
-  "authority_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
+  "authority_base_sha": "7d5a4b1717db78891fd2c38d8803d7fe2f922986",
   "status": "blocked_no_run",
   "shared_preparation_binding": {
     "authority_main_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
-    "r3a_atomic_cohort_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+    "r3a_atomic_cohort_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
     "historical_d192_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
     "r3a_requires_complete_cohort": true,
     "direct_ck07_use_of_r3a_preparation": "forbidden",
@@ -101,7 +101,7 @@
       },
       {
         "name": "worker_prequalification",
-        "source_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+        "source_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
         "source_role": "selected_r3a_atomic_cohort_preparation",
         "runtime_acceptance": "not_claimed",
         "receipt_policy": "not_yet_available",
@@ -110,7 +110,7 @@
       },
       {
         "name": "post_single_run",
-        "source_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+        "source_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
         "source_role": "selected_r3a_atomic_cohort_preparation",
         "runtime_acceptance": "qualified_only_with_complete_planner_valid_receipt",
         "receipt_policy": "complete_planner_valid_receipt_required",
@@ -119,7 +119,7 @@
       },
       {
         "name": "final_accepted",
-        "source_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+        "source_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
         "source_role": "selected_r3a_atomic_cohort_preparation",
         "runtime_acceptance": "accepted_only_with_worker_merge_and_exact_main",
         "receipt_policy": "same_complete_planner_valid_receipt_identity_required",
@@ -205,12 +205,12 @@
   },
   "selected_candidate": {
     "status": "r3a_shared_preparation_not_ck07_candidate",
-    "base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
+    "base_sha": "7d5a4b1717db78891fd2c38d8803d7fe2f922986",
     "retained_branch": "not_applicable_until_ck07_reapplication",
     "retained_worktree": "not_applicable_until_ck07_reapplication",
     "witness_status": "r3a_candidate_retained_uncommitted_read_only_not_ck07_qualified",
     "source_predecessor_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
-    "source_successor_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+    "source_successor_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
     "runtime_acceptance": "not_claimed",
     "requires_complete_r3a_cohort": true,
     "direct_ck07_use": "forbidden",
@@ -218,7 +218,7 @@
     "artifacts": [
       {
         "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
-        "sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+        "sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
         "role": "r3a_shared_preparation_not_ck07_source"
       },
       {
@@ -340,19 +340,58 @@
         "seed": 20260728
       },
       "fixture_files": [
-        {"path": "tests/agent_kernel/fixtures/profiles/standard-v1.json", "fixture_file_sha256": "ef0da880255a0b13ea6055e0f8d748870c075635aa6f199c9521462c681250f3"},
-        {"path": "tests/agent_kernel/fixtures/profiles/production-v1.json", "fixture_file_sha256": "2de0b4dc198603da6c1b0905b8d934e2cd5604e4036ef009d0cd07f1cc81f51b"},
-        {"path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0000.jsonl", "fixture_file_sha256": "bad29500048dcff994d4211ff6de446c48d51184ab00caa134a7d668a6e57191"},
-        {"path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0001.jsonl", "fixture_file_sha256": "d3ddb9592d67f058b7b7b354c7e01ff159d195c3963e0780be7a4cf35ec9a5eb"},
-        {"path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0002.jsonl", "fixture_file_sha256": "114dadd49888fe77bfa1690b0fb810820950dea80d04ff11b233cd14bab54605"},
-        {"path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0003.jsonl", "fixture_file_sha256": "12ccb3114f5f4583e98e6e0d8a485b2c1479762b93cd8e6008c9be14edfd2a5d"},
-        {"path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0004.jsonl", "fixture_file_sha256": "0729952c7d2c250608ac0913a9d4a879c09b3bf252d86ee84b6b333000b66514"},
-        {"path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0005.jsonl", "fixture_file_sha256": "cbfdfbb7f0f463c087c058b0f49cfdb6ec0ff72da5afa14d293b06a3f2ee817f"},
-        {"path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0006.jsonl", "fixture_file_sha256": "f7693618223a2de73d5dcfc0c645f13455c480a721641b4d790c278744283729"},
-        {"path": "tests/agent_kernel/fixtures/tiny-v1/sources/archived/exact-copy.jsonl", "fixture_file_sha256": "34709a9e5b6c52438f7c5710c9480db9a2641fbd33e25d8e6c767c383502a65f"},
-        {"path": "tests/agent_kernel/fixtures/tiny-v1/sources/malformed/malformed.jsonl", "fixture_file_sha256": "cdfbf46b0d9524c5c9b16b6672eb98cd9f1b413703cd75f8ca9b833e96e5ac4d"},
-        {"path": "tests/agent_kernel/fixtures/tiny-v1/sources/replaced/revision-1.jsonl", "fixture_file_sha256": "de66394d849cab6e4936af84b4991e36c1cdf6746f0ab90c7c39dd1ca10761e1"},
-        {"path": "tests/agent_kernel/fixtures/tiny-v1/sources/truncated/truncated.jsonl", "fixture_file_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+        {
+          "path": "tests/agent_kernel/fixtures/profiles/standard-v1.json",
+          "fixture_file_sha256": "ef0da880255a0b13ea6055e0f8d748870c075635aa6f199c9521462c681250f3"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/profiles/production-v1.json",
+          "fixture_file_sha256": "2de0b4dc198603da6c1b0905b8d934e2cd5604e4036ef009d0cd07f1cc81f51b"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0000.jsonl",
+          "fixture_file_sha256": "bad29500048dcff994d4211ff6de446c48d51184ab00caa134a7d668a6e57191"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0001.jsonl",
+          "fixture_file_sha256": "d3ddb9592d67f058b7b7b354c7e01ff159d195c3963e0780be7a4cf35ec9a5eb"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0002.jsonl",
+          "fixture_file_sha256": "114dadd49888fe77bfa1690b0fb810820950dea80d04ff11b233cd14bab54605"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0003.jsonl",
+          "fixture_file_sha256": "12ccb3114f5f4583e98e6e0d8a485b2c1479762b93cd8e6008c9be14edfd2a5d"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0004.jsonl",
+          "fixture_file_sha256": "0729952c7d2c250608ac0913a9d4a879c09b3bf252d86ee84b6b333000b66514"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0005.jsonl",
+          "fixture_file_sha256": "cbfdfbb7f0f463c087c058b0f49cfdb6ec0ff72da5afa14d293b06a3f2ee817f"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/tiny-v1/sources/active/source-0006.jsonl",
+          "fixture_file_sha256": "f7693618223a2de73d5dcfc0c645f13455c480a721641b4d790c278744283729"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/tiny-v1/sources/archived/exact-copy.jsonl",
+          "fixture_file_sha256": "34709a9e5b6c52438f7c5710c9480db9a2641fbd33e25d8e6c767c383502a65f"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/tiny-v1/sources/malformed/malformed.jsonl",
+          "fixture_file_sha256": "cdfbf46b0d9524c5c9b16b6672eb98cd9f1b413703cd75f8ca9b833e96e5ac4d"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/tiny-v1/sources/replaced/revision-1.jsonl",
+          "fixture_file_sha256": "de66394d849cab6e4936af84b4991e36c1cdf6746f0ab90c7c39dd1ca10761e1"
+        },
+        {
+          "path": "tests/agent_kernel/fixtures/tiny-v1/sources/truncated/truncated.jsonl",
+          "fixture_file_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
       ],
       "dynamic_digest": {
         "field": "workload_transition_digest",
@@ -371,11 +410,56 @@
       "profiled": false,
       "seed": 20260728,
       "workloads": [
-        {"name": "standard_30_day", "source_profile": "standard", "history_preset": "30_days", "model_calls": 2740, "entities": 685, "observations": 1369, "seed": 20260728, "profile_file_sha256": "ef0da880255a0b13ea6055e0f8d748870c075635aa6f199c9521462c681250f3"},
-        {"name": "production_all_time", "source_profile": "production", "history_preset": "all_time", "model_calls": 1316864, "entities": 329216, "observations": 658431, "seed": 20260728, "profile_file_sha256": "2de0b4dc198603da6c1b0905b8d934e2cd5604e4036ef009d0cd07f1cc81f51b"},
-        {"name": "no_change", "source_profile": "synthetic_tail", "history_preset": "all_time", "model_calls": 0, "entities": 0, "observations": 0, "seed": 20260728, "profile_file_sha256": null},
-        {"name": "one_call_tail", "source_profile": "synthetic_tail", "history_preset": "all_time", "model_calls": 0, "entities": 1, "observations": 1, "seed": 20260728, "profile_file_sha256": null},
-        {"name": "one_tool_tail", "source_profile": "synthetic_tail", "history_preset": "all_time", "model_calls": 0, "entities": 1, "observations": 1, "seed": 20260728, "profile_file_sha256": null}
+        {
+          "name": "standard_30_day",
+          "source_profile": "standard",
+          "history_preset": "30_days",
+          "model_calls": 2740,
+          "entities": 685,
+          "observations": 1369,
+          "seed": 20260728,
+          "profile_file_sha256": "ef0da880255a0b13ea6055e0f8d748870c075635aa6f199c9521462c681250f3"
+        },
+        {
+          "name": "production_all_time",
+          "source_profile": "production",
+          "history_preset": "all_time",
+          "model_calls": 1316864,
+          "entities": 329216,
+          "observations": 658431,
+          "seed": 20260728,
+          "profile_file_sha256": "2de0b4dc198603da6c1b0905b8d934e2cd5604e4036ef009d0cd07f1cc81f51b"
+        },
+        {
+          "name": "no_change",
+          "source_profile": "synthetic_tail",
+          "history_preset": "all_time",
+          "model_calls": 0,
+          "entities": 0,
+          "observations": 0,
+          "seed": 20260728,
+          "profile_file_sha256": null
+        },
+        {
+          "name": "one_call_tail",
+          "source_profile": "synthetic_tail",
+          "history_preset": "all_time",
+          "model_calls": 0,
+          "entities": 1,
+          "observations": 1,
+          "seed": 20260728,
+          "profile_file_sha256": null
+        },
+        {
+          "name": "one_tool_tail",
+          "source_profile": "synthetic_tail",
+          "history_preset": "all_time",
+          "model_calls": 0,
+          "entities": 1,
+          "observations": 1,
+          "seed": 20260728,
+          "profile_file_sha256": null
+        }
       ]
     },
     "tail_limits": {
@@ -411,7 +495,14 @@
       "selection": "plan_refresh alone selects append_safe_small; no manually constructed PublicationPlan or operation-class override",
       "unchanged_plan": {
         "identity": "the exact object returned by plan_refresh is passed to the writer",
-        "record": ["planner_operation_class", "planner_reason", "planner_tail_limits", "planner_change_estimate", "plan_digest_before_writer", "plan_digest_at_writer"],
+        "record": [
+          "planner_operation_class",
+          "planner_reason",
+          "planner_tail_limits",
+          "planner_change_estimate",
+          "plan_digest_before_writer",
+          "plan_digest_at_writer"
+        ],
         "verify": "plan_digest_before_writer equals plan_digest_at_writer and all serialized plan fields remain unchanged"
       },
       "identity_binding": [
@@ -440,7 +531,16 @@
     },
     "successful_process_launch": {
       "definition": "child creation returns a PID and the child is observed with the exact command and required cwd",
-      "record": ["pid", "parent_pid", "launched_at_utc", "launched_monotonic_ns", "argv", "cwd", "interpreter", "run_token_id"],
+      "record": [
+        "pid",
+        "parent_pid",
+        "launched_at_utc",
+        "launched_monotonic_ns",
+        "argv",
+        "cwd",
+        "interpreter",
+        "run_token_id"
+      ],
       "token": "consume exactly one run token at this stage and only at this stage"
     },
     "runtime_and_completion": {
@@ -499,10 +599,32 @@
     "writer_only_receipt_digest": "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d",
     "source_predecessor_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
     "source_successor_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-    "runtime_budgets_ms": {"first_publication_30_day": 5000, "production_all_time": 120000, "no_change": 100, "one_call_tail": 500, "one_tool_tail": 500},
-    "package_ceilings_bytes": {"sdist": 2000000, "wheel": 1000000},
-    "pr_394": {"number": 394, "head_sha": "98a9b5b82951d136644a5fe5f8a70d320131ba08", "workflow_run_id": "30685780055", "failed_job_id": "91331138768", "failure": "ordinary.2000_call_tail", "status": "stale_failed_superseded_read_only", "policy": "do_not_update_rerun_merge_or_reinterpret"},
-    "prior_attempt_ids": ["all-profile-initial-serializer", "all-profile-corrected-serializer-tail-oracle", "all-profile-pid-60367-recovery", "production-only-valid-profile"],
+    "runtime_budgets_ms": {
+      "first_publication_30_day": 5000,
+      "production_all_time": 120000,
+      "no_change": 100,
+      "one_call_tail": 500,
+      "one_tool_tail": 500
+    },
+    "package_ceilings_bytes": {
+      "sdist": 2000000,
+      "wheel": 1000000
+    },
+    "pr_394": {
+      "number": 394,
+      "head_sha": "98a9b5b82951d136644a5fe5f8a70d320131ba08",
+      "workflow_run_id": "30685780055",
+      "failed_job_id": "91331138768",
+      "failure": "ordinary.2000_call_tail",
+      "status": "stale_failed_superseded_read_only",
+      "policy": "do_not_update_rerun_merge_or_reinterpret"
+    },
+    "prior_attempt_ids": [
+      "all-profile-initial-serializer",
+      "all-profile-corrected-serializer-tail-oracle",
+      "all-profile-pid-60367-recovery",
+      "production-only-valid-profile"
+    ],
     "preservation": "all prior run identities, attempts, timestamps, failures, receipts, and digests remain visible and read-only; no old receipt is upgraded"
   },
   "feasibility": {
@@ -536,5 +658,10 @@
       "PR #394",
       "downstream packets"
     ]
+  },
+  "previous_r3a_shared_preparation": {
+    "sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+    "status": "revoked_for_session_boundedness_requalification",
+    "direct_use": "forbidden"
   }
 }

@@ -195,13 +195,13 @@ def test_argv_correction_preserves_first_failure_and_one_run_gate() -> None:
 def test_selected_candidate_is_r3a_shared_preparation_only_and_ck07_stays_blocked() -> None:
     authority = _authority()
     candidate = authority["selected_candidate"]
-    assert authority["schema"] == "codex-usage-tracker.lifecycle-run-invocation-authority.v4"
-    assert authority["authority_version"] == 4
-    assert authority["authority_base_sha"] == "ee4a064bf8850bceb362fbe73e40a57fe4af55d6"
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-run-invocation-authority.v5"
+    assert authority["authority_version"] == 5
+    assert authority["authority_base_sha"] == "7d5a4b1717db78891fd2c38d8803d7fe2f922986"
     assert authority["status"] == "blocked_no_run"
     assert authority["shared_preparation_binding"] == {
         "authority_main_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
-        "r3a_atomic_cohort_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+        "r3a_atomic_cohort_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
         "historical_d192_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
         "r3a_requires_complete_cohort": True,
         "direct_ck07_use_of_r3a_preparation": "forbidden",
@@ -214,14 +214,14 @@ def test_selected_candidate_is_r3a_shared_preparation_only_and_ck07_stays_blocke
     assert candidate["status"] == "r3a_shared_preparation_not_ck07_candidate"
     assert candidate["base_sha"] == authority["authority_base_sha"]
     assert candidate["source_successor_sha256"] == (
-        "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174"
+        "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c"
     )
     assert candidate["requires_complete_r3a_cohort"] is True
     assert candidate["direct_ck07_use"] == "forbidden"
     assert candidate["launch_authorized"] is False
     assert candidate["artifacts"][0] == {
         "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
-        "sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+        "sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
         "role": "r3a_shared_preparation_not_ck07_source",
     }
     assert candidate["binding"] == (
@@ -251,7 +251,7 @@ def test_finite_source_runtime_state_machine_is_exact_and_currently_unlaunched()
         "merge_policy": "current_authority_state",
     }
     assert machine["states"][1]["source_sha256"] == (
-        "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174"
+        "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c"
     )
     assert machine["states"][1]["source_role"] == "selected_r3a_atomic_cohort_preparation"
     assert machine["states"][1]["runtime_acceptance"] == "not_claimed"
