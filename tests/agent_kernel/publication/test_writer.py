@@ -75,6 +75,108 @@ def _tiny_changes():
     ).changes
 
 
+def _provenance_write_set(operation_id: str = "operation:provenance"):
+    changes = _tiny_changes()
+    request = _request(operation_id)
+    return changes, prepare_write_set_from_changes(changes, request)
+
+
+def test_turn_provenance_persists_nonzero_rank_and_null_order_fallback() -> None:
+    changes = _tiny_changes()
+    target = next(
+        item for item in changes.observations if item.observation_type == "TurnBoundaryObserved"
+    )
+    target_key = target.source_range.manifestation_key
+    observations = []
+    for item in changes.observations:
+        if item is target:
+            item = replace(item, source_rank=3)
+            # AdapterObservation is normally non-null; this models a legacy
+            # proposal reaching the defensive current-schema boundary.
+            object.__setattr__(item, "source_order", None)
+        observations.append(item)
+    selected_sources = tuple(
+        replace(item, source_rank=3) if item.manifestation_key == target_key else item
+        for item in changes.selected_sources
+    )
+    candidate = replace(
+        changes,
+        observations=tuple(observations),
+        selected_sources=selected_sources,
+    )
+    write_set = prepare_write_set_from_changes(candidate, _request("operation:provenance"))
+    row = next(
+        row
+        for row in write_set.rows
+        if row.table == "turns" and row.values["primary_occurrence_id"] == target.occurrence_id
+    )
+    assert row.values["start_source_rank"] == 3
+    assert row.values["start_source_order"] == target.source_range.record_ordinal
+
+
+@pytest.mark.parametrize("failure", ("rank", "unresolved", "ambiguous", "manifestation", "lifecycle"))
+def test_turn_provenance_rejects_unresolved_or_mismatched_candidates(failure: str) -> None:
+    changes, write_set = _provenance_write_set(f"operation:provenance-{failure}")
+    turn_row = next(row for row in write_set.rows if row.table == "turns")
+    occurrence_id = str(turn_row.values["primary_occurrence_id"])
+    bad_rows = list(write_set.rows)
+    row_index = bad_rows.index(turn_row)
+    values = dict(turn_row.values)
+    bad_changes = changes
+    if failure == "rank":
+        values["start_source_rank"] = int(values["start_source_rank"]) + 1
+    elif failure == "unresolved":
+        bad_changes = replace(
+            changes,
+            occurrences=tuple(
+                item for item in changes.occurrences if item.occurrence_id != occurrence_id
+            ),
+        )
+    elif failure == "ambiguous":
+        observation = next(
+            item
+            for item in changes.observations
+            if item.observation_type == "TurnBoundaryObserved"
+            and item.logical_id == turn_row.values["turn_id"]
+        )
+        duplicate = replace(
+            observation,
+            source_range=replace(
+                observation.source_range,
+                record_ordinal=observation.source_range.record_ordinal + 1,
+                byte_start=observation.source_range.byte_start + 1,
+                byte_end=observation.source_range.byte_end + 1,
+            ),
+        )
+        bad_changes = replace(changes, observations=(*changes.observations, duplicate))
+    elif failure == "manifestation":
+        bad_changes = replace(
+            changes,
+            selected_sources=tuple(
+                replace(item, manifestation_id="source-manifestation:wrong")
+                if item.manifestation_key
+                == next(
+                    occurrence.source_range.manifestation_key
+                    for occurrence in changes.occurrences
+                    if occurrence.occurrence_id == occurrence_id
+                )
+                else item
+                for item in changes.selected_sources
+            ),
+        )
+    else:
+        start_at_us = int(values["start_at_us"] or 0)
+        values["end_at_us"] = start_at_us - 1
+    bad_rows[row_index] = replace(turn_row, values=values)
+    bad_write_set = replace(write_set, changes=bad_changes, rows=tuple(bad_rows))
+    connection = sqlite3.connect(":memory:")
+    try:
+        with pytest.raises(PublicationWriteError):
+            PublicationWriter(connection)._validate_turn_provenance(bad_write_set)
+    finally:
+        connection.close()
+
+
 def test_tiny_fixture_publication_is_atomic_exact_and_idempotent(tmp_path: Path) -> None:
     changes = _tiny_changes()
     request = _request()

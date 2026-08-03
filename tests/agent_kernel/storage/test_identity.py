@@ -255,6 +255,7 @@ def test_repository_domain_models_expose_exact_selected_row_fields() -> None:
             "terminal_error_category",
             "measurement_mask",
             "first_seen_publication_id",
+            "session_id",
         ),
         LifecycleFold: (
             "entity_logical_id",
@@ -376,6 +377,7 @@ def test_domain_aggregate_and_lifecycle_models_preserve_missing_values() -> None
         None,
         0,
         "publication:test",
+        "session:test",
     )
     fold = LifecycleFold(
         "tool:test",

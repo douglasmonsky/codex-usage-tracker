@@ -1048,6 +1048,9 @@ def build_query_only_database(declaration: Mapping[str, Any]) -> sqlite3.Connect
         )
     for fact in by_relation["turn"]:
         values = fact["values"]
+        boundary = values.get("first_boundary_coordinates", {})
+        start_source_rank = int(boundary.get("source_rank", 0))
+        start_source_order = int(boundary.get("source_order", 1))
         insert(
             "turns",
             {
@@ -1059,8 +1062,9 @@ def build_query_only_database(declaration: Mapping[str, Any]) -> sqlite3.Connect
                 "transition_version": 1,
                 "start_at_us": values["start_at_us"],
                 "end_at_us": values["end_at_us"],
-                "start_source_order": 1,
-                "end_source_order": 2,
+                "start_source_rank": start_source_rank,
+                "start_source_order": start_source_order,
+                "end_source_order": start_source_order + 1,
                 "completion_basis": values["completion_basis"],
                 "membership_json": "{}",
                 "primary_occurrence_id": occurrence_id(fact["logical_id"]),

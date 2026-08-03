@@ -31,6 +31,9 @@ _TINY_ACCOUNTING_INDEX_BY_SCHEMA = {
     "e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35": (
         "evidence_source_occurrences_by_logical_order"
     ),
+    "998343ba4b52bb39decfcb436f8a862d41884fc6f6a6b4e88f7e8f8e42446295": (
+        "evidence_source_occurrences_by_logical_order"
+    ),
 }
 
 
@@ -279,11 +282,12 @@ def _tiny_accounting_connection(accounting: dict[str, Any]) -> sqlite3.Connectio
             """
             INSERT INTO turns (
               turn_id, session_id, ordinal, lifecycle_state, state_basis,
-              transition_version, start_at_us, end_at_us, start_source_order,
+              transition_version, start_at_us, end_at_us, start_source_rank,
+              start_source_order,
               end_source_order, completion_basis, membership_json,
               primary_occurrence_id, first_seen_publication_id,
               last_seen_publication_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 f"turn:{index:02d}",
@@ -294,6 +298,7 @@ def _tiny_accounting_connection(accounting: dict[str, Any]) -> sqlite3.Connectio
                 1,
                 index,
                 index + 1,
+                0,
                 index,
                 index + 1,
                 "synthetic",
