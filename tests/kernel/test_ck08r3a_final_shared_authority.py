@@ -8,7 +8,6 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-
 _ROOT = Path(__file__).resolve().parents[2]
 _AUTHORITY_PATH = _ROOT / "docs/decisions/evidence/ck08r3a/final-shared-authority.json"
 _SCHEMA_PATH = _ROOT / "docs/decisions/evidence/ck08r3a/final-shared-authority.schema.json"
