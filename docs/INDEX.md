@@ -29,8 +29,9 @@ Conditional Ready and implementation remains unaccepted. The exact
 keeps predecessor handling rejection-only and binds exact
 zero-based nonnegative turn-rank equality, including valid rank 0 and
 preserved rank >0, across manifestation, observation, persisted turn, and
-EvidenceService evidence. Its exact five-production/seven-support cohort and
-fixture/DDL identities are permitted, not accepted.
+EvidenceService evidence. Its exact atomic seven-production/nine-support
+cohort and fixture/DDL identities, including the session-leading lifecycle
+index, are permitted, not accepted.
 R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`;
 R1B remains held on shared query/evidence/grading integration before final R1
 requalification.
@@ -45,8 +46,9 @@ and [run-invocation authority](decisions/evidence/ck07r1a0/lifecycle-run-invocat
 keep CK-07R1 `blocked_hold`
 (`docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json`).
 The shared-preparation transition is exactly two-state: live exact-main
-preparation `408d18e4…` before R3A, and `e204e0da…` only inside the complete
-R3A cohort after its acceptance. Historical candidate `d192c858…` is retained
+preparation `408d18e4…` before R3A, and the current session-bounded preparation
+`6689d61f…` only inside the complete R3A cohort after its acceptance. Prior
+candidate `e204e0da…` and historical candidate `d192c858…` are retained
 read-only, revoked for the new base, and forbidden for direct use. CK-07 must
 later reapply its retained lifecycle diff onto the accepted R3A base to derive
 a new exact preparation digest before any run. PR #394 remains a stale failed

@@ -1,11 +1,11 @@
 {
-  "schema": "codex-usage-tracker.ck08r3a-evidence-service-supersession-authority.v3",
+  "schema": "codex-usage-tracker.ck08r3a-evidence-service-supersession-authority.v4",
   "owner": "CK-08R3A",
-  "authority_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
+  "authority_base_sha": "7d5a4b1717db78891fd2c38d8803d7fe2f922986",
   "base_transition": {
     "original_authority_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
-    "integrated_origin_main_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
-    "upstream_change": "final shared authority requalification from exact main"
+    "integrated_origin_main_sha": "7d5a4b1717db78891fd2c38d8803d7fe2f922986",
+    "upstream_change": "lifecycle session boundedness requalification from exact main"
   },
   "source_path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
   "predecessor": {
@@ -25,10 +25,20 @@
         "rate_card_paged_scope_rejected"
       ],
       "evidence_status": "preserved_read_only"
+    },
+    {
+      "sha256": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3",
+      "status": "rejected_non_acceptable",
+      "task": "019fbe2b-20e8-78b2-a687-0231b159d0c7",
+      "reason_codes": [
+        "entity_leading_lifecycle_requires_temp_sort_under_foreign_history",
+        "session_page_boundedness_not_proven"
+      ],
+      "evidence_status": "preserved_read_only"
     }
   ],
   "selected_successor": {
-    "sha256": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3",
+    "sha256": "4458ffb03adeed838fcda992747dbaeb192ccf59728b3a54e1527abc4d0651fb",
     "status": "permitted_not_accepted",
     "implementation_task": "019fbe2b-20e8-78b2-a687-0231b159d0c7",
     "blocked_task": "019fbbc0-cd25-7041-a847-b0098dfae29d",
@@ -36,33 +46,75 @@
       {
         "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
         "role": "source",
-        "sha256": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3"
+        "sha256": "4458ffb03adeed838fcda992747dbaeb192ccf59728b3a54e1527abc4d0651fb"
       },
       {
         "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
         "role": "evidence_order_indexes",
-        "sha256": "40254b62510e9c92b049e3608dfad99a208de2fd2d2762f376d32dc81a7d5838"
+        "sha256": "34b6aab813dbd520f1894ac3ccbce1a1b3ff4552a11f0a83597a897a0c8f7486"
       },
       {
         "path": "src/codex_usage_tracker/agent_kernel/storage/schema.py",
         "role": "schema_contract_digest",
-        "sha256": "af0877db25df1010e282a48c72c020785be92c211d70a733e309c40f82611fbe"
+        "sha256": "9850a431729c7eb8d5347278d0434f0849d1843297645547ee2dcd66a0359b77"
+      }
+    ],
+    "required_atomic_cohort": [
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+        "role": "evidence_service_source",
+        "sha256": "4458ffb03adeed838fcda992747dbaeb192ccf59728b3a54e1527abc4d0651fb"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "role": "publication_preparation",
+        "sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+        "role": "publication_writer",
+        "sha256": "13da341fc2a3c50d8d7de7fd6a6fc2b0aca0dbc832a9b56597cd96ab67d17488"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+        "role": "analytical_ddl",
+        "sha256": "34b6aab813dbd520f1894ac3ccbce1a1b3ff4552a11f0a83597a897a0c8f7486"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/storage/schema.py",
+        "role": "schema_contract",
+        "sha256": "9850a431729c7eb8d5347278d0434f0849d1843297645547ee2dcd66a0359b77"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/domain/models.py",
+        "role": "domain_models",
+        "sha256": "32eee9fba0cf7e2fc9933cd3f5e02ec39bf847b4c9196cab9917e464b339e9c2"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/storage/lifecycle.py",
+        "role": "lifecycle_storage",
+        "sha256": "bf0b6b2cf098e063b072939c005c9500260fb758a3267050ac9ac206a8cba2a7"
       }
     ],
     "required_evidence": {
       "test_path": "tests/agent_kernel/evidence/test_service.py",
       "schema": "codex-usage-tracker.evidence-scale-qualification.v1",
-      "status": "must_be_regenerated_by_implementation_worker"
+      "status": "must_be_regenerated_by_implementation_worker",
+      "foreign_lifecycle_rows": [
+        0,
+        1000,
+        5000
+      ]
     }
   },
   "schema_publication_transition_authority": {
     "path": "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.json",
     "status": "permitted_not_accepted",
-    "authority_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
-    "scope": "exact selected 13-index DDL/schema identities, linked synthetic publication fixtures, and tiny-accounting EXPLAIN transition"
+    "authority_base_sha": "7d5a4b1717db78891fd2c38d8803d7fe2f922986",
+    "scope": "exact current session-leading lifecycle DDL/schema identities, linked synthetic publication fixtures, and tiny-accounting EXPLAIN transition"
   },
   "physical_decision": {
-    "strategy": "branch_pruned_union_all_with_exact_evidence_order_indexes",
+    "strategy": "branch_pruned_union_all_with_persisted_session_leading_lifecycle_order",
     "source_only_candidate": "insufficient_under_strict_no_temp_sort_gate",
     "ddl_required": true,
     "scope": "session-scoped first/deep EvidenceService pages, all supported page views and directions, plus valid-empty rate_card pages",
@@ -75,7 +127,7 @@
       "evidence_compactions_by_session_order",
       "evidence_context_components_by_session_order",
       "evidence_turns_by_session_order",
-      "evidence_lifecycle_timeline_order",
+      "evidence_lifecycle_by_session_order",
       "evidence_source_occurrences_by_logical_order",
       "evidence_tools_by_resource_order",
       "evidence_state_changes_by_resource_order",
@@ -95,14 +147,21 @@
       "maximum_rows": 100,
       "maximum_response_bytes": 16384,
       "one_query_only_publication_snapshot": true
-    }
+    },
+    "rejected_join_only": "entity-leading lifecycle access emits USE TEMP B-TREE FOR ORDER BY under unrelated foreign history"
   },
   "reproduced_findings": {
     "synthetic_only": true,
     "predecessor_activity_scale": {
       "timeline_limit": 7,
-      "activity_rows": [2000, 10000],
-      "progress_callbacks": [990, 4750],
+      "activity_rows": [
+        2000,
+        10000
+      ],
+      "progress_callbacks": [
+        990,
+        4750
+      ],
       "forbidden_plan_markers": [
         "MATERIALIZE model_calls_visible",
         "SCAN stream",
@@ -115,10 +174,24 @@
       "calls": "unsupported evidence scope"
     },
     "selected_successor_recheck": {
-      "activity_rows": [2000, 10000],
-      "decoded_rows": [8, 8],
-      "progress_callbacks_per_100_vm_ops": [27, 25],
-      "forbidden_plan_markers": []
+      "activity_rows": [
+        2000,
+        10000
+      ],
+      "decoded_rows": [
+        8,
+        8
+      ],
+      "progress_callbacks_per_100_vm_ops": [
+        27,
+        25
+      ],
+      "forbidden_plan_markers": [],
+      "foreign_lifecycle_rows": [
+        0,
+        1000,
+        5000
+      ]
     }
   },
   "compatibility": {
@@ -136,6 +209,8 @@
     "candidate_implementation_not_accepted",
     "exact_required_artifact_paths_and_digests",
     "no_ck08r3_scale_or_downstream_dispatch_before_acceptance",
-    "generic_digest_drift_forbidden"
+    "generic_digest_drift_forbidden",
+    "session_id_persistence_and_session_leading_lifecycle_index_required",
+    "current_selected_cohort_is_atomic_and_mixed_cohorts_fail_closed"
   ]
 }

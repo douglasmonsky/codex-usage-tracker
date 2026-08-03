@@ -1,16 +1,16 @@
 {
-  "schema": "codex-usage-tracker.lifecycle-source-digest-authority.v5",
-  "authority_version": 5,
+  "schema": "codex-usage-tracker.lifecycle-source-digest-authority.v6",
+  "authority_version": 6,
   "owner": "CK-07R1A0",
-  "authority_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
+  "authority_base_sha": "7d5a4b1717db78891fd2c38d8803d7fe2f922986",
   "source_path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
   "status": "blocked_hold",
   "acceptance_state": {
     "status": "conditional_two_state_no_run",
     "authority_main_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
-    "r3a_atomic_cohort_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+    "r3a_atomic_cohort_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
     "historical_d192_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-    "binding": "408d18e4 remains the live source before R3A; e204e0da is permitted only inside the complete R3A cohort",
+    "binding": "408d18e4 remains the live source before R3A; the current session-bounded preparation is permitted only inside the complete current R3A cohort; prior e204e0da and historical d192c858 are forbidden",
     "runtime_acceptance": "not_claimed",
     "direct_use_of_d192": "forbidden",
     "worker_reapplication_required": true,
@@ -21,11 +21,27 @@
     "run_authority_schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
     "current_state": "authority_main",
     "states": [
-      {"name": "authority_main", "source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872", "source_role": "live_predecessor", "runtime_acceptance": "not_claimed"},
-      {"name": "r3a_worker_prequalification", "source_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174", "source_role": "selected_r3a_atomic_cohort_preparation", "runtime_acceptance": "not_claimed", "requires_complete_r3a_cohort": true},
-      {"name": "ck07_requalification", "source_sha256": "new_digest_required_after_reapplication", "source_role": "future_ck07_successor", "runtime_acceptance": "not_available"}
+      {
+        "name": "authority_main",
+        "source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+        "source_role": "live_predecessor",
+        "runtime_acceptance": "not_claimed"
+      },
+      {
+        "name": "r3a_worker_prequalification",
+        "source_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
+        "source_role": "selected_r3a_atomic_cohort_preparation",
+        "runtime_acceptance": "not_claimed",
+        "requires_complete_r3a_cohort": true
+      },
+      {
+        "name": "ck07_requalification",
+        "source_sha256": "new_digest_required_after_reapplication",
+        "source_role": "future_ck07_successor",
+        "runtime_acceptance": "not_available"
+      }
     ],
-    "source_digest_rule": "authority_main remains 408d18e4; e204e0da may enter only with every selected R3A production and support identity; CK-07 later requires a newly derived preparation digest",
+    "source_digest_rule": "authority_main remains 408d18e4; the current session-bounded preparation may enter only with every selected R3A production and support identity; prior e204e0da is superseded and CK-07 later requires a newly derived preparation digest",
     "other_digest": "fail_closed",
     "current_runtime_claim": "not_claimed",
     "launch_state": "blocked_hold_no_run"
@@ -39,10 +55,10 @@
     }
   },
   "selected_successor": {
-    "sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+    "sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
     "status": "permitted_not_accepted",
     "role": "selected_r3a_atomic_cohort_preparation",
-    "base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
+    "base_sha": "7d5a4b1717db78891fd2c38d8803d7fe2f922986",
     "requires_full_r3a_cohort": true,
     "direct_ck07_use": "forbidden",
     "mixed_state": "fail_closed",
@@ -59,15 +75,28 @@
     "reason": "built against the predecessor preparation base and not directly applicable after the R3A shared preparation transition"
   },
   "allowed_scope": {
-    "files": ["src/codex_usage_tracker/agent_kernel/publication/preparation.py", "scripts/benchmark_ck07r1_lifecycle_scale.py", "tests/agent_kernel/publication/test_lifecycle_scale.py"],
-    "lifecycle_symbols": ["codex_usage_tracker.agent_kernel.publication.preparation._WriteSetPreparer._build_lifecycle"],
-    "forbidden_files": ["src/codex_usage_tracker/agent_kernel/publication/planner.py", "src/codex_usage_tracker/agent_kernel/publication/writer.py", "src/codex_usage_tracker/agent_kernel/publication/recovery.py", "src/codex_usage_tracker/agent_kernel/storage/", "src/codex_usage_tracker/agent_kernel/query/", "src/codex_usage_tracker/agent_kernel/evidence/"]
+    "files": [
+      "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "scripts/benchmark_ck07r1_lifecycle_scale.py",
+      "tests/agent_kernel/publication/test_lifecycle_scale.py"
+    ],
+    "lifecycle_symbols": [
+      "codex_usage_tracker.agent_kernel.publication.preparation._WriteSetPreparer._build_lifecycle"
+    ],
+    "forbidden_files": [
+      "src/codex_usage_tracker/agent_kernel/publication/planner.py",
+      "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+      "src/codex_usage_tracker/agent_kernel/publication/recovery.py",
+      "src/codex_usage_tracker/agent_kernel/storage/",
+      "src/codex_usage_tracker/agent_kernel/query/",
+      "src/codex_usage_tracker/agent_kernel/evidence/"
+    ]
   },
   "worker_revalidation": {
     "required": true,
     "worker_task": "019fbfe2-8fe4-7de2-9264-d58572366727",
     "start": "fresh exact-main worktree after accepted R3A cohort",
-    "reapply": "deliberately reapply the retained CK-07 lifecycle diff onto exact-main preparation e204e0da or the later accepted-main successor; do not mutate the retained witness",
+    "reapply": "deliberately reapply the retained CK-07 lifecycle diff onto exact-main preparation after the accepted current R3A cohort; do not mutate the retained witness",
     "derive_new_digest": true,
     "update_source_authority_before_run": true,
     "old_d192_reuse": "fail_closed",
@@ -82,9 +111,33 @@
     "writer_only_receipt_digest": "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d",
     "preservation": "all prior attempts, receipts, failures, tokens, and digests remain retained read-only; no old receipt is upgraded"
   },
-  "runtime_budgets_ms": {"first_publication_30_day": 5000, "production_all_time": 120000, "no_change": 100, "one_call_tail": 500, "one_tool_tail": 500},
-  "package_ceilings_bytes": {"sdist": 2000000, "wheel": 1000000},
+  "runtime_budgets_ms": {
+    "first_publication_30_day": 5000,
+    "production_all_time": 120000,
+    "no_change": 100,
+    "one_call_tail": 500,
+    "one_tool_tail": 500
+  },
+  "package_ceilings_bytes": {
+    "sdist": 2000000,
+    "wheel": 1000000
+  },
   "maximum_new_end_to_end_runs": 1,
   "run_status": "unspent_unavailable",
-  "constraints": ["generic_digest_drift_forbidden", "any_different_preparation_digest_fails_closed", "408d18e4_live_before_r3a", "e204e0da_requires_complete_r3a_cohort", "historical_d192_direct_use_forbidden", "blocked_hold_no_launch", "no_new_worker_or_downstream_ready_task_from_this_authority"]
+  "constraints": [
+    "generic_digest_drift_forbidden",
+    "any_different_preparation_digest_fails_closed",
+    "408d18e4_live_before_r3a",
+    "current_session_bounded_preparation_requires_complete_r3a_cohort",
+    "e204e0da_superseded_and_direct_use_forbidden",
+    "historical_d192_direct_use_forbidden",
+    "blocked_hold_no_launch",
+    "no_new_worker_or_downstream_ready_task_from_this_authority"
+  ],
+  "superseded_r3a_candidate": {
+    "sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+    "status": "revoked_for_session_boundedness_requalification",
+    "direct_use": "forbidden",
+    "reason": "the prior R3A preparation candidate predates the current session-leading lifecycle cohort"
+  }
 }

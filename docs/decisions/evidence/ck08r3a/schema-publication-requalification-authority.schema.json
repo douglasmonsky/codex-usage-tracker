@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-usage-tracker.invalid/schemas/ck08r3a-schema-publication-requalification-authority.v2.json",
+  "$id": "https://codex-usage-tracker.invalid/schemas/ck08r3a-schema-publication-requalification-authority-v3.json",
   "title": "CK-08R3A schema/publication requalification authority",
   "type": "object",
   "additionalProperties": false,
@@ -20,256 +20,463 @@
     "preserved_semantics",
     "forbidden_changes",
     "scope_additions",
-    "no_live_operation"
+    "no_live_operation",
+    "selected_artifact_manifest_sha256s",
+    "selected_published_v2"
   ],
   "properties": {
     "schema": {
-      "const": "codex-usage-tracker.ck08r3a-schema-publication-requalification-authority.v2"
+      "const": "codex-usage-tracker.ck08r3a-schema-publication-requalification-authority.v3"
     },
-    "owner": {"const": "CK-08R3A"},
-    "authority_version": {"const": 2},
-    "authority_base_sha": {"const": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6"},
-    "status": {"const": "permitted_not_accepted"},
+    "owner": {
+      "const": "CK-08R3A"
+    },
+    "authority_version": {
+      "const": 3
+    },
+    "authority_base_sha": {
+      "const": "7d5a4b1717db78891fd2c38d8803d7fe2f922986"
+    },
+    "status": {
+      "const": "permitted_not_accepted"
+    },
     "linked_r3a_authority": {
       "const": "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json"
     },
+    "schema_contract_transition": {
+      "const": {
+        "predecessor": {
+          "schema_contract_sha256": "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5",
+          "analytical_table_count": 42,
+          "analytical_index_count": 44,
+          "operational_table_count": 6,
+          "operational_index_count": 6
+        },
+        "selected": {
+          "schema_contract_sha256": "998343ba4b52bb39decfcb436f8a862d41884fc6f6a6b4e88f7e8f8e42446295",
+          "analytical_table_count": 42,
+          "analytical_index_count": 57,
+          "operational_table_count": 6,
+          "operational_index_count": 6
+        },
+        "ddl_marker": "ck08r3a-evidence-indexes",
+        "selected_index_names": [
+          "evidence_model_calls_by_session_order",
+          "evidence_model_call_tail_by_session_order",
+          "evidence_tools_by_session_order",
+          "evidence_activities_by_session_order",
+          "evidence_state_changes_by_session_order",
+          "evidence_compactions_by_session_order",
+          "evidence_context_components_by_session_order",
+          "evidence_turns_by_session_order",
+          "evidence_lifecycle_by_session_order",
+          "evidence_source_occurrences_by_logical_order",
+          "evidence_tools_by_resource_order",
+          "evidence_state_changes_by_resource_order",
+          "evidence_allowance_observations_order"
+        ]
+      }
+    },
+    "publication_fixture_transition": {
+      "const": {
+        "publication_id": "publication:ck07a-structural-v2",
+        "fixture_root": "tests/agent_kernel/fixtures/tiny-v2",
+        "oracle_order": {
+          "path": "tests/agent_kernel/fixtures/oracles/cases_v2.py",
+          "sha256": "4ab32f4f924aef5f71e3b3d48478e5ae33eb86736a3b75de4b52621f4dae679b",
+          "count": 80,
+          "tuple_digest": "d5dc9695f8d383b6a2cf9840c8ab9e816d32f561fa0fe814db8fe64f125af7b8"
+        },
+        "predecessor": {
+          "schema_contract_sha256": "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5",
+          "manifest": {
+            "path": "tests/agent_kernel/fixtures/tiny-v2/manifest.json",
+            "sha256": "6f0bf98dcf6d2d5b159e667dcbdf520228e62657f2978d036e24a72d666331fb"
+          },
+          "question_scenarios": {
+            "path": "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json",
+            "sha256": "f26fce4ba5bc75e2efb0e7bab698e2029af4152536dfc87a9c4329c749a347eb"
+          },
+          "oracle_bundle": {
+            "path": "tests/agent_kernel/fixtures/tiny-v2/oracle-bundle.json",
+            "sha256": "8086c4d1e4deb3f08ec2cb272e0d7336527a19f4119af9c1433f3c7ad2abc2c7"
+          },
+          "variant_count": 80
+        },
+        "selected": {
+          "schema_contract_sha256": "998343ba4b52bb39decfcb436f8a862d41884fc6f6a6b4e88f7e8f8e42446295",
+          "manifest": {
+            "path": "tests/agent_kernel/fixtures/tiny-v2/manifest.json",
+            "sha256": "fb40a8a91d6ad537171e7a23e3f6fa9bd519080b513981b9483f9791e5e99e7d"
+          },
+          "question_scenarios": {
+            "path": "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json",
+            "sha256": "6ffca4917386c5bc13237952904d2a560a531e37c6eeba89b69ea53d76f35cd8"
+          },
+          "oracle_bundle": {
+            "path": "tests/agent_kernel/fixtures/tiny-v2/oracle-bundle.json",
+            "sha256": "97b78d11fa64eb2dac0a5f605bd9056f331ac9dd1fd210703e5f42b23935b40e"
+          },
+          "variant_count": 80
+        },
+        "selected_artifact_manifest_sha256s": [
+          "da80c04f4f2bf635be2e2bf6944247b679149b1736cae739233a364d788f84fa",
+          "6a10a272eeaae7923f442fca3b379bc50b05acd73649c54de70c688c02a7de35",
+          "056a717c5f1cb9f329d12e8f2af1c8d06c6aaae650dd73fa98c668324995edc9",
+          "bb080ce4e67d95b24360b09c00145453b853c6e22e3baa39a263963f37929ae1",
+          "0eae23fdacc49d97fef85a95a0a5d8b3fb36a87424bf52543e28674fbc63d2ce",
+          "5e6b85e452aa00faf86c7d7ef6d143ddfd2cb5a25370f9fd1e34c50bcdf06a2d",
+          "8c9cd9fba18c1d3019bcbba407e6b443b281ee5b3122d01d94338fef3e22f273",
+          "987205ab71d770d207dcff1f85fb0b6bf698558af4a9e99fbae344a4e12839a0",
+          "aa5f5fc8be6cc57ff66e10fa6730cb4d895da1f89d78157d7323c976c0ef700a",
+          "0516f0afc7c91189469c7c298ba6c24f48010209a3ec03fd85b4e41759f9c9af",
+          "2a99b05fe43a9a51ba5e32424e7c0cc17bb563d784e5c56e5e85a8e21138c066",
+          "660eae8bacfd91252842884cbf34edc0b9f7ea3b47aa0aa934e1caff0f2807d5",
+          "9d4c1f9772712fbd9cc0962129fcd4a5fe3e163d6d372af5ffede844689e5bd3",
+          "cddb17e3ab06ac02f9f5e89eb0906b5d135578db9062a49e022b224e256b1c41",
+          "4ee6479777723e05ac405435dd7415565dd4e0f653332d79096c48b79dc63127",
+          "a665df7688fc7dc95369212119838afa95fadbbedf1458cb66c5a219a439a16b",
+          "3b8ae2ad301d06efe1450e934f2cabb1ccedb84baf261fbb29c14ad7b086c8cd",
+          "62c034f36f4393bdc830030f22ca27a4705d03ca89c357e0ab2885bf62d306dc",
+          "3efc490279e380a00ec950d6bc6a154085c050fae2af856f93e04cafbf223540",
+          "3dbda3e0c3920cce17c543e11133b6018dbe434a99c8cbe360890e5387081d08",
+          "d65fbe01baeb9ae0d7be33f359934b3f4075844422df341337c2aad7028bbe51",
+          "5f725926390ca0368771e7bace97e4df231372354033f0c4c96bb632bc63ec45",
+          "0671912727ffee1ef3b669a601cf47d6c5fa422729bfbc5809d0bf7bcf2971e4",
+          "2751471bd8503d67ad84d2e3451bd54e9c9cb9a46c335f2e427979de5232e0ea",
+          "7e3e5931e9e4d851715994109814cee31f64de522c61251a12a3149fb1ad18fe",
+          "35b9a30fd9adc4a0d0e4d80d91831313152a8323ad994d68ba41ea64f993fa35",
+          "9c422c77f0f96ceeb5dbd37a2f9b1ffbf9601a0a99da774131052052eb031748",
+          "cbf098b493c72d4c1381b5b848cb7d7243768a587ba671c49450504de963ade7",
+          "e6566b9299ec36d1058800ab262b705fea727775f97a59b0d5b5a67e96fe82b8",
+          "682dc1ff7e14d99a65bdcbfdd33dbab51bc240d6ff7d1ae0df588aacf99b8a92",
+          "dd4ee0a1d374883d48cc12584b6f3493586597566d35bc1de5656f838dd18c61",
+          "4bab8b9a2c62e5ebc468fcf7e97047d8d477768cef6637026016e672c1cd7f09",
+          "102736180a4be2e26335c831b01bf8b389f0f8699b47255e673da69473b9a6c8",
+          "66efcc3aad9162ce2fb41d6f7b5b466629fcd3a4da6e04076ed1b98cafd9306b",
+          "b13cdbcf96d8661da26cd72c0fb316ca2c441c668e6558134f91b8db96997b66",
+          "162d00c240a173943bdd4d53de5eee5cf1fe5f693b473e379b6e6ebcdfb81cde",
+          "8a0207e58bb7821b632bab180a3eb941440fa5a78059126c40070e9f550fa739",
+          "22db630ce103db655a77a3cbcdc5730bbc699a3000aede6f15503cb55d165ff3",
+          "65e5efba5b5894bb27dc2a53adde3df08b734f514d6f567baab5773ddae8fb0d",
+          "aa4ea9e238e4c816a3b187e83fbbb94765b6a23aa967526ab97c7397074c9149",
+          "593fc1f1b2cc81526fbfa0a4fe54efb9d1822015d2e699a332d55d1bb348c055",
+          "4569c91f6372fb8144fc376febed055bcb83d659df8ae7b3a48e1c361d1e07e6",
+          "f5c9b72afde032aef8dbb3426187fb2e1770779de7dc4be9f42c11c95616cd9d",
+          "f879a098c311b2a1a93856d48780131e1c1abc0bf3a3b004f4e97dc172a61e88",
+          "4ad8f60d9d84ee7255087d8b85520b2cdbaec4b64ab69f00273bec10b431200a",
+          "3e059e2b0869d4514e53563da33325c9cd426cedfc8016be71cbc4d0d557fdc9",
+          "5e891cdf01cbb52ee11bf867f46f30c88fa44c731afbb078191d74f9d48d9835",
+          "22dac5640aae8c3feddd899cacde3c3020c8a7a6e4130012a9440eb9f86a5146",
+          "d08a33f5ed6d44f1a166d8d6419b8218f9faef5bb6687ede22fc9bd22dbf8cd7",
+          "010de431786409e214d8d1d6d5e772ac908ead6f907fadae8402e962ae99d6d9",
+          "6b4e22c2d6b59d61104e56db635cf97ee9ccdcf5b103f38a37074e9ee9fcef9c",
+          "7bf881349c71fae6f891cb3b5d701f3c9cb7e7d81fe18f42b665774b5b3f2a87",
+          "6b54a26e18de291c85731bdef8aace5ac1a2b5a8c9ea0f77837d2dba9434020c",
+          "752156d16f5d6b70a7f82e33e2a146bc008f9ebbdc5659db07931eda200f84a4",
+          "36a42dc4a86fe167cc19e41143ff6a1c90d2cf6c46addcdb90e1118e87d289ee",
+          "1adb40c2dc91b31ac6bc46b98a14d3b3fb59d37cb29c23960df5b32d7e080a4b",
+          "daecfd2f4c46b900a5c568eb13d9dbb068bb04beecc033b7c392e151f8f1def0",
+          "bbbe67d481a4df63ad9e22a2b989f90d7af434e0b063072107ea7fbe6a385839",
+          "30aa589736c3b036b88b8751a178cff2118350a6975a350fcd82cde532966c04",
+          "f2918e8e3b70ae185041cec8abac745d567e91577ee9ecab7502beda3b823e34",
+          "828ebafcc48ae457c39a29f113f79777a0d6b6daeb27cad58ec932b6302c5472",
+          "9932446f3cabece2194b2bc646e5cff7efc952b7c759cad6d9a27debef06885a",
+          "bea175c1d0142793cdb5c78a17aa1ab3326ace19a1cd3c7464736065901577c4",
+          "da94cc9884ed68ee6187ef5eab55cf088e1c0bda53eef5bfe426b1cb98af9ac7",
+          "86946ece36b452fafb93b07822cc722914a9e6e7905be4206e3eb6f1a527be3b",
+          "c11844f1a0432aa016eeaadbcbdce8645a6c9204c67cab64da79a255d7e5111e",
+          "c4097184e5a32c0bfe5f6dcd6b8182620d855cb18d813cf642d31a4aa1b2d635",
+          "570f16c7eff1ced82cae8dfdefa2df2a8a7648e319638a97752d081d074aec2a",
+          "8257a739da568a0b97d98ef443dc47e698d22b4209fa8522c8d64e4fa635b2ce",
+          "6cd30b6fd44a3b2a57a13ed0b66e2f0e81ae896191919df54e7e5e0af546fb54",
+          "ce9ec1a7afcd8c4467377b8bfd18594b69cceb880ad079a5fa95447358d05832",
+          "c116e8cb3a6da384e149e519d5bcd7ea1b1cf26dd0a0e041ebf6a0b790989804",
+          "c409412a494737309098a84d3341cc59c25906bbc2d7b3cd64b0b50ff922b3b1",
+          "6f7d4da72501b3af99bda73dc218cbbe9e9b82d6dbf86bd1735c1fcd8006b2aa",
+          "028cdfaebf380ace5a122e12d1a16cbbbc1bd734570d56080f7c0b37900e45a7",
+          "8c0a7238b5ab8d410caab884fb531a83c5829fd817bef7c395f45303643bc876",
+          "dc5e6797315bfbfe5cc0745fbea48a250e18815386fab1ed1d10b83f7c489bc1",
+          "6d69749cceb0c06ec2f4c69b080ddc1f089450fda8fd1eac2d7467e884d6cf17",
+          "a399bc575a0b3b77e9dac93a6dbc73ae0f055ef9ef7f7f91f641febee4cb4a8b",
+          "31681c5999de1e1ea2fdb800fac5af137cb52c444241fbedb50be84a3261bce2"
+        ]
+      }
+    },
+    "selected_artifact_manifest_sha256s": {
+      "const": [
+        "31ad1ec4a73ce22f702260782048d7f13ef3fb169bb9e09fdc25f1a277941732",
+        "a50ec90d01c35da25cc18c51cc1cfa097b6ae05f0bf7417dfaa573923e0bd5a8",
+        "756aab1522f6e6f8cc05b8a1bdaab88671ae4fd6bfa2580951cf03c38ba1dd37",
+        "b445a1b3479c82b8dd1f116dc920136aeaedad510696f4037f89abfdd432e234",
+        "cc9367872862a18a3382e962f45424230fe0411c3699cda93358e20e53f53421",
+        "a1634d27d4c361283b213eb6a169adb16d24a4b12469821b8c25210894d1e0ad",
+        "a627c9525c39780224d797ecc10e5ac1faa1fd9aa4066b12d60b618e09f0624f",
+        "4bf297ca684182141042650adb0f6783a094c5075ff5d20be9d4b6ad3d7df9f5",
+        "5ea511bca5c24303a08dc0484ae860fccf2fe2fce22ae14ef3dae2310cc67efe",
+        "886be062068b57db8cd1b31d9dae8998684f3013a877884c5c70dcb30123c98c",
+        "96fb2da76715ea016d738f4830e6d4038f298a9810f2f70e25efb21e7aadf14c",
+        "418579cb04e86ac055a8cebc0998b5b5a68c81f936104a7f01286167f1c5726a",
+        "c8db77a4bcc903fc8d73bf8b3573bbf7e93bc69e21992a14f6d47b2dcb469d53",
+        "baefdeeba31c0182f1d690b98810197e8b117ae6029142da1481011698a1f049",
+        "17148b759ffb69dbb78b3584d6cf2f967d9490b5712652ff4c8bb8e594ee52dd",
+        "07e5f47ac4e2fb988643150d605df58cda7119b9dd6fe6dfa59c99da5140e430",
+        "842bce1c7c24e4bd1f9efc9574378e72959d1465910929930e5f4f6550b66fc2",
+        "0a5d555e2f696cbf2cf09b4221e6669ec468e2dfad76e26f875628ced60f2e39",
+        "7f69c32b845dc77b4513c9996200032de3b7ce20ec171b44879ce1afb1ea818a",
+        "45cd758fdb1aea655b55f4473232f375ebe1fb18e4eee9d2c0c9dfa4241dd75a",
+        "f424f8ab9a773ec09e6d4329769377c9100c667178ae236bbdde0ac8543e1a12",
+        "305e22629adc3c20bc570f9073d4d712614240a053a882f9888c91095297ddaa",
+        "ad379c6daa8c0103ea47cce3a22f209e055164e02ed19321e8edbe1b2880f84a",
+        "58a9eca5b37c08119188becba6a827b9e134d56d73bf4b400a1fc57c6c592914",
+        "8f2894d9e91af8bc733547fcd2e3286eb7187bc486c492b28cb3524c46bc4b7b",
+        "cfb7296c7890bee60f1f55b27fbfe2927738f82e34d6375b9d016c17847e0a19",
+        "f3b0628c72fc8aa938f00bbc8281b0c1902bbb4ac05d8f846c88384f5cb2cd25",
+        "4adf07e4a831b015b0d2f89da877c6e7e78f8c0cea520ea1e5b97ab995121692",
+        "0ca244c17aff61cec5f5ab2d0828a60ea9a4a91fea3776f99ad11beda502b3b1",
+        "933364ddaa320e03044254cac29a4c2b4cdf6109cf6058b138ee0699efa6c6df",
+        "209d71fbd1b9020818c01e12c41a1a7c89ee1b81f82ef6f711f26728c93a0de8",
+        "6a73e58f10b51cf8302f3b0694ce8c39c92fb70d40610e72106818c066c3cc23",
+        "fb2c007690d715fa8cd71731ece1d9dc30409e38d5bafcd5a35fbcb1edf385e8",
+        "efaea7dd3b5185e7809d8f0f156f8a292db39112cd33c67ee7cc07e2d49b6fc7",
+        "c62b84558c3296483d27af0cebf544921f662283536a67205ca842f8646a28ec",
+        "43e5eb6904bcdce960f97d9d37efb73184cac3b7b28c1ef37829fed658939af7",
+        "e65573aae0524aba6714c100c867c9ed19788bbdc6f9a8dcfa8cd2057ad8fa07",
+        "7d619f78546fd3906122113c56e2b94ee213cb9ddda4e7510f413f3efc60a28f",
+        "282cef2fee27967e3014fe945bab9e37807488c55b4b58961cea8a57699168c7",
+        "ee514b36c07db22e4245ce0e7207acec56043c485184d5f1040b30dce8e6150c",
+        "88a919f3c855fdbae864ffcf98cc0b3f3ffd561d3c5e38dca060b3f7508f82ef",
+        "7c309b9cc204cc5132f5e3d8840615d38f4d44a2f99e2d9c788c9abc60554917",
+        "3450225e76d1ef551d5e13e410e8738c78d9b1e0cbf42ec0ebb53d688db80b24",
+        "c4c1abc0762e5ad7b2561ad4bdebf8955d0bb3f89282e61dd74acf8038ac84f1",
+        "79f6763656ad4449813ca589c0fb0c5aba210455dd439fd939e4a8e6d1ff8f66",
+        "1095bd8a735cf021b3cd9c3a8d9569277fc184aeded2c65c849c811a37db6e23",
+        "edc78a50c7f87c32d9e22b2527cb99961aa14844759c22ae85ebb59345d24218",
+        "f7bc61551c870aaa9100562ae9f8ffcdc01f8443413f5c2e76a08e55b2810424",
+        "2eb9ba8dee996c7bb3228a61838f51a154302e425da48d7a3b2079a0b3898793",
+        "3d9413c9010d94c89b160b01cf71935c14267f213dc053c31d2ac66b81e98f9b",
+        "44e4c7c84648d7eb6352cf1ce354ce5b82416097b7a94dc803075f9955c93820",
+        "2353224a9336ba936ff562b8f7919ce9b45a7c9f48be737ee880d25e378995b6",
+        "9545d75254d083479cf5ffff06c2dc9684cb107907e221b8a77521dfb9ea7fae",
+        "a1ddece9a806c9aaa92bc6b09a23fe1fb3ebfba4a1a7525f0643853c3bfc5549",
+        "9db2c2e34c45839d06e80e6ba73a36664b47ccb6e49c41f74d1e55a0bdeb7c9f",
+        "996146cf127a4f81b9361ba13f6dd26a1ebe40a8706e3e175fd9ea6075585c56",
+        "9715b5d55413e62e7457d04a05cda9d4e9e97ce52d20fdcf619f0381674022c4",
+        "dab4133ad976210b13600f946d22ae9f2740063825b84bd88dba42ef6a7609de",
+        "5169dd5fdb0b464c3856ad0e37256ead295e2e438ee3318fdd17471079124786",
+        "0899548a130d04b58d46829feec7482e888aed35d723ea030d993ce1a43903ac",
+        "5dc25cdae7a817becd02edd868938eefe86cbbb6e55defa30e9e8239773beaa4",
+        "b9dadc7cb8b1349d22a0ed2b05158599f361f2f519eff47ddd4ac70fd53c1115",
+        "c89897c0ffad64497c51dae90fddc98d88288203cbd830c8f69be4d853d3a971",
+        "b40fa5faab9363d1682dada026da7d38495feafbd2cf63b95f234ca3dd054b02",
+        "7581ec5f45ec40caa1784b3e3c2262d5c066ef42c47fbf6d9478e9d10829e4fe",
+        "5763f5dd8a0880b50fcda7058d01076498d0184cbc23ced276e5baec53cfaf00",
+        "8b23c011decb4c16700ca7484ff391af788ec7d612b4c0549e4f5e50c5140c99",
+        "3df07cef9ff9d2dd0db8d8c17ae24724a1fff6bef94af573c0a269567beea91c",
+        "8a1e943d1cedf9c0ef8ff21dff37ee6bd9ee767bad670dec1c83cea29210e2cc",
+        "e9e0ef9a675b51929e222b16f9e7c0f1d2ea0a1ee57857537f9b506f054ea853",
+        "c5a0be766803f41087f54f1d738e05994417d94a5e7a52cf9bc348fea4dbce55",
+        "57836752a5d8be2cc6802d05fe90a52acd35083d25009eef06a5ecbc6bf7835b",
+        "cd78272e6bcf959b6cf9c16bcda3d96d38a37110586f4e7afb3719758611e78f",
+        "543c463247588f760733802451c9e27ea82d2bbd64162e88a9c665386affcbe1",
+        "82fe694cf22b9fb800f78d7a8a12e72321e911cf8b7dfb53e0b743900ec0ba8f",
+        "dfdda5fb205b435f1c7aa1c9e1a066ce3c33e2084c28661de7219230ff6cecf4",
+        "5964a77d55cd6ef844d2878e57e3a13588201a5093b2c68a9cba4d7e65c7c575",
+        "124c028cd5ede635d8a34036690cb436cf910b047ed16c353ded944933f8a9ea",
+        "91536778311a827a091d2008d8e1cccee07f65e6d56ff9aa8a0b781d641ce7d5",
+        "e51a0f955f76d34a208c2fd6ef4f6aed00609252c1d9bf3404ad5abf277e2618"
+      ]
+    },
+    "selected_published_v2": {
+      "const": {
+        "path": "tests/agent_kernel/fixtures/published_v2.py",
+        "sha256": "eca815c5a47067bdc56759018e12fd7a25f446eb6d716236869cbef875ce8515"
+      }
+    },
+    "tiny_accounting_explain_transition": {
+      "const": {
+        "test_path": "tests/agent_kernel/storage/test_tiny_accounting.py",
+        "predecessor_index": "source_occurrences_by_logical_id",
+        "selected_index": "evidence_source_occurrences_by_logical_order",
+        "generic_explain_relaxation": false
+      }
+    },
+    "preflight": {
+      "const": {
+        "worktree_role": "fresh exact-main integration worktree",
+        "base_sha": "7d5a4b1717db78891fd2c38d8803d7fe2f922986",
+        "reapplied_production_paths": [
+          {
+            "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+            "role": "selected EvidenceService source",
+            "sha256": "4458ffb03adeed838fcda992747dbaeb192ccf59728b3a54e1527abc4d0651fb"
+          },
+          {
+            "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+            "role": "selected evidence-order DDL",
+            "sha256": "34b6aab813dbd520f1894ac3ccbce1a1b3ff4552a11f0a83597a897a0c8f7486"
+          },
+          {
+            "path": "src/codex_usage_tracker/agent_kernel/storage/schema.py",
+            "role": "selected schema-contract digest binding",
+            "sha256": "9850a431729c7eb8d5347278d0434f0849d1843297645547ee2dcd66a0359b77"
+          }
+        ],
+        "before_authority": {
+          "just_v_failures": 2,
+          "just_v_passed": 1401,
+          "warnings": 1
+        },
+        "required_boundaries": [
+          "schema-contract inventory and digest",
+          "independent DDL execution and equality",
+          "publication fixture and fact-backed 80-case replay",
+          "selector/query/service compatibility",
+          "tiny-accounting EXPLAIN index identity",
+          "session-scoped lifecycle pages with 0/1000/5000 foreign rows"
+        ],
+        "status": "passed",
+        "authority_bytes_byte_identical": true
+      }
+    },
+    "worker_evidence": {
+      "const": {
+        "focused_identity_count": 45,
+        "activity_rows": [
+          2000,
+          10000
+        ],
+        "page_limit": 7,
+        "returned_rows": [
+          7,
+          7
+        ],
+        "decoded_rows": [
+          8,
+          8
+        ],
+        "progress_callbacks": [
+          27,
+          25
+        ],
+        "marker_free": true,
+        "forward_backward_keyset": true,
+        "base_and_tail_truth": true,
+        "valid_empty_rate_card_pages": true,
+        "foreign_lifecycle_rows": [
+          0,
+          1000,
+          5000
+        ],
+        "foreign_history_bounded": true
+      }
+    },
+    "preserved_semantics": {
+      "const": [
+        "selector/version/view/direction/cursor/publication identity",
+        "result truth, ties, missingness, late events, base/tail streams",
+        "one-snapshot query-only reads and bounded limit-plus-one decode",
+        "synthetic-only fixtures and privacy boundaries",
+        "package ceilings and non-R3A schema/publication semantics"
+      ]
+    },
+    "forbidden_changes": {
+      "const": [
+        "generic EXPLAIN relaxation or fixture-only rebinding",
+        "EvidenceService/query compiler/registry production semantics",
+        "projection/public API, R1B/R1C, QG1, CK-07R1, or downstream readiness",
+        "live operation, real Codex data, or product redesign"
+      ]
+    },
+    "scope_additions": {
+      "const": [
+        "docs/decisions/evidence/ck08r3a/lifecycle-session-boundedness-authority.json",
+        "docs/decisions/evidence/ck08r3a/lifecycle-session-boundedness-authority.schema.json"
+      ]
+    },
+    "no_live_operation": {
+      "const": true
+    },
     "selected_production_identities": {
+      "$ref": "#/$defs/selected_prod"
+    }
+  },
+  "$defs": {
+    "selected_prod": {
       "type": "array",
       "minItems": 3,
       "maxItems": 3,
       "prefixItems": [
-        {"$ref": "#/$defs/selectedEvidenceServiceIdentity"},
-        {"$ref": "#/$defs/selectedAnalyticalDdlIdentity"},
-        {"$ref": "#/$defs/selectedSchemaIdentity"}
+        {
+          "$ref": "#/$defs/P0"
+        },
+        {
+          "$ref": "#/$defs/P1"
+        },
+        {
+          "$ref": "#/$defs/P2"
+        }
       ],
       "items": false
     },
-    "schema_contract_transition": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["predecessor", "selected", "ddl_marker", "selected_index_names"],
-      "properties": {
-        "predecessor": {"$ref": "#/$defs/schemaState"},
-        "selected": {"$ref": "#/$defs/schemaState"},
-        "ddl_marker": {"const": "ck08r3a-evidence-indexes"},
-        "selected_index_names": {
-          "type": "array",
-          "minItems": 13,
-          "maxItems": 13,
-          "items": {"type": "string"}
-        }
-      }
-    },
-    "publication_fixture_transition": {
+    "P0": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "publication_id",
-        "fixture_root",
-        "oracle_order",
-        "predecessor",
-        "selected",
-        "selected_artifact_manifest_sha256s"
+        "path",
+        "role",
+        "sha256"
       ],
       "properties": {
-        "publication_id": {"const": "publication:ck07a-structural-v2"},
-        "fixture_root": {"const": "tests/agent_kernel/fixtures/tiny-v2"},
-        "oracle_order": {"$ref": "#/$defs/artifact"},
-        "predecessor": {"$ref": "#/$defs/fixtureState"},
-        "selected": {"$ref": "#/$defs/fixtureState"},
-        "selected_artifact_manifest_sha256s": {
-          "type": "array",
-          "minItems": 80,
-          "maxItems": 80,
-          "items": {"$ref": "#/$defs/sha256"}
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/evidence/service.py"
+        },
+        "role": {
+          "const": "selected EvidenceService source"
+        },
+        "sha256": {
+          "const": "4458ffb03adeed838fcda992747dbaeb192ccf59728b3a54e1527abc4d0651fb"
         }
       }
     },
-    "tiny_accounting_explain_transition": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["test_path", "predecessor_index", "selected_index", "generic_explain_relaxation"],
-      "properties": {
-        "test_path": {"const": "tests/agent_kernel/storage/test_tiny_accounting.py"},
-        "predecessor_index": {"const": "source_occurrences_by_logical_id"},
-        "selected_index": {"const": "evidence_source_occurrences_by_logical_order"},
-        "generic_explain_relaxation": {"const": false}
-      }
-    },
-    "preflight": {
+    "P1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "worktree_role",
-        "base_sha",
-        "reapplied_production_paths",
-        "before_authority",
-        "required_boundaries",
-        "status"
+        "path",
+        "role",
+        "sha256"
       ],
       "properties": {
-        "worktree_role": {"const": "fresh exact-main integration worktree"},
-        "base_sha": {"const": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6"},
-        "reapplied_production_paths": {
-          "type": "array",
-          "minItems": 3,
-          "maxItems": 3,
-          "prefixItems": [
-            {"$ref": "#/$defs/selectedEvidenceServiceArtifact"},
-            {"$ref": "#/$defs/selectedAnalyticalDdlArtifact"},
-            {"$ref": "#/$defs/selectedSchemaArtifact"}
-          ],
-          "items": false
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql"
         },
-        "before_authority": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["just_v_failures", "just_v_passed", "warnings"],
-          "properties": {
-            "just_v_failures": {"const": 21},
-            "just_v_passed": {"const": 1375},
-            "warnings": {"const": 1}
-          }
+        "role": {
+          "const": "selected evidence-order DDL"
         },
-        "required_boundaries": {
-          "type": "array",
-          "minItems": 4,
-          "items": {"type": "string"}
+        "sha256": {
+          "const": "34b6aab813dbd520f1894ac3ccbce1a1b3ff4552a11f0a83597a897a0c8f7486"
+        }
+      }
+    },
+    "P2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/storage/schema.py"
         },
-        "status": {"const": "passed"}
-      }
-    },
-    "worker_evidence": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["focused_identity_count", "activity_rows", "page_limit", "returned_rows", "decoded_rows", "progress_callbacks", "marker_free", "forward_backward_keyset", "base_and_tail_truth", "valid_empty_rate_card_pages"],
-      "properties": {
-        "focused_identity_count": {"const": 45},
-        "activity_rows": {"const": [2000, 10000]},
-        "page_limit": {"const": 7},
-        "returned_rows": {"const": [7, 7]},
-        "decoded_rows": {"const": [8, 8]},
-        "progress_callbacks": {"const": [27, 25]},
-        "marker_free": {"const": true},
-        "forward_backward_keyset": {"const": true},
-        "base_and_tail_truth": {"const": true},
-        "valid_empty_rate_card_pages": {"const": true}
-      }
-    },
-    "preserved_semantics": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"type": "string"}
-    },
-    "forbidden_changes": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"type": "string"}
-    },
-    "scope_additions": {
-      "type": "array",
-      "minItems": 2,
-      "items": {"type": "string"}
-    },
-    "no_live_operation": {"const": true}
-  },
-  "$defs": {
-    "selectedEvidenceServiceIdentity": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "role", "sha256"],
-      "properties": {
-        "path": {"const": "src/codex_usage_tracker/agent_kernel/evidence/service.py"},
-        "role": {"const": "selected EvidenceService source"},
-        "sha256": {"const": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3"}
-      }
-    },
-    "selectedAnalyticalDdlIdentity": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "role", "sha256"],
-      "properties": {
-        "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql"},
-        "role": {"const": "selected evidence-order DDL"},
-        "sha256": {"const": "40254b62510e9c92b049e3608dfad99a208de2fd2d2762f376d32dc81a7d5838"}
-      }
-    },
-    "selectedSchemaIdentity": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "role", "sha256"],
-      "properties": {
-        "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/schema.py"},
-        "role": {"const": "selected schema-contract digest binding"},
-        "sha256": {"const": "af0877db25df1010e282a48c72c020785be92c211d70a733e309c40f82611fbe"}
-      }
-    },
-    "selectedEvidenceServiceArtifact": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "sha256"],
-      "properties": {
-        "path": {"const": "src/codex_usage_tracker/agent_kernel/evidence/service.py"},
-        "sha256": {"const": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3"}
-      }
-    },
-    "selectedAnalyticalDdlArtifact": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "sha256"],
-      "properties": {
-        "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql"},
-        "sha256": {"const": "40254b62510e9c92b049e3608dfad99a208de2fd2d2762f376d32dc81a7d5838"}
-      }
-    },
-    "selectedSchemaArtifact": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "sha256"],
-      "properties": {
-        "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/schema.py"},
-        "sha256": {"const": "af0877db25df1010e282a48c72c020785be92c211d70a733e309c40f82611fbe"}
-      }
-    },
-    "sha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "gitSha": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{40}$"
-    },
-    "artifact": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "sha256"],
-      "properties": {
-        "path": {"type": "string"},
-        "sha256": {"$ref": "#/$defs/sha256"}
-      }
-    },
-    "schemaState": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["schema_contract_sha256", "analytical_table_count", "analytical_index_count", "operational_table_count", "operational_index_count"],
-      "properties": {
-        "schema_contract_sha256": {"$ref": "#/$defs/sha256"},
-        "analytical_table_count": {"const": 42},
-        "analytical_index_count": {"enum": [44, 57]},
-        "operational_table_count": {"const": 6},
-        "operational_index_count": {"const": 6}
-      }
-    },
-    "fixtureState": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["schema_contract_sha256", "manifest", "question_scenarios", "oracle_bundle", "variant_count"],
-      "properties": {
-        "schema_contract_sha256": {"$ref": "#/$defs/sha256"},
-        "manifest": {"$ref": "#/$defs/artifact"},
-        "question_scenarios": {"$ref": "#/$defs/artifact"},
-        "oracle_bundle": {"$ref": "#/$defs/artifact"},
-        "variant_count": {"const": 80}
+        "role": {
+          "const": "selected schema-contract digest binding"
+        },
+        "sha256": {
+          "const": "9850a431729c7eb8d5347278d0434f0849d1843297645547ee2dcd66a0359b77"
+        }
       }
     }
   }

@@ -1,0 +1,1339 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-usage-tracker.invalid/schemas/ck08r3a-lifecycle-session-boundedness-authority-v1.json",
+  "title": "CK-08R3A lifecycle session boundedness authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "owner",
+    "authority_version",
+    "authority_base_sha",
+    "status",
+    "contract_mode",
+    "role_policy",
+    "predecessor_rejection",
+    "join_only_candidate",
+    "predecessor_cohort",
+    "selected_cohort",
+    "schema_contract",
+    "independent_ddl",
+    "publication_fixtures",
+    "turn_provenance",
+    "physical_contract",
+    "ck07_transition",
+    "negative_tests",
+    "preflight",
+    "scope",
+    "no_live_operation"
+  ],
+  "properties": {
+    "schema": {
+      "const": "codex-usage-tracker.ck08r3a-lifecycle-session-boundedness-authority.v1"
+    },
+    "owner": {
+      "const": "CK-08R3A"
+    },
+    "authority_version": {
+      "const": 1
+    },
+    "authority_base_sha": {
+      "const": "7d5a4b1717db78891fd2c38d8803d7fe2f922986"
+    },
+    "status": {
+      "const": "permitted_not_accepted"
+    },
+    "contract_mode": {
+      "const": "predecessor_rejection_only"
+    },
+    "role_policy": {
+      "const": {
+        "closed": true,
+        "path_free": true,
+        "vocabulary": [
+          "evidence_service_source",
+          "publication_preparation",
+          "publication_writer",
+          "analytical_ddl",
+          "schema_contract",
+          "domain_models",
+          "lifecycle_storage",
+          "evidence_service_test",
+          "fact_adapter_support_test",
+          "published_fixture",
+          "publication_writer_test",
+          "independent_ddl_test",
+          "tiny_accounting_test",
+          "fact_backed_publication_test",
+          "storage_identity_test",
+          "storage_lifecycle_test"
+        ]
+      }
+    },
+    "predecessor_rejection": {
+      "const": {
+        "application_boundary": "before_application_query_mutation_repair_or_promotion",
+        "enumeration_hash_schema_validation": "not_overclaimed",
+        "mutation_free": true,
+        "entry_points": [
+          "initialize_database",
+          "open_writer",
+          "open_read_only",
+          "select_readable_artifact",
+          "validate_artifact_path",
+          "reopen_validated_artifact",
+          "build_isolated_artifact",
+          "EvidenceService.read_path"
+        ],
+        "forbidden_compatibility": [
+          "migration",
+          "backfill",
+          "compatibility_views",
+          "temporary_read_only_migration",
+          "pointer_identity_refresh",
+          "caller_plumbing"
+        ],
+        "unchanged_bytes": [
+          "database_bytes",
+          "wal_bytes",
+          "shm_bytes",
+          "pointer_bytes",
+          "temporary_pointer_files"
+        ],
+        "rebuild_rule": "fresh replacement artifacts are built from admitted synthetic/source facts under the current exact schema, validated, hashed, fsynced, and promoted by the existing fenced pointer/recovery mechanism"
+      }
+    },
+    "join_only_candidate": {
+      "const": {
+        "status": "rejected_non_acceptable",
+        "service_sha256": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3",
+        "analytical_ddl_sha256": "40254b62510e9c92b049e3608dfad99a208de2fd2d2762f376d32dc81a7d5838",
+        "schema_contract_source_sha256": "af0877db25df1010e282a48c72c020785be92c211d70a733e309c40f82611fbe",
+        "rejection": "entity-leading lifecycle access requires USE TEMP B-TREE FOR ORDER BY when unrelated foreign lifecycle history grows",
+        "direct_use": "forbidden"
+      }
+    },
+    "schema_contract": {
+      "const": {
+        "predecessor_sha256": "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5",
+        "selected_sha256": "998343ba4b52bb39decfcb436f8a862d41884fc6f6a6b4e88f7e8f8e42446295",
+        "analytical_table_count": 42,
+        "analytical_index_count": 57,
+        "operational_table_count": 6,
+        "operational_index_count": 6,
+        "evidence_index_count": 13,
+        "index_names": [
+          "evidence_model_calls_by_session_order",
+          "evidence_model_call_tail_by_session_order",
+          "evidence_tools_by_session_order",
+          "evidence_activities_by_session_order",
+          "evidence_state_changes_by_session_order",
+          "evidence_compactions_by_session_order",
+          "evidence_context_components_by_session_order",
+          "evidence_turns_by_session_order",
+          "evidence_lifecycle_by_session_order",
+          "evidence_source_occurrences_by_logical_order",
+          "evidence_tools_by_resource_order",
+          "evidence_state_changes_by_resource_order",
+          "evidence_allowance_observations_order"
+        ],
+        "lifecycle_persisted_columns": [
+          "session_id TEXT NOT NULL",
+          "FOREIGN KEY (session_id) REFERENCES sessions(session_id)"
+        ],
+        "lifecycle_index": "evidence_lifecycle_by_session_order"
+      }
+    },
+    "independent_ddl": {
+      "const": {
+        "test_path": "tests/agent_kernel/storage/test_database_schema.py",
+        "test_sha256": "69e53fe786ab2e136529934cda830bf5eeb58bc480135492b6434d2d557fab29",
+        "declaration_digest": "799dd9b79bab758fc624f8681e9c8b34a3d19a314a04eac55c4029746f3855d9",
+        "execution_checked": true,
+        "equality_checked": true,
+        "candidate_self_reference": false,
+        "literal_turn_order": {
+          "event_kind_order": 20,
+          "transition_rank": 0
+        }
+      }
+    },
+    "publication_fixtures": {
+      "const": {
+        "publication_id": "publication:ck07a-structural-v2",
+        "fixture_root": "tests/agent_kernel/fixtures/tiny-v2",
+        "variant_count": 80,
+        "oracle_order": {
+          "path": "tests/agent_kernel/fixtures/oracles/cases_v2.py",
+          "sha256": "4ab32f4f924aef5f71e3b3d48478e5ae33eb86736a3b75de4b52621f4dae679b",
+          "count": 80,
+          "tuple_digest": "d5dc9695f8d383b6a2cf9840c8ab9e816d32f561fa0fe814db8fe64f125af7b8"
+        },
+        "states": [
+          {
+            "name": "predecessor",
+            "tuple_count": 80,
+            "tuple_digest": "66a78877c8be6eb384db4c82a2bb2cc885301a1c7b2dfa332d19ba4c5654193a",
+            "artifacts": {
+              "schema_contract_sha256": "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5",
+              "manifest": {
+                "path": "tests/agent_kernel/fixtures/tiny-v2/manifest.json",
+                "sha256": "fb40a8a91d6ad537171e7a23e3f6fa9bd519080b513981b9483f9791e5e99e7d"
+              },
+              "question_scenarios": {
+                "path": "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json",
+                "sha256": "6ffca4917386c5bc13237952904d2a560a531e37c6eeba89b69ea53d76f35cd8"
+              },
+              "oracle_bundle": {
+                "path": "tests/agent_kernel/fixtures/tiny-v2/oracle-bundle.json",
+                "sha256": "97b78d11fa64eb2dac0a5f605bd9056f331ac9dd1fd210703e5f42b23935b40e"
+              },
+              "oracle_order": {
+                "path": "tests/agent_kernel/fixtures/oracles/cases_v2.py",
+                "sha256": "4ab32f4f924aef5f71e3b3d48478e5ae33eb86736a3b75de4b52621f4dae679b"
+              },
+              "published_v2": {
+                "path": "tests/agent_kernel/fixtures/published_v2.py",
+                "sha256": "1f33482147a470fe4afea7cd96649f619bd2e2dc88cdca17195a6becccbe02eb"
+              }
+            }
+          },
+          {
+            "name": "selected",
+            "tuple_count": 80,
+            "tuple_digest": "b825e940247a7ea15f34fd71d7aa7774c1acfff3b810676515e66d1f93dffb06",
+            "artifacts": {
+              "schema_contract_sha256": "998343ba4b52bb39decfcb436f8a862d41884fc6f6a6b4e88f7e8f8e42446295",
+              "manifest": {
+                "path": "tests/agent_kernel/fixtures/tiny-v2/manifest.json",
+                "sha256": "fb40a8a91d6ad537171e7a23e3f6fa9bd519080b513981b9483f9791e5e99e7d"
+              },
+              "question_scenarios": {
+                "path": "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json",
+                "sha256": "6ffca4917386c5bc13237952904d2a560a531e37c6eeba89b69ea53d76f35cd8"
+              },
+              "oracle_bundle": {
+                "path": "tests/agent_kernel/fixtures/tiny-v2/oracle-bundle.json",
+                "sha256": "97b78d11fa64eb2dac0a5f605bd9056f331ac9dd1fd210703e5f42b23935b40e"
+              },
+              "oracle_order": {
+                "path": "tests/agent_kernel/fixtures/oracles/cases_v2.py",
+                "sha256": "4ab32f4f924aef5f71e3b3d48478e5ae33eb86736a3b75de4b52621f4dae679b"
+              },
+              "published_v2": {
+                "path": "tests/agent_kernel/fixtures/published_v2.py",
+                "sha256": "eca815c5a47067bdc56759018e12fd7a25f446eb6d716236869cbef875ce8515"
+              }
+            },
+            "artifact_manifest_sha256s": [
+              "31ad1ec4a73ce22f702260782048d7f13ef3fb169bb9e09fdc25f1a277941732",
+              "a50ec90d01c35da25cc18c51cc1cfa097b6ae05f0bf7417dfaa573923e0bd5a8",
+              "756aab1522f6e6f8cc05b8a1bdaab88671ae4fd6bfa2580951cf03c38ba1dd37",
+              "b445a1b3479c82b8dd1f116dc920136aeaedad510696f4037f89abfdd432e234",
+              "cc9367872862a18a3382e962f45424230fe0411c3699cda93358e20e53f53421",
+              "a1634d27d4c361283b213eb6a169adb16d24a4b12469821b8c25210894d1e0ad",
+              "a627c9525c39780224d797ecc10e5ac1faa1fd9aa4066b12d60b618e09f0624f",
+              "4bf297ca684182141042650adb0f6783a094c5075ff5d20be9d4b6ad3d7df9f5",
+              "5ea511bca5c24303a08dc0484ae860fccf2fe2fce22ae14ef3dae2310cc67efe",
+              "886be062068b57db8cd1b31d9dae8998684f3013a877884c5c70dcb30123c98c",
+              "96fb2da76715ea016d738f4830e6d4038f298a9810f2f70e25efb21e7aadf14c",
+              "418579cb04e86ac055a8cebc0998b5b5a68c81f936104a7f01286167f1c5726a",
+              "c8db77a4bcc903fc8d73bf8b3573bbf7e93bc69e21992a14f6d47b2dcb469d53",
+              "baefdeeba31c0182f1d690b98810197e8b117ae6029142da1481011698a1f049",
+              "17148b759ffb69dbb78b3584d6cf2f967d9490b5712652ff4c8bb8e594ee52dd",
+              "07e5f47ac4e2fb988643150d605df58cda7119b9dd6fe6dfa59c99da5140e430",
+              "842bce1c7c24e4bd1f9efc9574378e72959d1465910929930e5f4f6550b66fc2",
+              "0a5d555e2f696cbf2cf09b4221e6669ec468e2dfad76e26f875628ced60f2e39",
+              "7f69c32b845dc77b4513c9996200032de3b7ce20ec171b44879ce1afb1ea818a",
+              "45cd758fdb1aea655b55f4473232f375ebe1fb18e4eee9d2c0c9dfa4241dd75a",
+              "f424f8ab9a773ec09e6d4329769377c9100c667178ae236bbdde0ac8543e1a12",
+              "305e22629adc3c20bc570f9073d4d712614240a053a882f9888c91095297ddaa",
+              "ad379c6daa8c0103ea47cce3a22f209e055164e02ed19321e8edbe1b2880f84a",
+              "58a9eca5b37c08119188becba6a827b9e134d56d73bf4b400a1fc57c6c592914",
+              "8f2894d9e91af8bc733547fcd2e3286eb7187bc486c492b28cb3524c46bc4b7b",
+              "cfb7296c7890bee60f1f55b27fbfe2927738f82e34d6375b9d016c17847e0a19",
+              "f3b0628c72fc8aa938f00bbc8281b0c1902bbb4ac05d8f846c88384f5cb2cd25",
+              "4adf07e4a831b015b0d2f89da877c6e7e78f8c0cea520ea1e5b97ab995121692",
+              "0ca244c17aff61cec5f5ab2d0828a60ea9a4a91fea3776f99ad11beda502b3b1",
+              "933364ddaa320e03044254cac29a4c2b4cdf6109cf6058b138ee0699efa6c6df",
+              "209d71fbd1b9020818c01e12c41a1a7c89ee1b81f82ef6f711f26728c93a0de8",
+              "6a73e58f10b51cf8302f3b0694ce8c39c92fb70d40610e72106818c066c3cc23",
+              "fb2c007690d715fa8cd71731ece1d9dc30409e38d5bafcd5a35fbcb1edf385e8",
+              "efaea7dd3b5185e7809d8f0f156f8a292db39112cd33c67ee7cc07e2d49b6fc7",
+              "c62b84558c3296483d27af0cebf544921f662283536a67205ca842f8646a28ec",
+              "43e5eb6904bcdce960f97d9d37efb73184cac3b7b28c1ef37829fed658939af7",
+              "e65573aae0524aba6714c100c867c9ed19788bbdc6f9a8dcfa8cd2057ad8fa07",
+              "7d619f78546fd3906122113c56e2b94ee213cb9ddda4e7510f413f3efc60a28f",
+              "282cef2fee27967e3014fe945bab9e37807488c55b4b58961cea8a57699168c7",
+              "ee514b36c07db22e4245ce0e7207acec56043c485184d5f1040b30dce8e6150c",
+              "88a919f3c855fdbae864ffcf98cc0b3f3ffd561d3c5e38dca060b3f7508f82ef",
+              "7c309b9cc204cc5132f5e3d8840615d38f4d44a2f99e2d9c788c9abc60554917",
+              "3450225e76d1ef551d5e13e410e8738c78d9b1e0cbf42ec0ebb53d688db80b24",
+              "c4c1abc0762e5ad7b2561ad4bdebf8955d0bb3f89282e61dd74acf8038ac84f1",
+              "79f6763656ad4449813ca589c0fb0c5aba210455dd439fd939e4a8e6d1ff8f66",
+              "1095bd8a735cf021b3cd9c3a8d9569277fc184aeded2c65c849c811a37db6e23",
+              "edc78a50c7f87c32d9e22b2527cb99961aa14844759c22ae85ebb59345d24218",
+              "f7bc61551c870aaa9100562ae9f8ffcdc01f8443413f5c2e76a08e55b2810424",
+              "2eb9ba8dee996c7bb3228a61838f51a154302e425da48d7a3b2079a0b3898793",
+              "3d9413c9010d94c89b160b01cf71935c14267f213dc053c31d2ac66b81e98f9b",
+              "44e4c7c84648d7eb6352cf1ce354ce5b82416097b7a94dc803075f9955c93820",
+              "2353224a9336ba936ff562b8f7919ce9b45a7c9f48be737ee880d25e378995b6",
+              "9545d75254d083479cf5ffff06c2dc9684cb107907e221b8a77521dfb9ea7fae",
+              "a1ddece9a806c9aaa92bc6b09a23fe1fb3ebfba4a1a7525f0643853c3bfc5549",
+              "9db2c2e34c45839d06e80e6ba73a36664b47ccb6e49c41f74d1e55a0bdeb7c9f",
+              "996146cf127a4f81b9361ba13f6dd26a1ebe40a8706e3e175fd9ea6075585c56",
+              "9715b5d55413e62e7457d04a05cda9d4e9e97ce52d20fdcf619f0381674022c4",
+              "dab4133ad976210b13600f946d22ae9f2740063825b84bd88dba42ef6a7609de",
+              "5169dd5fdb0b464c3856ad0e37256ead295e2e438ee3318fdd17471079124786",
+              "0899548a130d04b58d46829feec7482e888aed35d723ea030d993ce1a43903ac",
+              "5dc25cdae7a817becd02edd868938eefe86cbbb6e55defa30e9e8239773beaa4",
+              "b9dadc7cb8b1349d22a0ed2b05158599f361f2f519eff47ddd4ac70fd53c1115",
+              "c89897c0ffad64497c51dae90fddc98d88288203cbd830c8f69be4d853d3a971",
+              "b40fa5faab9363d1682dada026da7d38495feafbd2cf63b95f234ca3dd054b02",
+              "7581ec5f45ec40caa1784b3e3c2262d5c066ef42c47fbf6d9478e9d10829e4fe",
+              "5763f5dd8a0880b50fcda7058d01076498d0184cbc23ced276e5baec53cfaf00",
+              "8b23c011decb4c16700ca7484ff391af788ec7d612b4c0549e4f5e50c5140c99",
+              "3df07cef9ff9d2dd0db8d8c17ae24724a1fff6bef94af573c0a269567beea91c",
+              "8a1e943d1cedf9c0ef8ff21dff37ee6bd9ee767bad670dec1c83cea29210e2cc",
+              "e9e0ef9a675b51929e222b16f9e7c0f1d2ea0a1ee57857537f9b506f054ea853",
+              "c5a0be766803f41087f54f1d738e05994417d94a5e7a52cf9bc348fea4dbce55",
+              "57836752a5d8be2cc6802d05fe90a52acd35083d25009eef06a5ecbc6bf7835b",
+              "cd78272e6bcf959b6cf9c16bcda3d96d38a37110586f4e7afb3719758611e78f",
+              "543c463247588f760733802451c9e27ea82d2bbd64162e88a9c665386affcbe1",
+              "82fe694cf22b9fb800f78d7a8a12e72321e911cf8b7dfb53e0b743900ec0ba8f",
+              "dfdda5fb205b435f1c7aa1c9e1a066ce3c33e2084c28661de7219230ff6cecf4",
+              "5964a77d55cd6ef844d2878e57e3a13588201a5093b2c68a9cba4d7e65c7c575",
+              "124c028cd5ede635d8a34036690cb436cf910b047ed16c353ded944933f8a9ea",
+              "91536778311a827a091d2008d8e1cccee07f65e6d56ff9aa8a0b781d641ce7d5",
+              "e51a0f955f76d34a208c2fd6ef4f6aed00609252c1d9bf3404ad5abf277e2618"
+            ]
+          },
+          {
+            "name": "revoked",
+            "tuple_count": 80,
+            "tuple_digest": "8fd0018ba9ccff07181ad20429344c9d62b731955df8c2e56a9a6ad3bf3683ce",
+            "artifacts": {
+              "schema_contract_sha256": "e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35",
+              "manifest": {
+                "path": "tests/agent_kernel/fixtures/tiny-v2/manifest.json",
+                "sha256": "fb40a8a91d6ad537171e7a23e3f6fa9bd519080b513981b9483f9791e5e99e7d"
+              },
+              "question_scenarios": {
+                "path": "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json",
+                "sha256": "6ffca4917386c5bc13237952904d2a560a531e37c6eeba89b69ea53d76f35cd8"
+              },
+              "oracle_bundle": {
+                "path": "tests/agent_kernel/fixtures/tiny-v2/oracle-bundle.json",
+                "sha256": "97b78d11fa64eb2dac0a5f605bd9056f331ac9dd1fd210703e5f42b23935b40e"
+              },
+              "oracle_order": {
+                "path": "tests/agent_kernel/fixtures/oracles/cases_v2.py",
+                "sha256": "4ab32f4f924aef5f71e3b3d48478e5ae33eb86736a3b75de4b52621f4dae679b"
+              },
+              "published_v2": {
+                "path": "tests/agent_kernel/fixtures/published_v2.py",
+                "sha256": "1f33482147a470fe4afea7cd96649f619bd2e2dc88cdca17195a6becccbe02eb"
+              }
+            }
+          }
+        ],
+        "mixed_cohort": "reject"
+      }
+    },
+    "turn_provenance": {
+      "const": {
+        "persisted_fields": [
+          "turns.start_source_rank",
+          "turns.start_source_order",
+          "turns.end_source_order"
+        ],
+        "rank_domain": "zero_based_nonnegative",
+        "rank_zero_valid": true,
+        "rank_positive_preserved": true,
+        "rank_equality": "manifestation_observation_persisted_turn_and_evidence_rank_must_match_exactly",
+        "rank_cases": [
+          {
+            "source_rank": 0,
+            "preserved": true
+          },
+          {
+            "source_rank": 3,
+            "preserved": true
+          }
+        ],
+        "record_ordinal_fallback": "only while constructing current-schema rows when source order is absent",
+        "negative_cases": [
+          "collapse_positive_rank_to_zero",
+          "rank_mismatch",
+          "missing_primary_occurrence",
+          "unresolved_manifestation",
+          "ambiguous_manifestation",
+          "mismatched_occurrence_manifestation",
+          "reversed_start_end_order",
+          "terminal_without_end_order"
+        ]
+      }
+    },
+    "physical_contract": {
+      "const": {
+        "strategy": "persisted_session_id_with_session_leading_lifecycle_order_index",
+        "join_only_candidate": "rejected_for_use_temp_b_tree",
+        "foreign_lifecycle_rows": [
+          0,
+          1000,
+          5000
+        ],
+        "supported_views": [
+          "summary",
+          "timeline",
+          "calls",
+          "tools",
+          "activities",
+          "state_changes",
+          "compactions",
+          "context_components",
+          "rate_card"
+        ],
+        "directions": [
+          "forward",
+          "backward"
+        ],
+        "page_shapes": [
+          "first",
+          "deep"
+        ],
+        "limit_plus_one_before_decode": true,
+        "marker_free_explain": true,
+        "forbidden_explain_markers": [
+          "SCAN stream",
+          "MATERIALIZE model_calls_visible",
+          "AUTOMATIC COVERING INDEX",
+          "USE TEMP B-TREE FOR ORDER BY"
+        ],
+        "foreign_history_callback_multiplier_max": 2,
+        "cursor_reversible": true,
+        "result_truth_unchanged": true,
+        "query_only_one_snapshot": true,
+        "synthetic_only": true
+      }
+    },
+    "ck07_transition": {
+      "const": {
+        "status": "blocked_hold",
+        "authority_main_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+        "r3a_atomic_cohort_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
+        "previous_r3a_candidate_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+        "historical_d192_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+        "binding": "408d18e4 remains live before R3A; the current session-bounded preparation is permitted only with the complete current R3A cohort; prior e204e0da and historical d192c858 are not directly applicable",
+        "direct_use_of_d192": "forbidden",
+        "direct_ck07_use_of_r3a": "forbidden",
+        "run_token": {
+          "maximum_new_end_to_end_runs": 1,
+          "status": "unspent_unavailable",
+          "launch_authorized": false
+        }
+      }
+    },
+    "negative_tests": {
+      "const": {
+        "malformed_independent_ddl_handoff_fragment": "e85210d2d",
+        "malformed_independent_ddl_handoff_status": "revoked",
+        "database_owner": "storage/database.py",
+        "migration_or_compatibility": "rejected",
+        "mixed_cohort": "rejected",
+        "role_path_hash_swaps": "rejected",
+        "generic_explain_relaxation": "rejected",
+        "private_absolute_paths": "rejected"
+      }
+    },
+    "preflight": {
+      "const": {
+        "base_sha": "7d5a4b1717db78891fd2c38d8803d7fe2f922986",
+        "worktree_role": "fresh exact-main integration worktree",
+        "reapplied_exact_cohort": true,
+        "authority_bytes_byte_identical": true,
+        "status": "passed",
+        "foreign_history_counts": [
+          0,
+          1000,
+          5000
+        ],
+        "focused_physical_boundaries": true,
+        "no_consuming_operation": true
+      }
+    },
+    "scope": {
+      "const": {
+        "authority_write_scope": [
+          "docs/decisions/evidence/ck08r3a/lifecycle-session-boundedness-authority.json",
+          "docs/decisions/evidence/ck08r3a/lifecycle-session-boundedness-authority.schema.json",
+          "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json",
+          "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.json",
+          "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.schema.json",
+          "docs/decisions/evidence/ck08r3a/final-shared-authority.json",
+          "docs/decisions/evidence/ck08r3a/final-shared-authority.schema.json",
+          "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
+          "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
+          "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
+          "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
+          "docs/roadmap/tasks/ck-08r3a-implement-evidence-physical-query.md",
+          "docs/architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md",
+          "docs/INDEX.md",
+          "scripts/check_kernel_scope.py",
+          "tests/kernel/test_ck08r3a_final_shared_authority.py",
+          "tests/kernel/test_ck08r3a_lifecycle_session_authority.py",
+          "tests/kernel/test_documentation_authority.py",
+          "tests/kernel/test_kernel_scope.py",
+          "tests/kernel/test_lifecycle_run_invocation_authority.py"
+        ],
+        "implementation_reapply_scope": [
+          "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+          "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+          "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+          "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+          "src/codex_usage_tracker/agent_kernel/storage/schema.py",
+          "src/codex_usage_tracker/agent_kernel/domain/models.py",
+          "src/codex_usage_tracker/agent_kernel/storage/lifecycle.py",
+          "tests/agent_kernel/evidence/test_service.py",
+          "tests/agent_kernel/fact_adapters/support.py",
+          "tests/agent_kernel/fixtures/published_v2.py",
+          "tests/agent_kernel/publication/test_writer.py",
+          "tests/agent_kernel/storage/test_database_schema.py",
+          "tests/agent_kernel/storage/test_tiny_accounting.py",
+          "tests/agent_kernel/test_fact_backed_publication_v2.py",
+          "tests/agent_kernel/storage/test_identity.py",
+          "tests/agent_kernel/storage/test_lifecycle.py"
+        ],
+        "forbidden": [
+          "production candidate paths in the authority PR",
+          "src/codex_usage_tracker/agent_kernel/storage/database.py",
+          "migration, backfill, compatibility views, recovery, or pointer expansion",
+          "generic EXPLAIN relaxation",
+          "fixture-only rebinding",
+          "CK-08R3A implementation acceptance",
+          "central DAG/readiness/count changes",
+          "CK-07R1 launch, token consumption, output, or acceptance",
+          "R1B, R1C, QG1, CK-07R1 implementation, or downstream dispatch",
+          "live operation or real Codex data"
+        ]
+      }
+    },
+    "no_live_operation": {
+      "const": true
+    },
+    "predecessor_cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "production_identities",
+        "support_identities"
+      ],
+      "properties": {
+        "production_identities": {
+          "$ref": "#/$defs/predecessor_production"
+        },
+        "support_identities": {
+          "$ref": "#/$defs/predecessor_support"
+        }
+      }
+    },
+    "selected_cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "production_identities",
+        "support_identities",
+        "atomic",
+        "mixed_cohort"
+      ],
+      "properties": {
+        "status": {
+          "const": "permitted_not_accepted"
+        },
+        "production_identities": {
+          "$ref": "#/$defs/selected_production"
+        },
+        "support_identities": {
+          "$ref": "#/$defs/selected_support"
+        },
+        "atomic": {
+          "const": true
+        },
+        "mixed_cohort": {
+          "const": "reject"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "predP0": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/evidence/service.py"
+        },
+        "role": {
+          "const": "evidence_service_source"
+        },
+        "sha256": {
+          "const": "ea32223d1afd997f310419bff0b6b260193e527c8333c9f561bcab280447dfa3"
+        }
+      }
+    },
+    "predP1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/publication/preparation.py"
+        },
+        "role": {
+          "const": "publication_preparation"
+        },
+        "sha256": {
+          "const": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"
+        }
+      }
+    },
+    "predP2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/publication/writer.py"
+        },
+        "role": {
+          "const": "publication_writer"
+        },
+        "sha256": {
+          "const": "3b073188a0250e26c89f0af75ecf9a36507b9cb0251576ae26305fe97068c01a"
+        }
+      }
+    },
+    "predP3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql"
+        },
+        "role": {
+          "const": "analytical_ddl"
+        },
+        "sha256": {
+          "const": "4341ce05b119c44c83865b434751cd8569bad5445de26be2e8ceaa9345ada820"
+        }
+      }
+    },
+    "predP4": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/storage/schema.py"
+        },
+        "role": {
+          "const": "schema_contract"
+        },
+        "sha256": {
+          "const": "3f5d9b47cec3ab36784024b75842cc22dcc57e6d07e39afc4b248addc3517ffe"
+        }
+      }
+    },
+    "predP5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/domain/models.py"
+        },
+        "role": {
+          "const": "domain_models"
+        },
+        "sha256": {
+          "const": "b6d737554ff993179c94b5f0504434e4b71e8d50c9f16bf790bd4ee4091ad5bd"
+        }
+      }
+    },
+    "predP6": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/storage/lifecycle.py"
+        },
+        "role": {
+          "const": "lifecycle_storage"
+        },
+        "sha256": {
+          "const": "de85499ec1289c5d1db4ecbd02052e2f5529c0d4cc6639172c91fb8a8fbb5125"
+        }
+      }
+    },
+    "predS0": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/evidence/test_service.py"
+        },
+        "role": {
+          "const": "evidence_service_test"
+        },
+        "sha256": {
+          "const": "8b533b99c8e841f369031a0fddf914fd88a181141fb9a46aa5e171c775e8090a"
+        }
+      }
+    },
+    "predS1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/fact_adapters/support.py"
+        },
+        "role": {
+          "const": "fact_adapter_support_test"
+        },
+        "sha256": {
+          "const": "9bc9bf7fa9257f277ba7be4e41467b84d2dc5a2d9548f56f193dfe84543d3fbb"
+        }
+      }
+    },
+    "predS2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/fixtures/published_v2.py"
+        },
+        "role": {
+          "const": "published_fixture"
+        },
+        "sha256": {
+          "const": "1f33482147a470fe4afea7cd96649f619bd2e2dc88cdca17195a6becccbe02eb"
+        }
+      }
+    },
+    "predS3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/publication/test_writer.py"
+        },
+        "role": {
+          "const": "publication_writer_test"
+        },
+        "sha256": {
+          "const": "3312ace2256b058df086095d5fd2c898e840318736bf2aae9609a3842e3b561e"
+        }
+      }
+    },
+    "predS4": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/storage/test_database_schema.py"
+        },
+        "role": {
+          "const": "independent_ddl_test"
+        },
+        "sha256": {
+          "const": "c7a1d0d9285ec82c28495a9cba1396ba0f0c42b43cb1acc8456964b3f6d669ce"
+        }
+      }
+    },
+    "predS5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/storage/test_tiny_accounting.py"
+        },
+        "role": {
+          "const": "tiny_accounting_test"
+        },
+        "sha256": {
+          "const": "8d8efe9ff5791a1d061195b95b6af83169e37c823d9c8d6b0b1a340e75995d2e"
+        }
+      }
+    },
+    "predS6": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/test_fact_backed_publication_v2.py"
+        },
+        "role": {
+          "const": "fact_backed_publication_test"
+        },
+        "sha256": {
+          "const": "4580f0131b297df6e3ed99a8f4ab4fd6869db51d931f0ed9ea90cc408e29bd2f"
+        }
+      }
+    },
+    "predS7": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/storage/test_identity.py"
+        },
+        "role": {
+          "const": "storage_identity_test"
+        },
+        "sha256": {
+          "const": "b303c3125656ae72ed1a5ccf256925cc49774efb623db670e00c8f671f1c622a"
+        }
+      }
+    },
+    "predS8": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/storage/test_lifecycle.py"
+        },
+        "role": {
+          "const": "storage_lifecycle_test"
+        },
+        "sha256": {
+          "const": "e2a125792475244e5196d50475040d12a1c547fae93d39f32f54a75f9f327791"
+        }
+      }
+    },
+    "selP0": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/evidence/service.py"
+        },
+        "role": {
+          "const": "evidence_service_source"
+        },
+        "sha256": {
+          "const": "4458ffb03adeed838fcda992747dbaeb192ccf59728b3a54e1527abc4d0651fb"
+        }
+      }
+    },
+    "selP1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/publication/preparation.py"
+        },
+        "role": {
+          "const": "publication_preparation"
+        },
+        "sha256": {
+          "const": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c"
+        }
+      }
+    },
+    "selP2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/publication/writer.py"
+        },
+        "role": {
+          "const": "publication_writer"
+        },
+        "sha256": {
+          "const": "13da341fc2a3c50d8d7de7fd6a6fc2b0aca0dbc832a9b56597cd96ab67d17488"
+        }
+      }
+    },
+    "selP3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql"
+        },
+        "role": {
+          "const": "analytical_ddl"
+        },
+        "sha256": {
+          "const": "34b6aab813dbd520f1894ac3ccbce1a1b3ff4552a11f0a83597a897a0c8f7486"
+        }
+      }
+    },
+    "selP4": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/storage/schema.py"
+        },
+        "role": {
+          "const": "schema_contract"
+        },
+        "sha256": {
+          "const": "9850a431729c7eb8d5347278d0434f0849d1843297645547ee2dcd66a0359b77"
+        }
+      }
+    },
+    "selP5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/domain/models.py"
+        },
+        "role": {
+          "const": "domain_models"
+        },
+        "sha256": {
+          "const": "32eee9fba0cf7e2fc9933cd3f5e02ec39bf847b4c9196cab9917e464b339e9c2"
+        }
+      }
+    },
+    "selP6": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "src/codex_usage_tracker/agent_kernel/storage/lifecycle.py"
+        },
+        "role": {
+          "const": "lifecycle_storage"
+        },
+        "sha256": {
+          "const": "bf0b6b2cf098e063b072939c005c9500260fb758a3267050ac9ac206a8cba2a7"
+        }
+      }
+    },
+    "selS0": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/evidence/test_service.py"
+        },
+        "role": {
+          "const": "evidence_service_test"
+        },
+        "sha256": {
+          "const": "cfc2dbce0a583742abfa90e1db6c04a80d9f07577ab8ff65a086d097b2739a3a"
+        }
+      }
+    },
+    "selS1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/fact_adapters/support.py"
+        },
+        "role": {
+          "const": "fact_adapter_support_test"
+        },
+        "sha256": {
+          "const": "2e8447613ce12fd0f82cb36af7ddebb2ba1e4eef1b6d53f31a990564b0be94c5"
+        }
+      }
+    },
+    "selS2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/fixtures/published_v2.py"
+        },
+        "role": {
+          "const": "published_fixture"
+        },
+        "sha256": {
+          "const": "eca815c5a47067bdc56759018e12fd7a25f446eb6d716236869cbef875ce8515"
+        }
+      }
+    },
+    "selS3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/publication/test_writer.py"
+        },
+        "role": {
+          "const": "publication_writer_test"
+        },
+        "sha256": {
+          "const": "28dce47dfe32717a937079f068e9c1f1abcfbdfa6d65a15db6faba1b0c914b26"
+        }
+      }
+    },
+    "selS4": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/storage/test_database_schema.py"
+        },
+        "role": {
+          "const": "independent_ddl_test"
+        },
+        "sha256": {
+          "const": "69e53fe786ab2e136529934cda830bf5eeb58bc480135492b6434d2d557fab29"
+        }
+      }
+    },
+    "selS5": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/storage/test_tiny_accounting.py"
+        },
+        "role": {
+          "const": "tiny_accounting_test"
+        },
+        "sha256": {
+          "const": "a0b64101fddec57846c319245191db44c4eb0599dd3a81ae0f9504e0c584be25"
+        }
+      }
+    },
+    "selS6": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/test_fact_backed_publication_v2.py"
+        },
+        "role": {
+          "const": "fact_backed_publication_test"
+        },
+        "sha256": {
+          "const": "987be77ca934242eee7720c3d20b90d57f811b6c24f9ddd477a4a720d4517864"
+        }
+      }
+    },
+    "selS7": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/storage/test_identity.py"
+        },
+        "role": {
+          "const": "storage_identity_test"
+        },
+        "sha256": {
+          "const": "0aee0b59d6472594a5375f4a30a1805c71437a4aadc7c2ab08cade5a176f2a53"
+        }
+      }
+    },
+    "selS8": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "tests/agent_kernel/storage/test_lifecycle.py"
+        },
+        "role": {
+          "const": "storage_lifecycle_test"
+        },
+        "sha256": {
+          "const": "e77327f4fa789ccc261bd310134e298bac53471e3b1ba909e4e11f0c2b52730b"
+        }
+      }
+    },
+    "predecessor_production": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/predP0"
+        },
+        {
+          "$ref": "#/$defs/predP1"
+        },
+        {
+          "$ref": "#/$defs/predP2"
+        },
+        {
+          "$ref": "#/$defs/predP3"
+        },
+        {
+          "$ref": "#/$defs/predP4"
+        },
+        {
+          "$ref": "#/$defs/predP5"
+        },
+        {
+          "$ref": "#/$defs/predP6"
+        }
+      ],
+      "items": false
+    },
+    "predecessor_support": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/predS0"
+        },
+        {
+          "$ref": "#/$defs/predS1"
+        },
+        {
+          "$ref": "#/$defs/predS2"
+        },
+        {
+          "$ref": "#/$defs/predS3"
+        },
+        {
+          "$ref": "#/$defs/predS4"
+        },
+        {
+          "$ref": "#/$defs/predS5"
+        },
+        {
+          "$ref": "#/$defs/predS6"
+        },
+        {
+          "$ref": "#/$defs/predS7"
+        },
+        {
+          "$ref": "#/$defs/predS8"
+        }
+      ],
+      "items": false
+    },
+    "selected_production": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/selP0"
+        },
+        {
+          "$ref": "#/$defs/selP1"
+        },
+        {
+          "$ref": "#/$defs/selP2"
+        },
+        {
+          "$ref": "#/$defs/selP3"
+        },
+        {
+          "$ref": "#/$defs/selP4"
+        },
+        {
+          "$ref": "#/$defs/selP5"
+        },
+        {
+          "$ref": "#/$defs/selP6"
+        }
+      ],
+      "items": false
+    },
+    "selected_support": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/selS0"
+        },
+        {
+          "$ref": "#/$defs/selS1"
+        },
+        {
+          "$ref": "#/$defs/selS2"
+        },
+        {
+          "$ref": "#/$defs/selS3"
+        },
+        {
+          "$ref": "#/$defs/selS4"
+        },
+        {
+          "$ref": "#/$defs/selS5"
+        },
+        {
+          "$ref": "#/$defs/selS6"
+        },
+        {
+          "$ref": "#/$defs/selS7"
+        },
+        {
+          "$ref": "#/$defs/selS8"
+        }
+      ],
+      "items": false
+    }
+  }
+}

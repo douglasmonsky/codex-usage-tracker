@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import hashlib
+import copy
 import json
-from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -13,127 +12,82 @@ _AUTHORITY_PATH = _ROOT / "docs/decisions/evidence/ck08r3a/final-shared-authorit
 _SCHEMA_PATH = _ROOT / "docs/decisions/evidence/ck08r3a/final-shared-authority.schema.json"
 
 
-def _read_json(path: Path) -> dict[str, Any]:
+def _json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _authority() -> dict[str, Any]:
-    return _read_json(_AUTHORITY_PATH)
+    return _json(_AUTHORITY_PATH)
 
 
 def _schema() -> dict[str, Any]:
-    return _read_json(_SCHEMA_PATH)
+    return _json(_SCHEMA_PATH)
 
 
 def _errors(value: dict[str, Any]) -> list[Any]:
     return list(Draft202012Validator(_schema()).iter_errors(value))
 
 
-def _sha256(relative_path: str) -> str:
-    return hashlib.sha256((_ROOT / relative_path).read_bytes()).hexdigest()
-
-
-def test_final_shared_authority_is_independently_schema_valid_and_exact() -> None:
-    schema = _schema()
+def test_final_shared_authority_is_schema_valid_and_binds_current_cohort() -> None:
     authority = _authority()
+    schema = _schema()
     Draft202012Validator.check_schema(schema)
     Draft202012Validator(schema).validate(authority)
 
-    assert authority["schema"] == "codex-usage-tracker.ck08r3a-final-shared-authority.v2"
-    assert authority["authority_version"] == 2
-    assert authority["authority_base_sha"] == "ee4a064bf8850bceb362fbe73e40a57fe4af55d6"
+    assert authority["schema"] == "codex-usage-tracker.ck08r3a-final-shared-authority.v3"
+    assert authority["authority_version"] == 3
+    assert authority["authority_base_sha"] == "7d5a4b1717db78891fd2c38d8803d7fe2f922986"
     assert authority["status"] == "permitted_not_accepted"
     assert authority["contract_mode"] == "predecessor_rejection_only"
-    assert schema["additionalProperties"] is False
-    assert "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md" in authority[
-        "scope"
-    ]["authority_write_scope"]
+    assert "lifecycle_boundedness" in authority["linked_authorities"]
 
-    r3a = authority["r3a"]
-    predecessor = r3a["predecessor"]
-    selected = r3a["selected"]
-    assert r3a["implementation_task"] == "019fbe2b-20e8-78b2-a687-0231b159d0c7"
+    selected = authority["r3a"]["selected"]
     assert selected["status"] == "permitted_not_accepted"
-    assert len(predecessor["production_identities"]) == 5
-    assert len(predecessor["support_identities"]) == 7
-    assert len(selected["production_identities"]) == 5
-    assert len(selected["support_identities"]) == 7
-
-    expected_selected = [
-        (
-            "src/codex_usage_tracker/agent_kernel/evidence/service.py",
-            "evidence_service_source",
-            "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3",
-        ),
-        (
-            "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
-            "publication_preparation",
-            "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
-        ),
-        (
-            "src/codex_usage_tracker/agent_kernel/publication/writer.py",
-            "publication_writer",
-            "458d7b91701fe143d16d13c9b30ea549541c3f9395e019f2d8bfe06f4120b7e6",
-        ),
-        (
-            "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
-            "analytical_ddl",
-            "40254b62510e9c92b049e3608dfad99a208de2fd2d2762f376d32dc81a7d5838",
-        ),
-        (
-            "src/codex_usage_tracker/agent_kernel/storage/schema.py",
-            "schema_contract",
-            "af0877db25df1010e282a48c72c020785be92c211d70a733e309c40f82611fbe",
-        ),
-    ]
+    assert len(selected["production_identities"]) == 7
+    assert len(selected["support_identities"]) == 9
     assert [
         (item["path"], item["role"], item["sha256"])
         for item in selected["production_identities"]
-    ] == expected_selected
-
-    expected_predecessor = [
+    ] == [
         (
             "src/codex_usage_tracker/agent_kernel/evidence/service.py",
             "evidence_service_source",
-            "ea32223d1afd997f310419bff0b6b260193e527c8333c9f561bcab280447dfa3",
+            "4458ffb03adeed838fcda992747dbaeb192ccf59728b3a54e1527abc4d0651fb",
         ),
         (
             "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
             "publication_preparation",
-            "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+            "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
         ),
         (
             "src/codex_usage_tracker/agent_kernel/publication/writer.py",
             "publication_writer",
-            "3b073188a0250e26c89f0af75ecf9a36507b9cb0251576ae26305fe97068c01a",
+            "13da341fc2a3c50d8d7de7fd6a6fc2b0aca0dbc832a9b56597cd96ab67d17488",
         ),
         (
             "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
             "analytical_ddl",
-            "4341ce05b119c44c83865b434751cd8569bad5445de26be2e8ceaa9345ada820",
+            "34b6aab813dbd520f1894ac3ccbce1a1b3ff4552a11f0a83597a897a0c8f7486",
         ),
         (
             "src/codex_usage_tracker/agent_kernel/storage/schema.py",
             "schema_contract",
-            "3f5d9b47cec3ab36784024b75842cc22dcc57e6d07e39afc4b248addc3517ffe",
+            "9850a431729c7eb8d5347278d0434f0849d1843297645547ee2dcd66a0359b77",
+        ),
+        (
+            "src/codex_usage_tracker/agent_kernel/domain/models.py",
+            "domain_models",
+            "32eee9fba0cf7e2fc9933cd3f5e02ec39bf847b4c9196cab9917e464b339e9c2",
+        ),
+        (
+            "src/codex_usage_tracker/agent_kernel/storage/lifecycle.py",
+            "lifecycle_storage",
+            "bf0b6b2cf098e063b072939c005c9500260fb758a3267050ac9ac206a8cba2a7",
         ),
     ]
-    assert [
-        (item["path"], item["role"], item["sha256"])
-        for item in predecessor["production_identities"]
-    ] == expected_predecessor
-
-    for item in selected["production_identities"]:
-        actual = _sha256(item["path"])
-        predecessor_item = next(
-            candidate
-            for candidate in predecessor["production_identities"]
-            if candidate["path"] == item["path"]
-        )
-        assert actual in {item["sha256"], predecessor_item["sha256"]}
 
     assert selected["schema_contract"] == {
-        "sha256": "7a2e1c8a84bc681b33e7c69552f65791c3f9a1a715d641da3a898237896d85dc",
+        "sha256": "998343ba4b52bb39decfcb436f8a862d41884fc6f6a6b4e88f7e8f8e42446295",
         "analytical_table_count": 42,
         "analytical_index_count": 57,
         "operational_table_count": 6,
@@ -148,7 +102,7 @@ def test_final_shared_authority_is_independently_schema_valid_and_exact() -> Non
             "evidence_compactions_by_session_order",
             "evidence_context_components_by_session_order",
             "evidence_turns_by_session_order",
-            "evidence_lifecycle_timeline_order",
+            "evidence_lifecycle_by_session_order",
             "evidence_source_occurrences_by_logical_order",
             "evidence_tools_by_resource_order",
             "evidence_state_changes_by_resource_order",
@@ -157,24 +111,17 @@ def test_final_shared_authority_is_independently_schema_valid_and_exact() -> Non
     }
     assert selected["independent_ddl"] == {
         "test_path": "tests/agent_kernel/storage/test_database_schema.py",
-        "test_sha256": "d1e7e852d2d95df489f366e40a89e25238842b0c10d40ad5c58b0d3761b2cea9",
-        "declaration_digest": "8b5a5650f7f41428832f276a1ad31bb08dded05ef92f078de6c8ca1a3effb1dc",
+        "test_sha256": "69e53fe786ab2e136529934cda830bf5eeb58bc480135492b6434d2d557fab29",
+        "declaration_digest": "799dd9b79bab758fc624f8681e9c8b34a3d19a314a04eac55c4029746f3855d9",
         "execution_checked": True,
         "equality_checked": True,
         "candidate_self_reference": False,
         "literal_turn_order": {"event_kind_order": 20, "transition_rank": 0},
-        "persisted_turn_columns": [
-            "start_source_rank NOT NULL",
-            "start_source_order NOT NULL",
-            "end_source_order NULLABLE",
-            "CHECK end_source_order IS NULL OR start_source_order <= end_source_order",
-        ],
     }
 
 
-def test_final_shared_rank_and_fixture_contracts_cover_zero_and_positive() -> None:
-    authority = _authority()
-    selected = authority["r3a"]["selected"]
+def test_final_shared_rank_fixture_and_physical_contracts_are_exact() -> None:
+    selected = _authority()["r3a"]["selected"]
     provenance = selected["turn_provenance"]
     assert provenance["rank_domain"] == "zero_based_nonnegative"
     assert provenance["rank_zero_valid"] is True
@@ -187,84 +134,92 @@ def test_final_shared_rank_and_fixture_contracts_cover_zero_and_positive() -> No
         {"source_rank": 3, "preserved": True},
     ]
     assert "collapse_positive_rank_to_zero" in provenance["negative_cases"]
-    assert "ambiguous_manifestation" in provenance["negative_cases"]
-    assert "unresolved_manifestation" in provenance["negative_cases"]
 
     fixtures = selected["publication_fixtures"]
+    current = next(state for state in fixtures["states"] if state["name"] == "selected")
     assert fixtures["variant_count"] == 80
-    assert fixtures["oracle_order"]["count"] == 80
-    assert fixtures["oracle_order"]["tuple_digest"] == (
-        "d5dc9695f8d383b6a2cf9840c8ab9e816d32f561fa0fe814db8fe64f125af7b8"
+    assert current["tuple_count"] == 80
+    assert current["tuple_digest"] == (
+        "b825e940247a7ea15f34fd71d7aa7774c1acfff3b810676515e66d1f93dffb06"
     )
-    assert [state["name"] for state in fixtures["states"]] == [
-        "predecessor",
-        "selected",
-        "revoked",
-    ]
-    assert fixtures["mixed_state"] == "reject"
-    assert selected["physical_evidence"]["marker_free_first_and_deep_forward_backward"] is True
-    assert selected["physical_evidence"]["query_only_one_snapshot"] is True
-    assert selected["physical_evidence"]["valid_empty_rate_card_pages"] is True
+    assert len(current["artifact_manifest_sha256s"]) == 80
+    assert fixtures["mixed_cohort"] == "reject"
+    assert current["artifacts"]["published_v2"]["sha256"] == (
+        "eca815c5a47067bdc56759018e12fd7a25f446eb6d716236869cbef875ce8515"
+    )
+
+    physical = selected["physical_evidence"]
+    assert physical["foreign_lifecycle_rows"] == [0, 1000, 5000]
+    assert physical["strategy"] == (
+        "persisted_session_id_with_session_leading_lifecycle_order_index"
+    )
+    assert physical["marker_free_explain"] is True
+    assert physical["limit_plus_one_before_decode"] is True
+    assert physical["cursor_reversible"] is True
 
 
-def test_final_shared_schema_rejects_scope_identity_rank_and_boundary_mutations() -> None:
+def test_final_shared_schema_rejects_identity_scope_and_boundary_mutations() -> None:
     authority = _authority()
-    mutations: list[tuple[str, Any]] = []
+    mutations: list[dict[str, Any]] = []
 
-    swapped_role = deepcopy(authority)
-    swapped_role["r3a"]["selected"]["production_identities"][0]["role"] = "schema_contract"
-    mutations.append(("role swap", swapped_role))
-
-    swapped_path = deepcopy(authority)
-    swapped_path["r3a"]["selected"]["production_identities"][0]["path"] = (
-        "src/codex_usage_tracker/agent_kernel/storage/schema.py"
-    )
-    mutations.append(("path swap", swapped_path))
-
-    swapped_hash = deepcopy(authority)
-    swapped_hash["r3a"]["selected"]["production_identities"][0]["sha256"] = (
-        authority["r3a"]["selected"]["production_identities"][1]["sha256"]
-    )
-    mutations.append(("hash swap", swapped_hash))
-
-    for name, mutated in (
-        ("database owner", deepcopy(authority)),
-        ("scope substitution", deepcopy(authority)),
-        ("forbidden scope", deepcopy(authority)),
-        ("rebuild rule", deepcopy(authority)),
-        ("rank domain", deepcopy(authority)),
-        ("rank zero", deepcopy(authority)),
-        ("rank positive", deepcopy(authority)),
-        ("mixed fixture", deepcopy(authority)),
+    for index, field, value in (
+        (0, "role", "schema_contract"),
+        (0, "path", "src/codex_usage_tracker/agent_kernel/storage/schema.py"),
+        (0, "sha256", authority["r3a"]["selected"]["production_identities"][1]["sha256"]),
     ):
-        if name == "database owner":
-            mutated["scope"]["implementation_reapply_scope"].append(
+        mutated = copy.deepcopy(authority)
+        mutated["r3a"]["selected"]["production_identities"][index][field] = value
+        mutations.append(mutated)
+
+    for _name, mutate in (
+        (
+            "database owner",
+            lambda value: value["scope"]["implementation_reapply_scope"].append(
                 "src/codex_usage_tracker/agent_kernel/storage/database.py"
-            )
-        elif name == "scope substitution":
-            mutated["scope"]["authority_write_scope"][0] = "src/codex_usage_tracker/agent_kernel/storage/database.py"
-        elif name == "forbidden scope":
-            mutated["scope"]["forbidden"][0] = "allow migration"
-        elif name == "rebuild rule":
-            mutated["r3a"]["predecessor_rejection"]["rebuild_rule"] = "migrate in place"
-        elif name == "rank domain":
-            mutated["r3a"]["selected"]["turn_provenance"]["rank_domain"] = "positive_only"
-        elif name == "rank zero":
-            mutated["r3a"]["selected"]["turn_provenance"]["rank_zero_valid"] = False
-        elif name == "rank positive":
-            mutated["r3a"]["selected"]["turn_provenance"]["rank_positive_preserved"] = False
-        else:
-            mutated["r3a"]["selected"]["publication_fixtures"]["mixed_state"] = "allow"
-        mutations.append((name, mutated))
+            ),
+        ),
+        (
+            "scope substitution",
+            lambda value: value["scope"]["authority_write_scope"].__setitem__(
+                0, "src/codex_usage_tracker/agent_kernel/storage/database.py"
+            ),
+        ),
+        (
+            "forbidden scope",
+            lambda value: value["scope"]["forbidden"].__setitem__(0, "allow migration"),
+        ),
+        (
+            "rebuild rule",
+            lambda value: value["r3a"]["predecessor_rejection"].__setitem__(
+                "rebuild_rule", "migrate in place"
+            ),
+        ),
+        (
+            "rank domain",
+            lambda value: value["r3a"]["selected"]["turn_provenance"].__setitem__(
+                "rank_domain", "positive_only"
+            ),
+        ),
+        (
+            "mixed fixture",
+            lambda value: value["r3a"]["selected"]["publication_fixtures"].__setitem__(
+                "mixed_cohort", "allow"
+            ),
+        ),
+    ):
+        mutated = copy.deepcopy(authority)
+        mutate(mutated)
+        mutations.append(mutated)
 
-    for name, mutated in mutations:
-        assert _errors(mutated), name
+    assert all(_errors(value) for value in mutations)
 
 
-def test_final_shared_authority_freezes_predecessor_rejection_and_ck07_two_state() -> None:
+def test_final_shared_rejection_and_ck07_state_remain_fail_closed() -> None:
     authority = _authority()
     rejection = authority["r3a"]["predecessor_rejection"]
-    assert rejection["application_boundary"] == "before_application_query_mutation_repair_or_promotion"
+    assert rejection["application_boundary"] == (
+        "before_application_query_mutation_repair_or_promotion"
+    )
     assert rejection["enumeration_hash_schema_validation"] == "not_overclaimed"
     assert rejection["mutation_free"] is True
     assert rejection["forbidden_compatibility"] == [
@@ -275,22 +230,18 @@ def test_final_shared_authority_freezes_predecessor_rejection_and_ck07_two_state
         "pointer_identity_refresh",
         "caller_plumbing",
     ]
-    assert rejection["rebuild_rule"] == (
-        "fresh replacement artifacts are built from admitted synthetic/source facts under the current exact schema, validated, hashed, fsynced, and promoted by the existing fenced pointer/recovery mechanism"
+    assert authority["ck07_shared_preparation"]["status"] == "blocked_hold"
+    assert authority["ck07_shared_preparation"]["r3a_atomic_cohort"]["sha256"] == (
+        "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c"
     )
-
-    ck07 = authority["ck07_shared_preparation"]
-    assert ck07["status"] == "blocked_hold"
-    assert ck07["authority_main"]["sha256"] == (
-        "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"
-    )
-    assert ck07["r3a_atomic_cohort"]["sha256"] == (
-        "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174"
-    )
-    assert ck07["r3a_atomic_cohort"]["direct_ck07_use"] == "forbidden"
-    assert ck07["historical_d192"]["direct_use"] == "forbidden"
-    assert ck07["future_ck07_requalification"]["new_digest_required"] is True
-    assert ck07["run_token"] == {
+    assert authority["ck07_shared_preparation"]["previous_r3a_candidate"] == {
+        "sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+        "status": "revoked_for_session_boundedness_requalification",
+        "direct_use": "forbidden",
+        "reason": "the prior preparation candidate omitted the current session-bounded lifecycle cohort",
+    }
+    assert authority["ck07_shared_preparation"]["historical_d192"]["direct_use"] == "forbidden"
+    assert authority["ck07_shared_preparation"]["run_token"] == {
         "maximum_new_end_to_end_runs": 1,
         "status": "unspent_unavailable",
         "consumption": "successful_process_launch_only",

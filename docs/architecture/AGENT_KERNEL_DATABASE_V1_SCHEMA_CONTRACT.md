@@ -36,10 +36,14 @@ The canonical database-v1 contract above remains the predecessor contract
 until the CK-08R3A implementation is accepted. The selected EvidenceService
 candidate is permitted to requalify only with the exact transition below. It
 adds 13 evidence-order indexes, changes the resulting digest to
-`7a2e1c8a84bc681b33e7c69552f65791c3f9a1a715d641da3a898237896d85dc`, and
+`998343ba4b52bb39decfcb436f8a862d41884fc6f6a6b4e88f7e8f8e42446295`, and
 does not authorize any other schema, publication, selector, cursor, or query
-semantic change. The transition is a contract fixture, not an active DDL
-replacement on this authority branch.
+semantic change. For session-scoped lifecycle pages, the current successor
+also persists non-null `lifecycle_transitions.session_id` and uses the
+session-leading `evidence_lifecycle_by_session_order` index; the earlier
+entity-leading/`7a2e1c8a…` candidate is revoked because it emits a temporary
+sort under unrelated foreign lifecycle history. The transition is a contract
+fixture, not an active DDL replacement on this authority branch.
 
 Turn source rank is zero-based and nonnegative: rank 0 is valid, and every
 rank greater than zero is preserved exactly. The manifestation rank,
