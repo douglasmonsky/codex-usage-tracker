@@ -1,6 +1,6 @@
 # Agent-kernel database-v1 physical schema contract
 
-**Status:** CK-04 production authority with CK-07C fact and CK-07D rate-card amendments
+**Status:** CK-04 production authority with CK-07C fact, CK-07D rate-card, and conditional CK-08R3A evidence-order amendments
 **Contract:** `codex-usage-tracker.agent-kernel.schema-contract.v1`
 **Database identity:** `codex-usage-tracker.agent-kernel.v1`
 **Operational-sidecar identity:** `codex-usage-tracker.agent-kernel.operations.v1`
@@ -23,10 +23,12 @@ allowance-interval, and late-parent writer paths without adding further
 tables.
 
 CK-07D makes `rate_card_revisions.effective_at_us` mandatory and adds the
-immutable `predecessor_rate_card_id` lineage edge. The 42-table/44-index
-inventory is unchanged. `active_rate_card` remains the publication-selected
-head; publication validation must reproduce its complete predecessor chain
-before promotion.
+immutable `predecessor_rate_card_id` lineage edge. The predecessor contract
+remains a 42-table/44-index inventory. The conditional CK-08R3A cohort adds
+exactly 13 evidence-order indexes, producing the selected 42-table/57-index
+digest below. `active_rate_card` remains the publication-selected head;
+publication validation must reproduce its complete predecessor chain before
+promotion.
 
 ## CK-08R3A schema/publication transition authority
 
@@ -34,10 +36,18 @@ The canonical database-v1 contract above remains the predecessor contract
 until the CK-08R3A implementation is accepted. The selected EvidenceService
 candidate is permitted to requalify only with the exact transition below. It
 adds 13 evidence-order indexes, changes the resulting digest to
-`e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35`, and
+`7a2e1c8a84bc681b33e7c69552f65791c3f9a1a715d641da3a898237896d85dc`, and
 does not authorize any other schema, publication, selector, cursor, or query
 semantic change. The transition is a contract fixture, not an active DDL
 replacement on this authority branch.
+
+Turn source rank is zero-based and nonnegative: rank 0 is valid, and every
+rank greater than zero is preserved exactly. The manifestation rank,
+observation rank, persisted `turns.start_source_rank`, and EvidenceService
+rank must be equal. A current-schema builder may use the primary occurrence's
+`record_ordinal` only to fill an absent source order before persisting the
+required non-null `start_source_order`; predecessor artifacts are rejected
+without migration or compatibility mutation.
 
 <!-- ck08r3a-evidence-indexes-ddl:start -->
 ```sql

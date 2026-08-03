@@ -691,6 +691,9 @@ def test_ck08r3a_authority_additions_are_explicit_and_bounded() -> None:
         "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json",
         "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.json",
         "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.schema.json",
+        "docs/decisions/evidence/ck08r3a/final-shared-authority.json",
+        "docs/decisions/evidence/ck08r3a/final-shared-authority.schema.json",
+        "tests/kernel/test_ck08r3a_final_shared_authority.py",
     } == CK08R3A_AUTHORITY_ADDITIONS
 
 

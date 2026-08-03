@@ -1,56 +1,34 @@
 {
-  "schema": "codex-usage-tracker.lifecycle-source-digest-authority.v3",
-  "authority_version": 3,
+  "schema": "codex-usage-tracker.lifecycle-source-digest-authority.v5",
+  "authority_version": 5,
   "owner": "CK-07R1A0",
-  "authority_base_sha": "955272c68548b82ea11eb65226ba0e6f3f570785",
+  "authority_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
   "source_path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+  "status": "blocked_hold",
   "acceptance_state": {
-    "status": "reconciled_no_run",
-    "live_source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
-    "predecessor_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
-    "selected_successor_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-    "binding": "live_source_predecessor_to_selected_successor",
+    "status": "conditional_two_state_no_run",
+    "authority_main_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+    "r3a_atomic_cohort_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+    "historical_d192_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+    "binding": "408d18e4 remains the live source before R3A; e204e0da is permitted only inside the complete R3A cohort",
     "runtime_acceptance": "not_claimed",
-    "worker_revalidation_required": true,
-    "linked_evidence": {
-      "path": "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
-      "sha256": "36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb"
-    }
+    "direct_use_of_d192": "forbidden",
+    "worker_reapplication_required": true,
+    "linked_final_shared_authority": "docs/decisions/evidence/ck08r3a/final-shared-authority.json"
   },
   "state_machine_binding": {
     "run_authority_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
     "run_authority_schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
     "current_state": "authority_main",
     "states": [
-      {
-        "name": "authority_main",
-        "source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
-        "source_role": "live_predecessor",
-        "runtime_acceptance": "not_claimed"
-      },
-      {
-        "name": "worker_prequalification",
-        "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-        "source_role": "selected_successor",
-        "runtime_acceptance": "not_claimed"
-      },
-      {
-        "name": "post_single_run",
-        "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-        "source_role": "selected_successor",
-        "runtime_acceptance": "qualified_only_with_complete_planner_valid_receipt"
-      },
-      {
-        "name": "final_accepted",
-        "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-        "source_role": "selected_successor",
-        "runtime_acceptance": "accepted_only_with_worker_merge_and_exact_main"
-      }
+      {"name": "authority_main", "source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872", "source_role": "live_predecessor", "runtime_acceptance": "not_claimed"},
+      {"name": "r3a_worker_prequalification", "source_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174", "source_role": "selected_r3a_atomic_cohort_preparation", "runtime_acceptance": "not_claimed", "requires_complete_r3a_cohort": true},
+      {"name": "ck07_requalification", "source_sha256": "new_digest_required_after_reapplication", "source_role": "future_ck07_successor", "runtime_acceptance": "not_available"}
     ],
-    "source_digest_rule": "authority_main may retain only the live predecessor; worker_prequalification and every later state permit only the exact selected successor",
+    "source_digest_rule": "authority_main remains 408d18e4; e204e0da may enter only with every selected R3A production and support identity; CK-07 later requires a newly derived preparation digest",
     "other_digest": "fail_closed",
-    "preserved_path_authority": "lifecycle-path-authority remains retained read-only path semantics and does not advance the current worker state",
-    "current_runtime_claim": "not_claimed"
+    "current_runtime_claim": "not_claimed",
+    "launch_state": "blocked_hold_no_run"
   },
   "predecessor": {
     "sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
@@ -61,101 +39,38 @@
     }
   },
   "selected_successor": {
-    "sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+    "sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
     "status": "permitted_not_accepted",
-    "blocked_task": "019fbfe2-8fe4-7de2-9264-d58572366727",
+    "role": "selected_r3a_atomic_cohort_preparation",
+    "base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
+    "requires_full_r3a_cohort": true,
+    "direct_ck07_use": "forbidden",
+    "mixed_state": "fail_closed",
+    "runtime_acceptance": "not_claimed"
+  },
+  "historical_candidate": {
+    "sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+    "status": "revoked_for_new_base",
+    "direct_use": "forbidden",
     "retained_branch": "feature/ck-07r1-lifecycle-requalification-v5",
     "retained_worktree": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v5",
     "base_sha": "955272c68548b82ea11eb65226ba0e6f3f570785",
     "witness_status": "retained_uncommitted_read_only",
-    "diff_identity": {
-      "modified": [
-        {
-          "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
-          "from_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
-          "to_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-          "patch_sha256": "7961e6922f7088a5ca1970ef9fa2a1762364dc257b0f751e87546feaa44e9a01"
-        }
-      ],
-      "untracked": [
-        {
-          "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-          "sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a"
-        },
-        {
-          "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-          "sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed"
-        }
-      ]
-    }
+    "reason": "built against the predecessor preparation base and not directly applicable after the R3A shared preparation transition"
   },
   "allowed_scope": {
-    "files": [
-      "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
-      "scripts/benchmark_ck07r1_lifecycle_scale.py",
-      "tests/agent_kernel/publication/test_lifecycle_scale.py"
-    ],
-    "lifecycle_symbols": [
-      "codex_usage_tracker.agent_kernel.publication.preparation._WriteSetPreparer._build_lifecycle"
-    ],
-    "forbidden_files": [
-      "src/codex_usage_tracker/agent_kernel/publication/planner.py",
-      "src/codex_usage_tracker/agent_kernel/publication/writer.py",
-      "src/codex_usage_tracker/agent_kernel/publication/recovery.py",
-      "src/codex_usage_tracker/agent_kernel/storage/",
-      "src/codex_usage_tracker/agent_kernel/query/",
-      "src/codex_usage_tracker/agent_kernel/evidence/"
-    ]
-  },
-  "reachable_consumer_path": {
-    "producer_to_preparation": [
-      "codex_usage_tracker.agent_kernel.publication.writer.prepare_write_set_from_changes",
-      "codex_usage_tracker.agent_kernel.publication.preparation.prepare_write_set",
-      "codex_usage_tracker.agent_kernel.publication.preparation._WriteSetPreparer.prepare",
-      "codex_usage_tracker.agent_kernel.publication.preparation._WriteSetPreparer._build_lifecycle"
-    ],
-    "preparation_to_consumer": [
-      "PublicationWriteSet.lifecycle",
-      "codex_usage_tracker.agent_kernel.publication.recovery.publish_small_with_pointer",
-      "codex_usage_tracker.agent_kernel.publication.writer.PublicationWriter.publish_with_pointer",
-      "codex_usage_tracker.agent_kernel.publication.writer.PublicationWriter.publish"
-    ],
-    "required_ordering": "recovery_read_first; planner_before_writer_lock; selected_plan_unchanged_through_writer",
-    "mismatch_result": "fail_closed_before_acceptance_no_stitched_artifacts_or_cross_run_identity_binding"
-  },
-  "independent_truth": {
-    "reference_path": "tests/agent_kernel/contracts/reference/lifecycle.py",
-    "reference_symbol": "fold_lifecycle",
-    "vector_tests": "tests/agent_kernel/contracts/test_lifecycle_vectors.py",
-    "consumer_tests": [
-      "tests/agent_kernel/publication/test_preparation.py",
-      "tests/agent_kernel/publication/test_lifecycle_scale.py"
-    ],
-    "required_comparisons": [
-      "lifecycle transition identity and version",
-      "independent fold state and transition count",
-      "publication lifecycle counts and postconditions"
-    ],
-    "forbidden_sources": [
-      "codex_usage_tracker.agent_kernel.publication.preparation",
-      "codex_usage_tracker.agent_kernel.publication.planner",
-      "codex_usage_tracker.agent_kernel.publication.writer",
-      "codex_usage_tracker.agent_kernel.publication.recovery",
-      "SQLite rows as expected answers"
-    ]
+    "files": ["src/codex_usage_tracker/agent_kernel/publication/preparation.py", "scripts/benchmark_ck07r1_lifecycle_scale.py", "tests/agent_kernel/publication/test_lifecycle_scale.py"],
+    "lifecycle_symbols": ["codex_usage_tracker.agent_kernel.publication.preparation._WriteSetPreparer._build_lifecycle"],
+    "forbidden_files": ["src/codex_usage_tracker/agent_kernel/publication/planner.py", "src/codex_usage_tracker/agent_kernel/publication/writer.py", "src/codex_usage_tracker/agent_kernel/publication/recovery.py", "src/codex_usage_tracker/agent_kernel/storage/", "src/codex_usage_tracker/agent_kernel/query/", "src/codex_usage_tracker/agent_kernel/evidence/"]
   },
   "worker_revalidation": {
     "required": true,
     "worker_task": "019fbfe2-8fe4-7de2-9264-d58572366727",
-    "start": "fresh worktree from the exact merged main SHA of this authority",
-    "reapply": "deliberately reapply the retained candidate diff; never rebase, stash, reset, clean, delete, overwrite, or mutate the witness",
-    "checks_before_end_to_end_run": [
-      "verify the exact-main predecessor digest",
-      "verify the selected successor digest after reapplying the retained candidate",
-      "verify the exact candidate base, changed paths, and lifecycle symbol",
-      "run all focused authority, digest, schema, DAG, and scope gates",
-      "run the worker pre-run gates before considering the one-run gate"
-    ],
+    "start": "fresh exact-main worktree after accepted R3A cohort",
+    "reapply": "deliberately reapply the retained CK-07 lifecycle diff onto exact-main preparation e204e0da or the later accepted-main successor; do not mutate the retained witness",
+    "derive_new_digest": true,
+    "update_source_authority_before_run": true,
+    "old_d192_reuse": "fail_closed",
     "different_digest": "fail_closed",
     "one_run_gate": "unspent_unavailable_until_authority_merge_exact_main_and_all_worker_pre_run_gates_pass"
   },
@@ -165,44 +80,11 @@
     "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-path-authority.schema.json",
     "schema_sha256": "181fa2290457e1149764b5f5952559838e70d4f81a512bc920aeb52592fc7856",
     "writer_only_receipt_digest": "935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d",
-    "prior_attempt_ids": [
-      "all-profile-initial-serializer",
-      "all-profile-corrected-serializer-tail-oracle",
-      "all-profile-pid-60367-recovery",
-      "production-only-valid-profile"
-    ],
-    "preservation": "all prior attempt identities, timestamps, failures, receipts, and statuses remain retained read-only and are never reused or upgraded"
+    "preservation": "all prior attempts, receipts, failures, tokens, and digests remain retained read-only; no old receipt is upgraded"
   },
-  "pr_394_policy": {
-    "number": 394,
-    "head_sha": "98a9b5b82951d136644a5fe5f8a70d320131ba08",
-    "workflow_run_id": "30685780055",
-    "failed_job_id": "91331138768",
-    "failure": "ordinary.2000_call_tail",
-    "status": "stale_failed_superseded_read_only",
-    "policy": "do_not_update_rerun_merge_or_reinterpret"
-  },
-  "runtime_budgets_ms": {
-    "first_publication_30_day": 5000,
-    "production_all_time": 120000,
-    "no_change": 100,
-    "one_call_tail": 500,
-    "one_tool_tail": 500
-  },
-  "package_ceilings_bytes": {
-    "sdist": 2000000,
-    "wheel": 1000000
-  },
+  "runtime_budgets_ms": {"first_publication_30_day": 5000, "production_all_time": 120000, "no_change": 100, "one_call_tail": 500, "one_tool_tail": 500},
+  "package_ceilings_bytes": {"sdist": 2000000, "wheel": 1000000},
   "maximum_new_end_to_end_runs": 1,
   "run_status": "unspent_unavailable",
-  "constraints": [
-    "generic_digest_drift_forbidden",
-    "any_different_preparation_digest_fails_closed",
-    "authority_reconciled_no_run",
-    "live_source_predecessor_binding_required",
-    "selected_successor_is_permitted_not_accepted",
-    "candidate_witness_is_retained_uncommitted_read_only",
-    "worker_must_revalidate_on_exact_merged_main_before_any_end_to_end_run",
-    "no_new_worker_or_downstream_ready_task_from_this_authority"
-  ]
+  "constraints": ["generic_digest_drift_forbidden", "any_different_preparation_digest_fails_closed", "408d18e4_live_before_r3a", "e204e0da_requires_complete_r3a_cohort", "historical_d192_direct_use_forbidden", "blocked_hold_no_launch", "no_new_worker_or_downstream_ready_task_from_this_authority"]
 }

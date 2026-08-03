@@ -1,25 +1,25 @@
 {
-  "schema": "codex-usage-tracker.ck08r3a-schema-publication-requalification-authority.v1",
+  "schema": "codex-usage-tracker.ck08r3a-schema-publication-requalification-authority.v2",
   "owner": "CK-08R3A",
-  "authority_version": 1,
-  "authority_base_sha": "3391244ca07287e90fe5eba296d4a2d11e4f8918",
+  "authority_version": 2,
+  "authority_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
   "status": "permitted_not_accepted",
   "linked_r3a_authority": "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json",
   "selected_production_identities": [
     {
       "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
       "role": "selected EvidenceService source",
-      "sha256": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c"
+      "sha256": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3"
     },
     {
       "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
       "role": "selected evidence-order DDL",
-      "sha256": "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc"
+      "sha256": "40254b62510e9c92b049e3608dfad99a208de2fd2d2762f376d32dc81a7d5838"
     },
     {
       "path": "src/codex_usage_tracker/agent_kernel/storage/schema.py",
       "role": "selected schema-contract digest binding",
-      "sha256": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0"
+      "sha256": "af0877db25df1010e282a48c72c020785be92c211d70a733e309c40f82611fbe"
     }
   ],
   "schema_contract_transition": {
@@ -31,7 +31,7 @@
       "operational_index_count": 6
     },
     "selected": {
-      "schema_contract_sha256": "e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35",
+      "schema_contract_sha256": "7a2e1c8a84bc681b33e7c69552f65791c3f9a1a715d641da3a898237896d85dc",
       "analytical_table_count": 42,
       "analytical_index_count": 57,
       "operational_table_count": 6,
@@ -78,7 +78,7 @@
       "variant_count": 80
     },
     "selected": {
-      "schema_contract_sha256": "e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35",
+      "schema_contract_sha256": "7a2e1c8a84bc681b33e7c69552f65791c3f9a1a715d641da3a898237896d85dc",
       "manifest": {
         "path": "tests/agent_kernel/fixtures/tiny-v2/manifest.json",
         "sha256": "fb40a8a91d6ad537171e7a23e3f6fa9bd519080b513981b9483f9791e5e99e7d"
@@ -184,19 +184,19 @@
   },
   "preflight": {
     "worktree_role": "fresh exact-main integration worktree",
-    "base_sha": "3391244ca07287e90fe5eba296d4a2d11e4f8918",
+    "base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
     "reapplied_production_paths": [
       {
         "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
-        "sha256": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c"
+        "sha256": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3"
       },
       {
         "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
-        "sha256": "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc"
+        "sha256": "40254b62510e9c92b049e3608dfad99a208de2fd2d2762f376d32dc81a7d5838"
       },
       {
         "path": "src/codex_usage_tracker/agent_kernel/storage/schema.py",
-        "sha256": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0"
+        "sha256": "af0877db25df1010e282a48c72c020785be92c211d70a733e309c40f82611fbe"
       }
     ],
     "before_authority": {
