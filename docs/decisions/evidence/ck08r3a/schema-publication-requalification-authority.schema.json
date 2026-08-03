@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-usage-tracker.invalid/schemas/ck08r3a-schema-publication-requalification-authority.v1.json",
+  "$id": "https://codex-usage-tracker.invalid/schemas/ck08r3a-schema-publication-requalification-authority.v2.json",
   "title": "CK-08R3A schema/publication requalification authority",
   "type": "object",
   "additionalProperties": false,
@@ -24,11 +24,11 @@
   ],
   "properties": {
     "schema": {
-      "const": "codex-usage-tracker.ck08r3a-schema-publication-requalification-authority.v1"
+      "const": "codex-usage-tracker.ck08r3a-schema-publication-requalification-authority.v2"
     },
     "owner": {"const": "CK-08R3A"},
-    "authority_version": {"const": 1},
-    "authority_base_sha": {"$ref": "#/$defs/gitSha"},
+    "authority_version": {"const": 2},
+    "authority_base_sha": {"const": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6"},
     "status": {"const": "permitted_not_accepted"},
     "linked_r3a_authority": {
       "const": "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json"
@@ -109,7 +109,7 @@
       ],
       "properties": {
         "worktree_role": {"const": "fresh exact-main integration worktree"},
-        "base_sha": {"$ref": "#/$defs/gitSha"},
+        "base_sha": {"const": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6"},
         "reapplied_production_paths": {
           "type": "array",
           "minItems": 3,
@@ -136,7 +136,7 @@
           "minItems": 4,
           "items": {"type": "string"}
         },
-        "status": {"enum": ["pending", "passed"]}
+        "status": {"const": "passed"}
       }
     },
     "worker_evidence": {
@@ -181,7 +181,7 @@
       "properties": {
         "path": {"const": "src/codex_usage_tracker/agent_kernel/evidence/service.py"},
         "role": {"const": "selected EvidenceService source"},
-        "sha256": {"const": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c"}
+        "sha256": {"const": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3"}
       }
     },
     "selectedAnalyticalDdlIdentity": {
@@ -191,7 +191,7 @@
       "properties": {
         "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql"},
         "role": {"const": "selected evidence-order DDL"},
-        "sha256": {"const": "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc"}
+        "sha256": {"const": "40254b62510e9c92b049e3608dfad99a208de2fd2d2762f376d32dc81a7d5838"}
       }
     },
     "selectedSchemaIdentity": {
@@ -201,7 +201,7 @@
       "properties": {
         "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/schema.py"},
         "role": {"const": "selected schema-contract digest binding"},
-        "sha256": {"const": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0"}
+        "sha256": {"const": "af0877db25df1010e282a48c72c020785be92c211d70a733e309c40f82611fbe"}
       }
     },
     "selectedEvidenceServiceArtifact": {
@@ -210,7 +210,7 @@
       "required": ["path", "sha256"],
       "properties": {
         "path": {"const": "src/codex_usage_tracker/agent_kernel/evidence/service.py"},
-        "sha256": {"const": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c"}
+        "sha256": {"const": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3"}
       }
     },
     "selectedAnalyticalDdlArtifact": {
@@ -219,7 +219,7 @@
       "required": ["path", "sha256"],
       "properties": {
         "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql"},
-        "sha256": {"const": "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc"}
+        "sha256": {"const": "40254b62510e9c92b049e3608dfad99a208de2fd2d2762f376d32dc81a7d5838"}
       }
     },
     "selectedSchemaArtifact": {
@@ -228,7 +228,7 @@
       "required": ["path", "sha256"],
       "properties": {
         "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/schema.py"},
-        "sha256": {"const": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0"}
+        "sha256": {"const": "af0877db25df1010e282a48c72c020785be92c211d70a733e309c40f82611fbe"}
       }
     },
     "sha256": {

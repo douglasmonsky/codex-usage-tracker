@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-run-invocation-authority-v3.schema.json",
+  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-run-invocation-authority-v4.schema.json",
   "title": "CK-07R1A0 finite lifecycle source/runtime authority",
   "type": "object",
   "additionalProperties": false,
@@ -10,6 +10,8 @@
     "owner",
     "authority_base_sha",
     "status",
+    "shared_preparation_binding",
+    "historical_d192",
     "argv_correction",
     "first_failure",
     "change_control",
@@ -25,11 +27,28 @@
     "scope"
   ],
   "properties": {
-    "schema": {"const": "codex-usage-tracker.lifecycle-run-invocation-authority.v3"},
-    "authority_version": {"const": 3},
+    "schema": {"const": "codex-usage-tracker.lifecycle-run-invocation-authority.v4"},
+    "authority_version": {"const": 4},
     "owner": {"const": "CK-07R1A0"},
-    "authority_base_sha": {"const": "955272c68548b82ea11eb65226ba0e6f3f570785"},
-    "status": {"const": "authority_reconciled_no_run"},
+    "authority_base_sha": {"const": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6"},
+    "status": {"const": "blocked_no_run"},
+    "shared_preparation_binding": {"const": {
+      "authority_main_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+      "r3a_atomic_cohort_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+      "historical_d192_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+      "r3a_requires_complete_cohort": true,
+      "direct_ck07_use_of_r3a_preparation": "forbidden",
+      "direct_use_of_d192": "forbidden",
+      "mixed_state": "fail_closed",
+      "runtime_acceptance": "not_claimed",
+      "launch_authorized": false
+    }},
+    "historical_d192": {"const": {
+      "sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+      "status": "revoked_for_new_base",
+      "direct_use": "forbidden",
+      "reason": "historical CK-07 candidate is not directly applicable after the R3A preparation transition"
+    }},
     "argv_correction": {
       "type": "object", "additionalProperties": false,
       "required": ["old_guard", "old_guard_effect", "corrected_guard", "corrected_candidate_status", "corrected_candidate_artifacts", "old_candidate_artifacts", "non_launching_subprocess_test", "old_candidate_invocation"],
@@ -125,8 +144,8 @@
             },
             {
               "name": "worker_prequalification",
-              "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-              "source_role": "selected_successor",
+              "source_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+              "source_role": "selected_r3a_atomic_cohort_preparation",
               "runtime_acceptance": "not_claimed",
               "receipt_policy": "not_yet_available",
               "evidence_identity_policy": "not_available",
@@ -134,8 +153,8 @@
             },
             {
               "name": "post_single_run",
-              "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-              "source_role": "selected_successor",
+              "source_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+              "source_role": "selected_r3a_atomic_cohort_preparation",
               "runtime_acceptance": "qualified_only_with_complete_planner_valid_receipt",
               "receipt_policy": "complete_planner_valid_receipt_required",
               "evidence_identity_policy": "bind_exact_dynamic_receipt_and_evidence_identity",
@@ -143,8 +162,8 @@
             },
             {
               "name": "final_accepted",
-              "source_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-              "source_role": "selected_successor",
+              "source_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+              "source_role": "selected_r3a_atomic_cohort_preparation",
               "runtime_acceptance": "accepted_only_with_worker_merge_and_exact_main",
               "receipt_policy": "same_complete_planner_valid_receipt_identity_required",
               "evidence_identity_policy": "same_exact_dynamic_receipt_and_evidence_identity",
@@ -225,24 +244,28 @@
       "additionalProperties": false,
       "required": [
         "status", "base_sha", "retained_branch", "retained_worktree", "witness_status",
-        "source_predecessor_sha256", "source_successor_sha256", "runtime_acceptance", "artifacts",
+        "source_predecessor_sha256", "source_successor_sha256", "runtime_acceptance",
+        "requires_complete_r3a_cohort", "direct_ck07_use", "launch_authorized", "artifacts",
         "binding", "worker_revalidation_required"
       ],
       "properties": {
-        "status": {"const": "reconciled_no_run"},
-        "base_sha": {"const": "955272c68548b82ea11eb65226ba0e6f3f570785"},
-        "retained_branch": {"const": "feature/ck-07r1-lifecycle-requalification-v5"},
-        "retained_worktree": {"const": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v5"},
-        "witness_status": {"const": "retained_uncommitted_read_only"},
+        "status": {"const": "r3a_shared_preparation_not_ck07_candidate"},
+        "base_sha": {"const": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6"},
+        "retained_branch": {"const": "not_applicable_until_ck07_reapplication"},
+        "retained_worktree": {"const": "not_applicable_until_ck07_reapplication"},
+        "witness_status": {"const": "r3a_candidate_retained_uncommitted_read_only_not_ck07_qualified"},
         "source_predecessor_sha256": {"const": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"},
-        "source_successor_sha256": {"const": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1"},
+        "source_successor_sha256": {"const": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174"},
         "runtime_acceptance": {"const": "not_claimed"},
+        "requires_complete_r3a_cohort": {"const": true},
+        "direct_ck07_use": {"const": "forbidden"},
+        "launch_authorized": {"const": false},
         "artifacts": {
           "const": [
             {
               "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
-              "sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-              "role": "source"
+              "sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+              "role": "r3a_shared_preparation_not_ck07_source"
             },
             {
               "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
@@ -261,7 +284,7 @@
             }
           ]
         },
-        "binding": {"const": "live_source_predecessor_to_selected_successor"},
+        "binding": {"const": "r3a_preparation_is_not_a_ck07_candidate; complete_cohort_required_before_ck07_reapplication"},
         "worker_revalidation_required": {"const": true}
       }
     },
@@ -287,9 +310,9 @@
           "required": ["path", "sha256", "schema_path", "schema_sha256"],
           "properties": {
             "path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json"},
-          "sha256": {"const": "0cda5ea3d44ed1e5726735a34d1a73a81635b068121015f81b85b128bf35c47f"},
+          "sha256": {"const": "fdda4898e1f2f638453410b9536d7de12b6e16f7034243e28624bb5c975b611e"},
             "schema_path": {"const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json"},
-          "schema_sha256": {"const": "d6c6611f94bd89f1080712271529542b21d6c5634278f7d5e21b2f7a9138672f"}
+          "schema_sha256": {"const": "b31270111e700ea3bc78d60ce539f1f1dce510f8cac3df929ee1635fbac44405"}
           }
         }
       }

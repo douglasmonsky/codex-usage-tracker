@@ -192,59 +192,44 @@ def test_argv_correction_preserves_first_failure_and_one_run_gate() -> None:
     }
 
 
-def test_selected_candidate_and_aggregate_timeout_are_reconciled_without_runtime_acceptance() -> None:
+def test_selected_candidate_is_r3a_shared_preparation_only_and_ck07_stays_blocked() -> None:
     authority = _authority()
-    assert authority["status"] == "authority_reconciled_no_run"
-    assert authority["authority_base_sha"] == "955272c68548b82ea11eb65226ba0e6f3f570785"
-    assert authority["selected_candidate"] == {
-        "status": "reconciled_no_run",
-        "base_sha": "955272c68548b82ea11eb65226ba0e6f3f570785",
-        "retained_branch": "feature/ck-07r1-lifecycle-requalification-v5",
-        "retained_worktree": "2026-08-01/codex-usage-tracker-ck07r1-lifecycle-requalification-v5",
-        "witness_status": "retained_uncommitted_read_only",
-        "source_predecessor_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
-        "source_successor_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+    candidate = authority["selected_candidate"]
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-run-invocation-authority.v4"
+    assert authority["authority_version"] == 4
+    assert authority["authority_base_sha"] == "ee4a064bf8850bceb362fbe73e40a57fe4af55d6"
+    assert authority["status"] == "blocked_no_run"
+    assert authority["shared_preparation_binding"] == {
+        "authority_main_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+        "r3a_atomic_cohort_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+        "historical_d192_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+        "r3a_requires_complete_cohort": True,
+        "direct_ck07_use_of_r3a_preparation": "forbidden",
+        "direct_use_of_d192": "forbidden",
+        "mixed_state": "fail_closed",
         "runtime_acceptance": "not_claimed",
-        "artifacts": [
-            {
-                "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
-                "sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
-                "role": "source",
-            },
-            {
-                "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-                "sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
-                "role": "benchmark",
-            },
-            {
-                "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-                "sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed",
-                "role": "lifecycle_test",
-            },
-            {
-                "path": "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
-                "sha256": "36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb",
-                "role": "linked_evidence",
-            },
-        ],
-        "binding": "live_source_predecessor_to_selected_successor",
-        "worker_revalidation_required": True,
+        "launch_authorized": False,
     }
-    assert authority["launch_contract"]["aggregate_timeout"] == {
-        "seconds": 720,
-        "formula": "5 * 120 + 120",
-        "production_sample_count": 5,
-        "production_sample_budget_seconds": 120,
-        "publication_recovery_overhead_seconds": 120,
-        "scope": "wrapper_only",
-        "underlying_runtime_budgets_ms": {
-            "first_publication_30_day": 5000,
-            "production_all_time": 120000,
-            "no_change": 100,
-            "one_call_tail": 500,
-            "one_tool_tail": 500,
-        },
+    assert authority["historical_d192"]["direct_use"] == "forbidden"
+    assert candidate["status"] == "r3a_shared_preparation_not_ck07_candidate"
+    assert candidate["base_sha"] == authority["authority_base_sha"]
+    assert candidate["source_successor_sha256"] == (
+        "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174"
+    )
+    assert candidate["requires_complete_r3a_cohort"] is True
+    assert candidate["direct_ck07_use"] == "forbidden"
+    assert candidate["launch_authorized"] is False
+    assert candidate["artifacts"][0] == {
+        "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+        "role": "r3a_shared_preparation_not_ck07_source",
     }
+    assert candidate["binding"] == (
+        "r3a_preparation_is_not_a_ck07_candidate; complete_cohort_required_before_ck07_reapplication"
+    )
+    assert authority["run_token"]["status"] == "unspent_unavailable"
+    assert authority["run_token"]["maximum_new_end_to_end_runs"] == 1
+    assert authority["change_control"]["merged_sha"] is None
 
 
 def test_finite_source_runtime_state_machine_is_exact_and_currently_unlaunched() -> None:
@@ -266,8 +251,9 @@ def test_finite_source_runtime_state_machine_is_exact_and_currently_unlaunched()
         "merge_policy": "current_authority_state",
     }
     assert machine["states"][1]["source_sha256"] == (
-        "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1"
+        "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174"
     )
+    assert machine["states"][1]["source_role"] == "selected_r3a_atomic_cohort_preparation"
     assert machine["states"][1]["runtime_acceptance"] == "not_claimed"
     assert machine["states"][2]["receipt_policy"] == "complete_planner_valid_receipt_required"
     assert machine["states"][2]["evidence_identity_policy"] == (

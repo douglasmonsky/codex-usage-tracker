@@ -1,17 +1,17 @@
 {
-  "schema": "codex-usage-tracker.ck08r3a-evidence-service-supersession-authority.v2",
+  "schema": "codex-usage-tracker.ck08r3a-evidence-service-supersession-authority.v3",
   "owner": "CK-08R3A",
-  "authority_base_sha": "fb0c57886097a6b985d2f321b2de858cbdfc0a97",
+  "authority_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
   "base_transition": {
-    "original_authority_base_sha": "f3f376fc644a2e3d23c313dd6b7ca4b707c2998b",
-    "integrated_origin_main_sha": "fb0c57886097a6b985d2f321b2de858cbdfc0a97",
-    "upstream_change": "CK-08R1C PR #411; disjoint evaluator and scope-test additions"
+    "original_authority_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
+    "integrated_origin_main_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
+    "upstream_change": "final shared authority requalification from exact main"
   },
   "source_path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
   "predecessor": {
     "authority_path": "docs/decisions/evidence/ck08r0/corrective-gates-v1.json",
-    "authority_base_sha": "fb0c57886097a6b985d2f321b2de858cbdfc0a97",
-    "source_reproduction_base_sha": "f3f376fc644a2e3d23c313dd6b7ca4b707c2998b",
+    "authority_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
+    "source_reproduction_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
     "sha256": "ea32223d1afd997f310419bff0b6b260193e527c8333c9f561bcab280447dfa3"
   },
   "rejected_successors": [
@@ -28,7 +28,7 @@
     }
   ],
   "selected_successor": {
-    "sha256": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c",
+    "sha256": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3",
     "status": "permitted_not_accepted",
     "implementation_task": "019fbe2b-20e8-78b2-a687-0231b159d0c7",
     "blocked_task": "019fbbc0-cd25-7041-a847-b0098dfae29d",
@@ -36,17 +36,17 @@
       {
         "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
         "role": "source",
-        "sha256": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c"
+        "sha256": "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3"
       },
       {
         "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
         "role": "evidence_order_indexes",
-        "sha256": "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc"
+        "sha256": "40254b62510e9c92b049e3608dfad99a208de2fd2d2762f376d32dc81a7d5838"
       },
       {
         "path": "src/codex_usage_tracker/agent_kernel/storage/schema.py",
         "role": "schema_contract_digest",
-        "sha256": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0"
+        "sha256": "af0877db25df1010e282a48c72c020785be92c211d70a733e309c40f82611fbe"
       }
     ],
     "required_evidence": {
@@ -58,7 +58,7 @@
   "schema_publication_transition_authority": {
     "path": "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.json",
     "status": "permitted_not_accepted",
-    "authority_base_sha": "3391244ca07287e90fe5eba296d4a2d11e4f8918",
+    "authority_base_sha": "ee4a064bf8850bceb362fbe73e40a57fe4af55d6",
     "scope": "exact selected 13-index DDL/schema identities, linked synthetic publication fixtures, and tiny-accounting EXPLAIN transition"
   },
   "physical_decision": {

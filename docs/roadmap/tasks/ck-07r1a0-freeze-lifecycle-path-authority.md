@@ -35,7 +35,12 @@ contract is
 with its schema. The linked [source-digest authority](../../decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json)
 and its schema freeze the exact predecessor/successor transition. The retained
 CK-07R1 implementation/profile/evidence diff is read-only evidence;
-the reconciled candidate binds preparation `d192c858…`, corrected benchmark
+the shared-preparation authority binds exact-main preparation `408d18e4…` before
+R3A and preparation `e204e0da…` only inside the complete R3A cohort; historical
+`d192c858…` is revoked for the new base and forbidden for direct use. The
+retained CK-07R1 diff must later be reapplied onto the accepted R3A base to
+derive a new preparation digest before any run. It does not claim runtime
+acceptance. The corrected benchmark
 `f173837d…`, corrected lifecycle test `b6468b60…`, linked evidence `36eb76ca…`, and
 canonical fixture identities without claiming runtime acceptance.
 The linked run-invocation authority is
@@ -73,24 +78,29 @@ qualification, PR #394 changes, writer/planner/recovery code, budgets,
 schemas/DDL/query/evidence services, projections, releases, or real/private
 Codex data.
 
-**Invariants:** CK-07R1A remains accepted at `4d807495…`; the exact
+**Invariants:** CK-07R1A remains accepted at `4d807495…`; CK-07R1 remains
+`blocked_hold` with no launch/output/token consumption. The exact
 predecessor digest is
 `408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872` and the
 permitted-not-accepted retained successor digest is
-`d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1`; generic
-or different digest drift fails closed; linked evidence is
+`e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174` only as
+the R3A shared-preparation state; historical
+`d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1` is
+revoked and direct use fails closed; generic or different digest drift fails
+closed; linked evidence is
 `36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb`; the
 wrapper timeout is exactly 720 seconds while the five budgets remain
 `5000/120000/100/500/500` ms; the malformed 62-character dispatch value is
 revoked, never authoritative, and never used; the source-digest and
 run-invocation authorities must be accepted, merged, and exact-main verified
-before CK-07R1 is Conditional Ready; every prior attempt and its
+before a future CK-07R1 requalification may proceed; every prior attempt and its
 identity/timestamp/failure remains visible; receipt
 `935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d` remains
 writer-only evidence and is never reused or upgraded. The old argv-guard
 attempt is preserved as `pre_child_argv_guard_failure`, not a launch; no old
-candidate invocation may recur, and the corrected candidate must be the only
-candidate re-applied after exact-main verification.
+candidate invocation may recur. The retained lifecycle diff must be
+reapplied only after accepted R3A exact-main verification and must yield a new
+exact preparation digest before any run.
 The current finite state is `authority_main`; no worker resumes from this
 packet, no receipt can claim qualification, and final acceptance additionally
 requires worker PR merge and exact-main verification.
