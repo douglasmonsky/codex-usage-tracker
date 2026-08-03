@@ -313,7 +313,9 @@ def generate(destination: Path) -> dict[str, Any]:
         comparison_digests = []
         for case in original["cases"]:
             name, _late, _null_cached, _native_turn_id = _variant_source(case)
-            published = published_question_case(connections[name], case)
+            published = published_question_case(
+                connections[name], case, preserve_frozen_authority=True
+            )
             construction = next(
                 item for item in variant_constructions if item["oracle_id"] == case["oracle_id"]
             )

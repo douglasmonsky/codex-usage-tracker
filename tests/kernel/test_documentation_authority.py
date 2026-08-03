@@ -366,6 +366,12 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "sha256": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0",
         },
     ]
+    assert r3a["schema_publication_transition_authority"] == {
+        "path": "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.json",
+        "status": "permitted_not_accepted",
+        "authority_base_sha": "3391244ca07287e90fe5eba296d4a2d11e4f8918",
+        "scope": "exact selected 13-index DDL/schema identities, linked synthetic publication fixtures, and tiny-accounting EXPLAIN transition",
+    }
     assert len(r3a["rejected_successors"]) == 1
     assert r3a["rejected_successors"][0]["sha256"] == (
         "718ff7032d050b13cb7fac1f857d0c99879d0ef3b13c57c39b55514fc610a88b"
@@ -386,6 +392,18 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
                 for required in successor["required_artifacts"]:
                     required_path = _REPO_ROOT / required["path"]
                     assert hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
+            else:
+                assert actual == artifact["sha256"]
+        elif artifact["path"] == "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json":
+            transition = _json(
+                r3a["schema_publication_transition_authority"]["path"]
+            )
+            assert actual in {
+                artifact["sha256"],
+                transition["publication_fixture_transition"]["selected"][
+                    "question_scenarios"
+                ]["sha256"],
+            }
         else:
             assert actual == artifact["sha256"]
     locks = [lock for lane in contract["lanes"] for lock in lane["owned_lock"]]
@@ -469,6 +487,132 @@ def test_ck08r3a_authority_rejects_identity_mutations() -> None:
         mutate(mutated)
         with pytest.raises(AssertionError):
             _assert_ck08r3a_identity_binding(mutated)
+
+
+def test_ck08r3a_schema_publication_authority_is_exact_and_fixture_bound() -> None:
+    authority_path = (
+        "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.json"
+    )
+    schema_path = authority_path.removesuffix(".json") + ".schema.json"
+    authority = _json(authority_path)
+    schema = _json(schema_path)
+    Draft202012Validator.check_schema(schema)
+    Draft202012Validator(schema).validate(authority)
+
+    assert authority["authority_base_sha"] == (
+        "3391244ca07287e90fe5eba296d4a2d11e4f8918"
+    )
+    assert authority["status"] == "permitted_not_accepted"
+    assert authority["selected_production_identities"] == [
+        {
+            "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+            "role": "selected EvidenceService source",
+            "sha256": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c",
+        },
+        {
+            "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+            "role": "selected evidence-order DDL",
+            "sha256": "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc",
+        },
+        {
+            "path": "src/codex_usage_tracker/agent_kernel/storage/schema.py",
+            "role": "selected schema-contract digest binding",
+            "sha256": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0",
+        },
+    ]
+    assert authority["preflight"]["reapplied_production_paths"] == [
+        {
+            "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+            "sha256": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c",
+        },
+        {
+            "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+            "sha256": "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc",
+        },
+        {
+            "path": "src/codex_usage_tracker/agent_kernel/storage/schema.py",
+            "sha256": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0",
+        },
+    ]
+    assert authority["schema_contract_transition"] == {
+        "predecessor": {
+            "schema_contract_sha256": "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5",
+            "analytical_table_count": 42,
+            "analytical_index_count": 44,
+            "operational_table_count": 6,
+            "operational_index_count": 6,
+        },
+        "selected": {
+            "schema_contract_sha256": "e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35",
+            "analytical_table_count": 42,
+            "analytical_index_count": 57,
+            "operational_table_count": 6,
+            "operational_index_count": 6,
+        },
+        "ddl_marker": "ck08r3a-evidence-indexes",
+        "selected_index_names": [
+            "evidence_model_calls_by_session_order",
+            "evidence_model_call_tail_by_session_order",
+            "evidence_tools_by_session_order",
+            "evidence_activities_by_session_order",
+            "evidence_state_changes_by_session_order",
+            "evidence_compactions_by_session_order",
+            "evidence_context_components_by_session_order",
+            "evidence_turns_by_session_order",
+            "evidence_lifecycle_timeline_order",
+            "evidence_source_occurrences_by_logical_order",
+            "evidence_tools_by_resource_order",
+            "evidence_state_changes_by_resource_order",
+            "evidence_allowance_observations_order",
+        ],
+    }
+
+    fixture = authority["publication_fixture_transition"]
+    for state_name, expected_schema, expected_digests in (
+        (
+            "predecessor",
+            "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5",
+            {
+                "manifest": "6f0bf98dcf6d2d5b159e667dcbdf520228e62657f2978d036e24a72d666331fb",
+                "question_scenarios": "f26fce4ba5bc75e2efb0e7bab698e2029af4152536dfc87a9c4329c749a347eb",
+                "oracle_bundle": "8086c4d1e4deb3f08ec2cb272e0d7336527a19f4119af9c1433f3c7ad2abc2c7",
+            },
+        ),
+        (
+            "selected",
+            "e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35",
+            {
+                "manifest": "fb40a8a91d6ad537171e7a23e3f6fa9bd519080b513981b9483f9791e5e99e7d",
+                "question_scenarios": "6ffca4917386c5bc13237952904d2a560a531e37c6eeba89b69ea53d76f35cd8",
+                "oracle_bundle": "97b78d11fa64eb2dac0a5f605bd9056f331ac9dd1fd210703e5f42b23935b40e",
+            },
+        ),
+    ):
+        state = fixture[state_name]
+        assert state["schema_contract_sha256"] == expected_schema
+        for artifact_name, expected_sha in expected_digests.items():
+            artifact = state[artifact_name]
+            assert artifact["path"].startswith(fixture["fixture_root"])
+            if state_name == "selected":
+                actual_sha = hashlib.sha256((_REPO_ROOT / artifact["path"]).read_bytes()).hexdigest()
+                assert actual_sha == expected_sha
+            else:
+                assert artifact["sha256"] == expected_sha
+
+    selected_cases = _json(
+        "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json"
+    )["cases"]
+    assert [
+        case["semantic_mutation"]["expected_artifact_manifest_sha256"]
+        for case in selected_cases
+    ] == fixture["selected_artifact_manifest_sha256s"]
+    oracle_order = fixture["oracle_order"]
+    assert hashlib.sha256((_REPO_ROOT / oracle_order["path"]).read_bytes()).hexdigest() == oracle_order[
+        "sha256"
+    ]
+    assert authority["tiny_accounting_explain_transition"]["generic_explain_relaxation"] is False
+    assert authority["preflight"]["status"] == "passed"
+    assert authority["no_live_operation"] is True
 
 
 def test_corrective_seam_packet_is_critical_path_authority() -> None:

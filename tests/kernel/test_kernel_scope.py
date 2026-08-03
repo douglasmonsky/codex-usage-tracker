@@ -689,6 +689,8 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
 def test_ck08r3a_authority_additions_are_explicit_and_bounded() -> None:
     assert {
         "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json",
+        "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.json",
+        "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.schema.json",
     } == CK08R3A_AUTHORITY_ADDITIONS
 
 

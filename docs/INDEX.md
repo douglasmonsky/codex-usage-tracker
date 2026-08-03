@@ -21,6 +21,10 @@ Retained CK-08R3 `a28e9cdbff8e48d334712a449fdcee111c725673` then stopped
 before scale on first/deep EvidenceService EXPLAIN. CK-08R3A owns that separate
 fix; CK-08R3 awaits its accepted merge/exact-main verification. Independent
 truth now consumes [`answer-semantics.v1`](../config/agent-kernel/answer-semantics-v1.json);
+The linked [CK-08R3A schema/publication requalification authority](decisions/evidence/ck08r3a/schema-publication-requalification-authority.json)
+binds only the resulting 57-index schema digest, synthetic publication fixture
+manifests, and compatible tiny-accounting EXPLAIN expectation; R3A remains
+Conditional Ready and implementation remains unaccepted.
 R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`;
 R1B remains held on shared query/evidence/grading integration before final R1
 requalification.

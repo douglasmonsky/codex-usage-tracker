@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-usage-tracker.invalid/schemas/ck08r3a-schema-publication-requalification-authority.v1.json",
+  "title": "CK-08R3A schema/publication requalification authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "owner",
+    "authority_version",
+    "authority_base_sha",
+    "status",
+    "linked_r3a_authority",
+    "selected_production_identities",
+    "schema_contract_transition",
+    "publication_fixture_transition",
+    "tiny_accounting_explain_transition",
+    "preflight",
+    "worker_evidence",
+    "preserved_semantics",
+    "forbidden_changes",
+    "scope_additions",
+    "no_live_operation"
+  ],
+  "properties": {
+    "schema": {
+      "const": "codex-usage-tracker.ck08r3a-schema-publication-requalification-authority.v1"
+    },
+    "owner": {"const": "CK-08R3A"},
+    "authority_version": {"const": 1},
+    "authority_base_sha": {"$ref": "#/$defs/gitSha"},
+    "status": {"const": "permitted_not_accepted"},
+    "linked_r3a_authority": {
+      "const": "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json"
+    },
+    "selected_production_identities": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {"$ref": "#/$defs/selectedEvidenceServiceIdentity"},
+        {"$ref": "#/$defs/selectedAnalyticalDdlIdentity"},
+        {"$ref": "#/$defs/selectedSchemaIdentity"}
+      ],
+      "items": false
+    },
+    "schema_contract_transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["predecessor", "selected", "ddl_marker", "selected_index_names"],
+      "properties": {
+        "predecessor": {"$ref": "#/$defs/schemaState"},
+        "selected": {"$ref": "#/$defs/schemaState"},
+        "ddl_marker": {"const": "ck08r3a-evidence-indexes"},
+        "selected_index_names": {
+          "type": "array",
+          "minItems": 13,
+          "maxItems": 13,
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "publication_fixture_transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "publication_id",
+        "fixture_root",
+        "oracle_order",
+        "predecessor",
+        "selected",
+        "selected_artifact_manifest_sha256s"
+      ],
+      "properties": {
+        "publication_id": {"const": "publication:ck07a-structural-v2"},
+        "fixture_root": {"const": "tests/agent_kernel/fixtures/tiny-v2"},
+        "oracle_order": {"$ref": "#/$defs/artifact"},
+        "predecessor": {"$ref": "#/$defs/fixtureState"},
+        "selected": {"$ref": "#/$defs/fixtureState"},
+        "selected_artifact_manifest_sha256s": {
+          "type": "array",
+          "minItems": 80,
+          "maxItems": 80,
+          "items": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "tiny_accounting_explain_transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["test_path", "predecessor_index", "selected_index", "generic_explain_relaxation"],
+      "properties": {
+        "test_path": {"const": "tests/agent_kernel/storage/test_tiny_accounting.py"},
+        "predecessor_index": {"const": "source_occurrences_by_logical_id"},
+        "selected_index": {"const": "evidence_source_occurrences_by_logical_order"},
+        "generic_explain_relaxation": {"const": false}
+      }
+    },
+    "preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "worktree_role",
+        "base_sha",
+        "reapplied_production_paths",
+        "before_authority",
+        "required_boundaries",
+        "status"
+      ],
+      "properties": {
+        "worktree_role": {"const": "fresh exact-main integration worktree"},
+        "base_sha": {"$ref": "#/$defs/gitSha"},
+        "reapplied_production_paths": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            {"$ref": "#/$defs/selectedEvidenceServiceArtifact"},
+            {"$ref": "#/$defs/selectedAnalyticalDdlArtifact"},
+            {"$ref": "#/$defs/selectedSchemaArtifact"}
+          ],
+          "items": false
+        },
+        "before_authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["just_v_failures", "just_v_passed", "warnings"],
+          "properties": {
+            "just_v_failures": {"const": 21},
+            "just_v_passed": {"const": 1375},
+            "warnings": {"const": 1}
+          }
+        },
+        "required_boundaries": {
+          "type": "array",
+          "minItems": 4,
+          "items": {"type": "string"}
+        },
+        "status": {"enum": ["pending", "passed"]}
+      }
+    },
+    "worker_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["focused_identity_count", "activity_rows", "page_limit", "returned_rows", "decoded_rows", "progress_callbacks", "marker_free", "forward_backward_keyset", "base_and_tail_truth", "valid_empty_rate_card_pages"],
+      "properties": {
+        "focused_identity_count": {"const": 45},
+        "activity_rows": {"const": [2000, 10000]},
+        "page_limit": {"const": 7},
+        "returned_rows": {"const": [7, 7]},
+        "decoded_rows": {"const": [8, 8]},
+        "progress_callbacks": {"const": [27, 25]},
+        "marker_free": {"const": true},
+        "forward_backward_keyset": {"const": true},
+        "base_and_tail_truth": {"const": true},
+        "valid_empty_rate_card_pages": {"const": true}
+      }
+    },
+    "preserved_semantics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"}
+    },
+    "forbidden_changes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"}
+    },
+    "scope_additions": {
+      "type": "array",
+      "minItems": 2,
+      "items": {"type": "string"}
+    },
+    "no_live_operation": {"const": true}
+  },
+  "$defs": {
+    "selectedEvidenceServiceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "role", "sha256"],
+      "properties": {
+        "path": {"const": "src/codex_usage_tracker/agent_kernel/evidence/service.py"},
+        "role": {"const": "selected EvidenceService source"},
+        "sha256": {"const": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c"}
+      }
+    },
+    "selectedAnalyticalDdlIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "role", "sha256"],
+      "properties": {
+        "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql"},
+        "role": {"const": "selected evidence-order DDL"},
+        "sha256": {"const": "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc"}
+      }
+    },
+    "selectedSchemaIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "role", "sha256"],
+      "properties": {
+        "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/schema.py"},
+        "role": {"const": "selected schema-contract digest binding"},
+        "sha256": {"const": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0"}
+      }
+    },
+    "selectedEvidenceServiceArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"const": "src/codex_usage_tracker/agent_kernel/evidence/service.py"},
+        "sha256": {"const": "23e1bfbd2eebcfbb20e0bd036f1ab3f6e27061109a518c53cc867e32de58f95c"}
+      }
+    },
+    "selectedAnalyticalDdlArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql"},
+        "sha256": {"const": "95415d4d9df04cb17169c4f054930d2eea86f8e98dbc857a228b4d1a33aee8dc"}
+      }
+    },
+    "selectedSchemaArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"const": "src/codex_usage_tracker/agent_kernel/storage/schema.py"},
+        "sha256": {"const": "328c41c11d35fd2a9024aab2c557cc533d43fee036cb15c1c52580f749a836b0"}
+      }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "schemaState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_contract_sha256", "analytical_table_count", "analytical_index_count", "operational_table_count", "operational_index_count"],
+      "properties": {
+        "schema_contract_sha256": {"$ref": "#/$defs/sha256"},
+        "analytical_table_count": {"const": 42},
+        "analytical_index_count": {"enum": [44, 57]},
+        "operational_table_count": {"const": 6},
+        "operational_index_count": {"const": 6}
+      }
+    },
+    "fixtureState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_contract_sha256", "manifest", "question_scenarios", "oracle_bundle", "variant_count"],
+      "properties": {
+        "schema_contract_sha256": {"$ref": "#/$defs/sha256"},
+        "manifest": {"$ref": "#/$defs/artifact"},
+        "question_scenarios": {"$ref": "#/$defs/artifact"},
+        "oracle_bundle": {"$ref": "#/$defs/artifact"},
+        "variant_count": {"const": 80}
+      }
+    }
+  }
+}
