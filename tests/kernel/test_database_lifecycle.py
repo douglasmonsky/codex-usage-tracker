@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from codex_usage_tracker.kernel import database
+from codex_usage_tracker.kernel import content, database, operational
 from codex_usage_tracker.kernel.database import (
     initialize_analytical_database,
     open_read_snapshot,
@@ -130,6 +131,54 @@ def test_interrupted_staging_creation_does_not_replace_active_cache(
 
     assert path.read_bytes() == before
     assert validate_analytical_database(path) == []
+
+
+@pytest.mark.parametrize(
+    ("initializer", "name"),
+    (
+        (initialize_analytical_database, "analytical.sqlite3"),
+        (operational.initialize_operational_database, "operational.sqlite3"),
+        (content._initialize_content_database, "content.sqlite3"),
+    ),
+)
+def test_database_initializers_close_connections_before_atomic_replace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    initializer: Callable[[Path], Any],
+    name: str,
+) -> None:
+    real_connect = sqlite3.connect
+    real_replace = os.replace
+    connections: list[Any] = []
+
+    class TrackingConnection:
+        def __init__(self, connection: sqlite3.Connection) -> None:
+            self._connection = connection
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+            self._connection.close()
+
+        def __getattr__(self, attribute: str) -> Any:
+            return getattr(self._connection, attribute)
+
+    def connect(*args: Any, **kwargs: Any) -> TrackingConnection:
+        connection = TrackingConnection(real_connect(*args, **kwargs))
+        connections.append(connection)
+        return connection
+
+    def replace(source: Path, target: Path) -> None:
+        assert connections
+        assert all(connection.closed for connection in connections)
+        real_replace(source, target)
+
+    monkeypatch.setattr(sqlite3, "connect", connect)
+    monkeypatch.setattr(os, "replace", replace)
+
+    initializer(tmp_path / name)
+
+    assert all(connection.closed for connection in connections)
 
 
 def test_kernel_creation_never_opens_legacy_database(tmp_path: Path) -> None:

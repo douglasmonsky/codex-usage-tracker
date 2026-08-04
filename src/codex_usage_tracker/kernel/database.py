@@ -40,10 +40,14 @@ def initialize_analytical_database(
     target.parent.mkdir(parents=True, exist_ok=True)
     staging = target.with_name(f".{target.name}.building-{uuid.uuid4().hex}")
     try:
-        with sqlite3.connect(staging) as connection:
+        connection = sqlite3.connect(staging)
+        try:
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("PRAGMA journal_mode = DELETE")
             create_schema(connection)
+            connection.commit()
+        finally:
+            connection.close()
         _owner_only(staging)
         failures = validate_analytical_database(staging)
         if failures:
@@ -148,7 +152,8 @@ def validate_analytical_database(path: Path) -> list[str]:
         return [f"analytical database does not exist: {path.name}"]
     failures: list[str] = []
     try:
-        with sqlite3.connect(path) as connection:
+        connection = sqlite3.connect(path)
+        try:
             connection.execute("PRAGMA foreign_keys = ON")
             if connection.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
                 failures.append(
@@ -185,6 +190,8 @@ def validate_analytical_database(path: Path) -> list[str]:
                 failures.append(f"analytical quick_check failed: {integrity}")
             if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
                 failures.append("analytical foreign-key check failed")
+        finally:
+            connection.close()
     except sqlite3.DatabaseError as exc:
         failures.append(f"analytical database is unreadable: {exc}")
     return failures
