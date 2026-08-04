@@ -18,7 +18,7 @@ test("warm reopen renders committed facts without starting refresh", async ({ pa
   await expect(page.getByRole("heading", { name: "Usage as it lands" })).toBeVisible();
   await expect(page.getByText("Total tokens", { exact: true })).toBeVisible();
   await expect(page.getByText("Cost and credits", { exact: true })).toBeVisible();
-  await expect(page.getByRole("img", { name: /daily token usage over time/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Load detailed views" })).toBeVisible();
   const browserReadyMs = await page.evaluate(() => performance.now());
   expect(browserReadyMs).toBeLessThan(500);
 
@@ -26,7 +26,7 @@ test("warm reopen renders committed facts without starting refresh", async ({ pa
   await expect(page.getByText("Generation 1 · committed")).toBeVisible();
   expect(refreshCalls).toBe(0);
   expect(statusCalls).toBe(2);
-  expect(queryCalls).toBe(2);
+  expect(queryCalls).toBe(1);
 });
 
 test("only the five focused areas are navigable and keyboard reachable", async ({ page }) => {
@@ -42,6 +42,15 @@ test("only the five focused areas are navigable and keyboard reachable", async (
   await page.reload();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to workspace" })).toBeFocused();
+});
+
+test("language selection persists in the local console", async ({ page }) => {
+  await page.goto("/settings");
+  await page.getByLabel("Language").selectOption("zh-CN");
+  await expect(page.getByRole("heading", { name: "设置" })).toBeVisible();
+  await expect(page.locator('nav a[data-route="live"]')).toContainText("实时概览");
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "设置" })).toBeVisible();
 });
 
 test("explore returns bounded facts and exact evidence deep links", async ({ page }) => {
@@ -169,6 +178,7 @@ test("human tables sort with the keyboard and paginate without new API work", as
     });
   });
   await page.goto("/live");
+  await page.getByRole("button", { name: "Load detailed views" }).click();
   const leaders = page.getByRole("heading", { name: "Highest-token threads" })
     .locator("..");
   await expect(page.getByText("$0.0000335", { exact: true })).toBeVisible();
@@ -187,7 +197,7 @@ test("human tables sort with the keyboard and paginate without new API work", as
   await filter.fill("");
   await leaders.getByRole("button", { name: "Next page" }).click();
   await expect(leaders.getByText("Rows 11–20 of 23")).toBeVisible();
-  expect(queryCalls).toBe(1);
+  expect(queryCalls).toBe(2);
 });
 
 test("every guided query template submits an allowlisted request", async ({ page }) => {
@@ -442,6 +452,14 @@ test("snapshot gap resnapshots before reopening without the stale event cursor",
     firstClosed: true,
     secondUrl: "/api/kernel/v1/events?limit=100",
   });
+
+  await page.evaluate(() => {
+    const second = window.__syntheticEventSources[1];
+    second.listeners.get("snapshot_required")();
+  });
+  await expect.poll(
+    () => page.evaluate(() => window.__syntheticEventSources.length),
+  ).toBe(2);
 });
 
 test("error recovery control retries the failed view", async ({ page }) => {
@@ -540,6 +558,7 @@ test("limits graph uses elapsed time and labels reset boundaries", async ({ page
 
 test("primary console surfaces hide implementation-first labels", async ({ page }) => {
   await page.goto("/live");
+  await page.getByRole("button", { name: "Load detailed views" }).click();
   await expect(page.getByText("Snapshot truth", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Tool-independent facts", { exact: true })).toHaveCount(0);
   const leaders = page.getByRole("heading", { name: "Highest-token threads" })
