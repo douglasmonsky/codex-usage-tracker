@@ -31,7 +31,21 @@ _FORBIDDEN_PLAN_MARKERS = (
     "SCAN stream",
     "MATERIALIZE model_calls_visible",
     "AUTOMATIC COVERING INDEX",
-    "USE TEMP B-TREE",
+)
+_TEMP_SORT_MARKER = "USE TEMP B-TREE FOR ORDER BY"
+_PORTABLE_SESSION_SORT_VIEWS = frozenset({"timeline", "allowance_interval"})
+_SESSION_LOOKUP = "SEARCH s USING PRIMARY KEY (session_id=?)"
+_OCCURRENCE_LOOKUP = "SEARCH o USING PRIMARY KEY (occurrence_id=?) LEFT-JOIN"
+_MANIFESTATION_LOOKUP = (
+    "SEARCH sm USING INDEX source_manifestations_by_occurrence_key "
+    "(manifestation_key=?) LEFT-JOIN"
+)
+_LIFECYCLE_LOOKUP = (
+    "SEARCH lt USING INDEX evidence_lifecycle_by_session_order (session_id=?)"
+)
+_BOUND_HEAD_LOOKUP = "SEARCH bound_head USING PRIMARY KEY (singleton=?)"
+_BOUND_HEAD_EXISTS_LOOKUP = (
+    "SEARCH bound_head EXISTS USING PRIMARY KEY (singleton=?)"
 )
 
 
@@ -310,13 +324,13 @@ def _add_unrelated_lifecycle_history(
         connection.execute("PRAGMA query_only = ON")
 
 
-def _explain_details(
+def _explain_rows(
     connection: sqlite3.Connection,
     view: str,
     direction: str,
     scope: Mapping[str, Any],
     cursor_order: tuple[Any, ...] | None,
-) -> tuple[str, ...]:
+) -> tuple[tuple[int, int, int, str], ...]:
     sql, parameters = evidence_service._page_statement(
         view,
         direction,
@@ -326,9 +340,168 @@ def _explain_details(
         7,
     )
     return tuple(
-        str(row[-1])
+        (int(row[0]), int(row[1]), int(row[2]), str(row[3]))
         for row in connection.execute("EXPLAIN QUERY PLAN " + sql, parameters)
     )
+
+
+def _assert_unique_manifestation_lookup(connection: sqlite3.Connection) -> None:
+    indexes = connection.execute("PRAGMA index_list(source_manifestations)").fetchall()
+    matching = [
+        row
+        for row in indexes
+        if str(row[1]) == "source_manifestations_by_occurrence_key"
+    ]
+    assert len(matching) == 1
+    assert int(matching[0][2]) == 1
+    columns = connection.execute(
+        "PRAGMA index_info(source_manifestations_by_occurrence_key)"
+    ).fetchall()
+    assert [str(row[2]) for row in columns] == ["manifestation_key"]
+
+
+def _is_session_branch_metadata(detail: str) -> bool:
+    return detail == _BOUND_HEAD_EXISTS_LOOKUP or (
+        detail.startswith("SCALAR SUBQUERY ")
+        and detail.removeprefix("SCALAR SUBQUERY ").isdigit()
+    )
+
+
+def _descendants(
+    rows: tuple[tuple[int, int, int, str], ...],
+    node_id: int,
+) -> tuple[tuple[int, int, int, str], ...]:
+    children_by_parent: dict[int, list[tuple[int, int, int, str]]] = {}
+    for row in rows:
+        children_by_parent.setdefault(row[1], []).append(row)
+    descendants: list[tuple[int, int, int, str]] = []
+    pending = [node_id]
+    while pending:
+        parent = pending.pop()
+        children = sorted(children_by_parent.get(parent, ()), key=lambda row: row[0])
+        descendants.extend(children)
+        pending.extend(row[0] for row in children)
+    return tuple(descendants)
+
+
+def _leftmost_branch(
+    rows: tuple[tuple[int, int, int, str], ...],
+    node_id: int,
+) -> bool:
+    rows_by_id = {row[0]: row for row in rows}
+    children_by_parent: dict[int, list[tuple[int, int, int, str]]] = {}
+    for row in rows:
+        children_by_parent.setdefault(row[1], []).append(row)
+    current = node_id
+    while current in rows_by_id:
+        parent = rows_by_id[current][1]
+        siblings = sorted(children_by_parent.get(parent, ()), key=lambda row: row[0])
+        if not siblings or siblings[0][0] != current:
+            return False
+        current = parent
+    return True
+
+
+def _session_branch_parent_candidates(
+    rows: tuple[tuple[int, int, int, str], ...],
+) -> tuple[int, ...]:
+    children_by_parent: dict[int, list[tuple[int, int, int, str]]] = {}
+    for row in rows:
+        children_by_parent.setdefault(row[1], []).append(row)
+    candidates: list[int] = []
+    for parent, children in children_by_parent.items():
+        ordered = sorted(children, key=lambda row: row[0])
+        details = tuple(row[3] for row in ordered)
+        required = (
+            _SESSION_LOOKUP,
+            _OCCURRENCE_LOOKUP,
+            _MANIFESTATION_LOOKUP,
+        )
+        if any(details.count(detail) != 1 for detail in required):
+            continue
+        if details.count(_TEMP_SORT_MARKER) > 1:
+            continue
+        if any(
+            detail not in required
+            and detail != _TEMP_SORT_MARKER
+            and not _is_session_branch_metadata(detail)
+            for detail in details
+        ):
+            continue
+        positions = {detail: details.index(detail) for detail in required}
+        if not (
+            positions[_SESSION_LOOKUP]
+            < positions[_OCCURRENCE_LOOKUP]
+            < positions[_MANIFESTATION_LOOKUP]
+        ):
+            continue
+        marker_position = (
+            details.index(_TEMP_SORT_MARKER)
+            if _TEMP_SORT_MARKER in details
+            else None
+        )
+        if marker_position is not None and marker_position <= positions[
+            _MANIFESTATION_LOOKUP
+        ]:
+            continue
+        metadata = [
+            row
+            for row in ordered
+            if _is_session_branch_metadata(row[3])
+        ]
+        if len(metadata) > 1:
+            continue
+        for row in metadata:
+            if row[3].startswith("SCALAR SUBQUERY "):
+                descendants = _descendants(rows, row[0])
+                assert len(descendants) == 1
+                assert descendants[0][3] == _BOUND_HEAD_LOOKUP
+        candidates.append(parent)
+    return tuple(candidates)
+
+
+def _assert_session_marker_branch_ownership(
+    rows: tuple[tuple[int, int, int, str], ...],
+) -> None:
+    candidates = _session_branch_parent_candidates(rows)
+    assert len(candidates) == 1, (candidates, rows)
+    session_parent = candidates[0]
+    assert _leftmost_branch(rows, session_parent), (session_parent, rows)
+    markers = [row for row in rows if row[3] == _TEMP_SORT_MARKER]
+    if markers:
+        assert markers[0][1] == session_parent, (session_parent, markers, rows)
+
+
+def _assert_page_plan_contract(
+    connection: sqlite3.Connection,
+    rows: tuple[tuple[int, int, int, str], ...],
+    *,
+    view: str,
+    cursor_order: tuple[Any, ...] | None,
+) -> None:
+    details = tuple(row[3] for row in rows)
+    assert not any(
+        marker in "\n".join(details) for marker in _FORBIDDEN_PLAN_MARKERS
+    ), details
+    temp_markers = [detail for detail in details if "USE TEMP B-TREE" in detail]
+    markers = [row for row in rows if row[3] == _TEMP_SORT_MARKER]
+    allows_session_sort = (
+        cursor_order is not None and view in _PORTABLE_SESSION_SORT_VIEWS
+    )
+    if view in _PORTABLE_SESSION_SORT_VIEWS:
+        assert _LIFECYCLE_LOOKUP in details, details
+    if not allows_session_sort:
+        assert temp_markers == [], (view, cursor_order, details)
+        return
+
+    assert temp_markers in ([], [_TEMP_SORT_MARKER]), (view, cursor_order, details)
+    assert len(markers) <= 1, (view, cursor_order, details)
+    if not markers:
+        _assert_session_marker_branch_ownership(rows)
+        return
+
+    _assert_session_marker_branch_ownership(rows)
+    _assert_unique_manifestation_lookup(connection)
 
 
 def test_evidence_contract_is_closed_and_bounded() -> None:
@@ -595,11 +768,101 @@ def test_first_and_deep_physical_plans_prune_unbounded_shapes(
     ):
         for direction in ("forward", "backward"):
             for cursor_order in (None, deep_order):
-                details = _explain_details(connection, view, direction, scope, cursor_order)
-                assert not any(
-                    marker in "\n".join(details) for marker in _FORBIDDEN_PLAN_MARKERS
-                ), (view, direction, cursor_order, details)
+                rows = _explain_rows(connection, view, direction, scope, cursor_order)
+                _assert_page_plan_contract(
+                    connection,
+                    rows,
+                    view=view,
+                    cursor_order=cursor_order,
+                )
     connection.close()
+
+
+def test_session_marker_branch_ownership_rejects_structural_mutations(
+    tmp_path: Path,
+) -> None:
+    connection, _case, selector = _published(tmp_path)
+    try:
+        scope = {
+            "kind": "session",
+            "logical_id": selector.partition(":")[2],
+            "start_us": None,
+            "end_us": None,
+        }
+        deep_order = (0, 0, 0, 0, 0, "activity:physical:00000", 0)
+        rows = _explain_rows(
+            connection,
+            "timeline",
+            "forward",
+            scope,
+            deep_order,
+        )
+        markers = [row for row in rows if row[3] == _TEMP_SORT_MARKER]
+        if not markers:
+            pytest.skip("SQLite build emitted the portable plan marker-free")
+        marker = markers[0]
+
+        def assert_rejected(
+            mutated: tuple[tuple[int, int, int, str], ...],
+        ) -> None:
+            with pytest.raises(AssertionError):
+                _assert_page_plan_contract(
+                    connection,
+                    mutated,
+                    view="timeline",
+                    cursor_order=deep_order,
+                )
+
+        calls_parent = next(
+            row[1]
+            for row in rows
+            if row[3].startswith("SEARCH mc USING INDEX")
+        )
+        tools_parent = next(
+            row[1]
+            for row in rows
+            if row[3].startswith("SEARCH ti USING INDEX")
+        )
+        lifecycle_parent = next(
+            row[1] for row in rows if row[3] == _LIFECYCLE_LOOKUP
+        )
+        for foreign_parent in (calls_parent, tools_parent, lifecycle_parent, 0):
+            assert_rejected(
+                tuple(
+                    (row[0], foreign_parent, row[2], row[3])
+                    if row[0] == marker[0]
+                    else row
+                    for row in rows
+                )
+            )
+
+        assert_rejected(
+            rows
+            + ((max(row[0] for row in rows) + 1, marker[1], 0, _TEMP_SORT_MARKER),)
+        )
+        assert_rejected(
+            tuple(
+                (row[0], row[1], row[2], "SCAN o")
+                if row[3] == _OCCURRENCE_LOOKUP
+                else row
+                for row in rows
+            )
+        )
+        ambiguous_rows = tuple(
+            row
+            for row in rows
+            if row[1] != calls_parent
+            or row[3]
+            in {
+                _SESSION_LOOKUP,
+                _OCCURRENCE_LOOKUP,
+                _MANIFESTATION_LOOKUP,
+            }
+            or _is_session_branch_metadata(row[3])
+        )
+        assert_rejected(ambiguous_rows)
+    finally:
+        connection.close()
 
 
 def test_activity_scale_keeps_decode_and_work_bounded(
@@ -618,7 +881,7 @@ def test_activity_scale_keeps_decode_and_work_bounded(
     for count in (2_000, 10_000):
         connection, case, selector = _published(tmp_path / f"activities-{count}")
         _add_synthetic_activities(connection, selector, count)
-        details = _explain_details(
+        rows = _explain_rows(
             connection,
             "timeline",
             "forward",
@@ -630,7 +893,12 @@ def test_activity_scale_keeps_decode_and_work_bounded(
             },
             None,
         )
-        assert not any(marker in "\n".join(details) for marker in _FORBIDDEN_PLAN_MARKERS)
+        _assert_page_plan_contract(
+            connection,
+            rows,
+            view="timeline",
+            cursor_order=None,
+        )
         callback_count = 0
 
         def progress() -> int:
@@ -675,16 +943,19 @@ def test_foreign_lifecycle_history_does_not_change_session_page_work(
         }
         for direction in ("forward", "backward"):
             for cursor_order in (None, (0, 0, 0, 0, 0, "activity:physical:00000", 0)):
-                details = _explain_details(
+                rows = _explain_rows(
                     connection,
                     "timeline",
                     direction,
                     scope,
                     cursor_order,
                 )
-                assert not any(
-                    marker in "\n".join(details) for marker in _FORBIDDEN_PLAN_MARKERS
-                ), (count, direction, cursor_order, details)
+                _assert_page_plan_contract(
+                    connection,
+                    rows,
+                    view="timeline",
+                    cursor_order=cursor_order,
+                )
         callback_count = 0
 
         def progress() -> int:
@@ -709,8 +980,7 @@ def test_foreign_lifecycle_history_does_not_change_session_page_work(
         connection.close()
 
     assert callback_counts[0] > 0
-    assert callback_counts[1] <= callback_counts[0] * 2
-    assert callback_counts[2] <= callback_counts[0] * 2
+    assert callback_counts[1:] == [callback_counts[0], callback_counts[0]]
 
 
 def test_rate_card_pages_remain_valid_empty_and_query_only(
