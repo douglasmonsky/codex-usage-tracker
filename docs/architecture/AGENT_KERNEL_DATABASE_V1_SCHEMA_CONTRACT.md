@@ -53,6 +53,17 @@ rank must be equal. A current-schema builder may use the primary occurrence's
 required non-null `start_source_order`; predecessor artifacts are rejected
 without migration or compatibility mutation.
 
+The [CK-08R3A bounded-session merge-sort portability authority](../decisions/evidence/ck08r3a/bounded-session-merge-sort-portability-authority.json)
+narrows only the planner wording for the supported physical contract. On the
+portable SQLite 3.45.1 boundary, a deep `timeline` or `allowance_interval`
+session branch may emit one `USE TEMP B-TREE FOR ORDER BY` because its session
+merge input is proven at most one row through the sessions primary-key,
+occurrence primary-key, and unique manifestation lookup chain. The lifecycle
+branch must still use `evidence_lifecycle_by_session_order(session_id=?)`;
+first pages and every other deep shape remain marker-free. This is not a
+generic EXPLAIN relaxation, a host-version special case, an additional
+derived-order key, or a production/DDL/schema change.
+
 <!-- ck08r3a-evidence-indexes-ddl:start -->
 ```sql
 -- CK-08R3A EvidenceService branch order.  These indexes mirror the

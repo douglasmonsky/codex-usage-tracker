@@ -86,6 +86,17 @@ def _json(path: str):
     return json.loads(_read(path))
 
 
+def _portable_selected_support_hashes() -> dict[str, str]:
+    authority = _json(
+        "docs/decisions/evidence/ck08r3a/"
+        "bounded-session-merge-sort-portability-authority.json"
+    )
+    return {
+        item["path"]: item["sha256"]
+        for item in authority["selected_cohort"]["support_identities"]
+    }
+
+
 def _active_markdown() -> list[Path]:
     return [path for path in _DOCS.rglob("*.md") if "archive" not in path.relative_to(_DOCS).parts]
 
@@ -417,7 +428,10 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
                     + final["r3a"]["selected"]["support_identities"]
                 ):
                     required_path = _REPO_ROOT / required["path"]
-                    assert hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
+                    expected = required["sha256"]
+                    if required["path"] == "tests/agent_kernel/evidence/test_service.py":
+                        expected = _portable_selected_support_hashes()[required["path"]]
+                    assert hashlib.sha256(required_path.read_bytes()).hexdigest() == expected
         else:
             assert actual == artifact["sha256"]
     locks = [lock for lane in contract["lanes"] for lock in lane["owned_lock"]]
@@ -968,7 +982,10 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
             + final["r3a"]["selected"]["support_identities"]
         ):
             required_path = _REPO_ROOT / required["path"]
-            assert hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
+            expected = required["sha256"]
+            if required["path"] == "tests/agent_kernel/evidence/test_service.py":
+                expected = _portable_selected_support_hashes()[required["path"]]
+            assert hashlib.sha256(required_path.read_bytes()).hexdigest() == expected
 
     mutations = [
         ("selected_successor", "sha256", "0" * 64),
