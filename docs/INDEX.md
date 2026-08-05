@@ -39,6 +39,12 @@ timeline/allowance session branch, whose merge input is at most one row. The
 lifecycle branch, every first page, every other deep shape, all result/cursor
 truth, and all generic forbidden-plan checks remain bounded and fail closed;
 the authority changes no production, DDL, or schema identity.
+The linked [CK-08R3A portable-plan branch-ownership authority](decisions/evidence/ck08r3a/portable-plan-branch-ownership-authority.json)
+supersedes only the support proof: full EXPLAIN row ids, parents, direct
+siblings, and leftmost ancestry must bind the sole marker to the unique
+session-event branch. A marker under calls, tools, lifecycle, or an ambiguous
+lookup chain is rejected; the corrected support test remains preflight-only
+and the implementation remains unaccepted.
 R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`;
 R1B remains held on shared query/evidence/grading integration before final R1
 requalification.

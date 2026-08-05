@@ -1,0 +1,335 @@
+{
+  "schema": "codex-usage-tracker.ck08r3a-portable-plan-branch-ownership-authority.v1",
+  "owner": "CK-08R3A",
+  "authority_version": 1,
+  "authority_base_sha": "d638f6a5c5079e1d1c80ba74704314ae091c9d4a",
+  "status": "permitted_not_accepted",
+  "contract_mode": "predecessor_rejection_only",
+  "supersedes": {
+    "path": "docs/decisions/evidence/ck08r3a/bounded-session-merge-sort-portability-authority.json",
+    "sha256": "34a42b4a47c4d223f8fb2365cf60437e96501db00ef6c5242cfcc2c0669c4019",
+    "field": "physical_contract.marker_branch",
+    "replacement": "structural_session_branch_ownership_proof",
+    "scope": "Support-test proof only; production, DDL, schema, result, cursor, lifecycle, fixture, publication, provenance, and CK-07 boundaries remain unchanged"
+  },
+  "inherited_authority": {
+    "path": "docs/decisions/evidence/ck08r3a/bounded-session-merge-sort-portability-authority.json",
+    "sha256": "34a42b4a47c4d223f8fb2365cf60437e96501db00ef6c5242cfcc2c0669c4019",
+    "schema_path": "docs/decisions/evidence/ck08r3a/bounded-session-merge-sort-portability-authority.schema.json",
+    "schema_sha256": "436ce6155aeccb23e2be7a5cdaa4cc15eef2cce7ab81d4f2dfe68ecc56ca1d51",
+    "unchanged_contracts": [
+      "production_identities",
+      "ddl_and_schema_identities",
+      "fixture_and_publication_identities",
+      "rank_and_provenance",
+      "predecessor_rejection",
+      "ck07_shared_preparation_and_token_hold"
+    ]
+  },
+  "role_policy": {
+    "closed": true,
+    "path_free": true,
+    "vocabulary": [
+      "evidence_service_source",
+      "publication_preparation",
+      "publication_writer",
+      "analytical_ddl",
+      "schema_contract",
+      "domain_models",
+      "lifecycle_storage",
+      "evidence_service_test",
+      "fact_adapter_support_test",
+      "published_fixture",
+      "publication_writer_test",
+      "independent_ddl_test",
+      "tiny_accounting_test",
+      "fact_backed_publication_test",
+      "storage_identity_test",
+      "storage_lifecycle_test"
+    ],
+    "path_probe_rejections": [
+      "/tmp/evidence_service_test",
+      "C:\\tmp\\evidence_service_test",
+      "file:///tmp/evidence_service_test",
+      "../evidence_service_test",
+      ".",
+      ".."
+    ]
+  },
+  "selected_cohort": {
+    "atomic": true,
+    "mixed_cohort": "reject",
+    "production_identities": [
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+        "role": "evidence_service_source",
+        "sha256": "4458ffb03adeed838fcda992747dbaeb192ccf59728b3a54e1527abc4d0651fb"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "role": "publication_preparation",
+        "sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+        "role": "publication_writer",
+        "sha256": "13da341fc2a3c50d8d7de7fd6a6fc2b0aca0dbc832a9b56597cd96ab67d17488"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+        "role": "analytical_ddl",
+        "sha256": "34b6aab813dbd520f1894ac3ccbce1a1b3ff4552a11f0a83597a897a0c8f7486"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/storage/schema.py",
+        "role": "schema_contract",
+        "sha256": "9850a431729c7eb8d5347278d0434f0849d1843297645547ee2dcd66a0359b77"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/domain/models.py",
+        "role": "domain_models",
+        "sha256": "32eee9fba0cf7e2fc9933cd3f5e02ec39bf847b4c9196cab9917e464b339e9c2"
+      },
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/storage/lifecycle.py",
+        "role": "lifecycle_storage",
+        "sha256": "bf0b6b2cf098e063b072939c005c9500260fb758a3267050ac9ac206a8cba2a7"
+      }
+    ],
+    "support_identities": [
+      {
+        "path": "tests/agent_kernel/evidence/test_service.py",
+        "role": "evidence_service_test",
+        "sha256": "bc01c3149101f0fd6c787e23a00c7bd2b2ec21628e8508223b8828df1f13390b"
+      },
+      {
+        "path": "tests/agent_kernel/fact_adapters/support.py",
+        "role": "fact_adapter_support_test",
+        "sha256": "2e8447613ce12fd0f82cb36af7ddebb2ba1e4eef1b6d53f31a990564b0be94c5"
+      },
+      {
+        "path": "tests/agent_kernel/fixtures/published_v2.py",
+        "role": "published_fixture",
+        "sha256": "eca815c5a47067bdc56759018e12fd7a25f446eb6d716236869cbef875ce8515"
+      },
+      {
+        "path": "tests/agent_kernel/publication/test_writer.py",
+        "role": "publication_writer_test",
+        "sha256": "28dce47dfe32717a937079f068e9c1f1abcfbdfa6d65a15db6faba1b0c914b26"
+      },
+      {
+        "path": "tests/agent_kernel/storage/test_database_schema.py",
+        "role": "independent_ddl_test",
+        "sha256": "69e53fe786ab2e136529934cda830bf5eeb58bc480135492b6434d2d557fab29"
+      },
+      {
+        "path": "tests/agent_kernel/storage/test_tiny_accounting.py",
+        "role": "tiny_accounting_test",
+        "sha256": "a0b64101fddec57846c319245191db44c4eb0599dd3a81ae0f9504e0c584be25"
+      },
+      {
+        "path": "tests/agent_kernel/test_fact_backed_publication_v2.py",
+        "role": "fact_backed_publication_test",
+        "sha256": "987be77ca934242eee7720c3d20b90d57f811b6c24f9ddd477a4a720d4517864"
+      },
+      {
+        "path": "tests/agent_kernel/storage/test_identity.py",
+        "role": "storage_identity_test",
+        "sha256": "0aee0b59d6472594a5375f4a30a1805c71437a4aadc7c2ab08cade5a176f2a53"
+      },
+      {
+        "path": "tests/agent_kernel/storage/test_lifecycle.py",
+        "role": "storage_lifecycle_test",
+        "sha256": "e77327f4fa789ccc261bd310134e298bac53471e3b1ba909e4e11f0c2b52730b"
+      }
+    ],
+    "corrected_support_transition": {
+      "path": "tests/agent_kernel/evidence/test_service.py",
+      "predecessor_sha256": "2a97bfaa0804d693fbd30d97096e28e42c4f515288302073e04e7ea9f9880f69",
+      "selected_sha256": "bc01c3149101f0fd6c787e23a00c7bd2b2ec21628e8508223b8828df1f13390b",
+      "reason": "full EXPLAIN topology proves the sole portable marker belongs to the unique leftmost session-event branch and rejects calls/tools/lifecycle/ambiguous ownership mutations",
+      "authority_pr_inclusion": "identity_only"
+    }
+  },
+  "branch_ownership_proof": {
+    "method": "EXPLAIN QUERY PLAN four-column id-parent-notused-detail topology",
+    "session_event_input_route": "unique leftmost-child ancestry from the compound-query root",
+    "unique_structural_candidate": true,
+    "candidate_parent_count": 1,
+    "session_branch_cardinality": "at_most_one",
+    "direct_sibling_chain": [
+      "SEARCH s USING PRIMARY KEY (session_id=?)",
+      "SEARCH o USING PRIMARY KEY (occurrence_id=?) LEFT-JOIN",
+      "SEARCH sm USING INDEX source_manifestations_by_occurrence_key (manifestation_key=?) LEFT-JOIN"
+    ],
+    "direct_sibling_order": "session_pk_then_optional_bound_head_then_occurrence_pk_then_unique_manifestation_then_marker",
+    "optional_bound_head_nodes": [
+      "SCALAR SUBQUERY <decimal> with exactly one descendant SEARCH bound_head USING PRIMARY KEY (singleton=?)",
+      "SEARCH bound_head EXISTS USING PRIMARY KEY (singleton=?)"
+    ],
+    "marker": "USE TEMP B-TREE FOR ORDER BY",
+    "marker_parent_must_equal_session_branch_parent": true,
+    "marker_must_follow_manifestation_lookup": true,
+    "marker_maximum": 1,
+    "all_other_direct_branch_details_reject": true,
+    "non_session_branch_rejection": [
+      "model-call source lookup",
+      "model-call-tail source lookup",
+      "tool source lookup",
+      "state-change source lookup",
+      "activity source lookup",
+      "compaction source lookup",
+      "context-component source lookup",
+      "lifecycle source lookup"
+    ]
+  },
+  "physical_contract": {
+    "allowed_views": ["timeline", "allowance_interval"],
+    "allowed_page_shape": "deep",
+    "allowed_directions": ["forward", "backward"],
+    "max_markers": 1,
+    "zero_markers_allowed": true,
+    "lifecycle_branch_lookup": "SEARCH lt USING INDEX evidence_lifecycle_by_session_order (session_id=?)",
+    "foreign_history": {
+      "rows": [0, 1000, 5000],
+      "portable_sqlite_callbacks": [21, 21, 21],
+      "portable_returned_rows": [7, 7, 7],
+      "portable_has_more": [true, true, true],
+      "cursor_round_trip": true,
+      "callback_growth": "reject"
+    },
+    "plan_matrix": {
+      "sqlite_3_45_1": {
+        "timeline": {"first_forward": 0, "first_backward": 0, "deep_forward": 1, "deep_backward": 1},
+        "allowance_interval": {"first_forward": 0, "first_backward": 0, "deep_forward": 1, "deep_backward": 1},
+        "all_other_supported_shapes": 0
+      },
+      "sqlite_3_53_3": {"all_required_shapes": 0}
+    },
+    "limit_plus_one_before_decode": true,
+    "result_truth_unchanged": true,
+    "cursor_reversible": true,
+    "query_only_one_snapshot": true,
+    "generic_explain_relaxation": false,
+    "host_version_special_case": false,
+    "production_ddl_schema_unchanged": true
+  },
+  "sqlite_evidence": {
+    "portable_boundary": {
+      "python_version": "3.14.6",
+      "sqlite_version": "3.45.1",
+      "sqlite_source_id": "2024-01-30 16:01:20 e876e51a0ed5c5b3126f52e532044363a014bc594cfefa87ffb5b82257cc467a",
+      "stat4_enabled": false,
+      "compile_options": ["TEMP_STORE=1", "THREADSAFE=1"],
+      "deep_exception_marker_count": 1,
+      "first_and_other_marker_count": 0
+    },
+    "local_newer_boundary": {
+      "python_version": "3.14.6",
+      "sqlite_version": "3.53.3",
+      "sqlite_source_id": "2026-06-26 20:14:12 d4c0e51e4aeb96955b99185ab9cde75c339e2c29c3f3f12428d364a10d782c62",
+      "stat4_enabled": true,
+      "compile_options": ["ENABLE_DBSTAT_VTAB", "ENABLE_STAT4", "TEMP_STORE=1", "THREADSAFE=1"],
+      "all_required_marker_count": 0
+    }
+  },
+  "preserved_boundaries": {
+    "schema_publication_authority": {
+      "path": "docs/decisions/evidence/ck08r3a/schema-publication-requalification-authority.json",
+      "sha256": "28f453daa1436e81681428ccd7a3ba447e1ff02dc70ff4ef9f1f30a020000fd4"
+    },
+    "final_shared_authority": {
+      "path": "docs/decisions/evidence/ck08r3a/final-shared-authority.json",
+      "sha256": "ee479cbd4b41b63a1701df97abda01b27be7e559783d44503144bdf0c0bdef98"
+    },
+    "ck07_source_authority": {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
+      "sha256": "1a00aa7e0de82866d2f45d587273f3d902e654df6702e43c40ae840758e568c6"
+    },
+    "ck07_run_authority": {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
+      "sha256": "1a4a5a7b805dff5c5988e7511664d7a47d8891f75d30c448b55364e8bac41a6e"
+    },
+    "ck07_status": "blocked_hold",
+    "ck07_token": "unspent_unavailable",
+    "r3a_acceptance": "permitted_not_accepted"
+  },
+  "negative_tests": {
+    "marker_under_calls_branch": "reject",
+    "marker_under_tools_branch": "reject",
+    "marker_under_lifecycle_branch": "reject",
+    "second_marker": "reject",
+    "marker_detached_from_session_chain": "reject",
+    "missing_session_equality_lookup": "reject",
+    "missing_occurrence_equality_lookup": "reject",
+    "missing_unique_manifestation_lookup": "reject",
+    "ambiguous_structural_owner": "reject",
+    "missing_lifecycle_session_index": "reject",
+    "foreign_callback_growth": "reject",
+    "changed_result_truth": "reject",
+    "generic_marker_deletion": "reject",
+    "generic_explain_relaxation": "reject",
+    "host_version_special_case": "reject",
+    "production_candidate_in_authority_pr": "reject",
+    "database_owner": "storage/database.py",
+    "migration_or_compatibility": "reject",
+    "ck07_resume_or_token_consumption": "reject"
+  },
+  "preflight": {
+    "base_sha": "d638f6a5c5079e1d1c80ba74704314ae091c9d4a",
+    "candidate_source_head_sha": "0db3bfe358c1263aa0f6289b182649868da04fc4",
+    "reapplied_candidate_path_count": 16,
+    "revised_support_sha256": "bc01c3149101f0fd6c787e23a00c7bd2b2ec21628e8508223b8828df1f13390b",
+    "portable_negative_mutations_passed": true,
+    "authority_bytes_byte_identical": true,
+    "status": "passed",
+    "no_consuming_operation": true,
+    "pr_417_remains_held": true
+  },
+  "scope": {
+    "authority_write_scope": [
+      "docs/decisions/evidence/ck08r3a/portable-plan-branch-ownership-authority.json",
+      "docs/decisions/evidence/ck08r3a/portable-plan-branch-ownership-authority.schema.json",
+      "docs/INDEX.md",
+      "docs/architecture/AGENT_KERNEL_DATABASE_V1_SCHEMA_CONTRACT.md",
+      "docs/roadmap/tasks/ck-08r3a-implement-evidence-physical-query.md",
+      "scripts/check_kernel_scope.py",
+      "tests/kernel/test_ck08r3a_portable_plan_branch_ownership_authority.py",
+      "tests/kernel/test_kernel_scope.py",
+      "tests/kernel/test_documentation_authority.py"
+    ],
+    "preflight_only_candidate_scope": [
+      "src/codex_usage_tracker/agent_kernel/evidence/service.py",
+      "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+      "src/codex_usage_tracker/agent_kernel/storage/analytical.sql",
+      "src/codex_usage_tracker/agent_kernel/storage/schema.py",
+      "src/codex_usage_tracker/agent_kernel/domain/models.py",
+      "src/codex_usage_tracker/agent_kernel/storage/lifecycle.py",
+      "tests/agent_kernel/evidence/test_service.py",
+      "tests/agent_kernel/fact_adapters/support.py",
+      "tests/agent_kernel/fixtures/published_v2.py",
+      "tests/agent_kernel/publication/test_writer.py",
+      "tests/agent_kernel/storage/test_database_schema.py",
+      "tests/agent_kernel/storage/test_tiny_accounting.py",
+      "tests/agent_kernel/test_fact_backed_publication_v2.py",
+      "tests/agent_kernel/storage/test_identity.py",
+      "tests/agent_kernel/storage/test_lifecycle.py"
+    ],
+    "authority_pr_forbidden": [
+      "src/codex_usage_tracker/agent_kernel/",
+      "tests/agent_kernel/evidence/test_service.py",
+      "tests/agent_kernel/"
+    ],
+    "forbidden": [
+      "src/codex_usage_tracker/agent_kernel/storage/database.py",
+      "migration or compatibility code",
+      "recovery or pointer expansion",
+      "generic EXPLAIN relaxation",
+      "CK-07 token/output/ledger mutation",
+      "central readiness or DAG count changes",
+      "live or real Codex data"
+    ]
+  },
+  "no_live_operation": true
+}
