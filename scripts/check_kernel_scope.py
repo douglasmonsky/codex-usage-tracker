@@ -807,6 +807,14 @@ CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     }
 )
 
+CK08R3_EVIDENCE_SCALE_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck08r3/evidence-scale-qualification.json",
+        "scripts/qualify_ck08r3_evidence_scale.py",
+        "tests/agent_kernel/evidence/test_ck08r3_scale_qualification.py",
+    }
+)
+
 CI_PERFORMANCE_QUALIFICATION_ADDITIONS = frozenset(
     {
         ".github/workflows/performance-qualification.yml",
@@ -859,6 +867,7 @@ INTEGRATION_ADDITIONS = (
     | CK08R1A_ANSWER_SEMANTICS_ADDITIONS
     | CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS
     | CK08R3A_AUTHORITY_ADDITIONS
+    | CK08R3_EVIDENCE_SCALE_ADDITIONS
     | CKQG1A0_AUTHORITY_ADDITIONS
     | PACKAGE_BUDGET_POLICY_ADDITIONS
     | CK07R1A0_AUTHORITY_ADDITIONS
