@@ -518,7 +518,8 @@ CREATE TABLE turns (
   transition_version INTEGER NOT NULL CHECK (transition_version >= 0),
   start_at_us INTEGER,
   end_at_us INTEGER,
-  start_source_order INTEGER CHECK (start_source_order IS NULL OR start_source_order >= 0),
+  start_source_rank INTEGER NOT NULL CHECK (start_source_rank >= 0),
+  start_source_order INTEGER NOT NULL CHECK (start_source_order >= 0),
   end_source_order INTEGER CHECK (end_source_order IS NULL OR end_source_order >= 0),
   completion_basis TEXT,
   membership_json TEXT NOT NULL DEFAULT '{}',
@@ -532,8 +533,7 @@ CREATE TABLE turns (
     OR start_at_us <= end_at_us
   ),
   CHECK (
-    start_source_order IS NULL
-    OR end_source_order IS NULL
+    end_source_order IS NULL
     OR start_source_order <= end_source_order
   ),
   FOREIGN KEY (turn_id) REFERENCES identity_registry(logical_id),
@@ -605,12 +605,14 @@ CREATE TABLE lifecycle_transitions (
   terminal_error_category TEXT,
   measurement_mask INTEGER NOT NULL CHECK (measurement_mask >= 0),
   first_seen_publication_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
   UNIQUE (entity_logical_id, transition_version),
   FOREIGN KEY (transition_id) REFERENCES identity_registry(logical_id),
   FOREIGN KEY (entity_logical_id) REFERENCES identity_registry(logical_id),
   FOREIGN KEY (occurrence_id) REFERENCES source_occurrences(occurrence_id),
   FOREIGN KEY (first_seen_publication_id)
-    REFERENCES publications(publication_id)
+    REFERENCES publications(publication_id),
+  FOREIGN KEY (session_id) REFERENCES sessions(session_id)
 ) STRICT, WITHOUT ROWID;
 
 CREATE TABLE model_call_locations (
@@ -1656,4 +1658,149 @@ CREATE INDEX model_call_tail_by_session
     source_order ASC,
     event_kind_order ASC,
     call_id ASC
+  );
+
+-- CK-08R3A evidence pages use the persisted seven-part order tuple.  Each
+-- branch has a covering session/order index so filtering and LIMIT + 1 happen
+-- before row decoding; turn boundary constants remain event_kind_order=20 and
+-- transition_rank=0 while source rank/order are persisted coordinates.
+CREATE INDEX evidence_model_calls_by_session_order
+  ON model_calls(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    call_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_model_call_tail_by_session_order
+  ON model_call_tail(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    call_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_tools_by_session_order
+  ON tool_invocations(
+    session_id ASC,
+    (start_at_us IS NULL) ASC,
+    COALESCE(start_at_us, 0) ASC,
+    start_source_rank ASC,
+    start_source_order ASC,
+    start_event_kind_order ASC,
+    tool_id ASC,
+    start_transition_rank ASC
+  );
+CREATE INDEX evidence_activities_by_session_order
+  ON activities(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    activity_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_state_changes_by_session_order
+  ON state_changes(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    change_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_compactions_by_session_order
+  ON compaction_boundaries(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    compaction_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_context_components_by_session_order
+  ON context_components(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    component_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_turns_by_session_order
+  ON turns(
+    session_id ASC,
+    (start_at_us IS NULL) ASC,
+    COALESCE(start_at_us, 0) ASC,
+    start_source_rank ASC,
+    start_source_order ASC,
+    20 ASC,
+    turn_id ASC,
+    0 ASC
+  );
+CREATE INDEX evidence_lifecycle_by_session_order
+  ON lifecycle_transitions(
+    session_id ASC,
+    (transition_at_us IS NULL) ASC,
+    COALESCE(transition_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    transition_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_source_occurrences_by_logical_order
+  ON source_occurrences(
+    semantic_logical_id ASC,
+    record_ordinal ASC,
+    byte_start ASC,
+    byte_end ASC,
+    occurrence_id ASC
+  );
+CREATE INDEX evidence_tools_by_resource_order
+  ON tool_invocations(
+    primary_resource_id ASC,
+    (start_at_us IS NULL) ASC,
+    COALESCE(start_at_us, 0) ASC,
+    start_source_rank ASC,
+    start_source_order ASC,
+    start_event_kind_order ASC,
+    tool_id ASC,
+    start_transition_rank ASC
+  )
+  WHERE primary_resource_id IS NOT NULL;
+CREATE INDEX evidence_state_changes_by_resource_order
+  ON state_changes(
+    resource_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    change_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_allowance_observations_order
+  ON allowance_observations(
+    (observed_at_us IS NULL) ASC,
+    COALESCE(observed_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    observation_id ASC,
+    transition_rank ASC
   );

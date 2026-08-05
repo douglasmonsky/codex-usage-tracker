@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from decimal import Decimal
 
 from ..adapters.codex_jsonl.canonicalize import ProposedChangeSet
@@ -56,7 +57,10 @@ class _WriteSetPreparer:
         inventory_started_at_us: int | None,
         inventory_completed_at_us: int | None,
     ) -> None:
-        self.changes = changes
+        normalized_observations = tuple(
+            self._normalize_source_order(observation) for observation in changes.observations
+        )
+        self.changes = replace(changes, observations=normalized_observations)
         self.request = request
         self.configured_producer_key = configured_producer_key
         self.prior = prior
@@ -76,6 +80,15 @@ class _WriteSetPreparer:
         self.transitions: list[LifecycleTransition] = []
         self.folds: dict[str, LifecycleFold] = {}
         self.tail_ordinal = 0 if prior.tail_state is None else prior.tail_state.row_count
+
+    @staticmethod
+    def _normalize_source_order(observation: AdapterObservation) -> AdapterObservation:
+        if observation.source_order is not None:
+            return observation
+        fallback = observation.source_range.record_ordinal
+        if fallback is None:
+            raise PublicationWriteError("source order provenance is missing")
+        return replace(observation, source_order=fallback)
 
     def prepare(self) -> PublicationWriteSet:
         self._add_adapter()
@@ -477,6 +490,15 @@ class _WriteSetPreparer:
                 continue
             sequence[observation.logical_id] += 1
             version = sequence[observation.logical_id]
+            session_id = (
+                observation.logical_id
+                if lifecycle_kind == "session"
+                else observation.payload.get("session_id")
+            )
+            if not isinstance(session_id, str) or not session_id:
+                raise PublicationWriteError(
+                    "lifecycle session provenance is missing"
+                )
             transition_identity = [
                 observation.logical_id,
                 version,
@@ -506,6 +528,7 @@ class _WriteSetPreparer:
                     ),
                     measurement_mask=observation.measurement_mask,
                     first_seen_publication_id=self.publication_id,
+                    session_id=session_id,
                 )
             )
         self.folds = {
@@ -639,6 +662,11 @@ class _WriteSetPreparer:
     ) -> None:
         payload = observation.payload
         fold = self._fold(logical_id)
+        start_source_order = observation.source_order
+        if start_source_order is None:
+            start_source_order = observation.source_range.record_ordinal
+        if start_source_order is None:
+            raise PublicationWriteError("turn source order provenance is missing")
         self.rows.append(
             PreparedRow(
                 "turns",
@@ -651,9 +679,10 @@ class _WriteSetPreparer:
                     "transition_version": fold.transition_version,
                     "start_at_us": fold.start_at_us,
                     "end_at_us": fold.terminal_at_us,
-                    "start_source_order": observation.source_order,
+                    "start_source_rank": observation.source_rank,
+                    "start_source_order": start_source_order,
                     "end_source_order": (
-                        observation.source_order if fold.terminal_at_us is not None else None
+                        start_source_order if fold.terminal_at_us is not None else None
                     ),
                     "completion_basis": None,
                     "membership_json": "{}",

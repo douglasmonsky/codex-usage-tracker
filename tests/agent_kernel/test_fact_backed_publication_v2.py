@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from dataclasses import replace
@@ -33,13 +34,22 @@ from codex_usage_tracker.agent_kernel.publication.writer import (
     read_prior_publication_snapshot,
 )
 from codex_usage_tracker.agent_kernel.storage.database import initialize_analytical
-from tests.agent_kernel.fixtures.oracles.cases_v2 import build_question_scenarios
+from tests.agent_kernel.fixtures.oracles.cases_v2 import (
+    ORACLE_AUTHORITY_ORDER,
+    build_question_scenarios,
+)
 from tests.agent_kernel.fixtures.oracles.database_replay import (
     evaluate_published_question_case,
 )
 from tests.agent_kernel.fixtures.oracles.reference import evaluate_question_case
 from tests.agent_kernel.fixtures.published_v2 import (
+    CURRENT_SCHEMA_ARTIFACT_MANIFESTS,
+    PREDECESSOR_ARTIFACT_MANIFESTS,
+    PREDECESSOR_SCHEMA_CONTRACT_SHA256,
     PUBLICATION_ID,
+    REVOKED_ARTIFACT_MANIFESTS,
+    REVOKED_SCHEMA_CONTRACT_SHA256,
+    SELECTED_SCHEMA_CONTRACT_SHA256,
     case_for_schema_contract,
     publish_structural_snapshot,
     published_question_case,
@@ -109,6 +119,51 @@ def test_all_80_cases_replay_through_real_ingestion_and_publication(
 
     assert len(comparisons) == 80
     assert len(set(comparisons)) == 80
+
+
+def test_publication_fixture_cohort_rejects_mixed_and_revoked_identities(
+    tmp_path: Path,
+) -> None:
+    scenarios = build_question_scenarios()
+    oracle_ids = tuple(str(case["oracle_id"]) for case in scenarios["cases"])
+    assert oracle_ids == tuple(ORACLE_AUTHORITY_ORDER)
+    assert len(oracle_ids) == 80
+    cohorts = (
+        PREDECESSOR_ARTIFACT_MANIFESTS,
+        CURRENT_SCHEMA_ARTIFACT_MANIFESTS,
+        REVOKED_ARTIFACT_MANIFESTS,
+    )
+    assert all(len(cohort) == len(oracle_ids) for cohort in cohorts)
+    assert all(len(set(cohort)) == len(cohort) for cohort in cohorts)
+    assert len(set().union(*(set(cohort) for cohort in cohorts))) == 240
+    published_v2 = Path(__file__).parent / "fixtures" / "published_v2.py"
+    assert hashlib.sha256(published_v2.read_bytes()).hexdigest() == (
+        "eca815c5a47067bdc56759018e12fd7a25f446eb6d716236869cbef875ce8515"
+    )
+
+    database_path = tmp_path / "database-v1.sqlite3"
+    publish_structural_snapshot(tmp_path / "fixture", database_path)
+    connection = sqlite3.connect(database_path)
+    case = dict(scenarios["cases"][0])
+    case["variant_predicates"] = ()
+    try:
+        for schema_digest, artifact_digest in (
+            (SELECTED_SCHEMA_CONTRACT_SHA256, PREDECESSOR_ARTIFACT_MANIFESTS[0]),
+            (PREDECESSOR_SCHEMA_CONTRACT_SHA256, CURRENT_SCHEMA_ARTIFACT_MANIFESTS[0]),
+            (REVOKED_SCHEMA_CONTRACT_SHA256, REVOKED_ARTIFACT_MANIFESTS[0]),
+        ):
+            connection.execute("PRAGMA query_only = OFF")
+            connection.execute(
+                "UPDATE publications SET schema_contract_sha256 = ?, "
+                "artifact_manifest_sha256 = ? WHERE publication_id = ?",
+                (schema_digest, artifact_digest, PUBLICATION_ID),
+            )
+            connection.commit()
+            connection.execute("PRAGMA query_only = ON")
+            with pytest.raises(ValueError, match="(unauthorized|differs from frozen)"):
+                published_question_case(connection, case)
+    finally:
+        connection.close()
 
 
 def test_rebuild_replacement_and_late_event_keep_existing_identity_provenance(

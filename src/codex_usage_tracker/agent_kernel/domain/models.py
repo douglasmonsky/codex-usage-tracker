@@ -125,6 +125,7 @@ class LifecycleTransition:
     terminal_error_category: str | None
     measurement_mask: int
     first_seen_publication_id: str
+    session_id: str
 
     def __post_init__(self) -> None:
         validate_nonnegative_int64(self.transition_version, allow_none=False)
@@ -136,6 +137,8 @@ class LifecycleTransition:
         validate_nonnegative_int64(self.event_kind_order, allow_none=False)
         validate_nonnegative_int64(self.transition_rank, allow_none=False)
         validate_nonnegative_int64(self.measurement_mask, allow_none=False)
+        if not isinstance(self.session_id, str) or not self.session_id.strip():
+            raise ValueError("session_id must be a non-empty canonical identifier")
 
 
 @dataclass(frozen=True, slots=True)

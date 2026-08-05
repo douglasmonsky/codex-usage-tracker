@@ -392,9 +392,19 @@ _STREAM_COLUMNS = (
 )
 
 
-def _branch(values: Mapping[str, str], source: str) -> str:
-    expressions = [f"{values.get(column, 'NULL')} AS {column}" for column in _STREAM_COLUMNS]
-    return "SELECT\n  " + ",\n  ".join(expressions) + "\n" + source
+@dataclass(frozen=True, slots=True)
+class _StreamBranch:
+    values: Mapping[str, str]
+    source: str
+
+    @property
+    def event_kind(self) -> str:
+        expression = self.values["event_kind"]
+        return expression.removeprefix("'").removesuffix("'")
+
+
+def _branch(values: Mapping[str, str], source: str) -> _StreamBranch:
+    return _StreamBranch(MappingProxyType(dict(values)), source)
 
 
 _OCCURRENCE_FIELDS = {
@@ -406,6 +416,35 @@ _OCCURRENCE_FIELDS = {
     "byte_start": "o.byte_start",
     "byte_end": "o.byte_end",
     "adapter_version": "o.adapter_version",
+}
+
+_CALL_VALUES = {
+    **_OCCURRENCE_FIELDS,
+    "event_kind": "'call'",
+    "logical_id": "mc.call_id",
+    "event_at_us": "mc.event_at_us",
+    "source_rank": "mc.source_rank",
+    "source_order": "mc.source_order",
+    "event_kind_order": "mc.event_kind_order",
+    "transition_rank": "mc.transition_rank",
+    "session_id": "mc.session_id",
+    "turn_id": "mc.turn_id",
+    "lifecycle_state": "mc.lifecycle_state",
+    "state_basis": "mc.state_basis",
+    "transition_version": "mc.transition_version",
+    "context_window_tokens": "mc.context_window_tokens",
+    "uncached_input_tokens": "mc.uncached_input_tokens",
+    "cached_input_tokens": "mc.cached_input_tokens",
+    "reasoning_tokens": "mc.reasoning_tokens",
+    "output_tokens": "mc.output_tokens",
+    "token_basis": "mc.token_basis",
+    "model_profile_id": "mc.model_profile_id",
+    "model": "mp.model",
+    "reasoning_effort": "mp.reasoning_effort",
+    "service_tier": "mp.service_tier",
+    "call_id": "mc.call_id",
+    "project_id": "s.project_id",
+    "error_category": "mc.error_category",
 }
 
 _STREAM_BRANCHES = (
@@ -434,8 +473,8 @@ _STREAM_BRANCHES = (
             "event_kind": "'turn'",
             "logical_id": "t.turn_id",
             "event_at_us": "t.start_at_us",
-            "source_rank": "COALESCE(sm.source_rank, 0)",
-            "source_order": "COALESCE(t.start_source_order, o.record_ordinal, 0)",
+            "source_rank": "t.start_source_rank",
+            "source_order": "t.start_source_order",
             "event_kind_order": "20",
             "session_id": "t.session_id",
             "turn_id": "t.turn_id",
@@ -449,35 +488,16 @@ _STREAM_BRANCHES = (
         LEFT JOIN source_manifestations AS sm ON sm.manifestation_key = o.manifestation_key""",
     ),
     _branch(
-        {
-            **_OCCURRENCE_FIELDS,
-            "event_kind": "'call'",
-            "logical_id": "mc.call_id",
-            "event_at_us": "mc.event_at_us",
-            "source_rank": "mc.source_rank",
-            "source_order": "mc.source_order",
-            "event_kind_order": "mc.event_kind_order",
-            "transition_rank": "mc.transition_rank",
-            "session_id": "mc.session_id",
-            "turn_id": "mc.turn_id",
-            "lifecycle_state": "mc.lifecycle_state",
-            "state_basis": "mc.state_basis",
-            "transition_version": "mc.transition_version",
-            "context_window_tokens": "mc.context_window_tokens",
-            "uncached_input_tokens": "mc.uncached_input_tokens",
-            "cached_input_tokens": "mc.cached_input_tokens",
-            "reasoning_tokens": "mc.reasoning_tokens",
-            "output_tokens": "mc.output_tokens",
-            "token_basis": "mc.token_basis",
-            "model_profile_id": "mc.model_profile_id",
-            "model": "mp.model",
-            "reasoning_effort": "mp.reasoning_effort",
-            "service_tier": "mp.service_tier",
-            "call_id": "mc.call_id",
-            "project_id": "s.project_id",
-            "error_category": "mc.error_category",
-        },
-        """FROM model_calls_visible AS mc
+        _CALL_VALUES,
+        """FROM model_calls AS mc
+        JOIN sessions AS s ON s.session_id = mc.session_id
+        LEFT JOIN model_profiles AS mp ON mp.model_profile_id = mc.model_profile_id
+        LEFT JOIN source_occurrences AS o ON o.occurrence_id = mc.primary_occurrence_id
+        LEFT JOIN source_manifestations AS sm ON sm.manifestation_key = o.manifestation_key""",
+    ),
+    _branch(
+        _CALL_VALUES,
+        """FROM model_call_tail AS mc
         JOIN sessions AS s ON s.session_id = mc.session_id
         LEFT JOIN model_profiles AS mp ON mp.model_profile_id = mc.model_profile_id
         LEFT JOIN source_occurrences AS o ON o.occurrence_id = mc.primary_occurrence_id
@@ -659,108 +679,251 @@ _STREAM_BRANCHES = (
             "source_order": "lt.source_order",
             "event_kind_order": "lt.event_kind_order",
             "transition_rank": "lt.transition_rank",
-            "session_id": "COALESCE(s.session_id, tr.session_id, mc.session_id, ti.session_id, a.session_id)",
-            "turn_id": "COALESCE(tr.turn_id, mc.turn_id, ti.turn_id, a.turn_id)",
+            "session_id": "lt.session_id",
+            "turn_id": (
+                "COALESCE(tr.turn_id, mc_base.turn_id, mc_tail.turn_id, "
+                "ti.turn_id, a.turn_id)"
+            ),
             "lifecycle_state": "lt.lifecycle_state",
             "state_basis": "lt.state_basis",
             "transition_version": "lt.transition_version",
-            "call_id": "mc.call_id",
+            "call_id": "COALESCE(mc_base.call_id, mc_tail.call_id)",
             "tool_id": "ti.tool_id",
-            "project_id": "COALESCE(s.project_id, sp.project_id, mc_project.project_id, ti_project.project_id, a_project.project_id)",
+            "project_id": (
+                "COALESCE(s.project_id, sp.project_id, mc_session.project_id, "
+                "ti_session.project_id, a_session.project_id)"
+            ),
             "error_category": "lt.terminal_error_category",
         },
-        """FROM lifecycle_transitions AS lt
+        """FROM lifecycle_transitions AS lt INDEXED BY {lifecycle_index}
         LEFT JOIN sessions AS s
           ON lt.entity_kind = 'session' AND s.session_id = lt.entity_logical_id
         LEFT JOIN turns AS tr
           ON lt.entity_kind = 'turn' AND tr.turn_id = lt.entity_logical_id
-        LEFT JOIN model_calls_visible AS mc
-          ON lt.entity_kind = 'model_call' AND mc.call_id = lt.entity_logical_id
+        LEFT JOIN model_calls AS mc_base
+          ON lt.entity_kind = 'model_call' AND mc_base.call_id = lt.entity_logical_id
+        LEFT JOIN model_call_tail AS mc_tail
+          ON lt.entity_kind = 'model_call' AND mc_tail.call_id = lt.entity_logical_id
         LEFT JOIN tool_invocations AS ti
           ON lt.entity_kind = 'tool_invocation' AND ti.tool_id = lt.entity_logical_id
         LEFT JOIN activities AS a
           ON lt.entity_kind = 'activity' AND a.activity_id = lt.entity_logical_id
         LEFT JOIN sessions AS sp ON sp.session_id = tr.session_id
-        LEFT JOIN sessions AS mc_session ON mc_session.session_id = mc.session_id
-        LEFT JOIN projects AS mc_project ON mc_project.project_id = mc_session.project_id
+        LEFT JOIN sessions AS mc_session
+          ON mc_session.session_id = COALESCE(mc_base.session_id, mc_tail.session_id)
         LEFT JOIN sessions AS ti_session ON ti_session.session_id = ti.session_id
-        LEFT JOIN projects AS ti_project ON ti_project.project_id = ti_session.project_id
         LEFT JOIN sessions AS a_session ON a_session.session_id = a.session_id
-        LEFT JOIN projects AS a_project ON a_project.project_id = a_session.project_id
         LEFT JOIN source_occurrences AS o ON o.occurrence_id = lt.occurrence_id
         LEFT JOIN source_manifestations AS sm ON sm.manifestation_key = o.manifestation_key""",
     ),
 )
 
-_STREAM_SQL = "\nUNION ALL\n".join(_STREAM_BRANCHES)
-_SCOPE_PREDICATE = """(
-       (scope.kind IN ('interval', 'allowance_interval', 'window')
-        AND stream.event_at_us IS NOT NULL
-        AND stream.event_at_us >= scope.start_us
-        AND stream.event_at_us < scope.end_us)
-    OR (scope.kind = 'publication')
-    OR (scope.kind = 'session' AND stream.session_id = scope.logical_id)
-    OR (scope.kind = 'turn' AND stream.turn_id = scope.logical_id)
-    OR (scope.kind = 'call' AND stream.call_id = scope.logical_id)
-    OR (scope.kind = 'tool' AND stream.tool_id = scope.logical_id)
-    OR (scope.kind = 'resource' AND stream.resource_id = scope.logical_id)
-    OR (scope.kind = 'state_change' AND stream.state_change_id = scope.logical_id)
-    OR (scope.kind = 'project' AND stream.project_id = scope.logical_id)
-    OR (scope.kind = 'model_profile' AND stream.model_profile_id = scope.logical_id)
-    OR (scope.kind = 'allowance_observation'
-        AND stream.allowance_observation_id = scope.logical_id)
-    OR (scope.kind = 'source_manifestation'
-        AND stream.manifestation_id = scope.logical_id)
-)"""
-_VIEW_FILTERS = MappingProxyType(
+_VIEW_EVENT_KINDS = MappingProxyType(
     {
-        "timeline": "1 = 1",
-        "calls": "stream.event_kind = 'call'",
-        "tools": "stream.event_kind = 'tool'",
-        "resources": "stream.event_kind = 'resource'",
-        "state_changes": "stream.event_kind = 'state_change'",
-        "allowance_interval": "stream.event_kind <> 'allowance_observation'",
+        "timeline": frozenset(branch.event_kind for branch in _STREAM_BRANCHES),
+        "calls": frozenset({"call"}),
+        "tools": frozenset({"tool"}),
+        "resources": frozenset({"resource"}),
+        "state_changes": frozenset({"state_change"}),
+        "allowance_interval": frozenset(
+            branch.event_kind
+            for branch in _STREAM_BRANCHES
+            if branch.event_kind != "allowance_observation"
+        ),
     }
 )
-_ORDER_FIELDS = "time_missing, COALESCE(event_at_us, 0), source_rank, source_order, event_kind_order, logical_id, transition_rank"
+_SCOPE_COLUMNS = MappingProxyType(
+    {
+        "session": "session_id",
+        "turn": "turn_id",
+        "call": "call_id",
+        "tool": "tool_id",
+        "resource": "resource_id",
+        "state_change": "state_change_id",
+        "project": "project_id",
+        "model_profile": "model_profile_id",
+        "allowance_observation": "allowance_observation_id",
+        "source_manifestation": "manifestation_id",
+    }
+)
+_INTERVAL_SCOPES = frozenset({"interval", "allowance_interval", "window"})
+_ORDER_COLUMNS = (
+    "time_missing",
+    "event_order_at_us",
+    "source_rank",
+    "source_order",
+    "event_kind_order",
+    "logical_id",
+    "transition_rank",
+)
+_ORDER_FIELDS = (
+    "time_missing, COALESCE(event_at_us, 0), source_rank, source_order, "
+    "event_kind_order, logical_id, transition_rank"
+)
 
 
-def _page_sql(view: str, direction: str) -> str:
-    comparison = ">" if direction == "forward" else "<"
+def _branch_expression(branch: _StreamBranch, column: str) -> str:
+    if column == "transition_rank":
+        return branch.values.get(column, "0")
+    return branch.values.get(column, "NULL")
+
+
+def _scope_predicate(
+    branch: _StreamBranch,
+    scope: Mapping[str, Any],
+) -> tuple[str, tuple[Any, ...]] | None:
+    """Return a branch-local scope predicate and its bound values."""
+
+    kind = str(scope["kind"])
+    if branch.event_kind == "lifecycle_transition" and kind == "session":
+        logical_id = scope["logical_id"]
+        return "lt.session_id = ?", (logical_id,)
+    if branch.event_kind == "lifecycle_transition" and kind in {"call", "tool"}:
+        entity_kind = "model_call" if kind == "call" else "tool_invocation"
+        return (
+            f"lt.entity_kind = '{entity_kind}' AND lt.entity_logical_id = ?",
+            (scope["logical_id"],),
+        )
+    if kind == "publication":
+        return "1 = 1", ()
+    if kind in _INTERVAL_SCOPES:
+        event_at = branch.values.get("event_at_us")
+        if event_at is None:
+            return None
+        return (
+            f"{event_at} IS NOT NULL AND {event_at} >= ? AND {event_at} < ?",
+            (scope.get("start_us"), scope.get("end_us")),
+        )
+    column = _SCOPE_COLUMNS.get(kind)
+    if column is None:
+        raise EvidenceServiceError(f"unsupported evidence scope {kind!r}")
+    expression = branch.values.get(column)
+    if expression is None:
+        return None
+    return f"{expression} = ?", (scope["logical_id"],)
+
+
+def _render_branch(
+    branch: _StreamBranch,
+    scope_predicate: str,
+    cursor_order: tuple[Any, ...] | None,
+    direction: str,
+    lifecycle_index: str | None = None,
+) -> str:
+    event_at = _branch_expression(branch, "event_at_us")
+    expressions = [
+        f"{_branch_expression(branch, column)} AS {column}"
+        for column in _STREAM_COLUMNS
+    ]
+    expressions.extend(
+        (
+            f"({event_at} IS NULL) AS time_missing",
+            f"COALESCE({event_at}, 0) AS event_order_at_us",
+        )
+    )
+    predicates = [
+        """EXISTS (
+            SELECT 1
+              FROM publication_head AS bound_head
+             WHERE bound_head.singleton = 1
+               AND bound_head.publication_id = ?
+        )""",
+        f"({scope_predicate})",
+    ]
+    if cursor_order is not None:
+        comparison = ">" if direction == "forward" else "<"
+        order_expressions = (
+            f"({event_at} IS NULL)",
+            f"COALESCE({event_at}, 0)",
+            _branch_expression(branch, "source_rank"),
+            _branch_expression(branch, "source_order"),
+            _branch_expression(branch, "event_kind_order"),
+            _branch_expression(branch, "logical_id"),
+            _branch_expression(branch, "transition_rank"),
+        )
+        predicates.append(
+            f"({', '.join(order_expressions)}) {comparison} "
+            "(?, ?, ?, ?, ?, ?, ?)"
+        )
+    source = branch.source
+    if lifecycle_index is not None:
+        source = source.format(lifecycle_index=lifecycle_index)
+    return (
+        "SELECT\n  "
+        + ",\n  ".join(expressions)
+        + "\n"
+        + source
+        + "\nWHERE "
+        + "\n  AND ".join(predicates)
+    )
+
+
+def _empty_branch_sql() -> str:
+    columns = (*_STREAM_COLUMNS, "time_missing", "event_order_at_us")
+    return "SELECT " + ", ".join(f"NULL AS {column}" for column in columns) + " WHERE 0"
+
+
+def _page_statement(
+    view: str,
+    direction: str,
+    scope: Mapping[str, Any],
+    cursor_order: tuple[Any, ...] | None,
+    publication_id: str,
+    limit: int,
+) -> tuple[str, tuple[Any, ...]]:
+    """Build one branch-pruned, publication-bound physical page statement."""
+
+    if view not in _VIEW_EVENT_KINDS:
+        raise EvidenceServiceError(f"unsupported evidence page view {view!r}")
+    if direction not in {"forward", "backward"}:
+        raise EvidenceServiceError(f"unsupported evidence direction {direction!r}")
+    if scope["kind"] == "rate_card":
+        # Rate cards have a summary owner but no stream relation.  Preserve
+        # the established valid-empty-page behavior for every paged view.
+        return _empty_branch_sql() + "\nLIMIT ?", (limit + 1,)
+    normalized_cursor = (
+        EvidenceService._cursor_parameters(cursor_order)
+        if cursor_order is not None
+        else None
+    )
+    statements: list[str] = []
+    parameters: list[Any] = []
+    for branch in _STREAM_BRANCHES:
+        if branch.event_kind not in _VIEW_EVENT_KINDS[view]:
+            continue
+        scoped = _scope_predicate(branch, scope)
+        if scoped is None:
+            continue
+        predicate, scope_parameters = scoped
+        lifecycle_index = None
+        if branch.event_kind == "lifecycle_transition":
+            lifecycle_index = (
+                "evidence_lifecycle_by_session_order"
+                if scope["kind"] == "session"
+                else "lifecycle_transitions_timeline"
+            )
+        statements.append(
+            _render_branch(
+                branch,
+                predicate,
+                normalized_cursor,
+                direction,
+                lifecycle_index,
+            )
+        )
+        parameters.append(publication_id)
+        parameters.extend(scope_parameters)
+        if normalized_cursor is not None:
+            parameters.extend(normalized_cursor)
     order = "ASC" if direction == "forward" else "DESC"
-    return f"""WITH scope AS (
-    SELECT ? AS kind, ? AS logical_id, ? AS start_us, ? AS end_us
-), stream AS (
-{_STREAM_SQL}
-), scoped AS (
-    SELECT stream.*, (stream.event_at_us IS NULL) AS time_missing
-      FROM stream CROSS JOIN scope
-     WHERE {_SCOPE_PREDICATE}
-       AND {_VIEW_FILTERS[view]}
-)
-SELECT *
-  FROM scoped
- WHERE ({_ORDER_FIELDS}) {comparison} (?, ?, ?, ?, ?, ?, ?)
- ORDER BY time_missing {order}, COALESCE(event_at_us, 0) {order},
-          source_rank {order}, source_order {order},
-          event_kind_order {order}, logical_id {order}, transition_rank {order}
- LIMIT ?"""
-
-
-_FIRST_PAGE_SQL: Mapping[tuple[str, str], str] = MappingProxyType(
-    {(view, direction): _page_sql(view, direction).replace(
-        " WHERE (time_missing, COALESCE(event_at_us, 0), source_rank, source_order, event_kind_order, logical_id, transition_rank) "
-        + (">" if direction == "forward" else "<")
-        + " (?, ?, ?, ?, ?, ?, ?)",
-        "",
-    ) for view in _VIEW_FILTERS for direction in ("forward", "backward")}
-)
-
-
-def _first_page_sql(view: str, direction: str) -> str:
-    # The replace above only removes the fixed keyset predicate; all remaining
-    # SQL is assembled from module constants, never request text.
-    return _FIRST_PAGE_SQL[(view, direction)]
+    sql = "\nUNION ALL\n".join(statements) if statements else _empty_branch_sql()
+    sql += (
+        "\nORDER BY "
+        + ", ".join(f"{column} {order}" for column in _ORDER_COLUMNS)
+        + "\nLIMIT ?"
+    )
+    parameters.append(limit + 1)
+    return sql, tuple(parameters)
 
 
 _SUMMARY_SQL = MappingProxyType(
@@ -1389,15 +1552,15 @@ class EvidenceService:
         publication_id: str,
         digest: str,
     ) -> tuple[tuple[Mapping[str, Any], ...], bool, str | None]:
-        parameters: list[Any] = [scope["kind"], scope["logical_id"], scope.get("start_us"), scope.get("end_us")]
-        if cursor_order is not None:
-            normalized = self._cursor_parameters(cursor_order)
-            parameters.extend(normalized)
-            sql = _page_sql(request.view, request.direction)
-        else:
-            sql = _first_page_sql(request.view, request.direction)
-        parameters.append(request.limit + 1)
-        cursor = connection.execute(sql, tuple(parameters))
+        sql, parameters = _page_statement(
+            request.view,
+            request.direction,
+            scope,
+            cursor_order,
+            publication_id,
+            request.limit,
+        )
+        cursor = connection.execute(sql, parameters)
         raw_rows = [_row_mapping(row, cursor.description) for row in cursor]
         typed = [_typed_row(row) for row in raw_rows]
         selected: list[Mapping[str, Any]] = []

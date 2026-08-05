@@ -18,7 +18,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
 
-from ..adapters.codex_jsonl.canonicalize import ProposedChangeSet
+from ..adapters.codex_jsonl.canonicalize import ProposedChangeSet, ProposedOccurrence
 from ..adapters.contracts import (
     ADAPTER_ID,
     ADAPTER_VERSION,
@@ -365,6 +365,7 @@ _MUTABLE_COLUMNS = {
             "transition_version",
             "start_at_us",
             "end_at_us",
+            "start_source_rank",
             "start_source_order",
             "end_source_order",
             "completion_basis",
@@ -1391,8 +1392,8 @@ class PublicationWriter:
         lifecycle: tuple[tuple[object, ...], ...],
         rows: tuple[PreparedRow, ...],
     ) -> None:
-        self._insert_lifecycle_many(lifecycle)
         self._apply_rows(rows)
+        self._insert_lifecycle_many(lifecycle)
 
     def _write_metadata(
         self,
@@ -1519,6 +1520,128 @@ class PublicationWriter:
                 )
         if request.publication_id == plan.parent_publication_id:
             raise PublicationWriteError("publication cannot parent itself")
+        self._validate_turn_provenance(write_set)
+
+    def _validate_turn_provenance(self, write_set: PublicationWriteSet) -> None:
+        """Validate the persisted turn coordinate before any writer mutation.
+
+        A turn's primary occurrence is the only admissible bridge to its source
+        manifestation.  The check stays on the prepared write set so an
+        invalid or mixed cohort cannot reach the transaction and rely on a
+        deferred foreign-key error after partial work.
+        """
+
+        turn_rows = [row for row in write_set.rows if row.table == "turns"]
+        if not turn_rows:
+            return
+
+        observations: dict[str, list[AdapterObservation]] = {}
+        for observation in write_set.changes.observations:
+            if observation.observation_type == "TurnBoundaryObserved":
+                observations.setdefault(observation.logical_id, []).append(observation)
+
+        occurrences: dict[str, ProposedOccurrence] = {}
+        for occurrence in write_set.changes.occurrences:
+            occurrence_id = occurrence.occurrence_id
+            previous = occurrences.get(occurrence_id)
+            if previous is not None and previous != occurrence:
+                raise PublicationWriteError(
+                    f"primary occurrence is ambiguous: {occurrence_id}"
+                )
+            occurrences[occurrence_id] = occurrence
+
+        inventories: dict[int, SourceInventory] = {}
+        for inventory in (
+            *write_set.changes.selected_sources,
+            *write_set.changes.deferred_sources,
+        ):
+            previous_inventory = inventories.get(inventory.manifestation_key)
+            if previous_inventory is not None and previous_inventory != inventory:
+                raise PublicationWriteError(
+                    "source manifestation is ambiguous: "
+                    f"{inventory.manifestation_key}"
+                )
+            inventories[inventory.manifestation_key] = inventory
+
+        for row in turn_rows:
+            turn_id = str(row.values["turn_id"])
+            candidates = observations.get(turn_id, [])
+            if not candidates:
+                raise PublicationWriteError(
+                    f"turn primary occurrence has no source observation: {turn_id}"
+                )
+            selected = max(candidates, key=lambda item: item.sort_key)
+            tied = [item for item in candidates if item.sort_key == selected.sort_key]
+            if len(tied) != 1:
+                raise PublicationWriteError(
+                    f"turn primary occurrence is ambiguous: {turn_id}"
+                )
+
+            occurrence_id = str(row.values["primary_occurrence_id"])
+            if occurrence_id != selected.occurrence_id:
+                raise PublicationWriteError(
+                    f"turn primary occurrence does not match observation: {turn_id}"
+                )
+            resolved_occurrence = occurrences.get(occurrence_id)
+            if resolved_occurrence is None:
+                raise PublicationWriteError(
+                    f"turn primary occurrence is unresolved: {occurrence_id}"
+                )
+            if resolved_occurrence.semantic_logical_id != turn_id:
+                raise PublicationWriteError(
+                    f"turn primary occurrence belongs to another entity: {turn_id}"
+                )
+
+            source = resolved_occurrence.source_range
+            resolved_inventory = inventories.get(source.manifestation_key)
+            if resolved_inventory is None:
+                raise PublicationWriteError(
+                    "turn primary occurrence has no source manifestation: "
+                    f"{occurrence_id}"
+                )
+            if (
+                resolved_inventory.manifestation_id != source.manifestation_id
+                or resolved_inventory.content_revision != source.source_revision
+            ):
+                raise PublicationWriteError(
+                    f"turn occurrence/manifestation provenance mismatches: {turn_id}"
+                )
+
+            expected_order = selected.source_order
+            if expected_order is None:
+                expected_order = source.record_ordinal
+            if expected_order is None:
+                raise PublicationWriteError(
+                    f"turn source order provenance is missing: {turn_id}"
+                )
+            if selected.source_rank != resolved_inventory.source_rank:
+                raise PublicationWriteError(
+                    f"turn source rank mismatches its manifestation: {turn_id}"
+                )
+            if row.values["start_source_rank"] != resolved_inventory.source_rank:
+                raise PublicationWriteError(
+                    f"turn persisted source rank mismatches provenance: {turn_id}"
+                )
+            if row.values["start_source_order"] != expected_order:
+                raise PublicationWriteError(
+                    f"turn persisted source order mismatches provenance: {turn_id}"
+                )
+
+            start_at_us = row.values["start_at_us"]
+            end_at_us = row.values["end_at_us"]
+            end_source_order = row.values["end_source_order"]
+            if end_at_us is not None and start_at_us is not None and start_at_us > end_at_us:
+                raise PublicationWriteError(
+                    f"turn lifecycle times are reversed: {turn_id}"
+                )
+            if end_source_order is not None and end_source_order < expected_order:
+                raise PublicationWriteError(
+                    f"turn lifecycle source order is reversed: {turn_id}"
+                )
+            if end_at_us is not None and end_source_order is None:
+                raise PublicationWriteError(
+                    f"terminal turn is missing end source order: {turn_id}"
+                )
 
     def _recheck_parent(self, expected: str | None) -> None:
         row = self._connection.execute(
@@ -1696,6 +1819,7 @@ class PublicationWriter:
             transition.terminal_error_category,
             transition.measurement_mask,
             transition.first_seen_publication_id,
+            transition.session_id,
         )
 
     def _validate_existing_identities(
