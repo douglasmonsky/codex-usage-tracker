@@ -22,8 +22,14 @@ focused, dual-SQLite, full, package, safety, and review gates. A duplicate
 postmerge full runtime rerun did not complete because the host exhausted disk
 space and SQLite could not create temporary files; no product assertion
 failed, and this environment-only limitation does not override the exact-tree
-and hosted acceptance evidence. CK-08R3 is now Ready for its separate
-synthetic scale qualification. Retained CK-08R1 work reached
+and hosted acceptance evidence. CK-08R3 then qualified the separate
+synthetic 100,000-call and 1,316,864-call profiles with `first_failure=null`,
+all 196 selector/view/direction outcomes per profile, typed seven-part truth,
+late-event, truncation, cursor, and query-only contracts. PR #425 passed hosted
+Python 3.10/3.14 and Console, squash-merged at
+`0fad272b3205614fb254398c9c9dc0a56d5ba7cd`, and was exact-main verified.
+CK-08R3 is complete; CK-08R4 remains blocked on CK-08R1 and CK-07R1.
+Retained CK-08R1 work reached
 80/80 parity by copying unsupported Q-REV-03/Q-WF-02 semantics; R1A now freezes
 their meaning and closure. R1C is accepted at exact main
 `fb0c57886097a6b985d2f321b2de858cbdfc0a97`; R1B remains held on shared
@@ -169,8 +175,8 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
-  "completed": ["CK-08R0", "CK-08R1A", "CK-08R1C", "CK-08R2", "CK-08R3A", "CK-QG1A0", "CK-QG1A", "CK-07R1A", "CK-07R1A0"],
-  "ready": ["CK-QG1", "CK-08R3"],
+  "completed": ["CK-08R0", "CK-08R1A", "CK-08R1C", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-07R1A", "CK-07R1A0"],
+  "ready": ["CK-QG1"],
   "conditional_ready": [{
     "condition": "ARGV authority accepted at 479cbdb; coordinator records the preserved prelaunch incident disposition and a clean exact-main reapplication path; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; no replacement, launch, or downstream task",
     "tasks": ["CK-07R1"]

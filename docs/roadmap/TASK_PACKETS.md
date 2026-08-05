@@ -12,9 +12,9 @@ parents are accounting umbrellas.
 - Not started: **8**
 - Critical-path completion: **14 / 21**
 - Optional packets: **CK-15**
-- Completed corrective child tasks: **9 — CK-08R0, CK-08R1A, CK-08R1C, CK-08R2, CK-08R3A, CK-QG1A0, CK-QG1A, CK-07R1A, CK-07R1A0**
-- Remaining delegable child tasks: **41**
-- Ready child tasks: **2 — CK-QG1, CK-08R3**
+- Completed corrective child tasks: **10 — CK-08R0, CK-08R1A, CK-08R1C, CK-08R2, CK-08R3A, CK-08R3, CK-QG1A0, CK-QG1A, CK-07R1A, CK-07R1A0**
+- Remaining delegable child tasks: **40**
+- Ready child tasks: **1 — CK-QG1**
 - Conditional-ready child tasks: **1 — CK-07R1 after coordinator disposition of the preserved prelaunch incident and a clean exact-main reapplication path**
 - Blocked child tasks: **38**
 - Orchestration mode: **convergence — one coordinator, one existing task per active packet, at most one shared-authority task**
@@ -65,13 +65,13 @@ other corrective locks are unchanged.
 - [x] **CK-08R2 — Implement bounded physical keyset execution** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r2-implement-physical-keyset-execution.md)
 - [x] **CK-QG1A0 — Authorize PageExecutor source supersession** · Completed on merge; exact-main required before CK-QG1A · [packet](tasks/ck-qg1a0-authorize-page-executor-source-supersession.md)
 - [x] **CK-08R3A — Implement bounded EvidenceService physical queries** · PR #417 hosted-green and squash-merged at `38537f6c`; exact-main identities verified · [packet](tasks/ck-08r3a-implement-evidence-physical-query.md)
-- [ ] **CK-08R3 — Qualify evidence service scale** · Ready after CK-08R3A accepted merge and exact-main verification · [packet](tasks/ck-08r3-qualify-evidence-scale.md)
+- [x] **CK-08R3 — Qualify evidence service scale** · PR #425 hosted-green and squash-merged at `0fad272b`; both frozen synthetic profiles accepted and exact-main verified · [packet](tasks/ck-08r3-qualify-evidence-scale.md)
 - [x] **CK-07R1A — Correct hosted lifecycle tail** · Accepted/merged at `4d807495`; exact-main verified · [packet](tasks/ck-07r1a-correct-hosted-lifecycle-tail.md)
 - [x] **CK-07R1A0 — Freeze lifecycle planner/recovery path authority** · Path, finite source/runtime, run-invocation authority, and argv-correction authority merged through `479cbdb`; retained witnesses remain read-only · [packet](tasks/ck-07r1a0-freeze-lifecycle-path-authority.md)
 - [ ] **CK-07R1 — Correct lifecycle preparation scale** · Conditional Ready after argv authority merge `479cbdb`, coordinator disposition of the preserved `prelaunch_failed` witness incident, and a clean exact-main reapplication path; only the existing worker may resume and no launch is yet authorized; PR #394 is stale read-only · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
 - [x] **CK-QG1A — Correct page-executor complexity** · PR #408 merged/exact-main `30983d4`; authorized successor `9e80c867…` accepted without behavior or baseline change · [packet](tasks/ck-qg1a-correct-page-executor-complexity.md)
 - [ ] **CK-QG1 — Enforce replacement-kernel maintainability** · Ready to refresh existing PR #392 from corrected exact main with the frozen baseline unchanged · [packet](tasks/ck-qg1-enforce-agent-kernel-maintainability.md)
-- [ ] **CK-08R4 — Reclassify physical named plans** · Blocked on CK-08R1/R2/R3 and CK-07R1 · [packet](tasks/ck-08r4-reclassify-physical-plans.md)
+- [ ] **CK-08R4 — Reclassify physical named plans** · Blocked on CK-08R1 and CK-07R1; CK-08R2/R3 are complete · [packet](tasks/ck-08r4-reclassify-physical-plans.md)
 - [ ] **CK-08RG — Authorize CK-09 resumption** · Blocked on CK-08R4 and CK-QG1 · [packet](tasks/ck-08rg-authorize-ck09-resumption.md)
 
 ### CK-09 children

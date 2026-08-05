@@ -1,6 +1,7 @@
 # CK-08R3 — Qualify evidence service scale
 
-**Status:** Ready after CK-08R3A PR #417 acceptance, merge, and exact-main verification
+**Status:** Completed on merge — PR #425 hosted-green, squash-merged at
+`0fad272b`, and exact-main verified
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -38,6 +39,15 @@ byte truncation, 100,000 and 1,316,864-call fixtures, first/deep plans and
 budgets at both scales, `just v/vc`.
 
 **Acceptance:** All preceding invariants/tests pass at both scales.
+
+**Accepted evidence:** The committed
+`docs/decisions/evidence/ck08r3/evidence-scale-qualification.json` records
+`first_failure=null` for the synthetic 100,000-call and 1,316,864-call
+profiles. Each profile covers 14 selector scopes, seven views, two directions,
+first/deep pages, typed seven-part truth, one late event, byte truncation,
+cursor tamper/replacement rejection, query-only execution, and bounded
+physical plans. PR #425 passed hosted Console and Python 3.10/3.14 before
+squash merge and exact-main verification.
 
 **Failure/rollback:** Retain first failure; stop scale/admission and route
 physical defects separately. Never weaken gates, create R4, or invent

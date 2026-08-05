@@ -207,6 +207,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "CK-08R1C",
         "CK-08R2",
         "CK-08R3A",
+        "CK-08R3",
         "CK-QG1A0",
         "CK-QG1A",
         "CK-07R1A",
@@ -220,8 +221,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         hashlib.sha256(qg1a_source.read_bytes()).hexdigest()
         == (qg1a_authority["selected_successor"]["sha256"])
     )
-    ready = {"CK-QG1", "CK-08R3"}
-    assert manifest["ready"] == ["CK-QG1", "CK-08R3"]
+    ready = {"CK-QG1"}
+    assert manifest["ready"] == ["CK-QG1"]
     assert manifest["conditional_ready"] == [
         {
             "condition": (
@@ -236,8 +237,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert "Completed packets: **14 / 22**" in ledger
     assert "Not started: **8**" in ledger
     assert "Critical-path completion: **14 / 21**" in ledger
-    assert "Completed corrective child tasks: **9" in ledger
-    assert "Remaining delegable child tasks: **41**" in ledger
+    assert "Completed corrective child tasks: **10" in ledger
+    assert "Remaining delegable child tasks: **40**" in ledger
     assert "Blocked child tasks: **38" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
@@ -343,6 +344,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "CK-08R1C",
             "CK-08R2",
             "CK-08R3A",
+            "CK-08R3",
             "CK-QG1A0",
             "CK-QG1A",
             "CK-07R1A",
