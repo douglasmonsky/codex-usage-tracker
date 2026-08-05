@@ -32,6 +32,13 @@ preserved rank >0, across manifestation, observation, persisted turn, and
 EvidenceService evidence. Its exact atomic seven-production/nine-support
 cohort and fixture/DDL identities, including the session-leading lifecycle
 index, are permitted, not accepted.
+The linked [CK-08R3A bounded-session portability authority](decisions/evidence/ck08r3a/bounded-session-merge-sort-portability-authority.json)
+supersedes only the prior marker-free EXPLAIN wording: SQLite 3.45.1 may emit
+at most one structurally proven `USE TEMP B-TREE FOR ORDER BY` for the deep
+timeline/allowance session branch, whose merge input is at most one row. The
+lifecycle branch, every first page, every other deep shape, all result/cursor
+truth, and all generic forbidden-plan checks remain bounded and fail closed;
+the authority changes no production, DDL, or schema identity.
 R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`;
 R1B remains held on shared query/evidence/grading integration before final R1
 requalification.
