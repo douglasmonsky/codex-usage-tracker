@@ -18,13 +18,15 @@ keeps CK-09 blocked.
 CK-08R2 is complete on merge: two supported direct plans now use bounded
 physical keyset SQL; 19 plans retain explicit gaps without projection.
 Retained CK-08R3 `a28e9cdbff8e48d334712a449fdcee111c725673` then stopped
-before scale on first/deep EvidenceService EXPLAIN. CK-08R3A owns that separate
-fix; CK-08R3 awaits its accepted merge/exact-main verification. Independent
+before scale on first/deep EvidenceService EXPLAIN. CK-08R3A corrected that
+physical path in PR #417 and was hosted-green, squash-merged, and exact-main
+identity verified at `38537f6cee42ad4ba2fb6e45354e410053c7a7cd`;
+CK-08R3 is now Ready for separate scale qualification. Independent
 truth now consumes [`answer-semantics.v1`](../config/agent-kernel/answer-semantics-v1.json);
 The linked [CK-08R3A schema/publication requalification authority](decisions/evidence/ck08r3a/schema-publication-requalification-authority.json)
-binds only the resulting 57-index schema digest, synthetic publication fixture
-manifests, and compatible tiny-accounting EXPLAIN expectation; R3A remains
-Conditional Ready and implementation remains unaccepted. The exact
+binds the resulting 57-index schema digest, synthetic publication fixture
+manifests, and compatible tiny-accounting EXPLAIN expectation accepted through
+the exact PR #417 cohort. The exact
 [final-shared authority](decisions/evidence/ck08r3a/final-shared-authority.json)
 keeps predecessor handling rejection-only and binds exact
 zero-based nonnegative turn-rank equality, including valid rank 0 and
@@ -43,8 +45,12 @@ The linked [CK-08R3A portable-plan branch-ownership authority](decisions/evidenc
 supersedes only the support proof: full EXPLAIN row ids, parents, direct
 siblings, and leftmost ancestry must bind the sole marker to the unique
 session-event branch. A marker under calls, tools, lifecycle, or an ambiguous
-lookup chain is rejected; the corrected support test remains preflight-only
-and the implementation remains unaccepted.
+lookup chain is rejected; the corrected support test and production cohort are
+accepted through PR #417. Premerge focused, dual-SQLite, full, package,
+safety, and review gates plus hosted CI passed. The duplicate postmerge full
+runtime rerun was environment-limited by ENOSPC before completion; fresh
+exact-main identities and authority/scope/documentation checks passed, and no
+product assertion failed.
 R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`;
 R1B remains held on shared query/evidence/grading integration before final R1
 requalification.

@@ -1,6 +1,6 @@
 # CK-08R3 — Qualify evidence service scale
 
-**Status:** Blocked on CK-08R3A acceptance, merge, and exact-main verification
+**Status:** Ready after CK-08R3A PR #417 acceptance, merge, and exact-main verification
 
 **Parent:** Corrective prerequisite for CK-09
 
