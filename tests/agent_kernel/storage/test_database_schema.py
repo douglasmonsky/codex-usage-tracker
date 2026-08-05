@@ -12,6 +12,7 @@ import pytest
 from codex_usage_tracker.agent_kernel.storage.database import (
     DatabaseContractError,
     DatabaseIdentityError,
+    DatabaseValidationError,
     initialize_analytical,
     initialize_operational,
     measure_database_size,
@@ -27,9 +28,12 @@ from codex_usage_tracker.agent_kernel.storage.paths import (
     ensure_owner_only_directory,
 )
 from codex_usage_tracker.agent_kernel.storage.schema import (
+    ANALYTICAL_DATABASE_IDENTITY,
     ANALYTICAL_DDL,
     OPERATIONAL_DDL,
+    SCHEMA_CONTRACT_ID,
     SCHEMA_CONTRACT_SHA256,
+    SCHEMA_VERSION,
     canonical_schema_digest,
     schema_objects,
 )
@@ -40,7 +44,7 @@ _PREDECESSOR_SCHEMA_DIGEST = (
     "1a2dcffe778633457bbeb60dd3a41c233a78c15af2a3393bf9cacc1d9e645bb5"
 )
 _SELECTED_SCHEMA_DIGEST = (
-    "e3b8509774987fb4fd9cd09aeee1ab9ee32642932ea6a07726315154409b1e35"
+    "998343ba4b52bb39decfcb436f8a862d41884fc6f6a6b4e88f7e8f8e42446295"
 )
 _CK08R3A_INDEX_NAMES = (
     "evidence_model_calls_by_session_order",
@@ -51,12 +55,348 @@ _CK08R3A_INDEX_NAMES = (
     "evidence_compactions_by_session_order",
     "evidence_context_components_by_session_order",
     "evidence_turns_by_session_order",
-    "evidence_lifecycle_timeline_order",
+    "evidence_lifecycle_by_session_order",
     "evidence_source_occurrences_by_logical_order",
     "evidence_tools_by_resource_order",
     "evidence_state_changes_by_resource_order",
     "evidence_allowance_observations_order",
 )
+
+_PREDECESSOR_TURNS_DDL = """CREATE TABLE turns (
+  turn_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  ordinal INTEGER NOT NULL CHECK (ordinal > 0),
+  lifecycle_state TEXT NOT NULL
+    CHECK (
+      lifecycle_state IN (
+        'pending',
+        'running',
+        'succeeded',
+        'failed',
+        'cancelled',
+        'rolled_back',
+        'open',
+        'unknown'
+      )
+    ),
+  state_basis TEXT NOT NULL,
+  transition_version INTEGER NOT NULL CHECK (transition_version >= 0),
+  start_at_us INTEGER,
+  end_at_us INTEGER,
+  start_source_order INTEGER CHECK (start_source_order IS NULL OR start_source_order >= 0),
+  end_source_order INTEGER CHECK (end_source_order IS NULL OR end_source_order >= 0),
+  completion_basis TEXT,
+  membership_json TEXT NOT NULL DEFAULT '{}',
+  primary_occurrence_id TEXT NOT NULL,
+  first_seen_publication_id TEXT NOT NULL,
+  last_seen_publication_id TEXT NOT NULL,
+  UNIQUE (session_id, ordinal),
+  CHECK (
+    start_at_us IS NULL
+    OR end_at_us IS NULL
+    OR start_at_us <= end_at_us
+  ),
+  CHECK (
+    start_source_order IS NULL
+    OR end_source_order IS NULL
+    OR start_source_order <= end_source_order
+  ),
+  FOREIGN KEY (turn_id) REFERENCES identity_registry(logical_id),
+  FOREIGN KEY (session_id) REFERENCES sessions(session_id),
+  FOREIGN KEY (primary_occurrence_id)
+    REFERENCES source_occurrences(occurrence_id),
+  FOREIGN KEY (first_seen_publication_id)
+    REFERENCES publications(publication_id),
+  FOREIGN KEY (last_seen_publication_id)
+    REFERENCES publications(publication_id)
+) STRICT, WITHOUT ROWID;
+"""
+_SUCCESSOR_TURNS_DDL = """CREATE TABLE turns (
+  turn_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  ordinal INTEGER NOT NULL CHECK (ordinal > 0),
+  lifecycle_state TEXT NOT NULL
+    CHECK (
+      lifecycle_state IN (
+        'pending',
+        'running',
+        'succeeded',
+        'failed',
+        'cancelled',
+        'rolled_back',
+        'open',
+        'unknown'
+      )
+    ),
+  state_basis TEXT NOT NULL,
+  transition_version INTEGER NOT NULL CHECK (transition_version >= 0),
+  start_at_us INTEGER,
+  end_at_us INTEGER,
+  start_source_rank INTEGER NOT NULL CHECK (start_source_rank >= 0),
+  start_source_order INTEGER NOT NULL CHECK (start_source_order >= 0),
+  end_source_order INTEGER CHECK (end_source_order IS NULL OR end_source_order >= 0),
+  completion_basis TEXT,
+  membership_json TEXT NOT NULL DEFAULT '{}',
+  primary_occurrence_id TEXT NOT NULL,
+  first_seen_publication_id TEXT NOT NULL,
+  last_seen_publication_id TEXT NOT NULL,
+  UNIQUE (session_id, ordinal),
+  CHECK (
+    start_at_us IS NULL
+    OR end_at_us IS NULL
+    OR start_at_us <= end_at_us
+  ),
+  CHECK (
+    end_source_order IS NULL
+    OR start_source_order <= end_source_order
+  ),
+  FOREIGN KEY (turn_id) REFERENCES identity_registry(logical_id),
+  FOREIGN KEY (session_id) REFERENCES sessions(session_id),
+  FOREIGN KEY (primary_occurrence_id)
+    REFERENCES source_occurrences(occurrence_id),
+  FOREIGN KEY (first_seen_publication_id)
+    REFERENCES publications(publication_id),
+  FOREIGN KEY (last_seen_publication_id)
+    REFERENCES publications(publication_id)
+) STRICT, WITHOUT ROWID;
+"""
+_PREDECESSOR_LIFECYCLE_DDL = """CREATE TABLE lifecycle_transitions (
+  transition_id TEXT PRIMARY KEY,
+  entity_logical_id TEXT NOT NULL,
+  entity_kind TEXT NOT NULL
+    CHECK (
+      entity_kind IN (
+        'session',
+        'turn',
+        'model_call',
+        'tool_invocation',
+        'activity'
+      )
+    ),
+  lifecycle_state TEXT NOT NULL
+    CHECK (
+      lifecycle_state IN (
+        'pending',
+        'running',
+        'succeeded',
+        'failed',
+        'cancelled',
+        'rolled_back',
+        'open',
+        'unknown'
+      )
+    ),
+  state_basis TEXT NOT NULL,
+  transition_version INTEGER NOT NULL CHECK (transition_version > 0),
+  transition_at_us INTEGER,
+  source_rank INTEGER NOT NULL CHECK (source_rank >= 0),
+  source_order INTEGER NOT NULL CHECK (source_order >= 0),
+  event_kind_order INTEGER NOT NULL CHECK (event_kind_order >= 0),
+  transition_rank INTEGER NOT NULL CHECK (transition_rank >= 0),
+  occurrence_id TEXT NOT NULL,
+  terminal_error_category TEXT,
+  measurement_mask INTEGER NOT NULL CHECK (measurement_mask >= 0),
+  first_seen_publication_id TEXT NOT NULL,
+  UNIQUE (entity_logical_id, transition_version),
+  FOREIGN KEY (transition_id) REFERENCES identity_registry(logical_id),
+  FOREIGN KEY (entity_logical_id) REFERENCES identity_registry(logical_id),
+  FOREIGN KEY (occurrence_id) REFERENCES source_occurrences(occurrence_id),
+  FOREIGN KEY (first_seen_publication_id)
+    REFERENCES publications(publication_id)
+) STRICT, WITHOUT ROWID;
+"""
+_SUCCESSOR_LIFECYCLE_DDL = """CREATE TABLE lifecycle_transitions (
+  transition_id TEXT PRIMARY KEY,
+  entity_logical_id TEXT NOT NULL,
+  entity_kind TEXT NOT NULL
+    CHECK (
+      entity_kind IN (
+        'session',
+        'turn',
+        'model_call',
+        'tool_invocation',
+        'activity'
+      )
+    ),
+  lifecycle_state TEXT NOT NULL
+    CHECK (
+      lifecycle_state IN (
+        'pending',
+        'running',
+        'succeeded',
+        'failed',
+        'cancelled',
+        'rolled_back',
+        'open',
+        'unknown'
+      )
+    ),
+  state_basis TEXT NOT NULL,
+  transition_version INTEGER NOT NULL CHECK (transition_version > 0),
+  transition_at_us INTEGER,
+  source_rank INTEGER NOT NULL CHECK (source_rank >= 0),
+  source_order INTEGER NOT NULL CHECK (source_order >= 0),
+  event_kind_order INTEGER NOT NULL CHECK (event_kind_order >= 0),
+  transition_rank INTEGER NOT NULL CHECK (transition_rank >= 0),
+  occurrence_id TEXT NOT NULL,
+  terminal_error_category TEXT,
+  measurement_mask INTEGER NOT NULL CHECK (measurement_mask >= 0),
+  first_seen_publication_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  UNIQUE (entity_logical_id, transition_version),
+  FOREIGN KEY (transition_id) REFERENCES identity_registry(logical_id),
+  FOREIGN KEY (entity_logical_id) REFERENCES identity_registry(logical_id),
+  FOREIGN KEY (occurrence_id) REFERENCES source_occurrences(occurrence_id),
+  FOREIGN KEY (first_seen_publication_id)
+    REFERENCES publications(publication_id),
+  FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+) STRICT, WITHOUT ROWID;
+"""
+_SUCCESSOR_INDEXES_DDL = """-- CK-08R3A evidence pages use the persisted seven-part order tuple.  Each
+-- branch has a covering session/order index so filtering and LIMIT + 1 happen
+-- before row decoding; turn boundary constants remain event_kind_order=20 and
+-- transition_rank=0 while source rank/order are persisted coordinates.
+CREATE INDEX evidence_model_calls_by_session_order
+  ON model_calls(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    call_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_model_call_tail_by_session_order
+  ON model_call_tail(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    call_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_tools_by_session_order
+  ON tool_invocations(
+    session_id ASC,
+    (start_at_us IS NULL) ASC,
+    COALESCE(start_at_us, 0) ASC,
+    start_source_rank ASC,
+    start_source_order ASC,
+    start_event_kind_order ASC,
+    tool_id ASC,
+    start_transition_rank ASC
+  );
+CREATE INDEX evidence_activities_by_session_order
+  ON activities(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    activity_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_state_changes_by_session_order
+  ON state_changes(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    change_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_compactions_by_session_order
+  ON compaction_boundaries(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    compaction_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_context_components_by_session_order
+  ON context_components(
+    session_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    component_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_turns_by_session_order
+  ON turns(
+    session_id ASC,
+    (start_at_us IS NULL) ASC,
+    COALESCE(start_at_us, 0) ASC,
+    start_source_rank ASC,
+    start_source_order ASC,
+    20 ASC,
+    turn_id ASC,
+    0 ASC
+  );
+CREATE INDEX evidence_lifecycle_by_session_order
+  ON lifecycle_transitions(
+    session_id ASC,
+    (transition_at_us IS NULL) ASC,
+    COALESCE(transition_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    transition_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_source_occurrences_by_logical_order
+  ON source_occurrences(
+    semantic_logical_id ASC,
+    record_ordinal ASC,
+    byte_start ASC,
+    byte_end ASC,
+    occurrence_id ASC
+  );
+CREATE INDEX evidence_tools_by_resource_order
+  ON tool_invocations(
+    primary_resource_id ASC,
+    (start_at_us IS NULL) ASC,
+    COALESCE(start_at_us, 0) ASC,
+    start_source_rank ASC,
+    start_source_order ASC,
+    start_event_kind_order ASC,
+    tool_id ASC,
+    start_transition_rank ASC
+  )
+  WHERE primary_resource_id IS NOT NULL;
+CREATE INDEX evidence_state_changes_by_resource_order
+  ON state_changes(
+    resource_id ASC,
+    (event_at_us IS NULL) ASC,
+    COALESCE(event_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    change_id ASC,
+    transition_rank ASC
+  );
+CREATE INDEX evidence_allowance_observations_order
+  ON allowance_observations(
+    (observed_at_us IS NULL) ASC,
+    COALESCE(observed_at_us, 0) ASC,
+    source_rank ASC,
+    source_order ASC,
+    event_kind_order ASC,
+    observation_id ASC,
+    transition_rank ASC
+  );
+"""
 
 
 def _contract_ddl(name: str) -> str:
@@ -79,7 +419,16 @@ def _contract_ddl(name: str) -> str:
 
 
 def _selected_analytical_ddl() -> str:
-    return _contract_ddl("analytical") + "\n" + _contract_ddl("ck08r3a-evidence-indexes")
+    predecessor = _contract_ddl("analytical")
+    assert predecessor.count(_PREDECESSOR_TURNS_DDL) == 1
+    assert predecessor.count(_PREDECESSOR_LIFECYCLE_DDL) == 1
+    return (
+        predecessor
+        .replace(_PREDECESSOR_TURNS_DDL, _SUCCESSOR_TURNS_DDL)
+        .replace(_PREDECESSOR_LIFECYCLE_DDL, _SUCCESSOR_LIFECYCLE_DDL)
+        + "\n"
+        + _SUCCESSOR_INDEXES_DDL
+    )
 
 
 def _pragma(connection: sqlite3.Connection, name: str) -> object:
@@ -216,6 +565,52 @@ def test_old_foreign_and_swapped_database_are_rejected_without_creation(
     initialize_operational(operational).close()
     with pytest.raises(DatabaseIdentityError):
         open_writer(operational, "analytical")
+
+
+def test_predecessor_schema_is_rejected_before_any_application_use(
+    tmp_path: Path,
+) -> None:
+    predecessor = tmp_path / "predecessor.sqlite3"
+    connection = sqlite3.connect(predecessor)
+    connection.executescript(_contract_ddl("analytical"))
+    connection.executemany(
+        "INSERT INTO metadata(key, value) VALUES (?, ?)",
+        (
+            ("database_identity", ANALYTICAL_DATABASE_IDENTITY),
+            ("schema_contract_id", SCHEMA_CONTRACT_ID),
+            ("schema_contract_sha256", _PREDECESSOR_SCHEMA_DIGEST),
+            ("schema_version", SCHEMA_VERSION),
+            ("raw_content_stored", "false"),
+            ("time_unit", "utc_microseconds"),
+            ("interval_semantics", "[start,end)"),
+        ),
+    )
+    connection.commit()
+    connection.close()
+    predecessor.chmod(0o600)
+    before = predecessor.read_bytes()
+
+    for opener in (open_writer, open_read_only):
+        with pytest.raises(DatabaseIdentityError):
+            opener(predecessor)
+        assert predecessor.read_bytes() == before
+        assert not Path(f"{predecessor}-wal").exists()
+        assert not Path(f"{predecessor}-shm").exists()
+
+    current_metadata = tmp_path / "predecessor-current-digest.sqlite3"
+    current_metadata.write_bytes(before)
+    current_metadata.chmod(0o600)
+    connection = sqlite3.connect(current_metadata)
+    connection.execute(
+        "UPDATE metadata SET value = ? WHERE key = 'schema_contract_sha256'",
+        (SCHEMA_CONTRACT_SHA256,),
+    )
+    connection.commit()
+    connection.close()
+    current_before = current_metadata.read_bytes()
+    with pytest.raises(DatabaseValidationError):
+        open_writer(current_metadata)
+    assert current_metadata.read_bytes() == current_before
 
 
 def test_cache_paths_fail_closed_on_unsafe_existing_paths(tmp_path: Path) -> None:

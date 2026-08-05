@@ -115,8 +115,8 @@ class LifecycleRepository:
                   state_basis, transition_version, transition_at_us, source_rank,
                   source_order, event_kind_order, transition_rank, occurrence_id,
                   terminal_error_category, measurement_mask,
-                  first_seen_publication_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  first_seen_publication_id, session_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     transition.transition_id,
@@ -134,6 +134,7 @@ class LifecycleRepository:
                     transition.terminal_error_category,
                     transition.measurement_mask,
                     transition.first_seen_publication_id,
+                    transition.session_id,
                 ),
             )
             folded = self.fold(transition.entity_logical_id)
@@ -153,7 +154,7 @@ class LifecycleRepository:
                    state_basis, transition_version, transition_at_us, source_rank,
                    source_order, event_kind_order, transition_rank, occurrence_id,
                    terminal_error_category, measurement_mask,
-                   first_seen_publication_id
+                   first_seen_publication_id, session_id
             FROM lifecycle_transitions
             WHERE entity_logical_id = ?
             ORDER BY transition_version, (transition_at_us IS NULL),

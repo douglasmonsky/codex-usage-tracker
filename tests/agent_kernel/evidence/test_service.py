@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+import codex_usage_tracker.agent_kernel.evidence.service as evidence_service
 from codex_usage_tracker.agent_kernel.evidence.cursors import CursorCodec
 from codex_usage_tracker.agent_kernel.evidence.service import (
     EvidenceContractError,
@@ -24,6 +27,12 @@ from tests.agent_kernel.fixtures.published_v2 import (
 _ROOT = Path(__file__).resolve().parents[3]
 _CONTRACT = _ROOT / "config/agent-kernel/selector-provenance-v1.json"
 _SECRET = b"ck08-evidence-service-synthetic-secret"
+_FORBIDDEN_PLAN_MARKERS = (
+    "SCAN stream",
+    "MATERIALIZE model_calls_visible",
+    "AUTOMATIC COVERING INDEX",
+    "USE TEMP B-TREE",
+)
 
 
 def _service() -> EvidenceService:
@@ -100,6 +109,7 @@ def _all_pages(
     selector: str,
     *,
     direction: str,
+    view: str = "timeline",
 ) -> list[dict[str, object]]:
     cursor = None
     rows: list[dict[str, object]] = []
@@ -109,6 +119,7 @@ def _all_pages(
             _request(
                 case,
                 selector,
+                view=view,
                 direction=direction,
                 limit=2,
                 cursor=cursor,
@@ -118,6 +129,206 @@ def _all_pages(
         cursor = page.next_cursor
         if cursor is None:
             return rows
+
+
+def _add_synthetic_activities(
+    connection: sqlite3.Connection,
+    selector: str,
+    count: int,
+) -> None:
+    session_id = selector.partition(":")[2]
+    turn = connection.execute(
+        """
+        SELECT turn_id, primary_occurrence_id
+          FROM turns
+         WHERE session_id = ?
+         ORDER BY ordinal, turn_id
+         LIMIT 1
+        """,
+        (session_id,),
+    ).fetchone()
+    assert turn is not None
+    turn_id, occurrence_id = str(turn[0]), str(turn[1])
+    assert connection.execute("PRAGMA query_only").fetchone()[0] == 1
+    connection.execute("PRAGMA query_only = OFF")
+    try:
+        for index in range(count):
+            activity_id = f"activity:physical:{index:05d}"
+            identity_bytes = activity_id.encode("utf-8")
+            connection.execute(
+                """
+                INSERT INTO identity_registry (
+                  logical_id, entity_kind, identity_version, identity_cbor,
+                  identity_sha256, first_seen_publication_id,
+                  last_seen_publication_id
+                ) VALUES (?, 'activity', 'v1', ?, ?, ?, ?)
+                """,
+                (
+                    activity_id,
+                    identity_bytes,
+                    hashlib.sha256(identity_bytes).hexdigest(),
+                    PUBLICATION_ID,
+                    PUBLICATION_ID,
+                ),
+            )
+            event_order = 10_000 + index
+            connection.execute(
+                """
+                INSERT INTO activities (
+                  activity_id, session_id, turn_id, activity_kind,
+                  lifecycle_state, state_basis, transition_version,
+                  event_at_us, source_rank, source_order, event_kind_order,
+                  transition_rank, primary_occurrence_id,
+                  first_seen_publication_id, last_seen_publication_id
+                ) VALUES (?, ?, ?, 'synthetic', 'succeeded', 'synthetic', 1,
+                          ?, 0, ?, 50, 0, ?, ?, ?)
+                """,
+                (
+                    activity_id,
+                    session_id,
+                    turn_id,
+                    event_order,
+                    event_order,
+                    occurrence_id,
+                    PUBLICATION_ID,
+                    PUBLICATION_ID,
+                ),
+            )
+        connection.commit()
+    finally:
+        connection.execute("PRAGMA query_only = ON")
+
+
+def _add_unrelated_lifecycle_history(
+    connection: sqlite3.Connection,
+    count: int,
+) -> None:
+    """Add synthetic foreign-session lifecycle rows without changing target facts."""
+
+    if count == 0:
+        return
+    target_session = str(
+        connection.execute(
+            "SELECT session_id FROM sessions ORDER BY session_id LIMIT 1"
+        ).fetchone()[0]
+    )
+    occurrence_id = str(
+        connection.execute(
+            "SELECT occurrence_id FROM source_occurrences ORDER BY occurrence_id LIMIT 1"
+        ).fetchone()[0]
+    )
+    project_id = str(
+        connection.execute(
+            "SELECT project_id FROM sessions WHERE session_id = ?",
+            (target_session,),
+        ).fetchone()[0]
+    )
+    foreign_session = "session:synthetic-unrelated-lifecycle"
+    connection.execute("PRAGMA query_only = OFF")
+    try:
+        identity_bytes = foreign_session.encode("utf-8")
+        connection.execute(
+            """
+            INSERT INTO identity_registry (
+              logical_id, entity_kind, identity_version, identity_cbor,
+              identity_sha256, first_seen_publication_id,
+              last_seen_publication_id
+            ) VALUES (?, 'session', 'v1', ?, ?, ?, ?)
+            """,
+            (
+                foreign_session,
+                identity_bytes,
+                hashlib.sha256(identity_bytes).hexdigest(),
+                PUBLICATION_ID,
+                PUBLICATION_ID,
+            ),
+        )
+        connection.execute(
+            """
+            INSERT INTO sessions (
+              session_id, adapter_native_session_key, identity_version,
+              project_id, lifecycle_state, state_basis, transition_version,
+              primary_occurrence_id, first_seen_publication_id,
+              last_seen_publication_id
+            ) VALUES (?, ?, 'v1', ?, 'unknown', 'synthetic', 0, ?, ?, ?)
+            """,
+            (
+                foreign_session,
+                "synthetic-unrelated-lifecycle",
+                project_id,
+                occurrence_id,
+                PUBLICATION_ID,
+                PUBLICATION_ID,
+            ),
+        )
+        lifecycle_rows = []
+        for version in range(1, count + 1):
+            transition_id = f"lifecycle-transition:synthetic-unrelated:{version:05d}"
+            identity_bytes = transition_id.encode("utf-8")
+            connection.execute(
+                """
+                INSERT INTO identity_registry (
+                  logical_id, entity_kind, identity_version, identity_cbor,
+                  identity_sha256, first_seen_publication_id,
+                  last_seen_publication_id
+                ) VALUES (?, 'lifecycle-transition', 'v1', ?, ?, ?, ?)
+                """,
+                (
+                    transition_id,
+                    identity_bytes,
+                    hashlib.sha256(identity_bytes).hexdigest(),
+                    PUBLICATION_ID,
+                    PUBLICATION_ID,
+                ),
+            )
+            lifecycle_rows.append(
+                (
+                    transition_id,
+                    foreign_session,
+                    "session",
+                    "unknown",
+                    "synthetic",
+                    version,
+                    1_000_000 + version,
+                    0,
+                    version,
+                    10,
+                    0,
+                    occurrence_id,
+                    None,
+                    0,
+                    PUBLICATION_ID,
+                    foreign_session,
+                )
+            )
+        connection.executemany(
+            "INSERT INTO lifecycle_transitions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            lifecycle_rows,
+        )
+        connection.commit()
+    finally:
+        connection.execute("PRAGMA query_only = ON")
+
+
+def _explain_details(
+    connection: sqlite3.Connection,
+    view: str,
+    direction: str,
+    scope: Mapping[str, Any],
+    cursor_order: tuple[Any, ...] | None,
+) -> tuple[str, ...]:
+    sql, parameters = evidence_service._page_statement(
+        view,
+        direction,
+        scope,
+        cursor_order,
+        PUBLICATION_ID,
+        7,
+    )
+    return tuple(
+        str(row[-1])
+        for row in connection.execute("EXPLAIN QUERY PLAN " + sql, parameters)
+    )
 
 
 def test_evidence_contract_is_closed_and_bounded() -> None:
@@ -361,3 +572,243 @@ def test_evidence_summary_resolves_all_14_selector_and_six_provenance_kinds(
         "source_inventory",
         "source_occurrence",
     }
+
+
+def test_first_and_deep_physical_plans_prune_unbounded_shapes(
+    tmp_path: Path,
+) -> None:
+    connection, _case, selector = _published(tmp_path)
+    scope = {
+        "kind": "session",
+        "logical_id": selector.partition(":")[2],
+        "start_us": None,
+        "end_us": None,
+    }
+    deep_order = (0, 0, 0, 0, 0, "activity:physical:00000", 0)
+    for view in (
+        "timeline",
+        "calls",
+        "tools",
+        "resources",
+        "state_changes",
+        "allowance_interval",
+    ):
+        for direction in ("forward", "backward"):
+            for cursor_order in (None, deep_order):
+                details = _explain_details(connection, view, direction, scope, cursor_order)
+                assert not any(
+                    marker in "\n".join(details) for marker in _FORBIDDEN_PLAN_MARKERS
+                ), (view, direction, cursor_order, details)
+    connection.close()
+
+
+def test_activity_scale_keeps_decode_and_work_bounded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    decoded_counts: list[int] = []
+    progress_counts: list[int] = []
+    original_typed_row = evidence_service._typed_row
+
+    def count_decodes(row: Mapping[str, Any]) -> dict[str, Any]:
+        decoded_counts[-1] += 1
+        return original_typed_row(row)
+
+    monkeypatch.setattr(evidence_service, "_typed_row", count_decodes)
+    for count in (2_000, 10_000):
+        connection, case, selector = _published(tmp_path / f"activities-{count}")
+        _add_synthetic_activities(connection, selector, count)
+        details = _explain_details(
+            connection,
+            "timeline",
+            "forward",
+            {
+                "kind": "session",
+                "logical_id": selector.partition(":")[2],
+                "start_us": None,
+                "end_us": None,
+            },
+            None,
+        )
+        assert not any(marker in "\n".join(details) for marker in _FORBIDDEN_PLAN_MARKERS)
+        callback_count = 0
+
+        def progress() -> int:
+            nonlocal callback_count
+            callback_count += 1
+            return 0
+
+        decoded_counts.append(0)
+        connection.set_progress_handler(progress, 100)
+        try:
+            page = _service().read(
+                connection,
+                _request(case, selector, view="timeline", limit=7),
+            )
+        finally:
+            connection.set_progress_handler(None, 0)
+        progress_counts.append(callback_count)
+        connection.close()
+        assert len(page.rows) == 7
+        assert page.has_more is True
+        assert page.next_cursor is not None
+        assert decoded_counts[-1] == 8
+
+    assert progress_counts[0] > 0
+    assert progress_counts[1] <= progress_counts[0] * 4
+    assert max(progress_counts) <= 200
+
+
+def test_foreign_lifecycle_history_does_not_change_session_page_work(
+    tmp_path: Path,
+) -> None:
+    callback_counts: list[int] = []
+    baseline_rows: list[dict[str, object]] | None = None
+    for count in (0, 1_000, 5_000):
+        connection, case, selector = _published(tmp_path / f"foreign-{count}")
+        _add_unrelated_lifecycle_history(connection, count)
+        scope = {
+            "kind": "session",
+            "logical_id": selector.partition(":")[2],
+            "start_us": None,
+            "end_us": None,
+        }
+        for direction in ("forward", "backward"):
+            for cursor_order in (None, (0, 0, 0, 0, 0, "activity:physical:00000", 0)):
+                details = _explain_details(
+                    connection,
+                    "timeline",
+                    direction,
+                    scope,
+                    cursor_order,
+                )
+                assert not any(
+                    marker in "\n".join(details) for marker in _FORBIDDEN_PLAN_MARKERS
+                ), (count, direction, cursor_order, details)
+        callback_count = 0
+
+        def progress() -> int:
+            nonlocal callback_count
+            callback_count += 1
+            return 0
+
+        connection.set_progress_handler(progress, 100)
+        try:
+            page = _service().read(
+                connection,
+                _request(case, selector, view="timeline", limit=7),
+            )
+        finally:
+            connection.set_progress_handler(None, 0)
+        callback_counts.append(callback_count)
+        rows = [dict(row) for row in page.rows]
+        if baseline_rows is None:
+            baseline_rows = rows
+        assert rows == baseline_rows
+        assert len(rows) <= 7
+        connection.close()
+
+    assert callback_counts[0] > 0
+    assert callback_counts[1] <= callback_counts[0] * 2
+    assert callback_counts[2] <= callback_counts[0] * 2
+
+
+def test_rate_card_pages_remain_valid_empty_and_query_only(
+    tmp_path: Path,
+) -> None:
+    connection, case, _selector = _published(tmp_path)
+    digest = connection.execute(
+        "SELECT rate_card_digest FROM publications WHERE publication_id = ?",
+        (PUBLICATION_ID,),
+    ).fetchone()[0]
+    selector = f"rate-card:{digest}"
+    request = _request(case, selector, view="timeline", limit=7)
+    summary = _service().read(connection, _request(case, selector, view="summary"))
+    assert summary.resolved_selector["selector_kind"] == "rate_card"
+    assert summary.summary["facts"]
+    for direction in ("forward", "backward"):
+        page = _service().read(
+            connection,
+            replace_request_direction(request, direction),
+        )
+        assert page.rows == ()
+        assert page.has_more is False
+        assert page.next_cursor is None
+    connection.close()
+
+
+def test_calls_pages_match_independent_base_and_tail_order(
+    tmp_path: Path,
+) -> None:
+    connection, case, selector = _published(tmp_path)
+    session_id = selector.partition(":")[2]
+    base_and_tail = connection.execute(
+        """
+        SELECT call_id, event_at_us, source_rank, source_order,
+               event_kind_order, transition_rank
+          FROM model_calls
+         WHERE session_id = ?
+        UNION ALL
+        SELECT call_id, event_at_us, source_rank, source_order,
+               event_kind_order, transition_rank
+          FROM model_call_tail
+         WHERE session_id = ?
+        """,
+        (session_id, session_id),
+    ).fetchall()
+
+    def order_key(row: sqlite3.Row) -> tuple[Any, ...]:
+        event_at_us = row[1]
+        return (
+            1 if event_at_us is None else 0,
+            0 if event_at_us is None else event_at_us,
+            int(row[2]),
+            int(row[3]),
+            int(row[4]),
+            str(row[0]),
+            int(row[5]),
+        )
+
+    expected = [
+        (str(row[0]), *order_key(row))
+        for row in sorted(base_and_tail, key=order_key)
+    ]
+    forward = _all_pages(
+        connection,
+        case,
+        selector,
+        direction="forward",
+        view="calls",
+    )
+    backward = _all_pages(
+        connection,
+        case,
+        selector,
+        direction="backward",
+        view="calls",
+    )
+    connection.close()
+    observed = [(str(row["logical_id"]), *tuple(row["order_key"])) for row in forward]
+    assert observed == expected
+    assert len(observed) == len(set(observed))
+    assert [str(row["logical_id"]) for row in backward] == [
+        str(row["logical_id"]) for row in reversed(forward)
+    ]
+
+
+def replace_request_direction(request: EvidenceRequest, direction: str) -> EvidenceRequest:
+    return EvidenceRequest(
+        selector=request.selector,
+        boundary_pair=request.boundary_pair,
+        selector_role=request.selector_role,
+        view=request.view,
+        direction=direction,
+        limit=request.limit,
+        byte_limit=request.byte_limit,
+        cursor=request.cursor,
+        publication_id=request.bound_publication_id,
+        plan_id=request.plan_id,
+        plan_version=request.plan_version,
+        parameters=request.parameters,
+        gates=request.gates,
+    )

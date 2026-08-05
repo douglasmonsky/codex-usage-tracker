@@ -71,6 +71,8 @@ def _connection() -> sqlite3.Connection:
         ("adapter:lifecycle", "adapter"),
         ("producer:lifecycle", "producer"),
         ("source:lifecycle", "source"),
+        ("project:lifecycle", "project"),
+        ("session:lifecycle", "session"),
         ("manifestation:lifecycle", "source_manifestation"),
         ("tool:lifecycle", "tool_invocation"),
         ("occurrence:start", "source_occurrence"),
@@ -169,6 +171,41 @@ def _connection() -> sqlite3.Connection:
                 PUBLICATION_ID,
             ),
         )
+    connection.execute(
+        """
+        INSERT INTO projects (
+          project_id, workspace_key, label_candidates_json,
+          first_event_at_us, last_event_at_us, provenance_json,
+          first_seen_publication_id, last_seen_publication_id
+        ) VALUES (?, ?, '[]', NULL, NULL, '[]', ?, ?)
+        """,
+        ("project:lifecycle", "lifecycle", PUBLICATION_ID, PUBLICATION_ID),
+    )
+    connection.execute(
+        """
+        INSERT INTO sessions (
+          session_id, adapter_native_session_key, identity_version, project_id,
+          root_session_id, parent_session_id, relationship_basis,
+          delegation_depth, lifecycle_state, state_basis, transition_version,
+          start_at_us, end_at_us, observed_duration_us, completion_basis,
+          label_candidates_json, primary_occurrence_id,
+          first_seen_publication_id, last_seen_publication_id
+        ) VALUES (?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?, ?, NULL, NULL,
+                  NULL, NULL, '[]', ?, ?, ?)
+        """,
+        (
+            "session:lifecycle",
+            "native-lifecycle",
+            "identity-v1",
+            "project:lifecycle",
+            "unknown",
+            "synthetic",
+            0,
+            "occurrence:start",
+            PUBLICATION_ID,
+            PUBLICATION_ID,
+        ),
+    )
     return connection
 
 
@@ -195,6 +232,7 @@ def _transition(
         None,
         1,
         PUBLICATION_ID,
+        "session:lifecycle",
     )
 
 
