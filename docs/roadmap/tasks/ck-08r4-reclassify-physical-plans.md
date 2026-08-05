@@ -1,6 +1,6 @@
 # CK-08R4 — Reclassify physical named plans
 
-**Status:** Blocked on CK-08R1, CK-08R2, CK-08R3, and CK-07R1
+**Status:** Blocked on CK-08R1 and CK-07R1; CK-08R2 and CK-08R3 are complete
 
 **Parent:** Corrective prerequisite for CK-09
 

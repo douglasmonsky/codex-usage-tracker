@@ -20,8 +20,12 @@ physical keyset SQL; 19 plans retain explicit gaps without projection.
 Retained CK-08R3 `a28e9cdbff8e48d334712a449fdcee111c725673` then stopped
 before scale on first/deep EvidenceService EXPLAIN. CK-08R3A corrected that
 physical path in PR #417 and was hosted-green, squash-merged, and exact-main
-identity verified at `38537f6cee42ad4ba2fb6e45354e410053c7a7cd`;
-CK-08R3 is now Ready for separate scale qualification. Independent
+identity verified at `38537f6cee42ad4ba2fb6e45354e410053c7a7cd`.
+CK-08R3 then passed both frozen synthetic profiles, all selector/view/direction
+outcomes, typed seven-part truth, late-event, truncation, cursor, and
+query-only contracts. PR #425 was hosted-green, squash-merged, and exact-main
+verified at `0fad272b3205614fb254398c9c9dc0a56d5ba7cd`. CK-08R3 is complete;
+CK-08R4 remains blocked on CK-08R1 and CK-07R1. Independent
 truth now consumes [`answer-semantics.v1`](../config/agent-kernel/answer-semantics-v1.json);
 The linked [CK-08R3A schema/publication requalification authority](decisions/evidence/ck08r3a/schema-publication-requalification-authority.json)
 binds the resulting 57-index schema digest, synthetic publication fixture
