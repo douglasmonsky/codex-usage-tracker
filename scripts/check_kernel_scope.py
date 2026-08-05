@@ -736,9 +736,12 @@ CK08R3A_AUTHORITY_ADDITIONS = frozenset(
         "docs/decisions/evidence/ck08r3a/final-shared-authority.schema.json",
         "docs/decisions/evidence/ck08r3a/bounded-session-merge-sort-portability-authority.json",
         "docs/decisions/evidence/ck08r3a/bounded-session-merge-sort-portability-authority.schema.json",
+        "docs/decisions/evidence/ck08r3a/portable-plan-branch-ownership-authority.json",
+        "docs/decisions/evidence/ck08r3a/portable-plan-branch-ownership-authority.schema.json",
         "tests/kernel/test_ck08r3a_final_shared_authority.py",
         "tests/kernel/test_ck08r3a_lifecycle_session_authority.py",
         "tests/kernel/test_ck08r3a_bounded_session_merge_sort_authority.py",
+        "tests/kernel/test_ck08r3a_portable_plan_branch_ownership_authority.py",
     }
 )
 

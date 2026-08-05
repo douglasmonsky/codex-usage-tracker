@@ -89,7 +89,7 @@ def _json(path: str):
 def _portable_selected_support_hashes() -> dict[str, str]:
     authority = _json(
         "docs/decisions/evidence/ck08r3a/"
-        "bounded-session-merge-sort-portability-authority.json"
+        "portable-plan-branch-ownership-authority.json"
     )
     return {
         item["path"]: item["sha256"]

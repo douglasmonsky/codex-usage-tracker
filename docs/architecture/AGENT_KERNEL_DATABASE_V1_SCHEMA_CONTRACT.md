@@ -63,6 +63,10 @@ branch must still use `evidence_lifecycle_by_session_order(session_id=?)`;
 first pages and every other deep shape remain marker-free. This is not a
 generic EXPLAIN relaxation, a host-version special case, an additional
 derived-order key, or a production/DDL/schema change.
+The linked [portable-plan branch-ownership authority](../decisions/evidence/ck08r3a/portable-plan-branch-ownership-authority.json)
+requires the full `id`/`parent`/`detail` topology to identify the unique
+leftmost session-event merge input and to reject markers under calls, tools,
+lifecycle, or ambiguous sibling chains.
 
 <!-- ck08r3a-evidence-indexes-ddl:start -->
 ```sql
