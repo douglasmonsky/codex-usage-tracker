@@ -26,6 +26,7 @@ from scripts.check_kernel_scope import (
     CK08R1A_ANSWER_SEMANTICS_ADDITIONS,
     CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS,
     CK08R2_PHYSICAL_PAGE_ADDITIONS,
+    CK08R3_EVIDENCE_SCALE_ADDITIONS,
     CK08R3A_AUTHORITY_ADDITIONS,
     CKQG1A0_AUTHORITY_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
@@ -673,6 +674,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK07A_FACT_BACKED_REQUALIFICATION_ADDITIONS
         | CK08_QUERY_EVIDENCE_ADDITIONS
         | CK08R2_PHYSICAL_PAGE_ADDITIONS
+        | CK08R3_EVIDENCE_SCALE_ADDITIONS
         | CK08R1A_ANSWER_SEMANTICS_ADDITIONS
         | CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS
         | CK08R3A_AUTHORITY_ADDITIONS
@@ -704,6 +706,12 @@ def test_ck08r3a_authority_additions_are_explicit_and_bounded() -> None:
         "tests/kernel/test_ck08r3a_bounded_session_merge_sort_authority.py",
         "tests/kernel/test_ck08r3a_portable_plan_branch_ownership_authority.py",
     } == CK08R3A_AUTHORITY_ADDITIONS
+
+    assert {
+        "docs/decisions/evidence/ck08r3/evidence-scale-qualification.json",
+        "scripts/qualify_ck08r3_evidence_scale.py",
+        "tests/agent_kernel/evidence/test_ck08r3_scale_qualification.py",
+    } == CK08R3_EVIDENCE_SCALE_ADDITIONS
 
 
 def test_ck08r1a_answer_semantics_additions_are_explicit_and_bounded() -> None:
