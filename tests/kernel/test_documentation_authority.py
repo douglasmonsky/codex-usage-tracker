@@ -88,12 +88,10 @@ def _json(path: str):
 
 def _portable_selected_support_hashes() -> dict[str, str]:
     authority = _json(
-        "docs/decisions/evidence/ck08r3a/"
-        "portable-plan-branch-ownership-authority.json"
+        "docs/decisions/evidence/ck08r3a/portable-plan-branch-ownership-authority.json"
     )
     return {
-        item["path"]: item["sha256"]
-        for item in authority["selected_cohort"]["support_identities"]
+        item["path"]: item["sha256"] for item in authority["selected_cohort"]["support_identities"]
     }
 
 
@@ -201,13 +199,14 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
         "blocked_policy": "spawn_none_and_report_to_orchestrator",
     }
-    conditional_ready = {"CK-07R1", "CK-08R3A"}
+    conditional_ready = {"CK-07R1"}
     blocked: set[str] = set()
     assert manifest["completed"] == [
         "CK-08R0",
         "CK-08R1A",
         "CK-08R1C",
         "CK-08R2",
+        "CK-08R3A",
         "CK-QG1A0",
         "CK-QG1A",
         "CK-07R1A",
@@ -217,18 +216,13 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "docs/decisions/evidence/ckqg1a0/page-executor-source-supersession-authority.json"
     )
     qg1a_source = _REPO_ROOT / qg1a_authority["source_path"]
-    assert hashlib.sha256(qg1a_source.read_bytes()).hexdigest() == (
-        qg1a_authority["selected_successor"]["sha256"]
+    assert (
+        hashlib.sha256(qg1a_source.read_bytes()).hexdigest()
+        == (qg1a_authority["selected_successor"]["sha256"])
     )
-    ready = {"CK-QG1"}
-    assert manifest["ready"] == ["CK-QG1"]
+    ready = {"CK-QG1", "CK-08R3"}
+    assert manifest["ready"] == ["CK-QG1", "CK-08R3"]
     assert manifest["conditional_ready"] == [
-        {
-            "condition": (
-                "CK-08R3A's serialized corrective authority correction accepted, merged, and exact-main verified"
-            ),
-            "tasks": ["CK-08R3A"],
-        },
         {
             "condition": (
                 "ARGV authority accepted at 479cbdb; coordinator records the preserved prelaunch incident "
@@ -242,7 +236,9 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert "Completed packets: **14 / 22**" in ledger
     assert "Not started: **8**" in ledger
     assert "Critical-path completion: **14 / 21**" in ledger
-    assert "Blocked child tasks: **39" in ledger
+    assert "Completed corrective child tasks: **9" in ledger
+    assert "Remaining delegable child tasks: **41**" in ledger
+    assert "Blocked child tasks: **38" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
         f"Conditional-ready child tasks: **{sum(len(item['tasks']) for item in manifest['conditional_ready'])}"
@@ -284,9 +280,10 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "docs/decisions/evidence/kernel-release-candidate-package-budget-supersession.json"
     )
     assert package_policy["status"] == "maintainer-approved"
-    assert "Package-size micro-optimization is no longer a roadmap objective" in package_policy[
-        "rationale"
-    ]
+    assert (
+        "Package-size micro-optimization is no longer a roadmap objective"
+        in package_policy["rationale"]
+    )
     for packet_id in (
         "CK-08R1A",
         "CK-08R1B",
@@ -340,7 +337,17 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             assert "**Status:** Ready" in body
         elif packet_id in blocked:
             assert "**Status:** Blocked" in body
-        elif packet_id in {"CK-08R0", "CK-08R1A", "CK-08R1C", "CK-08R2", "CK-QG1A0", "CK-QG1A", "CK-07R1A", "CK-07R1A0"}:
+        elif packet_id in {
+            "CK-08R0",
+            "CK-08R1A",
+            "CK-08R1C",
+            "CK-08R2",
+            "CK-08R3A",
+            "CK-QG1A0",
+            "CK-QG1A",
+            "CK-07R1A",
+            "CK-07R1A0",
+        }:
             assert "**Status:** Completed on merge" in body
         else:
             assert "**Status:** Blocked" in body
@@ -351,9 +358,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     contract_validator.validate(contract)
     r2_evidence = _json("docs/decisions/evidence/ck08r2/physical-page-executor-evidence.json")
     superseded = {item["path"]: item for item in r2_evidence["superseded_authority_artifacts"]}
-    r3a = _json(
-        "docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json"
-    )
+    r3a = _json("docs/decisions/evidence/ck08r3a/evidence-service-supersession-authority.json")
     assert r3a["owner"] == "CK-08R3A"
     assert r3a["source_path"] == "src/codex_usage_tracker/agent_kernel/evidence/service.py"
     assert r3a["authority_base_sha"] == "7d5a4b1717db78891fd2c38d8803d7fe2f922986"
@@ -405,18 +410,18 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             if actual == successor["sha256"]:
                 for required in successor["required_artifacts"]:
                     required_path = _REPO_ROOT / required["path"]
-                    assert hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
+                    assert (
+                        hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
+                    )
             else:
                 assert actual == artifact["sha256"]
         elif artifact["path"] == "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json":
-            transition = _json(
-                r3a["schema_publication_transition_authority"]["path"]
-            )
+            transition = _json(r3a["schema_publication_transition_authority"]["path"])
             assert actual in {
                 artifact["sha256"],
-                transition["publication_fixture_transition"]["selected"][
-                    "question_scenarios"
-                ]["sha256"],
+                transition["publication_fixture_transition"]["selected"]["question_scenarios"][
+                    "sha256"
+                ],
             }
         elif artifact["path"] == "src/codex_usage_tracker/agent_kernel/publication/preparation.py":
             final = _json("docs/decisions/evidence/ck08r3a/final-shared-authority.json")
@@ -531,9 +536,7 @@ def test_ck08r3a_schema_publication_authority_is_exact_and_fixture_bound() -> No
         "codex-usage-tracker.ck08r3a-schema-publication-requalification-authority.v3"
     )
     assert authority["authority_version"] == 3
-    assert authority["authority_base_sha"] == (
-        "7d5a4b1717db78891fd2c38d8803d7fe2f922986"
-    )
+    assert authority["authority_base_sha"] == ("7d5a4b1717db78891fd2c38d8803d7fe2f922986")
     assert authority["status"] == "permitted_not_accepted"
     assert authority["selected_production_identities"] == [
         {
@@ -561,9 +564,7 @@ def test_ck08r3a_schema_publication_authority_is_exact_and_fixture_bound() -> No
         "operational_table_count": 6,
         "operational_index_count": 6,
     }
-    assert transition["selected_index_names"][8] == (
-        "evidence_lifecycle_by_session_order"
-    )
+    assert transition["selected_index_names"][8] == ("evidence_lifecycle_by_session_order")
     assert len(transition["selected_index_names"]) == 13
 
     fixture = authority["publication_fixture_transition"]
@@ -577,16 +578,19 @@ def test_ck08r3a_schema_publication_authority_is_exact_and_fixture_bound() -> No
         "6ffca4917386c5bc13237952904d2a560a531e37c6eeba89b69ea53d76f35cd8"
     )
     assert len(authority["selected_artifact_manifest_sha256s"]) == 80
-    assert hashlib.sha256(
-        ("".join(item + "\n" for item in authority["selected_artifact_manifest_sha256s"])).encode()
-    ).hexdigest() == "b825e940247a7ea15f34fd71d7aa7774c1acfff3b810676515e66d1f93dffb06"
+    assert (
+        hashlib.sha256(
+            (
+                "".join(item + "\n" for item in authority["selected_artifact_manifest_sha256s"])
+            ).encode()
+        ).hexdigest()
+        == "b825e940247a7ea15f34fd71d7aa7774c1acfff3b810676515e66d1f93dffb06"
+    )
     assert authority["selected_published_v2"] == {
         "path": "tests/agent_kernel/fixtures/published_v2.py",
         "sha256": "eca815c5a47067bdc56759018e12fd7a25f446eb6d716236869cbef875ce8515",
     }
-    assert authority["tiny_accounting_explain_transition"][
-        "generic_explain_relaxation"
-    ] is False
+    assert authority["tiny_accounting_explain_transition"]["generic_explain_relaxation"] is False
     assert authority["preflight"] == {
         "worktree_role": "fresh exact-main integration worktree",
         "base_sha": "7d5a4b1717db78891fd2c38d8803d7fe2f922986",
@@ -604,6 +608,7 @@ def test_ck08r3a_schema_publication_authority_is_exact_and_fixture_bound() -> No
         "status": "passed",
     }
     assert authority["no_live_operation"] is True
+
 
 def test_corrective_seam_packet_is_critical_path_authority() -> None:
     agents = _read("AGENTS.md")
@@ -673,11 +678,11 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert all(
         token in ck08r3a + ck08r3a_digest + ck08r3a_final
         for token in (
-                "ea32223d1afd997f310419bff0b6b260193e527c8333c9f561bcab280447dfa3",
-                "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3",
-                "4458ffb03adeed838fcda992747dbaeb192ccf59728b3a54e1527abc4d0651fb",
-                "718ff7032d050b13cb7fac1f857d0c99879d0ef3b13c57c39b55514fc610a88b",
-                "998343ba4b52bb39decfcb436f8a862d41884fc6f6a6b4e88f7e8f8e42446295",
+            "ea32223d1afd997f310419bff0b6b260193e527c8333c9f561bcab280447dfa3",
+            "659c1957157bc36aecbc37824ef04479853ec7ae1ff6ddad5be5882d7ca844b3",
+            "4458ffb03adeed838fcda992747dbaeb192ccf59728b3a54e1527abc4d0651fb",
+            "718ff7032d050b13cb7fac1f857d0c99879d0ef3b13c57c39b55514fc610a88b",
+            "998343ba4b52bb39decfcb436f8a862d41884fc6f6a6b4e88f7e8f8e42446295",
             "zero_based_nonnegative",
             "permitted_not_accepted",
             "generic_digest_drift_forbidden",
@@ -696,7 +701,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
             "SCAN stream",
             "MATERIALIZE model_calls_visible",
             "AUTOMATIC COVERING INDEX",
-                "USE TEMP B-TREE FOR ORDER BY",
+            "USE TEMP B-TREE FOR ORDER BY",
         )
     )
     assert "**Dependencies:** CK-08R3A accepted, merged, and exact-main verified." in ck08r3
@@ -968,7 +973,10 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     assert authority["state_machine_binding"]["launch_state"] == "blocked_hold_no_run"
     assert authority["maximum_new_end_to_end_runs"] == 1
     assert authority["run_status"] == "unspent_unavailable"
-    assert "src/codex_usage_tracker/agent_kernel/storage/" in authority["allowed_scope"]["forbidden_files"]
+    assert (
+        "src/codex_usage_tracker/agent_kernel/storage/"
+        in authority["allowed_scope"]["forbidden_files"]
+    )
     source = _REPO_ROOT / "src/codex_usage_tracker/agent_kernel/publication/preparation.py"
     actual_source = hashlib.sha256(source.read_bytes()).hexdigest()
     assert actual_source in {
@@ -994,7 +1002,12 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
         ("acceptance_state", "mixed_state", "allow"),
         ("state_machine_binding", "other_digest", "allow"),
         ("state_machine_binding", "launch_state", "ready"),
-        ("allowed_scope", "files", authority["allowed_scope"]["files"] + ["src/codex_usage_tracker/agent_kernel/storage/database.py"]),
+        (
+            "allowed_scope",
+            "files",
+            authority["allowed_scope"]["files"]
+            + ["src/codex_usage_tracker/agent_kernel/storage/database.py"],
+        ),
     ]
     for section, field, value in mutations:
         changed = deepcopy(authority)

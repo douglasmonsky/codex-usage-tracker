@@ -12,11 +12,11 @@ parents are accounting umbrellas.
 - Not started: **8**
 - Critical-path completion: **14 / 21**
 - Optional packets: **CK-15**
-- Completed corrective child tasks: **8 — CK-08R0, CK-08R1A, CK-08R1C, CK-08R2, CK-QG1A0, CK-QG1A, CK-07R1A, CK-07R1A0**
-- Remaining delegable child tasks: **42**
-- Ready child tasks: **1 — CK-QG1**
-- Conditional-ready child tasks: **2 — CK-07R1 after coordinator disposition of the preserved prelaunch incident and a clean exact-main reapplication path; CK-08R3A**
-- Blocked child tasks: **39**
+- Completed corrective child tasks: **9 — CK-08R0, CK-08R1A, CK-08R1C, CK-08R2, CK-08R3A, CK-QG1A0, CK-QG1A, CK-07R1A, CK-07R1A0**
+- Remaining delegable child tasks: **41**
+- Ready child tasks: **2 — CK-QG1, CK-08R3**
+- Conditional-ready child tasks: **1 — CK-07R1 after coordinator disposition of the preserved prelaunch incident and a clean exact-main reapplication path**
+- Blocked child tasks: **38**
 - Orchestration mode: **convergence — one coordinator, one existing task per active packet, at most one shared-authority task**
 - Continuation policy: **reuse the active packet task for ordinary corrections; create a task only for a newly Ready distinct packet or a genuinely new authority decision**
 - Handoff policy: **tasks proactively message the parent; no polling or wait-only tasks**
@@ -64,8 +64,8 @@ other corrective locks are unchanged.
 - [ ] **CK-08R1 — Requalify independent answer truth** · Blocked on CK-08R1B; CK-08R1C is accepted · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
 - [x] **CK-08R2 — Implement bounded physical keyset execution** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r2-implement-physical-keyset-execution.md)
 - [x] **CK-QG1A0 — Authorize PageExecutor source supersession** · Completed on merge; exact-main required before CK-QG1A · [packet](tasks/ck-qg1a0-authorize-page-executor-source-supersession.md)
-- [ ] **CK-08R3A — Implement bounded EvidenceService physical queries** · Conditional Ready after corrective authority exact-main verification; CK-08R0 remains accepted · [packet](tasks/ck-08r3a-implement-evidence-physical-query.md)
-- [ ] **CK-08R3 — Qualify evidence service scale** · Blocked on CK-08R3A accepted merge and exact-main verification · [packet](tasks/ck-08r3-qualify-evidence-scale.md)
+- [x] **CK-08R3A — Implement bounded EvidenceService physical queries** · PR #417 hosted-green and squash-merged at `38537f6c`; exact-main identities verified · [packet](tasks/ck-08r3a-implement-evidence-physical-query.md)
+- [ ] **CK-08R3 — Qualify evidence service scale** · Ready after CK-08R3A accepted merge and exact-main verification · [packet](tasks/ck-08r3-qualify-evidence-scale.md)
 - [x] **CK-07R1A — Correct hosted lifecycle tail** · Accepted/merged at `4d807495`; exact-main verified · [packet](tasks/ck-07r1a-correct-hosted-lifecycle-tail.md)
 - [x] **CK-07R1A0 — Freeze lifecycle planner/recovery path authority** · Path, finite source/runtime, run-invocation authority, and argv-correction authority merged through `479cbdb`; retained witnesses remain read-only · [packet](tasks/ck-07r1a0-freeze-lifecycle-path-authority.md)
 - [ ] **CK-07R1 — Correct lifecycle preparation scale** · Conditional Ready after argv authority merge `479cbdb`, coordinator disposition of the preserved `prelaunch_failed` witness incident, and a clean exact-main reapplication path; only the existing worker may resume and no launch is yet authorized; PR #394 is stale read-only · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)

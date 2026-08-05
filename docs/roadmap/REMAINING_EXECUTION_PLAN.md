@@ -13,10 +13,17 @@ paging, measurements, and scale. CK-08R0 freezes the exact contracts and
 requalification frontier in `docs/decisions/evidence/ck08r0/corrective-gates-v1.json`.
 Preserve CK-03–CK-08 history and supersede only its four named claims.
 Retained CK-08R3 pre-scale evidence at commit
-`a28e9cdbff8e48d334712a449fdcee111c725673` proves the EvidenceService outer
-query physically unbounded independent of scale profile. CK-08R3A owns that
-production fix. CK-08R3 must not become Ready or be redelegated until CK-08R3A
-is accepted, merged, and exact-main verified. Retained CK-08R1 work reached
+`a28e9cdbff8e48d334712a449fdcee111c725673` proved the EvidenceService outer
+query physically unbounded independent of scale profile. CK-08R3A corrected
+that production path in PR #417, passed hosted Python 3.10/3.14 and Console,
+and was squash-merged and exact-main identity verified at
+`38537f6cee42ad4ba2fb6e45354e410053c7a7cd`. The same premerge tree passed
+focused, dual-SQLite, full, package, safety, and review gates. A duplicate
+postmerge full runtime rerun did not complete because the host exhausted disk
+space and SQLite could not create temporary files; no product assertion
+failed, and this environment-only limitation does not override the exact-tree
+and hosted acceptance evidence. CK-08R3 is now Ready for its separate
+synthetic scale qualification. Retained CK-08R1 work reached
 80/80 parity by copying unsupported Q-REV-03/Q-WF-02 semantics; R1A now freezes
 their meaning and closure. R1C is accepted at exact main
 `fb0c57886097a6b985d2f321b2de858cbdfc0a97`; R1B remains held on shared
@@ -162,12 +169,9 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
-  "completed": ["CK-08R0", "CK-08R1A", "CK-08R1C", "CK-08R2", "CK-QG1A0", "CK-QG1A", "CK-07R1A", "CK-07R1A0"],
-  "ready": ["CK-QG1"],
+  "completed": ["CK-08R0", "CK-08R1A", "CK-08R1C", "CK-08R2", "CK-08R3A", "CK-QG1A0", "CK-QG1A", "CK-07R1A", "CK-07R1A0"],
+  "ready": ["CK-QG1", "CK-08R3"],
   "conditional_ready": [{
-    "condition": "CK-08R3A's serialized corrective authority correction accepted, merged, and exact-main verified",
-    "tasks": ["CK-08R3A"]
-  }, {
     "condition": "ARGV authority accepted at 479cbdb; coordinator records the preserved prelaunch incident disposition and a clean exact-main reapplication path; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; no replacement, launch, or downstream task",
     "tasks": ["CK-07R1"]
   }],
