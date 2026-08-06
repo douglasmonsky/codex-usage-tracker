@@ -639,6 +639,9 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     ckqg1a = _read("docs/roadmap/tasks/ck-qg1a-correct-page-executor-complexity.md")
     ckqg1a0 = _read("docs/roadmap/tasks/ck-qg1a0-authorize-page-executor-source-supersession.md")
     ckqg1 = _read("docs/roadmap/tasks/ck-qg1-enforce-agent-kernel-maintainability.md")
+    ckqg1_authority = _read(
+        "docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json"
+    )
     ck07r1a = _read("docs/roadmap/tasks/ck-07r1a-correct-hosted-lifecycle-tail.md")
     ck07r1a0 = _read("docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md")
     ck07r1 = _read("docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md")
@@ -744,6 +747,19 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
             ),
         ),
         (
+            ckqg1 + ckqg1_authority,
+            (
+                "Baseline transition authority",
+                "PublicationWriter._validate_turn_provenance",
+                "score 35/count 1",
+                "fda777e28db7a0696f29b55c9d694f99d987413b206d8e323f217b4fa6a73ad5",
+                "authorize_exact_successor_baseline_only",
+                "not_generic_baseline_growth",
+                "implementation_acceptance",
+                "new_authority_task",
+            ),
+        ),
+        (
             ck07r1a,
             (
                 "ordinary.2000_call_tail",
@@ -773,7 +789,10 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert "exact-main verified at `519b503aa3b23019033b6481687c08b23fc6c31e`" in ck07r1a0
     assert "strict Authority v2" in ck07r1a0
     assert "supersedes earlier CK-07R1 wording" in central
-    assert "**Status:** Ready after CK-QG1A merge exact-main verification" in ckqg1
+    assert (
+        "**Status:** Ready after CK-QG1A and CK-QG1 baseline-transition authority\n"
+        "merge exact-main verification"
+    ) in ckqg1
     assert "**Status:** `blocked_hold`" in ck07r1
     assert "720-second wrapper timeout" in ck07r1a0
     assert "revoked, never authoritative, and never used" in ck07r1a0

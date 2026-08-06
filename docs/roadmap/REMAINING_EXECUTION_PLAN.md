@@ -37,7 +37,10 @@ query/evidence/grading integration, and R1 is their requalification join.
 CK-QG1A removed R2's two page-executor C/B/B violations
 without changing behavior or the frozen maintainability baseline and is
 accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`.
-Existing CK-QG1 PR #392 is Ready to resume from that corrected main.
+Existing CK-QG1 PR #392 is Ready to resume from that corrected main after the
+linked [CK-QG1 exact maintainability baseline transition authority](../decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json)
+is exact-main verified. That authority permits only the exact accepted-main
+writer provenance finding transition and does not accept the implementation.
 CK-07R1A is accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 was accepted at
 `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked

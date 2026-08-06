@@ -28,6 +28,7 @@ from scripts.check_kernel_scope import (
     CK08R2_PHYSICAL_PAGE_ADDITIONS,
     CK08R3_EVIDENCE_SCALE_ADDITIONS,
     CK08R3A_AUTHORITY_ADDITIONS,
+    CKQG1_AUTHORITY_ADDITIONS,
     CKQG1A0_AUTHORITY_ADDITIONS,
     CLEAN_CUTOVER_DOCUMENTATION_ADDITIONS,
     DEV_ENVIRONMENT_BOOTSTRAP_ADDITIONS,
@@ -679,6 +680,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS
         | CK08R3A_AUTHORITY_ADDITIONS
         | CKQG1A0_AUTHORITY_ADDITIONS
+        | CKQG1_AUTHORITY_ADDITIONS
         | PACKAGE_BUDGET_POLICY_ADDITIONS
         | CK07R1A0_AUTHORITY_ADDITIONS
         | CK07R1_LIFECYCLE_SCOPE_ADDITIONS
@@ -722,6 +724,21 @@ def test_ck08r1a_answer_semantics_additions_are_explicit_and_bounded() -> None:
         "tests/agent_kernel/contracts/test_answer_semantics_contract.py",
         "tests/agent_kernel/fixtures/contracts/answer-semantics-v1-vectors.json",
     } == CK08R1A_ANSWER_SEMANTICS_ADDITIONS
+
+
+def test_ckqg1_authority_additions_are_explicit_and_bounded() -> None:
+    assert {
+        "docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json",
+        "docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.schema.json",
+        "docs/INDEX.md",
+        "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/tasks/ck-qg1-enforce-agent-kernel-maintainability.md",
+        "scripts/check_kernel_scope.py",
+        "tests/kernel/test_ckqg1_maintainability_baseline_authority.py",
+        "tests/kernel/test_documentation_authority.py",
+        "tests/kernel/test_kernel_scope.py",
+    } == CKQG1_AUTHORITY_ADDITIONS
 
 
 def test_ck07r1a0_authority_and_lifecycle_scope_additions_are_explicit() -> None:
