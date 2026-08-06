@@ -192,11 +192,15 @@ def initialize_operational_database(path: Path) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
     staging = target.with_name(f".{target.name}.building-{uuid.uuid4().hex}")
     try:
-        with sqlite3.connect(staging) as connection:
+        connection = sqlite3.connect(staging)
+        try:
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute(f"PRAGMA user_version = {OPERATIONAL_SCHEMA_VERSION}")
             connection.executescript(_OPERATIONAL_SQL)
             connection.execute("INSERT INTO cutover_control(singleton, state) VALUES (1, 'absent')")
+            connection.commit()
+        finally:
+            connection.close()
         staging.chmod(0o600)
         _validate_operational(staging)
         os.replace(staging, target)
