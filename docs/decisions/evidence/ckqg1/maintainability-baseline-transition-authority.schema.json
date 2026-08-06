@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-usage-tracker.invalid/schemas/ckqg1-maintainability-baseline-transition-authority-v1.schema.json",
+  "title": "CK-QG1 exact maintainability baseline transition authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "authority_version", "owner", "authority_base_sha", "status", "decision",
+    "decision_basis", "linked_authorities", "baseline_transition", "invariants",
+    "non_generalizable", "negative_mutations", "preflight", "scope", "worker_handoff"
+  ],
+  "properties": {
+    "schema": {"const": "codex-usage-tracker.ckqg1-maintainability-baseline-transition-authority.v1"},
+    "authority_version": {"const": 1},
+    "owner": {"const": "CK-QG1"},
+    "authority_base_sha": {"const": "479cc58a887ab49e1bf6fae90ed87cd1cf389fd5"},
+    "status": {"const": "permitted_not_accepted"},
+    "decision": {"const": "authorize_exact_successor_baseline_only"},
+    "decision_basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted_main_change", "not_generic_baseline_growth", "rationale"],
+      "properties": {
+        "accepted_main_change": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "symbol", "score", "count", "source_sha256", "introduced_commit", "accepted_main_sha", "accepted_pr", "linked_authority"],
+          "properties": {
+            "path": {"const": "src/codex_usage_tracker/agent_kernel/publication/writer.py"},
+            "symbol": {"const": "PublicationWriter._validate_turn_provenance"},
+            "score": {"const": 35},
+            "count": {"const": 1},
+            "source_sha256": {"const": "13da341fc2a3c50d8d7de7fd6a6fc2b0aca0dbc832a9b56597cd96ab67d17488"},
+            "introduced_commit": {"const": "38537f6cee42ad4ba2fb6e45354e410053c7a7cd"},
+            "accepted_main_sha": {"const": "479cc58a887ab49e1bf6fae90ed87cd1cf389fd5"},
+            "accepted_pr": {"const": 417},
+            "linked_authority": {"$ref": "#/$defs/r3aAuthority"}
+          }
+        },
+        "not_generic_baseline_growth": {"const": true},
+        "rationale": {"type": "string", "minLength": 1}
+      }
+    },
+    "linked_authorities": {
+      "type": "array",
+      "const": [
+        {"path": "docs/decisions/evidence/ck08r0/corrective-gates-v1.json", "sha256": "8f2bc6762b3b12f3c42ad72fb23ccaa49bfde3124280082fa65766bb9ceb9936"},
+        {"path": "docs/decisions/evidence/ck08r0/corrective-gates-v1.schema.json", "sha256": "6f2213ae1eb31b0ffb6b3fc46b53361824c9520d905b91b165f2c196f5f42d33"},
+        {"path": "docs/decisions/evidence/ck08r3a/final-shared-authority.json", "sha256": "ee479cbd4b41b63a1701df97abda01b27be7e559783d44503144bdf0c0bdef98"},
+        {"path": "docs/decisions/evidence/ckqg1a0/page-executor-source-supersession-authority.json", "sha256": "f7ef41dc626e7c68526717586bac1522062ae5178ed5b1f204f2a618b7455513"}
+      ]
+    },
+    "baseline_transition": {"$ref": "#/$defs/transition"},
+    "invariants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["active_thresholds", "no_text_exemptions", "deterministic_normalization", "release_size_ratchet", "privacy", "spike_checks", "failure_semantics"],
+      "properties": {
+        "active_thresholds": {"const": {"block": "C", "module": "B", "average": "B"}},
+        "no_text_exemptions": {"const": true},
+        "deterministic_normalization": {"const": "xenon-threshold-findings-v1"},
+        "release_size_ratchet": {
+          "const": {
+            "active_package_ceilings": {"wheel_bytes": 1000000, "sdist_bytes": 2000000},
+            "historical_ck08r0_ratchet": {
+              "wheel_bytes": 383000,
+              "sdist_bytes": 820000,
+              "maximum_headroom_percent": 25,
+              "catalog_count_headroom": 0
+            },
+            "package_policy": {
+              "path": "docs/decisions/evidence/kernel-release-candidate-package-budget-supersession.json",
+              "sha256": "4c1b40c31e8bd5357a6cbef4ee5083a95b6a703230666dca776f9b722b4f146a",
+              "active_config_path": "config/kernel-release-candidate-budget.json",
+              "active_config_sha256": "7e6e577ee47f9a0a22814ee6848c9b9759f4653c575bf564e5b768ec3987561d",
+              "effective_date": "2026-08-01",
+              "historical_package_ceilings": {"wheel_bytes": 383000, "sdist_bytes": 828000}
+            },
+            "preserved_non_package_budget": "bound_by_exact_package_policy_artifact"
+          }
+        },
+        "privacy": {"const": "synthetic or repository-private normalized findings only; no real logs, prompts, responses, commands, tool bodies, secrets, or local databases"},
+        "spike_checks": {"const": "the CK-08R0 frozen-spike checks remain active"},
+        "failure_semantics": {
+          "const": {
+            "baseline_mismatch": "fail_closed",
+            "new_unlisted_finding": "fail_closed",
+            "worsened_finding": "fail_closed",
+            "improvement": "must_shrink_the_successor_baseline",
+            "text_exemption": "forbidden_and_ignored_by_normalization"
+          }
+        }
+      }
+    },
+    "non_generalizable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exact_transition_only", "required_matches", "uncovered_changes", "successor_chain"],
+      "properties": {
+        "exact_transition_only": {"const": true},
+        "required_matches": {"type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "uncovered_changes": {"type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "successor_chain": {"type": "string", "minLength": 1}
+      }
+    },
+    "negative_mutations": {
+      "type": "array",
+      "const": [
+        {"id": "predecessor_digest_changed", "result": "reject_fail_closed"},
+        {"id": "successor_digest_changed", "result": "reject_fail_closed"},
+        {"id": "transition_finding_removed", "result": "reject_fail_closed"},
+        {"id": "transition_finding_score_or_count_changed", "result": "reject_fail_closed"},
+        {"id": "improvement_without_exact_rebaseline", "result": "reject_fail_closed"},
+        {"id": "new_unlisted_finding", "result": "reject_fail_closed"},
+        {"id": "worsened_finding", "result": "reject_fail_closed"},
+        {"id": "text_exemption_added", "result": "reject_fail_closed"},
+        {"id": "production_path_added_to_authority_scope", "result": "reject_fail_closed"}
+      ]
+    },
+    "preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "authority_bytes_byte_identical", "entry_point", "candidate", "cases"],
+      "properties": {
+        "status": {"const": "passed"},
+        "authority_bytes_byte_identical": {"const": true},
+        "entry_point": {"const": "scripts/check_kernel_maintainability.py::maintainability_failures"},
+        "candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["role", "base_sha", "head_sha", "pr", "retained_pr_head_sha", "failed_workflow_run", "checker_sha256", "predecessor_baseline_sha256", "successor_baseline_sha256"],
+          "properties": {
+            "role": {"const": "held CK-QG1 reapplication candidate"},
+            "base_sha": {"const": "479cc58a887ab49e1bf6fae90ed87cd1cf389fd5"},
+            "head_sha": {"const": "479cc58a887ab49e1bf6fae90ed87cd1cf389fd5"},
+            "pr": {"const": 392},
+            "retained_pr_head_sha": {"const": "29f18ae178a4d048e9d4bd1ae49a4307dd8472dd"},
+            "failed_workflow_run": {"const": "30684568886"},
+            "checker_sha256": {"const": "b63c52430315b0feb40d9e6fee5c98a51a413561e946b80c71103d13b81218dd"},
+            "predecessor_baseline_sha256": {"const": "c490d954a5e9d09c61f884d51e3b9d3196af5615887f409c36f8469d1b2b6cf9"},
+            "successor_baseline_sha256": {"const": "fda777e28db7a0696f29b55c9d694f99d987413b206d8e323f217b4fa6a73ad5"}
+          }
+        },
+        "cases": {
+          "const": [
+            {"id": "accepted_main_with_predecessor", "expected": "fail_closed:mismatch", "observed": "fail_closed:mismatch"},
+            {"id": "exact_successor_match", "expected": "pass", "observed": "pass"},
+            {"id": "baseline_byte_mismatch", "expected": "fail_closed:mismatch", "observed": "fail_closed:mismatch"},
+            {"id": "improvement_without_rebaseline", "expected": "fail_closed:mismatch", "observed": "fail_closed:mismatch"},
+            {"id": "improvement_with_exact_shrink", "expected": "pass", "observed": "pass"},
+            {"id": "new_unlisted_finding", "expected": "fail_closed:baseline", "observed": "fail_closed:baseline"},
+            {"id": "worsened_finding", "expected": "fail_closed:baseline", "observed": "fail_closed:baseline"},
+            {"id": "text_exemption", "expected": "fail_closed:mismatch_or_baseline", "observed": "fail_closed:mismatch"},
+            {"id": "production_scope_mutation", "expected": "fail_closed:scope", "observed": "fail_closed:scope"}
+          ]
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority_write_scope", "preflight_only_candidate_scope", "forbidden"],
+      "properties": {
+        "authority_write_scope": {
+          "const": [
+            "docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json",
+            "docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.schema.json",
+            "docs/INDEX.md",
+            "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+            "docs/roadmap/TASK_PACKETS.md",
+            "docs/roadmap/tasks/ck-qg1-enforce-agent-kernel-maintainability.md",
+            "scripts/check_kernel_scope.py",
+            "tests/kernel/test_ckqg1_maintainability_baseline_authority.py",
+            "tests/kernel/test_documentation_authority.py",
+            "tests/kernel/test_kernel_scope.py"
+          ]
+        },
+        "preflight_only_candidate_scope": {
+          "const": [
+            "config/agent-kernel/maintainability-baseline-v1.json",
+            "scripts/check_kernel_maintainability.py",
+            "pyproject.toml",
+            "tests/agent_kernel/test_maintainability_ratchet.py",
+            "tests/kernel/test_kernel_maintainability.py"
+          ]
+        },
+        "forbidden": {
+          "const": [
+            "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+            "all production source and support candidate bytes",
+            "the retained PR #392 witness at 29f18ae178a4d048e9d4bd1ae49a4307dd8472dd",
+            "baseline/checker implementation edits in this authority PR",
+            "threshold weakening, text exemptions, normalization changes, release-budget waivers, or privacy relaxation",
+            "CK-QG1 implementation acceptance, CK-08RG, CK-09, downstream dispatch, or live operation"
+          ]
+        }
+      }
+    },
+    "worker_handoff": {
+      "const": {
+        "held_worker_thread": "019fbb41-79b6-7760-8e7f-e68fc381422a",
+        "resume_after": "this authority is squash-merged and fresh exact-main identities are verified",
+        "next_authorized_action": "reuse PR #392 in a new latest-exact-main worktree, reapply the held candidate, install the exact successor baseline document, and rerun the existing implementation validation",
+        "implementation_acceptance": "not_granted_by_this_authority",
+        "new_authority_task": "forbidden",
+        "downstream_dispatch": "forbidden"
+      }
+    }
+  },
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "nonEmpty": {"type": "string", "minLength": 1},
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "score", "count"],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonEmpty"},
+        "score": {"type": "integer", "minimum": 1},
+        "count": {"type": "integer", "minimum": 1}
+      }
+    },
+    "scopeOwnership": {
+      "const": {
+        "active_thresholds": {"average_max_rank": "B", "block_max_rank": "C", "module_max_rank": "B"},
+        "consumer_seam": ["just vp", "just v", "just vc", ".github/workflows/ci.yml"],
+        "owned_lock": ["replacement maintainability baseline", "normalized maintainability CI gate"],
+        "source_root": "src/codex_usage_tracker/agent_kernel"
+      }
+    },
+    "baselineDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline_findings", "dependency_sha", "improved_findings", "new_findings", "normalization_version", "retirement_condition", "schema", "scope_ownership", "tool_identity", "worsened_findings"],
+      "properties": {
+        "baseline_findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+        "dependency_sha": {"const": "306cef37eea2ae017aca824d898cc435f7e1bea0"},
+        "improved_findings": {"const": []},
+        "new_findings": {"const": []},
+        "normalization_version": {"const": "xenon-threshold-findings-v1"},
+        "retirement_condition": {"const": "CK-14 may retire the frozen-spike check only; this replacement baseline remains until every baseline finding is removed and the same thresholds can be enforced with no recorded debt."},
+        "schema": {"const": "codex-usage-tracker.agent-kernel-maintainability-baseline.v1"},
+        "scope_ownership": {"$ref": "#/$defs/scopeOwnership"},
+        "tool_identity": {"const": "xenon==0.9.3;radon==6.0.1"},
+        "worsened_findings": {"const": []}
+      }
+    },
+    "r3aAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"const": "docs/decisions/evidence/ck08r3a/final-shared-authority.json"},
+        "sha256": {"const": "ee479cbd4b41b63a1701df97abda01b27be7e559783d44503144bdf0c0bdef98"}
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "metadata_sha256", "byte_serialization", "predecessor", "successor", "transition_finding"],
+      "properties": {
+        "path": {"const": "config/agent-kernel/maintainability-baseline-v1.json"},
+        "metadata_sha256": {"const": "a86abfe8565347950964245a11698aae587086e36f4cf3a48e5df6853ddd1c2d"},
+        "byte_serialization": {"const": "json.dumps(indent=2) followed by one LF"},
+        "predecessor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sha256", "finding_count", "document"],
+          "properties": {
+            "sha256": {"const": "c490d954a5e9d09c61f884d51e3b9d3196af5615887f409c36f8469d1b2b6cf9"},
+            "finding_count": {"const": 19},
+            "document": {"allOf": [{"$ref": "#/$defs/baselineDocument"}, {"properties": {"baseline_findings": {"minItems": 19, "maxItems": 19}}}]}
+          }
+        },
+        "successor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sha256", "finding_count", "document"],
+          "properties": {
+            "sha256": {"const": "fda777e28db7a0696f29b55c9d694f99d987413b206d8e323f217b4fa6a73ad5"},
+            "finding_count": {"const": 20},
+            "document": {"allOf": [{"$ref": "#/$defs/baselineDocument"}, {"properties": {"baseline_findings": {"minItems": 20, "maxItems": 20}}}]}
+          }
+        },
+        "transition_finding": {
+          "const": {
+            "id": "publication/writer.py:PublicationWriter._validate_turn_provenance",
+            "score": 35,
+            "count": 1,
+            "predecessor_presence": "absent",
+            "successor_presence": "exactly_once"
+          }
+        }
+      }
+    }
+  }
+}

@@ -771,6 +771,21 @@ CKQG1A0_AUTHORITY_ADDITIONS = frozenset(
     ]
 )
 
+CKQG1_AUTHORITY_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json",
+        "docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.schema.json",
+        "docs/INDEX.md",
+        "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/tasks/ck-qg1-enforce-agent-kernel-maintainability.md",
+        "scripts/check_kernel_scope.py",
+        "tests/kernel/test_ckqg1_maintainability_baseline_authority.py",
+        "tests/kernel/test_documentation_authority.py",
+        "tests/kernel/test_kernel_scope.py",
+    }
+)
+
 PACKAGE_BUDGET_POLICY_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/kernel-release-candidate-package-budget-supersession.json",
@@ -869,6 +884,7 @@ INTEGRATION_ADDITIONS = (
     | CK08R3A_AUTHORITY_ADDITIONS
     | CK08R3_EVIDENCE_SCALE_ADDITIONS
     | CKQG1A0_AUTHORITY_ADDITIONS
+    | CKQG1_AUTHORITY_ADDITIONS
     | PACKAGE_BUDGET_POLICY_ADDITIONS
     | CK07R1A0_AUTHORITY_ADDITIONS
     | CK07R1_LIFECYCLE_SCOPE_ADDITIONS
@@ -906,6 +922,17 @@ def active_paths(repo_root: Path) -> set[str]:
     return {
         path for path in paths if (repo_root / path).exists() or (repo_root / path).is_symlink()
     }
+
+
+def authority_changed_path_failures(
+    changed_paths: set[str], allowed_paths: set[str]
+) -> list[str]:
+    """Reject any changed path outside a machine-bound authority scope."""
+
+    return [
+        f"authority scope forbids changed path: {path}"
+        for path in sorted(changed_paths - allowed_paths)
+    ]
 
 
 def scope_failures(repo_root: Path, manifest: dict[str, Any]) -> list[str]:
