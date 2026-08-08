@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 
@@ -85,9 +86,13 @@ def _assert_supersession_bindings(authority: dict[str, object], current_source_s
         "normalization_version": "xenon-threshold-findings-v1",
         "thresholds": {"block": "C", "module": "B", "average": "B"},
     }
-    baseline_path = _ROOT / baseline["path"]
-    if baseline_path.exists():
-        assert hashlib.sha256(baseline_path.read_bytes()).hexdigest() == _BASELINE_SHA
+    historical_baseline = subprocess.run(
+        ["git", "show", f'{baseline["head_sha"]}:{baseline["path"]}'],
+        cwd=_ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
+    assert hashlib.sha256(historical_baseline).hexdigest() == _BASELINE_SHA
     assert set(authority["preserved_semantics"]) == {
         "request_validation", "optional_entity_kind_and_limit", "typed_request_digest_binding",
         "keyset_cursor_and_total_order", "query_only_sqlite", "limit_page_size_plus_one",

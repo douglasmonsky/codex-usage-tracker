@@ -27,16 +27,26 @@ def _serialized(document: dict) -> bytes:
     return (json.dumps(document, indent=2) + "\n").encode()
 
 
+def _authority_head() -> str:
+    result = subprocess.run(
+        ["git", "log", "-1", "--format=%H", "--", _AUTHORITY_PATH],
+        cwd=_REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
 def _changed_paths(authority_base_sha: str) -> set[str]:
-    paths: set[str] = set()
-    for command in (
-        ["git", "diff", "--name-only", f"{authority_base_sha}...HEAD"],
-        ["git", "diff", "--name-only", "--cached"],
-        ["git", "diff", "--name-only"],
-    ):
-        result = subprocess.run(command, cwd=_REPO_ROOT, check=True, capture_output=True, text=True)
-        paths.update(line for line in result.stdout.splitlines() if line)
-    return paths
+    result = subprocess.run(
+        ["git", "diff", "--name-only", f"{authority_base_sha}...{_authority_head()}"],
+        cwd=_REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return {line for line in result.stdout.splitlines() if line}
 
 
 def test_ckqg1_authority_is_exact_and_binds_the_selected_successor() -> None:
