@@ -37,10 +37,12 @@ query/evidence/grading integration, and R1 is their requalification join.
 CK-QG1A removed R2's two page-executor C/B/B violations
 without changing behavior or the frozen maintainability baseline and is
 accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`.
-Existing CK-QG1 PR #392 is Ready to resume from that corrected main after the
-linked [CK-QG1 exact maintainability baseline transition authority](../decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json)
-is exact-main verified. That authority permits only the exact accepted-main
-writer provenance finding transition and does not accept the implementation.
+The linked [CK-QG1 exact maintainability baseline transition authority](../decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json)
+permitted only the exact accepted-main writer provenance finding transition.
+PR #392 then passed exact normalized baseline enforcement, full validation,
+review, and hosted Console/Python 3.10/3.14 before squash merge and fresh
+exact-main verification at `68050b9313ccc5be8e1fcd0ccd5b95cb4173f3ff`.
+CK-QG1 is complete; CK-08RG remains blocked on CK-08R4.
 CK-07R1A is accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 was accepted at
 `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked
@@ -178,8 +180,8 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
-  "completed": ["CK-08R0", "CK-08R1A", "CK-08R1C", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-07R1A", "CK-07R1A0"],
-  "ready": ["CK-QG1"],
+  "completed": ["CK-08R0", "CK-08R1A", "CK-08R1C", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
+  "ready": [],
   "conditional_ready": [{
     "condition": "ARGV authority accepted at 479cbdb; coordinator records the preserved prelaunch incident disposition and a clean exact-main reapplication path; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; no replacement, launch, or downstream task",
     "tasks": ["CK-07R1"]

@@ -1,6 +1,6 @@
 # CK-08RG — Authorize CK-09 resumption
 
-**Status:** Blocked on CK-08R4 and CK-QG1
+**Status:** Blocked on CK-08R4; CK-QG1 is complete
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -20,7 +20,8 @@ packet status assertion.
 
 **Controls:** All corrective packets, CI, review, and exact-main policy.
 
-**Dependencies:** CK-08R4 and CK-QG1 merged and exact-main verified.
+**Dependencies:** CK-08R4 and CK-QG1 merged and exact-main verified. CK-QG1
+completed at exact main `68050b93`; CK-08R4 remains blocked.
 
 **Owned files/interfaces:** Authority lock, supersession links, final resume
 evidence, and task handoff; no feature implementation.
