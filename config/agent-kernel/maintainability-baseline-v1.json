@@ -1,0 +1,130 @@
+{
+  "baseline_findings": [
+    {
+      "id": "adapters/codex_jsonl/normalize.py:normalize_record",
+      "score": 54,
+      "count": 1
+    },
+    {
+      "id": "adapters/codex_jsonl/parser.py:iter_source_batches",
+      "score": 28,
+      "count": 1
+    },
+    {
+      "id": "domain/formulas.py",
+      "score": 143,
+      "count": 11
+    },
+    {
+      "id": "domain/formulas.py:evaluate_formula",
+      "score": 109,
+      "count": 1
+    },
+    {
+      "id": "domain/plan_operands.py:_validate_materialization",
+      "score": 39,
+      "count": 1
+    },
+    {
+      "id": "domain/valuation.py:_validate_revision",
+      "score": 23,
+      "count": 1
+    },
+    {
+      "id": "domain/valuation.py:_validated_frontier",
+      "score": 26,
+      "count": 1
+    },
+    {
+      "id": "evidence/selectors.py:_normalize_entries",
+      "score": 55,
+      "count": 1
+    },
+    {
+      "id": "evidence/selectors.py:_owner_rules",
+      "score": 24,
+      "count": 1
+    },
+    {
+      "id": "evidence/selectors.py:_resolve_one",
+      "score": 21,
+      "count": 1
+    },
+    {
+      "id": "evidence/service.py:EvidenceRequest.__post_init__",
+      "score": 36,
+      "count": 1
+    },
+    {
+      "id": "evidence/service.py:_typed_row",
+      "score": 25,
+      "count": 1
+    },
+    {
+      "id": "publication/preparation.py:_WriteSetPreparer._add_session_relationship",
+      "score": 30,
+      "count": 1
+    },
+    {
+      "id": "publication/writer.py:PublicationWriter._validate_turn_provenance",
+      "score": 35,
+      "count": 1
+    },
+    {
+      "id": "query/compiler.py:DatabaseV1FactCompiler._validate_publication_authority",
+      "score": 62,
+      "count": 1
+    },
+    {
+      "id": "query/compiler.py:_attach_occurrence_event_coordinates",
+      "score": 21,
+      "count": 1
+    },
+    {
+      "id": "query/contracts.py:QueryPage.__post_init__",
+      "score": 23,
+      "count": 1
+    },
+    {
+      "id": "query/registry.py:QueryDefinition.validate_request",
+      "score": 24,
+      "count": 1
+    },
+    {
+      "id": "query/registry.py:build_registry",
+      "score": 75,
+      "count": 1
+    },
+    {
+      "id": "storage/lifecycle.py:fold_lifecycle",
+      "score": 23,
+      "count": 1
+    }
+  ],
+  "dependency_sha": "306cef37eea2ae017aca824d898cc435f7e1bea0",
+  "improved_findings": [],
+  "new_findings": [],
+  "normalization_version": "xenon-threshold-findings-v1",
+  "retirement_condition": "CK-14 may retire the frozen-spike check only; this replacement baseline remains until every baseline finding is removed and the same thresholds can be enforced with no recorded debt.",
+  "schema": "codex-usage-tracker.agent-kernel-maintainability-baseline.v1",
+  "scope_ownership": {
+    "active_thresholds": {
+      "average_max_rank": "B",
+      "block_max_rank": "C",
+      "module_max_rank": "B"
+    },
+    "consumer_seam": [
+      "just vp",
+      "just v",
+      "just vc",
+      ".github/workflows/ci.yml"
+    ],
+    "owned_lock": [
+      "replacement maintainability baseline",
+      "normalized maintainability CI gate"
+    ],
+    "source_root": "src/codex_usage_tracker/agent_kernel"
+  },
+  "tool_identity": "xenon==0.9.3;radon==6.0.1",
+  "worsened_findings": []
+}

@@ -686,6 +686,10 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK07R1_LIFECYCLE_SCOPE_ADDITIONS
         | CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS
         | CK08_PREREQUISITE_BLOCKER_ADDITIONS
+        | {
+            "config/agent-kernel/maintainability-baseline-v1.json",
+            "tests/agent_kernel/test_maintainability_ratchet.py",
+        }
         | CI_PERFORMANCE_QUALIFICATION_ADDITIONS
     )
 
