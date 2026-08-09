@@ -23,6 +23,7 @@ from scripts.check_kernel_scope import (
     CK07R1A0_AUTHORITY_ADDITIONS,
     CK08_PREREQUISITE_BLOCKER_ADDITIONS,
     CK08_QUERY_EVIDENCE_ADDITIONS,
+    CK08R1_ANSWER_REQUALIFICATION_ADDITIONS,
     CK08R1A_ANSWER_SEMANTICS_ADDITIONS,
     CK08R1B_JOIN_AUTHORITY_ADDITIONS,
     CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS,
@@ -639,6 +640,14 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         "tests/agent_kernel/query/test_page_executor.py",
         "tests/agent_kernel/query/test_page_executor_evidence.py",
     } == CK08R2_PHYSICAL_PAGE_ADDITIONS
+    assert CK08R1_ANSWER_REQUALIFICATION_ADDITIONS == {
+        "docs/decisions/evidence/ck08r1/answer-truth-requalification-v2.json",
+        "scripts/qualify_ck08r1_answer_truth.py",
+        "tests/agent_kernel/requalification/__init__.py",
+        "tests/agent_kernel/requalification/closure.py",
+        "tests/agent_kernel/requalification/production.py",
+        "tests/agent_kernel/test_ck08r1_answer_requalification.py",
+    }
     assert INTEGRATION_ADDITIONS == (
         K1A_ADDITIONS
         | K2_ADDITIONS
@@ -679,6 +688,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK08R3_EVIDENCE_SCALE_ADDITIONS
         | CK08R1A_ANSWER_SEMANTICS_ADDITIONS
         | CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS
+        | CK08R1_ANSWER_REQUALIFICATION_ADDITIONS
         | CK08R1B_JOIN_AUTHORITY_ADDITIONS
         | CK08R3A_AUTHORITY_ADDITIONS
         | CKQG1A0_AUTHORITY_ADDITIONS

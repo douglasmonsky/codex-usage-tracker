@@ -764,6 +764,17 @@ CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS = frozenset(
     }
 )
 
+CK08R1_ANSWER_REQUALIFICATION_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck08r1/answer-truth-requalification-v2.json",
+        "scripts/qualify_ck08r1_answer_truth.py",
+        "tests/agent_kernel/requalification/__init__.py",
+        "tests/agent_kernel/requalification/closure.py",
+        "tests/agent_kernel/requalification/production.py",
+        "tests/agent_kernel/test_ck08r1_answer_requalification.py",
+    }
+)
+
 CK08R1B_JOIN_AUTHORITY_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.json",
@@ -899,6 +910,7 @@ INTEGRATION_ADDITIONS = (
     | CK08R2_PHYSICAL_PAGE_ADDITIONS
     | CK08R1A_ANSWER_SEMANTICS_ADDITIONS
     | CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS
+    | CK08R1_ANSWER_REQUALIFICATION_ADDITIONS
     | CK08R1B_JOIN_AUTHORITY_ADDITIONS
     | CK08R3A_AUTHORITY_ADDITIONS
     | CK08R3_EVIDENCE_SCALE_ADDITIONS

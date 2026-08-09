@@ -12,9 +12,9 @@ parents are accounting umbrellas.
 - Not started: **8**
 - Critical-path completion: **14 / 21**
 - Optional packets: **CK-15**
-- Completed corrective child tasks: **12 — CK-08R0, CK-08R1A, CK-08R1B, CK-08R1C, CK-08R2, CK-08R3A, CK-08R3, CK-QG1A0, CK-QG1A, CK-QG1, CK-07R1A, CK-07R1A0**
+- Completed corrective child tasks: **13 — CK-08R0, CK-08R1A, CK-08R1B, CK-08R1C, CK-08R1, CK-08R2, CK-08R3A, CK-08R3, CK-QG1A0, CK-QG1A, CK-QG1, CK-07R1A, CK-07R1A0**
 - Remaining delegable child tasks: **38**
-- Ready child tasks: **1 — CK-08R1**
+- Ready child tasks: **0**
 - Conditional-ready child tasks: **1 — CK-07R1 after coordinator disposition of the preserved prelaunch incident and a clean exact-main reapplication path**
 - Blocked child tasks: **36**
 - Orchestration mode: **convergence — one coordinator, one existing task per active packet, at most one shared-authority task**
@@ -51,8 +51,10 @@ parents are accounting umbrellas.
 
 Readiness is controlled by
 [the machine DAG](REMAINING_EXECUTION_PLAN.md). R1C and R1B are accepted after
-R1A; R1 is the sole Ready serialized requalification join. CK-QG1 is accepted
-and exact-main verified; other corrective locks are unchanged.
+R1A; R1 is complete on merge with a schema-valid 80/80 two-lane
+requalification artifact. No successor is Ready while CK-07R1 remains
+conditional. CK-QG1 is accepted and exact-main verified; other corrective
+locks are unchanged.
 
 ### Corrective gates
 
@@ -60,7 +62,7 @@ and exact-main verified; other corrective locks are unchanged.
 - [x] **CK-08R1A — Freeze answer semantics and evidence closure** · Completed on merge; exact-main verification required in handoff · [packet](tasks/ck-08r1a-freeze-answer-semantics.md)
 - [x] **CK-08R1B — Implement production answer semantics** · PR #430 hosted-green, squash-merged, and exact-main verified at `9e9332b3`; exact 23-path cohort and 80/80 production-versus-independent replay accepted · [packet](tasks/ck-08r1b-implement-production-answer-semantics.md)
 - [x] **CK-08R1C — Build independent semantic evaluator** · PR #411 merged/exact-main `fb0c578`; independent closure and all 80 variants accepted · [packet](tasks/ck-08r1c-build-independent-semantic-evaluator.md)
-- [ ] **CK-08R1 — Requalify independent answer truth** · Ready after CK-08R1B PR #430 and CK-08R1C acceptance; serialized join only · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
+- [x] **CK-08R1 — Requalify independent answer truth** · Completed on merge; schema-valid 80/80 production-independent rows, grades, order, evidence, provenance, null, closure, grading-isolation, and mutation proof; hosted CI, squash merge, and exact-main verification required in handoff · [artifact](../decisions/evidence/ck08r1/answer-truth-requalification-v2.json) · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
 - [x] **CK-08R2 — Implement bounded physical keyset execution** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r2-implement-physical-keyset-execution.md)
 - [x] **CK-QG1A0 — Authorize PageExecutor source supersession** · Completed on merge; exact-main required before CK-QG1A · [packet](tasks/ck-qg1a0-authorize-page-executor-source-supersession.md)
 - [x] **CK-08R3A — Implement bounded EvidenceService physical queries** · PR #417 hosted-green and squash-merged at `38537f6c`; exact-main identities verified · [packet](tasks/ck-08r3a-implement-evidence-physical-query.md)
@@ -70,7 +72,7 @@ and exact-main verified; other corrective locks are unchanged.
 - [ ] **CK-07R1 — Correct lifecycle preparation scale** · Conditional Ready after argv authority merge `479cbdb`, coordinator disposition of the preserved `prelaunch_failed` witness incident, and a clean exact-main reapplication path; only the existing worker may resume and no launch is yet authorized; PR #394 is stale read-only · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
 - [x] **CK-QG1A — Correct page-executor complexity** · PR #408 merged/exact-main `30983d4`; authorized successor `9e80c867…` accepted without behavior or baseline change · [packet](tasks/ck-qg1a-correct-page-executor-complexity.md)
 - [x] **CK-QG1 — Enforce replacement-kernel maintainability** · PR #392 hosted-green, squash-merged at `68050b93`, exact-main verified, and its [v2 writer transition authority](../decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json) is linked for the reviewed PR #430 successor · [packet](tasks/ck-qg1-enforce-agent-kernel-maintainability.md)
-- [ ] **CK-08R4 — Reclassify physical named plans** · Blocked on CK-08R1 and CK-07R1; CK-08R2/R3 are complete · [packet](tasks/ck-08r4-reclassify-physical-plans.md)
+- [ ] **CK-08R4 — Reclassify physical named plans** · Blocked on CK-07R1; CK-08R1/R2/R3 are complete · [packet](tasks/ck-08r4-reclassify-physical-plans.md)
 - [ ] **CK-08RG — Authorize CK-09 resumption** · Blocked on CK-08R4; CK-QG1 is complete · [packet](tasks/ck-08rg-authorize-ck09-resumption.md)
 
 ### CK-09 children

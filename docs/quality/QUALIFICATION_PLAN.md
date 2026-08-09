@@ -47,8 +47,12 @@ paging, so they admit neither projections nor CK-09.
 
 R1A freezes Q-REV-03/Q-WF-02 and executable transitive closure before parallel
 R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`;
-R1B is accepted through PR #430 and exact-main `9e9332b3`, making the final
-two-lane R1 replay the sole Ready packet.
+R1B is accepted through PR #430 and exact-main `9e9332b3`. R1 now records the
+schema-valid 80/80 two-lane replay with exact closure membership/digests,
+grading isolation, and sentinel mutations in
+`docs/decisions/evidence/ck08r1/answer-truth-requalification-v2.json`; it is
+complete on merge, with hosted CI, squash merge, and exact-main verification
+required in the handoff.
 R3 scale awaits merged/exact-main R3A.
 CK-QG1A removed only R2's two rank-D findings against its unchanged baseline and is accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`; CK-QG1 PR #392 then passed the exact authorized normalized baseline ratchet, hosted CI, squash merge, and fresh exact-main verification at `68050b93`. CK-07R1A preserves the first hosted Python
 3.14 `ordinary.2000_call_tail` failure and
