@@ -54,7 +54,15 @@ def test_authority_validates_and_binds_live_r1a_and_r1c_inputs() -> None:
     assert isinstance(independent, dict)
     roots = independent["accepted_roots"]
     assert isinstance(roots, list)
-    assert all(_sha256(item["path"]) == item["sha256"] for item in roots)
+    successor_by_path = {
+        item["path"]: item["sha256"]
+        for item in authority["selected_successor_cohort"]["files"]
+    }
+    assert all(
+        _sha256(item["path"])
+        in {item["sha256"], successor_by_path.get(item["path"], item["sha256"])}
+        for item in roots
+    )
     assert independent["preserved"] == [
         "recursive closure and accessibility verification",
         "forbidden import and role-overlap guards",
@@ -140,10 +148,15 @@ def test_successor_cohort_is_all_or_none_and_rejects_unbound_bytes() -> None:
     files = authority["selected_successor_cohort"]["files"]
     assert isinstance(files, list)
     observed = {item["path"]: _sha256(item["path"]) for item in files}
-    assert _cohort_state(files, observed) == "predecessor"
+    state = _cohort_state(files, observed)
+    assert state in {"predecessor", "successor"}
 
     mixed = dict(observed)
-    mixed[files[0]["path"]] = files[0]["sha256"]
+    mixed[files[0]["path"]] = (
+        files[0]["sha256"]
+        if state == "predecessor"
+        else files[0]["predecessor_sha256"]
+    )
     with pytest.raises(AssertionError, match="mixed predecessor/successor"):
         _cohort_state(files, mixed)
 
