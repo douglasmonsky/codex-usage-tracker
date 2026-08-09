@@ -280,12 +280,163 @@ VARIANT_MUTATIONS = {
     for variant_ordinal, oracle_id in enumerate(ORACLE_AUTHORITY_ORDER)
 }
 
+_MEASUREMENT_BITS = {
+    "uncached_input_tokens": 1 << 0,
+    "cached_input_tokens": 1 << 1,
+    "reasoning_tokens": 1 << 2,
+    "output_tokens": 1 << 3,
+    "context_window_tokens": 1 << 4,
+    "event_at_us": 1 << 5,
+}
+_TERMINAL_LIFECYCLES = frozenset({"succeeded", "failed", "cancelled", "rolled_back"})
+_TOOL_COORDINATE_FIELDS = tuple(
+    field
+    for prefix in ("start", "terminal")
+    for field in (
+        f"{prefix}_at_us",
+        f"{prefix}_source_rank",
+        f"{prefix}_source_order",
+        f"{prefix}_event_kind_order",
+        f"{prefix}_transition_rank",
+    )
+)
+
 
 def _load(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise TypeError(f"{path} must contain one object")
     return value
+
+
+def _materialize_r1a_measurements_and_tool_coordinates(
+    cases: list[dict[str, Any]],
+) -> None:
+    """Fold synthetic declarations into the complete R1A fact shape."""
+
+    for case in cases:
+        needs_context_capability = case["request"]["plan_id"] == "compare_sessions"
+        if needs_context_capability:
+            publication_id = "publication:ck07a-structural-v2"
+            if not any(fact["relation"] == "publication" for fact in case["declaration"]["facts"]):
+                case["declaration"]["facts"].append(
+                    {
+                        "relation": "publication",
+                        "logical_id": publication_id,
+                        "values": {
+                            "publication_id": publication_id,
+                            "capabilities": {"structural_context": True},
+                        },
+                        "coordinates": {
+                            "event_at_us": 600,
+                            "source_rank": 0,
+                            "source_order": 0,
+                            "event_kind_order": 0,
+                            "transition_rank": 0,
+                        },
+                    }
+                )
+        session_facts = {
+            fact["logical_id"]: fact
+            for fact in case["declaration"]["facts"]
+            if fact["relation"] == "session"
+        }
+
+        def hierarchy(
+            session_id: str,
+            seen: set[str],
+            session_facts: dict[str, dict[str, Any]] = session_facts,
+        ) -> tuple[str, int] | None:
+            if session_id in seen:
+                return None
+            fact = session_facts.get(session_id)
+            if fact is None:
+                return None
+            parent = fact["values"].get("parent_session_id")
+            if parent is None:
+                return session_id, 0
+            if not isinstance(parent, str):
+                return None
+            ancestor = hierarchy(parent, seen | {session_id})
+            if ancestor is None:
+                return None
+            return ancestor[0], ancestor[1] + 1
+
+        for fact in case["declaration"]["facts"]:
+            values = fact["values"]
+            coordinates = fact.get("coordinates")
+            if fact["relation"] == "publication" and needs_context_capability:
+                capabilities = values.get("capabilities")
+                if isinstance(capabilities, dict) and "structural_context" not in capabilities:
+                    capabilities["structural_context"] = True
+            if fact["relation"] == "session":
+                session_id = values.get("session_id")
+                if isinstance(session_id, str):
+                    resolved = hierarchy(session_id, set())
+                    if resolved is not None:
+                        root_session_id, delegation_depth = resolved
+                        values.setdefault("root_session_id", root_session_id)
+                        values.setdefault("delegation_depth", delegation_depth)
+                        if values.get("root_session_id") is None:
+                            values["root_session_id"] = root_session_id
+                        if values.get("delegation_depth") is None:
+                            values["delegation_depth"] = delegation_depth
+            if fact["relation"] == "canonical_call" and "measurement_mask" not in values:
+                mask = 0
+                for field, bit in _MEASUREMENT_BITS.items():
+                    if field == "event_at_us":
+                        available = (
+                            isinstance(coordinates, dict) and coordinates.get(field) is not None
+                        )
+                    else:
+                        available = values.get(field) is not None
+                    if available:
+                        mask |= bit
+                values["measurement_mask"] = mask
+            if fact["relation"] != "tool_invocation":
+                continue
+            if any(field in values for field in _TOOL_COORDINATE_FIELDS):
+                continue
+            if not isinstance(coordinates, dict):
+                continue
+            start_at_us = coordinates.get("event_at_us")
+            source_rank = coordinates.get("source_rank", 0)
+            source_order = coordinates.get("source_order")
+            event_kind_order = coordinates.get("event_kind_order")
+            transition_rank = coordinates.get("transition_rank", 0)
+            duration_us = values.get("duration_us")
+            lifecycle = values.get("lifecycle")
+            if (
+                not isinstance(start_at_us, int)
+                or isinstance(start_at_us, bool)
+                or not isinstance(source_rank, int)
+                or isinstance(source_rank, bool)
+                or not isinstance(source_order, int)
+                or isinstance(source_order, bool)
+                or not isinstance(event_kind_order, int)
+                or isinstance(event_kind_order, bool)
+                or not isinstance(transition_rank, int)
+                or isinstance(transition_rank, bool)
+                or not isinstance(duration_us, int)
+                or isinstance(duration_us, bool)
+                or duration_us < 0
+                or lifecycle not in _TERMINAL_LIFECYCLES
+            ):
+                continue
+            values.update(
+                {
+                    "start_at_us": start_at_us,
+                    "start_source_rank": source_rank,
+                    "start_source_order": source_order,
+                    "start_event_kind_order": event_kind_order,
+                    "start_transition_rank": transition_rank,
+                    "terminal_at_us": start_at_us + duration_us,
+                    "terminal_source_rank": source_rank,
+                    "terminal_source_order": source_order + 1,
+                    "terminal_event_kind_order": 50,
+                    "terminal_transition_rank": 1,
+                }
+            )
 
 
 def build_question_scenarios() -> dict[str, Any]:
@@ -304,6 +455,7 @@ def build_question_scenarios() -> dict[str, Any]:
         raise ValueError("CK-07A variant mutations must produce 80 distinct source shapes")
 
     cases = copy.deepcopy(authority["cases"])
+    _materialize_r1a_measurements_and_tool_coordinates(cases)
     if {case["oracle_id"] for case in cases} != catalog_ids:
         raise ValueError("frozen CK-07A authority does not match the catalog")
     plans = {plan["plan_id"]: plan for plan in plan_contract()["plans"]}
@@ -325,6 +477,12 @@ def build_question_scenarios() -> dict[str, Any]:
                 or fact["values"]["semantic_logical_id"] in selected_entity_ids
             ]
         mutation = copy.deepcopy(VARIANT_MUTATIONS[case["oracle_id"]])
+        frozen_mutation = case.get("semantic_mutation")
+        if not isinstance(frozen_mutation, dict):
+            raise ValueError(f"{case['oracle_id']} has no frozen semantic mutation")
+        mutation["expected_artifact_manifest_sha256"] = frozen_mutation[
+            "expected_artifact_manifest_sha256"
+        ]
         source_profile = case.get("source_profile")
         if not isinstance(source_profile, dict):
             prior_name = Path(str(case["source_path"])).stem

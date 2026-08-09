@@ -4969,7 +4969,7 @@
           "relation": "state_change",
           "logical_id": "state_change:1",
           "values": {
-            "mutation_kind": 1,
+            "mutation_kind": "modified",
             "resource_id": "resource:1",
             "session_id": "session:1",
             "state_change_id": "state_change:1",
@@ -4987,7 +4987,7 @@
           "relation": "state_change",
           "logical_id": "state_change:2",
           "values": {
-            "mutation_kind": 1,
+            "mutation_kind": "modified",
             "resource_id": "resource:2",
             "session_id": "session:2",
             "state_change_id": "state_change:2",
@@ -5007,7 +5007,7 @@
           "values": {
             "duration_us": 1,
             "error_category": 1,
-            "lifecycle": "completed",
+            "lifecycle": "succeeded",
             "output_bytes": 1,
             "resource_id": "resource:1",
             "resource_kind": "file",
@@ -5016,6 +5016,16 @@
             ],
             "semantic_operation": "inspect",
             "session_id": "session:1",
+            "start_at_us": 10,
+            "start_event_kind_order": 10,
+            "start_source_order": 20,
+            "start_source_rank": 0,
+            "start_transition_rank": 0,
+            "terminal_at_us": 11,
+            "terminal_event_kind_order": 10,
+            "terminal_source_order": 21,
+            "terminal_source_rank": 0,
+            "terminal_transition_rank": 1,
             "tool_family": "shell",
             "tool_id": "tool:1",
             "transport_name": 1,
@@ -5036,7 +5046,7 @@
           "values": {
             "duration_us": 1,
             "error_category": 1,
-            "lifecycle": "completed",
+            "lifecycle": "succeeded",
             "output_bytes": 1,
             "resource_id": "resource:2",
             "resource_kind": "file",
@@ -5045,6 +5055,16 @@
             ],
             "semantic_operation": "inspect",
             "session_id": "session:2",
+            "start_at_us": 50,
+            "start_event_kind_order": 10,
+            "start_source_order": 21,
+            "start_source_rank": 0,
+            "start_transition_rank": 0,
+            "terminal_at_us": 51,
+            "terminal_event_kind_order": 10,
+            "terminal_source_order": 22,
+            "terminal_source_rank": 0,
+            "terminal_transition_rank": 1,
             "tool_family": "shell",
             "tool_id": "tool:2",
             "transport_name": 1,
@@ -5115,39 +5135,17 @@
               "use_id": "Q-WF-02:first_boundary_v1:0:0",
               "formula_id": "first_boundary_v1",
               "operands": {
-                "boundary_kind": "tool_invocation",
+                "boundary_kind": "tool_start",
                 "records": [
                   {
-                    "kind": "canonical_call",
-                    "tokens": 1
+                    "kind": "tool_start",
+                    "logical_id": "tool:1",
+                    "tokens": 4
                   },
                   {
-                    "kind": "state_change",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "tool_invocation",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "turn",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "canonical_call",
-                    "tokens": 1
-                  },
-                  {
-                    "kind": "state_change",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "tool_invocation",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "turn",
-                    "tokens": null
+                    "kind": "tool_start",
+                    "logical_id": "tool:2",
+                    "tokens": 8
                   }
                 ]
               },
@@ -5164,36 +5162,14 @@
                 "boundary_kind": "state_change",
                 "records": [
                   {
-                    "kind": "canonical_call",
-                    "tokens": 1
+                    "kind": "state_change",
+                    "logical_id": "state_change:1",
+                    "tokens": 4
                   },
                   {
                     "kind": "state_change",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "tool_invocation",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "turn",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "canonical_call",
-                    "tokens": 1
-                  },
-                  {
-                    "kind": "state_change",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "tool_invocation",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "turn",
-                    "tokens": null
+                    "logical_id": "state_change:2",
+                    "tokens": 8
                   }
                 ]
               },
@@ -5207,39 +5183,17 @@
               "use_id": "Q-WF-02:first_boundary_v1:0:0",
               "formula_id": "first_boundary_v1",
               "operands": {
-                "boundary_kind": "canonical_call",
+                "boundary_kind": "tool_terminal_succeeded",
                 "records": [
                   {
-                    "kind": "canonical_call",
-                    "tokens": 1
+                    "kind": "tool_terminal_succeeded",
+                    "logical_id": "tool:1",
+                    "tokens": 4
                   },
                   {
-                    "kind": "state_change",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "tool_invocation",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "turn",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "canonical_call",
-                    "tokens": 1
-                  },
-                  {
-                    "kind": "state_change",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "tool_invocation",
-                    "tokens": null
-                  },
-                  {
-                    "kind": "turn",
-                    "tokens": null
+                    "kind": "tool_terminal_succeeded",
+                    "logical_id": "tool:2",
+                    "tokens": 8
                   }
                 ]
               },
@@ -5258,14 +5212,14 @@
       ],
       "expected_rows": [
         {
-          "first_action_tokens": null,
-          "first_mutation_tokens": null,
-          "first_success_tokens": 1,
+          "first_action_tokens": 4,
+          "first_mutation_tokens": 4,
+          "first_success_tokens": 4,
           "mutation_observed": true
         }
       ],
-      "expected_materialization_sha256": "1b23dbe35017edcab073dcef2ad421cb16ede1f13d0d06b7f9f8c73cafc08e82",
-      "expected_evaluation_sha256": "13a5b435ffe292813fa984a48c0afb33c5b8b342d96480a3f1aec9fbf52b5843",
+      "expected_materialization_sha256": "498fd776ed6b4cd48e7e307112bccfb6ca848246de87b7e61819722998829991",
+      "expected_evaluation_sha256": "c91a32b5313a9ee02d37c4912ab48fb062edcd36269c0dbd8eafd00ac2b04526",
       "formula_use_ids": [
         "Q-WF-02:first_boundary_v1:0"
       ],
@@ -10065,6 +10019,7 @@
             "call_id": "call:1",
             "context_window_tokens": 1,
             "lifecycle": "completed",
+            "measurement_mask": 16,
             "model_profile_id": "model_profile:1",
             "output_tokens": 1,
             "project_id": "project:1",
@@ -10090,6 +10045,7 @@
             "call_id": "call:2",
             "context_window_tokens": 1,
             "lifecycle": "completed",
+            "measurement_mask": 16,
             "model_profile_id": "model_profile:2",
             "output_tokens": 1,
             "project_id": "project:2",
@@ -10138,16 +10094,33 @@
           }
         },
         {
+          "relation": "publication",
+          "logical_id": "publication:1",
+          "values": {
+            "capabilities": {
+              "structural_context": true
+            },
+            "publication_id": "publication:1"
+          },
+          "coordinates": {
+            "event_at_us": 0,
+            "source_rank": 0,
+            "source_order": 0,
+            "event_kind_order": 0,
+            "transition_rank": 0
+          }
+        },
+        {
           "relation": "session",
           "logical_id": "session:1",
           "values": {
             "completion_basis": "completed",
-            "delegation_depth": 1,
+            "delegation_depth": 0,
             "end_at_us": 1,
             "lifecycle_state": "completed",
-            "parent_session_id": "parent_session:1",
+            "parent_session_id": null,
             "project_id": "project:1",
-            "root_session_id": "root_session:1",
+            "root_session_id": "session:1",
             "session_id": "session:1",
             "start_at_us": 1
           },
@@ -10164,12 +10137,12 @@
           "logical_id": "session:2",
           "values": {
             "completion_basis": "completed",
-            "delegation_depth": 1,
+            "delegation_depth": 0,
             "end_at_us": 1,
             "lifecycle_state": "completed",
-            "parent_session_id": "parent_session:2",
+            "parent_session_id": null,
             "project_id": "project:2",
-            "root_session_id": "root_session:2",
+            "root_session_id": "session:2",
             "session_id": "session:2",
             "start_at_us": 1
           },
@@ -10185,7 +10158,7 @@
           "relation": "state_change",
           "logical_id": "state_change:1",
           "values": {
-            "mutation_kind": 1,
+            "mutation_kind": "modified",
             "resource_id": "resource:1",
             "session_id": "session:1",
             "state_change_id": "state_change:1",
@@ -10203,7 +10176,7 @@
           "relation": "state_change",
           "logical_id": "state_change:2",
           "values": {
-            "mutation_kind": 1,
+            "mutation_kind": "modified",
             "resource_id": "resource:2",
             "session_id": "session:2",
             "state_change_id": "state_change:2",
@@ -10223,7 +10196,7 @@
           "values": {
             "duration_us": 1,
             "error_category": 1,
-            "lifecycle": "completed",
+            "lifecycle": "succeeded",
             "output_bytes": 1,
             "resource_id": "resource:1",
             "resource_kind": "file",
@@ -10252,7 +10225,7 @@
           "values": {
             "duration_us": 1,
             "error_category": 1,
-            "lifecycle": "completed",
+            "lifecycle": "succeeded",
             "output_bytes": 1,
             "resource_id": "resource:2",
             "resource_kind": "file",
@@ -10325,28 +10298,99 @@
           "key": [],
           "direct_slots": {
             "completion_state": {
-              "left": "observed",
-              "right": "observed"
+              "left": {
+                "completion_basis": "completed",
+                "lifecycle_state": "completed"
+              },
+              "right": {
+                "completion_basis": "completed",
+                "lifecycle_state": "completed"
+              }
             },
             "context_features": {
-              "left_calls": 1,
-              "right_calls": 1
+              "left": {
+                "distinct_context_window_tokens": [
+                  1
+                ],
+                "observed_call_count": 1
+              },
+              "right": {
+                "distinct_context_window_tokens": [
+                  1
+                ],
+                "observed_call_count": 1
+              }
+            },
+            "delegation_metrics": {
+              "left": {
+                "descendant_tokens": 0,
+                "exclusive_tokens": 4,
+                "inclusive_tokens": 4
+              },
+              "right": {
+                "descendant_tokens": 0,
+                "exclusive_tokens": 4,
+                "inclusive_tokens": 4
+              }
+            },
+            "token_deltas": {
+              "cached_input_tokens": 0,
+              "output_tokens": 0,
+              "reasoning_tokens": 0,
+              "total_tokens": 0,
+              "uncached_input_tokens": 0
             },
             "resource_metrics": {
-              "left": 0,
-              "right": 0
+              "left": {
+                "by_kind": {
+                  "file": 1
+                },
+                "count": 1
+              },
+              "right": {
+                "by_kind": {
+                  "file": 2
+                },
+                "count": 2
+              }
             },
             "state_change_metrics": {
-              "left": 0,
-              "right": 0
+              "left": {
+                "by_mutation_kind": {
+                  "modified": 1
+                },
+                "count": 1
+              },
+              "right": {
+                "by_mutation_kind": {
+                  "modified": 1
+                },
+                "count": 1
+              }
             },
             "tool_metrics": {
-              "left": 0,
-              "right": 0
+              "left": {
+                "failed_count": 0,
+                "invocation_count": 1,
+                "open_count": 0,
+                "succeeded_count": 1
+              },
+              "right": {
+                "failed_count": 0,
+                "invocation_count": 1,
+                "open_count": 0,
+                "succeeded_count": 1
+              }
             },
             "turn_call_counts": {
-              "left": 1,
-              "right": 1
+              "left": {
+                "call_count": 1,
+                "turn_count": 1
+              },
+              "right": {
+                "call_count": 1,
+                "turn_count": 1
+              }
             }
           },
           "formula_calls": [
@@ -10355,11 +10399,9 @@
               "formula_id": "exclusive_inclusive_scope_v1",
               "operands": {
                 "descendant": 0,
-                "inclusive": 3
+                "inclusive": 4
               },
-              "output_bindings": {
-                "delegation_metrics": "$"
-              },
+              "output_bindings": {},
               "internal_only": false,
               "consume_as": null
             },
@@ -10367,12 +10409,10 @@
               "use_id": "Q-REV-03:side_by_side_delta_v1:1:0",
               "formula_id": "side_by_side_delta_v1",
               "operands": {
-                "current": 3,
-                "previous": 3
+                "current": 4,
+                "previous": 4
               },
-              "output_bindings": {
-                "token_deltas": "$"
-              },
+              "output_bindings": {},
               "internal_only": false,
               "consume_as": null
             },
@@ -10407,38 +10447,104 @@
       "expected_rows": [
         {
           "completion_state": {
-            "left": "observed",
-            "right": "observed"
+            "left": {
+              "completion_basis": "completed",
+              "lifecycle_state": "completed"
+            },
+            "right": {
+              "completion_basis": "completed",
+              "lifecycle_state": "completed"
+            }
           },
           "context_features": {
-            "left_calls": 1,
-            "right_calls": 1
+            "left": {
+              "distinct_context_window_tokens": [
+                1
+              ],
+              "observed_call_count": 1
+            },
+            "right": {
+              "distinct_context_window_tokens": [
+                1
+              ],
+              "observed_call_count": 1
+            }
           },
           "delegation_metrics": {
-            "exclusive": 3,
-            "inclusive": 3
+            "left": {
+              "descendant_tokens": 0,
+              "exclusive_tokens": 4,
+              "inclusive_tokens": 4
+            },
+            "right": {
+              "descendant_tokens": 0,
+              "exclusive_tokens": 4,
+              "inclusive_tokens": 4
+            }
           },
           "resource_metrics": {
-            "left": 0,
-            "right": 0
+            "left": {
+              "by_kind": {
+                "file": 1
+              },
+              "count": 1
+            },
+            "right": {
+              "by_kind": {
+                "file": 2
+              },
+              "count": 2
+            }
           },
           "state_change_metrics": {
-            "left": 0,
-            "right": 0
+            "left": {
+              "by_mutation_kind": {
+                "modified": 1
+              },
+              "count": 1
+            },
+            "right": {
+              "by_mutation_kind": {
+                "modified": 1
+              },
+              "count": 1
+            }
           },
-          "token_deltas": 0,
+          "token_deltas": {
+            "cached_input_tokens": 0,
+            "output_tokens": 0,
+            "reasoning_tokens": 0,
+            "total_tokens": 0,
+            "uncached_input_tokens": 0
+          },
           "tool_metrics": {
-            "left": 0,
-            "right": 0
+            "left": {
+              "failed_count": 0,
+              "invocation_count": 1,
+              "open_count": 0,
+              "succeeded_count": 1
+            },
+            "right": {
+              "failed_count": 0,
+              "invocation_count": 1,
+              "open_count": 0,
+              "succeeded_count": 1
+            }
           },
           "turn_call_counts": {
-            "left": 1,
-            "right": 1
+            "left": {
+              "call_count": 1,
+              "turn_count": 1
+            },
+            "right": {
+              "call_count": 1,
+              "turn_count": 1
+            }
           }
         }
       ],
-      "expected_materialization_sha256": "592524c8392b4b41b387a0607557967c976fa2966d6b481c29c1a7985b80095f",
-      "expected_evaluation_sha256": "ad1ce3cb2e0ecc3955813413442a03842193006497931b7715289587257ed065",
+      "expected_materialization_sha256": "217d6c1f87fca1cd020a875846017a22bb84db63cb382b936e741cdd27b7f848",
+      "expected_evaluation_sha256": "7a8634a5195bdd82903fc25c6a6b686acd9d98eb7af826780c59dbdd60316d5f",
       "formula_use_ids": [
         "Q-REV-03:exclusive_inclusive_scope_v1:0",
         "Q-REV-03:side_by_side_delta_v1:1",

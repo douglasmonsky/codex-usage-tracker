@@ -620,7 +620,7 @@ FACT_BACKED_PLAN_RULES = {
     "cache_reuse_candidates": (10, 31, 4, 3),
     "cached_replay_small_output": (10, 31, 4, 3),
     "compaction_comparison": (11, 32, 5, 3),
-    "compare_sessions": (19, 64, 10, 9),
+    "compare_sessions": (24, 78, 10, 9),
     "context_composition": (10, 25, 3, 3),
     "context_pressure_trajectory": (11, 32, 5, 3),
     "current_usage": (9, 30, 7, 1),

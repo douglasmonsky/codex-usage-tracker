@@ -7,7 +7,7 @@
     "docs/architecture/ADAPTER_CONTRACT.md",
     "config/agent-kernel/question-catalog-v1.json"
   ],
-  "vector_bundle_sha256": "87b9d08a8d1186ab1e3eb794f58d17fd28b991e210fc0144713f1299ab224b2c",
+  "vector_bundle_sha256": "644faaef6f32e43892f70a98d61d4137862dfcb9c3ccc292cb852c5f3f0c61b2",
   "identity": {
     "version": "v1",
     "tuple_encoding": "canonical_cbor",

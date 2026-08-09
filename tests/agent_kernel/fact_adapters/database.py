@@ -117,6 +117,46 @@ def _attach_occurrence_event_coordinates(
     return normalized
 
 
+def _complete_session_hierarchy(
+    facts: Sequence[CanonicalFact],
+) -> list[CanonicalFact]:
+    sessions = {fact.logical_id: fact for fact in facts if fact.relation == "session"}
+
+    def resolved(session_id: str, seen: frozenset[str]) -> tuple[str, int]:
+        if session_id in seen or session_id not in sessions:
+            raise DatabaseAdapterContractError("session hierarchy is cyclic or dangling")
+        parent = sessions[session_id].values.get("parent_session_id")
+        if parent is None:
+            return session_id, 0
+        if not isinstance(parent, str) or not parent:
+            raise DatabaseAdapterContractError("session parent identity is malformed")
+        root, depth = resolved(parent, seen | {session_id})
+        return root, depth + 1
+
+    normalized: list[CanonicalFact] = []
+    for fact in facts:
+        if fact.relation != "session":
+            normalized.append(fact)
+            continue
+        root, depth = resolved(fact.logical_id, frozenset())
+        values = dict(fact.values)
+        declared_root = values.get("root_session_id")
+        declared_depth = values.get("delegation_depth")
+        if declared_root not in (None, root) or declared_depth not in (None, depth):
+            raise DatabaseAdapterContractError("session hierarchy root/depth mismatch")
+        values["root_session_id"] = root
+        values["delegation_depth"] = depth
+        normalized.append(
+            CanonicalFact(
+                fact.relation,
+                fact.logical_id,
+                values,
+                fact.coordinates,
+            )
+        )
+    return normalized
+
+
 def _freeze(value: Any) -> Any:
     if isinstance(value, Mapping):
         return MappingProxyType({key: _freeze(item) for key, item in value.items()})
@@ -264,6 +304,7 @@ _RELATION_QUERIES: Mapping[str, str] = MappingProxyType(
                    s.project_id, NULL AS tool_id, mc.lifecycle_state AS lifecycle,
                    mc.context_window_tokens, mc.uncached_input_tokens,
                    mc.cached_input_tokens, mc.reasoning_tokens, mc.output_tokens,
+                   mc.measurement_mask,
                    mc.event_at_us, mc.source_rank, mc.source_order,
                    mc.event_kind_order, mc.transition_rank
               FROM model_calls_visible AS mc
@@ -374,7 +415,12 @@ _RELATION_QUERIES: Mapping[str, str] = MappingProxyType(
                    t.start_source_rank AS source_rank,
                    t.start_source_order AS source_order,
                    t.start_event_kind_order AS event_kind_order,
-                   t.start_transition_rank AS transition_rank
+                   t.start_transition_rank AS transition_rank,
+                   t.start_at_us, t.start_source_rank,
+                   t.start_source_order, t.start_event_kind_order,
+                   t.start_transition_rank, t.terminal_at_us,
+                   t.terminal_source_rank, t.terminal_source_order,
+                   t.terminal_event_kind_order, t.terminal_transition_rank
               FROM tool_invocations AS t
               LEFT JOIN resources AS r ON r.resource_id = t.primary_resource_id
              ORDER BY t.tool_id
@@ -564,6 +610,7 @@ _RELATION_FIELDS: Mapping[str, frozenset[str]] = MappingProxyType(
                 "cached_input_tokens",
                 "reasoning_tokens",
                 "output_tokens",
+                "measurement_mask",
                 "lifecycle",
             }
         ),
@@ -608,6 +655,16 @@ _RELATION_FIELDS: Mapping[str, frozenset[str]] = MappingProxyType(
                 "resource_kind",
                 "write_intent",
                 "lifecycle",
+                "start_at_us",
+                "start_source_rank",
+                "start_source_order",
+                "start_event_kind_order",
+                "start_transition_rank",
+                "terminal_at_us",
+                "terminal_source_rank",
+                "terminal_source_order",
+                "terminal_event_kind_order",
+                "terminal_transition_rank",
                 "output_bytes",
                 "duration_us",
                 "error_category",
@@ -902,7 +959,7 @@ class DatabaseV1FactAdapter:
                 raise DatabaseAdapterContractError(
                     f"database snapshot produced no facts for {plan_request.plan_id}"
                 )
-            facts = _attach_occurrence_event_coordinates(facts)
+            facts = _complete_session_hierarchy(_attach_occurrence_event_coordinates(facts))
             evidence = self._evidence(
                 connection,
                 plan_request,
