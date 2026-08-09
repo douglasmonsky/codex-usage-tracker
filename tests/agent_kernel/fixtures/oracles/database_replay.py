@@ -10,7 +10,7 @@ from codex_usage_tracker.agent_kernel.domain.plan_operands import (
     PlanRequest,
     evaluate_plan,
 )
-from tests.agent_kernel.fact_adapters.database import DatabaseV1FactAdapter
+from codex_usage_tracker.agent_kernel.query.compiler import DatabaseV1FactCompiler
 from tests.agent_kernel.fact_adapters.support import plan_contract, selector_contract
 from tests.agent_kernel.fixtures.oracles.exact import exact_sha256, normalize_exact
 
@@ -48,16 +48,22 @@ def evaluate_published_question_case(
         gates=dict(request_value["gates"]),
     )
     contract = plan_contract()
-    materialized = DatabaseV1FactAdapter(
-        contract,
-        selector_contract(),
-        required_evidence,
-    ).materialize(
-        connection,
-        request,
-        required_evidence,
-    )
-    evaluation = evaluate_plan(contract, materialized.request, materialized.facts)
+    if connection.in_transaction:
+        raise RuntimeError("published replay requires a caller-free read transaction")
+    connection.execute("BEGIN")
+    try:
+        materialized = DatabaseV1FactCompiler(
+            contract,
+            selector_contract(),
+            required_evidence,
+        ).compile(
+            connection,
+            request,
+            required_evidence=required_evidence,
+        )
+        evaluation = evaluate_plan(contract, materialized.request, materialized.facts)
+    finally:
+        connection.execute("ROLLBACK")
     rows = normalize_exact(evaluation.rows)
     result = {
         "oracle_id": oracle_id,

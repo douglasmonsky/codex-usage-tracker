@@ -563,9 +563,15 @@ class _WriteSetPreparer:
             if handler is not None:
                 handler(logical_id, grouped, observation)
         for logical_id, grouped in sorted(self.observations_by_id.items()):
-            observation = max(grouped, key=lambda item: item.sort_key)
-            if observation.observation_type == "SessionRelationshipObserved":
+            relationships = [
+                item
+                for item in grouped
+                if item.observation_type == "SessionRelationshipObserved"
+            ]
+            if relationships:
+                observation = max(relationships, key=self._relationship_order)
                 self._add_session_relationship(logical_id, grouped, observation)
+        self._complete_session_hierarchy()
 
     @staticmethod
     def _common_order(
@@ -619,6 +625,11 @@ class _WriteSetPreparer:
         payload = observation.payload
         fold = self._fold(logical_id)
         parent = payload.get("parent_session_id")
+        relationship_basis = (
+            str(payload.get("relationship_basis") or "structural")
+            if isinstance(parent, str)
+            else None
+        )
         self.rows.append(
             PreparedRow(
                 "sessions",
@@ -636,7 +647,7 @@ class _WriteSetPreparer:
                         if isinstance(parent, str)
                         else None
                     ),
-                    "relationship_basis": None,
+                    "relationship_basis": relationship_basis,
                     "delegation_depth": None,
                     "lifecycle_state": fold.lifecycle_state,
                     "state_basis": fold.state_basis,
@@ -653,6 +664,62 @@ class _WriteSetPreparer:
                 tuple(_MUTABLE_COLUMNS["sessions"]),
             )
         )
+
+    def _complete_session_hierarchy(self) -> None:
+        current = {
+            str(row.values["session_id"]): (index, row)
+            for index, row in enumerate(self.rows)
+            if row.table == "sessions"
+        }
+        available = {
+            logical_id: row
+            for logical_id, row in self.prior.entity_rows.items()
+            if row.table == "sessions"
+        }
+        available.update({session_id: row for session_id, (_, row) in current.items()})
+        resolved: dict[str, tuple[str, int]] = {}
+
+        def hierarchy(session_id: str, seen: frozenset[str]) -> tuple[str, int]:
+            if session_id in resolved:
+                return resolved[session_id]
+            if session_id in seen or session_id not in available:
+                raise PublicationWriteError("session hierarchy is cyclic or dangling")
+            row = available[session_id]
+            parent_id = row.values.get("parent_session_id")
+            if parent_id is None:
+                result = (session_id, 0)
+            else:
+                if not isinstance(parent_id, str) or not parent_id:
+                    raise PublicationWriteError("session parent identity is malformed")
+                root_id, parent_depth = hierarchy(parent_id, seen | {session_id})
+                result = (root_id, parent_depth + 1)
+            resolved[session_id] = result
+            return result
+
+        for session_id in sorted(available):
+            root_id, depth = hierarchy(session_id, frozenset())
+            current_item = current.get(session_id)
+            row = available[session_id] if current_item is None else current_item[1]
+            if (
+                row.values.get("root_session_id") == root_id
+                and row.values.get("delegation_depth") == depth
+            ):
+                continue
+            updated = replace(
+                row,
+                values={
+                    **row.values,
+                    "root_session_id": root_id,
+                    "delegation_depth": depth,
+                    "last_seen_publication_id": self.publication_id,
+                },
+                update_columns=tuple(_MUTABLE_COLUMNS["sessions"]),
+            )
+            if current_item is None:
+                self.rows.append(updated)
+            else:
+                self.rows[current_item[0]] = updated
+            available[session_id] = updated
 
     def _add_turn(
         self,
@@ -694,14 +761,203 @@ class _WriteSetPreparer:
             )
         )
 
+    @staticmethod
+    def _relationship_order(
+        observation: AdapterObservation,
+    ) -> tuple[bool, int, int, int, int, int]:
+        event_at_us = observation.event_at_us
+        return (
+            event_at_us is None,
+            0 if event_at_us is None else event_at_us,
+            observation.source_rank,
+            observation.source_order,
+            observation.event_kind_order,
+            observation.transition_rank,
+        )
+
+    @staticmethod
+    def _persisted_relationship_order(
+        row: PreparedRow,
+    ) -> tuple[bool, int, int, int, int, int]:
+        event_at_us = row.values["event_at_us"]
+        return (
+            event_at_us is None,
+            0 if event_at_us is None else int(event_at_us),
+            int(row.values["source_rank"]),
+            int(row.values["source_order"]),
+            int(row.values["event_kind_order"]),
+            int(row.values["transition_rank"]),
+        )
+
+    @staticmethod
+    def _relationship_evidence_identity(
+        observation: AdapterObservation,
+    ) -> tuple[str, str, str]:
+        return (
+            str(observation.payload["parent_session_id"]),
+            str(observation.payload["relationship_basis"]),
+            observation.occurrence_id,
+        )
+
+    @staticmethod
+    def _persisted_relationship_evidence_identity(
+        row: PreparedRow,
+    ) -> tuple[str, str, str]:
+        return (
+            str(row.values["parent_session_id"]),
+            str(row.values["relationship_basis"]),
+            str(row.values["occurrence_id"]),
+        )
+
+    def _current_child_relationships(
+        self,
+        child_id: str,
+    ) -> list[AdapterObservation]:
+        candidates: list[AdapterObservation] = []
+        for grouped in self.observations_by_id.values():
+            relationships = [
+                item
+                for item in grouped
+                if (
+                    item.observation_type == "SessionRelationshipObserved"
+                    and item.payload.get("session_id") == child_id
+                )
+            ]
+            if not relationships:
+                continue
+            winning_order = max(map(self._relationship_order, relationships))
+            tied = [
+                item
+                for item in relationships
+                if self._relationship_order(item) == winning_order
+            ]
+            if len({self._relationship_evidence_identity(item) for item in tied}) > 1:
+                raise PublicationWriteError(
+                    f"late parent relationship equal-order conflict for child session: "
+                    f"{child_id}"
+                )
+            candidates.append(min(tied, key=lambda item: item.sort_key))
+
+        by_order: dict[
+            tuple[bool, int, int, int, int, int],
+            AdapterObservation,
+        ] = {}
+        for candidate in candidates:
+            order = self._relationship_order(candidate)
+            existing = by_order.get(order)
+            if (
+                existing is not None
+                and self._relationship_evidence_identity(existing)
+                != self._relationship_evidence_identity(candidate)
+            ):
+                raise PublicationWriteError(
+                    f"late parent relationship equal-order conflict for child session: "
+                    f"{child_id}"
+                )
+            if existing is None or candidate.sort_key < existing.sort_key:
+                by_order[order] = candidate
+
+        by_relationship: dict[tuple[str, str], AdapterObservation] = {}
+        for candidate in by_order.values():
+            key = (
+                str(candidate.payload["parent_session_id"]),
+                str(candidate.payload["relationship_basis"]),
+            )
+            existing = by_relationship.get(key)
+            if (
+                existing is None
+                or self._relationship_order(candidate)
+                > self._relationship_order(existing)
+            ):
+                by_relationship[key] = candidate
+        return sorted(by_relationship.values(), key=self._relationship_order)
+
+    def _relationship_replay_disposition(
+        self,
+        *,
+        child_id: str,
+        parent_id: str,
+        basis: str,
+        observation: AdapterObservation,
+    ) -> str:
+        incoming_order = self._relationship_order(observation)
+        prior_child_edges = [
+            row
+            for (prior_child_id, _, _, _), row in self.prior.late_parent_edges.items()
+            if prior_child_id == child_id
+        ]
+        same_order = [
+            row
+            for row in prior_child_edges
+            if self._persisted_relationship_order(row) == incoming_order
+        ]
+        if any(
+            self._persisted_relationship_evidence_identity(row)
+            != (parent_id, basis, observation.occurrence_id)
+            for row in same_order
+        ):
+            raise PublicationWriteError(
+                f"late parent relationship equal-order conflict for child session: "
+                f"{child_id}"
+            )
+        if same_order:
+            return "duplicate"
+        authoritative_prior = max(
+            prior_child_edges,
+            key=self._persisted_relationship_order,
+            default=None,
+        )
+        if (
+            authoritative_prior is not None
+            and incoming_order < self._persisted_relationship_order(authoritative_prior)
+        ):
+            return "stale"
+        return "current"
+
+    def _new_late_parent_edge(
+        self,
+        *,
+        child_id: str,
+        parent_id: str,
+        basis: str,
+        observation: AdapterObservation,
+    ) -> PreparedRow:
+        return PreparedRow(
+            "late_parent_edges",
+            {
+                "child_session_id": child_id,
+                "relationship_version": (
+                    self.prior.late_parent_versions.get(child_id, 0) + 1
+                ),
+                "parent_session_id": parent_id,
+                "relationship_basis": basis,
+                **self._common_order(observation),
+                "occurrence_id": observation.occurrence_id,
+                "first_seen_publication_id": self.publication_id,
+            },
+        )
+
     def _add_session_relationship(
         self,
         _logical_id: str,
         _grouped: list[AdapterObservation],
         observation: AdapterObservation,
     ) -> None:
-        child_id = str(observation.payload["session_id"])
-        parent_id = str(observation.payload["parent_session_id"])
+        if observation.observation_type != "SessionRelationshipObserved":
+            raise PublicationWriteError("late parent observation type is invalid")
+        child_value = observation.payload.get("session_id")
+        parent_value = observation.payload.get("parent_session_id")
+        basis_value = observation.payload.get("relationship_basis")
+        if not all(
+            isinstance(value, str) and value
+            for value in (child_value, parent_value, basis_value)
+        ):
+            raise PublicationWriteError("late parent relationship identity is malformed")
+        child_id = child_value
+        parent_id = parent_value
+        basis = str(basis_value)
+        if child_id == parent_id:
+            raise PublicationWriteError("session hierarchy is cyclic or dangling")
         available_sessions = {
             str(row.values["session_id"]) for row in self.rows if row.table == "sessions"
         } | {
@@ -709,68 +965,51 @@ class _WriteSetPreparer:
             for logical_id, row in self.prior.entity_rows.items()
             if row.table == "sessions"
         }
-        if child_id not in available_sessions or parent_id not in available_sessions:
+        if child_id not in available_sessions:
             return
-        relationship_key = (
-            child_id,
-            parent_id,
-            str(observation.payload["relationship_basis"]),
-        )
-        child_edges_by_relationship: dict[tuple[str, str, str], AdapterObservation] = {}
-        for grouped in self.observations_by_id.values():
-            candidate = max(grouped, key=lambda item: item.sort_key)
-            if (
-                candidate.observation_type != "SessionRelationshipObserved"
-                or candidate.payload.get("session_id") != child_id
-            ):
-                continue
-            key = (
-                child_id,
-                str(candidate.payload["parent_session_id"]),
-                str(candidate.payload["relationship_basis"]),
+        if parent_id not in available_sessions:
+            raise PublicationWriteError(
+                f"late parent relationship has no observed parent session: {parent_id}"
             )
-            existing = child_edges_by_relationship.get(key)
-            if existing is None or candidate.sort_key > existing.sort_key:
-                child_edges_by_relationship[key] = candidate
-        if observation is not child_edges_by_relationship[relationship_key]:
+        child_edges = self._current_child_relationships(child_id)
+        if not child_edges:
+            raise PublicationWriteError("late parent relationship winner is missing")
+        if child_edges != sorted(child_edges, key=self._relationship_order):
+            raise PublicationWriteError("late parent relationship order is invalid")
+        if any(
+            item.payload.get("session_id") != child_id
+            for item in child_edges
+        ):
+            raise PublicationWriteError("late parent relationship child is inconsistent")
+        winner_parent = child_edges[-1].payload.get("parent_session_id")
+        if not isinstance(winner_parent, str):
+            raise PublicationWriteError("late parent winner parent is malformed")
+        winner_basis = child_edges[-1].payload.get("relationship_basis")
+        if not isinstance(winner_basis, str):
+            raise PublicationWriteError("late parent winner basis is malformed")
+        if all(observation is not item for item in child_edges):
             return
-        child_edges = sorted(
-            child_edges_by_relationship.values(),
-            key=lambda item: item.sort_key,
-        )
-        prior_edge = self.prior.late_parent_edges.get(relationship_key)
-        if prior_edge is not None:
-            edge = prior_edge
-        else:
-            new_edges = [
-                item
-                for item in child_edges
-                if (
-                    child_id,
-                    str(item.payload["parent_session_id"]),
-                    str(item.payload["relationship_basis"]),
-                )
-                not in self.prior.late_parent_edges
-            ]
-            relationship_version = (
-                self.prior.late_parent_versions.get(child_id, 0) + new_edges.index(observation) + 1
-            )
-            edge = PreparedRow(
-                "late_parent_edges",
-                {
-                    "child_session_id": child_id,
-                    "relationship_version": relationship_version,
-                    "parent_session_id": parent_id,
-                    "relationship_basis": str(observation.payload["relationship_basis"]),
-                    **self._common_order(observation),
-                    "occurrence_id": observation.occurrence_id,
-                    "first_seen_publication_id": self.publication_id,
-                },
-            )
-        self.rows.append(edge)
         if observation is not child_edges[-1]:
             return
-
+        replay_disposition = self._relationship_replay_disposition(
+            child_id=child_id,
+            parent_id=parent_id,
+            basis=basis,
+            observation=observation,
+        )
+        if replay_disposition == "duplicate":
+            return
+        if replay_disposition not in {"current", "stale"}:
+            raise PublicationWriteError("late parent replay disposition is invalid")
+        edge = self._new_late_parent_edge(
+            child_id=child_id,
+            parent_id=parent_id,
+            basis=basis,
+            observation=observation,
+        )
+        self.rows.append(edge)
+        if replay_disposition == "stale":
+            return
         child_index = next(
             (
                 index
@@ -788,24 +1027,14 @@ class _WriteSetPreparer:
             raise PublicationWriteError(
                 f"late parent relationship has no observed child session: {child_id}"
             )
-        parent = next(
-            (
-                row
-                for row in self.rows
-                if row.table == "sessions" and row.values["session_id"] == parent_id
-            ),
-            self.prior.entity_rows.get(parent_id),
-        )
-        parent_root = None if parent is None else parent.values.get("root_session_id")
-        parent_depth = None if parent is None else parent.values.get("delegation_depth")
         updated = PreparedRow(
             "sessions",
             {
                 **child.values,
-                "root_session_id": parent_root or parent_id,
+                "root_session_id": None,
                 "parent_session_id": parent_id,
                 "relationship_basis": str(observation.payload["relationship_basis"]),
-                "delegation_depth": (1 if parent_depth is None else int(parent_depth) + 1),
+                "delegation_depth": None,
                 "last_seen_publication_id": self.publication_id,
             },
             tuple(_MUTABLE_COLUMNS["sessions"]),
