@@ -17,6 +17,7 @@
     "identity_correction",
     "review_correction",
     "acceptance_correction",
+    "writer_closure_correction",
     "consumer_join",
     "selected_successor_cohort",
     "negative_mutations",
@@ -25,15 +26,33 @@
     "worker_handoff"
   ],
   "properties": {
-    "schema": {"const": "codex-usage-tracker.ck08r1b-answer-semantics-join-authority.v1"},
-    "authority_version": {"const": 1},
-    "owner": {"const": "CK-08R1B-JOIN"},
-    "authority_base_sha": {"const": "f31efbdcb81ae3c3cb77d71eb740af4f4ffdfca4"},
-    "status": {"const": "permitted_not_accepted"},
-    "decision": {"const": "authorize_exact_query_evidence_grading_join_for_existing_worker"},
-    "producer_authority": {"$ref": "#/$defs/object"},
-    "independent_truth_authority": {"$ref": "#/$defs/object"},
-    "held_candidate": {"$ref": "#/$defs/object"},
+    "schema": {
+      "const": "codex-usage-tracker.ck08r1b-answer-semantics-join-authority.v1"
+    },
+    "authority_version": {
+      "const": 1
+    },
+    "owner": {
+      "const": "CK-08R1B-JOIN"
+    },
+    "authority_base_sha": {
+      "const": "f31efbdcb81ae3c3cb77d71eb740af4f4ffdfca4"
+    },
+    "status": {
+      "const": "permitted_not_accepted"
+    },
+    "decision": {
+      "const": "authorize_exact_query_evidence_grading_join_for_existing_worker"
+    },
+    "producer_authority": {
+      "$ref": "#/$defs/object"
+    },
+    "independent_truth_authority": {
+      "$ref": "#/$defs/object"
+    },
+    "held_candidate": {
+      "$ref": "#/$defs/object"
+    },
     "identity_correction": {
       "type": "object",
       "required": [
@@ -52,19 +71,45 @@
         "worker_pr_edit"
       ],
       "properties": {
-        "base_sha": {"const": "97ea3aed8f67c7840a34b610e7e0588b7eaf3c4d"},
-        "source_pr": {"const": 430},
-        "worker_head_sha": {"const": "78d01ab9e19b37da776abe638f0feb436b4780bd"},
-        "path": {"const": "scripts/generate_ck07a_fixture.py"},
-        "failure": {"const": "hosted_ruff_i001_import_order"},
-        "superseded_successor_sha256": {"const": "37cfd57351491c25141fde2d6ef0812d3f4e6e6b60921a2ce6e1af670b3cc28d"},
-        "selected_successor_sha256": {"const": "f7adde83efb963121e841aec8d71ebd2e2be1fa3a1c2745d8e5ec05e6884cb68"},
-        "superseded_patch_sha256": {"const": "d3ba81015172cd6e0be2dbaa3beb0aa321cc0232c7820d7ce7cba5630c0674d2"},
-        "selected_patch_sha256": {"const": "38c0db5c2242a962b20fa2abd05c264fb08e36f6d9dc542fe5763ca69986c690"},
-        "changed_successor_paths": {"const": 1},
-        "unchanged_successor_paths": {"const": 17},
-        "semantic_change": {"const": "none"},
-        "worker_pr_edit": {"const": "forbidden"}
+        "base_sha": {
+          "const": "97ea3aed8f67c7840a34b610e7e0588b7eaf3c4d"
+        },
+        "source_pr": {
+          "const": 430
+        },
+        "worker_head_sha": {
+          "const": "78d01ab9e19b37da776abe638f0feb436b4780bd"
+        },
+        "path": {
+          "const": "scripts/generate_ck07a_fixture.py"
+        },
+        "failure": {
+          "const": "hosted_ruff_i001_import_order"
+        },
+        "superseded_successor_sha256": {
+          "const": "37cfd57351491c25141fde2d6ef0812d3f4e6e6b60921a2ce6e1af670b3cc28d"
+        },
+        "selected_successor_sha256": {
+          "const": "f7adde83efb963121e841aec8d71ebd2e2be1fa3a1c2745d8e5ec05e6884cb68"
+        },
+        "superseded_patch_sha256": {
+          "const": "d3ba81015172cd6e0be2dbaa3beb0aa321cc0232c7820d7ce7cba5630c0674d2"
+        },
+        "selected_patch_sha256": {
+          "const": "38c0db5c2242a962b20fa2abd05c264fb08e36f6d9dc542fe5763ca69986c690"
+        },
+        "changed_successor_paths": {
+          "const": 1
+        },
+        "unchanged_successor_paths": {
+          "const": 17
+        },
+        "semantic_change": {
+          "const": "none"
+        },
+        "worker_pr_edit": {
+          "const": "forbidden"
+        }
       },
       "additionalProperties": false
     },
@@ -83,22 +128,43 @@
         "implementation_acceptance"
       ],
       "properties": {
-        "base_sha": {"const": "dce25ea306382b271391ce62036623996205c29e"},
-        "source_pr": {"const": 430},
-        "worker_head_sha": {"const": "3a86a10b12122d6ff9bec70f5f62105157af25c8"},
-        "review_disposition": {"const": "requested_changes_preserved_open_unmerged"},
-        "superseded_patch_sha256": {"const": "38c0db5c2242a962b20fa2abd05c264fb08e36f6d9dc542fe5763ca69986c690"},
-        "selected_patch_sha256": {"const": "74776e524db39a8687963faa8a163dccd848fd9bf7ca81697ca3c86c5e5a0d5a"},
-        "selected_successor_paths": {"const": 21},
+        "base_sha": {
+          "const": "dce25ea306382b271391ce62036623996205c29e"
+        },
+        "source_pr": {
+          "const": 430
+        },
+        "worker_head_sha": {
+          "const": "3a86a10b12122d6ff9bec70f5f62105157af25c8"
+        },
+        "review_disposition": {
+          "const": "requested_changes_preserved_open_unmerged"
+        },
+        "superseded_patch_sha256": {
+          "const": "38c0db5c2242a962b20fa2abd05c264fb08e36f6d9dc542fe5763ca69986c690"
+        },
+        "selected_patch_sha256": {
+          "const": "74776e524db39a8687963faa8a163dccd848fd9bf7ca81697ca3c86c5e5a0d5a"
+        },
+        "selected_successor_paths": {
+          "const": 21
+        },
         "findings": {
           "type": "array",
           "minItems": 4,
           "maxItems": 4,
           "uniqueItems": true,
-          "items": {"type": "string", "minLength": 1}
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "worker_pr_edit": {"const": "forbidden"},
-        "implementation_acceptance": {"const": "not_granted"}
+        "worker_pr_edit": {
+          "const": "forbidden"
+        },
+        "implementation_acceptance": {
+          "const": "not_granted"
+        }
       },
       "additionalProperties": false
     },
@@ -118,53 +184,172 @@
         "implementation_acceptance"
       ],
       "properties": {
-        "base_sha": {"const": "362e9bb908c06980cbe25cc2d433d3f78a238947"},
-        "source_pr": {"const": 430},
-        "worker_head_sha": {"const": "3a86a10b12122d6ff9bec70f5f62105157af25c8"},
-        "worker_state": {"const": "fresh_acceptance_worktree_dirty_exact_21_staged_paths_preserved"},
-        "superseded_selected_patch_sha256": {"const": "74776e524db39a8687963faa8a163dccd848fd9bf7ca81697ca3c86c5e5a0d5a"},
-        "selected_patch_sha256": {"const": "735b87616e3fd98acebe6d2bc0751c3ffd18bda0422e1a0d08c42d8d173aeae2"},
-        "selected_successor_paths": {"const": 21},
+        "base_sha": {
+          "const": "362e9bb908c06980cbe25cc2d433d3f78a238947"
+        },
+        "source_pr": {
+          "const": 430
+        },
+        "worker_head_sha": {
+          "const": "3a86a10b12122d6ff9bec70f5f62105157af25c8"
+        },
+        "worker_state": {
+          "const": "fresh_acceptance_worktree_dirty_exact_21_staged_paths_preserved"
+        },
+        "superseded_selected_patch_sha256": {
+          "const": "74776e524db39a8687963faa8a163dccd848fd9bf7ca81697ca3c86c5e5a0d5a"
+        },
+        "selected_patch_sha256": {
+          "const": "735b87616e3fd98acebe6d2bc0751c3ffd18bda0422e1a0d08c42d8d173aeae2"
+        },
+        "selected_successor_paths": {
+          "const": 21
+        },
         "changed_successor_paths": {
           "type": "array",
           "minItems": 6,
           "maxItems": 6,
           "uniqueItems": true,
-          "items": {"type": "string", "minLength": 1}
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "findings": {
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
           "uniqueItems": true,
-          "items": {"type": "string", "minLength": 1}
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "worker_pr_edit": {"const": "forbidden"},
-        "implementation_acceptance": {"const": "not_granted"}
+        "worker_pr_edit": {
+          "const": "forbidden"
+        },
+        "implementation_acceptance": {
+          "const": "not_granted"
+        }
       },
       "additionalProperties": false
     },
-    "consumer_join": {"$ref": "#/$defs/object"},
+    "writer_closure_correction": {
+      "type": "object",
+      "required": [
+        "base_sha",
+        "source_pr",
+        "worker_head_sha",
+        "worker_state",
+        "superseded_selected_patch_sha256",
+        "selected_patch_sha256",
+        "selected_successor_paths",
+        "added_successor_paths",
+        "changed_successor_paths",
+        "findings",
+        "worker_pr_edit",
+        "implementation_acceptance"
+      ],
+      "properties": {
+        "base_sha": {
+          "const": "f55e513d3be9ea367b8cf29bc080d35e7a366e89"
+        },
+        "source_pr": {
+          "const": 430
+        },
+        "worker_head_sha": {
+          "const": "3a86a10b12122d6ff9bec70f5f62105157af25c8"
+        },
+        "worker_state": {
+          "const": "fresh_acceptance_worktree_dirty_exact_21_staged_paths_preserved"
+        },
+        "superseded_selected_patch_sha256": {
+          "const": "735b87616e3fd98acebe6d2bc0751c3ffd18bda0422e1a0d08c42d8d173aeae2"
+        },
+        "selected_patch_sha256": {
+          "const": "5ea9275830146875cd60cdf28372d5bbb4deeafe0b170c29ecd3118a70390fc2"
+        },
+        "selected_successor_paths": {
+          "const": 23
+        },
+        "added_successor_paths": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "changed_successor_paths": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "findings": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "worker_pr_edit": {
+          "const": "forbidden"
+        },
+        "implementation_acceptance": {
+          "const": "not_granted"
+        }
+      },
+      "additionalProperties": false
+    },
+    "consumer_join": {
+      "$ref": "#/$defs/object"
+    },
     "selected_successor_cohort": {
       "type": "object",
-      "required": ["preflight_base_sha", "patch_sha256", "files", "focused_test_identities", "focused_validation"],
+      "required": [
+        "preflight_base_sha",
+        "patch_sha256",
+        "files",
+        "focused_test_identities",
+        "focused_validation"
+      ],
       "properties": {
-        "preflight_base_sha": {"$ref": "#/$defs/gitSha"},
-        "patch_sha256": {"$ref": "#/$defs/sha"},
+        "preflight_base_sha": {
+          "$ref": "#/$defs/gitSha"
+        },
+        "patch_sha256": {
+          "$ref": "#/$defs/sha"
+        },
         "files": {
           "type": "array",
-          "minItems": 21,
-          "maxItems": 21,
+          "minItems": 23,
+          "maxItems": 23,
           "uniqueItems": true,
-          "items": {"$ref": "#/$defs/transitionPathDigest"}
+          "items": {
+            "$ref": "#/$defs/transitionPathDigest"
+          }
         },
         "focused_test_identities": {
           "type": "array",
           "minItems": 2,
           "uniqueItems": true,
-          "items": {"$ref": "#/$defs/pathDigest"}
+          "items": {
+            "$ref": "#/$defs/pathDigest"
+          }
         },
-        "focused_validation": {"$ref": "#/$defs/object"}
+        "focused_validation": {
+          "$ref": "#/$defs/object"
+        }
       },
       "additionalProperties": false
     },
@@ -172,18 +357,30 @@
       "type": "array",
       "minItems": 12,
       "uniqueItems": true,
-      "items": {"type": "string", "minLength": 1}
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "required_gates": {
       "type": "object",
-      "required": ["implementation", "downstream"],
+      "required": [
+        "implementation",
+        "downstream"
+      ],
       "properties": {
-        "implementation": {"$ref": "#/$defs/nonEmptyStrings"},
-        "downstream": {"$ref": "#/$defs/nonEmptyStrings"}
+        "implementation": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        },
+        "downstream": {
+          "$ref": "#/$defs/nonEmptyStrings"
+        }
       },
       "additionalProperties": false
     },
-    "scope": {"$ref": "#/$defs/object"},
+    "scope": {
+      "$ref": "#/$defs/object"
+    },
     "worker_handoff": {
       "type": "object",
       "required": [
@@ -196,36 +393,77 @@
         "downstream_dispatch"
       ],
       "properties": {
-        "resume_existing_worker": {"const": "019fc419-0dab-73e3-a6cc-ce574f18c89f"},
-        "resume_after": {"type": "string", "minLength": 1},
-        "next_authorized_action": {"type": "string", "minLength": 1},
-        "replacement_worker": {"const": "forbidden"},
-        "implementation_acceptance": {"const": "not_granted_by_this_authority"},
-        "new_authority_task": {"const": "forbidden"},
-        "downstream_dispatch": {"const": "forbidden"}
+        "resume_existing_worker": {
+          "const": "019fc419-0dab-73e3-a6cc-ce574f18c89f"
+        },
+        "resume_after": {
+          "type": "string",
+          "minLength": 1
+        },
+        "next_authorized_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "replacement_worker": {
+          "const": "forbidden"
+        },
+        "implementation_acceptance": {
+          "const": "not_granted_by_this_authority"
+        },
+        "new_authority_task": {
+          "const": "forbidden"
+        },
+        "downstream_dispatch": {
+          "const": "forbidden"
+        }
       },
       "additionalProperties": false
     }
   },
   "$defs": {
-    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
     "pathDigest": {
       "type": "object",
-      "required": ["path", "sha256"],
+      "required": [
+        "path",
+        "sha256"
+      ],
       "properties": {
-        "path": {"type": "string", "minLength": 1},
-        "sha256": {"$ref": "#/$defs/sha"}
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha"
+        }
       },
       "additionalProperties": false
     },
     "transitionPathDigest": {
       "type": "object",
-      "required": ["path", "predecessor_sha256", "sha256"],
+      "required": [
+        "path",
+        "predecessor_sha256",
+        "sha256"
+      ],
       "properties": {
-        "path": {"type": "string", "minLength": 1},
-        "predecessor_sha256": {"$ref": "#/$defs/sha"},
-        "sha256": {"$ref": "#/$defs/sha"}
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "predecessor_sha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha"
+        }
       },
       "additionalProperties": false
     },
@@ -233,8 +471,14 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": {"type": "string", "minLength": 1}
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
-    "object": {"type": "object", "minProperties": 1}
+    "object": {
+      "type": "object",
+      "minProperties": 1
+    }
   }
 }

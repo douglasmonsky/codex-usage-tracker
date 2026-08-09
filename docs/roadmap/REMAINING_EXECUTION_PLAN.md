@@ -41,8 +41,12 @@ duplicate stable-ID rejection, production-compiler replay, and the Q-REV-03
 direct-fact/internal-formula decision. Its exact selected-cohort acceptance
 correction additionally requires all authoritative late relationships before
 one hierarchy computation and explicit non-null required tool timestamps.
-Only the existing worker may resume after that correction merges and exact-main
-verifies. R1 remains their blocked requalification join.
+The final writer-closure correction extends that atomic cohort to 23 paths:
+writer-owned prior-state loading supplies every connected existing ancestor and
+descendant, preparation emits every changed descendant after reparenting, and
+unaffected session rows remain exact. Only the existing worker may resume after
+that correction merges and exact-main verifies. R1 remains their blocked
+requalification join.
 CK-QG1A removed R2's two page-executor C/B/B violations
 without changing behavior or the frozen maintainability baseline and is
 accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`.
