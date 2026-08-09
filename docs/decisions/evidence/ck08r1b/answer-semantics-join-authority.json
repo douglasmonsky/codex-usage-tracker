@@ -95,6 +95,21 @@
     "witnesses": "read_only_and_retained",
     "authority_pr_candidate_bytes": "forbidden"
   },
+  "identity_correction": {
+    "base_sha": "97ea3aed8f67c7840a34b610e7e0588b7eaf3c4d",
+    "source_pr": 430,
+    "worker_head_sha": "78d01ab9e19b37da776abe638f0feb436b4780bd",
+    "path": "scripts/generate_ck07a_fixture.py",
+    "failure": "hosted_ruff_i001_import_order",
+    "superseded_successor_sha256": "37cfd57351491c25141fde2d6ef0812d3f4e6e6b60921a2ce6e1af670b3cc28d",
+    "selected_successor_sha256": "f7adde83efb963121e841aec8d71ebd2e2be1fa3a1c2745d8e5ec05e6884cb68",
+    "superseded_patch_sha256": "d3ba81015172cd6e0be2dbaa3beb0aa321cc0232c7820d7ce7cba5630c0674d2",
+    "selected_patch_sha256": "38c0db5c2242a962b20fa2abd05c264fb08e36f6d9dc542fe5763ca69986c690",
+    "changed_successor_paths": 1,
+    "unchanged_successor_paths": 17,
+    "semantic_change": "none",
+    "worker_pr_edit": "forbidden"
+  },
   "consumer_join": {
     "query_compiler": {
       "path": "src/codex_usage_tracker/agent_kernel/query/compiler.py",
@@ -136,13 +151,13 @@
     }
   },
   "selected_successor_cohort": {
-    "preflight_base_sha": "f31efbdcb81ae3c3cb77d71eb740af4f4ffdfca4",
-    "patch_sha256": "d3ba81015172cd6e0be2dbaa3beb0aa321cc0232c7820d7ce7cba5630c0674d2",
+    "preflight_base_sha": "97ea3aed8f67c7840a34b610e7e0588b7eaf3c4d",
+    "patch_sha256": "38c0db5c2242a962b20fa2abd05c264fb08e36f6d9dc542fe5763ca69986c690",
     "files": [
       {"path": "config/agent-kernel/logical-contract-v1.json", "predecessor_sha256": "27981ec9bac8c245306e02784b8730e8ff9216b33a81da9efb8409403431fe3d", "sha256": "3d7412156c735a9e1e497049ec86c8130c20632da27e009deed24d19c5836e84"},
       {"path": "config/agent-kernel/plan-operand-contract-v1.json", "predecessor_sha256": "19b9c69f50f67b01321e1f269cee2f70370ca64c0c666ff4dac2cc52efa314b4", "sha256": "0f21a484b66c36bb467bc659f2656fd20c31619e9bc7b6e8edd89250855edffe"},
       {"path": "experiments/physical-architecture/candidate_a/queries.py", "predecessor_sha256": "dd2a121480920cf96cd51ec43084a76a278009a8b72153b15963862d9619fe89", "sha256": "53c947fa8468db211428104aa4276e9138d6c48160de8c99821b5c509ae5929e"},
-      {"path": "scripts/generate_ck07a_fixture.py", "predecessor_sha256": "d24be0a95b302a9c52d413c300f23536d8c0287512c4b446ed03f8d33ce0863f", "sha256": "37cfd57351491c25141fde2d6ef0812d3f4e6e6b60921a2ce6e1af670b3cc28d"},
+      {"path": "scripts/generate_ck07a_fixture.py", "predecessor_sha256": "d24be0a95b302a9c52d413c300f23536d8c0287512c4b446ed03f8d33ce0863f", "sha256": "f7adde83efb963121e841aec8d71ebd2e2be1fa3a1c2745d8e5ec05e6884cb68"},
       {"path": "src/codex_usage_tracker/agent_kernel/domain/plan_derivations_structural.py", "predecessor_sha256": "c63b5ae2528852768c7a0906c2dccd537587192116fd2cec956110bcc8ed1367", "sha256": "1c0441ca1d26c1d774aba9b53e0e10b04fcec2c6de7c1453a3e42aabcffa20ad"},
       {"path": "src/codex_usage_tracker/agent_kernel/query/compiler.py", "predecessor_sha256": "0e57ddb03c5bff28eb74dc2eaa98f35491c649de71e7e9ba680c358a5adc0286", "sha256": "c3c43f044a43b5d2aed18cc03b88f1a5156a6570dd4d1cfc2f47a8b4d1833ffa"},
       {"path": "tests/agent_kernel/contracts/test_plan_derivations_structural.py", "predecessor_sha256": "853f5d6d44d17ef4a19bff0ab383d758d52541ec7c7b8bf92d008d93b3fb40fb", "sha256": "8531e34b4a1c11c4e55c49efbf369ee82126bdf2a4c373896b0142c6acdae915"},

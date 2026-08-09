@@ -103,6 +103,49 @@ def test_join_is_exact_non_accepting_and_reuses_only_the_held_worker() -> None:
     }
 
 
+def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
+    authority = _load(AUTHORITY_PATH)
+    correction = authority["identity_correction"]
+    cohort = authority["selected_successor_cohort"]
+
+    assert isinstance(correction, dict)
+    assert isinstance(cohort, dict)
+    assert correction == {
+        "base_sha": "97ea3aed8f67c7840a34b610e7e0588b7eaf3c4d",
+        "source_pr": 430,
+        "worker_head_sha": "78d01ab9e19b37da776abe638f0feb436b4780bd",
+        "path": "scripts/generate_ck07a_fixture.py",
+        "failure": "hosted_ruff_i001_import_order",
+        "superseded_successor_sha256": (
+            "37cfd57351491c25141fde2d6ef0812d3f4e6e6b60921a2ce6e1af670b3cc28d"
+        ),
+        "selected_successor_sha256": (
+            "f7adde83efb963121e841aec8d71ebd2e2be1fa3a1c2745d8e5ec05e6884cb68"
+        ),
+        "superseded_patch_sha256": (
+            "d3ba81015172cd6e0be2dbaa3beb0aa321cc0232c7820d7ce7cba5630c0674d2"
+        ),
+        "selected_patch_sha256": (
+            "38c0db5c2242a962b20fa2abd05c264fb08e36f6d9dc542fe5763ca69986c690"
+        ),
+        "changed_successor_paths": 1,
+        "unchanged_successor_paths": 17,
+        "semantic_change": "none",
+        "worker_pr_edit": "forbidden",
+    }
+    assert cohort["preflight_base_sha"] == correction["base_sha"]
+    assert cohort["patch_sha256"] == correction["selected_patch_sha256"]
+
+    selected = {
+        item["path"]: item["sha256"]
+        for item in cohort["files"]
+        if isinstance(item, dict)
+    }
+    assert selected[correction["path"]] == correction["selected_successor_sha256"]
+    assert correction["superseded_successor_sha256"] not in selected.values()
+    assert correction["superseded_patch_sha256"] != cohort["patch_sha256"]
+
+
 def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
     authority = _load(AUTHORITY_PATH)
     cohort = authority["selected_successor_cohort"]

@@ -1,10 +1,10 @@
 # CK-08R1B — Implement production answer semantics
-**Status:** Ready after exact join-authority merge; resume existing worker only
+**Status:** Ready after exact join-authority import-order identity correction merges; resume existing worker only
 **Recommended owner:** `worker production-semantics`; Sol-class
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md); [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md); [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 **Goal:** Implement R1A Q-REV-03/Q-WF-02 semantics.
 **Dependencies:** R1A accepted/merged/exact-main.
-**Owned files/interfaces:** The exact 18-path successor cohort in the [join authority](../../decisions/evidence/ck08r1b/answer-semantics-join-authority.json), plus focused tests for those paths. Query compiler admission, synthetic materialization, R1C's stale Q-WF-02 seam, deterministic fixture generation, database/reference parity, and Candidate A plan requalification are allowed only as bound there; public API, EvidenceService, cursor, projection, and unrelated evaluator changes remain forbidden.
+**Owned files/interfaces:** The exact 18-path successor cohort in the [join authority](../../decisions/evidence/ck08r1b/answer-semantics-join-authority.json), including its one-path Ruff import-order successor correction and 17 byte-identical successors, plus focused tests for those paths. Query compiler admission, synthetic materialization, R1C's stale Q-WF-02 seam, deterministic fixture generation, database/reference parity, and Candidate A plan requalification are allowed only as bound there; public API, EvidenceService, cursor, projection, and unrelated evaluator changes remain forbidden.
 **Produces:** Exact comparison/boundaries/nulls and closure.
 **Independent truth source:** R1A plus R1C's preserved recursive closure and facts-only evaluator, requalified at the exact stale Q-WF-02 seam; no grading source or copied expected rows in production.
 **Consumer seam:** `compile_plan_operands` emits final-R1 materializations.

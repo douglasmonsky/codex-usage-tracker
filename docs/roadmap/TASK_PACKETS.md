@@ -59,7 +59,7 @@ verified; other corrective locks are unchanged.
 
 - [x] **CK-08R0 — Freeze corrective query and scale contracts** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r0-freeze-corrective-contracts.md)
 - [x] **CK-08R1A — Freeze answer semantics and evidence closure** · Completed on merge; exact-main verification required in handoff · [packet](tasks/ck-08r1a-freeze-answer-semantics.md)
-- [ ] **CK-08R1B — Implement production answer semantics** · Ready after the exact join-authority merge; resume existing worker only · [packet](tasks/ck-08r1b-implement-production-answer-semantics.md)
+- [ ] **CK-08R1B — Implement production answer semantics** · Ready after the exact join-authority import-order identity correction merges; resume existing worker only · [packet](tasks/ck-08r1b-implement-production-answer-semantics.md)
 - [x] **CK-08R1C — Build independent semantic evaluator** · PR #411 merged/exact-main `fb0c578`; independent closure and all 80 variants accepted · [packet](tasks/ck-08r1c-build-independent-semantic-evaluator.md)
 - [ ] **CK-08R1 — Requalify independent answer truth** · Blocked on CK-08R1B; CK-08R1C is accepted · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
 - [x] **CK-08R2 — Implement bounded physical keyset execution** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r2-implement-physical-keyset-execution.md)
