@@ -87,8 +87,7 @@ def test_independent_evaluator_evaluates_all_80_declared_variants() -> None:
 def test_field_grades_are_the_declared_typed_contract_for_all_80_variants() -> None:
     catalog = json.loads(QUESTION_CATALOG_PATH.read_text(encoding="utf-8"))
     expected = {
-        question["plan_id"]: question["answers"]["fields"]
-        for question in catalog["questions"]
+        question["plan_id"]: question["answers"]["fields"] for question in catalog["questions"]
     }
     for case, result in zip(load_cases(), evaluate_all(), strict=True):
         assert result["field_grades"] == expected[case["request"]["plan_id"]]
@@ -120,10 +119,7 @@ def test_r1a_contract_identity_and_q_wf_02_vectors_are_consumed_directly() -> No
     assert contract["packet"] == "CK-08R1A"
     assert tuple(contract["questions"]["Q-REV-03"]["fields"]) == Q_REV_FIELDS
 
-    evaluated = [
-        evaluate_wf02_events(vector["events"])
-        for vector in vectors["q_wf_02"]
-    ]
+    evaluated = [evaluate_wf02_events(vector["events"]) for vector in vectors["q_wf_02"]]
     assert evaluated == [vector["expected"] for vector in vectors["q_wf_02"]]
 
 
@@ -136,6 +132,30 @@ def test_q_wf_02_rejects_duplicate_logical_ids_for_every_event_kind() -> None:
         duplicate.append(copy.deepcopy(event))
         with pytest.raises(SemanticError):
             evaluate_wf02_events(duplicate)
+
+
+def test_q_wf_02_session_selector_excludes_same_window_foreign_facts() -> None:
+    case = _case("oracle:q-wf-02:failed_then_success")
+    selected_session = next(
+        fact["values"]["session_id"]
+        for fact in case["declaration"]["facts"]
+        if fact["relation"] == "tool_invocation"
+    )
+    case["request"]["parameters"]["session_selector"] = selected_session
+    baseline = evaluate_case(case)
+
+    foreign = copy.deepcopy(case)
+    for fact in foreign["declaration"]["facts"]:
+        if fact["relation"] in {"canonical_call", "tool_invocation", "state_change"}:
+            fact["values"]["session_id"] = "session:foreign"
+    row = evaluate_case(foreign)["rows"][0]
+    assert row == {
+        "first_action_tokens": None,
+        "first_mutation_tokens": None,
+        "first_success_tokens": None,
+        "mutation_observed": False,
+    }
+    assert row != baseline["rows"][0]
 
 
 def test_q_rev_03_emits_frozen_shape_and_exact_side_metrics() -> None:
@@ -168,8 +188,7 @@ def test_q_rev_03_open_lifecycle_and_missingness_fail_closed() -> None:
     session = next(
         fact
         for fact in open_case["declaration"]["facts"]
-        if fact["relation"] == "session"
-        and fact["values"]["session_id"] == left_id
+        if fact["relation"] == "session" and fact["values"]["session_id"] == left_id
     )
     session["values"]["lifecycle_state"] = "open"
     session["values"]["completion_basis"] = "open_tail"
@@ -184,8 +203,7 @@ def test_q_rev_03_open_lifecycle_and_missingness_fail_closed() -> None:
     call = next(
         fact
         for fact in mixed_case["declaration"]["facts"]
-        if fact["relation"] == "canonical_call"
-        and fact["values"]["session_id"] == left_id
+        if fact["relation"] == "canonical_call" and fact["values"]["session_id"] == left_id
     )
     del call["values"]["context_window_tokens"]
     with pytest.raises(SemanticError):
@@ -201,8 +219,7 @@ def test_canonical_fact_mutation_changes_truth_but_source_metadata_does_not() ->
     call = next(
         fact
         for fact in fact_mutation["declaration"]["facts"]
-        if fact["relation"] == "canonical_call"
-        and fact["values"]["session_id"] == left_id
+        if fact["relation"] == "canonical_call" and fact["values"]["session_id"] == left_id
     )
     call["values"]["output_tokens"] += 1
     changed = evaluate_case(fact_mutation)
@@ -315,9 +332,7 @@ def test_relative_from_import_is_recursive_and_forbidden_dependencies_fail_close
 def test_independent_closure_has_no_forbidden_imports_or_overlap_roles() -> None:
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
     lane = contract["lanes"]["independent"]
-    modules = set().union(
-        *(_module_imports(path) for path in INDEPENDENT_ROOT.glob("*.py"))
-    )
+    modules = set().union(*(_module_imports(path) for path in INDEPENDENT_ROOT.glob("*.py")))
 
     assert not any(
         module == forbidden or module.startswith(f"{forbidden}.")

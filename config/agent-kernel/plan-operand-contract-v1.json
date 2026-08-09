@@ -3892,6 +3892,7 @@
             "cached_input_tokens",
             "reasoning_tokens",
             "output_tokens",
+            "measurement_mask",
             "lifecycle"
           ]
         },
@@ -3919,6 +3920,16 @@
             "resource_kind",
             "write_intent",
             "lifecycle",
+            "start_at_us",
+            "start_source_rank",
+            "start_source_order",
+            "start_event_kind_order",
+            "start_transition_rank",
+            "terminal_at_us",
+            "terminal_source_rank",
+            "terminal_source_order",
+            "terminal_event_kind_order",
+            "terminal_transition_rank",
             "output_bytes",
             "duration_us",
             "error_category"
@@ -8607,6 +8618,7 @@
             "cached_input_tokens",
             "reasoning_tokens",
             "output_tokens",
+            "measurement_mask",
             "lifecycle"
           ]
         },
@@ -8658,6 +8670,13 @@
             "output_bytes",
             "duration_us",
             "error_category"
+          ]
+        },
+        {
+          "relation": "publication",
+          "fields": [
+            "publication_id",
+            "capabilities"
           ]
         },
         {

@@ -6,7 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from codex_usage_tracker.agent_kernel.domain.plan_operands import evaluate_plan
+from codex_usage_tracker.agent_kernel.domain.plan_operands import (
+    CanonicalFact,
+    evaluate_plan,
+)
 from codex_usage_tracker.agent_kernel.domain.valuation import (
     RateCardFrontier,
     RateCardRevision,
@@ -15,6 +18,7 @@ from codex_usage_tracker.agent_kernel.domain.valuation import (
 from tests.agent_kernel.fact_adapters.database import (
     DatabaseAdapterContractError,
     DatabaseV1FactAdapter,
+    _complete_session_hierarchy,
 )
 from tests.agent_kernel.fact_adapters.reference import (
     StructuralReferenceAdapterError,
@@ -61,6 +65,62 @@ PROVENANCE_KINDS = {
     "source_inventory",
     "source_occurrence",
 }
+
+
+def _session_fact(
+    session_id: str,
+    parent_session_id: str | None,
+    *,
+    root_session_id: str | None = None,
+    delegation_depth: int | None = None,
+) -> CanonicalFact:
+    return CanonicalFact(
+        "session",
+        session_id,
+        {
+            "session_id": session_id,
+            "parent_session_id": parent_session_id,
+            "root_session_id": root_session_id,
+            "delegation_depth": delegation_depth,
+        },
+        None,
+    )
+
+
+def test_database_adapter_completes_legacy_null_session_hierarchy() -> None:
+    facts = _complete_session_hierarchy(
+        [
+            _session_fact("session:root", None),
+            _session_fact("session:child", "session:root"),
+        ]
+    )
+    by_id = {fact.logical_id: fact for fact in facts}
+    assert by_id["session:root"].values["root_session_id"] == "session:root"
+    assert by_id["session:root"].values["delegation_depth"] == 0
+    assert by_id["session:child"].values["root_session_id"] == "session:root"
+    assert by_id["session:child"].values["delegation_depth"] == 1
+
+
+@pytest.mark.parametrize("mutation", ["dangling", "cycle", "mismatch"])
+def test_database_adapter_rejects_invalid_session_hierarchy(mutation: str) -> None:
+    if mutation == "dangling":
+        facts = [_session_fact("session:child", "session:missing")]
+    elif mutation == "cycle":
+        facts = [
+            _session_fact("session:left", "session:right"),
+            _session_fact("session:right", "session:left"),
+        ]
+    else:
+        facts = [
+            _session_fact(
+                "session:root",
+                None,
+                root_session_id="session:other",
+                delegation_depth=0,
+            )
+        ]
+    with pytest.raises(DatabaseAdapterContractError):
+        _complete_session_hierarchy(facts)
 
 
 def _references(request, *, window: bool) -> tuple[dict[str, str], ...]:
