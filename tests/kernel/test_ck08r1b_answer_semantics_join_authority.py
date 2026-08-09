@@ -106,6 +106,7 @@ def test_join_is_exact_non_accepting_and_reuses_only_the_held_worker() -> None:
 def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
     authority = _load(AUTHORITY_PATH)
     correction = authority["identity_correction"]
+    review_correction = authority["review_correction"]
     cohort = authority["selected_successor_cohort"]
 
     assert isinstance(correction, dict)
@@ -133,8 +134,13 @@ def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
         "semantic_change": "none",
         "worker_pr_edit": "forbidden",
     }
-    assert cohort["preflight_base_sha"] == correction["base_sha"]
-    assert cohort["patch_sha256"] == correction["selected_patch_sha256"]
+    assert isinstance(review_correction, dict)
+    assert cohort["preflight_base_sha"] == review_correction["base_sha"]
+    assert cohort["patch_sha256"] == review_correction["selected_patch_sha256"]
+    assert review_correction["superseded_patch_sha256"] == correction["selected_patch_sha256"]
+    assert review_correction["worker_head_sha"] == (
+        "3a86a10b12122d6ff9bec70f5f62105157af25c8"
+    )
 
     selected = {
         item["path"]: item["sha256"]
@@ -154,13 +160,15 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
     assert isinstance(join, dict)
     files = cohort["files"]
     assert isinstance(files, list)
-    assert len(files) == 18
+    assert len(files) == 21
     paths = {item["path"] for item in files}
     assert {
         "src/codex_usage_tracker/agent_kernel/query/compiler.py",
+        "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
         "experiments/physical-architecture/candidate_a/queries.py",
-        "tests/agent_kernel/fact_adapters/test_contracts.py",
         "tests/agent_kernel/fixtures/independent/semantic.py",
+        "tests/agent_kernel/fixtures/oracles/database_replay.py",
+        "tests/agent_kernel/publication/test_preparation.py",
         "tests/agent_kernel/test_ck08r1c_independent_evaluator.py",
         "scripts/generate_ck07a_fixture.py",
         "tests/agent_kernel/fixtures/tiny-v2/manifest.json",
@@ -173,15 +181,16 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
         == "forbidden"
     )
     assert cohort["focused_validation"] == {
-        "result": "182 passed",
+        "result": "135 passed focused preflight",
         "case_count": 80,
         "independent_rows_equal_production_rows": True,
         "independent_grades_equal_frozen_grades": True,
         "fixture_source_jsonl_unchanged": True,
         "review_mutations": [
-            "Q-WF-02 no-match and same-window foreign-session selector isolation",
-            "Q-WF-02 valid before-window and after-window tool exclusion",
-            "Q-REV-03 missing, null, and mask-value mismatch while capability is unavailable",
+            "Q-WF-02 start-before/terminal-inside and start-inside/terminal-after straddling",
+            "production publication complete hierarchy plus dangling and cyclic rejection",
+            "independent evaluator duplicate call, tool, and state-change stable-ID rejection",
+            "Q-REV-03 direct fact answers and bound internal formula diagnostics",
         ],
     }
 
@@ -219,10 +228,12 @@ def test_fail_closed_mutations_and_downstream_locks_are_complete() -> None:
         "measurement_mask",
         "session selector",
         "half-open window",
+        "straddling",
         "start coordinate",
         "terminal coordinate",
         "terminal without start",
         "terminal ordered before start",
+        "formula diagnostics",
         "grading sentinel",
         "production-source mutation",
         "canonical-fact mutation",
