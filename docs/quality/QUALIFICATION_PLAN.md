@@ -47,8 +47,8 @@ paging, so they admit neither projections nor CK-09.
 
 R1A freezes Q-REV-03/Q-WF-02 and executable transitive closure before parallel
 R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`;
-the exact R1B join authority makes only the existing worker Ready to reconcile
-its bound shared query/evidence/grading seams before final two-lane R1 replay.
+R1B is accepted through PR #430 and exact-main `9e9332b3`, making the final
+two-lane R1 replay the sole Ready packet.
 R3 scale awaits merged/exact-main R3A.
 CK-QG1A removed only R2's two rank-D findings against its unchanged baseline and is accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`; CK-QG1 PR #392 then passed the exact authorized normalized baseline ratchet, hosted CI, squash merge, and fresh exact-main verification at `68050b93`. CK-07R1A preserves the first hosted Python
 3.14 `ordinary.2000_call_tail` failure and

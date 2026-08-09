@@ -1,5 +1,5 @@
 # CK-08R1B — Implement production answer semantics
-**Status:** Ready under final 23-path direct-reparent/full-history/equal-coordinate/current-batch correction; resume existing worker and PR #430 only
+**Status:** Completed on merge — PR #430 hosted-green, squash-merged, and exact-main verified at `9e9332b3ae2be78cedb581ff8f76149ad76f4440`
 **Recommended owner:** `worker production-semantics`; Sol-class
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md); [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md); [AGENT_FIRST_CLEAN_CUTOVER.md](../AGENT_FIRST_CLEAN_CUTOVER.md)
 **Goal:** Implement R1A Q-REV-03/Q-WF-02 semantics.
@@ -19,8 +19,15 @@ across input permutations.
 **Non-goals:** Query/public/projection/R3/R4/RG/09.
 **Invariants:** Production publication owns complete acyclic session hierarchy; no test fallback may manufacture it. Explicit complete tool start/terminal coordinates are selected independently at window boundaries. Canonical-call `measurement_mask` and four token classes remain exact. Q-REV-03 answer objects are direct facts and its named formulas are bound internal diagnostics. No placeholders; malformed/null/mismatch/duplicate fails closed; CK-08R2 and 19 fail-closed residual plans unchanged; synthetic; sdist <=2,000,000.
 **Required tests/checks:** Recompute authority identities; R1A vectors; formula/operand/query/database/closure; deterministic fixture regeneration with unchanged source JSONL; full 80-case independent-versus-production rows/grades/order/provenance/null replay; all authority negative mutations; `just vp`; `just v/vc`; reviewer/CI/merge/exact-main.
-**Acceptance:** Facts alone drive output; no grading source.
+**Acceptance:** Facts alone drive output; no grading source. Exact
+authority-selected 23-path cohort; focused 284; authority/negative 160;
+synthetic production-versus-independent replay 80/80; `just vp`, `just v`, and
+`just vc` green with 1,465 passed and 1 skipped; one bounded reviewer clean;
+hosted Console and Python 3.10/3.14 green.
 **Failure/rollback:** Any cohort, closure, hierarchy, coordinate, measurement, row, grade, provenance, or regeneration mismatch fails closed; keep R1 blocked and request new authority only for a genuinely new policy decision.
-**Handoff:** SHA/R1A digest/R1C closure/23-path cohort/full 80-case production-compiler comparison/gates/risks; R1 remains blocked until implementation acceptance.
-**Cleanup/docs:** Final R1 accounting.
+**Handoff:** PR #430 merge `9e9332b3`; R1A digest/R1C closure/23-path cohort,
+full 80-case production-compiler comparison, gates, and risks accepted. R1 is
+Ready after this coordinator accounting merge.
+**Cleanup/docs:** Completed by this accounting reconciliation; retained
+implementation and exact-main worktrees remain preserved.
 **Suggested commit:** `fix: derive supported answer semantics`
