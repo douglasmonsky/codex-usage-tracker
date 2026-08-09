@@ -59,11 +59,14 @@ R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`.
 The [CK-08R1B answer-semantics join authority](decisions/evidence/ck08r1b/answer-semantics-join-authority.json)
 binds the exact R1A producer artifacts, preserves R1C closure independence,
 and permits only the proved query admission, production-owned synthetic
-hierarchy materialization, explicit tool coordinates and straddling lifecycle,
+ hierarchy materialization after every authoritative relationship is applied,
+ explicit non-null required tool coordinates and straddling lifecycle,
 duplicate-ID rejection, Q-REV-03 direct-fact/internal-formula binding, and
-deterministic 80-case production-compiler fixture transition. R1B is Ready only
-for its existing held worker and PR #430 after that
-authority is merged and exact-main verified; the authority does not accept the
+deterministic 80-case production-compiler fixture transition. Its narrow
+selected-cohort acceptance correction binds late-cycle/reverse-chain/ambiguous
+parent rejection and production-independent null-coordinate parity. R1B is
+Ready only for its existing held worker and PR #430 after that correction is
+merged and exact-main verified; the authority does not accept the
 implementation. CK-08R1, CK-08R4, CK-08RG, CK-09, and CK-07 remain blocked or
 held by their existing gates.
 CK-QG1A0 gated the selected R2 PageExecutor successor; QG1A removed its two

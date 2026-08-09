@@ -127,6 +127,30 @@
     "worker_pr_edit": "forbidden",
     "implementation_acceptance": "not_granted"
   },
+  "acceptance_correction": {
+    "base_sha": "362e9bb908c06980cbe25cc2d433d3f78a238947",
+    "source_pr": 430,
+    "worker_head_sha": "3a86a10b12122d6ff9bec70f5f62105157af25c8",
+    "worker_state": "fresh_acceptance_worktree_dirty_exact_21_staged_paths_preserved",
+    "superseded_selected_patch_sha256": "74776e524db39a8687963faa8a163dccd848fd9bf7ca81697ca3c86c5e5a0d5a",
+    "selected_patch_sha256": "078fe2ded1d49035581b545f9d9710be856e0c7123c8434c2154a597b695fa41",
+    "selected_successor_paths": 21,
+    "changed_successor_paths": [
+      "src/codex_usage_tracker/agent_kernel/domain/plan_derivations_structural.py",
+      "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "tests/agent_kernel/contracts/test_plan_derivations_structural.py",
+      "tests/agent_kernel/fixtures/independent/semantic.py",
+      "tests/agent_kernel/publication/test_preparation.py",
+      "tests/agent_kernel/test_ck08r1c_independent_evaluator.py"
+    ],
+    "findings": [
+      "all authoritative late session relationships apply before one complete hierarchy computation and validation",
+      "late relationship cycles, ambiguous new parents, missing parents, and stale reverse-order chains fail closed or resolve exactly",
+      "required Q-WF-02 tool start and terminal event_at_us values reject explicit null in production and independent truth"
+    ],
+    "worker_pr_edit": "forbidden",
+    "implementation_acceptance": "not_granted"
+  },
   "consumer_join": {
     "query_compiler": {
       "path": "src/codex_usage_tracker/agent_kernel/query/compiler.py",
@@ -152,7 +176,7 @@
       ],
       "owner": "existing CK-08R1B worker",
       "requirements": [
-        "production publication materializes every selected session with one complete acyclic parent chain before query compilation",
+        "production publication applies every authoritative session relationship before computing and validating exactly one complete acyclic parent chain for every selected session before query compilation",
         "the full 80-case database replay uses DatabaseV1FactCompiler rather than a test fact adapter",
         "tool starts and terminals materialize their separately declared coordinates",
         "canonical calls materialize exact measurement_mask and four token classes",
@@ -186,43 +210,43 @@
     }
   },
   "selected_successor_cohort": {
-    "preflight_base_sha": "dce25ea306382b271391ce62036623996205c29e",
-    "patch_sha256": "74776e524db39a8687963faa8a163dccd848fd9bf7ca81697ca3c86c5e5a0d5a",
+    "preflight_base_sha": "362e9bb908c06980cbe25cc2d433d3f78a238947",
+    "patch_sha256": "078fe2ded1d49035581b545f9d9710be856e0c7123c8434c2154a597b695fa41",
     "files": [
       {"path": "config/agent-kernel/formula-contract-v1.json", "predecessor_sha256": "2e16599f244ac179313aa7bf7263caaddbd49f2c0984dbfa424ba89713e70ffa", "sha256": "3db5d4315d74f3c949cce6f6292f09026a5f26b4a1107c0434dbdd361c6a246c"},
       {"path": "config/agent-kernel/logical-contract-v1.json", "predecessor_sha256": "27981ec9bac8c245306e02784b8730e8ff9216b33a81da9efb8409403431fe3d", "sha256": "cf10cd6efd7bb149bd41d92dc817e7656fe74b999639b129d019b4d69773ecd7"},
       {"path": "config/agent-kernel/plan-operand-contract-v1.json", "predecessor_sha256": "19b9c69f50f67b01321e1f269cee2f70370ca64c0c666ff4dac2cc52efa314b4", "sha256": "e4a030893495e971e7890043c7ebe6c16843f5e457ad8c9aaa65202744364b06"},
       {"path": "experiments/physical-architecture/candidate_a/queries.py", "predecessor_sha256": "dd2a121480920cf96cd51ec43084a76a278009a8b72153b15963862d9619fe89", "sha256": "4c14507bba3259d725a9432c2e193f7a5bdac14c880bdf145d548552aad01a7f"},
       {"path": "scripts/generate_ck07a_fixture.py", "predecessor_sha256": "d24be0a95b302a9c52d413c300f23536d8c0287512c4b446ed03f8d33ce0863f", "sha256": "f7adde83efb963121e841aec8d71ebd2e2be1fa3a1c2745d8e5ec05e6884cb68"},
-      {"path": "src/codex_usage_tracker/agent_kernel/domain/plan_derivations_structural.py", "predecessor_sha256": "c63b5ae2528852768c7a0906c2dccd537587192116fd2cec956110bcc8ed1367", "sha256": "04673e50cdd7d3cc2c212295b64299b6a017bf86ebc74628e0c9bc1719aa0144"},
-      {"path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py", "predecessor_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c", "sha256": "d00df193b1bb44af6149734c67af9fe235dd7eed384c9dbb5c0732cf5a6c0868"},
+      {"path": "src/codex_usage_tracker/agent_kernel/domain/plan_derivations_structural.py", "predecessor_sha256": "c63b5ae2528852768c7a0906c2dccd537587192116fd2cec956110bcc8ed1367", "sha256": "068ae7db91225b1477833d7d77b7d5910779424f40609095f8a5d31621d81676"},
+      {"path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py", "predecessor_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c", "sha256": "79fb1414a77a400da5e20b339788a7e00453f96ecb79979056e07c9eeabd121f"},
       {"path": "src/codex_usage_tracker/agent_kernel/query/compiler.py", "predecessor_sha256": "0e57ddb03c5bff28eb74dc2eaa98f35491c649de71e7e9ba680c358a5adc0286", "sha256": "c3c43f044a43b5d2aed18cc03b88f1a5156a6570dd4d1cfc2f47a8b4d1833ffa"},
-      {"path": "tests/agent_kernel/contracts/test_plan_derivations_structural.py", "predecessor_sha256": "853f5d6d44d17ef4a19bff0ab383d758d52541ec7c7b8bf92d008d93b3fb40fb", "sha256": "80a5df1cce9fa33e9203edd459d749d03530b4b76e5f4a7a2911129698972122"},
+      {"path": "tests/agent_kernel/contracts/test_plan_derivations_structural.py", "predecessor_sha256": "853f5d6d44d17ef4a19bff0ab383d758d52541ec7c7b8bf92d008d93b3fb40fb", "sha256": "84d6e17cf3011eeaea42f502130ad1d7f3c37dcda93ad169c553277f05f2388a"},
       {"path": "tests/agent_kernel/contracts/test_plan_operand_contract.py", "predecessor_sha256": "72e9e205d56623eec9e26cba2fd8877190da1ee9675a779f49d527e989ad0988", "sha256": "1f7216e96232098d8efac7b19b205e399b9571d1e9ed6f3b489bb0c08f84b9d0"},
       {"path": "tests/agent_kernel/contracts/vectors/plan-operands-v1.json", "predecessor_sha256": "cc4d944354356136c45c6a22aa0a289849fe6c4804e4a5d5bd5574cac1ab72c2", "sha256": "d23fb7a0b68f3b403f1add8d4b99a5a3d3d5881677f7bb2e144f4402cd2ee22b"},
       {"path": "tests/agent_kernel/fact_adapters/database.py", "predecessor_sha256": "30c3f34d3847e75faeb5a5d543ec88b30939ad218ae38071e1929acddba6a63e", "sha256": "9ee0f23056aaa87a07981df56a0d130c5a976084fe945378182d9e0c9bc43471"},
       {"path": "tests/agent_kernel/fact_adapters/support.py", "predecessor_sha256": "2e8447613ce12fd0f82cb36af7ddebb2ba1e4eef1b6d53f31a990564b0be94c5", "sha256": "4e9ae26ce21909579bb5ccb1494cd55aaf1c2629ab547a50a8fda049829ad896"},
-      {"path": "tests/agent_kernel/fixtures/independent/semantic.py", "predecessor_sha256": "8d46b9f65676087437386c270d975f2be8651a8eb299ee1e6d525b5eda913443", "sha256": "1615c02e5617b80b43d1d3dda57a4dd7a575cf659e6459a0ba946ba96179d4b5"},
+      {"path": "tests/agent_kernel/fixtures/independent/semantic.py", "predecessor_sha256": "8d46b9f65676087437386c270d975f2be8651a8eb299ee1e6d525b5eda913443", "sha256": "1b1fe30d20216c1ae9a59021fa5e67a76fe060f25a8cfab31caccfb108c8f4c5"},
       {"path": "tests/agent_kernel/fixtures/oracles/cases_v2.py", "predecessor_sha256": "4ab32f4f924aef5f71e3b3d48478e5ae33eb86736a3b75de4b52621f4dae679b", "sha256": "7042fd002c1345c555a13148163cef326b3f6b4cf362ea7c922511e80c321b39"},
       {"path": "tests/agent_kernel/fixtures/oracles/database_replay.py", "predecessor_sha256": "a22169f3884390ff7f98b871daf778aaae1fec7c5d0805eec3a9ce0db07219b6", "sha256": "73b3a0e796c0885d5ce09e8f5349f704a34138515b32729def3f139c17058467"},
       {"path": "tests/agent_kernel/fixtures/tiny-v2/manifest.json", "predecessor_sha256": "fb40a8a91d6ad537171e7a23e3f6fa9bd519080b513981b9483f9791e5e99e7d", "sha256": "4e33fc263f75cdd7d532d2972232b92c5320f58c0628154deaa74380d8875a8c"},
       {"path": "tests/agent_kernel/fixtures/tiny-v2/oracle-bundle.json", "predecessor_sha256": "97b78d11fa64eb2dac0a5f605bd9056f331ac9dd1fd210703e5f42b23935b40e", "sha256": "e5f682332b7529a85b420f1e1d2c543a5f867eef617fcb484ecc2d04c517da72"},
       {"path": "tests/agent_kernel/fixtures/tiny-v2/question-scenarios.json", "predecessor_sha256": "6ffca4917386c5bc13237952904d2a560a531e37c6eeba89b69ea53d76f35cd8", "sha256": "986d2f9689f0abf6515247655d75ad8c3587cf7635b201479801de0c94431014"},
-      {"path": "tests/agent_kernel/publication/test_preparation.py", "predecessor_sha256": "2b43cdfca0d935d4f08aa44a16bd176713ddf3ef7083ff3e76b42d4d0c8687e3", "sha256": "d0c277af4c655efb9b57c9bd7605592ce8a4959a12ffdad030935af5a4df6ce9"},
-      {"path": "tests/agent_kernel/test_ck08r1c_independent_evaluator.py", "predecessor_sha256": "db9c0dd58dbd24bb28a76cb1a603516686bf552e0303c451b5d1949c4b62e693", "sha256": "defac63d1ee27c83a67c4f3f9e8dae24d713a263582614b83c9f9b20279d4ce2"}
+      {"path": "tests/agent_kernel/publication/test_preparation.py", "predecessor_sha256": "2b43cdfca0d935d4f08aa44a16bd176713ddf3ef7083ff3e76b42d4d0c8687e3", "sha256": "d4e06c6fc7b2faa3d06c447d06c5a4ed5523da24caa1b25ee60de63e3fe6aa78"},
+      {"path": "tests/agent_kernel/test_ck08r1c_independent_evaluator.py", "predecessor_sha256": "db9c0dd58dbd24bb28a76cb1a603516686bf552e0303c451b5d1949c4b62e693", "sha256": "0509b5cafaec53e042a19863545d5085f83db29bb50fb2708f5069afa6553f91"}
     ],
     "focused_test_identities": [
       {
         "path": "tests/agent_kernel/contracts/test_plan_derivations_structural.py",
-        "sha256": "80a5df1cce9fa33e9203edd459d749d03530b4b76e5f4a7a2911129698972122"
+        "sha256": "84d6e17cf3011eeaea42f502130ad1d7f3c37dcda93ad169c553277f05f2388a"
       },
       {
         "path": "tests/agent_kernel/publication/test_preparation.py",
-        "sha256": "d0c277af4c655efb9b57c9bd7605592ce8a4959a12ffdad030935af5a4df6ce9"
+        "sha256": "d4e06c6fc7b2faa3d06c447d06c5a4ed5523da24caa1b25ee60de63e3fe6aa78"
       },
       {
         "path": "tests/agent_kernel/test_ck08r1c_independent_evaluator.py",
-        "sha256": "defac63d1ee27c83a67c4f3f9e8dae24d713a263582614b83c9f9b20279d4ce2"
+        "sha256": "0509b5cafaec53e042a19863545d5085f83db29bb50fb2708f5069afa6553f91"
       },
       {
         "path": "tests/agent_kernel/fixtures/oracles/database_replay.py",
@@ -239,12 +263,14 @@
         "Q-WF-02 start-before/terminal-inside and start-inside/terminal-after straddling",
         "production publication complete hierarchy plus dangling and cyclic rejection",
         "independent evaluator duplicate call, tool, and state-change stable-ID rejection",
-        "Q-REV-03 direct fact answers and bound internal formula diagnostics"
+        "Q-REV-03 direct fact answers and bound internal formula diagnostics",
+        "late relationship cycle, reverse-order chain, ambiguous new parent, and missing-parent rejection",
+        "production and independent required tool start/terminal null timestamp rejection"
       ]
     }
   },
   "negative_mutations": [
-    "missing, null, duplicate, cyclic, or dangling session hierarchy rejects",
+    "missing, null, duplicate, cyclic, dangling, ambiguous, or stale reverse-order session hierarchy rejects after all authoritative relationships apply",
     "missing, null, malformed, or value-mismatched canonical-call measurement_mask rejects even when structural-context capability is unavailable",
     "Q-WF-02 session selector excludes same-window foreign-session calls, tools, and state changes",
     "valid Q-WF-02 tools before or after the selected half-open window are excluded",
