@@ -320,6 +320,7 @@
         "worker_head_sha",
         "worker_state",
         "superseded_selected_patch_sha256",
+        "superseded_authority_patch_sha256",
         "selected_patch_sha256",
         "selected_successor_paths",
         "changed_successor_paths",
@@ -330,7 +331,7 @@
       ],
       "properties": {
         "base_sha": {
-          "const": "e5b6321f406e10770b1caa96639f90f47cca2221"
+          "const": "5eb9ffb4afc35e20db57ee936388c345d3c2c609"
         },
         "source_pr": {
           "const": 430
@@ -339,13 +340,16 @@
           "const": "3a86a10b12122d6ff9bec70f5f62105157af25c8"
         },
         "worker_state": {
-          "const": "dirty_exact_23_path_reapplication_preserved_no_post_review_edits"
+          "const": "dirty_exact_23_path_reapplication_preserved_no_post_review_edits_or_pr_update"
         },
         "superseded_selected_patch_sha256": {
           "const": "5ea9275830146875cd60cdf28372d5bbb4deeafe0b170c29ecd3118a70390fc2"
         },
-        "selected_patch_sha256": {
+        "superseded_authority_patch_sha256": {
           "const": "e424294a083b7f8f4c61dd57ac11400f3f6bdf63469f3d43154931c9c9c1939c"
+        },
+        "selected_patch_sha256": {
+              "const": "d64e930928f6fc913b25c2b889ecd5588289edb8410e19188ddf7172c8126bba"
         },
         "selected_successor_paths": {
           "const": 23
@@ -370,8 +374,8 @@
         },
         "findings": {
           "type": "array",
-          "minItems": 4,
-          "maxItems": 4,
+            "minItems": 8,
+            "maxItems": 8,
           "uniqueItems": true,
           "items": {
             "type": "string",

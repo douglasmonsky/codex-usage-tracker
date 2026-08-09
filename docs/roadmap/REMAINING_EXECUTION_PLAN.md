@@ -49,8 +49,12 @@ retains those 23 paths and binds the remaining closure seam:
 `SessionObserved` native parents seed their exact semantic parent component,
 and persisted/incoming late-parent relations compare event/source coordinates
 so stale replay cannot reverse a newer reparent. Exact replay is idempotent;
-conflicting equal-order parent or basis declarations fail closed. Only the
-existing worker may resume after
+conflicting equal-order parent or basis declarations fail closed. The selected
+cohort now also seeds an existing directly reparented session so its complete
+persisted descendants are recomputed, requires parent/basis/occurrence
+provenance equality for equal-coordinate idempotency, and resolves
+current-batch relations by the six-part authority order before logical
+identity with one emitted winner. Only the existing worker may resume after
 that correction merges and exact-main verifies. R1 remains their blocked
 requalification join.
 CK-QG1A removed R2's two page-executor C/B/B violations
