@@ -183,7 +183,7 @@
     "worker_state": "dirty_exact_23_path_reapplication_preserved_no_post_review_edits_or_pr_update",
     "superseded_selected_patch_sha256": "5ea9275830146875cd60cdf28372d5bbb4deeafe0b170c29ecd3118a70390fc2",
     "superseded_authority_patch_sha256": "e424294a083b7f8f4c61dd57ac11400f3f6bdf63469f3d43154931c9c9c1939c",
-    "selected_patch_sha256": "cde2a7a9095e62f4abbc8db31dc40b929cb44446a9f3bb07f316149782c621fa",
+    "selected_patch_sha256": "d64e930928f6fc913b25c2b889ecd5588289edb8410e19188ddf7172c8126bba",
     "selected_successor_paths": 23,
     "changed_successor_paths": [
       "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
@@ -206,7 +206,8 @@
       "four-publication stale replay preserves the newer reparented subtree, every changed descendant, unaffected components, and production write-set parity",
       "direct SessionObserved reparent seeds the existing session and loads its complete persisted descendant subtree before hierarchy recomputation",
       "equal six-part coordinates require exact parent basis and occurrence provenance identity; distinct evidence fails closed and exact duplicate remains idempotent",
-      "current-batch relationship winner uses the six-part authority order before logical identity, emits one winner, and rejects equal-order ties"
+      "current-batch relationship winner uses the six-part authority order before logical identity, emits one winner, and rejects equal-order ties",
+      "persisted relationship history retains every occurrence so older exact replay is idempotent and distinct evidence at the same older coordinate fails closed"
     ],
     "worker_pr_edit": "forbidden",
     "implementation_acceptance": "not_granted"
@@ -275,7 +276,7 @@
   },
   "selected_successor_cohort": {
     "preflight_base_sha": "5eb9ffb4afc35e20db57ee936388c345d3c2c609",
-    "patch_sha256": "cde2a7a9095e62f4abbc8db31dc40b929cb44446a9f3bb07f316149782c621fa",
+    "patch_sha256": "d64e930928f6fc913b25c2b889ecd5588289edb8410e19188ddf7172c8126bba",
     "files": [
       {
         "path": "config/agent-kernel/formula-contract-v1.json",
@@ -310,12 +311,12 @@
       {
         "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
         "predecessor_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
-        "sha256": "65016a3463861634320eca2b9b3d774c35aa18176c6ebd62430a47356007a7a9"
+        "sha256": "7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb"
       },
       {
         "path": "src/codex_usage_tracker/agent_kernel/publication/writer.py",
         "predecessor_sha256": "13da341fc2a3c50d8d7de7fd6a6fc2b0aca0dbc832a9b56597cd96ab67d17488",
-        "sha256": "1ba92de3716d3c7a1339e86dd569c688cccbc16c1c56a208473aa91b7e68a908"
+        "sha256": "d163e6c566665a65062952be1618b9f2c4032eabd841408e2f274bcd29748a73"
       },
       {
         "path": "src/codex_usage_tracker/agent_kernel/query/compiler.py",
@@ -385,7 +386,7 @@
       {
         "path": "tests/agent_kernel/publication/test_writer.py",
         "predecessor_sha256": "28dce47dfe32717a937079f068e9c1f1abcfbdfa6d65a15db6faba1b0c914b26",
-        "sha256": "488f322a8fb2910f3a57e98be850ba41e1642b9bd0efb74483869723aa33ce80"
+        "sha256": "7ce9712aaed6464c579d4bdb94c858fcf064393124b5ded9116bd49b1f83b67d"
       },
       {
         "path": "tests/agent_kernel/test_ck08r1c_independent_evaluator.py",
@@ -404,7 +405,7 @@
       },
       {
         "path": "tests/agent_kernel/publication/test_writer.py",
-        "sha256": "488f322a8fb2910f3a57e98be850ba41e1642b9bd0efb74483869723aa33ce80"
+        "sha256": "7ce9712aaed6464c579d4bdb94c858fcf064393124b5ded9116bd49b1f83b67d"
       },
       {
         "path": "tests/agent_kernel/test_ck08r1c_independent_evaluator.py",
@@ -416,7 +417,7 @@
       }
     ],
     "focused_validation": {
-      "result": "266 passed focused semantic, publication, compiler, replay, and writer preflight",
+      "result": "267 passed focused semantic, publication, compiler, replay, and writer preflight",
       "case_count": 80,
       "independent_rows_equal_production_rows": true,
       "independent_grades_equal_frozen_grades": true,
@@ -433,7 +434,8 @@
         "four-publication newer reparent, stale replay, exact duplicate, equal-order conflict, descendant recomputation, and unaffected-component preservation",
         "direct SessionObserved reparent with complete persisted descendant write set and unaffected-component parity",
         "equal six-part same-parent different-basis or provenance conflict plus exact duplicate idempotency",
-        "current-batch transition-rank winner over inverse logical-id order across permutations with one emitted edge"
+        "current-batch transition-rank winner over inverse logical-id order across permutations with one emitted edge",
+        "three-publication older same-relation exact replay plus distinct-occurrence equal-order conflict"
       ]
     }
   },

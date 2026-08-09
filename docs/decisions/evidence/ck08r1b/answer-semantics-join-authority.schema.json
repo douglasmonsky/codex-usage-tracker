@@ -349,7 +349,7 @@
           "const": "e424294a083b7f8f4c61dd57ac11400f3f6bdf63469f3d43154931c9c9c1939c"
         },
         "selected_patch_sha256": {
-          "const": "cde2a7a9095e62f4abbc8db31dc40b929cb44446a9f3bb07f316149782c621fa"
+              "const": "d64e930928f6fc913b25c2b889ecd5588289edb8410e19188ddf7172c8126bba"
         },
         "selected_successor_paths": {
           "const": 23
@@ -374,8 +374,8 @@
         },
         "findings": {
           "type": "array",
-          "minItems": 7,
-          "maxItems": 7,
+            "minItems": 8,
+            "maxItems": 8,
           "uniqueItems": true,
           "items": {
             "type": "string",

@@ -239,7 +239,7 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
         == "forbidden"
     )
     assert cohort["focused_validation"] == {
-        "result": "266 passed focused semantic, publication, compiler, replay, and writer preflight",
+        "result": "267 passed focused semantic, publication, compiler, replay, and writer preflight",
         "case_count": 80,
         "independent_rows_equal_production_rows": True,
         "independent_grades_equal_frozen_grades": True,
@@ -257,6 +257,7 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
             "direct SessionObserved reparent with complete persisted descendant write set and unaffected-component parity",
             "equal six-part same-parent different-basis or provenance conflict plus exact duplicate idempotency",
             "current-batch transition-rank winner over inverse logical-id order across permutations with one emitted edge",
+            "three-publication older same-relation exact replay plus distinct-occurrence equal-order conflict",
         ],
     }
 
