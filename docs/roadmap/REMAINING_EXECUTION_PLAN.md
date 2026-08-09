@@ -65,7 +65,12 @@ permitted only the exact accepted-main writer provenance finding transition.
 PR #392 then passed exact normalized baseline enforcement, full validation,
 review, and hosted Console/Python 3.10/3.14 before squash merge and fresh
 exact-main verification at `68050b9313ccc5be8e1fcd0ccd5b95cb4173f3ff`.
-CK-QG1 is complete; CK-08RG remains blocked on CK-08R4.
+CK-QG1 is complete; its v2 [writer transition authority](../decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json)
+binds current main `dd771073` writer `13da341f…` to reviewed PR #430 writer
+`d163e6c5…` with the unchanged `fda777e2…` baseline and identical normalized
+findings. CK-08R1B remains permitted-not-accepted and may resume only after
+this authority is merged and exact-main verified; CK-08RG remains blocked on
+CK-08R4.
 CK-07R1A is accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 was accepted at
 `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked

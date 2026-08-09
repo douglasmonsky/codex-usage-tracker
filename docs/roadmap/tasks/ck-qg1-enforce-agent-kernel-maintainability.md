@@ -7,8 +7,11 @@
 transition authority](../../decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json)
 permits only the accepted-main `PublicationWriter._validate_turn_provenance`
 finding at score 35/count 1, bound to the exact predecessor and successor
-digests. It does not accept the implementation, authorize generic baseline
-growth, or authorize any downstream packet.
+digests. Its v2 cross-packet section additionally binds the current-main
+writer `13da341f…` to the reviewed CK-08R1B PR #430 writer `d163e6c5…` with
+the unchanged successor baseline and identical normalized findings. It does
+not accept either implementation, authorize generic baseline growth, or
+authorize any downstream packet.
 
 **Parent:** Corrective quality gate for all remaining packets
 
@@ -43,10 +46,10 @@ over exact source.
 
 **Consumer seam:** `just vp`, `just v`, `just vc`, and later packet CI.
 
-**Parallelism:** Resume existing task
-`019fbb41-79b6-7760-8e7f-e68fc381422a` only after QG1A handoff and the linked
-baseline-transition authority is squash-merged and exact-main verified; other
-corrective locks stay disjoint.
+**Parallelism:** The CK-QG1 implementation is complete. Only existing
+CK-08R1B task `019fc419-0dab-73e3-a6cc-ce574f18c89f` may resume PR #430 after
+this v2 writer-transition authority is squash-merged and exact-main verified;
+other corrective locks stay disjoint.
 
 **Non-goals:** Clearing all historical findings or exempting new complexity.
 

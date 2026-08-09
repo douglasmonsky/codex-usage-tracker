@@ -91,7 +91,12 @@ PR #392 then enforced that exact normalized baseline without weakening
 thresholds, exemptions, release budgets, privacy, or spike semantics. Hosted
 Console and Python 3.10/3.14 passed before squash merge and fresh exact-main
 verification at `68050b9313ccc5be8e1fcd0ccd5b95cb4173f3ff`. CK-QG1 is
-complete; CK-08RG remains blocked on CK-08R4. CK-07R1A separately corrected
+complete; CK-08RG remains blocked on CK-08R4. The v2 [CK-QG1/R1B writer
+transition authority](decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json)
+binds current main `dd771073` writer `13da341f…` to reviewed PR #430 head
+writer `d163e6c5…` without changing the active baseline
+`fda777e2…`; both states produce the same 20 normalized findings and the
+authority remains permitted-not-accepted. CK-07R1A separately corrected
 PR #394's exact
 hosted lifecycle-tail failure without a budget waiver.
 CK-07R1A0 path authority remains accepted at exact main

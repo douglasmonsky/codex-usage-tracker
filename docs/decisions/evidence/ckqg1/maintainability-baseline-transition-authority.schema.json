@@ -1,21 +1,21 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-usage-tracker.invalid/schemas/ckqg1-maintainability-baseline-transition-authority-v1.schema.json",
-  "title": "CK-QG1 exact maintainability baseline transition authority",
+  "$id": "https://codex-usage-tracker.invalid/schemas/ckqg1-maintainability-baseline-transition-authority-v2.schema.json",
+  "title": "CK-QG1 exact maintainability and CK-08R1B writer transition authority",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema", "authority_version", "owner", "authority_base_sha", "status", "decision",
-    "decision_basis", "linked_authorities", "baseline_transition", "invariants",
+    "decision_basis", "cross_packet_writer_transition", "linked_authorities", "baseline_transition", "invariants",
     "non_generalizable", "negative_mutations", "preflight", "scope", "worker_handoff"
   ],
   "properties": {
-    "schema": {"const": "codex-usage-tracker.ckqg1-maintainability-baseline-transition-authority.v1"},
-    "authority_version": {"const": 1},
+    "schema": {"const": "codex-usage-tracker.ckqg1-maintainability-baseline-transition-authority.v2"},
+    "authority_version": {"const": 2},
     "owner": {"const": "CK-QG1"},
-    "authority_base_sha": {"const": "479cc58a887ab49e1bf6fae90ed87cd1cf389fd5"},
+    "authority_base_sha": {"const": "dd771073c9b3126599d2a0a8282edba04a48a09d"},
     "status": {"const": "permitted_not_accepted"},
-    "decision": {"const": "authorize_exact_successor_baseline_only"},
+    "decision": {"const": "authorize_exact_writer_transition_only"},
     "decision_basis": {
       "type": "object",
       "additionalProperties": false,
@@ -41,6 +41,7 @@
         "rationale": {"type": "string", "minLength": 1}
       }
     },
+    "cross_packet_writer_transition": {"$ref": "#/$defs/crossPacketWriterTransition"},
     "linked_authorities": {
       "type": "array",
       "const": [
@@ -114,7 +115,11 @@
         {"id": "new_unlisted_finding", "result": "reject_fail_closed"},
         {"id": "worsened_finding", "result": "reject_fail_closed"},
         {"id": "text_exemption_added", "result": "reject_fail_closed"},
-        {"id": "production_path_added_to_authority_scope", "result": "reject_fail_closed"}
+        {"id": "production_path_added_to_authority_scope", "result": "reject_fail_closed"},
+        {"id": "writer_successor_digest_changed", "result": "reject_fail_closed"},
+        {"id": "r1b_authority_digest_changed", "result": "reject_fail_closed"},
+        {"id": "pr430_head_changed", "result": "reject_fail_closed"},
+        {"id": "writer_successor_with_predecessor_baseline", "result": "reject_fail_closed"}
       ]
     },
     "preflight": {
@@ -191,16 +196,16 @@
             "the retained PR #392 witness at 29f18ae178a4d048e9d4bd1ae49a4307dd8472dd",
             "baseline/checker implementation edits in this authority PR",
             "threshold weakening, text exemptions, normalization changes, release-budget waivers, or privacy relaxation",
-            "CK-QG1 implementation acceptance, CK-08RG, CK-09, downstream dispatch, or live operation"
+          "CK-QG1 or CK-08R1B implementation acceptance, PR #430 edits, CK-08RG, CK-09, downstream dispatch, or live operation"
           ]
         }
       }
     },
     "worker_handoff": {
       "const": {
-        "held_worker_thread": "019fbb41-79b6-7760-8e7f-e68fc381422a",
-        "resume_after": "this authority is squash-merged and fresh exact-main identities are verified",
-        "next_authorized_action": "reuse PR #392 in a new latest-exact-main worktree, reapply the held candidate, install the exact successor baseline document, and rerun the existing implementation validation",
+          "held_worker_thread": "019fc419-0dab-73e3-a6cc-ce574f18c89f",
+          "resume_after": "this authority is squash-merged and fresh exact-main identities are verified",
+          "next_authorized_action": "resume only existing PR #430 in a new latest-exact-main worktree, reapply the reviewed 23-path CK-08R1B successor, and rerun the existing implementation validation",
         "implementation_acceptance": "not_granted_by_this_authority",
         "new_authority_task": "forbidden",
         "downstream_dispatch": "forbidden"
@@ -253,6 +258,97 @@
       "properties": {
         "path": {"const": "docs/decisions/evidence/ck08r3a/final-shared-authority.json"},
         "sha256": {"const": "ee479cbd4b41b63a1701df97abda01b27be7e559783d44503144bdf0c0bdef98"}
+      }
+    },
+    "crossPacketWriterTransition": {
+      "const": {
+        "packet": "CK-08R1B",
+        "state": "exact_writer_successor_without_baseline_change",
+        "r1b_authority": {
+          "path": "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.json",
+          "sha256": "d35bca7600e2e372d6c7b71420cc95996ee1222343982ffd323fee9ba5cbf8b5",
+          "schema_path": "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.schema.json",
+          "schema_sha256": "4921d75b71138d4a2ced9345cc4cb40ea0873305e3245b22f16059e3d41ebd3b",
+          "authority_base_sha": "f31efbdcb81ae3c3cb77d71eb740af4f4ffdfca4",
+          "status": "permitted_not_accepted",
+          "decision": "authorize_exact_query_evidence_grading_join_for_existing_worker",
+          "selected_successor_paths": 23,
+          "selected_patch_sha256": "d64e930928f6fc913b25c2b889ecd5588289edb8410e19188ddf7172c8126bba"
+        },
+        "source_pr": {
+          "number": 430,
+          "base_sha": "97ea3aed8f67c7840a34b610e7e0588b7eaf3c4d",
+          "head_sha": "925270e6ad13074ddec756e0cd89165c29d9b144",
+          "head_tree_sha": "aba15a107365a5cfccea80d5bbf57c7fb5f92e82",
+          "head_changed_paths": 31,
+          "url": "https://github.com/douglasmonsky/codex-usage-tracker/pull/430"
+        },
+        "writer_transition": {
+          "path": "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+          "predecessor_sha256": "13da341fc2a3c50d8d7de7fd6a6fc2b0aca0dbc832a9b56597cd96ab67d17488",
+          "successor_sha256": "d163e6c566665a65062952be1618b9f2c4032eabd841408e2f274bcd29748a73",
+          "r1b_selected_cohort_predecessor_sha256": "13da341fc2a3c50d8d7de7fd6a6fc2b0aca0dbc832a9b56597cd96ab67d17488",
+          "r1b_selected_cohort_successor_sha256": "d163e6c566665a65062952be1618b9f2c4032eabd841408e2f274bcd29748a73"
+        },
+        "baseline_binding": {
+          "path": "config/agent-kernel/maintainability-baseline-v1.json",
+          "sha256": "fda777e28db7a0696f29b55c9d694f99d987413b206d8e323f217b4fa6a73ad5",
+          "finding_count": 20,
+          "normalized_findings_sha256": "17bf73aa73ce9f70bb9837379acf976662418e6288913c77fa70efd4b5b443cc",
+          "normalization_version": "xenon-threshold-findings-v1",
+          "tool_identity": "xenon==0.9.3;radon==6.0.1",
+          "new_findings": [],
+          "worsened_findings": [],
+          "improved_findings": []
+        },
+        "checker_binding": {
+          "path": "scripts/check_kernel_maintainability.py",
+          "sha256": "2cc29d749432ee8e922f4403616164784cf956c30969ecb22e309cadd9cf315a",
+          "entry_point": "scripts/check_kernel_maintainability.py::maintainability_failures",
+          "active_thresholds": {"block": "C", "module": "B", "average": "B"},
+          "failure_semantics": {
+            "baseline_mismatch": "fail_closed",
+            "new_unlisted_finding": "fail_closed",
+            "worsened_finding": "fail_closed",
+            "improvement": "must_shrink_the_successor_baseline",
+            "text_exemption": "forbidden_and_ignored_by_normalization"
+          }
+        },
+        "authorized_states": [
+          {
+            "id": "current_main",
+            "commit_sha": "dd771073c9b3126599d2a0a8282edba04a48a09d",
+            "writer_sha256": "13da341fc2a3c50d8d7de7fd6a6fc2b0aca0dbc832a9b56597cd96ab67d17488",
+            "baseline_sha256": "fda777e28db7a0696f29b55c9d694f99d987413b206d8e323f217b4fa6a73ad5",
+            "checker_failures": [],
+            "result": "pass"
+          },
+          {
+            "id": "pr430_reviewed_successor",
+            "commit_sha": "925270e6ad13074ddec756e0cd89165c29d9b144",
+            "writer_sha256": "d163e6c566665a65062952be1618b9f2c4032eabd841408e2f274bcd29748a73",
+            "baseline_sha256": "fda777e28db7a0696f29b55c9d694f99d987413b206d8e323f217b4fa6a73ad5",
+            "r1b_authority_sha256": "d35bca7600e2e372d6c7b71420cc95996ee1222343982ffd323fee9ba5cbf8b5",
+            "checker_failures": [],
+            "result": "pass"
+          }
+        ],
+        "combined_preflight": {
+          "status": "passed",
+          "authority_bytes_byte_identical": true,
+          "finding_count": 20,
+          "normalized_findings_sha256": "17bf73aa73ce9f70bb9837379acf976662418e6288913c77fa70efd4b5b443cc",
+          "cases": [
+            {"id": "current_main_bound_state", "expected": "pass", "observed": "pass"},
+            {"id": "pr430_reviewed_successor_same_baseline", "expected": "pass", "observed": "pass"},
+            {"id": "pr430_successor_with_predecessor_baseline", "expected": "fail_closed:mismatch", "observed": "fail_closed:mismatch"},
+            {"id": "writer_digest_mutation", "expected": "reject_fail_closed:identity", "observed": "reject_fail_closed:identity"},
+            {"id": "r1b_authority_digest_mutation", "expected": "reject_fail_closed:identity", "observed": "reject_fail_closed:identity"},
+            {"id": "pr430_head_mutation", "expected": "reject_fail_closed:identity", "observed": "reject_fail_closed:identity"},
+            {"id": "new_unlisted_finding", "expected": "fail_closed:baseline", "observed": "fail_closed:baseline"},
+            {"id": "worsened_finding", "expected": "fail_closed:baseline", "observed": "fail_closed:baseline"}
+          ]
+        }
       }
     },
     "transition": {
