@@ -24,6 +24,7 @@ from scripts.check_kernel_scope import (
     CK08_PREREQUISITE_BLOCKER_ADDITIONS,
     CK08_QUERY_EVIDENCE_ADDITIONS,
     CK08R1A_ANSWER_SEMANTICS_ADDITIONS,
+    CK08R1B_JOIN_AUTHORITY_ADDITIONS,
     CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS,
     CK08R2_PHYSICAL_PAGE_ADDITIONS,
     CK08R3_EVIDENCE_SCALE_ADDITIONS,
@@ -678,6 +679,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK08R3_EVIDENCE_SCALE_ADDITIONS
         | CK08R1A_ANSWER_SEMANTICS_ADDITIONS
         | CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS
+        | CK08R1B_JOIN_AUTHORITY_ADDITIONS
         | CK08R3A_AUTHORITY_ADDITIONS
         | CKQG1A0_AUTHORITY_ADDITIONS
         | CKQG1_AUTHORITY_ADDITIONS
@@ -728,6 +730,24 @@ def test_ck08r1a_answer_semantics_additions_are_explicit_and_bounded() -> None:
         "tests/agent_kernel/contracts/test_answer_semantics_contract.py",
         "tests/agent_kernel/fixtures/contracts/answer-semantics-v1-vectors.json",
     } == CK08R1A_ANSWER_SEMANTICS_ADDITIONS
+
+
+def test_ck08r1b_join_authority_additions_are_explicit_and_bounded() -> None:
+    assert {
+        "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.json",
+        "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.schema.json",
+        "docs/INDEX.md",
+        "docs/architecture/QUERY_EVIDENCE_PROJECTION_CONTRACTS.md",
+        "docs/quality/QUALIFICATION_PLAN.md",
+        "docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md",
+        "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/tasks/ck-08r1b-implement-production-answer-semantics.md",
+        "scripts/check_kernel_scope.py",
+        "tests/kernel/test_ck08r1b_answer_semantics_join_authority.py",
+        "tests/kernel/test_documentation_authority.py",
+        "tests/kernel/test_kernel_scope.py",
+    } == CK08R1B_JOIN_AUTHORITY_ADDITIONS
 
 
 def test_ckqg1_authority_additions_are_explicit_and_bounded() -> None:

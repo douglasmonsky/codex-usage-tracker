@@ -95,6 +95,16 @@ def _portable_selected_support_hashes() -> dict[str, str]:
     }
 
 
+def _ck08r1b_selected_hashes() -> dict[str, str]:
+    authority = _json(
+        "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.json"
+    )
+    return {
+        item["path"]: item["sha256"]
+        for item in authority["selected_successor_cohort"]["files"]
+    }
+
+
 def _active_markdown() -> list[Path]:
     return [path for path in _DOCS.rglob("*.md") if "archive" not in path.relative_to(_DOCS).parts]
 
@@ -222,8 +232,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         hashlib.sha256(qg1a_source.read_bytes()).hexdigest()
         == (qg1a_authority["selected_successor"]["sha256"])
     )
-    ready: set[str] = set()
-    assert manifest["ready"] == []
+    ready: set[str] = {"CK-08R1B"}
+    assert manifest["ready"] == ["CK-08R1B"]
     assert manifest["conditional_ready"] == [
         {
             "condition": (
@@ -240,7 +250,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert "Critical-path completion: **14 / 21**" in ledger
     assert "Completed corrective child tasks: **11" in ledger
     assert "Remaining delegable child tasks: **39**" in ledger
-    assert "Blocked child tasks: **38" in ledger
+    assert "Blocked child tasks: **37" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
         f"Conditional-ready child tasks: **{sum(len(item['tasks']) for item in manifest['conditional_ready'])}"
@@ -426,6 +436,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
                 transition["publication_fixture_transition"]["selected"]["question_scenarios"][
                     "sha256"
                 ],
+                _ck08r1b_selected_hashes()[artifact["path"]],
             }
         elif artifact["path"] == "src/codex_usage_tracker/agent_kernel/publication/preparation.py":
             final = _json("docs/decisions/evidence/ck08r3a/final-shared-authority.json")
@@ -437,10 +448,17 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
                     + final["r3a"]["selected"]["support_identities"]
                 ):
                     required_path = _REPO_ROOT / required["path"]
-                    expected = required["sha256"]
+                    expected = {required["sha256"]}
                     if required["path"] == "tests/agent_kernel/evidence/test_service.py":
-                        expected = _portable_selected_support_hashes()[required["path"]]
-                    assert hashlib.sha256(required_path.read_bytes()).hexdigest() == expected
+                        expected = {_portable_selected_support_hashes()[required["path"]]}
+                    elif required["path"] == "tests/agent_kernel/fact_adapters/support.py":
+                        expected.add(_ck08r1b_selected_hashes()[required["path"]])
+                    assert hashlib.sha256(required_path.read_bytes()).hexdigest() in expected
+        elif artifact["path"] == "config/agent-kernel/plan-operand-contract-v1.json":
+            assert actual in {
+                artifact["sha256"],
+                _ck08r1b_selected_hashes()[artifact["path"]],
+            }
         else:
             assert actual == artifact["sha256"]
     locks = [lock for lane in contract["lanes"] for lock in lane["owned_lock"]]
@@ -1017,10 +1035,12 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
             + final["r3a"]["selected"]["support_identities"]
         ):
             required_path = _REPO_ROOT / required["path"]
-            expected = required["sha256"]
+            expected = {required["sha256"]}
             if required["path"] == "tests/agent_kernel/evidence/test_service.py":
-                expected = _portable_selected_support_hashes()[required["path"]]
-            assert hashlib.sha256(required_path.read_bytes()).hexdigest() == expected
+                expected = {_portable_selected_support_hashes()[required["path"]]}
+            elif required["path"] == "tests/agent_kernel/fact_adapters/support.py":
+                expected.add(_ck08r1b_selected_hashes()[required["path"]])
+            assert hashlib.sha256(required_path.read_bytes()).hexdigest() in expected
 
     mutations = [
         ("selected_successor", "sha256", "0" * 64),

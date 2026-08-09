@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-usage-tracker.invalid/schemas/ck08r1b-answer-semantics-join-authority-v1.schema.json",
+  "title": "CK-08R1B answer-semantics join authority",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "authority_version",
+    "owner",
+    "authority_base_sha",
+    "status",
+    "decision",
+    "producer_authority",
+    "independent_truth_authority",
+    "held_candidate",
+    "consumer_join",
+    "selected_successor_cohort",
+    "negative_mutations",
+    "required_gates",
+    "scope",
+    "worker_handoff"
+  ],
+  "properties": {
+    "schema": {"const": "codex-usage-tracker.ck08r1b-answer-semantics-join-authority.v1"},
+    "authority_version": {"const": 1},
+    "owner": {"const": "CK-08R1B-JOIN"},
+    "authority_base_sha": {"const": "f31efbdcb81ae3c3cb77d71eb740af4f4ffdfca4"},
+    "status": {"const": "permitted_not_accepted"},
+    "decision": {"const": "authorize_exact_query_evidence_grading_join_for_existing_worker"},
+    "producer_authority": {"$ref": "#/$defs/object"},
+    "independent_truth_authority": {"$ref": "#/$defs/object"},
+    "held_candidate": {"$ref": "#/$defs/object"},
+    "consumer_join": {"$ref": "#/$defs/object"},
+    "selected_successor_cohort": {
+      "type": "object",
+      "required": ["preflight_base_sha", "patch_sha256", "files", "focused_test_identities", "focused_validation"],
+      "properties": {
+        "preflight_base_sha": {"$ref": "#/$defs/gitSha"},
+        "patch_sha256": {"$ref": "#/$defs/sha"},
+        "files": {
+          "type": "array",
+          "minItems": 18,
+          "maxItems": 18,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/transitionPathDigest"}
+        },
+        "focused_test_identities": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/pathDigest"}
+        },
+        "focused_validation": {"$ref": "#/$defs/object"}
+      },
+      "additionalProperties": false
+    },
+    "negative_mutations": {
+      "type": "array",
+      "minItems": 12,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "required_gates": {
+      "type": "object",
+      "required": ["implementation", "downstream"],
+      "properties": {
+        "implementation": {"$ref": "#/$defs/nonEmptyStrings"},
+        "downstream": {"$ref": "#/$defs/nonEmptyStrings"}
+      },
+      "additionalProperties": false
+    },
+    "scope": {"$ref": "#/$defs/object"},
+    "worker_handoff": {
+      "type": "object",
+      "required": [
+        "resume_existing_worker",
+        "resume_after",
+        "next_authorized_action",
+        "replacement_worker",
+        "implementation_acceptance",
+        "new_authority_task",
+        "downstream_dispatch"
+      ],
+      "properties": {
+        "resume_existing_worker": {"const": "019fc419-0dab-73e3-a6cc-ce574f18c89f"},
+        "resume_after": {"type": "string", "minLength": 1},
+        "next_authorized_action": {"type": "string", "minLength": 1},
+        "replacement_worker": {"const": "forbidden"},
+        "implementation_acceptance": {"const": "not_granted_by_this_authority"},
+        "new_authority_task": {"const": "forbidden"},
+        "downstream_dispatch": {"const": "forbidden"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "pathDigest": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha"}
+      },
+      "additionalProperties": false
+    },
+    "transitionPathDigest": {
+      "type": "object",
+      "required": ["path", "predecessor_sha256", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "predecessor_sha256": {"$ref": "#/$defs/sha"},
+        "sha256": {"$ref": "#/$defs/sha"}
+      },
+      "additionalProperties": false
+    },
+    "nonEmptyStrings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "object": {"type": "object", "minProperties": 1}
+  }
+}

@@ -128,8 +128,8 @@ consumer replay reconciles published database-v1 facts to independent truth.
 ### Gate G4: answer kernel
 
 CK-08 history is provisional. R1A freezes Q-REV-03/Q-WF-02 and closure; R1C is
-accepted, R1B remains held on its shared integration join, and R1 requalifies
-after R1B. R2 bounds two direct plans while 19 fail
+accepted, the exact R1B join authority makes only its existing worker Ready,
+and R1 requalifies after R1B. R2 bounds two direct plans while 19 fail
 closed. R3A removes unbounded EvidenceService shape; R3 measures it. 07R1A
 materially corrects the exact hosted tail before PR #394 resumes. QG1A0 authorizes
 only the exact R2 PageExecutor successor; QG1A then removes
