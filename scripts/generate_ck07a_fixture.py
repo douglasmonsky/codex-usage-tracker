@@ -17,6 +17,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tests.agent_kernel.fact_adapters.support import plan_contract  # noqa: E402
+from tests.agent_kernel.fixtures.independent.semantic import (  # noqa: E402
+    evaluate_case as evaluate_independent_case,
+)
 from tests.agent_kernel.fixtures.oracles.cases_v2 import (  # noqa: E402
     FIXTURE_REVISION,
     SCENARIO_SCHEMA,
@@ -328,14 +331,15 @@ def generate(destination: Path) -> dict[str, Any]:
             }
             question = questions[published["question_id"]]
             evaluated = evaluate_question_case(published, question)
+            independent = evaluate_independent_case(published)
             comparison_digests.append(evaluated["comparison_digest"])
             cases.append(published)
             oracle_questions[published["oracle_id"]] = {
                 "question_id": published["question_id"],
                 "variant": published["variant"],
                 "request_digest": evaluated["request_digest"],
-                "expected_rows": evaluated["rows"],
-                "field_grades": question["answers"]["fields"],
+                "expected_rows": independent["rows"],
+                "field_grades": independent["field_grades"],
                 "references": evaluated["references"],
                 "comparison_digest": evaluated["comparison_digest"],
                 "source_path": published["source_path"],

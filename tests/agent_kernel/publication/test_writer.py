@@ -7,6 +7,9 @@ from pathlib import Path
 import pytest
 
 from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.canonicalize import (
+    AdapterAccounting,
+    ProposedChangeSet,
+    ProposedOccurrence,
     build_change_set,
 )
 from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.ingest import ingest
@@ -73,6 +76,780 @@ def _tiny_changes():
         workers=2,
         batch_size=32,
     ).changes
+
+
+def _root_sessions(changes: ProposedChangeSet):
+    latest = {
+        observation.logical_id: observation
+        for observation in changes.observations
+        if observation.observation_type == "SessionObserved"
+    }
+    return tuple(
+        observation
+        for observation in latest.values()
+        if observation.payload.get("parent_session_id") is None
+    )
+
+
+def _late_parent(source, child, parent, ordinal: int):
+    identity = (
+        child.identity_tuple[0],
+        parent.identity_tuple[0],
+        "late_discovery",
+    )
+    return replace(
+        source,
+        observation_type="SessionRelationshipObserved",
+        logical_id=semantic_id("session-relationship", identity),
+        identity_tuple=identity,
+        event_at_us=ordinal * 10,
+        source_order=ordinal,
+        payload={
+            "session_id": child.logical_id,
+            "parent_session_id": parent.logical_id,
+            "relationship_basis": "late_discovery",
+        },
+    )
+
+
+def _hierarchy_changes(*observations) -> ProposedChangeSet:
+    expanded = tuple(observations)
+    return ProposedChangeSet(
+        observations=expanded,
+        occurrences=tuple(
+            ProposedOccurrence(observation.logical_id, observation.source_range)
+            for observation in expanded
+        ),
+        diagnostics=(),
+        cursor_updates=(),
+        accounting=AdapterAccounting({}, {}, {}),
+        selected_sources=(),
+        deferred_sources=(),
+    )
+
+
+def _publish_changes(
+    connection: sqlite3.Connection,
+    changes: ProposedChangeSet,
+    operation_id: str,
+    *,
+    parent_publication_id: str | None = None,
+):
+    request = _request(
+        operation_id,
+        parent_publication_id=parent_publication_id,
+        committed_at_us=1_800_000_000_000_000,
+    )
+    plan = _plan(changes, parent_publication_id)
+    prior = read_prior_publication_snapshot(connection, changes)
+    write_set = prepare_write_set_from_changes(changes, request, prior=prior)
+    request = replace(
+        request,
+        artifact_manifest_sha256=planned_artifact_manifest_sha256(
+            plan,
+            request,
+            write_set,
+        ),
+    )
+    PublicationWriter(connection).publish(plan, request, write_set)
+    return request.publication_id, prior, write_set
+
+
+def _append_observations(
+    changes: ProposedChangeSet,
+    *observations,
+) -> ProposedChangeSet:
+    return replace(
+        changes,
+        observations=(*changes.observations, *observations),
+        occurrences=(
+            *changes.occurrences,
+            *(
+                ProposedOccurrence(observation.logical_id, observation.source_range)
+                for observation in observations
+            ),
+        ),
+    )
+
+
+def test_writer_snapshot_loads_existing_parent_for_new_child_across_publications(
+    tmp_path: Path,
+) -> None:
+    initial = _tiny_changes()
+    root, middle, child, *_ = _root_sessions(initial)
+    first_changes = _append_observations(
+        initial,
+        _late_parent(middle, middle, root, 400),
+    )
+    new_child = replace(
+        child,
+        logical_id=semantic_id("session", ["multipub-child", "identity-v1"]),
+        identity_tuple=("multipub-child", "identity-v1"),
+        payload={
+            **child.payload,
+            "session_id": semantic_id("session", ["multipub-child", "identity-v1"]),
+            "parent_session_id": str(middle.identity_tuple[0]),
+        },
+    )
+    connection = initialize_analytical(tmp_path / "writer-multipub-parent.sqlite3")
+    try:
+        first, _, _ = _publish_changes(
+            connection,
+            first_changes,
+            "multipub-parent-first",
+        )
+        _, prior, write_set = _publish_changes(
+            connection,
+            _hierarchy_changes(new_child),
+            "multipub-parent-child",
+            parent_publication_id=first,
+        )
+
+        assert set(prior.entity_rows) >= {root.logical_id, middle.logical_id}
+        prepared = next(
+            row
+            for row in write_set.rows
+            if row.table == "sessions"
+            and row.values["session_id"] == new_child.logical_id
+        )
+        assert prepared.values["parent_session_id"] == middle.logical_id
+        assert prepared.values["root_session_id"] == root.logical_id
+        assert prepared.values["delegation_depth"] == 2
+    finally:
+        connection.close()
+
+
+def test_writer_snapshot_rejects_unknown_parent_for_new_child(
+    tmp_path: Path,
+) -> None:
+    initial = _tiny_changes()
+    _, _, child, *_ = _root_sessions(initial)
+    missing_parent_native_id = "missing-parent"
+    new_child = replace(
+        child,
+        logical_id=semantic_id("session", ["dangling-child", "identity-v1"]),
+        identity_tuple=("dangling-child", "identity-v1"),
+        payload={
+            **child.payload,
+            "session_id": semantic_id("session", ["dangling-child", "identity-v1"]),
+            "parent_session_id": missing_parent_native_id,
+        },
+    )
+    connection = initialize_analytical(tmp_path / "writer-multipub-dangling.sqlite3")
+    try:
+        first, _, _ = _publish_changes(
+            connection,
+            initial,
+            "multipub-dangling-first",
+        )
+        changes = _hierarchy_changes(new_child)
+        request = _request(
+            "multipub-dangling-child",
+            parent_publication_id=first,
+        )
+        prior = read_prior_publication_snapshot(connection, changes)
+
+        with pytest.raises(PublicationWriteError, match="cyclic or dangling"):
+            prepare_write_set_from_changes(changes, request, prior=prior)
+    finally:
+        connection.close()
+
+
+def test_writer_snapshot_closes_existing_non_root_parent_and_reverse_late_chain(
+    tmp_path: Path,
+) -> None:
+    initial = _tiny_changes()
+    root, middle, child, *_ = _root_sessions(initial)
+    connection = initialize_analytical(tmp_path / "writer-hierarchy-chain.sqlite3")
+    try:
+        first, _, _ = _publish_changes(
+            connection,
+            initial,
+            "hierarchy-chain-initial",
+        )
+        second_changes = _hierarchy_changes(
+            _late_parent(child, child, middle, 500),
+            _late_parent(middle, middle, root, 400),
+        )
+        _, prior, write_set = _publish_changes(
+            connection,
+            second_changes,
+            "hierarchy-chain-late",
+            parent_publication_id=first,
+        )
+
+        assert set(prior.entity_rows) >= {
+            root.logical_id,
+            middle.logical_id,
+            child.logical_id,
+        }
+        prepared_sessions = {
+            str(row.values["session_id"]): row
+            for row in write_set.rows
+            if row.table == "sessions"
+        }
+        assert set(prepared_sessions) == {middle.logical_id, child.logical_id}
+        assert prepared_sessions[middle.logical_id].values["root_session_id"] == root.logical_id
+        assert prepared_sessions[middle.logical_id].values["delegation_depth"] == 1
+        assert prepared_sessions[child.logical_id].values["root_session_id"] == root.logical_id
+        assert prepared_sessions[child.logical_id].values["delegation_depth"] == 2
+    finally:
+        connection.close()
+
+
+def test_writer_reparent_recomputes_descendants_and_preserves_unaffected_rows(
+    tmp_path: Path,
+) -> None:
+    initial = _tiny_changes()
+    left_root, right_root, middle, child, *_ = _root_sessions(initial)
+    connection = initialize_analytical(tmp_path / "writer-hierarchy-reparent.sqlite3")
+    try:
+        first, _, _ = _publish_changes(
+            connection,
+            initial,
+            "hierarchy-reparent-initial",
+        )
+        second, _, _ = _publish_changes(
+            connection,
+            _hierarchy_changes(
+                _late_parent(middle, middle, left_root, 500),
+                _late_parent(child, child, middle, 600),
+            ),
+            "hierarchy-reparent-subtree",
+            parent_publication_id=first,
+        )
+        before = {
+            str(row["session_id"]): tuple(row)
+            for row in connection.execute(
+                "SELECT * FROM sessions ORDER BY session_id"
+            )
+        }
+        second_changes = _hierarchy_changes(
+            _late_parent(middle, middle, right_root, 700)
+        )
+        _, prior, write_set = _publish_changes(
+            connection,
+            second_changes,
+            "hierarchy-reparent-late",
+            parent_publication_id=second,
+        )
+
+        assert set(prior.entity_rows) >= {
+            left_root.logical_id,
+            right_root.logical_id,
+            middle.logical_id,
+            child.logical_id,
+        }
+        prepared_sessions = {
+            str(row.values["session_id"]): row
+            for row in write_set.rows
+            if row.table == "sessions"
+        }
+        assert {middle.logical_id, child.logical_id} <= set(prepared_sessions)
+        assert left_root.logical_id not in prepared_sessions
+        assert right_root.logical_id not in prepared_sessions
+        for session_id, prepared in prepared_sessions.items():
+            persisted = connection.execute(
+                "SELECT * FROM sessions WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+            assert persisted is not None
+            assert tuple(persisted) == tuple(prepared.values.values())
+        assert prepared_sessions[middle.logical_id].values["root_session_id"] == (
+            right_root.logical_id
+        )
+        assert prepared_sessions[child.logical_id].values["root_session_id"] == (
+            right_root.logical_id
+        )
+        after = {
+            str(row["session_id"]): tuple(row)
+            for row in connection.execute(
+                "SELECT * FROM sessions ORDER BY session_id"
+            )
+        }
+        assert after[left_root.logical_id] == before[left_root.logical_id]
+        assert after[right_root.logical_id] == before[right_root.logical_id]
+    finally:
+        connection.close()
+
+
+def test_writer_direct_session_reparent_loads_and_recomputes_persisted_descendants(
+    tmp_path: Path,
+) -> None:
+    initial = _tiny_changes()
+    left_root, right_root, middle, child, *_ = _root_sessions(initial)
+    connection = initialize_analytical(tmp_path / "writer-direct-reparent.sqlite3")
+    try:
+        first, _, _ = _publish_changes(
+            connection,
+            initial,
+            "direct-reparent-initial",
+        )
+        second, _, _ = _publish_changes(
+            connection,
+            _hierarchy_changes(
+                _late_parent(middle, middle, left_root, 500),
+                _late_parent(child, child, middle, 600),
+            ),
+            "direct-reparent-subtree",
+            parent_publication_id=first,
+        )
+        before = {
+            str(row["session_id"]): tuple(row)
+            for row in connection.execute("SELECT * FROM sessions ORDER BY session_id")
+        }
+        expected_changed = {
+            str(row["session_id"])
+            for row in connection.execute(
+                """
+                WITH RECURSIVE subtree(session_id) AS (
+                    SELECT ?
+                    UNION
+                    SELECT sessions.session_id
+                    FROM sessions
+                    JOIN subtree
+                      ON sessions.parent_session_id = subtree.session_id
+                )
+                SELECT session_id FROM subtree
+                """,
+                (middle.logical_id,),
+            )
+        }
+        direct_source = middle
+        assert direct_source.event_at_us is not None
+        direct_reparent = replace(
+            direct_source,
+            event_at_us=direct_source.event_at_us + 1,
+            source_order=direct_source.source_order + 1,
+            payload={
+                **direct_source.payload,
+                "parent_session_id": right_root.identity_tuple[0],
+                "relationship_basis": "structural",
+            },
+        )
+        _, prior, write_set = _publish_changes(
+            connection,
+            _hierarchy_changes(direct_reparent),
+            "direct-reparent-existing-session",
+            parent_publication_id=second,
+        )
+        assert set(prior.entity_rows) >= {
+            left_root.logical_id,
+            right_root.logical_id,
+            middle.logical_id,
+            child.logical_id,
+        }
+        prepared_sessions = {
+            str(row.values["session_id"]): row
+            for row in write_set.rows
+            if row.table == "sessions"
+        }
+        assert set(prepared_sessions) == expected_changed
+        assert prepared_sessions[middle.logical_id].values["parent_session_id"] == (
+            right_root.logical_id
+        )
+        assert prepared_sessions[middle.logical_id].values["root_session_id"] == (
+            right_root.logical_id
+        )
+        assert prepared_sessions[middle.logical_id].values["delegation_depth"] == 1
+        assert prepared_sessions[child.logical_id].values["root_session_id"] == (
+            right_root.logical_id
+        )
+        assert prepared_sessions[child.logical_id].values["delegation_depth"] == 2
+        after = {
+            str(row["session_id"]): tuple(row)
+            for row in connection.execute("SELECT * FROM sessions ORDER BY session_id")
+        }
+        for session_id in set(before) - expected_changed:
+            assert after[session_id] == before[session_id]
+    finally:
+        connection.close()
+
+
+def test_writer_stale_late_parent_replay_preserves_newer_reparented_subtree(
+    tmp_path: Path,
+) -> None:
+    initial = _tiny_changes()
+    left_root, right_root, middle, child, unrelated_root, *_ = _root_sessions(initial)
+    connection = initialize_analytical(tmp_path / "writer-stale-replay.sqlite3")
+    try:
+        first, _, _ = _publish_changes(connection, initial, "stale-replay-first")
+        old_middle_edge = _late_parent(middle, middle, left_root, 500)
+        second, _, _ = _publish_changes(
+            connection,
+            _hierarchy_changes(
+                old_middle_edge,
+                _late_parent(child, child, middle, 600),
+            ),
+            "stale-replay-subtree",
+            parent_publication_id=first,
+        )
+        unrelated_before = tuple(
+            connection.execute(
+                "SELECT * FROM sessions WHERE session_id = ?",
+                (unrelated_root.logical_id,),
+            ).fetchone()
+        )
+        newer_middle_edge = _late_parent(middle, middle, right_root, 700)
+        third, _, newer_write_set = _publish_changes(
+            connection,
+            _hierarchy_changes(newer_middle_edge),
+            "stale-replay-newer",
+            parent_publication_id=second,
+        )
+
+        newer_sessions = {
+            str(row.values["session_id"]): row
+            for row in newer_write_set.rows
+            if row.table == "sessions"
+        }
+        assert {middle.logical_id, child.logical_id} <= set(newer_sessions)
+        assert all(
+            row.values["root_session_id"] == right_root.logical_id
+            for row in newer_sessions.values()
+        )
+
+        _, _, replay_write_set = _publish_changes(
+            connection,
+            _hierarchy_changes(old_middle_edge),
+            "stale-replay-older",
+            parent_publication_id=third,
+        )
+
+        persisted = {
+            str(row["session_id"]): row
+            for row in connection.execute(
+                "SELECT * FROM sessions WHERE session_id IN (?, ?)",
+                (middle.logical_id, child.logical_id),
+            )
+        }
+        assert persisted[middle.logical_id]["parent_session_id"] == right_root.logical_id
+        assert persisted[middle.logical_id]["root_session_id"] == right_root.logical_id
+        assert persisted[middle.logical_id]["delegation_depth"] == 1
+        assert persisted[child.logical_id]["root_session_id"] == right_root.logical_id
+        assert persisted[child.logical_id]["delegation_depth"] == 2
+        assert not any(
+            row.table in {"sessions", "late_parent_edges"}
+            for row in replay_write_set.rows
+        )
+        assert tuple(
+            connection.execute(
+                "SELECT * FROM sessions WHERE session_id = ?",
+                (unrelated_root.logical_id,),
+            ).fetchone()
+        ) == unrelated_before
+    finally:
+        connection.close()
+
+
+def test_writer_exact_late_parent_replay_is_idempotent(tmp_path: Path) -> None:
+    initial = _tiny_changes()
+    root, _, middle, *_ = _root_sessions(initial)
+    edge = _late_parent(middle, middle, root, 500)
+    connection = initialize_analytical(tmp_path / "writer-exact-replay.sqlite3")
+    try:
+        first, _, _ = _publish_changes(connection, initial, "exact-replay-first")
+        second, _, _ = _publish_changes(
+            connection,
+            _hierarchy_changes(edge),
+            "exact-replay-edge",
+            parent_publication_id=first,
+        )
+        _, _, replay_write_set = _publish_changes(
+            connection,
+            _hierarchy_changes(edge),
+            "exact-replay-duplicate",
+            parent_publication_id=second,
+        )
+
+        assert not any(
+            row.table in {"sessions", "late_parent_edges"}
+            for row in replay_write_set.rows
+        )
+        assert (
+            connection.execute(
+                "SELECT COUNT(*) FROM late_parent_edges WHERE child_session_id = ?",
+                (middle.logical_id,),
+            ).fetchone()[0]
+            == 1
+        )
+    finally:
+        connection.close()
+
+
+def test_writer_older_same_relationship_replay_preserves_full_history(
+    tmp_path: Path,
+) -> None:
+    initial = _tiny_changes()
+    root, _, middle, *_ = _root_sessions(initial)
+    older = _late_parent(middle, middle, root, 700)
+    newer = replace(
+        _late_parent(middle, middle, root, 800),
+        source_range=replace(
+            older.source_range,
+            record_ordinal=older.source_range.record_ordinal + 1,
+        ),
+    )
+    conflicting_older = replace(
+        older,
+        source_range=replace(
+            older.source_range,
+            record_ordinal=older.source_range.record_ordinal + 2,
+        ),
+    )
+    assert len(
+        {older.occurrence_id, newer.occurrence_id, conflicting_older.occurrence_id}
+    ) == 3
+
+    connection = initialize_analytical(tmp_path / "writer-full-relation-history.sqlite3")
+    try:
+        first, _, _ = _publish_changes(connection, initial, "full-history-first")
+        second, _, _ = _publish_changes(
+            connection,
+            _hierarchy_changes(older),
+            "full-history-older",
+            parent_publication_id=first,
+        )
+        third, _, _ = _publish_changes(
+            connection,
+            _hierarchy_changes(newer),
+            "full-history-newer",
+            parent_publication_id=second,
+        )
+
+        _, _, replay_write_set = _publish_changes(
+            connection,
+            _hierarchy_changes(older),
+            "full-history-exact-replay",
+            parent_publication_id=third,
+        )
+        assert not any(
+            row.table in {"sessions", "late_parent_edges"}
+            for row in replay_write_set.rows
+        )
+        assert (
+            connection.execute(
+                "SELECT COUNT(*) FROM late_parent_edges WHERE child_session_id = ?",
+                (middle.logical_id,),
+            ).fetchone()[0]
+            == 2
+        )
+
+        changes = _hierarchy_changes(conflicting_older)
+        request = _request(
+            "full-history-equal-order-conflict",
+            parent_publication_id=third,
+        )
+        prior = read_prior_publication_snapshot(connection, changes)
+        with pytest.raises(PublicationWriteError, match="equal-order conflict"):
+            prepare_write_set_from_changes(changes, request, prior=prior)
+    finally:
+        connection.close()
+
+
+def test_writer_equal_order_late_parent_conflict_fails_closed(
+    tmp_path: Path,
+) -> None:
+    initial = _tiny_changes()
+    left_root, right_root, middle, *_ = _root_sessions(initial)
+    connection = initialize_analytical(tmp_path / "writer-equal-order.sqlite3")
+    try:
+        first, _, _ = _publish_changes(connection, initial, "equal-order-first")
+        second, _, _ = _publish_changes(
+            connection,
+            _hierarchy_changes(_late_parent(middle, middle, left_root, 700)),
+            "equal-order-left",
+            parent_publication_id=first,
+        )
+        changes = _hierarchy_changes(
+            _late_parent(middle, middle, right_root, 700)
+        )
+        request = _request("equal-order-right", parent_publication_id=second)
+        prior = read_prior_publication_snapshot(connection, changes)
+
+        with pytest.raises(PublicationWriteError, match="equal-order conflict"):
+            prepare_write_set_from_changes(changes, request, prior=prior)
+    finally:
+        connection.close()
+
+
+def test_writer_equal_order_same_parent_different_basis_fails_closed(
+    tmp_path: Path,
+) -> None:
+    initial = _tiny_changes()
+    root, _, middle, *_ = _root_sessions(initial)
+    first_edge = _late_parent(middle, middle, root, 700)
+    connection = initialize_analytical(tmp_path / "writer-equal-order-basis.sqlite3")
+    try:
+        first, _, _ = _publish_changes(connection, initial, "equal-basis-first")
+        second, _, _ = _publish_changes(
+            connection,
+            _hierarchy_changes(first_edge),
+            "equal-basis-original",
+            parent_publication_id=first,
+        )
+        conflicting = replace(
+            first_edge,
+            logical_id=semantic_id(
+                "session-relationship",
+                [middle.logical_id, root.logical_id, "delegation_metadata"],
+            ),
+            identity_tuple=(
+                middle.identity_tuple[0],
+                root.identity_tuple[0],
+                "delegation_metadata",
+            ),
+            payload={
+                **first_edge.payload,
+                "relationship_basis": "delegation_metadata",
+            },
+        )
+        changes = _hierarchy_changes(conflicting)
+        request = _request("equal-basis-conflict", parent_publication_id=second)
+        prior = read_prior_publication_snapshot(connection, changes)
+        with pytest.raises(PublicationWriteError, match="equal-order conflict"):
+            prepare_write_set_from_changes(changes, request, prior=prior)
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_writer_current_batch_relationship_winner_uses_six_part_order(
+    tmp_path: Path,
+    reverse: bool,
+) -> None:
+    initial = _tiny_changes()
+    left_root, right_root, middle, *_ = _root_sessions(initial)
+    first_edge = _late_parent(middle, middle, left_root, 700)
+    second_edge = _late_parent(middle, middle, right_root, 700)
+    higher, lower = sorted(
+        (first_edge, second_edge),
+        key=lambda item: item.logical_id,
+    )
+    higher = replace(higher, transition_rank=1)
+    lower = replace(lower, transition_rank=0)
+    assert higher.logical_id < lower.logical_id
+    observations = (higher, lower) if reverse else (lower, higher)
+    connection = initialize_analytical(
+        tmp_path / f"writer-current-winner-{int(reverse)}.sqlite3"
+    )
+    try:
+        first, _, _ = _publish_changes(connection, initial, "current-winner-first")
+        _, _, write_set = _publish_changes(
+            connection,
+            _hierarchy_changes(*observations),
+            f"current-winner-{int(reverse)}",
+            parent_publication_id=first,
+        )
+        edges = [row for row in write_set.rows if row.table == "late_parent_edges"]
+        assert len(edges) == 1
+        assert edges[0].values["transition_rank"] == 1
+        assert edges[0].values["occurrence_id"] == higher.occurrence_id
+        session = next(row for row in write_set.rows if row.table == "sessions")
+        assert session.values["parent_session_id"] == higher.payload["parent_session_id"]
+    finally:
+        connection.close()
+
+
+def test_writer_current_batch_equal_order_distinct_evidence_fails_closed(
+    tmp_path: Path,
+) -> None:
+    initial = _tiny_changes()
+    left_root, right_root, middle, *_ = _root_sessions(initial)
+    left = _late_parent(middle, middle, left_root, 700)
+    right = _late_parent(middle, middle, right_root, 700)
+    changes = _hierarchy_changes(left, right)
+    connection = initialize_analytical(tmp_path / "writer-current-tie.sqlite3")
+    try:
+        first, _, _ = _publish_changes(connection, initial, "current-tie-first")
+        request = _request("current-tie-conflict", parent_publication_id=first)
+        prior = read_prior_publication_snapshot(connection, changes)
+        with pytest.raises(PublicationWriteError, match="equal-order conflict"):
+            prepare_write_set_from_changes(changes, request, prior=prior)
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize(
+    ("relationships", "match"),
+    [
+        (
+            (
+                ("left_root", "child", 700),
+            ),
+            "cyclic or dangling",
+        ),
+        (
+            (
+                ("middle", "missing_parent", 700),
+            ),
+            "no observed parent",
+        ),
+        (
+                (
+                    ("right_root", "left_root", 700),
+                    ("right_root", "other_root", 700),
+                ),
+                "equal-order conflict",
+        ),
+    ],
+)
+def test_writer_hierarchy_closure_rejects_cycle_dangling_and_ambiguity(
+    tmp_path: Path,
+    relationships: tuple[tuple[str, str, int], ...],
+    match: str,
+) -> None:
+    initial = _tiny_changes()
+    left_root, right_root, middle, child, other_root, *_ = _root_sessions(initial)
+    sessions = {
+        "left_root": left_root,
+        "right_root": right_root,
+        "middle": middle,
+        "child": child,
+        "other_root": other_root,
+    }
+    missing_parent = replace(
+        right_root,
+        logical_id="session:missing-parent",
+        identity_tuple=("missing-parent", "identity-v1"),
+    )
+    sessions["missing_parent"] = missing_parent
+    connection = initialize_analytical(tmp_path / f"writer-hierarchy-{match}.sqlite3")
+    try:
+        first, _, _ = _publish_changes(
+            connection,
+            initial,
+            f"hierarchy-{match}-initial",
+        )
+        second, _, _ = _publish_changes(
+            connection,
+            _hierarchy_changes(
+                _late_parent(middle, middle, left_root, 500),
+                _late_parent(child, child, middle, 600),
+            ),
+            f"hierarchy-{match}-subtree",
+            parent_publication_id=first,
+        )
+        changes = _hierarchy_changes(
+            *(
+                _late_parent(
+                    sessions[child_id],
+                    sessions[child_id],
+                    sessions[parent_id],
+                    ordinal,
+                )
+                for child_id, parent_id, ordinal in relationships
+            )
+        )
+        request = _request(
+            f"hierarchy-{match}-late",
+            parent_publication_id=second,
+        )
+        prior = read_prior_publication_snapshot(connection, changes)
+        with pytest.raises(PublicationWriteError, match=match):
+            prepare_write_set_from_changes(changes, request, prior=prior)
+    finally:
+        connection.close()
 
 
 def _provenance_write_set(operation_id: str = "operation:provenance"):

@@ -3892,6 +3892,7 @@
             "cached_input_tokens",
             "reasoning_tokens",
             "output_tokens",
+            "measurement_mask",
             "lifecycle"
           ]
         },
@@ -3919,6 +3920,16 @@
             "resource_kind",
             "write_intent",
             "lifecycle",
+            "start_at_us",
+            "start_source_rank",
+            "start_source_order",
+            "start_event_kind_order",
+            "start_transition_rank",
+            "terminal_at_us",
+            "terminal_source_rank",
+            "terminal_source_order",
+            "terminal_event_kind_order",
+            "terminal_transition_rank",
             "output_bytes",
             "duration_us",
             "error_category"
@@ -8607,6 +8618,7 @@
             "cached_input_tokens",
             "reasoning_tokens",
             "output_tokens",
+            "measurement_mask",
             "lifecycle"
           ]
         },
@@ -8658,6 +8670,13 @@
             "output_bytes",
             "duration_us",
             "error_category"
+          ]
+        },
+        {
+          "relation": "publication",
+          "fields": [
+            "publication_id",
+            "capabilities"
           ]
         },
         {
@@ -8729,11 +8748,9 @@
             "inclusive": "exclusive_inclusive_scope_inclusive",
             "descendant": "exclusive_inclusive_scope_descendant"
           },
-          "output_bindings": {
-            "delegation_metrics": "$"
-          },
-          "internal_only": false,
-          "consume_as": null,
+          "output_bindings": {},
+          "internal_only": true,
+          "consume_as": "left_exclusive_inclusive_scope",
           "derivation_rule": {
             "symbol": "derive_compare_sessions_v1",
             "stage": 1,
@@ -8755,11 +8772,9 @@
             "current": "side_by_side_delta_current",
             "previous": "side_by_side_delta_previous"
           },
-          "output_bindings": {
-            "token_deltas": "$"
-          },
-          "internal_only": false,
-          "consume_as": null,
+          "output_bindings": {},
+          "internal_only": true,
+          "consume_as": "total_token_delta",
           "derivation_rule": {
             "symbol": "derive_compare_sessions_v1",
             "stage": 1,
@@ -8831,12 +8846,22 @@
         },
         {
           "field": "delegation_metrics",
-          "classification": "formula_output",
+          "classification": "direct_fact",
           "slot": "delegation_metrics",
-          "formula_id": "exclusive_inclusive_scope_v1",
-          "output_key": "$",
+          "formula_id": null,
+          "output_key": null,
           "derivation_rule": "derive_compare_sessions_v1",
-          "source_rule": null
+          "source_rule": {
+            "manifest": "permitted_sources",
+            "relations": [
+              "canonical_call",
+              "resource",
+              "session",
+              "state_change",
+              "tool_invocation",
+              "turn"
+            ]
+          }
         },
         {
           "field": "resource_metrics",
@@ -8878,12 +8903,22 @@
         },
         {
           "field": "token_deltas",
-          "classification": "formula_output",
+          "classification": "direct_fact",
           "slot": "token_deltas",
-          "formula_id": "side_by_side_delta_v1",
-          "output_key": "$",
+          "formula_id": null,
+          "output_key": null,
           "derivation_rule": "derive_compare_sessions_v1",
-          "source_rule": null
+          "source_rule": {
+            "manifest": "permitted_sources",
+            "relations": [
+              "canonical_call",
+              "resource",
+              "session",
+              "state_change",
+              "tool_invocation",
+              "turn"
+            ]
+          }
         },
         {
           "field": "tool_metrics",
