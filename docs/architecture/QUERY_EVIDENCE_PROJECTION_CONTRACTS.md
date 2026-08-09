@@ -113,9 +113,9 @@ Q-REV-03/Q-WF-02 meaning and executable transitive closure. R1C's independent
 consumer is accepted at exact main
 `fb0c57886097a6b985d2f321b2de858cbdfc0a97`; the exact
 [R1B join authority](../decisions/evidence/ck08r1b/answer-semantics-join-authority.json)
-makes only the existing R1B worker Ready to reconcile its bound shared
-query/evidence/grading seams, and final R1 replays both only after that consumer
-is accepted. Cursor serialization still binds its version, request digest,
+bound the shared query/evidence/grading seams accepted through PR #430 and
+exact-main `9e9332b3`; final R1 is now the sole Ready replay of both accepted
+consumers. Cursor serialization still binds its version, request digest,
 plan, publication, and order; malformed, tampered, stale, replacement, and
 mismatched bindings fail closed.
 

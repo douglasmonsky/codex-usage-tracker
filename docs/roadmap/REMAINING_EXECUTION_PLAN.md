@@ -34,8 +34,13 @@ Retained CK-08R1 work reached
 their meaning and closure. R1C is accepted at exact main
 `fb0c57886097a6b985d2f321b2de858cbdfc0a97`; the exact
 [R1B join authority](../decisions/evidence/ck08r1b/answer-semantics-join-authority.json)
-makes only the existing R1B worker Ready to reconcile the shared
-query/evidence/grading seams. Its exact reviewer correction binds production
+binds the shared query/evidence/grading seams accepted through PR #430;
+CK-08R1B then passed the exact 23-path cohort,
+80/80 production-versus-independent replay, full local/package gates, one
+bounded review, and hosted Python 3.10/3.14 plus Console checks in PR #430;
+it squash-merged and was exact-main verified at
+`9e9332b3ae2be78cedb581ff8f76149ad76f4440`. CK-08R1B is accepted, making
+CK-08R1 the sole Ready packet. Its exact reviewer correction binds production
 publication hierarchy ownership, independent start/terminal window membership,
 duplicate stable-ID rejection, production-compiler replay, and the Q-REV-03
 direct-fact/internal-formula decision. Its exact selected-cohort acceptance
@@ -54,9 +59,9 @@ cohort now also seeds an existing directly reparented session so its complete
 persisted descendants are recomputed, requires parent/basis/occurrence
 provenance equality for equal-coordinate idempotency, and resolves
 current-batch relations by the six-part authority order before logical
-identity with one emitted winner. Only the existing worker may resume after
-that correction merges and exact-main verifies. R1 remains their blocked
-requalification join.
+identity with one emitted winner. PR #430 passed hosted CI, squash-merged, and
+was exact-main verified at `9e9332b3ae2be78cedb581ff8f76149ad76f4440`.
+R1B is complete and R1 is the sole Ready requalification join.
 CK-QG1A removed R2's two page-executor C/B/B violations
 without changing behavior or the frozen maintainability baseline and is
 accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`.
@@ -68,8 +73,9 @@ exact-main verification at `68050b9313ccc5be8e1fcd0ccd5b95cb4173f3ff`.
 CK-QG1 is complete; its v2 [writer transition authority](../decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json)
 binds current main `dd771073` writer `13da341f…` to reviewed PR #430 writer
 `d163e6c5…` with the unchanged `fda777e2…` baseline and identical normalized
-findings. CK-08R1B remains permitted-not-accepted and may resume only after
-this authority is merged and exact-main verified; CK-08RG remains blocked on
+findings. CK-08R1B is accepted at `9e9332b3`; CK-08R1 is Ready for the
+serialized production-versus-independent answer-truth requalification.
+CK-08RG remains blocked on
 CK-08R4.
 CK-07R1A is accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 was accepted at
@@ -208,8 +214,8 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
-  "completed": ["CK-08R0", "CK-08R1A", "CK-08R1C", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
-  "ready": ["CK-08R1B"],
+  "completed": ["CK-08R0", "CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
+  "ready": ["CK-08R1"],
   "conditional_ready": [{
     "condition": "ARGV authority accepted at 479cbdb; coordinator records the preserved prelaunch incident disposition and a clean exact-main reapplication path; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; no replacement, launch, or downstream task",
     "tasks": ["CK-07R1"]

@@ -12,11 +12,11 @@ parents are accounting umbrellas.
 - Not started: **8**
 - Critical-path completion: **14 / 21**
 - Optional packets: **CK-15**
-- Completed corrective child tasks: **11 — CK-08R0, CK-08R1A, CK-08R1C, CK-08R2, CK-08R3A, CK-08R3, CK-QG1A0, CK-QG1A, CK-QG1, CK-07R1A, CK-07R1A0**
-- Remaining delegable child tasks: **39**
-- Ready child tasks: **1 — CK-08R1B; resume existing worker only**
+- Completed corrective child tasks: **12 — CK-08R0, CK-08R1A, CK-08R1B, CK-08R1C, CK-08R2, CK-08R3A, CK-08R3, CK-QG1A0, CK-QG1A, CK-QG1, CK-07R1A, CK-07R1A0**
+- Remaining delegable child tasks: **38**
+- Ready child tasks: **1 — CK-08R1**
 - Conditional-ready child tasks: **1 — CK-07R1 after coordinator disposition of the preserved prelaunch incident and a clean exact-main reapplication path**
-- Blocked child tasks: **37**
+- Blocked child tasks: **36**
 - Orchestration mode: **convergence — one coordinator, one existing task per active packet, at most one shared-authority task**
 - Continuation policy: **reuse the active packet task for ordinary corrections; create a task only for a newly Ready distinct packet or a genuinely new authority decision**
 - Handoff policy: **tasks proactively message the parent; no polling or wait-only tasks**
@@ -50,18 +50,17 @@ parents are accounting umbrellas.
 ## Remaining delegated child tasks
 
 Readiness is controlled by
-[the machine DAG](REMAINING_EXECUTION_PLAN.md). R1C is accepted after R1A;
-R1B has an exact shared query/evidence/grading join authority and is Ready only
-for its existing worker. CK-QG1 is accepted and exact-main
-verified; other corrective locks are unchanged.
+[the machine DAG](REMAINING_EXECUTION_PLAN.md). R1C and R1B are accepted after
+R1A; R1 is the sole Ready serialized requalification join. CK-QG1 is accepted
+and exact-main verified; other corrective locks are unchanged.
 
 ### Corrective gates
 
 - [x] **CK-08R0 — Freeze corrective query and scale contracts** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r0-freeze-corrective-contracts.md)
 - [x] **CK-08R1A — Freeze answer semantics and evidence closure** · Completed on merge; exact-main verification required in handoff · [packet](tasks/ck-08r1a-freeze-answer-semantics.md)
-- [ ] **CK-08R1B — Implement production answer semantics** · Ready under the final 23-path correction and the linked CK-QG1/R1B writer transition authority; after authority merge/exact-main, resume existing worker and PR #430 only · [packet](tasks/ck-08r1b-implement-production-answer-semantics.md)
+- [x] **CK-08R1B — Implement production answer semantics** · PR #430 hosted-green, squash-merged, and exact-main verified at `9e9332b3`; exact 23-path cohort and 80/80 production-versus-independent replay accepted · [packet](tasks/ck-08r1b-implement-production-answer-semantics.md)
 - [x] **CK-08R1C — Build independent semantic evaluator** · PR #411 merged/exact-main `fb0c578`; independent closure and all 80 variants accepted · [packet](tasks/ck-08r1c-build-independent-semantic-evaluator.md)
-- [ ] **CK-08R1 — Requalify independent answer truth** · Blocked on CK-08R1B; CK-08R1C is accepted · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
+- [ ] **CK-08R1 — Requalify independent answer truth** · Ready after CK-08R1B PR #430 and CK-08R1C acceptance; serialized join only · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
 - [x] **CK-08R2 — Implement bounded physical keyset execution** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r2-implement-physical-keyset-execution.md)
 - [x] **CK-QG1A0 — Authorize PageExecutor source supersession** · Completed on merge; exact-main required before CK-QG1A · [packet](tasks/ck-qg1a0-authorize-page-executor-source-supersession.md)
 - [x] **CK-08R3A — Implement bounded EvidenceService physical queries** · PR #417 hosted-green and squash-merged at `38537f6c`; exact-main identities verified · [packet](tasks/ck-08r3a-implement-evidence-physical-query.md)

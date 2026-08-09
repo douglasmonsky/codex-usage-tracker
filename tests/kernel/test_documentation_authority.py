@@ -214,6 +214,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest["completed"] == [
         "CK-08R0",
         "CK-08R1A",
+        "CK-08R1B",
         "CK-08R1C",
         "CK-08R2",
         "CK-08R3A",
@@ -232,8 +233,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         hashlib.sha256(qg1a_source.read_bytes()).hexdigest()
         == (qg1a_authority["selected_successor"]["sha256"])
     )
-    ready: set[str] = {"CK-08R1B"}
-    assert manifest["ready"] == ["CK-08R1B"]
+    ready: set[str] = {"CK-08R1"}
+    assert manifest["ready"] == ["CK-08R1"]
     assert manifest["conditional_ready"] == [
         {
             "condition": (
@@ -245,17 +246,46 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         },
     ]
     assert manifest["blocked"] == []
-    assert "Completed packets: **14 / 22**" in ledger
-    assert "Not started: **8**" in ledger
-    assert "Critical-path completion: **14 / 21**" in ledger
-    assert "Completed corrective child tasks: **11" in ledger
-    assert "Remaining delegable child tasks: **39**" in ledger
-    assert "Blocked child tasks: **37" in ledger
+    parent_section = ledger.split("## Parent packets", 1)[1].split(
+        "## Remaining delegated child tasks", 1
+    )[0]
+    parent_rows = [
+        line
+        for line in parent_section.splitlines()
+        if line.startswith("- [") and "**CK-" in line
+    ]
+    parent_completed = sum(line.startswith("- [x]") for line in parent_rows)
+    assert len(parent_rows) == 22
+    assert parent_completed == 14
+    assert f"Completed packets: **{parent_completed} / {len(parent_rows)}**" in ledger
+    assert f"Not started: **{len(parent_rows) - parent_completed}**" in ledger
+    assert f"Critical-path completion: **{parent_completed} / 21**" in ledger
+    assert "Completed corrective child tasks: **12" in ledger
+    assert "Remaining delegable child tasks: **38**" in ledger
+    assert "Blocked child tasks: **36" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
         f"Conditional-ready child tasks: **{sum(len(item['tasks']) for item in manifest['conditional_ready'])}"
         in ledger
     )
+    active_status_docs = "\n".join(
+        [
+            (_REPO_ROOT / "AGENTS.md").read_text(),
+            (_DOCS / "INDEX.md").read_text(),
+            (_DOCS / "architecture/QUERY_EVIDENCE_PROJECTION_CONTRACTS.md").read_text(),
+            (_DOCS / "quality/QUALIFICATION_PLAN.md").read_text(),
+            (_DOCS / "roadmap/AGENT_FIRST_CLEAN_CUTOVER.md").read_text(),
+            central,
+            ledger,
+        ]
+    )
+    for stale_claim in (
+        "R1B remains held",
+        "R1B is Ready only",
+        "R1B worker Ready",
+        "R1 remains their blocked",
+    ):
+        assert stale_claim not in active_status_docs
 
     tasks = manifest["tasks"]
     assert len(tasks) == 50
@@ -352,6 +382,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         elif packet_id in {
             "CK-08R0",
             "CK-08R1A",
+            "CK-08R1B",
             "CK-08R1C",
             "CK-08R2",
             "CK-08R3A",
