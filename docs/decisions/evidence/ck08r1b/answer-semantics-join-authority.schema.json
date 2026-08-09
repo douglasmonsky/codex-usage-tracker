@@ -123,7 +123,7 @@
         "worker_head_sha": {"const": "3a86a10b12122d6ff9bec70f5f62105157af25c8"},
         "worker_state": {"const": "fresh_acceptance_worktree_dirty_exact_21_staged_paths_preserved"},
         "superseded_selected_patch_sha256": {"const": "74776e524db39a8687963faa8a163dccd848fd9bf7ca81697ca3c86c5e5a0d5a"},
-        "selected_patch_sha256": {"const": "078fe2ded1d49035581b545f9d9710be856e0c7123c8434c2154a597b695fa41"},
+        "selected_patch_sha256": {"const": "735b87616e3fd98acebe6d2bc0751c3ffd18bda0422e1a0d08c42d8d173aeae2"},
         "selected_successor_paths": {"const": 21},
         "changed_successor_paths": {
           "type": "array",

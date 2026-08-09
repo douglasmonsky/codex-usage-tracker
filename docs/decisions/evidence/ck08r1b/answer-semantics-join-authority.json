@@ -133,7 +133,7 @@
     "worker_head_sha": "3a86a10b12122d6ff9bec70f5f62105157af25c8",
     "worker_state": "fresh_acceptance_worktree_dirty_exact_21_staged_paths_preserved",
     "superseded_selected_patch_sha256": "74776e524db39a8687963faa8a163dccd848fd9bf7ca81697ca3c86c5e5a0d5a",
-    "selected_patch_sha256": "078fe2ded1d49035581b545f9d9710be856e0c7123c8434c2154a597b695fa41",
+    "selected_patch_sha256": "735b87616e3fd98acebe6d2bc0751c3ffd18bda0422e1a0d08c42d8d173aeae2",
     "selected_successor_paths": 21,
     "changed_successor_paths": [
       "src/codex_usage_tracker/agent_kernel/domain/plan_derivations_structural.py",
@@ -211,7 +211,7 @@
   },
   "selected_successor_cohort": {
     "preflight_base_sha": "362e9bb908c06980cbe25cc2d433d3f78a238947",
-    "patch_sha256": "078fe2ded1d49035581b545f9d9710be856e0c7123c8434c2154a597b695fa41",
+    "patch_sha256": "735b87616e3fd98acebe6d2bc0751c3ffd18bda0422e1a0d08c42d8d173aeae2",
     "files": [
       {"path": "config/agent-kernel/formula-contract-v1.json", "predecessor_sha256": "2e16599f244ac179313aa7bf7263caaddbd49f2c0984dbfa424ba89713e70ffa", "sha256": "3db5d4315d74f3c949cce6f6292f09026a5f26b4a1107c0434dbdd361c6a246c"},
       {"path": "config/agent-kernel/logical-contract-v1.json", "predecessor_sha256": "27981ec9bac8c245306e02784b8730e8ff9216b33a81da9efb8409403431fe3d", "sha256": "cf10cd6efd7bb149bd41d92dc817e7656fe74b999639b129d019b4d69773ecd7"},
@@ -219,7 +219,7 @@
       {"path": "experiments/physical-architecture/candidate_a/queries.py", "predecessor_sha256": "dd2a121480920cf96cd51ec43084a76a278009a8b72153b15963862d9619fe89", "sha256": "4c14507bba3259d725a9432c2e193f7a5bdac14c880bdf145d548552aad01a7f"},
       {"path": "scripts/generate_ck07a_fixture.py", "predecessor_sha256": "d24be0a95b302a9c52d413c300f23536d8c0287512c4b446ed03f8d33ce0863f", "sha256": "f7adde83efb963121e841aec8d71ebd2e2be1fa3a1c2745d8e5ec05e6884cb68"},
       {"path": "src/codex_usage_tracker/agent_kernel/domain/plan_derivations_structural.py", "predecessor_sha256": "c63b5ae2528852768c7a0906c2dccd537587192116fd2cec956110bcc8ed1367", "sha256": "068ae7db91225b1477833d7d77b7d5910779424f40609095f8a5d31621d81676"},
-      {"path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py", "predecessor_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c", "sha256": "79fb1414a77a400da5e20b339788a7e00453f96ecb79979056e07c9eeabd121f"},
+      {"path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py", "predecessor_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c", "sha256": "e4068ac564020740885b11a6e7e22a081c694c99766ca587224117c9468f62d9"},
       {"path": "src/codex_usage_tracker/agent_kernel/query/compiler.py", "predecessor_sha256": "0e57ddb03c5bff28eb74dc2eaa98f35491c649de71e7e9ba680c358a5adc0286", "sha256": "c3c43f044a43b5d2aed18cc03b88f1a5156a6570dd4d1cfc2f47a8b4d1833ffa"},
       {"path": "tests/agent_kernel/contracts/test_plan_derivations_structural.py", "predecessor_sha256": "853f5d6d44d17ef4a19bff0ab383d758d52541ec7c7b8bf92d008d93b3fb40fb", "sha256": "84d6e17cf3011eeaea42f502130ad1d7f3c37dcda93ad169c553277f05f2388a"},
       {"path": "tests/agent_kernel/contracts/test_plan_operand_contract.py", "predecessor_sha256": "72e9e205d56623eec9e26cba2fd8877190da1ee9675a779f49d527e989ad0988", "sha256": "1f7216e96232098d8efac7b19b205e399b9571d1e9ed6f3b489bb0c08f84b9d0"},
