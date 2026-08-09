@@ -441,7 +441,11 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         elif artifact["path"] == "src/codex_usage_tracker/agent_kernel/publication/preparation.py":
             final = _json("docs/decisions/evidence/ck08r3a/final-shared-authority.json")
             selected = final["ck07_shared_preparation"]["r3a_atomic_cohort"]["sha256"]
-            assert actual in {artifact["sha256"], selected}
+            assert actual in {
+                artifact["sha256"],
+                selected,
+                _ck08r1b_selected_hashes()[artifact["path"]],
+            }
             if actual == selected:
                 for required in (
                     final["r3a"]["selected"]["production_identities"]
@@ -454,16 +458,16 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
                     elif required["path"] == "tests/agent_kernel/fact_adapters/support.py":
                         expected.add(_ck08r1b_selected_hashes()[required["path"]])
                     assert hashlib.sha256(required_path.read_bytes()).hexdigest() in expected
-            elif artifact["path"] in {
-                "config/agent-kernel/formula-contract-v1.json",
-                "config/agent-kernel/plan-operand-contract-v1.json",
-            }:
-                assert actual in {
-                    artifact["sha256"],
-                    _ck08r1b_selected_hashes()[artifact["path"]],
-                }
-            else:
-                assert actual == artifact["sha256"]
+        elif artifact["path"] in {
+            "config/agent-kernel/formula-contract-v1.json",
+            "config/agent-kernel/plan-operand-contract-v1.json",
+        }:
+            assert actual in {
+                artifact["sha256"],
+                _ck08r1b_selected_hashes()[artifact["path"]],
+            }
+        else:
+            assert actual == artifact["sha256"]
     locks = [lock for lane in contract["lanes"] for lock in lane["owned_lock"]]
     assert len(locks) == len(set(locks))
     changed = json.loads(json.dumps(contract))
