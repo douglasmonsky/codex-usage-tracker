@@ -32,8 +32,10 @@ CK-08R3 is complete; CK-08R4 remains blocked on CK-08R1 and CK-07R1.
 Retained CK-08R1 work reached
 80/80 parity by copying unsupported Q-REV-03/Q-WF-02 semantics; R1A now freezes
 their meaning and closure. R1C is accepted at exact main
-`fb0c57886097a6b985d2f321b2de858cbdfc0a97`; R1B remains held on shared
-query/evidence/grading integration, and R1 is their requalification join.
+`fb0c57886097a6b985d2f321b2de858cbdfc0a97`; the exact
+[R1B join authority](../decisions/evidence/ck08r1b/answer-semantics-join-authority.json)
+makes only the existing R1B worker Ready to reconcile the shared
+query/evidence/grading seams, and R1 remains their blocked requalification join.
 CK-QG1A removed R2's two page-executor C/B/B violations
 without changing behavior or the frozen maintainability baseline and is
 accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`.
@@ -181,7 +183,7 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
   "completed": ["CK-08R0", "CK-08R1A", "CK-08R1C", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
-  "ready": [],
+  "ready": ["CK-08R1B"],
   "conditional_ready": [{
     "condition": "ARGV authority accepted at 479cbdb; coordinator records the preserved prelaunch incident disposition and a clean exact-main reapplication path; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; no replacement, launch, or downstream task",
     "tasks": ["CK-07R1"]

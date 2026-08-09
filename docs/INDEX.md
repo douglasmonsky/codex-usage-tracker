@@ -55,9 +55,15 @@ safety, and review gates plus hosted CI passed. The duplicate postmerge full
 runtime rerun was environment-limited by ENOSPC before completion; fresh
 exact-main identities and authority/scope/documentation checks passed, and no
 product assertion failed.
-R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`;
-R1B remains held on shared query/evidence/grading integration before final R1
-requalification.
+R1C is accepted at exact main `fb0c57886097a6b985d2f321b2de858cbdfc0a97`.
+The [CK-08R1B answer-semantics join authority](decisions/evidence/ck08r1b/answer-semantics-join-authority.json)
+binds the exact R1A producer artifacts, preserves R1C closure independence,
+and permits only the proved query admission, synthetic hierarchy/coordinate
+materialization, Q-WF-02 evaluator requalification, and deterministic 80-case
+fixture transition. R1B is Ready only for its existing held worker after that
+authority is merged and exact-main verified; the authority does not accept the
+implementation. CK-08R1, CK-08R4, CK-08RG, CK-09, and CK-07 remain blocked or
+held by their existing gates.
 CK-QG1A0 gated the selected R2 PageExecutor successor; QG1A removed its two
 C/B/B findings and is accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`;
 the linked

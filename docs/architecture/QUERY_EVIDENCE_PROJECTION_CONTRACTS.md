@@ -111,9 +111,11 @@ production `evaluate_plan`; this proves fact-adapter and database replay parity,
 not independent answer semantics. CK-08R1A must freeze corrected
 Q-REV-03/Q-WF-02 meaning and executable transitive closure. R1C's independent
 consumer is accepted at exact main
-`fb0c57886097a6b985d2f321b2de858cbdfc0a97`; R1B remains held on shared
-query/evidence/grading integration, and final R1 replays both only after that
-consumer is accepted. Cursor serialization still binds its version, request digest,
+`fb0c57886097a6b985d2f321b2de858cbdfc0a97`; the exact
+[R1B join authority](../decisions/evidence/ck08r1b/answer-semantics-join-authority.json)
+makes only the existing R1B worker Ready to reconcile its bound shared
+query/evidence/grading seams, and final R1 replays both only after that consumer
+is accepted. Cursor serialization still binds its version, request digest,
 plan, publication, and order; malformed, tampered, stale, replacement, and
 mismatched bindings fail closed.
 

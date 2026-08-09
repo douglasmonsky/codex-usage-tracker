@@ -764,6 +764,24 @@ CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS = frozenset(
     }
 )
 
+CK08R1B_JOIN_AUTHORITY_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.json",
+        "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.schema.json",
+        "docs/INDEX.md",
+        "docs/architecture/QUERY_EVIDENCE_PROJECTION_CONTRACTS.md",
+        "docs/quality/QUALIFICATION_PLAN.md",
+        "docs/roadmap/AGENT_FIRST_CLEAN_CUTOVER.md",
+        "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/tasks/ck-08r1b-implement-production-answer-semantics.md",
+        "scripts/check_kernel_scope.py",
+        "tests/kernel/test_ck08r1b_answer_semantics_join_authority.py",
+        "tests/kernel/test_documentation_authority.py",
+        "tests/kernel/test_kernel_scope.py",
+    }
+)
+
 CKQG1A0_AUTHORITY_ADDITIONS = frozenset(
     [
         "docs/decisions/evidence/ckqg1a0/page-executor-source-supersession-authority.json",
@@ -881,6 +899,7 @@ INTEGRATION_ADDITIONS = (
     | CK08R2_PHYSICAL_PAGE_ADDITIONS
     | CK08R1A_ANSWER_SEMANTICS_ADDITIONS
     | CK08R1C_INDEPENDENT_EVALUATOR_ADDITIONS
+    | CK08R1B_JOIN_AUTHORITY_ADDITIONS
     | CK08R3A_AUTHORITY_ADDITIONS
     | CK08R3_EVIDENCE_SCALE_ADDITIONS
     | CKQG1A0_AUTHORITY_ADDITIONS
