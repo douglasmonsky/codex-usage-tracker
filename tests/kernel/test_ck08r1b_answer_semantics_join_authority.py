@@ -107,6 +107,7 @@ def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
     authority = _load(AUTHORITY_PATH)
     correction = authority["identity_correction"]
     review_correction = authority["review_correction"]
+    acceptance_correction = authority["acceptance_correction"]
     cohort = authority["selected_successor_cohort"]
 
     assert isinstance(correction, dict)
@@ -135,9 +136,22 @@ def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
         "worker_pr_edit": "forbidden",
     }
     assert isinstance(review_correction, dict)
-    assert cohort["preflight_base_sha"] == review_correction["base_sha"]
-    assert cohort["patch_sha256"] == review_correction["selected_patch_sha256"]
+    assert isinstance(acceptance_correction, dict)
+    assert cohort["preflight_base_sha"] == acceptance_correction["base_sha"]
+    assert cohort["patch_sha256"] == acceptance_correction["selected_patch_sha256"]
     assert review_correction["superseded_patch_sha256"] == correction["selected_patch_sha256"]
+    assert (
+        acceptance_correction["superseded_selected_patch_sha256"]
+        == review_correction["selected_patch_sha256"]
+    )
+    assert set(acceptance_correction["changed_successor_paths"]) == {
+        "src/codex_usage_tracker/agent_kernel/domain/plan_derivations_structural.py",
+        "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "tests/agent_kernel/contracts/test_plan_derivations_structural.py",
+        "tests/agent_kernel/fixtures/independent/semantic.py",
+        "tests/agent_kernel/publication/test_preparation.py",
+        "tests/agent_kernel/test_ck08r1c_independent_evaluator.py",
+    }
     assert review_correction["worker_head_sha"] == (
         "3a86a10b12122d6ff9bec70f5f62105157af25c8"
     )
@@ -191,6 +205,8 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
             "production publication complete hierarchy plus dangling and cyclic rejection",
             "independent evaluator duplicate call, tool, and state-change stable-ID rejection",
             "Q-REV-03 direct fact answers and bound internal formula diagnostics",
+            "late relationship cycle, reverse-order chain, ambiguous new parent, and missing-parent rejection",
+            "production and independent required tool start/terminal null timestamp rejection",
         ],
     }
 
