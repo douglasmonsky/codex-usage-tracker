@@ -64,11 +64,14 @@ and permits only the proved query admission, production-owned synthetic
 duplicate-ID rejection, Q-REV-03 direct-fact/internal-formula binding, and
 deterministic 80-case production-compiler fixture transition. Its narrow
 selected-cohort acceptance correction binds late-cycle/reverse-chain/ambiguous
-parent rejection and production-independent null-coordinate parity. R1B is
-Ready only for its existing held worker and PR #430 after that correction is
-merged and exact-main verified; the authority does not accept the
-implementation. CK-08R1, CK-08R4, CK-08RG, CK-09, and CK-07 remain blocked or
-held by their existing gates.
+parent rejection and production-independent null-coordinate parity. Its final
+writer-closure correction adds the publication writer and its focused tests to
+the atomic cohort: the writer supplies the complete connected existing session
+component, preparation recomputes every changed descendant after reparenting,
+and unaffected rows remain exact. R1B is Ready only for its existing held
+worker and PR #430 after that correction is merged and exact-main verified; the
+authority does not accept the implementation. CK-08R1, CK-08R4, CK-08RG,
+CK-09, and CK-07 remain blocked or held by their existing gates.
 CK-QG1A0 gated the selected R2 PageExecutor successor; QG1A removed its two
 C/B/B findings and is accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`;
 the linked

@@ -108,6 +108,7 @@ def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
     correction = authority["identity_correction"]
     review_correction = authority["review_correction"]
     acceptance_correction = authority["acceptance_correction"]
+    writer_closure_correction = authority["writer_closure_correction"]
     cohort = authority["selected_successor_cohort"]
 
     assert isinstance(correction, dict)
@@ -137,13 +138,27 @@ def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
     }
     assert isinstance(review_correction, dict)
     assert isinstance(acceptance_correction, dict)
-    assert cohort["preflight_base_sha"] == acceptance_correction["base_sha"]
-    assert cohort["patch_sha256"] == acceptance_correction["selected_patch_sha256"]
+    assert isinstance(writer_closure_correction, dict)
+    assert cohort["preflight_base_sha"] == writer_closure_correction["base_sha"]
+    assert cohort["patch_sha256"] == writer_closure_correction["selected_patch_sha256"]
     assert review_correction["superseded_patch_sha256"] == correction["selected_patch_sha256"]
     assert (
         acceptance_correction["superseded_selected_patch_sha256"]
         == review_correction["selected_patch_sha256"]
     )
+    assert (
+        writer_closure_correction["superseded_selected_patch_sha256"]
+        == acceptance_correction["selected_patch_sha256"]
+    )
+    assert set(writer_closure_correction["added_successor_paths"]) == {
+        "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+        "tests/agent_kernel/publication/test_writer.py",
+    }
+    assert set(writer_closure_correction["changed_successor_paths"]) == {
+        "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+        "tests/agent_kernel/publication/test_writer.py",
+    }
     assert set(acceptance_correction["changed_successor_paths"]) == {
         "src/codex_usage_tracker/agent_kernel/domain/plan_derivations_structural.py",
         "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
@@ -174,15 +189,17 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
     assert isinstance(join, dict)
     files = cohort["files"]
     assert isinstance(files, list)
-    assert len(files) == 21
+    assert len(files) == 23
     paths = {item["path"] for item in files}
     assert {
         "src/codex_usage_tracker/agent_kernel/query/compiler.py",
         "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "src/codex_usage_tracker/agent_kernel/publication/writer.py",
         "experiments/physical-architecture/candidate_a/queries.py",
         "tests/agent_kernel/fixtures/independent/semantic.py",
         "tests/agent_kernel/fixtures/oracles/database_replay.py",
         "tests/agent_kernel/publication/test_preparation.py",
+        "tests/agent_kernel/publication/test_writer.py",
         "tests/agent_kernel/test_ck08r1c_independent_evaluator.py",
         "scripts/generate_ck07a_fixture.py",
         "tests/agent_kernel/fixtures/tiny-v2/manifest.json",
@@ -195,7 +212,7 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
         == "forbidden"
     )
     assert cohort["focused_validation"] == {
-        "result": "135 passed focused preflight",
+        "result": "174 passed focused semantic and writer preflight",
         "case_count": 80,
         "independent_rows_equal_production_rows": True,
         "independent_grades_equal_frozen_grades": True,
@@ -207,6 +224,7 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
             "Q-REV-03 direct fact answers and bound internal formula diagnostics",
             "late relationship cycle, reverse-order chain, ambiguous new parent, and missing-parent rejection",
             "production and independent required tool start/terminal null timestamp rejection",
+            "writer-owned existing non-root closure, reverse late chain, reparented descendants, unaffected-row preservation, and write-set parity",
         ],
     }
 
@@ -240,6 +258,8 @@ def test_fail_closed_mutations_and_downstream_locks_are_complete() -> None:
     assert isinstance(mutations, list)
     text = "\n".join(mutations)
     for required in (
+        "writer snapshot",
+        "reparented subtree",
         "session hierarchy",
         "measurement_mask",
         "session selector",
