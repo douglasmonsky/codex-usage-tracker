@@ -381,7 +381,7 @@
       }
     ],
     "focused_validation": {
-      "result": "171 passed focused preflight",
+      "result": "174 passed focused semantic and writer preflight",
       "case_count": 80,
       "independent_rows_equal_production_rows": true,
       "independent_grades_equal_frozen_grades": true,

@@ -212,7 +212,7 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
         == "forbidden"
     )
     assert cohort["focused_validation"] == {
-        "result": "171 passed focused preflight",
+        "result": "174 passed focused semantic and writer preflight",
         "case_count": 80,
         "independent_rows_equal_production_rows": True,
         "independent_grades_equal_frozen_grades": True,
