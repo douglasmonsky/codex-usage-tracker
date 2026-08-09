@@ -176,6 +176,37 @@
     "worker_pr_edit": "forbidden",
     "implementation_acceptance": "not_granted"
   },
+  "multi_publication_correction": {
+    "base_sha": "e5b6321f406e10770b1caa96639f90f47cca2221",
+    "source_pr": 430,
+    "worker_head_sha": "3a86a10b12122d6ff9bec70f5f62105157af25c8",
+    "worker_state": "dirty_exact_23_path_reapplication_preserved_no_post_review_edits",
+    "superseded_selected_patch_sha256": "5ea9275830146875cd60cdf28372d5bbb4deeafe0b170c29ecd3118a70390fc2",
+    "selected_patch_sha256": "e424294a083b7f8f4c61dd57ac11400f3f6bdf63469f3d43154931c9c9c1939c",
+    "selected_successor_paths": 23,
+    "changed_successor_paths": [
+      "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+      "tests/agent_kernel/publication/test_preparation.py",
+      "tests/agent_kernel/publication/test_writer.py"
+    ],
+    "relationship_order": [
+      "event_at_us_is_null",
+      "event_at_us",
+      "source_rank",
+      "source_order",
+      "event_kind_order",
+      "transition_rank"
+    ],
+    "findings": [
+      "SessionObserved native parent identity is normalized to the exact session semantic identity before writer snapshot seeding loads its complete ancestor and descendant component",
+      "persisted and incoming late-parent relations compare exact event and source coordinates so a newer authoritative relation wins independent of publication arrival order",
+      "exact same-parent same-basis coordinate replay is idempotent, while a different parent or basis at equal coordinates fails closed",
+      "four-publication stale replay preserves the newer reparented subtree, every changed descendant, unaffected components, and production write-set parity"
+    ],
+    "worker_pr_edit": "forbidden",
+    "implementation_acceptance": "not_granted"
+  },
   "consumer_join": {
     "query_compiler": {
       "path": "src/codex_usage_tracker/agent_kernel/query/compiler.py",
@@ -239,8 +270,8 @@
     }
   },
   "selected_successor_cohort": {
-    "preflight_base_sha": "f55e513d3be9ea367b8cf29bc080d35e7a366e89",
-    "patch_sha256": "5ea9275830146875cd60cdf28372d5bbb4deeafe0b170c29ecd3118a70390fc2",
+    "preflight_base_sha": "e5b6321f406e10770b1caa96639f90f47cca2221",
+    "patch_sha256": "e424294a083b7f8f4c61dd57ac11400f3f6bdf63469f3d43154931c9c9c1939c",
     "files": [
       {
         "path": "config/agent-kernel/formula-contract-v1.json",
@@ -275,12 +306,12 @@
       {
         "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
         "predecessor_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
-        "sha256": "b5a6ef960d3b0361dfe0b1108b67f6231939cf82dc0bc549c76d9d8ad4e24c89"
+        "sha256": "382e486932064735e990794fb111362a02572bcf42e33dbe757b37f2b53f71a7"
       },
       {
         "path": "src/codex_usage_tracker/agent_kernel/publication/writer.py",
         "predecessor_sha256": "13da341fc2a3c50d8d7de7fd6a6fc2b0aca0dbc832a9b56597cd96ab67d17488",
-        "sha256": "76db52708cead6ccd2b5ccf2872c6bd501fd9369ee561e3216da4ab13e6fe48d"
+        "sha256": "b23428f58040db06fc46eb938103f6e2844db6ee52843b169867c58bb0226997"
       },
       {
         "path": "src/codex_usage_tracker/agent_kernel/query/compiler.py",
@@ -345,12 +376,12 @@
       {
         "path": "tests/agent_kernel/publication/test_preparation.py",
         "predecessor_sha256": "2b43cdfca0d935d4f08aa44a16bd176713ddf3ef7083ff3e76b42d4d0c8687e3",
-        "sha256": "d4e06c6fc7b2faa3d06c447d06c5a4ed5523da24caa1b25ee60de63e3fe6aa78"
+        "sha256": "df73de981b1675a0ae250daeecf2196d51889f4552a535538b80b628038b0f61"
       },
       {
         "path": "tests/agent_kernel/publication/test_writer.py",
         "predecessor_sha256": "28dce47dfe32717a937079f068e9c1f1abcfbdfa6d65a15db6faba1b0c914b26",
-        "sha256": "c580641402ae79e31078c115ac01b10d486a72b14c57636d56577d2aadebc9b3"
+        "sha256": "67db39217a617361a9d5bf66cde5adcc41433e79ff3031a3c104caa8e052d34f"
       },
       {
         "path": "tests/agent_kernel/test_ck08r1c_independent_evaluator.py",
@@ -365,11 +396,11 @@
       },
       {
         "path": "tests/agent_kernel/publication/test_preparation.py",
-        "sha256": "d4e06c6fc7b2faa3d06c447d06c5a4ed5523da24caa1b25ee60de63e3fe6aa78"
+        "sha256": "df73de981b1675a0ae250daeecf2196d51889f4552a535538b80b628038b0f61"
       },
       {
         "path": "tests/agent_kernel/publication/test_writer.py",
-        "sha256": "c580641402ae79e31078c115ac01b10d486a72b14c57636d56577d2aadebc9b3"
+        "sha256": "67db39217a617361a9d5bf66cde5adcc41433e79ff3031a3c104caa8e052d34f"
       },
       {
         "path": "tests/agent_kernel/test_ck08r1c_independent_evaluator.py",
@@ -381,7 +412,7 @@
       }
     ],
     "focused_validation": {
-      "result": "174 passed focused semantic and writer preflight",
+      "result": "261 passed focused semantic, publication, compiler, replay, and writer preflight",
       "case_count": 80,
       "independent_rows_equal_production_rows": true,
       "independent_grades_equal_frozen_grades": true,
@@ -393,12 +424,17 @@
         "Q-REV-03 direct fact answers and bound internal formula diagnostics",
         "late relationship cycle, reverse-order chain, ambiguous new parent, and missing-parent rejection",
         "production and independent required tool start/terminal null timestamp rejection",
-        "writer-owned existing non-root closure, reverse late chain, reparented descendants, unaffected-row preservation, and write-set parity"
+        "writer-owned existing non-root closure, reverse late chain, reparented descendants, unaffected-row preservation, and write-set parity",
+        "two-publication native-parent closure plus unknown-parent dangling rejection",
+        "four-publication newer reparent, stale replay, exact duplicate, equal-order conflict, descendant recomputation, and unaffected-component preservation"
       ]
     }
   },
   "negative_mutations": [
     "writer snapshot missing an existing ancestor or descendant session rejects cohort identity and production replay",
+    "SessionObserved native parent seeding that omits semantic identity normalization rejects the cohort",
+    "older persisted late-parent replay that reverses a newer authoritative relation rejects the cohort",
+    "different parent or basis at equal late-parent event/source coordinates rejects before hierarchy mutation",
     "reparented subtree with stale descendant root or depth rejects production write-set parity",
     "missing, null, duplicate, cyclic, dangling, ambiguous, or stale reverse-order session hierarchy rejects after all authoritative relationships apply",
     "missing, null, malformed, or value-mismatched canonical-call measurement_mask rejects even when structural-context capability is unavailable",

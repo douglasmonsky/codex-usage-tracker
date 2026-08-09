@@ -44,7 +44,13 @@ one hierarchy computation and explicit non-null required tool timestamps.
 The final writer-closure correction extends that atomic cohort to 23 paths:
 writer-owned prior-state loading supplies every connected existing ancestor and
 descendant, preparation emits every changed descendant after reparenting, and
-unaffected session rows remain exact. Only the existing worker may resume after
+unaffected session rows remain exact. The final multi-publication correction
+retains those 23 paths and binds the remaining closure seam:
+`SessionObserved` native parents seed their exact semantic parent component,
+and persisted/incoming late-parent relations compare event/source coordinates
+so stale replay cannot reverse a newer reparent. Exact replay is idempotent;
+conflicting equal-order parent or basis declarations fail closed. Only the
+existing worker may resume after
 that correction merges and exact-main verifies. R1 remains their blocked
 requalification join.
 CK-QG1A removed R2's two page-executor C/B/B violations

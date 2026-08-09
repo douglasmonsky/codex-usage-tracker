@@ -109,6 +109,7 @@ def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
     review_correction = authority["review_correction"]
     acceptance_correction = authority["acceptance_correction"]
     writer_closure_correction = authority["writer_closure_correction"]
+    multi_publication_correction = authority["multi_publication_correction"]
     cohort = authority["selected_successor_cohort"]
 
     assert isinstance(correction, dict)
@@ -139,8 +140,12 @@ def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
     assert isinstance(review_correction, dict)
     assert isinstance(acceptance_correction, dict)
     assert isinstance(writer_closure_correction, dict)
-    assert cohort["preflight_base_sha"] == writer_closure_correction["base_sha"]
-    assert cohort["patch_sha256"] == writer_closure_correction["selected_patch_sha256"]
+    assert isinstance(multi_publication_correction, dict)
+    assert cohort["preflight_base_sha"] == multi_publication_correction["base_sha"]
+    assert (
+        cohort["patch_sha256"]
+        == multi_publication_correction["selected_patch_sha256"]
+    )
     assert review_correction["superseded_patch_sha256"] == correction["selected_patch_sha256"]
     assert (
         acceptance_correction["superseded_selected_patch_sha256"]
@@ -149,6 +154,10 @@ def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
     assert (
         writer_closure_correction["superseded_selected_patch_sha256"]
         == acceptance_correction["selected_patch_sha256"]
+    )
+    assert (
+        multi_publication_correction["superseded_selected_patch_sha256"]
+        == writer_closure_correction["selected_patch_sha256"]
     )
     assert set(writer_closure_correction["added_successor_paths"]) == {
         "src/codex_usage_tracker/agent_kernel/publication/writer.py",
@@ -159,6 +168,20 @@ def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
         "src/codex_usage_tracker/agent_kernel/publication/writer.py",
         "tests/agent_kernel/publication/test_writer.py",
     }
+    assert set(multi_publication_correction["changed_successor_paths"]) == {
+        "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+        "tests/agent_kernel/publication/test_preparation.py",
+        "tests/agent_kernel/publication/test_writer.py",
+    }
+    assert multi_publication_correction["relationship_order"] == [
+        "event_at_us_is_null",
+        "event_at_us",
+        "source_rank",
+        "source_order",
+        "event_kind_order",
+        "transition_rank",
+    ]
     assert set(acceptance_correction["changed_successor_paths"]) == {
         "src/codex_usage_tracker/agent_kernel/domain/plan_derivations_structural.py",
         "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
@@ -212,7 +235,7 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
         == "forbidden"
     )
     assert cohort["focused_validation"] == {
-        "result": "174 passed focused semantic and writer preflight",
+        "result": "261 passed focused semantic, publication, compiler, replay, and writer preflight",
         "case_count": 80,
         "independent_rows_equal_production_rows": True,
         "independent_grades_equal_frozen_grades": True,
@@ -225,6 +248,8 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
             "late relationship cycle, reverse-order chain, ambiguous new parent, and missing-parent rejection",
             "production and independent required tool start/terminal null timestamp rejection",
             "writer-owned existing non-root closure, reverse late chain, reparented descendants, unaffected-row preservation, and write-set parity",
+            "two-publication native-parent closure plus unknown-parent dangling rejection",
+            "four-publication newer reparent, stale replay, exact duplicate, equal-order conflict, descendant recomputation, and unaffected-component preservation",
         ],
     }
 

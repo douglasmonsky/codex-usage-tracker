@@ -18,6 +18,7 @@
     "review_correction",
     "acceptance_correction",
     "writer_closure_correction",
+    "multi_publication_correction",
     "consumer_join",
     "selected_successor_cohort",
     "negative_mutations",
@@ -296,6 +297,81 @@
           "type": "array",
           "minItems": 3,
           "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "worker_pr_edit": {
+          "const": "forbidden"
+        },
+        "implementation_acceptance": {
+          "const": "not_granted"
+        }
+      },
+      "additionalProperties": false
+    },
+    "multi_publication_correction": {
+      "type": "object",
+      "required": [
+        "base_sha",
+        "source_pr",
+        "worker_head_sha",
+        "worker_state",
+        "superseded_selected_patch_sha256",
+        "selected_patch_sha256",
+        "selected_successor_paths",
+        "changed_successor_paths",
+        "relationship_order",
+        "findings",
+        "worker_pr_edit",
+        "implementation_acceptance"
+      ],
+      "properties": {
+        "base_sha": {
+          "const": "e5b6321f406e10770b1caa96639f90f47cca2221"
+        },
+        "source_pr": {
+          "const": 430
+        },
+        "worker_head_sha": {
+          "const": "3a86a10b12122d6ff9bec70f5f62105157af25c8"
+        },
+        "worker_state": {
+          "const": "dirty_exact_23_path_reapplication_preserved_no_post_review_edits"
+        },
+        "superseded_selected_patch_sha256": {
+          "const": "5ea9275830146875cd60cdf28372d5bbb4deeafe0b170c29ecd3118a70390fc2"
+        },
+        "selected_patch_sha256": {
+          "const": "e424294a083b7f8f4c61dd57ac11400f3f6bdf63469f3d43154931c9c9c1939c"
+        },
+        "selected_successor_paths": {
+          "const": 23
+        },
+        "changed_successor_paths": {
+          "const": [
+            "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+            "src/codex_usage_tracker/agent_kernel/publication/writer.py",
+            "tests/agent_kernel/publication/test_preparation.py",
+            "tests/agent_kernel/publication/test_writer.py"
+          ]
+        },
+        "relationship_order": {
+          "const": [
+            "event_at_us_is_null",
+            "event_at_us",
+            "source_rank",
+            "source_order",
+            "event_kind_order",
+            "transition_rank"
+          ]
+        },
+        "findings": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
           "uniqueItems": true,
           "items": {
             "type": "string",
