@@ -210,6 +210,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "CK-08R3",
         "CK-QG1A0",
         "CK-QG1A",
+        "CK-QG1",
         "CK-07R1A",
         "CK-07R1A0",
     ]
@@ -221,8 +222,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         hashlib.sha256(qg1a_source.read_bytes()).hexdigest()
         == (qg1a_authority["selected_successor"]["sha256"])
     )
-    ready = {"CK-QG1"}
-    assert manifest["ready"] == ["CK-QG1"]
+    ready: set[str] = set()
+    assert manifest["ready"] == []
     assert manifest["conditional_ready"] == [
         {
             "condition": (
@@ -237,8 +238,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert "Completed packets: **14 / 22**" in ledger
     assert "Not started: **8**" in ledger
     assert "Critical-path completion: **14 / 21**" in ledger
-    assert "Completed corrective child tasks: **10" in ledger
-    assert "Remaining delegable child tasks: **40**" in ledger
+    assert "Completed corrective child tasks: **11" in ledger
+    assert "Remaining delegable child tasks: **39**" in ledger
     assert "Blocked child tasks: **38" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
@@ -347,6 +348,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             "CK-08R3",
             "CK-QG1A0",
             "CK-QG1A",
+            "CK-QG1",
             "CK-07R1A",
             "CK-07R1A0",
         }:
@@ -657,6 +659,10 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert "| CK-07A |" in backlog
     assert "### Evidence claim classes" in qualification
     assert "### Fact-backed plan admission" in query_contract
+    for active_authority in (qualification, query_contract):
+        assert "CK-QG1 PR #392 then passed" in active_authority
+        assert "QG1 PR #392 is Ready" not in active_authority
+        assert "QG1 PR #392 Ready" not in active_authority
     assert "**Dependencies:** CK-07, CK-07B, CK-07C, CK-07D, and CK-07E merged" in ck07a
     assert "greatest eligible" in ck07d
     assert "fetched_at_us" in ck07d
@@ -790,8 +796,8 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
     assert "strict Authority v2" in ck07r1a0
     assert "supersedes earlier CK-07R1 wording" in central
     assert (
-        "**Status:** Ready after CK-QG1A and CK-QG1 baseline-transition authority\n"
-        "merge exact-main verification"
+        "**Status:** Completed on merge — PR #392 hosted-green, squash-merged at\n"
+        "`68050b93`, and exact-main verified"
     ) in ckqg1
     assert "**Status:** `blocked_hold`" in ck07r1
     assert "720-second wrapper timeout" in ck07r1a0

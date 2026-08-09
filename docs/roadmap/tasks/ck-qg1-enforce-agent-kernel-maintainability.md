@@ -1,7 +1,7 @@
 # CK-QG1 — Enforce replacement-kernel maintainability
 
-**Status:** Ready after CK-QG1A and CK-QG1 baseline-transition authority
-merge exact-main verification
+**Status:** Completed on merge — PR #392 hosted-green, squash-merged at
+`68050b93`, and exact-main verified
 
 **Baseline transition authority:** [CK-QG1 exact maintainability baseline
 transition authority](../../decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json)
@@ -61,6 +61,16 @@ match/mismatch/improvement/new-finding tests; all profiles; GitNexus.
 
 **Acceptance:** Refreshed PR #392 passes exact C/B/B baseline enforcement and
 every new/worsened replacement finding fails without exemptions.
+
+**Accepted evidence:** PR #392 reused its retained lineage and selected only
+the exact authority-bound successor baseline
+`fda777e28db7a0696f29b55c9d694f99d987413b206d8e323f217b4fa6a73ad5`.
+Focused ratchet and authority checks, `just vc`, one bounded independent review,
+and hosted Console/Python 3.10/3.14 passed before squash merge. Fresh exact-main
+verification at `68050b9313ccc5be8e1fcd0ccd5b95cb4173f3ff` passed the focused
+authority/scope/evidence checks and full repository validation. Thresholds,
+text exemptions, release budgets, privacy rules, and spike semantics remain
+unchanged.
 
 **Failure/rollback:** Normalize tool output before enforcement if unstable;
 never disable the gate or broadly refactor unrelated code.

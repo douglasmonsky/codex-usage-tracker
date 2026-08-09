@@ -60,12 +60,16 @@ R1B remains held on shared query/evidence/grading integration before final R1
 requalification.
 CK-QG1A0 gated the selected R2 PageExecutor successor; QG1A removed its two
 C/B/B findings and is accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`;
-existing QG1 PR #392 is Ready to resume from corrected main. The linked
+the linked
 [CK-QG1 exact maintainability baseline transition authority](decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json)
 binds the accepted-main writer provenance finding at score 35/count 1 to the
 single successor baseline digest `fda777e28db7a0696f29b55c9d694f99d987413b206d8e323f217b4fa6a73ad5`;
-it is permitted-not-accepted authority, not generic baseline growth or CK-QG1
-implementation acceptance. CK-07R1A separately corrected PR #394's exact
+PR #392 then enforced that exact normalized baseline without weakening
+thresholds, exemptions, release budgets, privacy, or spike semantics. Hosted
+Console and Python 3.10/3.14 passed before squash merge and fresh exact-main
+verification at `68050b9313ccc5be8e1fcd0ccd5b95cb4173f3ff`. CK-QG1 is
+complete; CK-08RG remains blocked on CK-08R4. CK-07R1A separately corrected
+PR #394's exact
 hosted lifecycle-tail failure without a budget waiver.
 CK-07R1A0 path authority remains accepted at exact main
 `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked [source-digest

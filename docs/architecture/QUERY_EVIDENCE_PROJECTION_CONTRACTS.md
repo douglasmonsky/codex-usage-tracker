@@ -166,9 +166,10 @@ only the resulting measured residual list after CK-08RG.
 
 CK-QG1A0 gated the selected PageExecutor successor. CK-QG1A removed R2's
 rank-D findings and is accepted at exact main
-`30983d4b5005e7e2a507757c76a3c05ab56281e6`; existing QG1 PR #392 is Ready
-to resume. R2 semantics, evidence, thresholds, baseline, and generic-drift
-prohibition remain binding.
+`30983d4b5005e7e2a507757c76a3c05ab56281e6`. CK-QG1 PR #392 then passed the
+exact authorized normalized baseline ratchet, hosted CI, squash merge, and
+fresh exact-main verification at `68050b93`. R2 semantics, evidence,
+thresholds, baseline, and generic-drift prohibition remain binding.
 
 CK-07R1A is a separate lifecycle-performance lock: preserve the first hosted
 Python 3.14 `ordinary.2000_call_tail` failure, frozen five budgets, fold and
