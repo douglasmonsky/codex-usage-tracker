@@ -159,6 +159,10 @@ def test_import_order_identity_correction_is_exact_and_non_semantic() -> None:
         multi_publication_correction["superseded_selected_patch_sha256"]
         == writer_closure_correction["selected_patch_sha256"]
     )
+    assert (
+        multi_publication_correction["superseded_authority_patch_sha256"]
+        == "e424294a083b7f8f4c61dd57ac11400f3f6bdf63469f3d43154931c9c9c1939c"
+    )
     assert set(writer_closure_correction["added_successor_paths"]) == {
         "src/codex_usage_tracker/agent_kernel/publication/writer.py",
         "tests/agent_kernel/publication/test_writer.py",
@@ -235,7 +239,7 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
         == "forbidden"
     )
     assert cohort["focused_validation"] == {
-        "result": "261 passed focused semantic, publication, compiler, replay, and writer preflight",
+        "result": "266 passed focused semantic, publication, compiler, replay, and writer preflight",
         "case_count": 80,
         "independent_rows_equal_production_rows": True,
         "independent_grades_equal_frozen_grades": True,
@@ -250,6 +254,9 @@ def test_successor_cohort_and_consumer_ownership_are_bounded() -> None:
             "writer-owned existing non-root closure, reverse late chain, reparented descendants, unaffected-row preservation, and write-set parity",
             "two-publication native-parent closure plus unknown-parent dangling rejection",
             "four-publication newer reparent, stale replay, exact duplicate, equal-order conflict, descendant recomputation, and unaffected-component preservation",
+            "direct SessionObserved reparent with complete persisted descendant write set and unaffected-component parity",
+            "equal six-part same-parent different-basis or provenance conflict plus exact duplicate idempotency",
+            "current-batch transition-rank winner over inverse logical-id order across permutations with one emitted edge",
         ],
     }
 

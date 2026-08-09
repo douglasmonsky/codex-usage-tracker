@@ -72,7 +72,12 @@ and unaffected rows remain exact. The final multi-publication correction keeps
 the same 23 paths and binds native-parent snapshot seeding plus authoritative
 late-parent ordering: newer event/source coordinates win, exact replay is
 idempotent, and conflicting equal-order parent or basis declarations fail
-closed. R1B is Ready only for its existing held
+closed. The final selected-cohort correction additionally requires direct
+`SessionObserved` reparenting to load and emit the complete persisted
+descendant subtree, treats equal six-part coordinates as idempotent only when
+parent, basis, and occurrence provenance are exact, and selects one
+current-batch winner by that six-part order before logical identity. R1B is
+Ready only for its existing held
 worker and PR #430 after that correction is merged and exact-main verified; the
 authority does not accept the implementation. CK-08R1, CK-08R4, CK-08RG,
 CK-09, and CK-07 remain blocked or held by their existing gates.
