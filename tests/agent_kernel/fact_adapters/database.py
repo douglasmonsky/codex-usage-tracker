@@ -264,6 +264,7 @@ _RELATION_QUERIES: Mapping[str, str] = MappingProxyType(
                    s.project_id, NULL AS tool_id, mc.lifecycle_state AS lifecycle,
                    mc.context_window_tokens, mc.uncached_input_tokens,
                    mc.cached_input_tokens, mc.reasoning_tokens, mc.output_tokens,
+                   mc.measurement_mask,
                    mc.event_at_us, mc.source_rank, mc.source_order,
                    mc.event_kind_order, mc.transition_rank
               FROM model_calls_visible AS mc
@@ -374,7 +375,12 @@ _RELATION_QUERIES: Mapping[str, str] = MappingProxyType(
                    t.start_source_rank AS source_rank,
                    t.start_source_order AS source_order,
                    t.start_event_kind_order AS event_kind_order,
-                   t.start_transition_rank AS transition_rank
+                   t.start_transition_rank AS transition_rank,
+                   t.start_at_us, t.start_source_rank,
+                   t.start_source_order, t.start_event_kind_order,
+                   t.start_transition_rank, t.terminal_at_us,
+                   t.terminal_source_rank, t.terminal_source_order,
+                   t.terminal_event_kind_order, t.terminal_transition_rank
               FROM tool_invocations AS t
               LEFT JOIN resources AS r ON r.resource_id = t.primary_resource_id
              ORDER BY t.tool_id
@@ -564,6 +570,7 @@ _RELATION_FIELDS: Mapping[str, frozenset[str]] = MappingProxyType(
                 "cached_input_tokens",
                 "reasoning_tokens",
                 "output_tokens",
+                "measurement_mask",
                 "lifecycle",
             }
         ),
@@ -608,6 +615,16 @@ _RELATION_FIELDS: Mapping[str, frozenset[str]] = MappingProxyType(
                 "resource_kind",
                 "write_intent",
                 "lifecycle",
+                "start_at_us",
+                "start_source_rank",
+                "start_source_order",
+                "start_event_kind_order",
+                "start_transition_rank",
+                "terminal_at_us",
+                "terminal_source_rank",
+                "terminal_source_order",
+                "terminal_event_kind_order",
+                "terminal_transition_rank",
                 "output_bytes",
                 "duration_us",
                 "error_category",

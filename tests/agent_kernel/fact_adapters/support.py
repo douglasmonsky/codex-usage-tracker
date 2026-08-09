@@ -274,6 +274,18 @@ def build_structural_v2(
                 else cached,
                 "reasoning_tokens": reasoning,
                 "output_tokens": output,
+                "measurement_mask": (
+                    (1 << 0)
+                    | (1 << 2)
+                    | (1 << 3)
+                    | (1 << 4)
+                    | (1 << 5)
+                    | (
+                        (1 << 1)
+                        if not (null_cached_tokens and call_id == "call:before")
+                        else 0
+                    )
+                ),
                 "lifecycle": "succeeded",
             },
             at,
@@ -290,6 +302,7 @@ def build_structural_v2(
         ("tool:retry", "test", "test", "resource:test", True, "succeeded", 220),
     )
     for tool_id, operation, family, resource_id, write_intent, lifecycle_state, at in tool_rows:
+        start_source_order = order
         resource_links = (
             ["resource:file", "resource:test"] if tool_id == "tool:inspect" else [resource_id]
         )
@@ -311,8 +324,19 @@ def build_structural_v2(
                 "duration_us": 25,
                 "output_bytes": 64,
                 "error_category": "synthetic_failure" if lifecycle_state == "failed" else None,
+                "start_at_us": at,
+                "start_source_rank": 1,
+                "start_source_order": start_source_order,
+                "start_event_kind_order": 40,
+                "start_transition_rank": 0,
+                "terminal_at_us": at + 25,
+                "terminal_source_rank": 1,
+                "terminal_source_order": start_source_order + 1,
+                "terminal_event_kind_order": 50,
+                "terminal_transition_rank": 1,
             },
             at,
+            event_kind_order=40,
         )
     add(
         "state_change",
@@ -1104,7 +1128,7 @@ def build_query_only_database(declaration: Mapping[str, Any]) -> sqlite3.Connect
                 "token_basis": "structural",
                 "finish_category": None,
                 "error_category": None,
-                "measurement_mask": 0,
+                "measurement_mask": values["measurement_mask"],
                 "primary_occurrence_id": occurrence_id(fact["logical_id"]),
                 "first_seen_publication_id": PUBLICATION_ID,
                 "last_seen_publication_id": PUBLICATION_ID,
@@ -1144,17 +1168,17 @@ def build_query_only_database(declaration: Mapping[str, Any]) -> sqlite3.Connect
                 "lifecycle_state": values["lifecycle"],
                 "state_basis": "structural",
                 "transition_version": 1,
-                "start_at_us": coordinates["event_at_us"],
-                "start_source_rank": coordinates["source_rank"],
-                "start_source_order": coordinates["source_order"],
-                "start_event_kind_order": coordinates["event_kind_order"],
-                "start_transition_rank": coordinates["transition_rank"],
+                "start_at_us": values["start_at_us"],
+                "start_source_rank": values["start_source_rank"],
+                "start_source_order": values["start_source_order"],
+                "start_event_kind_order": values["start_event_kind_order"],
+                "start_transition_rank": values["start_transition_rank"],
                 "start_occurrence_id": occurrence_id(fact["logical_id"]),
-                "terminal_at_us": coordinates["event_at_us"] + values["duration_us"],
-                "terminal_source_rank": coordinates["source_rank"],
-                "terminal_source_order": coordinates["source_order"] + 1,
-                "terminal_event_kind_order": coordinates["event_kind_order"],
-                "terminal_transition_rank": 1,
+                "terminal_at_us": values["terminal_at_us"],
+                "terminal_source_rank": values["terminal_source_rank"],
+                "terminal_source_order": values["terminal_source_order"],
+                "terminal_event_kind_order": values["terminal_event_kind_order"],
+                "terminal_transition_rank": values["terminal_transition_rank"],
                 "terminal_occurrence_id": occurrence_id(fact["logical_id"]),
                 "observed_duration_us": values["duration_us"],
                 "output_bytes": values["output_bytes"],

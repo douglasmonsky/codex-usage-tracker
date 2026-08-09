@@ -165,7 +165,9 @@ class PriorPublicationSnapshot:
     entity_rows: Mapping[str, PreparedRow] = field(default_factory=dict)
     occurrence_ids: frozenset[str] = frozenset()
     late_parent_versions: Mapping[str, int] = field(default_factory=dict)
-    late_parent_edges: Mapping[tuple[str, str, str], PreparedRow] = field(default_factory=dict)
+    late_parent_edges: Mapping[tuple[str, str, str, str], PreparedRow] = field(
+        default_factory=dict
+    )
     allowance_predecessors: Mapping[tuple[str, ...], PreparedRow] = field(default_factory=dict)
     allowance_intervals: Mapping[str, PreparedRow] = field(default_factory=dict)
     rate_card_frontier: RateCardFrontier | None = None
@@ -692,6 +694,7 @@ def _read_affected_entity_rows(
 ) -> dict[str, PreparedRow]:
     result: dict[str, PreparedRow] = {}
     affected: set[tuple[str, str, str]] = set()
+    session_hierarchy_seeds: set[str] = set()
     for observation in changes.observations:
         table_spec = _ENTITY_TABLES.get(observation.observation_type)
         if table_spec is not None:
@@ -699,6 +702,12 @@ def _read_affected_entity_rows(
         if observation.observation_type == "SessionObserved":
             native_project = str(observation.payload.get("project_id") or "unknown-project")
             affected.add(("projects", "project_id", semantic_id("project", [native_project])))
+            session_hierarchy_seeds.add(observation.logical_id)
+            parent_session_id = observation.payload.get("parent_session_id")
+            if isinstance(parent_session_id, str):
+                session_hierarchy_seeds.add(
+                    semantic_id("session", [parent_session_id, "identity-v1"])
+                )
         elif observation.observation_type == "ResourceObserved":
             affected.add(
                 (
@@ -713,7 +722,7 @@ def _read_affected_entity_rows(
                 observation.payload.get("parent_session_id"),
             ):
                 if isinstance(session_id, str):
-                    affected.add(("sessions", "session_id", session_id))
+                    session_hierarchy_seeds.add(session_id)
     for table, id_column, logical_id in sorted(affected):
         rows = _prepared_rows(
             connection.execute(
@@ -724,6 +733,40 @@ def _read_affected_entity_rows(
         )
         if rows:
             result[logical_id] = rows[0]
+    if session_hierarchy_seeds:
+        placeholders = ", ".join("?" for _ in session_hierarchy_seeds)
+        rows = _prepared_rows(
+            connection.execute(
+                f"""
+                WITH RECURSIVE relevant_sessions(session_id) AS (
+                    SELECT session_id
+                    FROM sessions
+                    WHERE session_id IN ({placeholders})
+                    UNION
+                    SELECT sessions.parent_session_id
+                    FROM sessions
+                    JOIN relevant_sessions
+                      ON sessions.session_id = relevant_sessions.session_id
+                    WHERE sessions.parent_session_id IS NOT NULL
+                    UNION
+                    SELECT sessions.session_id
+                    FROM sessions
+                    JOIN relevant_sessions
+                      ON sessions.parent_session_id = relevant_sessions.session_id
+                )
+                SELECT sessions.*
+                FROM sessions
+                JOIN relevant_sessions USING (session_id)
+                ORDER BY sessions.session_id
+                """,
+                tuple(sorted(session_hierarchy_seeds)),
+            ),
+            "sessions",
+        )
+        result.update(
+            (str(row.values["session_id"]), row)
+            for row in rows
+        )
     return result
 
 
@@ -775,7 +818,7 @@ def _read_late_parent_versions(
 def _read_late_parent_edges(
     connection: sqlite3.Connection,
     changes: ProposedChangeSet,
-) -> dict[tuple[str, str, str], PreparedRow]:
+) -> dict[tuple[str, str, str, str], PreparedRow]:
     child_ids = sorted(
         {
             str(observation.payload["session_id"])
@@ -783,7 +826,7 @@ def _read_late_parent_edges(
             if observation.observation_type == "SessionRelationshipObserved"
         }
     )
-    result: dict[tuple[str, str, str], PreparedRow] = {}
+    result: dict[tuple[str, str, str, str], PreparedRow] = {}
     for child_id in child_ids:
         rows = _prepared_rows(
             connection.execute(
@@ -802,6 +845,7 @@ def _read_late_parent_edges(
                 child_id,
                 str(row.values["parent_session_id"]),
                 str(row.values["relationship_basis"]),
+                str(row.values["occurrence_id"]),
             )
             result[key] = row
     return result

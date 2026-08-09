@@ -2211,9 +2211,7 @@
         },
         {
           "field": "delegation_metrics",
-          "classification": "formula_output",
-          "formula_id": "exclusive_inclusive_scope_v1",
-          "output_key": "$"
+          "classification": "direct_fact"
         },
         {
           "field": "resource_metrics",
@@ -2225,9 +2223,7 @@
         },
         {
           "field": "token_deltas",
-          "classification": "formula_output",
-          "formula_id": "side_by_side_delta_v1",
-          "output_key": "$"
+          "classification": "direct_fact"
         },
         {
           "field": "tool_metrics",
@@ -2239,6 +2235,8 @@
         }
       ],
       "internal_formula_ids": [
+        "exclusive_inclusive_scope_v1",
+        "side_by_side_delta_v1",
         "total_tokens_v1"
       ]
     }
@@ -3376,10 +3374,8 @@
         "limit",
         "window"
       ],
-      "output_fields": [
-        "delegation_metrics"
-      ],
-      "internal_use": false,
+      "output_fields": [],
+      "internal_use": true,
       "operand_rule": "Build exclusive_inclusive_scope_v1 operands only from the listed canonical relations after compare_sessions applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
     },
     {
@@ -3404,10 +3400,8 @@
         "limit",
         "window"
       ],
-      "output_fields": [
-        "token_deltas"
-      ],
-      "internal_use": false,
+      "output_fields": [],
+      "internal_use": true,
       "operand_rule": "Build side_by_side_delta_v1 operands only from the listed canonical relations after compare_sessions applies its typed request, capability, publication, selector, and half-open window gates; emitted answer, oracle, and grading fields are forbidden inputs."
     },
     {

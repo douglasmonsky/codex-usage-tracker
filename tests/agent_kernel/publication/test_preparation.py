@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.canonicalize import (
     AdapterAccounting,
     ProposedChangeSet,
@@ -17,6 +19,7 @@ from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.normalize import (
 from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.parser import ParseBatch
 from codex_usage_tracker.agent_kernel.adapters.contracts import SourceRange
 from codex_usage_tracker.agent_kernel.domain.identity import semantic_id
+from codex_usage_tracker.agent_kernel.domain.plan_operands import PlanRequest
 from codex_usage_tracker.agent_kernel.publication.planner import (
     OperationClass,
     PublicationPlan,
@@ -24,12 +27,15 @@ from codex_usage_tracker.agent_kernel.publication.planner import (
 )
 from codex_usage_tracker.agent_kernel.publication.writer import (
     PublicationRequest,
+    PublicationWriteError,
     PublicationWriter,
     planned_artifact_manifest_sha256,
     prepare_write_set_from_changes,
     read_prior_publication_snapshot,
 )
+from codex_usage_tracker.agent_kernel.query.compiler import DatabaseV1FactCompiler
 from codex_usage_tracker.agent_kernel.storage.database import initialize_analytical
+from tests.agent_kernel.fact_adapters.support import plan_contract
 
 _FIXTURE = Path(__file__).parents[1] / "fixtures" / "tiny-v1"
 
@@ -232,6 +238,281 @@ def test_late_parent_preparation_writes_edge_and_current_hierarchy_without_label
     assert updated_child.values["label_candidates_json"] == "[]"
 
 
+def test_session_observation_parent_materializes_complete_hierarchy() -> None:
+    parent = _observation(
+        {
+            "type": "session_start",
+            "event_at_us": 10,
+            "source_order": 1,
+            "payload": {"session_id": "parent", "state": "running", "project_id": "p"},
+        },
+        4,
+    )
+    child = _observation(
+        {
+            "type": "session_start",
+            "event_at_us": 20,
+            "source_order": 2,
+            "payload": {
+                "session_id": "child",
+                "parent_session_id": "parent",
+                "state": "running",
+                "project_id": "p",
+            },
+        },
+        5,
+    )
+
+    sessions = {
+        str(row.values["adapter_native_session_key"]): row
+        for row in _write_set(parent, child).rows
+        if row.table == "sessions"
+    }
+    parent_id = str(sessions["parent"].values["session_id"])
+    assert sessions["parent"].values["root_session_id"] == parent_id
+    assert sessions["parent"].values["delegation_depth"] == 0
+    assert sessions["child"].values["parent_session_id"] == parent_id
+    assert sessions["child"].values["root_session_id"] == parent_id
+    assert sessions["child"].values["delegation_depth"] == 1
+
+
+@pytest.mark.parametrize("mutation", ["dangling", "cycle"])
+def test_session_observation_hierarchy_fails_closed(mutation: str) -> None:
+    parent = "missing" if mutation == "dangling" else "right"
+    left = _observation(
+        {
+            "type": "session_start",
+            "event_at_us": 10,
+            "source_order": 1,
+            "payload": {
+                "session_id": "left",
+                "parent_session_id": parent,
+                "state": "running",
+                "project_id": "p",
+            },
+        },
+        4,
+    )
+    observations = [left]
+    if mutation == "cycle":
+        observations.append(
+            _observation(
+                {
+                    "type": "session_start",
+                    "event_at_us": 20,
+                    "source_order": 2,
+                    "payload": {
+                        "session_id": "right",
+                        "parent_session_id": "left",
+                        "state": "running",
+                        "project_id": "p",
+                    },
+                },
+                5,
+            )
+        )
+    with pytest.raises(PublicationWriteError, match="cyclic or dangling"):
+        _write_set(*observations)
+
+
+def _session_start(native_id: str, ordinal: int):
+    return _observation(
+        {
+            "type": "session_start",
+            "event_at_us": ordinal * 10,
+            "source_order": ordinal,
+            "payload": {
+                "session_id": native_id,
+                "state": "running",
+                "project_id": "p",
+            },
+        },
+        ordinal,
+    )
+
+
+def _late_parent(child_id: str, parent_id: str, ordinal: int):
+    return _observation(
+        {
+            "type": "late_parent",
+            "event_at_us": ordinal * 10,
+            "source_order": ordinal,
+            "payload": {
+                "session_id": child_id,
+                "parent_session_id": parent_id,
+                "relationship_basis": "late_discovery",
+            },
+        },
+        ordinal,
+    )
+
+
+def test_late_parent_reverse_chain_computes_one_complete_hierarchy() -> None:
+    root = _session_start("root", 1)
+    middle = _session_start("middle", 2)
+    child = _session_start("child", 3)
+    child_to_middle = _late_parent("child", "middle", 4)
+    middle_to_root = _late_parent("middle", "root", 5)
+
+    sessions = {
+        str(row.values["session_id"]): row.values
+        for row in _write_set(
+            root,
+            middle,
+            child,
+            child_to_middle,
+            middle_to_root,
+        ).rows
+        if row.table == "sessions"
+    }
+    assert sessions[root.logical_id]["root_session_id"] == root.logical_id
+    assert sessions[root.logical_id]["delegation_depth"] == 0
+    assert sessions[middle.logical_id]["root_session_id"] == root.logical_id
+    assert sessions[middle.logical_id]["delegation_depth"] == 1
+    assert sessions[child.logical_id]["root_session_id"] == root.logical_id
+    assert sessions[child.logical_id]["delegation_depth"] == 2
+
+
+def test_late_parent_cycle_fails_after_all_relationships_are_applied() -> None:
+    left = _session_start("left", 1)
+    right = _session_start("right", 2)
+    with pytest.raises(PublicationWriteError, match="cyclic or dangling"):
+        _write_set(
+            left,
+            right,
+            _late_parent("left", "right", 3),
+            _late_parent("right", "left", 4),
+        )
+
+
+@pytest.mark.parametrize("mutation", ["ambiguous", "missing_parent"])
+def test_late_parent_relationship_fails_closed_on_invalid_parent_selection(
+    mutation: str,
+) -> None:
+    child = _session_start("child", 1)
+    left = _session_start("left", 2)
+    right = _session_start("right", 3)
+    relationships = [_late_parent("child", "left", 4)]
+    expected = "ambiguous"
+    if mutation == "ambiguous":
+        relationships.append(_late_parent("child", "right", 4))
+        expected = "equal-order conflict"
+    else:
+        relationships = [
+            _late_parent(
+                "child",
+                "missing",
+                4,
+            )
+        ]
+        expected = "no observed parent"
+    with pytest.raises(PublicationWriteError, match=expected):
+        _write_set(child, left, right, *relationships)
+
+
+def test_published_reverse_chain_replays_through_production_compiler(tmp_path: Path) -> None:
+    changes = ingest(_FIXTURE, manifest=_FIXTURE / "manifest.json").changes
+    sessions_by_id = {
+        observation.logical_id: observation
+        for observation in changes.observations
+        if observation.observation_type == "SessionObserved"
+    }
+    root, middle, child = tuple(sessions_by_id.values())[:3]
+
+    def relationship(source, descendant, parent, source_order):
+        identity = descendant.logical_id, parent.logical_id, "late_discovery"
+        return replace(
+            source,
+            observation_type="SessionRelationshipObserved",
+            logical_id=semantic_id("session-relationship", identity),
+            identity_tuple=identity,
+            event_at_us=source_order * 10,
+            source_order=source_order,
+            payload={
+                "session_id": descendant.logical_id,
+                "parent_session_id": parent.logical_id,
+                "relationship_basis": "late_discovery",
+            },
+        )
+
+    child_to_middle = relationship(child, child, middle, 400)
+    middle_to_root = relationship(middle, middle, root, 500)
+    augmented = replace(
+        changes,
+        observations=tuple(
+            sorted(
+                (*changes.observations, child_to_middle, middle_to_root),
+                key=lambda item: item.sort_key,
+            )
+        ),
+        occurrences=(
+            *changes.occurrences,
+            ProposedOccurrence(child_to_middle.logical_id, child_to_middle.source_range),
+            ProposedOccurrence(middle_to_root.logical_id, middle_to_root.source_range),
+        ),
+    )
+    connection = initialize_analytical(tmp_path / "hierarchy.sqlite3")
+    try:
+        publication_id = _publish(connection, augmented, _request("hierarchy-replay"))
+        # This focused seam has no valuation preparation. Supply the unrelated
+        # publication capability row required by the production compiler while
+        # retaining production preparation/writer ownership of every session.
+        connection.execute(
+            """
+            INSERT INTO publication_capability_coverage (
+                publication_id,
+                capability_id,
+                eligible_entity_count,
+                observed_entity_count,
+                unavailable_entity_count,
+                measurement_mask,
+                grade,
+                basis
+            ) VALUES (?, 'session_hierarchy', 3, 3, 0, 4, 'exact', 'synthetic_replay')
+            """,
+            (publication_id,),
+        )
+        connection.execute(
+            """
+            INSERT INTO publication_capability_coverage (
+                publication_id,
+                capability_id,
+                eligible_entity_count,
+                observed_entity_count,
+                unavailable_entity_count,
+                measurement_mask,
+                grade,
+                basis
+            ) VALUES (?, 'valuation', 0, 0, 0, 0, 'configured_estimate', 'synthetic_replay')
+            """,
+            (publication_id,),
+        )
+        connection.commit()
+        connection.execute("PRAGMA query_only = ON")
+        connection.execute("BEGIN")
+        compiled = DatabaseV1FactCompiler(plan_contract()).compile(
+            connection,
+            PlanRequest(
+                "compare_sessions",
+                {
+                    "left_session": root.logical_id,
+                    "right_session": child.logical_id,
+                },
+            ),
+        )
+        session_rows = {
+            str(fact.values["session_id"]): fact.values
+            for fact in compiled.facts
+            if fact.relation == "session"
+        }
+        assert session_rows[child.logical_id]["root_session_id"] == root.logical_id
+        assert session_rows[child.logical_id]["delegation_depth"] == 2
+    finally:
+        if connection.in_transaction:
+            connection.rollback()
+        connection.close()
+
+
 def test_allowance_preparation_does_not_bridge_plan_or_reset_changes() -> None:
     def allowance(ordinal: int, plan: str, reset: str):
         return _observation(
@@ -351,6 +632,12 @@ def test_context_component_and_late_parent_are_persisted(tmp_path: Path) -> None
         )
         replayed_relationship = replace(
             relationship,
+            event_at_us=(
+                None
+                if relationship.event_at_us is None
+                else relationship.event_at_us + 1
+            ),
+            source_order=relationship.source_order + 1,
             source_range=replace(
                 relationship.source_range,
                 record_ordinal=10_002,
@@ -382,10 +669,13 @@ def test_context_component_and_late_parent_are_persisted(tmp_path: Path) -> None
             other_parent.identity_tuple[0],
             "late_discovery",
         )
+        assert replayed_relationship.event_at_us is not None
         new_relationship = replace(
             replayed_relationship,
             logical_id=semantic_id("session-relationship", new_relationship_identity),
             identity_tuple=new_relationship_identity,
+            event_at_us=replayed_relationship.event_at_us + 1,
+            source_order=replayed_relationship.source_order + 1,
             source_range=replace(
                 relationship.source_range,
                 record_ordinal=10_004,
