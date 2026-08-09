@@ -35,7 +35,11 @@ their meaning and closure. R1C is accepted at exact main
 `fb0c57886097a6b985d2f321b2de858cbdfc0a97`; the exact
 [R1B join authority](../decisions/evidence/ck08r1b/answer-semantics-join-authority.json)
 makes only the existing R1B worker Ready to reconcile the shared
-query/evidence/grading seams, and R1 remains their blocked requalification join.
+query/evidence/grading seams. Its exact reviewer correction binds production
+publication hierarchy ownership, independent start/terminal window membership,
+duplicate stable-ID rejection, production-compiler replay, and the Q-REV-03
+direct-fact/internal-formula decision. R1 remains their blocked requalification
+join.
 CK-QG1A removed R2's two page-executor C/B/B violations
 without changing behavior or the frozen maintainability baseline and is
 accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`.

@@ -15,6 +15,7 @@
     "independent_truth_authority",
     "held_candidate",
     "identity_correction",
+    "review_correction",
     "consumer_join",
     "selected_successor_cohort",
     "negative_mutations",
@@ -66,6 +67,40 @@
       },
       "additionalProperties": false
     },
+    "review_correction": {
+      "type": "object",
+      "required": [
+        "base_sha",
+        "source_pr",
+        "worker_head_sha",
+        "review_disposition",
+        "superseded_patch_sha256",
+        "selected_patch_sha256",
+        "selected_successor_paths",
+        "findings",
+        "worker_pr_edit",
+        "implementation_acceptance"
+      ],
+      "properties": {
+        "base_sha": {"const": "dce25ea306382b271391ce62036623996205c29e"},
+        "source_pr": {"const": 430},
+        "worker_head_sha": {"const": "3a86a10b12122d6ff9bec70f5f62105157af25c8"},
+        "review_disposition": {"const": "requested_changes_preserved_open_unmerged"},
+        "superseded_patch_sha256": {"const": "38c0db5c2242a962b20fa2abd05c264fb08e36f6d9dc542fe5763ca69986c690"},
+        "selected_patch_sha256": {"const": "74776e524db39a8687963faa8a163dccd848fd9bf7ca81697ca3c86c5e5a0d5a"},
+        "selected_successor_paths": {"const": 21},
+        "findings": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "worker_pr_edit": {"const": "forbidden"},
+        "implementation_acceptance": {"const": "not_granted"}
+      },
+      "additionalProperties": false
+    },
     "consumer_join": {"$ref": "#/$defs/object"},
     "selected_successor_cohort": {
       "type": "object",
@@ -75,8 +110,8 @@
         "patch_sha256": {"$ref": "#/$defs/sha"},
         "files": {
           "type": "array",
-          "minItems": 18,
-          "maxItems": 18,
+          "minItems": 21,
+          "maxItems": 21,
           "uniqueItems": true,
           "items": {"$ref": "#/$defs/transitionPathDigest"}
         },
