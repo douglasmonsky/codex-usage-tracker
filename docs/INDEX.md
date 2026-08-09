@@ -24,8 +24,13 @@ identity verified at `38537f6cee42ad4ba2fb6e45354e410053c7a7cd`.
 CK-08R3 then passed both frozen synthetic profiles, all selector/view/direction
 outcomes, typed seven-part truth, late-event, truncation, cursor, and
 query-only contracts. PR #425 was hosted-green, squash-merged, and exact-main
-verified at `0fad272b3205614fb254398c9c9dc0a56d5ba7cd`. CK-08R3 is complete;
-CK-08R4 remains blocked on CK-08R1 and CK-07R1. Independent
+verified at `0fad272b3205614fb254398c9c9dc0a56d5ba7cd`. CK-08R3 is complete.
+CK-08R1's schema-valid
+[`answer-truth-requalification.v2`](decisions/evidence/ck08r1/answer-truth-requalification-v2.json)
+records 80/80 rows, grades, order, evidence, provenance, null semantics,
+closure, grading isolation, and mutation proof; completion remains subject to
+hosted CI, squash merge, and exact-main verification. CK-08R4 remains blocked
+on CK-07R1. Independent
 truth now consumes [`answer-semantics.v1`](../config/agent-kernel/answer-semantics-v1.json);
 The linked [CK-08R3A schema/publication requalification authority](decisions/evidence/ck08r3a/schema-publication-requalification-authority.json)
 binds the resulting 57-index schema digest, synthetic publication fixture
@@ -78,8 +83,8 @@ descendant subtree, treats equal six-part coordinates as idempotent only when
 parent, basis, and occurrence provenance are exact, and selects one
 current-batch winner by that six-part order before logical identity. PR #430
 passed hosted CI, squash-merged, and was exact-main verified at `9e9332b3`.
-R1B is complete, R1 is the sole Ready packet, and CK-08R4, CK-08RG, CK-09,
-and CK-07 remain blocked or held by their existing gates.
+R1B and R1 are complete on merge; CK-08R4, CK-08RG, CK-09, and CK-07 remain
+blocked or held by their existing gates.
 CK-QG1A0 gated the selected R2 PageExecutor successor; QG1A removed its two
 C/B/B findings and is accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`;
 the linked

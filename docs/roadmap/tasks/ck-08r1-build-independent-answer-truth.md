@@ -1,6 +1,7 @@
 # CK-08R1 — Requalify independent answer truth
 
-**Status:** Ready — CK-08R1B and CK-08R1C accepted, merged, and exact-main verified
+**Status:** Completed on merge — hosted CI, squash merge, and exact-main
+verification required in handoff
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -63,3 +64,20 @@ digests, 80/mutation/R2 results, CI/review/exact-main, and join readiness.
 new v2 amendment.
 
 **Suggested commit:** `test: requalify independent answer truth`
+
+## Completion evidence
+
+- Collector: `scripts/qualify_ck08r1_answer_truth.py`
+- Artifact:
+  `docs/decisions/evidence/ck08r1/answer-truth-requalification-v2.json`
+- Result: all 80 variants match on rows, grades, order, evidence, provenance,
+  and null semantics.
+- Isolation: both lanes retain baseline answers with grading unavailable or
+  sentinel-mutated.
+- Mutation sensitivity: canonical-fact mutation changes both lanes; a
+  production-source mutation changes only production while independent output
+  remains unchanged.
+- Identity: R1A `7f8b52ccbc6b0ddeb103ff768a1b36403401727b`, R1B
+  `9e9332b3ae2be78cedb581ff8f76149ad76f4440`, and R1C
+  `fb0c57886097a6b985d2f321b2de858cbdfc0a97` are recomputed from committed
+  repository paths by the collector.
