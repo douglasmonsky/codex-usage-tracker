@@ -13,7 +13,7 @@ parents are accounting umbrellas.
 - Critical-path completion: **14 / 21**
 - Optional packets: **CK-15**
 - Completed corrective child tasks: **13 — CK-08R0, CK-08R1A, CK-08R1B, CK-08R1C, CK-08R1, CK-08R2, CK-08R3A, CK-08R3, CK-QG1A0, CK-QG1A, CK-QG1, CK-07R1A, CK-07R1A0**
-- Remaining delegable child tasks: **38**
+- Remaining delegable child tasks: **37**
 - Ready child tasks: **0**
 - Conditional-ready child tasks: **1 — CK-07R1 after coordinator disposition of the preserved prelaunch incident and a clean exact-main reapplication path**
 - Blocked child tasks: **36**
@@ -62,7 +62,7 @@ locks are unchanged.
 - [x] **CK-08R1A — Freeze answer semantics and evidence closure** · Completed on merge; exact-main verification required in handoff · [packet](tasks/ck-08r1a-freeze-answer-semantics.md)
 - [x] **CK-08R1B — Implement production answer semantics** · PR #430 hosted-green, squash-merged, and exact-main verified at `9e9332b3`; exact 23-path cohort and 80/80 production-versus-independent replay accepted · [packet](tasks/ck-08r1b-implement-production-answer-semantics.md)
 - [x] **CK-08R1C — Build independent semantic evaluator** · PR #411 merged/exact-main `fb0c578`; independent closure and all 80 variants accepted · [packet](tasks/ck-08r1c-build-independent-semantic-evaluator.md)
-- [x] **CK-08R1 — Requalify independent answer truth** · Completed on merge; schema-valid 80/80 production-independent rows, grades, order, evidence, provenance, null, closure, grading-isolation, and mutation proof; hosted CI, squash merge, and exact-main verification required in handoff · [artifact](../decisions/evidence/ck08r1/answer-truth-requalification-v2.json) · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
+- [x] **CK-08R1 — Requalify independent answer truth** · PR #439 hosted-green, squash-merged, and exact-main verified at `0832b854`; schema-valid 80/80 production-independent rows, grades, order, evidence, provenance, null, closure, grading-isolation, and mutation proof accepted · [artifact](../decisions/evidence/ck08r1/answer-truth-requalification-v2.json) · [packet](tasks/ck-08r1-build-independent-answer-truth.md)
 - [x] **CK-08R2 — Implement bounded physical keyset execution** · Completed on merge; exact-main verification recorded in handoff · [packet](tasks/ck-08r2-implement-physical-keyset-execution.md)
 - [x] **CK-QG1A0 — Authorize PageExecutor source supersession** · Completed on merge; exact-main required before CK-QG1A · [packet](tasks/ck-qg1a0-authorize-page-executor-source-supersession.md)
 - [x] **CK-08R3A — Implement bounded EvidenceService physical queries** · PR #417 hosted-green and squash-merged at `38537f6c`; exact-main identities verified · [packet](tasks/ck-08r3a-implement-evidence-physical-query.md)
