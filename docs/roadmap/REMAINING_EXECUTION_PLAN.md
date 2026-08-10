@@ -93,10 +93,12 @@ run-invocation authority, and argv-correction authority are merged through
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` failed the hosted Python 3.14
 `ordinary.2000_call_tail` gate and is superseded read-only. It must not be
 updated, rerun, or merged. The planner-valid lifecycle receipt is an
-acceptance output of the existing CK-07R1 worker only after the coordinator
-records the preserved prelaunch-incident disposition and the worker
-revalidates the candidate from a clean exact-main worktree. The accepted
-authorities do not authorize a launch by themselves.
+acceptance output of the existing CK-07R1 worker. The coordinator recorded the
+preserved incident disposition and the worker derived the exact candidate
+cohort from exact main `cf44f4fd`: preparation `66c015de…`, benchmark
+`f173837d…`, and lifecycle test `b6468b60…`. That cohort remains
+permitted-not-accepted and cannot enter `worker_prequalification` until this
+authority transition merges and exact-main verifies.
 The old frozen-command attempt is preserved exactly as a terminal
 `pre_child_argv_guard_failure` (exit 2 after `0.075241709` seconds, no child or
 runtime evidence), and its old benchmark/test identities cannot be reused.
@@ -107,21 +109,21 @@ instrumentation mistake invoked the corrected candidate from the retained V5
 witness and stopped at the child-handshake boundary. It produced only the
 preserved `prelaunch_failed` launch-token ledger, with
 `token_consumed=false`, no successful child/PID/receipt/runtime evidence, and
-no retry. The witness remains read-only. CK-07R1 stays Conditional Ready until
-the coordinator records an incident disposition and a clean exact-main
-reapplication path; the incident does not authorize a launch or a replacement
-worker.
+no retry. The witness remains read-only. The incident does not authorize a
+launch or replacement worker.
 The first sample, 720-second wrapper timeout, all five underlying budgets,
 one-run ceiling, and every fail-closed rule remain binding. CK-07R1 is
-Conditional Ready pending the incident disposition and clean exact-main
-reapplication path; until then its current authority state is `authority_main`
-and no worker may resume. After that handoff only the existing stopped worker
-may be resumed for required revalidation of the corrected exact candidate. The
-worker may enter
-`worker_prequalification` only with the exact selected successor,
-`post_single_run` only with a complete planner-valid receipt and bound dynamic
-evidence identity, and `final_accepted` only after worker merge and exact-main
-verification. The still-unspent one-run token may fund exactly one first
+Conditional Ready pending merge and exact-main verification of the exact
+successor authority. Until then its current authority state is
+`authority_main` at preparation `7d1831ff…` and no worker may resume. After
+that handoff only the existing stopped worker may resume with the complete
+`66c015de…` / `f173837d…` / `b6468b60…` cohort. Historical accepted R3A
+`6689d61f…`, revoked `d192c858…`, mixed cohorts, and every other digest are
+predecessor-only or fail-closed and cannot enter `worker_prequalification`.
+The worker may enter `worker_prequalification` only with the exact selected
+cohort, `post_single_run` only with a complete planner-valid receipt and bound
+dynamic evidence identity, and `final_accepted` only after worker merge and
+exact-main verification. The still-unspent one-run token may fund exactly one first
 successful child launch after all gates pass; this is not a retry, restart, or
 replacement of a launched process. Earlier wording that says to resume, refresh, or rerun PR #394 is
 historical provenance and does not authorize action. This source-digest
@@ -224,7 +226,7 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "completed": ["CK-08R0", "CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R1", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
   "ready": [],
   "conditional_ready": [{
-    "condition": "ARGV authority accepted at 479cbdb; coordinator records the preserved prelaunch incident disposition and a clean exact-main reapplication path; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; no replacement, launch, or downstream task",
+    "condition": "exact 66c015de/f173837d/b6468b60 successor authority merges and exact-main verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 with the atomic cohort; no replacement, launch, token consumption, or downstream task",
     "tasks": ["CK-07R1"]
   }],
   "blocked": [],

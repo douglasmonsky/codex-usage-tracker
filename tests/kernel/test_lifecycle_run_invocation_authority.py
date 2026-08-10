@@ -192,15 +192,15 @@ def test_argv_correction_preserves_first_failure_and_one_run_gate() -> None:
     }
 
 
-def test_selected_candidate_is_r3a_shared_preparation_only_and_ck07_stays_blocked() -> None:
+def test_selected_candidate_is_exact_ck07_cohort_and_runtime_stays_blocked() -> None:
     authority = _authority()
     candidate = authority["selected_candidate"]
-    assert authority["schema"] == "codex-usage-tracker.lifecycle-run-invocation-authority.v5"
-    assert authority["authority_version"] == 5
-    assert authority["authority_base_sha"] == "7d5a4b1717db78891fd2c38d8803d7fe2f922986"
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-run-invocation-authority.v6"
+    assert authority["authority_version"] == 6
+    assert authority["authority_base_sha"] == "cf44f4fdd3f54ad53263b5e744203be468fbe5ca"
     assert authority["status"] == "blocked_no_run"
     assert authority["shared_preparation_binding"] == {
-        "authority_main_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
+        "authority_main_sha256": "7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb",
         "r3a_atomic_cohort_sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
         "historical_d192_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
         "r3a_requires_complete_cohort": True,
@@ -211,21 +211,24 @@ def test_selected_candidate_is_r3a_shared_preparation_only_and_ck07_stays_blocke
         "launch_authorized": False,
     }
     assert authority["historical_d192"]["direct_use"] == "forbidden"
-    assert candidate["status"] == "r3a_shared_preparation_not_ck07_candidate"
+    assert candidate["status"] == "exact_ck07_successor_permitted_not_accepted"
     assert candidate["base_sha"] == authority["authority_base_sha"]
     assert candidate["source_successor_sha256"] == (
-        "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c"
+        "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea"
     )
-    assert candidate["requires_complete_r3a_cohort"] is True
-    assert candidate["direct_ck07_use"] == "forbidden"
+    assert candidate["requires_complete_candidate_cohort"] is True
+    assert candidate["direct_ck07_use"] == (
+        "worker_prequalification_only_after_authority_exact_main"
+    )
     assert candidate["launch_authorized"] is False
     assert candidate["artifacts"][0] == {
         "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
-        "sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
-        "role": "r3a_shared_preparation_not_ck07_source",
+        "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea",
+        "role": "source",
     }
     assert candidate["binding"] == (
-        "r3a_preparation_is_not_a_ck07_candidate; complete_cohort_required_before_ck07_reapplication"
+        "only the byte-exact 66c015de/f173837d/b6468b60 cohort may enter "
+        "worker_prequalification after this authority merges and exact-main verifies"
     )
     assert authority["run_token"]["status"] == "unspent_unavailable"
     assert authority["run_token"]["maximum_new_end_to_end_runs"] == 1
@@ -243,17 +246,17 @@ def test_finite_source_runtime_state_machine_is_exact_and_currently_unlaunched()
     ]
     assert machine["states"][0] == {
         "name": "authority_main",
-        "source_sha256": "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872",
-        "source_role": "live_predecessor",
+        "source_sha256": "7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb",
+        "source_role": "accepted_current_r1b_predecessor",
         "runtime_acceptance": "not_claimed",
         "receipt_policy": "receipt_absent_and_non_qualifying",
         "evidence_identity_policy": "not_available",
         "merge_policy": "current_authority_state",
     }
     assert machine["states"][1]["source_sha256"] == (
-        "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c"
+        "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea"
     )
-    assert machine["states"][1]["source_role"] == "selected_r3a_atomic_cohort_preparation"
+    assert machine["states"][1]["source_role"] == "selected_ck07_exact_candidate"
     assert machine["states"][1]["runtime_acceptance"] == "not_claimed"
     assert machine["states"][2]["receipt_policy"] == "complete_planner_valid_receipt_required"
     assert machine["states"][2]["evidence_identity_policy"] == (
@@ -495,7 +498,7 @@ def test_process_exclusion_launch_token_and_evidence_capture_are_required() -> N
         "refund": False,
         "prior_identities_reused": False,
         "concurrent_processes_allowed": False,
-        "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker deliberately reapplies only the corrected exact candidate, and all gates pass",
+        "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/f173837d/b6468b60 candidate cohort, and all gates pass",
         "first_successful_launch": "exactly one first successful child launch may consume the still-unspent token; this is not a retry, restart, or replacement of a launched process",
         "old_candidate_reuse": "forbidden",
     }
@@ -512,7 +515,7 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
         after_launch["failures"]
     )
     feasibility = authority["feasibility"]
-    assert feasibility["candidate_status"] == "corrected_no_run_runtime_unqualified"
+    assert feasibility["candidate_status"] == "exact_successor_bound_no_run_runtime_unqualified"
     assert "planner-valid receipt" in feasibility["exact_blocker"]
     assert feasibility["run_action"].startswith("do not execute")
 
@@ -534,10 +537,14 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
         ("fixture-digest-binding", ("launch_contract", "fixture_identity", "manifest", "fixture_file_sha256"), "0" * 64),
         ("aggregate-timeout", ("launch_contract", "aggregate_timeout", "seconds"), 120),
         ("candidate-benchmark", ("selected_candidate", "artifacts", 1, "sha256"), "0" * 64),
+        ("candidate-launch-authorization", ("selected_candidate", "launch_authorized"), True),
+        ("shared-launch-authorization", ("shared_preparation_binding", "launch_authorized"), True),
+        ("candidate-runtime-acceptance", ("selected_candidate", "runtime_acceptance"), "accepted"),
         ("rejected-dispatch", ("launch_contract", "fixture_identity", "rejected_dispatch_values", 0, "status"), "used"),
         ("output-overwrite", ("launch_contract", "output", "overwrite_rule"), "overwrite"),
         ("process-exclusion", ("launch_gates", "prelaunch", "required", 3), "process check omitted"),
         ("run-token-timing", ("run_token", "consumption"), "before launch"),
+        ("run-token-status", ("run_token", "status"), "spent"),
         ("no-retry", ("failure_matrix", "after_launch", "no_retry"), False),
         ("tail-limit", ("launch_contract", "tail_limits", "values", "observations"), 12001),
         ("count", ("launch_contract", "profiles", "workloads", 0, "observations"), 1370),
@@ -585,6 +592,7 @@ def test_dag_ledger_index_and_scope_bind_the_authority_without_new_task() -> Non
     assert "CK-07R1" in central and "CK-07R1" in ledger
     assert authority["scope"]["authority_only_files"]
     assert set(authority["scope"]["authority_only_files"]) == {
+        "AGENTS.md",
         "docs/INDEX.md",
         "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
         "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",

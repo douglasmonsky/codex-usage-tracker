@@ -40,10 +40,12 @@ behavior or the frozen baseline and is accepted at exact main `30983d4`;
 QG1 PR #392 passed hosted CI, squash-merged, and was exact-main verified at
 `68050b93`. CK-07R1A corrected
 the exact hosted Python 3.14 lifecycle-tail blocker; the linked CK-07R1A0
-authorities, including argv correction, are merged through `479cbdb`. The
-existing CK-07R1 worker remains stopped pending coordinator disposition of the
-preserved `prelaunch_failed` witness incident and a clean exact-main
-reapplication path. PR #394 remains stale failed read-only.
+authorities, including argv correction, are merged through `479cbdb`.
+Coordinator disposition and clean exact-main reapplication from `cf44f4fd`
+derived the exact `66c015de…` / `f173837d…` / `b6468b60…` candidate cohort.
+The existing CK-07R1 worker remains stopped until that authority transition is
+merged and exact-main verified; no launch or token use is authorized. PR #394
+remains stale failed read-only.
 Retained R3 evidence proved the EvidenceService outer query
 physically unbounded; CK-08R3A owns that isolated fix and R3 awaits its
 accepted, merged, exact-main-verified result.

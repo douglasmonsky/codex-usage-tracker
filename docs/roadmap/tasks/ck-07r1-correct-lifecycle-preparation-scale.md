@@ -1,6 +1,7 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** `blocked_hold`; CK-07R1 remains unlaunched until a later exact-main reapplication produces a new CK-07 preparation digest
+**Status:** `blocked_hold`; the exact successor cohort is selected but remains
+unlaunched and unavailable until its authority merges and exact-main verifies
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -27,24 +28,22 @@ contracts.
 **Dependencies:** CK-07R1A accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 path authority remains
 historical; and the linked finite source/runtime authorities remain
-`blocked_hold` with the one-run token unspent/unavailable. Exact-main
-preparation `408d18e4…` is the only live source before R3A. Preparation
-`e204e0da…` is permitted only inside the complete CK-08R3A cohort and is not a
-direct CK-07 candidate. Historical `d192c858…` is retained read-only, revoked
-for the new base, and forbidden for direct use. After accepted R3A exact-main,
-the existing worker must start in a fresh worktree, deliberately reapply its
-retained lifecycle diff onto the new preparation base, derive a new exact
-preparation digest, and update CK-07 source authority before any end-to-end
-run. PR #394 head `98a9b5b82951d136644a5fe5f8a70d320131ba08` is a stale failed
+`blocked_hold` with the one-run token unspent/unavailable. Accepted R3A
+preparation `6689d61f…` remains a historical predecessor and accepted
+R1B/current exact-main preparation `7d1831ff…` is the live predecessor. The
+existing worker's fresh exact-main `cf44f4fd` reapplication derived the sole
+candidate cohort: preparation `66c015de…`, benchmark `f173837d…`, and lifecycle
+test `b6468b60…`. Historical `d192c858…`, mixed or incomplete cohorts, and
+every other digest fail closed. PR #394 head
+`98a9b5b82951d136644a5fe5f8a70d320131ba08` is a stale failed
 read-only witness and is not refreshed, rerun, or merged.
 
 **Owned files/interfaces:** Lifecycle preparation implementation, focused
 publication tests, profile/benchmark, and linked CK-07 evidence amendment;
-the current authority binds the live preparation `408d18e4…`, the shared R3A
-preparation `e204e0da…` only as a conditional two-state source, retained
-benchmark `f173837d…`, lifecycle test `b6468b60…`, linked evidence `36eb76ca…`,
-and the 720-second wrapper timeout without executing the worker. No CK-07
-successor is currently selected for runtime use.
+the current authority binds predecessor preparation `7d1831ff…` to the atomic
+`66c015de…` / `f173837d…` / `b6468b60…` successor cohort, linked evidence
+`36eb76ca…`, and the 720-second wrapper timeout without executing the worker.
+The successor is permitted-not-accepted and launch remains unauthorized.
 
 **Produces:** Publication-scale requalification with equivalent fold identity.
 
@@ -54,10 +53,9 @@ database postconditions.
 **Consumer seam:** Preparation to `PublicationWriter` to read-only publication.
 
 **Parallelism:** Resume only the existing stopped CK-07R1 worker after the
-R3A cohort is accepted and exact-main verifies, using an exact-main START, a
-fresh worktree, and deliberate reapplication of only the retained lifecycle
-diff onto the new R3A preparation base. Historical `d192c858…` cannot be
-reapplied directly.
+exact successor authority merges and exact-main verifies, using only the
+preserved exact candidate worktree and complete selected cohort. Historical
+`d192c858…` cannot be reapplied directly.
 Never rebase, stash,
 reset, clean, delete, overwrite, or mutate the witness; do not create a
 replacement worker task. The planner-valid receipt is produced by that worker

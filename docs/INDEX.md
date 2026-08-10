@@ -109,13 +109,13 @@ authority](decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json)
 and [run-invocation authority](decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json)
 keep CK-07R1 `blocked_hold`
 (`docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json`).
-The shared-preparation transition is exactly two-state: live exact-main
-preparation `408d18e4…` before R3A, and the current session-bounded preparation
-`6689d61f…` only inside the complete R3A cohort after its acceptance. Prior
-candidate `e204e0da…` and historical candidate `d192c858…` are retained
-read-only, revoked for the new base, and forbidden for direct use. CK-07 must
-later reapply its retained lifecycle diff onto the accepted R3A base to derive
-a new exact preparation digest before any run. PR #394 remains a stale failed
+The accepted source history retains R3A preparation `6689d61f…` as a
+historical predecessor and R1B/current exact-main preparation `7d1831ff…` as
+the live predecessor. The sole CK-07 worker-prequalification successor is the
+atomic `66c015de…` preparation, `f173837d…` benchmark, and `b6468b60…`
+lifecycle-test cohort derived from exact main `cf44f4fd`. Mixed or incomplete
+cohorts, prior candidate `e204e0da…`, and historical candidate `d192c858…`
+fail closed. PR #394 remains a stale failed
 read-only witness; it is not updated, rerun, or merged. The old argv-guard attempt remains the historical
 `pre_child_argv_guard_failure`: exit 2 after `0.075241709` seconds, with no
 child, PID, handshake, token, output, ledger, stdout, stderr, receipt, or
@@ -123,10 +123,10 @@ runtime evidence. The corrected guard is
 `(sys.argv[0], *sys.argv[1:]) == LAUNCH_COMMAND[1:]`. The run authority freezes
 the exact launch, fixture, revoked malformed dispatch value, 720-second wrapper
 timeout, four-path non-overwriting preflight, evidence, token, and no-retry
-contract while preserving the 5000/120000/100/500/500 ms budgets. No worker
-resumes from this authority task, no run token is consumed, no launch/output is
-authorized, no other successor is advanced, and the one-run gate remains
-unspent. Reclassification and maintainability remain open. The central authority is
+contract while preserving the 5000/120000/100/500/500 ms budgets. This
+authority task does not resume the worker, consume the run token, authorize
+launch/output, or advance another successor. The one-run gate remains unspent
+and unavailable. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
 
 The finite source/runtime state machine is currently `authority_main`: the live

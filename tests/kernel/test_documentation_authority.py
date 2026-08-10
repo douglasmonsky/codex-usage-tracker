@@ -239,9 +239,9 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest["conditional_ready"] == [
         {
             "condition": (
-                "ARGV authority accepted at 479cbdb; coordinator records the preserved prelaunch incident "
-                "disposition and a clean exact-main reapplication path; resume only existing worker "
-                "019fbfe2-8fe4-7de2-9264-d58572366727; no replacement, launch, or downstream task"
+                "exact 66c015de/f173837d/b6468b60 successor authority merges and exact-main "
+                "verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 "
+                "with the atomic cohort; no replacement, launch, token consumption, or downstream task"
             ),
             "tasks": ["CK-07R1"],
         },
@@ -481,13 +481,18 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
             }
         elif artifact["path"] == "src/codex_usage_tracker/agent_kernel/publication/preparation.py":
             final = _json("docs/decisions/evidence/ck08r3a/final-shared-authority.json")
-            selected = final["ck07_shared_preparation"]["r3a_atomic_cohort"]["sha256"]
+            r3a_selected = final["ck07_shared_preparation"]["r3a_atomic_cohort"]["sha256"]
+            source_authority = _json(
+                "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json"
+            )
+            ck07_selected = source_authority["selected_successor"]
             assert actual in {
                 artifact["sha256"],
-                selected,
-                _ck08r1b_selected_hashes()[artifact["path"]],
+                r3a_selected,
+                source_authority["predecessor"]["sha256"],
+                ck07_selected["sha256"],
             }
-            if actual == selected:
+            if actual == r3a_selected:
                 for required in (
                     final["r3a"]["selected"]["production_identities"]
                     + final["r3a"]["selected"]["support_identities"]
@@ -499,6 +504,11 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
                     elif required["path"] == "tests/agent_kernel/fact_adapters/support.py":
                         expected.add(_ck08r1b_selected_hashes()[required["path"]])
                     assert hashlib.sha256(required_path.read_bytes()).hexdigest() in expected
+            elif actual == ck07_selected["sha256"]:
+                for required in ck07_selected["artifacts"]:
+                    required_path = _REPO_ROOT / required["path"]
+                    assert required_path.is_file()
+                    assert hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
         elif artifact["path"] in {
             "config/agent-kernel/formula-contract-v1.json",
             "config/agent-kernel/plan-operand-contract-v1.json",
@@ -1030,24 +1040,42 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     validator = Draft202012Validator(schema)
     validator.validate(authority)
 
-    assert authority["schema"] == "codex-usage-tracker.lifecycle-source-digest-authority.v6"
-    assert authority["authority_version"] == 6
-    assert authority["authority_base_sha"] == "7d5a4b1717db78891fd2c38d8803d7fe2f922986"
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-source-digest-authority.v7"
+    assert authority["authority_version"] == 7
+    assert authority["authority_base_sha"] == "cf44f4fdd3f54ad53263b5e744203be468fbe5ca"
     assert authority["status"] == "blocked_hold"
     assert authority["predecessor"]["sha256"] == (
-        "408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872"
+        "7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb"
     )
     assert authority["selected_successor"] == {
-        "sha256": "6689d61fbf6d7948e1958a9d0bc58b4ea326a7f04221914b74c0651e0be1e37c",
+        "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea",
         "status": "permitted_not_accepted",
-        "role": "selected_r3a_atomic_cohort_preparation",
-        "base_sha": "7d5a4b1717db78891fd2c38d8803d7fe2f922986",
-        "requires_full_r3a_cohort": True,
-        "direct_ck07_use": "forbidden",
+        "role": "selected_ck07_exact_candidate",
+        "base_sha": "cf44f4fdd3f54ad53263b5e744203be468fbe5ca",
+        "requires_full_candidate_cohort": True,
+        "direct_ck07_use": "worker_prequalification_only_after_authority_exact_main",
         "mixed_state": "fail_closed",
         "runtime_acceptance": "not_claimed",
+        "launch_authorized": False,
+        "artifacts": [
+            {
+                "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+                "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea",
+                "role": "source",
+            },
+            {
+                "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+                "sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
+                "role": "benchmark",
+            },
+            {
+                "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+                "sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed",
+                "role": "lifecycle_test",
+            },
+        ],
     }
-    assert authority["acceptance_state"]["status"] == "conditional_two_state_no_run"
+    assert authority["acceptance_state"]["status"] == "exact_successor_selected_no_run"
     assert authority["acceptance_state"]["direct_use_of_d192"] == "forbidden"
     assert authority["superseded_r3a_candidate"]["sha256"].startswith("e204e0da")
     assert authority["historical_candidate"] == {
@@ -1063,8 +1091,8 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     assert authority["state_machine_binding"]["current_state"] == "authority_main"
     assert [state["name"] for state in authority["state_machine_binding"]["states"]] == [
         "authority_main",
-        "r3a_worker_prequalification",
-        "ck07_requalification",
+        "r3a_accepted_predecessor",
+        "worker_prequalification",
     ]
     assert authority["state_machine_binding"]["other_digest"] == "fail_closed"
     assert authority["state_machine_binding"]["launch_state"] == "blocked_hold_no_run"
@@ -1079,28 +1107,24 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     assert actual_source in {
         authority["predecessor"]["sha256"],
         authority["selected_successor"]["sha256"],
-        _ck08r1b_selected_hashes()[
-            "src/codex_usage_tracker/agent_kernel/publication/preparation.py"
-        ],
     }
     if actual_source == authority["selected_successor"]["sha256"]:
-        final = _json("docs/decisions/evidence/ck08r3a/final-shared-authority.json")
-        for required in (
-            final["r3a"]["selected"]["production_identities"]
-            + final["r3a"]["selected"]["support_identities"]
-        ):
+        for required in authority["selected_successor"]["artifacts"]:
             required_path = _REPO_ROOT / required["path"]
-            expected = {required["sha256"]}
-            if required["path"] == "tests/agent_kernel/evidence/test_service.py":
-                expected = {_portable_selected_support_hashes()[required["path"]]}
-            elif required["path"] == "tests/agent_kernel/fact_adapters/support.py":
-                expected.add(_ck08r1b_selected_hashes()[required["path"]])
-            assert hashlib.sha256(required_path.read_bytes()).hexdigest() in expected
+            assert required_path.is_file()
+            assert hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
 
     mutations = [
         ("selected_successor", "sha256", "0" * 64),
         ("selected_successor", "direct_ck07_use", "allow"),
-        ("selected_successor", "requires_full_r3a_cohort", False),
+        ("selected_successor", "requires_full_candidate_cohort", False),
+        ("selected_successor", "launch_authorized", True),
+        ("selected_successor", "runtime_acceptance", "accepted"),
+        (
+            "selected_successor",
+            "artifacts",
+            authority["selected_successor"]["artifacts"][:-1],
+        ),
         ("acceptance_state", "mixed_state", "allow"),
         ("state_machine_binding", "other_digest", "allow"),
         ("state_machine_binding", "launch_state", "ready"),
