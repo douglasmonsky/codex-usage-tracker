@@ -262,7 +262,9 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert f"Not started: **{len(parent_rows) - parent_completed}**" in ledger
     assert f"Critical-path completion: **{parent_completed} / 21**" in ledger
     assert "Completed corrective child tasks: **13" in ledger
-    assert "Remaining delegable child tasks: **38**" in ledger
+    remaining_delegable = len(manifest["tasks"]) - len(manifest["completed"])
+    assert remaining_delegable == 37
+    assert f"Remaining delegable child tasks: **{remaining_delegable}**" in ledger
     assert "Blocked child tasks: **36" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
@@ -285,8 +287,14 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "R1B is Ready only",
         "R1B worker Ready",
         "R1 remains their blocked",
+        "final R1 requalification is the sole Ready packet",
+        "final R1 is now the sole Ready replay",
+        "remain acceptance handoff requirements",
+        "existing QG1 PR #392 is Ready to resume",
     ):
         assert stale_claim not in active_status_docs
+    assert "PR #439" in central
+    assert "0832b85411e68feb9cf1a7300ab14e4cc97d391a" in central
 
     tasks = manifest["tasks"]
     assert len(tasks) == 50

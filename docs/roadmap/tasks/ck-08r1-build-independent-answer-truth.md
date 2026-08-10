@@ -1,7 +1,7 @@
 # CK-08R1 — Requalify independent answer truth
 
-**Status:** Completed on merge — hosted CI, squash merge, and exact-main
-verification required in handoff
+**Status:** Completed on merge — PR #439 hosted-green, squash-merged, and
+exact-main verified at `0832b854`
 
 **Parent:** Corrective prerequisite for CK-09
 

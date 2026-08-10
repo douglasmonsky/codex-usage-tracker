@@ -28,7 +28,7 @@ all 196 selector/view/direction outcomes per profile, typed seven-part truth,
 late-event, truncation, cursor, and query-only contracts. PR #425 passed hosted
 Python 3.10/3.14 and Console, squash-merged at
 `0fad272b3205614fb254398c9c9dc0a56d5ba7cd`, and was exact-main verified.
-CK-08R3 is complete; CK-08R4 remains blocked on CK-08R1 and CK-07R1.
+CK-08R3 and CK-08R1 are complete; CK-08R4 remains blocked on CK-07R1.
 Retained CK-08R1 work reached
 80/80 parity by copying unsupported Q-REV-03/Q-WF-02 semantics; R1A now freezes
 their meaning and closure. R1C is accepted at exact main
@@ -44,8 +44,8 @@ synthetic variants through separate production and independent closures with
 exact rows, grades, order, evidence, provenance, null semantics, grading
 isolation, and sentinel mutations. Its schema-valid
 [`answer-truth-requalification.v2`](../decisions/evidence/ck08r1/answer-truth-requalification-v2.json)
-is complete on merge; hosted CI, squash merge, and exact-main verification
-remain acceptance handoff requirements. The R1B exact reviewer correction
+passed hosted CI in PR #439, squash-merged, and was exact-main verified at
+`0832b85411e68feb9cf1a7300ab14e4cc97d391a`. The R1B exact reviewer correction
 binds production
 publication hierarchy ownership, independent start/terminal window membership,
 duplicate stable-ID rejection, production-compiler replay, and the Q-REV-03
@@ -67,8 +67,7 @@ provenance equality for equal-coordinate idempotency, and resolves
 current-batch relations by the six-part authority order before logical
 identity with one emitted winner. PR #430 passed hosted CI, squash-merged, and
 was exact-main verified at `9e9332b3ae2be78cedb581ff8f76149ad76f4440`.
-R1B is complete. R1 is complete on merge with its independent two-lane
-requalification artifact; no successor becomes Ready while CK-07R1 remains
+R1B and R1 are complete. No successor becomes Ready while CK-07R1 remains
 conditional.
 CK-QG1A removed R2's two page-executor C/B/B violations
 without changing behavior or the frozen maintainability baseline and is
@@ -82,9 +81,9 @@ CK-QG1 is complete; its v2 [writer transition authority](../decisions/evidence/c
 binds current main `dd771073` writer `13da341f…` to reviewed PR #430 writer
 `d163e6c5…` with the unchanged `fda777e2…` baseline and identical normalized
 findings. CK-08R1B is accepted at `9e9332b3`; CK-08R1's serialized
-production-versus-independent answer-truth requalification is complete on
-merge. CK-08R4 remains blocked on CK-07R1, and CK-08RG remains blocked on
-CK-08R4.
+production-versus-independent answer-truth requalification is accepted through
+PR #439 and exact-main `0832b854`. CK-08R4 remains blocked on CK-07R1, and
+CK-08RG remains blocked on CK-08R4.
 CK-07R1A is accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 was accepted at
 `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked
