@@ -9,6 +9,10 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 
 from scripts.check_kernel_scope import authority_changed_path_failures
+from scripts.ck07r1_shared_successor_overlay import (
+    overlay_changed_path_allowance,
+    verify_shared_successor_overlay,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _AUTHORITY_PATH = "docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json"
@@ -162,10 +166,14 @@ def test_ckqg1_authority_is_exact_and_binds_the_selected_successor() -> None:
     ]
     changed_paths = _changed_paths(authority["authority_base_sha"])
     allowed_paths = set(scope["authority_write_scope"])
-    assert changed_paths <= allowed_paths
-    assert authority_changed_path_failures(changed_paths, allowed_paths) == []
+    overlay, overlay_state = verify_shared_successor_overlay(_REPO_ROOT)
+    overlay_paths = overlay_changed_path_allowance(overlay, overlay_state)
+    ckqg1_changed_paths = changed_paths - overlay_paths
+    assert ckqg1_changed_paths <= allowed_paths
+    assert authority_changed_path_failures(ckqg1_changed_paths, allowed_paths) == []
     assert authority_changed_path_failures(
-        changed_paths | {"src/codex_usage_tracker/agent_kernel/publication/writer.py"},
+        ckqg1_changed_paths
+        | {"src/codex_usage_tracker/agent_kernel/publication/writer.py"},
         allowed_paths,
     ) == [
         "authority scope forbids changed path: "

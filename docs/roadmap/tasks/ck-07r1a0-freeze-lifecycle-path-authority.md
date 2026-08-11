@@ -1,6 +1,9 @@
 # CK-07R1A0 — Freeze lifecycle planner/recovery path authority
 
-**Status:** Completed on merge; path authority exact-main verified at `519b503aa3b23019033b6481687c08b23fc6c31e`; finite source/runtime state authority is pending merge and exact-main verification, so the existing CK-07R1 worker remains held
+**Status:** Completed on merge; path authority exact-main verified at `519b503aa3b23019033b6481687c08b23fc6c31e`;
+the exact CK-07 successor
+source/runtime transition is pending merge and exact-main verification, so the
+existing worker remains held
 
 **Release-candidate package ceilings:** sdist remains at most 2,000,000
 bytes and wheel remains at most 1,000,000 bytes. The historical 828000/383000
@@ -33,16 +36,18 @@ remains accepted.
 contract is
 [lifecycle-path-authority.json](../../decisions/evidence/ck07r1a0/lifecycle-path-authority.json)
 with its schema. The linked [source-digest authority](../../decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json)
-and its schema freeze the exact predecessor/successor transition. The retained
+and its schema freeze the exact predecessor/successor transition. The
+[versioned shared successor overlay](../../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
+preserves accepted CK-08R1B v1, CK-08R1 evidence, and CK-QG1 authority bytes
+while reconciling their consumers with only the complete exact successor. The retained
 CK-07R1 implementation/profile/evidence diff is read-only evidence;
-the shared-preparation authority binds exact-main preparation `408d18e4…` before
-R3A and preparation `e204e0da…` only inside the complete R3A cohort; historical
-`d192c858…` is revoked for the new base and forbidden for direct use. The
-retained CK-07R1 diff must later be reapplied onto the accepted R3A base to
-derive a new preparation digest before any run. It does not claim runtime
-acceptance. The corrected benchmark
-`f173837d…`, corrected lifecycle test `b6468b60…`, linked evidence `36eb76ca…`, and
-canonical fixture identities without claiming runtime acceptance.
+accepted R3A preparation `6689d61f…` remains historical, current R1B
+preparation `7d1831ff…` is the live predecessor, and only the exact
+`66c015de…` preparation plus `4b1c62b2…` benchmark and `75d03f53…` lifecycle
+test may enter worker prequalification. Historical `d192c858…`, mixed cohorts,
+and every other digest fail closed; prior R3A candidate `e204e0da…` remains
+superseded and forbidden. The selected cohort does not claim runtime acceptance.
+Linked evidence `36eb76ca…` and canonical fixture identities remain unchanged.
 The linked run-invocation authority is
 `docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json`;
 it adds no runtime implementation, freezes the corrected argv guard,
@@ -81,10 +86,10 @@ Codex data.
 **Invariants:** CK-07R1A remains accepted at `4d807495…`; CK-07R1 remains
 `blocked_hold` with no launch/output/token consumption. The exact
 predecessor digest is
-`408d18e44c87da234d220c29298ebac1780e9426e2dce767b0bfc3ae65e8a872` and the
+`7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb` and the
 permitted-not-accepted retained successor digest is
-`e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174` only as
-the R3A shared-preparation state; historical
+`66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea`
+only with benchmark `4b1c62b2…` and lifecycle test `75d03f53…`; historical
 `d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1` is
 revoked and direct use fails closed; generic or different digest drift fails
 closed; linked evidence is
@@ -98,9 +103,7 @@ identity/timestamp/failure remains visible; receipt
 `935e4427b93e67c5ca649b773b0b3895dafac87f49bc76d7ed8917dff2f0250d` remains
 writer-only evidence and is never reused or upgraded. The old argv-guard
 attempt is preserved as `pre_child_argv_guard_failure`, not a launch; no old
-candidate invocation may recur. The retained lifecycle diff must be
-reapplied only after accepted R3A exact-main verification and must yield a new
-exact preparation digest before any run.
+candidate invocation may recur.
 The current finite state is `authority_main`; no worker resumes from this
 packet, no receipt can claim qualification, and final acceptance additionally
 requires worker PR merge and exact-main verification.

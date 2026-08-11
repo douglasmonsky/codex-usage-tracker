@@ -830,6 +830,15 @@ CK07R1A0_AUTHORITY_ADDITIONS = frozenset(
     }
 )
 
+CK07R1_SHARED_OVERLAY_AUTHORITY_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json",
+        "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.schema.json",
+        "scripts/ck07r1_shared_successor_overlay.py",
+        "tests/kernel/test_ck07r1_shared_successor_overlay.py",
+    }
+)
+
 CK07R1_LIFECYCLE_SCOPE_ADDITIONS = frozenset(
     {
         "scripts/benchmark_ck07r1_lifecycle_scale.py",
@@ -918,6 +927,7 @@ INTEGRATION_ADDITIONS = (
     | CKQG1_AUTHORITY_ADDITIONS
     | PACKAGE_BUDGET_POLICY_ADDITIONS
     | CK07R1A0_AUTHORITY_ADDITIONS
+    | CK07R1_SHARED_OVERLAY_AUTHORITY_ADDITIONS
     | CK07R1_LIFECYCLE_SCOPE_ADDITIONS
     | CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
