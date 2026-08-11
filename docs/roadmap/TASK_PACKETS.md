@@ -15,7 +15,7 @@ parents are accounting umbrellas.
 - Completed corrective child tasks: **13 — CK-08R0, CK-08R1A, CK-08R1B, CK-08R1C, CK-08R1, CK-08R2, CK-08R3A, CK-08R3, CK-QG1A0, CK-QG1A, CK-QG1, CK-07R1A, CK-07R1A0**
 - Remaining delegable child tasks: **37**
 - Ready child tasks: **0**
-- Conditional-ready child tasks: **1 — CK-07R1 after the exact 66c015de/f173837d/b6468b60 successor authority merges and exact-main verifies**
+- Conditional-ready child tasks: **1 — CK-07R1 after the exact 66c015de/4b1c62b2/75d03f53 successor authority merges and exact-main verifies**
 - Blocked child tasks: **36**
 - Orchestration mode: **convergence — one coordinator, one existing task per active packet, at most one shared-authority task**
 - Continuation policy: **reuse the active packet task for ordinary corrections; create a task only for a newly Ready distinct packet or a genuinely new authority decision**
@@ -69,7 +69,7 @@ locks are unchanged.
 - [x] **CK-08R3 — Qualify evidence service scale** · PR #425 hosted-green and squash-merged at `0fad272b`; both frozen synthetic profiles accepted and exact-main verified · [packet](tasks/ck-08r3-qualify-evidence-scale.md)
 - [x] **CK-07R1A — Correct hosted lifecycle tail** · Accepted/merged at `4d807495`; exact-main verified · [packet](tasks/ck-07r1a-correct-hosted-lifecycle-tail.md)
 - [x] **CK-07R1A0 — Freeze lifecycle planner/recovery path authority** · Path, finite source/runtime, run-invocation authority, and argv-correction authority merged through `479cbdb`; retained witnesses remain read-only · [packet](tasks/ck-07r1a0-freeze-lifecycle-path-authority.md)
-- [ ] **CK-07R1 — Correct lifecycle preparation scale** · Conditional Ready after the versioned [shared successor overlay](../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json) for the exact `66c015de…` / `f173837d…` / `b6468b60…` cohort merges and exact-main verifies; only the existing worker may resume and no launch is yet authorized; PR #394 is stale read-only · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
+- [ ] **CK-07R1 — Correct lifecycle preparation scale** · Conditional Ready after the versioned [shared successor overlay](../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json) for the exact `66c015de…` / `4b1c62b2…` / `75d03f53…` cohort merges and exact-main verifies; only the existing worker may resume and no launch is yet authorized; PR #394 is stale read-only · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
 - [x] **CK-QG1A — Correct page-executor complexity** · PR #408 merged/exact-main `30983d4`; authorized successor `9e80c867…` accepted without behavior or baseline change · [packet](tasks/ck-qg1a-correct-page-executor-complexity.md)
 - [x] **CK-QG1 — Enforce replacement-kernel maintainability** · PR #392 hosted-green, squash-merged at `68050b93`, exact-main verified, and its [v2 writer transition authority](../decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json) is linked for the reviewed PR #430 successor · [packet](tasks/ck-qg1-enforce-agent-kernel-maintainability.md)
 - [ ] **CK-08R4 — Reclassify physical named plans** · Blocked on CK-07R1; CK-08R1/R2/R3 are complete · [packet](tasks/ck-08r4-reclassify-physical-plans.md)

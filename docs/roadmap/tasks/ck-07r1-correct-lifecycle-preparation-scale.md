@@ -32,8 +32,8 @@ historical; and the linked finite source/runtime authorities remain
 preparation `6689d61f…` remains a historical predecessor and accepted
 R1B/current exact-main preparation `7d1831ff…` is the live predecessor. The
 existing worker's fresh exact-main `cf44f4fd` reapplication derived the sole
-candidate cohort: preparation `66c015de…`, benchmark `f173837d…`, and lifecycle
-test `b6468b60…`. Historical `d192c858…`, mixed or incomplete cohorts, and
+candidate cohort: preparation `66c015de…`, benchmark `4b1c62b2…`, and lifecycle
+test `75d03f53…`. Historical `d192c858…`, mixed or incomplete cohorts, and
 every other digest fail closed. PR #394 head
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` is a stale failed
 read-only witness and is not refreshed, rerun, or merged.
@@ -41,7 +41,7 @@ read-only witness and is not refreshed, rerun, or merged.
 **Owned files/interfaces:** Lifecycle preparation implementation, focused
 publication tests, profile/benchmark, and linked CK-07 evidence amendment;
 the current authority binds predecessor preparation `7d1831ff…` to the atomic
-`66c015de…` / `f173837d…` / `b6468b60…` successor cohort, linked evidence
+`66c015de…` / `4b1c62b2…` / `75d03f53…` successor cohort, linked evidence
 `36eb76ca…`, and the 720-second wrapper timeout without executing the worker.
 The successor is permitted-not-accepted and launch remains unauthorized.
 The versioned [shared successor overlay](../../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)

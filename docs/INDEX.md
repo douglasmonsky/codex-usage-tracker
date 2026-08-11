@@ -112,7 +112,7 @@ keep CK-07R1 `blocked_hold`
 The accepted source history retains R3A preparation `6689d61f…` as a
 historical predecessor and R1B/current exact-main preparation `7d1831ff…` as
 the live predecessor. The sole CK-07 worker-prequalification successor is the
-atomic `66c015de…` preparation, `f173837d…` benchmark, and `b6468b60…`
+atomic `66c015de…` preparation, `4b1c62b2…` benchmark, and `75d03f53…`
 lifecycle-test cohort derived from exact main `cf44f4fd`. Mixed or incomplete
 cohorts, prior candidate `e204e0da…`, and historical candidate `d192c858…`
 fail closed. PR #394 remains a stale failed

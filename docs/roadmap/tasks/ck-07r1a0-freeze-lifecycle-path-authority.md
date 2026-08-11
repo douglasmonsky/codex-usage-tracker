@@ -43,7 +43,7 @@ while reconciling their consumers with only the complete exact successor. The re
 CK-07R1 implementation/profile/evidence diff is read-only evidence;
 accepted R3A preparation `6689d61f…` remains historical, current R1B
 preparation `7d1831ff…` is the live predecessor, and only the exact
-`66c015de…` preparation plus `f173837d…` benchmark and `b6468b60…` lifecycle
+`66c015de…` preparation plus `4b1c62b2…` benchmark and `75d03f53…` lifecycle
 test may enter worker prequalification. Historical `d192c858…`, mixed cohorts,
 and every other digest fail closed; prior R3A candidate `e204e0da…` remains
 superseded and forbidden. The selected cohort does not claim runtime acceptance.
@@ -89,7 +89,7 @@ predecessor digest is
 `7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb` and the
 permitted-not-accepted retained successor digest is
 `66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea`
-only with benchmark `f173837d…` and lifecycle test `b6468b60…`; historical
+only with benchmark `4b1c62b2…` and lifecycle test `75d03f53…`; historical
 `d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1` is
 revoked and direct use fails closed; generic or different digest drift fails
 closed; linked evidence is

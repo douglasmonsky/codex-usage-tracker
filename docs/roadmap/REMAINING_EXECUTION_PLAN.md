@@ -96,7 +96,7 @@ updated, rerun, or merged. The planner-valid lifecycle receipt is an
 acceptance output of the existing CK-07R1 worker. The coordinator recorded the
 preserved incident disposition and the worker derived the exact candidate
 cohort from exact main `cf44f4fd`: preparation `66c015de…`, benchmark
-`f173837d…`, and lifecycle test `b6468b60…`. That cohort remains
+`4b1c62b2…`, and lifecycle test `75d03f53…`. That cohort remains
 permitted-not-accepted and cannot enter `worker_prequalification` until this
 authority transition merges and exact-main verifies.
 The versioned [shared successor overlay](../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
@@ -122,7 +122,7 @@ Conditional Ready pending merge and exact-main verification of the exact
 successor authority. Until then its current authority state is
 `authority_main` at preparation `7d1831ff…` and no worker may resume. After
 that handoff only the existing stopped worker may resume with the complete
-`66c015de…` / `f173837d…` / `b6468b60…` cohort. Historical accepted R3A
+`66c015de…` / `4b1c62b2…` / `75d03f53…` cohort. Historical accepted R3A
 `6689d61f…`, revoked `d192c858…`, mixed cohorts, and every other digest are
 predecessor-only or fail-closed and cannot enter `worker_prequalification`.
 The worker may enter `worker_prequalification` only with the exact selected
@@ -231,7 +231,7 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "completed": ["CK-08R0", "CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R1", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
   "ready": [],
   "conditional_ready": [{
-    "condition": "exact 66c015de/f173837d/b6468b60 successor authority merges and exact-main verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 with the atomic cohort; no replacement, launch, token consumption, or downstream task",
+    "condition": "exact 66c015de/4b1c62b2/75d03f53 successor authority merges and exact-main verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 with the atomic cohort; no replacement, launch, token consumption, or downstream task",
     "tasks": ["CK-07R1"]
   }],
   "blocked": [],

@@ -239,7 +239,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest["conditional_ready"] == [
         {
             "condition": (
-                "exact 66c015de/f173837d/b6468b60 successor authority merges and exact-main "
+                "exact 66c015de/4b1c62b2/75d03f53 successor authority merges and exact-main "
                 "verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 "
                 "with the atomic cohort; no replacement, launch, token consumption, or downstream task"
             ),
@@ -1065,12 +1065,12 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
             },
             {
                 "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-                "sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
+                "sha256": "4b1c62b2d56bf808b66f47c71b1bb1fa3595e2d590d0fa0192b5f7be3b2b4dde",
                 "role": "benchmark",
             },
             {
                 "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-                "sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed",
+                "sha256": "75d03f5346ffe2d02ffedc5df007ce45bef5533b324202ccf41b535de8b33cd2",
                 "role": "lifecycle_test",
             },
         ],

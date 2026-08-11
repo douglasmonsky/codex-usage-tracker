@@ -13,6 +13,7 @@
     "ck07_authorities",
     "states",
     "consumer_bridge",
+    "launcher_safety",
     "non_consuming_invariants",
     "scope",
     "negative_mutations"
@@ -67,16 +68,16 @@
         {
           "id": "lifecycle-source-digest-v7",
           "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
-          "sha256": "c78dc07ca22a98d89200b8e857d377e759e3c78986a1a827478f3fd806ab9aaa",
+          "sha256": "6156780a7e8663859658bb5309f13eb6bf5283704784d8270edf0512c167d70b",
           "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
-          "schema_sha256": "4b25ca4e88f2fc54cd5c8119f2b6dd1e62b7064397fb168258a949f27dfa8a36"
+          "schema_sha256": "4026a4e971c1b6b177b467440a36931bc6a15a0b376918bdc4169b732a0d489c"
         },
         {
           "id": "lifecycle-run-invocation-v6",
           "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
-          "sha256": "d90b2d7da9a361907ac6ef5a38050529b5914644e3dda7308801206263006745",
+          "sha256": "6b1a2753e935da9a9c0121e4f1691957b06b388c1bc55631920725ae6d9089be",
           "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
-          "schema_sha256": "1ae7e01b5d664e3e5b676aaaab5601e8b5e9fbb9bacef665e2a3acf124e633dc"
+          "schema_sha256": "e3f24adc98078524523dcb404b9cf9d934fe6c68637abb8a5c40e2eb97ea7e74"
         }
       ]
     },
@@ -122,12 +123,12 @@
               },
               {
                 "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-                "sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
+                "sha256": "4b1c62b2d56bf808b66f47c71b1bb1fa3595e2d590d0fa0192b5f7be3b2b4dde",
                 "presence": "required"
               },
               {
                 "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-                "sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed",
+                "sha256": "75d03f5346ffe2d02ffedc5df007ce45bef5533b324202ccf41b535de8b33cd2",
                 "presence": "required"
               }
             ],
@@ -177,6 +178,23 @@
         "ckqg1_semantics": {
           "const": "the accepted baseline, C/B/B thresholds, normalized findings, and writer transition remain unchanged"
         }
+      }
+    },
+    "launcher_safety": {
+      "const": {
+        "overlay_and_cohort_verification": "must_complete_before_ledger_fork_child_release_or_token_consumption",
+        "receipt_binding": "must_equal_exact_overlay_verification_result_and_three_artifact_cohort",
+        "post_token_or_release_failure_state": "failed_after_launch",
+        "aggregate_timeout_seconds": 720,
+        "termination_sequence": [
+          "SIGTERM",
+          "wait_up_to_5_seconds",
+          "SIGKILL"
+        ],
+        "final_reap_timeout_seconds": 5,
+        "retry": "none",
+        "restart": "none",
+        "replacement": "none"
       }
     },
     "non_consuming_invariants": {
@@ -264,8 +282,10 @@
         "remove or add a successor cohort artifact",
         "substitute any successor digest",
         "present a mixed or partial predecessor/successor cohort",
+        "present any extra dirty or CK-QG1-allowed path in combined preflight",
         "claim post_single_run or final_accepted",
         "claim runtime acceptance, launch authorization, or token consumption",
+        "weaken launcher overlay, receipt, failure classification, or timeout binding",
         "fabricate a receipt or any output path",
         "weaken the exact authority or preflight scope"
       ]

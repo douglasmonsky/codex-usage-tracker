@@ -99,10 +99,10 @@
           ],
           "properties": {
             "benchmark_sha256": {
-              "const": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a"
+              "const": "4b1c62b2d56bf808b66f47c71b1bb1fa3595e2d590d0fa0192b5f7be3b2b4dde"
             },
             "lifecycle_test_sha256": {
-              "const": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed"
+              "const": "75d03f5346ffe2d02ffedc5df007ce45bef5533b324202ccf41b535de8b33cd2"
             }
           }
         },
@@ -367,7 +367,7 @@
               "requires": [
                 "this authority is merged and exact-main verified",
                 "the existing worker resumes only the preserved exact candidate worktree",
-                "the worker presents the byte-exact 66c015de/f173837d/b6468b60 cohort over the 7d1831ff predecessor",
+                "the worker presents the byte-exact 66c015de/4b1c62b2/75d03f53 cohort over the 7d1831ff predecessor",
                 "runtime_acceptance remains not_claimed",
                 "authority-integrity and prelaunch gates pass",
                 "maximum_new_end_to_end_runs remains 1 and unspent_unavailable",
@@ -491,10 +491,10 @@
           "const": "cf44f4fdd3f54ad53263b5e744203be468fbe5ca"
         },
         "retained_branch": {
-          "const": "feature/ck-07r1-exact-main-reapplication-v6"
+          "const": "feature/ck-07r1-launcher-correction-v7"
         },
         "retained_worktree": {
-          "const": "2026-08-10/codex-usage-tracker-ck07r1-exact-main-reapplication-v6"
+          "const": "2026-08-11/codex-usage-tracker-ck07r1-launcher-correction-v7"
         },
         "witness_status": {
           "const": "retained_uncommitted_read_only_exact_candidate"
@@ -526,12 +526,12 @@
             },
             {
               "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-              "sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
+              "sha256": "4b1c62b2d56bf808b66f47c71b1bb1fa3595e2d590d0fa0192b5f7be3b2b4dde",
               "role": "benchmark"
             },
             {
               "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-              "sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed",
+              "sha256": "75d03f5346ffe2d02ffedc5df007ce45bef5533b324202ccf41b535de8b33cd2",
               "role": "lifecycle_test"
             },
             {
@@ -542,7 +542,7 @@
           ]
         },
         "binding": {
-          "const": "only the byte-exact 66c015de/f173837d/b6468b60 cohort may enter worker_prequalification after this authority merges and exact-main verifies"
+          "const": "only the byte-exact 66c015de/4b1c62b2/75d03f53 cohort may enter worker_prequalification after this authority merges and exact-main verifies"
         },
         "worker_revalidation_required": {
           "const": true
@@ -595,13 +595,13 @@
               "const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json"
             },
             "sha256": {
-              "const": "c78dc07ca22a98d89200b8e857d377e759e3c78986a1a827478f3fd806ab9aaa"
+              "const": "6156780a7e8663859658bb5309f13eb6bf5283704784d8270edf0512c167d70b"
             },
             "schema_path": {
               "const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json"
             },
             "schema_sha256": {
-              "const": "4b25ca4e88f2fc54cd5c8119f2b6dd1e62b7064397fb168258a949f27dfa8a36"
+              "const": "4026a4e971c1b6b177b467440a36931bc6a15a0b376918bdc4169b732a0d489c"
             }
           }
         }
@@ -612,6 +612,7 @@
       "additionalProperties": false,
       "required": [
         "aggregate_timeout",
+        "launcher_safety",
         "repository_relative_command",
         "required_cwd",
         "cwd_rule",
@@ -664,6 +665,22 @@
                 "one_tool_tail": 500
               }
             }
+          }
+        },
+        "launcher_safety": {
+          "const": {
+            "overlay_and_cohort_verification": "must_complete_before_ledger_fork_child_release_or_token_consumption",
+            "receipt_binding": "must_equal_exact_overlay_verification_result_and_three_artifact_cohort",
+            "post_token_or_release_failure_state": "failed_after_launch",
+            "termination_sequence": [
+              "SIGTERM",
+              "wait_up_to_5_seconds",
+              "SIGKILL"
+            ],
+            "final_reap_timeout_seconds": 5,
+            "retry": "none",
+            "restart": "none",
+            "replacement": "none"
           }
         },
         "repository_relative_command": {
@@ -1248,7 +1265,7 @@
           "const": false
         },
         "eligibility": {
-          "const": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/f173837d/b6468b60 candidate cohort, and all gates pass"
+          "const": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/4b1c62b2/75d03f53 candidate cohort, and all gates pass"
         },
         "first_successful_launch": {
           "const": "exactly one first successful child launch may consume the still-unspent token; this is not a retry, restart, or replacement of a launched process"

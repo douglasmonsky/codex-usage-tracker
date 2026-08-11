@@ -42,7 +42,7 @@ QG1 PR #392 passed hosted CI, squash-merged, and was exact-main verified at
 the exact hosted Python 3.14 lifecycle-tail blocker; the linked CK-07R1A0
 authorities, including argv correction, are merged through `479cbdb`.
 Coordinator disposition and clean exact-main reapplication from `cf44f4fd`
-derived the exact `66c015de…` / `f173837d…` / `b6468b60…` candidate cohort.
+derived the exact `66c015de…` / `4b1c62b2…` / `75d03f53…` candidate cohort.
 The versioned
 [`shared-successor-overlay-authority-v1`](docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
 preserves accepted CK-08R1B, CK-08R1, and CK-QG1 bytes while admitting only

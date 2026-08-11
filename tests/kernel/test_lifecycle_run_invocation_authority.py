@@ -16,7 +16,9 @@ from scripts.check_kernel_scope import CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS
 
 _ROOT = Path(__file__).resolve().parents[2]
 _AUTHORITY_PATH = _ROOT / "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json"
-_SCHEMA_PATH = _ROOT / "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json"
+_SCHEMA_PATH = (
+    _ROOT / "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json"
+)
 
 
 def _authority() -> dict[str, Any]:
@@ -87,12 +89,19 @@ def test_corrected_argv_guard_accepts_exact_candidate_in_real_non_launching_subp
         _ROOT.parents[1] / authority["selected_candidate"]["retained_worktree"],
     ]
     candidate = next(
-        (root / relative_candidate for root in candidate_roots if (root / relative_candidate).is_file()),
+        (
+            root / relative_candidate
+            for root in candidate_roots
+            if (root / relative_candidate).is_file()
+        ),
         None,
     )
     if candidate is None:
         pytest.skip("the retained candidate is unavailable until the worker reapplies it")
-    assert hashlib.sha256(candidate.read_bytes()).hexdigest() == authority["selected_candidate"]["artifacts"][1]["sha256"]
+    assert (
+        hashlib.sha256(candidate.read_bytes()).hexdigest()
+        == authority["selected_candidate"]["artifacts"][1]["sha256"]
+    )
     candidate_copy = tmp_path / relative_candidate
     candidate_copy.parent.mkdir(parents=True)
     candidate_copy.write_bytes(candidate.read_bytes())
@@ -165,8 +174,8 @@ def test_argv_correction_preserves_first_failure_and_one_run_gate() -> None:
     assert correction["old_guard"] == "sys.argv[1:] == LAUNCH_COMMAND[1:]"
     assert correction["corrected_guard"] == "(sys.argv[0], *sys.argv[1:]) == LAUNCH_COMMAND[1:]"
     assert correction["corrected_candidate_artifacts"] == {
-        "benchmark_sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
-        "lifecycle_test_sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed",
+        "benchmark_sha256": "4b1c62b2d56bf808b66f47c71b1bb1fa3595e2d590d0fa0192b5f7be3b2b4dde",
+        "lifecycle_test_sha256": "75d03f5346ffe2d02ffedc5df007ce45bef5533b324202ccf41b535de8b33cd2",
     }
     assert correction["old_candidate_artifacts"]["reuse"] == "forbidden"
     assert correction["non_launching_subprocess_test"]["required"] is True
@@ -227,7 +236,7 @@ def test_selected_candidate_is_exact_ck07_cohort_and_runtime_stays_blocked() -> 
         "role": "source",
     }
     assert candidate["binding"] == (
-        "only the byte-exact 66c015de/f173837d/b6468b60 cohort may enter "
+        "only the byte-exact 66c015de/4b1c62b2/75d03f53 cohort may enter "
         "worker_prequalification after this authority merges and exact-main verifies"
     )
     assert authority["run_token"]["status"] == "unspent_unavailable"
@@ -265,7 +274,9 @@ def test_finite_source_runtime_state_machine_is_exact_and_currently_unlaunched()
     assert machine["states"][3]["merge_policy"] == (
         "worker_pr_squash_merge_and_exact_main_verification_required"
     )
-    assert [transition["from"] + "->" + transition["to"] for transition in machine["transitions"]] == [
+    assert [
+        transition["from"] + "->" + transition["to"] for transition in machine["transitions"]
+    ] == [
         "authority_main->worker_prequalification",
         "worker_prequalification->post_single_run",
         "post_single_run->final_accepted",
@@ -361,7 +372,10 @@ def test_fixture_identity_vocabulary_and_static_file_shas_are_distinct_and_prove
         "fixture_file_sha256",
         "workload_transition_digest",
     }
-    assert identity["manifest"]["fixture_manifest_digest"] != identity["manifest"]["fixture_file_sha256"]
+    assert (
+        identity["manifest"]["fixture_manifest_digest"]
+        != identity["manifest"]["fixture_file_sha256"]
+    )
     assert identity["rejected_dispatch_values"] == [
         {
             "value": "e8c79373697ebe2af5385dbb2899ae49cec61037c4a3b0909f91225128e0bc",
@@ -455,6 +469,7 @@ def test_profiles_samples_counts_seed_and_tail_limits_are_frozen() -> None:
         "model_call_tail_rows": 32000,
     }
 
+
 def test_reachable_path_and_plan_identity_are_explicit() -> None:
     path = _authority()["launch_contract"]["reachable_path"]
     assert path["ordered_steps"] == [
@@ -469,6 +484,29 @@ def test_reachable_path_and_plan_identity_are_explicit() -> None:
     assert path["unchanged_plan"]["identity"].startswith("the exact object")
     assert len(path["identity_binding"]) == 6
     assert path["failure"].startswith("any path")
+
+
+def test_corrected_launcher_safety_contract_is_exact() -> None:
+    safety = _authority()["launch_contract"]["launcher_safety"]
+
+    assert safety == {
+        "overlay_and_cohort_verification": (
+            "must_complete_before_ledger_fork_child_release_or_token_consumption"
+        ),
+        "receipt_binding": (
+            "must_equal_exact_overlay_verification_result_and_three_artifact_cohort"
+        ),
+        "post_token_or_release_failure_state": "failed_after_launch",
+        "termination_sequence": [
+            "SIGTERM",
+            "wait_up_to_5_seconds",
+            "SIGKILL",
+        ],
+        "final_reap_timeout_seconds": 5,
+        "retry": "none",
+        "restart": "none",
+        "replacement": "none",
+    }
 
 
 def test_process_exclusion_launch_token_and_evidence_capture_are_required() -> None:
@@ -498,7 +536,7 @@ def test_process_exclusion_launch_token_and_evidence_capture_are_required() -> N
         "refund": False,
         "prior_identities_reused": False,
         "concurrent_processes_allowed": False,
-        "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/f173837d/b6468b60 candidate cohort, and all gates pass",
+        "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/4b1c62b2/75d03f53 candidate cohort, and all gates pass",
         "first_successful_launch": "exactly one first successful child launch may consume the still-unspent token; this is not a retry, restart, or replacement of a launched process",
         "old_candidate_reuse": "forbidden",
     }
@@ -511,9 +549,13 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
     assert after_launch["no_restart"] is True
     assert after_launch["no_replacement"] is True
     assert after_launch["token_remains_consumed"] is True
-    assert {"interruption", "timeout", "incomplete receipt", "budget miss", "postcondition failure"} <= set(
-        after_launch["failures"]
-    )
+    assert {
+        "interruption",
+        "timeout",
+        "incomplete receipt",
+        "budget miss",
+        "postcondition failure",
+    } <= set(after_launch["failures"])
     feasibility = authority["feasibility"]
     assert feasibility["candidate_status"] == "exact_successor_bound_no_run_runtime_unqualified"
     assert "planner-valid receipt" in feasibility["exact_blocker"]
@@ -524,45 +566,150 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
     ("label", "path", "replacement"),
     [
         ("old-argv-guard", ("argv_correction", "old_guard"), "sys.argv == LAUNCH_COMMAND"),
-        ("corrected-argv-guard", ("argv_correction", "corrected_guard"), "sys.argv[1:] == LAUNCH_COMMAND[1:]"),
-        ("first-failure-classification", ("first_failure", "classification"), "successful_process_launch"),
+        (
+            "corrected-argv-guard",
+            ("argv_correction", "corrected_guard"),
+            "sys.argv[1:] == LAUNCH_COMMAND[1:]",
+        ),
+        (
+            "first-failure-classification",
+            ("first_failure", "classification"),
+            "successful_process_launch",
+        ),
         ("first-failure-exit", ("first_failure", "exit_code"), 0),
         ("first-failure-token-evidence", ("first_failure", "evidence", "token"), "consumed"),
-        ("exclusive-output-path", ("launch_contract", "output", "exclusive_paths", "ledger"), "output/other.json"),
+        (
+            "exclusive-output-path",
+            ("launch_contract", "output", "exclusive_paths", "ledger"),
+            "output/other.json",
+        ),
         ("old-candidate-reuse", ("run_token", "old_candidate_reuse"), "allowed"),
         ("merge-sha-invention", ("change_control", "merged_sha"), "0" * 40),
         ("command", ("launch_contract", "repository_relative_command", 1), "wrong.py"),
         ("cwd", ("launch_contract", "required_cwd"), "scripts"),
-        ("fixture-vocabulary", ("launch_contract", "fixture_identity", "vocabulary", "fixture_file_sha256"), "manifest"),
-        ("fixture-digest-binding", ("launch_contract", "fixture_identity", "manifest", "fixture_file_sha256"), "0" * 64),
+        (
+            "fixture-vocabulary",
+            ("launch_contract", "fixture_identity", "vocabulary", "fixture_file_sha256"),
+            "manifest",
+        ),
+        (
+            "fixture-digest-binding",
+            ("launch_contract", "fixture_identity", "manifest", "fixture_file_sha256"),
+            "0" * 64,
+        ),
         ("aggregate-timeout", ("launch_contract", "aggregate_timeout", "seconds"), 120),
+        (
+            "overlay-after-ledger",
+            (
+                "launch_contract",
+                "launcher_safety",
+                "overlay_and_cohort_verification",
+            ),
+            "after_ledger",
+        ),
+        (
+            "receipt-unbound",
+            ("launch_contract", "launcher_safety", "receipt_binding"),
+            "optional",
+        ),
+        (
+            "post-token-prelaunch-label",
+            (
+                "launch_contract",
+                "launcher_safety",
+                "post_token_or_release_failure_state",
+            ),
+            "prelaunch_failed",
+        ),
+        (
+            "unbounded-reap",
+            (
+                "launch_contract",
+                "launcher_safety",
+                "final_reap_timeout_seconds",
+            ),
+            0,
+        ),
         ("candidate-benchmark", ("selected_candidate", "artifacts", 1, "sha256"), "0" * 64),
         ("candidate-launch-authorization", ("selected_candidate", "launch_authorized"), True),
         ("shared-launch-authorization", ("shared_preparation_binding", "launch_authorized"), True),
         ("candidate-runtime-acceptance", ("selected_candidate", "runtime_acceptance"), "accepted"),
-        ("rejected-dispatch", ("launch_contract", "fixture_identity", "rejected_dispatch_values", 0, "status"), "used"),
+        (
+            "rejected-dispatch",
+            ("launch_contract", "fixture_identity", "rejected_dispatch_values", 0, "status"),
+            "used",
+        ),
         ("output-overwrite", ("launch_contract", "output", "overwrite_rule"), "overwrite"),
-        ("process-exclusion", ("launch_gates", "prelaunch", "required", 3), "process check omitted"),
+        (
+            "process-exclusion",
+            ("launch_gates", "prelaunch", "required", 3),
+            "process check omitted",
+        ),
         ("run-token-timing", ("run_token", "consumption"), "before launch"),
         ("run-token-status", ("run_token", "status"), "spent"),
         ("no-retry", ("failure_matrix", "after_launch", "no_retry"), False),
         ("tail-limit", ("launch_contract", "tail_limits", "values", "observations"), 12001),
         ("count", ("launch_contract", "profiles", "workloads", 0, "observations"), 1370),
         ("seed", ("launch_contract", "profiles", "seed"), 42),
-        ("reachable-path", ("launch_contract", "reachable_path", "ordered_steps", 2), "direct writer"),
+        (
+            "reachable-path",
+            ("launch_contract", "reachable_path", "ordered_steps", 2),
+            "direct writer",
+        ),
         ("generic-drift", ("preserved_history", "source_predecessor_sha256"), "0" * 64),
         ("current-state", ("lifecycle_state_machine", "current_state"), "worker_prequalification"),
         ("successor-drift", ("lifecycle_state_machine", "states", 1, "source_sha256"), "0" * 64),
         ("receipt-bypass", ("lifecycle_state_machine", "states", 2, "receipt_policy"), "optional"),
-        ("post-run-no-receipt-qualification", ("lifecycle_state_machine", "states", 2, "runtime_acceptance"), "accepted"),
-        ("final-no-receipt-acceptance", ("lifecycle_state_machine", "states", 3, "receipt_policy"), "optional"),
-        ("final-no-evidence-acceptance", ("lifecycle_state_machine", "states", 3, "evidence_identity_policy"), "not_available"),
-        ("final-merge-bypass", ("lifecycle_state_machine", "states", 3, "merge_policy"), "optional"),
-        ("transition-bypass", ("lifecycle_state_machine", "transitions", 0, "to"), "final_accepted"),
-        ("receipt-path-drift", ("lifecycle_state_machine", "dynamic_receipt_identity", "identity_paths", "output_sha256"), "receipt.output_file_sha256"),
-        ("receipt-ledger-drift", ("lifecycle_state_machine", "dynamic_receipt_identity", "ledger_path"), "output/other.json"),
-        ("fixture-inventory-omission", ("launch_contract", "fixture_identity", "fixture_files", 0), None),
-        ("fixture-inventory-digest", ("launch_contract", "fixture_identity", "fixture_files", 1, "fixture_file_sha256"), "0" * 64),
+        (
+            "post-run-no-receipt-qualification",
+            ("lifecycle_state_machine", "states", 2, "runtime_acceptance"),
+            "accepted",
+        ),
+        (
+            "final-no-receipt-acceptance",
+            ("lifecycle_state_machine", "states", 3, "receipt_policy"),
+            "optional",
+        ),
+        (
+            "final-no-evidence-acceptance",
+            ("lifecycle_state_machine", "states", 3, "evidence_identity_policy"),
+            "not_available",
+        ),
+        (
+            "final-merge-bypass",
+            ("lifecycle_state_machine", "states", 3, "merge_policy"),
+            "optional",
+        ),
+        (
+            "transition-bypass",
+            ("lifecycle_state_machine", "transitions", 0, "to"),
+            "final_accepted",
+        ),
+        (
+            "receipt-path-drift",
+            (
+                "lifecycle_state_machine",
+                "dynamic_receipt_identity",
+                "identity_paths",
+                "output_sha256",
+            ),
+            "receipt.output_file_sha256",
+        ),
+        (
+            "receipt-ledger-drift",
+            ("lifecycle_state_machine", "dynamic_receipt_identity", "ledger_path"),
+            "output/other.json",
+        ),
+        (
+            "fixture-inventory-omission",
+            ("launch_contract", "fixture_identity", "fixture_files", 0),
+            None,
+        ),
+        (
+            "fixture-inventory-digest",
+            ("launch_contract", "fixture_identity", "fixture_files", 1, "fixture_file_sha256"),
+            "0" * 64,
+        ),
     ],
 )
 def test_negative_contract_mutations_fail_closed(
@@ -581,8 +728,12 @@ def test_dag_ledger_index_and_scope_bind_the_authority_without_new_task() -> Non
     index = (_ROOT / "docs/INDEX.md").read_text(encoding="utf-8")
     central = (_ROOT / "docs/roadmap/REMAINING_EXECUTION_PLAN.md").read_text(encoding="utf-8")
     ledger = (_ROOT / "docs/roadmap/TASK_PACKETS.md").read_text(encoding="utf-8")
-    packet = (_ROOT / "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md").read_text(encoding="utf-8")
-    ck07r1 = (_ROOT / "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md").read_text(encoding="utf-8")
+    packet = (_ROOT / "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md").read_text(
+        encoding="utf-8"
+    )
+    ck07r1 = (
+        _ROOT / "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md"
+    ).read_text(encoding="utf-8")
     artifact = "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json"
     assert artifact in index
     assert artifact in packet

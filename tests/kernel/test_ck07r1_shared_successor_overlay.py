@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from pathlib import Path
 
@@ -11,16 +12,22 @@ from scripts.ck07r1_shared_successor_overlay import (
     SCHEMA_PATH,
     SharedSuccessorOverlayError,
     classify_observed_state,
+    expected_worktree_delta,
     load_overlay,
     observed_candidate_artifacts,
     overlay_changed_path_allowance,
     sha256_path,
     verify_bound_authority_bytes,
+    verify_exact_worktree_delta,
+    verify_launcher_safety_contract,
     verify_shared_successor_overlay,
 )
 
 
-def _state_observed(authority: dict, state_name: str) -> dict[str, str | None]:
+def _state_observed(
+    authority: dict,
+    state_name: str,
+) -> dict[str, str | None]:
     state = authority["states"][state_name]
     return {
         item["path"]: None if item["presence"] == "absent" else item["sha256"]
@@ -90,22 +97,15 @@ def test_overlay_admits_only_the_complete_exact_successor() -> None:
         classify_observed_state(authority, extra)
 
 
-def test_overlay_schema_rejects_status_token_launch_and_scope_weakening() -> None:
+def test_overlay_schema_rejects_status_token_launch_scope_and_safety_weakening() -> None:
     authority = load_overlay()
-    schema = __import__("json").loads((ROOT / SCHEMA_PATH).read_text(encoding="utf-8"))
+    schema = json.loads((ROOT / SCHEMA_PATH).read_text(encoding="utf-8"))
     validator = Draft202012Validator(schema)
-
-    mutations = (
+    mutations = [
         lambda value: value.__setitem__("status", "final_accepted"),
-        lambda value: value["states"]["successor"].__setitem__(
-            "launch_authorized", True
-        ),
-        lambda value: value["non_consuming_invariants"].__setitem__(
-            "token_consumed", True
-        ),
-        lambda value: value["non_consuming_invariants"].__setitem__(
-            "receipt", "fabricated"
-        ),
+        lambda value: value["states"]["successor"].__setitem__("launch_authorized", True),
+        lambda value: value["non_consuming_invariants"].__setitem__("token_consumed", True),
+        lambda value: value["non_consuming_invariants"].__setitem__("receipt", "fabricated"),
         lambda value: value["states"]["successor"]["artifacts"].pop(),
         lambda value: value["states"]["successor"]["artifacts"].append(
             {"path": "extra.py", "sha256": "0" * 64, "presence": "required"}
@@ -114,14 +114,24 @@ def test_overlay_schema_rejects_status_token_launch_and_scope_weakening() -> Non
             "src/codex_usage_tracker/agent_kernel/publication/writer.py"
         ),
         lambda value: value["scope"]["combined_preflight_candidate_scope"].pop(),
-    )
+        lambda value: value["launcher_safety"].__setitem__(
+            "overlay_and_cohort_verification", "after_ledger"
+        ),
+        lambda value: value["launcher_safety"].__setitem__("receipt_binding", "optional"),
+        lambda value: value["launcher_safety"].__setitem__(
+            "post_token_or_release_failure_state", "prelaunch_failed"
+        ),
+        lambda value: value["launcher_safety"].__setitem__("final_reap_timeout_seconds", 0),
+    ]
     for mutate in mutations:
         changed = deepcopy(authority)
         mutate(changed)
         assert list(validator.iter_errors(changed))
 
 
-def test_overlay_rejects_any_immutable_v1_rewrite(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_overlay_rejects_any_immutable_v1_rewrite(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     authority = load_overlay()
     original = sha256_path
     first = authority["immutable_authorities"][0]["path"]
@@ -139,7 +149,41 @@ def test_overlay_rejects_any_immutable_v1_rewrite(monkeypatch: pytest.MonkeyPatc
         verify_bound_authority_bytes(authority)
 
 
-def test_overlay_scope_is_state_specific_and_cannot_hide_writer_changes() -> None:
+def test_overlay_requires_exact_all_or_none_git_delta() -> None:
+    authority = load_overlay()
+    candidate = set(authority["scope"]["combined_preflight_candidate_scope"])
+
+    assert expected_worktree_delta(authority, "authority_main") == set()
+    assert expected_worktree_delta(authority, "worker_prequalification") == candidate
+    verify_exact_worktree_delta(authority, "authority_main", observed=set())
+    verify_exact_worktree_delta(
+        authority,
+        "worker_prequalification",
+        observed=candidate,
+    )
+
+    with pytest.raises(SharedSuccessorOverlayError, match="missing="):
+        verify_exact_worktree_delta(
+            authority,
+            "worker_prequalification",
+            observed=candidate - {next(iter(candidate))},
+        )
+    with pytest.raises(SharedSuccessorOverlayError, match="extra="):
+        verify_exact_worktree_delta(
+            authority,
+            "worker_prequalification",
+            observed=candidate | {"src/codex_usage_tracker/agent_kernel/publication/writer.py"},
+        )
+    with pytest.raises(SharedSuccessorOverlayError, match="extra="):
+        verify_exact_worktree_delta(
+            authority,
+            "worker_prequalification",
+            observed=candidate
+            | {"docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json"},
+        )
+
+
+def test_overlay_scope_and_launcher_contract_are_exact() -> None:
     authority = load_overlay()
     predecessor = overlay_changed_path_allowance(authority, "authority_main")
     successor = overlay_changed_path_allowance(authority, "worker_prequalification")
@@ -148,3 +192,9 @@ def test_overlay_scope_is_state_specific_and_cannot_hide_writer_changes() -> Non
     assert successor == predecessor | candidate
     assert candidate.isdisjoint(predecessor)
     assert "src/codex_usage_tracker/agent_kernel/publication/writer.py" not in successor
+    verify_launcher_safety_contract(authority)
+
+    weakened = deepcopy(authority)
+    weakened["launcher_safety"]["termination_sequence"] = ["SIGTERM"]
+    with pytest.raises(SharedSuccessorOverlayError, match="safety"):
+        verify_launcher_safety_contract(weakened)
