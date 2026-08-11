@@ -14,6 +14,7 @@ from jsonschema import Draft202012Validator
 ROOT = Path(__file__).resolve().parents[1]
 AUTHORITY_PATH = "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json"
 SCHEMA_PATH = AUTHORITY_PATH.removesuffix(".json") + ".schema.json"
+PREPARATION_PATH = "src/codex_usage_tracker/agent_kernel/publication/preparation.py"
 
 
 class SharedSuccessorOverlayError(RuntimeError):
