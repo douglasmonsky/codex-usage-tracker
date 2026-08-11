@@ -124,6 +124,11 @@ runtime evidence. The corrected guard is
 the exact launch, fixture, revoked malformed dispatch value, 720-second wrapper
 timeout, four-path non-overwriting preflight, evidence, token, and no-retry
 contract while preserving the 5000/120000/100/500/500 ms budgets. This
+versioned
+[`shared-successor-overlay-authority-v1`](decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
+is the only additive consumer bridge: accepted CK-08R1B v1, CK-08R1 evidence,
+and CK-QG1 authority bytes remain exact, and the overlay grants neither
+implementation acceptance nor launch authority. This
 authority task does not resume the worker, consume the run token, authorize
 launch/output, or advance another successor. The one-run gate remains unspent
 and unavailable. The central authority is

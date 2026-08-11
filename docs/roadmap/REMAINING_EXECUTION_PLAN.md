@@ -99,6 +99,11 @@ cohort from exact main `cf44f4fd`: preparation `66c015de…`, benchmark
 `f173837d…`, and lifecycle test `b6468b60…`. That cohort remains
 permitted-not-accepted and cannot enter `worker_prequalification` until this
 authority transition merges and exact-main verifies.
+The versioned [shared successor overlay](../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
+preserves the accepted CK-08R1B v1, CK-08R1 evidence, and CK-QG1 authority
+bytes and reconciles only their consumers with this atomic CK-07 transition.
+Predecessor-only, exact complete successor, and every mixed, partial, extra, or
+other-digest state remain explicit and fail closed.
 The old frozen-command attempt is preserved exactly as a terminal
 `pre_child_argv_guard_failure` (exit 2 after `0.075241709` seconds, no child or
 runtime evidence), and its old benchmark/test identities cannot be reused.

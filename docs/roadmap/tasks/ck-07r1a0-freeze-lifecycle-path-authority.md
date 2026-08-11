@@ -36,7 +36,10 @@ remains accepted.
 contract is
 [lifecycle-path-authority.json](../../decisions/evidence/ck07r1a0/lifecycle-path-authority.json)
 with its schema. The linked [source-digest authority](../../decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json)
-and its schema freeze the exact predecessor/successor transition. The retained
+and its schema freeze the exact predecessor/successor transition. The
+[versioned shared successor overlay](../../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
+preserves accepted CK-08R1B v1, CK-08R1 evidence, and CK-QG1 authority bytes
+while reconciling their consumers with only the complete exact successor. The retained
 CK-07R1 implementation/profile/evidence diff is read-only evidence;
 accepted R3A preparation `6689d61f…` remains historical, current R1B
 preparation `7d1831ff…` is the live predecessor, and only the exact

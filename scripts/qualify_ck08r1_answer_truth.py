@@ -41,6 +41,12 @@ from codex_usage_tracker.agent_kernel.query.service import (  # noqa: E402
     QueryService,
     QueryServiceError,
 )
+from scripts.ck07r1_shared_successor_overlay import (  # noqa: E402
+    PREPARATION_PATH as CK07R1_PREPARATION_PATH,
+)
+from scripts.ck07r1_shared_successor_overlay import (  # noqa: E402
+    verify_shared_successor_overlay,
+)
 from tests.agent_kernel.fixtures.independent import (  # noqa: E402
     semantic as independent_semantic,
 )
@@ -123,6 +129,9 @@ def _git_last_touch(relative: str) -> str:
 def recompute_authority_identities() -> dict[str, Any]:
     """Recompute all R1A/B/C identities from committed authority paths."""
 
+    overlay, overlay_state = verify_shared_successor_overlay(ROOT)
+    overlay_predecessor = overlay["states"]["predecessor"]["artifacts"][0]["sha256"]
+    overlay_successor = overlay["states"]["successor"]["artifacts"][0]["sha256"]
     authority = _json(JOIN_AUTHORITY)
     producer = authority.get("producer_authority")
     independent = authority.get("independent_truth_authority")
@@ -176,7 +185,13 @@ def recompute_authority_identities() -> dict[str, Any]:
         if relative in selected_by_path:
             raise QualificationError(f"R1B cohort path is duplicated: {relative}")
         actual = sha256_file(ROOT / relative)
-        if actual != record.get("sha256"):
+        is_exact_ck07_successor = (
+            overlay_state == "worker_prequalification"
+            and relative == CK07R1_PREPARATION_PATH
+            and record.get("sha256") == overlay_predecessor
+            and actual == overlay_successor
+        )
+        if actual != record.get("sha256") and not is_exact_ck07_successor:
             raise QualificationError(f"R1B authority digest drift: {relative}")
         selected_by_path[relative] = record
     if len(selected_by_path) != 23:
@@ -194,7 +209,15 @@ def recompute_authority_identities() -> dict[str, Any]:
         if (
             successor is None
             or successor.get("predecessor_sha256") != accepted_digest
-            or successor.get("sha256") != actual
+            or (
+                successor.get("sha256") != actual
+                and not (
+                    overlay_state == "worker_prequalification"
+                    and relative == CK07R1_PREPARATION_PATH
+                    and successor.get("sha256") == overlay_predecessor
+                    and actual == overlay_successor
+                )
+            )
         ):
             raise QualificationError(f"R1C root has unbound successor drift: {relative}")
 
@@ -212,6 +235,7 @@ def recompute_authority_identities() -> dict[str, Any]:
         "dependency_shas": dependency_shas,
         "authority_digests": authority_digests,
         "r1b_selected_paths": len(selected_by_path),
+        "ck07r1_overlay_state": overlay_state,
     }
 
 

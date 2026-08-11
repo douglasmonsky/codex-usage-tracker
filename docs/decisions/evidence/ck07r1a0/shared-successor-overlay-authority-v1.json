@@ -1,0 +1,182 @@
+{
+  "schema": "codex-usage-tracker.ck07r1-shared-successor-overlay.v1",
+  "authority_version": 1,
+  "owner": "CK-07R1-SHARED-OVERLAY",
+  "authority_base_sha": "cf44f4fdd3f54ad53263b5e744203be468fbe5ca",
+  "status": "permitted_not_accepted",
+  "decision": "authorize_exact_ck07_worker_prequalification_overlay_only",
+  "immutable_authorities": [
+    {
+      "id": "CK-08R1B-v1",
+      "path": "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.json",
+      "sha256": "d35bca7600e2e372d6c7b71420cc95996ee1222343982ffd323fee9ba5cbf8b5",
+      "schema_path": "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.schema.json",
+      "schema_sha256": "4921d75b71138d4a2ced9345cc4cb40ea0873305e3245b22f16059e3d41ebd3b"
+    },
+    {
+      "id": "CK-08R1-accepted-evidence",
+      "path": "docs/decisions/evidence/ck08r1/answer-truth-requalification-v2.json",
+      "sha256": "54a5a1c2ca590e8d09591a4143ad2689d9be72be4fe0542effa5d8f3d07c4294",
+      "schema_path": "docs/decisions/evidence/ck08r1a/answer-truth-requalification-v2.schema.json",
+      "schema_sha256": "ea35833d4dcca418f5e2776002249cb55174cb73d2f70a54d1c3f1721ca03fcc"
+    },
+    {
+      "id": "CK-QG1-accepted-authority",
+      "path": "docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json",
+      "sha256": "f7bedece9116beec29880bd8211e2facaaa8071d036ab13f1af217d77aa6505e",
+      "schema_path": "docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.schema.json",
+      "schema_sha256": "9290f65352718c67f6e9306350fb20c9998f225f59be64de58e9bd8397a20633"
+    }
+  ],
+  "ck07_authorities": [
+    {
+      "id": "lifecycle-source-digest-v7",
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
+      "sha256": "c78dc07ca22a98d89200b8e857d377e759e3c78986a1a827478f3fd806ab9aaa",
+      "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
+      "schema_sha256": "4b25ca4e88f2fc54cd5c8119f2b6dd1e62b7064397fb168258a949f27dfa8a36"
+    },
+    {
+      "id": "lifecycle-run-invocation-v6",
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
+      "sha256": "d90b2d7da9a361907ac6ef5a38050529b5914644e3dda7308801206263006745",
+      "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
+      "schema_sha256": "1ae7e01b5d664e3e5b676aaaab5601e8b5e9fbb9bacef665e2a3acf124e633dc"
+    }
+  ],
+  "states": {
+    "predecessor": {
+      "name": "authority_main",
+      "status": "accepted_historical_and_current_predecessor_only",
+      "artifacts": [
+        {
+          "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+          "sha256": "7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb",
+          "presence": "required"
+        },
+        {
+          "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+          "presence": "absent"
+        },
+        {
+          "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+          "presence": "absent"
+        }
+      ]
+    },
+    "successor": {
+      "name": "worker_prequalification",
+      "status": "permitted_not_accepted",
+      "artifacts": [
+        {
+          "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+          "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea",
+          "presence": "required"
+        },
+        {
+          "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+          "sha256": "f173837d71e393e53e13f0253f3f1ede4045befb5dab2cbf81d6fe147be4b47a",
+          "presence": "required"
+        },
+        {
+          "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+          "sha256": "b6468b609dd7e47462d4e0c958f33d37d876959c90fb17ae02d64c3d18c22eed",
+          "presence": "required"
+        }
+      ],
+      "entry": "worker_prequalification_only_after_authority_merge_and_exact_main",
+      "runtime_acceptance": "not_claimed",
+      "launch_authorized": false
+    },
+    "forbidden": {
+      "historical_d192_sha256": "d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1",
+      "superseded_e204_sha256": "e204e0da8f6dce7b6c4cf7a981803d2d8c08b45cb3a2ca370fe1838fd6cf2174",
+      "mixed_or_partial": "fail_closed",
+      "other_digest": "fail_closed",
+      "extra_cohort_artifact": "fail_closed"
+    }
+  },
+  "consumer_bridge": {
+    "policy": "accepted_v1_bytes_remain_authoritative; only the exact complete CK-07 successor is interpreted as a successor of the accepted 7d1831ff preparation state",
+    "consumers": [
+      "scripts/qualify_ck08r1_answer_truth.py",
+      "tests/kernel/test_ck08r1b_answer_semantics_join_authority.py",
+      "tests/kernel/test_ckqg1_maintainability_baseline_authority.py"
+    ],
+    "ck08r1b_history": "the accepted 23-path predecessor/successor cohort and all historical Git identities remain unchanged",
+    "ck08r1_evidence": "the accepted evidence and closure identities remain unchanged",
+    "ckqg1_semantics": "the accepted baseline, C/B/B thresholds, normalized findings, and writer transition remain unchanged"
+  },
+  "non_consuming_invariants": {
+    "maximum_new_end_to_end_runs": 1,
+    "token_status": "unspent_unavailable",
+    "token_consumed": false,
+    "matching_processes": [],
+    "successful_child": "absent",
+    "pid": "absent",
+    "handshake": "absent",
+    "runtime_acceptance": "not_claimed",
+    "receipt": "absent_non_qualifying",
+    "output": "absent",
+    "ledger": "absent",
+    "stdout": "absent",
+    "stderr": "absent",
+    "retry": "none",
+    "restart": "none",
+    "replacement": "none",
+    "pr394": "stale_read_only",
+    "downstream": "CK-08R4_CK-08RG_CK-09_blocked",
+    "data_policy": "synthetic_only"
+  },
+  "scope": {
+    "authority_write_scope": [
+      "AGENTS.md",
+      "docs/INDEX.md",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
+      "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json",
+      "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.schema.json",
+      "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+      "docs/roadmap/TASK_PACKETS.md",
+      "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
+      "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md",
+      "scripts/check_kernel_scope.py",
+      "scripts/ck07r1_shared_successor_overlay.py",
+      "scripts/qualify_ck08r1_answer_truth.py",
+      "tests/kernel/test_ck07r1_shared_successor_overlay.py",
+      "tests/kernel/test_ck08r1b_answer_semantics_join_authority.py",
+      "tests/kernel/test_ckqg1_maintainability_baseline_authority.py",
+      "tests/kernel/test_documentation_authority.py",
+      "tests/kernel/test_kernel_scope.py",
+      "tests/kernel/test_lifecycle_run_invocation_authority.py"
+    ],
+    "combined_preflight_candidate_scope": [
+      "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "scripts/benchmark_ck07r1_lifecycle_scale.py",
+      "tests/agent_kernel/publication/test_lifecycle_scale.py"
+    ],
+    "forbidden": [
+      "accepted CK-08R1B v1 authority or schema edits",
+      "accepted CK-08R1 evidence or schema edits",
+      "accepted CK-QG1 authority or schema edits",
+      "candidate or support bytes in the authority PR",
+      "implementation acceptance or launch authorization",
+      "output, ledger, stdout, stderr, or receipt creation",
+      "token consumption",
+      "PR #394 mutation",
+      "CK-08R4, CK-08RG, or CK-09 readiness"
+    ]
+  },
+  "negative_mutations": [
+    "rewrite any immutable accepted authority byte",
+    "remove or add a successor cohort artifact",
+    "substitute any successor digest",
+    "present a mixed or partial predecessor/successor cohort",
+    "claim post_single_run or final_accepted",
+    "claim runtime acceptance, launch authorization, or token consumption",
+    "fabricate a receipt or any output path",
+    "weaken the exact authority or preflight scope"
+  ]
+}

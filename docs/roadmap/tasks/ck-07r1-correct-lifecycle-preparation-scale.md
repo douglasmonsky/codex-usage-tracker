@@ -44,6 +44,10 @@ the current authority binds predecessor preparation `7d1831ff…` to the atomic
 `66c015de…` / `f173837d…` / `b6468b60…` successor cohort, linked evidence
 `36eb76ca…`, and the 720-second wrapper timeout without executing the worker.
 The successor is permitted-not-accepted and launch remains unauthorized.
+The versioned [shared successor overlay](../../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
+preserves all accepted CK-08R1B v1, CK-08R1 evidence, and CK-QG1 authority
+bytes while allowing their consumers to recognize only this exact atomic
+worker-prequalification state.
 
 **Produces:** Publication-scale requalification with equivalent fold identity.
 

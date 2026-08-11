@@ -8,6 +8,11 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
+from scripts.ck07r1_shared_successor_overlay import (
+    PREPARATION_PATH,
+    verify_shared_successor_overlay,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 AUTHORITY_PATH = (
     ROOT / "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.json"
@@ -267,10 +272,23 @@ def test_successor_cohort_is_all_or_none_and_rejects_unbound_bytes() -> None:
     files = authority["selected_successor_cohort"]["files"]
     assert isinstance(files, list)
     observed = {item["path"]: _sha256(item["path"]) for item in files}
-    state = _cohort_state(files, observed)
-    assert state in {"predecessor", "successor"}
+    overlay, overlay_state = verify_shared_successor_overlay(ROOT)
+    bound_observed = dict(observed)
+    if overlay_state == "worker_prequalification":
+        preparation = next(item for item in files if item["path"] == PREPARATION_PATH)
+        assert preparation["sha256"] == overlay["states"]["predecessor"]["artifacts"][0][
+            "sha256"
+        ]
+        assert observed[PREPARATION_PATH] == overlay["states"]["successor"]["artifacts"][0][
+            "sha256"
+        ]
+        bound_observed[PREPARATION_PATH] = preparation["sha256"]
 
-    mixed = dict(observed)
+    state = _cohort_state(files, bound_observed)
+    assert state in {"predecessor", "successor"}
+    assert overlay_state in {"authority_main", "worker_prequalification"}
+
+    mixed = dict(bound_observed)
     mixed[files[0]["path"]] = (
         files[0]["sha256"]
         if state == "predecessor"
@@ -279,7 +297,7 @@ def test_successor_cohort_is_all_or_none_and_rejects_unbound_bytes() -> None:
     with pytest.raises(AssertionError, match="mixed predecessor/successor"):
         _cohort_state(files, mixed)
 
-    unbound = dict(observed)
+    unbound = dict(bound_observed)
     unbound[files[0]["path"]] = "0" * 64
     with pytest.raises(AssertionError, match="unbound cohort identity"):
         _cohort_state(files, unbound)
