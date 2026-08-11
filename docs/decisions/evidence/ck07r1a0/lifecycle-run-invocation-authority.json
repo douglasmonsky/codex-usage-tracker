@@ -1,8 +1,8 @@
 {
-  "schema": "codex-usage-tracker.lifecycle-run-invocation-authority.v6",
-  "authority_version": 6,
+  "schema": "codex-usage-tracker.lifecycle-run-invocation-authority.v7",
+  "authority_version": 7,
   "owner": "CK-07R1A0",
-  "authority_base_sha": "cf44f4fdd3f54ad53263b5e744203be468fbe5ca",
+  "authority_base_sha": "6c08ecd92a2c5166c1585be426e1ed437309a910",
   "status": "blocked_no_run",
   "shared_preparation_binding": {
     "authority_main_sha256": "7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb",
@@ -27,8 +27,8 @@
     "corrected_guard": "(sys.argv[0], *sys.argv[1:]) == LAUNCH_COMMAND[1:]",
     "corrected_candidate_status": "frozen_not_run",
     "corrected_candidate_artifacts": {
-      "benchmark_sha256": "4b1c62b2d56bf808b66f47c71b1bb1fa3595e2d590d0fa0192b5f7be3b2b4dde",
-      "lifecycle_test_sha256": "75d03f5346ffe2d02ffedc5df007ce45bef5533b324202ccf41b535de8b33cd2"
+      "benchmark_sha256": "98aac35d01c0e4ec6cd18b296807d1b67864db38353874d372efec3e470ec9bc",
+      "lifecycle_test_sha256": "7914d993286249e449b46c4f5ba0f344aeab9dc0e9eee0f5d3aeb4e917cb730f"
     },
     "old_candidate_artifacts": {
       "benchmark_sha256": "6a864c74a403da3edb671d9750fc2b2a59b73899102075ee0cec89fbb429b783",
@@ -134,7 +134,7 @@
         "requires": [
           "this authority is merged and exact-main verified",
           "the existing worker resumes only the preserved exact candidate worktree",
-          "the worker presents the byte-exact 66c015de/4b1c62b2/75d03f53 cohort over the 7d1831ff predecessor",
+          "the worker presents the byte-exact 66c015de/98aac35d/7914d993 cohort over the 7d1831ff predecessor",
           "runtime_acceptance remains not_claimed",
           "authority-integrity and prelaunch gates pass",
           "maximum_new_end_to_end_runs remains 1 and unspent_unavailable",
@@ -205,9 +205,9 @@
   },
   "selected_candidate": {
     "status": "exact_ck07_successor_permitted_not_accepted",
-    "base_sha": "cf44f4fdd3f54ad53263b5e744203be468fbe5ca",
-    "retained_branch": "feature/ck-07r1-launcher-correction-v7",
-    "retained_worktree": "2026-08-11/codex-usage-tracker-ck07r1-launcher-correction-v7",
+    "base_sha": "6c08ecd92a2c5166c1585be426e1ed437309a910",
+    "retained_branch": "feature/ck-07r1-launcher-correction-v9",
+    "retained_worktree": "2026-08-11/codex-usage-tracker-ck07r1-launcher-correction-v9",
     "witness_status": "retained_uncommitted_read_only_exact_candidate",
     "source_predecessor_sha256": "7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb",
     "source_successor_sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea",
@@ -223,12 +223,12 @@
       },
       {
         "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-        "sha256": "4b1c62b2d56bf808b66f47c71b1bb1fa3595e2d590d0fa0192b5f7be3b2b4dde",
+        "sha256": "98aac35d01c0e4ec6cd18b296807d1b67864db38353874d372efec3e470ec9bc",
         "role": "benchmark"
       },
       {
         "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-        "sha256": "75d03f5346ffe2d02ffedc5df007ce45bef5533b324202ccf41b535de8b33cd2",
+        "sha256": "7914d993286249e449b46c4f5ba0f344aeab9dc0e9eee0f5d3aeb4e917cb730f",
         "role": "lifecycle_test"
       },
       {
@@ -237,7 +237,7 @@
         "role": "linked_evidence"
       }
     ],
-    "binding": "only the byte-exact 66c015de/4b1c62b2/75d03f53 cohort may enter worker_prequalification after this authority merges and exact-main verifies",
+    "binding": "only the byte-exact 66c015de/98aac35d/7914d993 cohort may enter worker_prequalification after this authority merges and exact-main verifies",
     "worker_revalidation_required": true
   },
   "preserved_authorities": {
@@ -249,9 +249,9 @@
     },
     "lifecycle_source_digest": {
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
-      "sha256": "6156780a7e8663859658bb5309f13eb6bf5283704784d8270edf0512c167d70b",
+      "sha256": "8c244b1afae072468ea8a91da12a9a2d1b65728d01da25e5924441b6f84d27e3",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
-      "schema_sha256": "4026a4e971c1b6b177b467440a36931bc6a15a0b376918bdc4169b732a0d489c"
+      "schema_sha256": "4e4ebe429f624ce0b2e3236c97ea56c0231f5c9481b446906bd4eee494d55683"
     }
   },
   "launch_contract": {
@@ -273,6 +273,16 @@
     "launcher_safety": {
       "overlay_and_cohort_verification": "must_complete_before_ledger_fork_child_release_or_token_consumption",
       "receipt_binding": "must_equal_exact_overlay_verification_result_and_three_artifact_cohort",
+      "receipt_completion_ordering": "construct_exact_overlay_bound_receipt_then_validate_then_first_durable_completed_finalization",
+      "receipt_failure_state": "construction_validation_or_finalization_failure_is_failed_after_launch_never_completed",
+      "interpreter_identity": {
+        "executable": "lexical_repository_worktree_.venv/bin/python_required",
+        "sys_prefix": "lexical_repository_worktree_.venv_required",
+        "base_interpreter": "rejected",
+        "symlink_or_resolved_equivalence": "rejected",
+        "wrong_worktree_venv": "rejected",
+        "prefix_mismatch": "rejected"
+      },
       "post_token_or_release_failure_state": "failed_after_launch",
       "termination_sequence": [
         "SIGTERM",
@@ -580,7 +590,7 @@
     "refund": false,
     "prior_identities_reused": false,
     "concurrent_processes_allowed": false,
-    "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/4b1c62b2/75d03f53 candidate cohort, and all gates pass",
+    "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/98aac35d/7914d993 candidate cohort, and all gates pass",
     "first_successful_launch": "exactly one first successful child launch may consume the still-unspent token; this is not a retry, restart, or replacement of a launched process",
     "old_candidate_reuse": "forbidden"
   },

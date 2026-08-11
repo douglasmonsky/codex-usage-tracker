@@ -112,8 +112,8 @@ keep CK-07R1 `blocked_hold`
 The accepted source history retains R3A preparation `6689d61f…` as a
 historical predecessor and R1B/current exact-main preparation `7d1831ff…` as
 the live predecessor. The sole CK-07 worker-prequalification successor is the
-atomic `66c015de…` preparation, `4b1c62b2…` benchmark, and `75d03f53…`
-lifecycle-test cohort derived from exact main `cf44f4fd`. Mixed or incomplete
+atomic `66c015de…` preparation, `98aac35d…` benchmark, and `7914d993…`
+lifecycle-test cohort derived from exact main `6c08ecd9`. Mixed or incomplete
 cohorts, prior candidate `e204e0da…`, and historical candidate `d192c858…`
 fail closed. PR #394 remains a stale failed
 read-only witness; it is not updated, rerun, or merged. The old argv-guard attempt remains the historical
@@ -133,6 +133,13 @@ authority task does not resume the worker, consume the run token, authorize
 launch/output, or advance another successor. The one-run gate remains unspent
 and unavailable. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
+
+The V9 candidate must construct and validate the exact overlay/cohort-bound
+receipt before its first durable `completed` finalization; construction,
+validation, or finalization failures are terminal `failed_after_launch`.
+Interpreter identity is the lexical repository-worktree `.venv/bin/python` plus
+the matching lexical venv `sys.prefix`; base interpreters, symlink/resolved
+equivalence, wrong-worktree venvs, and prefix mismatch are rejected.
 
 The finite source/runtime state machine is currently `authority_main`: the live
 predecessor may remain on authority main, while only the exact selected

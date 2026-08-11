@@ -239,7 +239,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest["conditional_ready"] == [
         {
             "condition": (
-                "exact 66c015de/4b1c62b2/75d03f53 successor authority merges and exact-main "
+                "exact 66c015de/98aac35d/7914d993 successor authority merges and exact-main "
                 "verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 "
                 "with the atomic cohort; no replacement, launch, token consumption, or downstream task"
             ),
@@ -1040,9 +1040,9 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     validator = Draft202012Validator(schema)
     validator.validate(authority)
 
-    assert authority["schema"] == "codex-usage-tracker.lifecycle-source-digest-authority.v7"
-    assert authority["authority_version"] == 7
-    assert authority["authority_base_sha"] == "cf44f4fdd3f54ad53263b5e744203be468fbe5ca"
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-source-digest-authority.v8"
+    assert authority["authority_version"] == 8
+    assert authority["authority_base_sha"] == "6c08ecd92a2c5166c1585be426e1ed437309a910"
     assert authority["status"] == "blocked_hold"
     assert authority["predecessor"]["sha256"] == (
         "7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb"
@@ -1051,7 +1051,7 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
         "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea",
         "status": "permitted_not_accepted",
         "role": "selected_ck07_exact_candidate",
-        "base_sha": "cf44f4fdd3f54ad53263b5e744203be468fbe5ca",
+        "base_sha": "6c08ecd92a2c5166c1585be426e1ed437309a910",
         "requires_full_candidate_cohort": True,
         "direct_ck07_use": "worker_prequalification_only_after_authority_exact_main",
         "mixed_state": "fail_closed",
@@ -1065,12 +1065,12 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
             },
             {
                 "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-                "sha256": "4b1c62b2d56bf808b66f47c71b1bb1fa3595e2d590d0fa0192b5f7be3b2b4dde",
+                "sha256": "98aac35d01c0e4ec6cd18b296807d1b67864db38353874d372efec3e470ec9bc",
                 "role": "benchmark",
             },
             {
                 "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-                "sha256": "75d03f5346ffe2d02ffedc5df007ce45bef5533b324202ccf41b535de8b33cd2",
+                "sha256": "7914d993286249e449b46c4f5ba0f344aeab9dc0e9eee0f5d3aeb4e917cb730f",
                 "role": "lifecycle_test",
             },
         ],

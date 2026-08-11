@@ -30,7 +30,7 @@
       "const": "CK-07R1-SHARED-OVERLAY"
     },
     "authority_base_sha": {
-      "const": "cf44f4fdd3f54ad53263b5e744203be468fbe5ca"
+      "const": "6c08ecd92a2c5166c1585be426e1ed437309a910"
     },
     "status": {
       "const": "permitted_not_accepted"
@@ -66,18 +66,18 @@
     "ck07_authorities": {
       "const": [
         {
-          "id": "lifecycle-source-digest-v7",
+          "id": "lifecycle-source-digest-v8",
           "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
-          "sha256": "6156780a7e8663859658bb5309f13eb6bf5283704784d8270edf0512c167d70b",
+          "sha256": "8c244b1afae072468ea8a91da12a9a2d1b65728d01da25e5924441b6f84d27e3",
           "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
-          "schema_sha256": "4026a4e971c1b6b177b467440a36931bc6a15a0b376918bdc4169b732a0d489c"
+          "schema_sha256": "4e4ebe429f624ce0b2e3236c97ea56c0231f5c9481b446906bd4eee494d55683"
         },
         {
-          "id": "lifecycle-run-invocation-v6",
+          "id": "lifecycle-run-invocation-v7",
           "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
-          "sha256": "6b1a2753e935da9a9c0121e4f1691957b06b388c1bc55631920725ae6d9089be",
+          "sha256": "b850a063878c15234083c8e9e7fc1502d633691c391506b76a92b07a77ebbea1",
           "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
-          "schema_sha256": "e3f24adc98078524523dcb404b9cf9d934fe6c68637abb8a5c40e2eb97ea7e74"
+          "schema_sha256": "c7d9d2518816c15bcf5e93fec241aeaa8d719d433fd7f91f0873ad7b1aa21c78"
         }
       ]
     },
@@ -123,12 +123,12 @@
               },
               {
                 "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-                "sha256": "4b1c62b2d56bf808b66f47c71b1bb1fa3595e2d590d0fa0192b5f7be3b2b4dde",
+                "sha256": "98aac35d01c0e4ec6cd18b296807d1b67864db38353874d372efec3e470ec9bc",
                 "presence": "required"
               },
               {
                 "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-                "sha256": "75d03f5346ffe2d02ffedc5df007ce45bef5533b324202ccf41b535de8b33cd2",
+                "sha256": "7914d993286249e449b46c4f5ba0f344aeab9dc0e9eee0f5d3aeb4e917cb730f",
                 "presence": "required"
               }
             ],
@@ -184,6 +184,16 @@
       "const": {
         "overlay_and_cohort_verification": "must_complete_before_ledger_fork_child_release_or_token_consumption",
         "receipt_binding": "must_equal_exact_overlay_verification_result_and_three_artifact_cohort",
+        "receipt_completion_ordering": "construct_exact_overlay_bound_receipt_then_validate_then_first_durable_completed_finalization",
+        "receipt_failure_state": "construction_validation_or_finalization_failure_is_failed_after_launch_never_completed",
+        "interpreter_identity": {
+          "executable": "lexical_repository_worktree_.venv/bin/python_required",
+          "sys_prefix": "lexical_repository_worktree_.venv_required",
+          "base_interpreter": "rejected",
+          "symlink_or_resolved_equivalence": "rejected",
+          "wrong_worktree_venv": "rejected",
+          "prefix_mismatch": "rejected"
+        },
         "post_token_or_release_failure_state": "failed_after_launch",
         "aggregate_timeout_seconds": 720,
         "termination_sequence": [
@@ -243,14 +253,9 @@
             "docs/roadmap/TASK_PACKETS.md",
             "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
             "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md",
-            "scripts/check_kernel_scope.py",
             "scripts/ck07r1_shared_successor_overlay.py",
-            "scripts/qualify_ck08r1_answer_truth.py",
             "tests/kernel/test_ck07r1_shared_successor_overlay.py",
-            "tests/kernel/test_ck08r1b_answer_semantics_join_authority.py",
-            "tests/kernel/test_ckqg1_maintainability_baseline_authority.py",
             "tests/kernel/test_documentation_authority.py",
-            "tests/kernel/test_kernel_scope.py",
             "tests/kernel/test_lifecycle_run_invocation_authority.py"
           ]
         },
@@ -285,7 +290,7 @@
         "present any extra dirty or CK-QG1-allowed path in combined preflight",
         "claim post_single_run or final_accepted",
         "claim runtime acceptance, launch authorization, or token consumption",
-        "weaken launcher overlay, receipt, failure classification, or timeout binding",
+        "weaken launcher overlay, receipt construction, validation, completion ordering, failure classification, interpreter identity, or timeout binding",
         "fabricate a receipt or any output path",
         "weaken the exact authority or preflight scope"
       ]

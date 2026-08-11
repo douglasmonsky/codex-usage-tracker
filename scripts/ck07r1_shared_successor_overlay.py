@@ -223,6 +223,22 @@ def verify_launcher_safety_contract(authority: Mapping[str, Any]) -> None:
         "receipt_binding": (
             "must_equal_exact_overlay_verification_result_and_three_artifact_cohort"
         ),
+        "receipt_completion_ordering": (
+            "construct_exact_overlay_bound_receipt_then_validate_then_first_durable_"
+            "completed_finalization"
+        ),
+        "receipt_failure_state": (
+            "construction_validation_or_finalization_failure_is_failed_after_launch_"
+            "never_completed"
+        ),
+        "interpreter_identity": {
+            "executable": "lexical_repository_worktree_.venv/bin/python_required",
+            "sys_prefix": "lexical_repository_worktree_.venv_required",
+            "base_interpreter": "rejected",
+            "symlink_or_resolved_equivalence": "rejected",
+            "wrong_worktree_venv": "rejected",
+            "prefix_mismatch": "rejected",
+        },
         "post_token_or_release_failure_state": "failed_after_launch",
         "aggregate_timeout_seconds": 720,
         "termination_sequence": ["SIGTERM", "wait_up_to_5_seconds", "SIGKILL"],

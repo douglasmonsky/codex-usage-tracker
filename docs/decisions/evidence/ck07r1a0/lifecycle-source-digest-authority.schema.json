@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-source-digest-authority-v7.schema.json",
+  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-source-digest-authority-v8.schema.json",
   "title": "CK-07R1A0 shared-preparation source digest authority",
   "type": "object",
   "additionalProperties": false,
@@ -28,16 +28,16 @@
   ],
   "properties": {
     "schema": {
-      "const": "codex-usage-tracker.lifecycle-source-digest-authority.v7"
+      "const": "codex-usage-tracker.lifecycle-source-digest-authority.v8"
     },
     "authority_version": {
-      "const": 7
+      "const": 8
     },
     "owner": {
       "const": "CK-07R1A0"
     },
     "authority_base_sha": {
-      "const": "cf44f4fdd3f54ad53263b5e744203be468fbe5ca"
+      "const": "6c08ecd92a2c5166c1585be426e1ed437309a910"
     },
     "source_path": {
       "const": "src/codex_usage_tracker/agent_kernel/publication/preparation.py"
@@ -85,7 +85,7 @@
               "requires_complete_candidate_cohort": true
             }
           ],
-        "source_digest_rule": "authority_main remains exact 7d1831ff; historical accepted 6689d61f remains predecessor-only; worker_prequalification admits only 66c015de with byte-exact 4b1c62b2 benchmark and 75d03f53 lifecycle test; every mixed, incomplete, historical, or other digest state fails closed",
+        "source_digest_rule": "authority_main remains exact 7d1831ff; historical accepted 6689d61f remains predecessor-only; worker_prequalification admits only 66c015de with byte-exact 98aac35d benchmark and 7914d993 lifecycle test; every mixed, incomplete, historical, or other digest state fails closed",
         "other_digest": "fail_closed",
         "current_runtime_claim": "not_claimed",
         "launch_state": "blocked_hold_no_run"
@@ -106,7 +106,7 @@
         "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea",
         "status": "permitted_not_accepted",
         "role": "selected_ck07_exact_candidate",
-        "base_sha": "cf44f4fdd3f54ad53263b5e744203be468fbe5ca",
+        "base_sha": "6c08ecd92a2c5166c1585be426e1ed437309a910",
         "requires_full_candidate_cohort": true,
         "direct_ck07_use": "worker_prequalification_only_after_authority_exact_main",
         "mixed_state": "fail_closed",
@@ -120,12 +120,12 @@
           },
           {
             "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-            "sha256": "4b1c62b2d56bf808b66f47c71b1bb1fa3595e2d590d0fa0192b5f7be3b2b4dde",
+            "sha256": "98aac35d01c0e4ec6cd18b296807d1b67864db38353874d372efec3e470ec9bc",
             "role": "benchmark"
           },
           {
             "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-            "sha256": "75d03f5346ffe2d02ffedc5df007ce45bef5533b324202ccf41b535de8b33cd2",
+            "sha256": "7914d993286249e449b46c4f5ba0f344aeab9dc0e9eee0f5d3aeb4e917cb730f",
             "role": "lifecycle_test"
           }
         ]
@@ -168,7 +168,7 @@
         "required": true,
         "worker_task": "019fbfe2-8fe4-7de2-9264-d58572366727",
         "start": "resume the preserved exact-main candidate worktree only after this authority merges and exact-main verifies",
-        "reapply": "use only the already-derived atomic 66c015de/4b1c62b2/75d03f53 candidate cohort; do not mutate any historical witness or substitute another digest",
+        "reapply": "use only the already-derived atomic 66c015de/98aac35d/7914d993 candidate cohort; do not mutate any historical witness or substitute another digest",
         "derive_new_digest": false,
         "update_source_authority_before_run": false,
         "old_d192_reuse": "fail_closed",
@@ -213,7 +213,7 @@
         "any_different_preparation_digest_fails_closed",
         "7d1831ff_is_current_exact_main_predecessor",
         "6689d61f_is_historical_accepted_r3a_predecessor_only",
-        "66c015de_requires_atomic_4b1c62b2_and_75d03f53_cohort",
+        "66c015de_requires_atomic_98aac35d_and_7914d993_cohort",
         "mixed_or_incomplete_candidate_cohort_fails_closed",
         "e204e0da_superseded_and_direct_use_forbidden",
         "historical_d192_direct_use_forbidden",

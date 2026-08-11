@@ -119,6 +119,18 @@ def test_overlay_schema_rejects_status_token_launch_scope_and_safety_weakening()
         ),
         lambda value: value["launcher_safety"].__setitem__("receipt_binding", "optional"),
         lambda value: value["launcher_safety"].__setitem__(
+            "receipt_completion_ordering", "durable_completed_before_validation"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "receipt_failure_state", "completed"
+        ),
+        lambda value: value["launcher_safety"]["interpreter_identity"].__setitem__(
+            "executable", "resolved_equivalent_python_allowed"
+        ),
+        lambda value: value["launcher_safety"]["interpreter_identity"].__setitem__(
+            "sys_prefix", "optional"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
             "post_token_or_release_failure_state", "prelaunch_failed"
         ),
         lambda value: value["launcher_safety"].__setitem__("final_reap_timeout_seconds", 0),
@@ -196,5 +208,12 @@ def test_overlay_scope_and_launcher_contract_are_exact() -> None:
 
     weakened = deepcopy(authority)
     weakened["launcher_safety"]["termination_sequence"] = ["SIGTERM"]
+    with pytest.raises(SharedSuccessorOverlayError, match="safety"):
+        verify_launcher_safety_contract(weakened)
+
+    weakened = deepcopy(authority)
+    weakened["launcher_safety"]["interpreter_identity"][
+        "symlink_or_resolved_equivalence"
+    ] = "accepted"
     with pytest.raises(SharedSuccessorOverlayError, match="safety"):
         verify_launcher_safety_contract(weakened)
