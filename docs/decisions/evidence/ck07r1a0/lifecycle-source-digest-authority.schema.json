@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-source-digest-authority-v10.schema.json",
+  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-source-digest-authority-v11.schema.json",
   "title": "CK-07R1A0 shared-preparation source digest authority",
   "type": "object",
   "additionalProperties": false,
@@ -28,10 +28,10 @@
   ],
   "properties": {
     "schema": {
-      "const": "codex-usage-tracker.lifecycle-source-digest-authority.v10"
+      "const": "codex-usage-tracker.lifecycle-source-digest-authority.v11"
     },
     "authority_version": {
-      "const": 10
+      "const": 11
     },
     "owner": {
       "const": "CK-07R1A0"
@@ -85,7 +85,7 @@
               "requires_complete_candidate_cohort": true
             }
           ],
-        "source_digest_rule": "authority_main remains exact 7d1831ff; historical accepted 6689d61f remains predecessor-only; worker_prequalification admits only 66c015de with byte-exact c922b59f benchmark and 5e9cb014 lifecycle test; every mixed, incomplete, historical, or other digest state fails closed",
+        "source_digest_rule": "authority_main remains exact 7d1831ff; historical accepted 6689d61f remains predecessor-only; worker_prequalification admits only 66c015de with byte-exact 1c7e1ea7 benchmark and a8de9667 lifecycle test; every mixed, incomplete, historical, or other digest state fails closed",
         "other_digest": "fail_closed",
         "current_runtime_claim": "not_claimed",
         "launch_state": "blocked_hold_no_run"
@@ -120,12 +120,12 @@
           },
           {
             "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-            "sha256": "c922b59fbb79df6f8bd1aee35abf03b057859627a60f7fa7028d2d8f90f9bf32",
+            "sha256": "1c7e1ea7168e916d856ea2eaab5f97a3e06cf2dc6d16665dbd441f7bb3f84fe5",
             "role": "benchmark"
           },
           {
             "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-            "sha256": "5e9cb0144887cb34bd123ed03a2e83724e70100c71b7512e57dc2a286e34349e",
+            "sha256": "a8de96673b55a8015b865f1b0f80f1cc1bad4148b4118b56590d2de6636bb94b",
             "role": "lifecycle_test"
           }
         ]
@@ -168,7 +168,7 @@
         "required": true,
         "worker_task": "019fbfe2-8fe4-7de2-9264-d58572366727",
         "start": "resume the preserved exact-main candidate worktree only after this authority merges and exact-main verifies",
-        "reapply": "use only the already-derived atomic 66c015de/c922b59f/5e9cb014 candidate cohort; do not mutate any historical witness or substitute another digest",
+        "reapply": "use only the already-derived atomic 66c015de/1c7e1ea7/a8de9667 candidate cohort; do not mutate any historical witness or substitute another digest",
         "derive_new_digest": false,
         "update_source_authority_before_run": false,
         "old_d192_reuse": "fail_closed",
@@ -213,7 +213,7 @@
         "any_different_preparation_digest_fails_closed",
         "7d1831ff_is_current_exact_main_predecessor",
         "6689d61f_is_historical_accepted_r3a_predecessor_only",
-        "66c015de_requires_atomic_c922b59f_and_5e9cb014_cohort",
+        "66c015de_requires_atomic_1c7e1ea7_and_a8de9667_cohort",
         "mixed_or_incomplete_candidate_cohort_fails_closed",
         "e204e0da_superseded_and_direct_use_forbidden",
         "historical_d192_direct_use_forbidden",

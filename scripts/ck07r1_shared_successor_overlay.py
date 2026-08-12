@@ -302,7 +302,8 @@ def verify_launcher_safety_contract(authority: Mapping[str, Any]) -> None:
         ),
         "parent_signal_handling": (
             "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_"
-            "and_restored_after_wait"
+            "held_through_bounded_reap_evidence_receipt_and_terminal_ledger_"
+            "persistence_then_restored"
         ),
         "wait_interruption_cleanup": (
             "every_wait_exception_or_parent_signal_requires_bounded_SIGTERM_then_"

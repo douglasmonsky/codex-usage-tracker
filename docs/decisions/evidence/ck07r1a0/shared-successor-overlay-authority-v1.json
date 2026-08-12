@@ -30,18 +30,18 @@
   ],
   "ck07_authorities": [
     {
-      "id": "lifecycle-source-digest-v10",
+      "id": "lifecycle-source-digest-v11",
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
-      "sha256": "db92ebf1a24fcbfbc6efb6acadedea24155d37c1dbae8bf67cba1ea530ffd9ca",
+      "sha256": "74768468a00cf37d3908b196f6c1f6577c95bf037957500a05493fd93b92e875",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
-      "schema_sha256": "d7724b92fac1e7823bfcd6c5c5ce068cee94d14ac97435444ef3614fa6cd4edc"
+      "schema_sha256": "69e887566838a3fc2e6f85483da848aa90556861f84817e817d66d950c97b676"
     },
     {
-      "id": "lifecycle-run-invocation-v9",
+      "id": "lifecycle-run-invocation-v10",
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
-      "sha256": "5a216f497c8f24e69655b58b9a93e71407dbff8ce462b20519d10df4fb3580df",
+      "sha256": "c64b9b540bfce6bab615d1707dd6c648e4f07b7e97e56349ac80be2020a4b4b6",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
-      "schema_sha256": "cdf9e7ed6662adfef7c4fa2695928a8d98b9e1f9965a8f9fb02333d05c317004"
+      "schema_sha256": "0cd157c48e0dc0c2867b6c5de89c7075f49ba22940a6f84a408b9e3c110b6e57"
     }
   ],
   "states": {
@@ -75,12 +75,12 @@
         },
         {
           "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-          "sha256": "c922b59fbb79df6f8bd1aee35abf03b057859627a60f7fa7028d2d8f90f9bf32",
+          "sha256": "1c7e1ea7168e916d856ea2eaab5f97a3e06cf2dc6d16665dbd441f7bb3f84fe5",
           "presence": "required"
         },
         {
           "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-          "sha256": "5e9cb0144887cb34bd123ed03a2e83724e70100c71b7512e57dc2a286e34349e",
+          "sha256": "a8de96673b55a8015b865f1b0f80f1cc1bad4148b4118b56590d2de6636bb94b",
           "presence": "required"
         }
       ],
@@ -117,7 +117,7 @@
     "parent_cleanup_pid_guard": "reject_pid_less_than_or_equal_to_zero_before_kill_wait_or_reap",
     "atomic_ledger_update": "unique_same_directory_mkstemp_close_and_unlink_on_every_failed_or_interrupted_write_fsync_replace_or_post_replace_path",
     "atomic_failure_state": "durable_failed_after_launch_token_consumed_no_retry_no_temp_residue",
-    "parent_signal_handling": "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_and_restored_after_wait",
+    "parent_signal_handling": "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_held_through_bounded_reap_evidence_receipt_and_terminal_ledger_persistence_then_restored",
     "wait_interruption_cleanup": "every_wait_exception_or_parent_signal_requires_bounded_SIGTERM_then_SIGKILL_then_reap_before_terminal_failure",
     "signal_cleanup_mask": "SIGINT_SIGTERM_ignored_during_bounded_child_cleanup",
     "evidence_completion_ordering": "required_non_null_stdout_stderr_output_read_hash_parse_validate_before_first_durable_completed_finalization",

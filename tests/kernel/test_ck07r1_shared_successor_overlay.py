@@ -144,6 +144,9 @@ def test_overlay_schema_rejects_status_token_launch_scope_and_safety_weakening()
             "parent_signal_handling", "not_installed"
         ),
         lambda value: value["launcher_safety"].__setitem__(
+            "parent_signal_handling", "restored_after_wait"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
             "wait_interruption_cleanup", "persist_without_reap"
         ),
         lambda value: value["launcher_safety"].__setitem__(

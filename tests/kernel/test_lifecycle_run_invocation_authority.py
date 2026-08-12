@@ -185,8 +185,8 @@ def test_argv_correction_preserves_first_failure_and_one_run_gate() -> None:
     assert correction["old_guard"] == "sys.argv[1:] == LAUNCH_COMMAND[1:]"
     assert correction["corrected_guard"] == "(sys.argv[0], *sys.argv[1:]) == LAUNCH_COMMAND[1:]"
     assert correction["corrected_candidate_artifacts"] == {
-        "benchmark_sha256": "c922b59fbb79df6f8bd1aee35abf03b057859627a60f7fa7028d2d8f90f9bf32",
-        "lifecycle_test_sha256": "5e9cb0144887cb34bd123ed03a2e83724e70100c71b7512e57dc2a286e34349e",
+        "benchmark_sha256": "1c7e1ea7168e916d856ea2eaab5f97a3e06cf2dc6d16665dbd441f7bb3f84fe5",
+        "lifecycle_test_sha256": "a8de96673b55a8015b865f1b0f80f1cc1bad4148b4118b56590d2de6636bb94b",
     }
     assert correction["old_candidate_artifacts"]["reuse"] == "forbidden"
     assert correction["non_launching_subprocess_test"]["required"] is True
@@ -215,8 +215,8 @@ def test_argv_correction_preserves_first_failure_and_one_run_gate() -> None:
 def test_selected_candidate_is_exact_ck07_cohort_and_runtime_stays_blocked() -> None:
     authority = _authority()
     candidate = authority["selected_candidate"]
-    assert authority["schema"] == "codex-usage-tracker.lifecycle-run-invocation-authority.v9"
-    assert authority["authority_version"] == 9
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-run-invocation-authority.v10"
+    assert authority["authority_version"] == 10
     assert authority["authority_base_sha"] == "6c08ecd92a2c5166c1585be426e1ed437309a910"
     assert authority["status"] == "blocked_no_run"
     assert authority["shared_preparation_binding"] == {
@@ -247,7 +247,7 @@ def test_selected_candidate_is_exact_ck07_cohort_and_runtime_stays_blocked() -> 
         "role": "source",
     }
     assert candidate["binding"] == (
-        "only the byte-exact 66c015de/c922b59f/5e9cb014 cohort may enter "
+        "only the byte-exact 66c015de/1c7e1ea7/a8de9667 cohort may enter "
         "worker_prequalification after this authority merges and exact-main verifies"
     )
     assert authority["run_token"]["status"] == "unspent_unavailable"
@@ -533,7 +533,8 @@ def test_corrected_launcher_safety_contract_is_exact() -> None:
         ),
         "parent_signal_handling": (
             "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_"
-            "and_restored_after_wait"
+            "held_through_bounded_reap_evidence_receipt_and_terminal_ledger_"
+            "persistence_then_restored"
         ),
         "wait_interruption_cleanup": (
             "every_wait_exception_or_parent_signal_requires_bounded_SIGTERM_then_"
@@ -598,7 +599,7 @@ def test_process_exclusion_launch_token_and_evidence_capture_are_required() -> N
         "refund": False,
         "prior_identities_reused": False,
         "concurrent_processes_allowed": False,
-        "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/c922b59f/5e9cb014 candidate cohort, and all gates pass",
+        "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/1c7e1ea7/a8de9667 candidate cohort, and all gates pass",
         "first_successful_launch": "exactly one first successful child launch may consume the still-unspent token; this is not a retry, restart, or replacement of a launched process",
         "old_candidate_reuse": "forbidden",
     }
@@ -713,6 +714,11 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
             "parent-signals-not-installed",
             ("launch_contract", "launcher_safety", "parent_signal_handling"),
             "not_installed",
+        ),
+        (
+            "parent-signals-restored-before-finalization",
+            ("launch_contract", "launcher_safety", "parent_signal_handling"),
+            "restored_after_wait",
         ),
         (
             "wait-error-without-reap",
