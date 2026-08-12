@@ -18,6 +18,7 @@ from scripts.ck07r1_shared_successor_overlay import (
     overlay_changed_path_allowance,
     sha256_path,
     verify_bound_authority_bytes,
+    verify_exact_committed_delta,
     verify_exact_worktree_delta,
     verify_launcher_safety_contract,
     verify_shared_successor_overlay,
@@ -119,6 +120,54 @@ def test_overlay_schema_rejects_status_token_launch_scope_and_safety_weakening()
         ),
         lambda value: value["launcher_safety"].__setitem__("receipt_binding", "optional"),
         lambda value: value["launcher_safety"].__setitem__(
+            "receipt_completion_ordering", "durable_completed_before_validation"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "receipt_failure_state", "completed"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "child_pre_release_failure", "exception_returns_to_parent_path"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "child_wait_signal_handling", "signals_actionable_while_waiting"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "parent_cleanup_pid_guard", "pid_zero_allowed"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "atomic_ledger_update", "fixed_temp_without_cleanup"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "atomic_failure_state", "retry_or_temp_residue_allowed"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "parent_signal_handling", "not_installed"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "parent_signal_handling", "restored_after_wait"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "wait_interruption_cleanup", "persist_without_reap"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "signal_cleanup_mask", "signals_remain_actionable"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "terminal_fallback_signal_mask", "signals_remain_actionable"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "evidence_completion_ordering", "nullable_hashes_allowed"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "evidence_failure_state", "launched_consumed"
+        ),
+        lambda value: value["launcher_safety"]["interpreter_identity"].__setitem__(
+            "executable", "resolved_equivalent_python_allowed"
+        ),
+        lambda value: value["launcher_safety"]["interpreter_identity"].__setitem__(
+            "sys_prefix", "optional"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
             "post_token_or_release_failure_state", "prelaunch_failed"
         ),
         lambda value: value["launcher_safety"].__setitem__("final_reap_timeout_seconds", 0),
@@ -183,6 +232,36 @@ def test_overlay_requires_exact_all_or_none_git_delta() -> None:
         )
 
 
+def test_overlay_requires_exact_committed_authority_delta() -> None:
+    authority = load_overlay()
+    expected = set(authority["scope"]["authority_write_scope"])
+
+    verify_exact_committed_delta(
+        authority,
+        observed=expected,
+        base_is_ancestor=True,
+    )
+    with pytest.raises(SharedSuccessorOverlayError, match="not an ancestor"):
+        verify_exact_committed_delta(
+            authority,
+            observed=expected,
+            base_is_ancestor=False,
+        )
+    with pytest.raises(SharedSuccessorOverlayError, match="missing="):
+        verify_exact_committed_delta(
+            authority,
+            observed=expected - {next(iter(expected))},
+            base_is_ancestor=True,
+        )
+    with pytest.raises(SharedSuccessorOverlayError, match="extra="):
+        verify_exact_committed_delta(
+            authority,
+            observed=expected
+            | {"src/codex_usage_tracker/agent_kernel/publication/writer.py"},
+            base_is_ancestor=True,
+        )
+
+
 def test_overlay_scope_and_launcher_contract_are_exact() -> None:
     authority = load_overlay()
     predecessor = overlay_changed_path_allowance(authority, "authority_main")
@@ -196,5 +275,12 @@ def test_overlay_scope_and_launcher_contract_are_exact() -> None:
 
     weakened = deepcopy(authority)
     weakened["launcher_safety"]["termination_sequence"] = ["SIGTERM"]
+    with pytest.raises(SharedSuccessorOverlayError, match="safety"):
+        verify_launcher_safety_contract(weakened)
+
+    weakened = deepcopy(authority)
+    weakened["launcher_safety"]["interpreter_identity"][
+        "symlink_or_resolved_equivalence"
+    ] = "accepted"
     with pytest.raises(SharedSuccessorOverlayError, match="safety"):
         verify_launcher_safety_contract(weakened)

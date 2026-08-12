@@ -213,6 +213,59 @@ def verify_exact_worktree_delta(
         )
 
 
+def verify_exact_committed_delta(
+    authority: Mapping[str, Any],
+    root: Path = ROOT,
+    *,
+    observed: set[str] | None = None,
+    base_is_ancestor: bool | None = None,
+) -> None:
+    """Reject any committed path outside the exact versioned authority scope."""
+
+    base = authority.get("authority_base_sha")
+    scope = authority.get("scope")
+    if not isinstance(base, str) or len(base) != 40:
+        raise SharedSuccessorOverlayError("authority base SHA is malformed")
+    if not isinstance(scope, Mapping):
+        raise SharedSuccessorOverlayError("overlay scope missing")
+    authority_paths = scope.get("authority_write_scope")
+    if not isinstance(authority_paths, list) or not all(
+        isinstance(path, str) for path in authority_paths
+    ):
+        raise SharedSuccessorOverlayError("authority write scope malformed")
+
+    if base_is_ancestor is None:
+        try:
+            result = subprocess.run(
+                ("git", "merge-base", "--is-ancestor", base, "HEAD"),
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as exc:
+            raise SharedSuccessorOverlayError(
+                "cannot verify authority base ancestry"
+            ) from exc
+        base_is_ancestor = result.returncode == 0
+    if not base_is_ancestor:
+        raise SharedSuccessorOverlayError("authority base is not an ancestor of HEAD")
+
+    actual = (
+        _git_paths(root, "diff", "--name-only", "--no-renames", f"{base}...HEAD")
+        if observed is None
+        else set(observed)
+    )
+    expected = set(authority_paths)
+    if actual != expected:
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        raise SharedSuccessorOverlayError(
+            f"exact committed authority delta mismatch; missing={missing!r}; "
+            f"extra={extra!r}"
+        )
+
+
 def verify_launcher_safety_contract(authority: Mapping[str, Any]) -> None:
     """Pin the corrected candidate's non-consuming launcher semantics."""
 
@@ -223,6 +276,62 @@ def verify_launcher_safety_contract(authority: Mapping[str, Any]) -> None:
         "receipt_binding": (
             "must_equal_exact_overlay_verification_result_and_three_artifact_cohort"
         ),
+        "receipt_completion_ordering": (
+            "construct_exact_overlay_bound_receipt_then_validate_then_first_durable_"
+            "completed_finalization"
+        ),
+        "receipt_failure_state": (
+            "construction_validation_or_finalization_failure_is_failed_after_launch_"
+            "never_completed"
+        ),
+        "child_pre_release_failure": (
+            "every_pre_release_child_failure_routes_to_os._exit_71"
+        ),
+        "child_wait_signal_handling": (
+            "SIGINT_SIGTERM_ignored_while_waiting_for_parent_release"
+        ),
+        "parent_cleanup_pid_guard": (
+            "reject_pid_less_than_or_equal_to_zero_before_kill_wait_or_reap"
+        ),
+        "atomic_ledger_update": (
+            "unique_same_directory_mkstemp_close_and_unlink_on_every_failed_or_"
+            "interrupted_write_fsync_replace_or_post_replace_path"
+        ),
+        "atomic_failure_state": (
+            "durable_failed_after_launch_token_consumed_no_retry_no_temp_residue"
+        ),
+        "parent_signal_handling": (
+            "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_"
+            "held_through_bounded_reap_evidence_receipt_and_terminal_ledger_"
+            "persistence_then_restored"
+        ),
+        "wait_interruption_cleanup": (
+            "every_wait_exception_or_parent_signal_requires_bounded_SIGTERM_then_"
+            "SIGKILL_then_reap_before_terminal_failure"
+        ),
+        "signal_cleanup_mask": (
+            "SIGINT_SIGTERM_ignored_during_bounded_child_cleanup"
+        ),
+        "terminal_fallback_signal_mask": (
+            "SIGINT_SIGTERM_ignored_during_every_terminal_fallback_persistence_"
+            "then_prior_temporary_handlers_restored"
+        ),
+        "evidence_completion_ordering": (
+            "required_non_null_stdout_stderr_output_read_hash_parse_validate_before_"
+            "first_durable_completed_finalization"
+        ),
+        "evidence_failure_state": (
+            "missing_read_hash_parse_validation_or_finalization_failure_is_failed_"
+            "after_launch_never_completed"
+        ),
+        "interpreter_identity": {
+            "executable": "lexical_repository_worktree_.venv/bin/python_required",
+            "sys_prefix": "lexical_repository_worktree_.venv_required",
+            "base_interpreter": "rejected",
+            "symlink_or_resolved_equivalence": "rejected",
+            "wrong_worktree_venv": "rejected",
+            "prefix_mismatch": "rejected",
+        },
         "post_token_or_release_failure_state": "failed_after_launch",
         "aggregate_timeout_seconds": 720,
         "termination_sequence": ["SIGTERM", "wait_up_to_5_seconds", "SIGKILL"],
@@ -243,6 +352,7 @@ def verify_shared_successor_overlay(
     authority = load_overlay(root)
     verify_bound_authority_bytes(authority, root)
     verify_launcher_safety_contract(authority)
+    verify_exact_committed_delta(authority, root)
     state = classify_observed_state(
         authority,
         observed_candidate_artifacts(authority, root),

@@ -112,8 +112,8 @@ keep CK-07R1 `blocked_hold`
 The accepted source history retains R3A preparation `6689d61f…` as a
 historical predecessor and R1B/current exact-main preparation `7d1831ff…` as
 the live predecessor. The sole CK-07 worker-prequalification successor is the
-atomic `66c015de…` preparation, `4b1c62b2…` benchmark, and `75d03f53…`
-lifecycle-test cohort derived from exact main `cf44f4fd`. Mixed or incomplete
+atomic `66c015de…` preparation, `f108dbb4…` benchmark, and `4c514889…`
+lifecycle-test cohort derived from exact main `6c08ecd9`. Mixed or incomplete
 cohorts, prior candidate `e204e0da…`, and historical candidate `d192c858…`
 fail closed. PR #394 remains a stale failed
 read-only witness; it is not updated, rerun, or merged. The old argv-guard attempt remains the historical
@@ -133,6 +133,26 @@ authority task does not resume the worker, consume the run token, authorize
 launch/output, or advance another successor. The one-run gate remains unspent
 and unavailable. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
+
+The V11 candidate must construct and validate the exact overlay/cohort-bound
+receipt and non-null stdout/stderr/output evidence before its first durable
+`completed` finalization. Evidence read/hash/parse/validation/finalization
+failures are terminal `failed_after_launch`. Temporary parent SIGINT/SIGTERM
+handlers route every wait interruption/error through bounded TERM/KILL/reap
+before terminal persistence and remain installed through evidence, receipt,
+and terminal ledger finalization; originals restore only after the terminal
+state attempt. Every terminal fallback persistence call masks SIGINT/SIGTERM
+with the existing ignore guard and restores the prior temporary handlers
+afterward; the outer final restoration of original handlers remains last. The
+fork child ignores SIGINT/SIGTERM while
+waiting for parent release and maps every pre-release failure to
+`os._exit(71)`; parent cleanup rejects nonpositive PIDs. Unique same-directory
+`mkstemp` ledger updates close and unlink on failed or interrupted
+write/fsync/replace/post-replace paths and retain durable consumed/no-retry
+`failed_after_launch` evidence without temporary residue. Interpreter identity
+is the lexical repository-worktree `.venv/bin/python` plus the matching lexical venv
+`sys.prefix`; base interpreters, symlink/resolved equivalence, wrong-worktree
+venvs, and prefix mismatch are rejected.
 
 The finite source/runtime state machine is currently `authority_main`: the live
 predecessor may remain on authority main, while only the exact selected

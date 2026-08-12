@@ -31,9 +31,9 @@ historical; and the linked finite source/runtime authorities remain
 `blocked_hold` with the one-run token unspent/unavailable. Accepted R3A
 preparation `6689d61f…` remains a historical predecessor and accepted
 R1B/current exact-main preparation `7d1831ff…` is the live predecessor. The
-existing worker's fresh exact-main `cf44f4fd` reapplication derived the sole
-candidate cohort: preparation `66c015de…`, benchmark `4b1c62b2…`, and lifecycle
-test `75d03f53…`. Historical `d192c858…`, mixed or incomplete cohorts, and
+existing worker's fresh exact-main `6c08ecd9` reapplication derived the sole
+candidate cohort: preparation `66c015de…`, benchmark `f108dbb4…`, and lifecycle
+test `4c514889…`. Historical `d192c858…`, mixed or incomplete cohorts, and
 every other digest fail closed. PR #394 head
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` is a stale failed
 read-only witness and is not refreshed, rerun, or merged.
@@ -41,7 +41,7 @@ read-only witness and is not refreshed, rerun, or merged.
 **Owned files/interfaces:** Lifecycle preparation implementation, focused
 publication tests, profile/benchmark, and linked CK-07 evidence amendment;
 the current authority binds predecessor preparation `7d1831ff…` to the atomic
-`66c015de…` / `4b1c62b2…` / `75d03f53…` successor cohort, linked evidence
+`66c015de…` / `f108dbb4…` / `4c514889…` successor cohort, linked evidence
 `36eb76ca…`, and the 720-second wrapper timeout without executing the worker.
 The successor is permitted-not-accepted and launch remains unauthorized.
 The versioned [shared successor overlay](../../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
@@ -90,6 +90,27 @@ worker gates pass; this is not a retry, restart, or replacement of a launched
 process. Receipt
 absence before dispatch is not a blocker; receipt absence or invalidity at
 successor acceptance remains fail-closed.
+
+The V11 candidate must construct and validate the fully overlay/cohort-bound
+receipt and non-null stdout/stderr/output evidence before its first durable
+`completed` finalization. Evidence read/hash/parse/validation/finalization
+failure is terminal `failed_after_launch`, never false `completed`. Temporary
+parent SIGINT/SIGTERM handlers route every wait interruption/error through
+bounded TERM/KILL/reap before terminal persistence and remain installed
+through evidence, receipt, and terminal ledger finalization; originals restore
+only after the terminal-state attempt. Every terminal fallback persistence
+call masks SIGINT/SIGTERM with the existing ignore guard and restores the prior
+temporary handlers afterward; the outer final restoration of original
+handlers remains last. The launch contract
+requires the fork child to ignore SIGINT/SIGTERM while waiting for parent release and route
+every pre-release failure to `os._exit(71)`; parent cleanup rejects nonpositive
+PIDs. Unique same-directory `mkstemp` ledger updates close and unlink on every
+failed or interrupted write/fsync/replace/post-replace path and retain durable
+consumed/no-retry `failed_after_launch` evidence without temporary residue.
+Interpreter identity requires the lexical repository-worktree
+`.venv/bin/python` plus matching lexical venv
+`sys.prefix`; base interpreters, symlink/resolved equivalence, wrong-worktree
+venvs, and prefix mismatch are rejected before side effects.
 
 **Failure/rollback:** Retain the profile and create one narrow follow-up for a
 new dominant blocker; never weaken the gate.

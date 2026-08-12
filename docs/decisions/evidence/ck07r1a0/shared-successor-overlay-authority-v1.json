@@ -2,7 +2,7 @@
   "schema": "codex-usage-tracker.ck07r1-shared-successor-overlay.v1",
   "authority_version": 1,
   "owner": "CK-07R1-SHARED-OVERLAY",
-  "authority_base_sha": "cf44f4fdd3f54ad53263b5e744203be468fbe5ca",
+  "authority_base_sha": "6c08ecd92a2c5166c1585be426e1ed437309a910",
   "status": "permitted_not_accepted",
   "decision": "authorize_exact_ck07_worker_prequalification_overlay_only",
   "immutable_authorities": [
@@ -30,18 +30,18 @@
   ],
   "ck07_authorities": [
     {
-      "id": "lifecycle-source-digest-v7",
+      "id": "lifecycle-source-digest-v12",
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
-      "sha256": "6156780a7e8663859658bb5309f13eb6bf5283704784d8270edf0512c167d70b",
+      "sha256": "7cc998fb29cad3a7b87e95026df5fb2195684c064628885cab7cc0a781d0bb74",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
-      "schema_sha256": "4026a4e971c1b6b177b467440a36931bc6a15a0b376918bdc4169b732a0d489c"
+      "schema_sha256": "6bf00ce49082be581783c33ce7247a29eb9b63515d6a5af209dccd82d28d685b"
     },
     {
-      "id": "lifecycle-run-invocation-v6",
+      "id": "lifecycle-run-invocation-v11",
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
-      "sha256": "6b1a2753e935da9a9c0121e4f1691957b06b388c1bc55631920725ae6d9089be",
+      "sha256": "437b05c7dfa23ff8efb3038c19e6a0f2524ac45e2fa25f910af40023aad7b8cd",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
-      "schema_sha256": "e3f24adc98078524523dcb404b9cf9d934fe6c68637abb8a5c40e2eb97ea7e74"
+      "schema_sha256": "ba0d47358aba2f1d66c5b699e2ecd89b2378d082b7bbbfb777fc806329c7e7d4"
     }
   ],
   "states": {
@@ -75,12 +75,12 @@
         },
         {
           "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-          "sha256": "4b1c62b2d56bf808b66f47c71b1bb1fa3595e2d590d0fa0192b5f7be3b2b4dde",
+          "sha256": "f108dbb45d7586a15eb370c94fc124268a249f2f6f1ee97e7b8b28a3874b737c",
           "presence": "required"
         },
         {
           "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-          "sha256": "75d03f5346ffe2d02ffedc5df007ce45bef5533b324202ccf41b535de8b33cd2",
+          "sha256": "4c51488988397e0ccaf40266a4f68bb1d6d342e4be1db36dd1cf36ab63aa335a",
           "presence": "required"
         }
       ],
@@ -110,6 +110,27 @@
   "launcher_safety": {
     "overlay_and_cohort_verification": "must_complete_before_ledger_fork_child_release_or_token_consumption",
     "receipt_binding": "must_equal_exact_overlay_verification_result_and_three_artifact_cohort",
+    "receipt_completion_ordering": "construct_exact_overlay_bound_receipt_then_validate_then_first_durable_completed_finalization",
+    "receipt_failure_state": "construction_validation_or_finalization_failure_is_failed_after_launch_never_completed",
+    "child_pre_release_failure": "every_pre_release_child_failure_routes_to_os._exit_71",
+    "child_wait_signal_handling": "SIGINT_SIGTERM_ignored_while_waiting_for_parent_release",
+    "parent_cleanup_pid_guard": "reject_pid_less_than_or_equal_to_zero_before_kill_wait_or_reap",
+    "atomic_ledger_update": "unique_same_directory_mkstemp_close_and_unlink_on_every_failed_or_interrupted_write_fsync_replace_or_post_replace_path",
+    "atomic_failure_state": "durable_failed_after_launch_token_consumed_no_retry_no_temp_residue",
+    "parent_signal_handling": "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_held_through_bounded_reap_evidence_receipt_and_terminal_ledger_persistence_then_restored",
+    "wait_interruption_cleanup": "every_wait_exception_or_parent_signal_requires_bounded_SIGTERM_then_SIGKILL_then_reap_before_terminal_failure",
+    "signal_cleanup_mask": "SIGINT_SIGTERM_ignored_during_bounded_child_cleanup",
+    "terminal_fallback_signal_mask": "SIGINT_SIGTERM_ignored_during_every_terminal_fallback_persistence_then_prior_temporary_handlers_restored",
+    "evidence_completion_ordering": "required_non_null_stdout_stderr_output_read_hash_parse_validate_before_first_durable_completed_finalization",
+    "evidence_failure_state": "missing_read_hash_parse_validation_or_finalization_failure_is_failed_after_launch_never_completed",
+    "interpreter_identity": {
+      "executable": "lexical_repository_worktree_.venv/bin/python_required",
+      "sys_prefix": "lexical_repository_worktree_.venv_required",
+      "base_interpreter": "rejected",
+      "symlink_or_resolved_equivalence": "rejected",
+      "wrong_worktree_venv": "rejected",
+      "prefix_mismatch": "rejected"
+    },
     "post_token_or_release_failure_state": "failed_after_launch",
     "aggregate_timeout_seconds": 720,
     "termination_sequence": [
@@ -157,14 +178,9 @@
       "docs/roadmap/TASK_PACKETS.md",
       "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
       "docs/roadmap/tasks/ck-07r1a0-freeze-lifecycle-path-authority.md",
-      "scripts/check_kernel_scope.py",
       "scripts/ck07r1_shared_successor_overlay.py",
-      "scripts/qualify_ck08r1_answer_truth.py",
       "tests/kernel/test_ck07r1_shared_successor_overlay.py",
-      "tests/kernel/test_ck08r1b_answer_semantics_join_authority.py",
-      "tests/kernel/test_ckqg1_maintainability_baseline_authority.py",
       "tests/kernel/test_documentation_authority.py",
-      "tests/kernel/test_kernel_scope.py",
       "tests/kernel/test_lifecycle_run_invocation_authority.py"
     ],
     "combined_preflight_candidate_scope": [
@@ -192,7 +208,7 @@
     "present any extra dirty or CK-QG1-allowed path in combined preflight",
     "claim post_single_run or final_accepted",
     "claim runtime acceptance, launch authorization, or token consumption",
-    "weaken launcher overlay, receipt, failure classification, or timeout binding",
+    "weaken launcher overlay, receipt or evidence construction, validation, completion ordering, signal handling, wait cleanup, failure classification, interpreter identity, or timeout binding",
     "fabricate a receipt or any output path",
     "weaken the exact authority or preflight scope"
   ]

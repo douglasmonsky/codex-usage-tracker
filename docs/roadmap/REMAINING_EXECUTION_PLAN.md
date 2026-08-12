@@ -95,8 +95,8 @@ run-invocation authority, and argv-correction authority are merged through
 updated, rerun, or merged. The planner-valid lifecycle receipt is an
 acceptance output of the existing CK-07R1 worker. The coordinator recorded the
 preserved incident disposition and the worker derived the exact candidate
-cohort from exact main `cf44f4fd`: preparation `66c015de…`, benchmark
-`4b1c62b2…`, and lifecycle test `75d03f53…`. That cohort remains
+cohort from exact main `6c08ecd9`: preparation `66c015de…`, benchmark
+`f108dbb4…`, and lifecycle test `4c514889…`. That cohort remains
 permitted-not-accepted and cannot enter `worker_prequalification` until this
 authority transition merges and exact-main verifies.
 The versioned [shared successor overlay](../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
@@ -122,7 +122,7 @@ Conditional Ready pending merge and exact-main verification of the exact
 successor authority. Until then its current authority state is
 `authority_main` at preparation `7d1831ff…` and no worker may resume. After
 that handoff only the existing stopped worker may resume with the complete
-`66c015de…` / `4b1c62b2…` / `75d03f53…` cohort. Historical accepted R3A
+`66c015de…` / `f108dbb4…` / `4c514889…` cohort. Historical accepted R3A
 `6689d61f…`, revoked `d192c858…`, mixed cohorts, and every other digest are
 predecessor-only or fail-closed and cannot enter `worker_prequalification`.
 The worker may enter `worker_prequalification` only with the exact selected
@@ -135,6 +135,27 @@ historical provenance and does not authorize action. This source-digest
 authority supersedes earlier CK-07R1 wording that says to resume, refresh, or
 rerun PR #394; those retained references are historical provenance and do not
 authorize action.
+
+The exact V11 launcher contract constructs and validates the fully
+overlay/cohort-bound receipt and non-null stdout/stderr/output evidence before
+any first durable `completed` finalization. Evidence
+read/hash/parse/validation/finalization failure is terminal
+`failed_after_launch`, never false `completed`. Temporary parent SIGINT/SIGTERM
+handlers route every wait interruption/error through bounded TERM/KILL/reap
+before terminal persistence and remain installed through evidence, receipt,
+and terminal ledger finalization; originals restore only after the terminal
+state attempt. Every terminal fallback persistence call masks SIGINT/SIGTERM
+with the existing ignore guard and restores the prior temporary handlers
+afterward; the outer final restoration of original handlers remains last. The
+fork child ignores SIGINT/SIGTERM while
+waiting for parent release and maps every pre-release failure to
+`os._exit(71)`; parent cleanup rejects nonpositive PIDs. Unique same-directory
+`mkstemp` ledger updates close and unlink on failed or interrupted
+write/fsync/replace/post-replace paths and persist durable consumed/no-retry
+`failed_after_launch` evidence without temporary residue. It also requires the
+lexical repository-worktree `.venv/bin/python` and matching lexical venv `sys.prefix`; base interpreters,
+symlink/resolved equivalence, wrong-worktree venvs, and prefix mismatch fail
+closed.
 
 ## Delegation law
 
@@ -231,7 +252,7 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "completed": ["CK-08R0", "CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R1", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
   "ready": [],
   "conditional_ready": [{
-    "condition": "exact 66c015de/4b1c62b2/75d03f53 successor authority merges and exact-main verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 with the atomic cohort; no replacement, launch, token consumption, or downstream task",
+    "condition": "exact 66c015de/f108dbb4/4c514889 successor authority merges and exact-main verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 with the atomic cohort; no replacement, launch, token consumption, or downstream task",
     "tasks": ["CK-07R1"]
   }],
   "blocked": [],
