@@ -30,18 +30,18 @@
   ],
   "ck07_authorities": [
     {
-      "id": "lifecycle-source-digest-v9",
+      "id": "lifecycle-source-digest-v10",
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
-      "sha256": "18e497a76676aa8997bc7d16da9da9f4f13fa0a97e02097f8e9dd8b67cdaabb3",
+      "sha256": "db92ebf1a24fcbfbc6efb6acadedea24155d37c1dbae8bf67cba1ea530ffd9ca",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
-      "schema_sha256": "00968ffa7f146b8e9a4ce06517b1327d420f5586a61cc967f9abd0921b8c344e"
+      "schema_sha256": "d7724b92fac1e7823bfcd6c5c5ce068cee94d14ac97435444ef3614fa6cd4edc"
     },
     {
-      "id": "lifecycle-run-invocation-v8",
+      "id": "lifecycle-run-invocation-v9",
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
-      "sha256": "eaccc1d8d55d004a4a051351c2f3e69b5e5798cfbc273d4ab6c7982015186a3d",
+      "sha256": "7500c965698e6c8784b74c9ee01dfe9db7dbbbef8e1ab5a9bfd2a1b8f7211d89",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
-      "schema_sha256": "f0de24878de81038efba2285a454a9b90a67b35f2383e8515743e66e306cdaaa"
+      "schema_sha256": "70542bcbc8bfd484b0297c617cde65dbcea1d41d914d12bdb54aa9cefad833d2"
     }
   ],
   "states": {
@@ -75,12 +75,12 @@
         },
         {
           "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-          "sha256": "2125d127fc2f7978f12b9655ac678fbd05f5db8b4fec2c478ca693e5779f1b97",
+          "sha256": "c922b59fbb79df6f8bd1aee35abf03b057859627a60f7fa7028d2d8f90f9bf32",
           "presence": "required"
         },
         {
           "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-          "sha256": "a4163ffbc121d101a40c6e304d9593e10ff0857beaf542df8f82236bb1f861c6",
+          "sha256": "5e9cb0144887cb34bd123ed03a2e83724e70100c71b7512e57dc2a286e34349e",
           "presence": "required"
         }
       ],
@@ -112,6 +112,11 @@
     "receipt_binding": "must_equal_exact_overlay_verification_result_and_three_artifact_cohort",
     "receipt_completion_ordering": "construct_exact_overlay_bound_receipt_then_validate_then_first_durable_completed_finalization",
     "receipt_failure_state": "construction_validation_or_finalization_failure_is_failed_after_launch_never_completed",
+    "child_pre_release_failure": "every_pre_release_child_failure_routes_to_os._exit_71",
+    "child_wait_signal_handling": "SIGINT_SIGTERM_ignored_while_waiting_for_parent_release",
+    "parent_cleanup_pid_guard": "reject_pid_less_than_or_equal_to_zero_before_kill_wait_or_reap",
+    "atomic_ledger_update": "unique_same_directory_mkstemp_close_and_unlink_on_every_failed_or_interrupted_write_fsync_replace_or_post_replace_path",
+    "atomic_failure_state": "durable_failed_after_launch_token_consumed_no_retry_no_temp_residue",
     "parent_signal_handling": "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_and_restored_after_wait",
     "wait_interruption_cleanup": "every_wait_exception_or_parent_signal_requires_bounded_SIGTERM_then_SIGKILL_then_reap_before_terminal_failure",
     "signal_cleanup_mask": "SIGINT_SIGTERM_ignored_during_bounded_child_cleanup",

@@ -174,8 +174,8 @@ def test_argv_correction_preserves_first_failure_and_one_run_gate() -> None:
     assert correction["old_guard"] == "sys.argv[1:] == LAUNCH_COMMAND[1:]"
     assert correction["corrected_guard"] == "(sys.argv[0], *sys.argv[1:]) == LAUNCH_COMMAND[1:]"
     assert correction["corrected_candidate_artifacts"] == {
-        "benchmark_sha256": "2125d127fc2f7978f12b9655ac678fbd05f5db8b4fec2c478ca693e5779f1b97",
-        "lifecycle_test_sha256": "a4163ffbc121d101a40c6e304d9593e10ff0857beaf542df8f82236bb1f861c6",
+        "benchmark_sha256": "c922b59fbb79df6f8bd1aee35abf03b057859627a60f7fa7028d2d8f90f9bf32",
+        "lifecycle_test_sha256": "5e9cb0144887cb34bd123ed03a2e83724e70100c71b7512e57dc2a286e34349e",
     }
     assert correction["old_candidate_artifacts"]["reuse"] == "forbidden"
     assert correction["non_launching_subprocess_test"]["required"] is True
@@ -204,8 +204,8 @@ def test_argv_correction_preserves_first_failure_and_one_run_gate() -> None:
 def test_selected_candidate_is_exact_ck07_cohort_and_runtime_stays_blocked() -> None:
     authority = _authority()
     candidate = authority["selected_candidate"]
-    assert authority["schema"] == "codex-usage-tracker.lifecycle-run-invocation-authority.v8"
-    assert authority["authority_version"] == 8
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-run-invocation-authority.v9"
+    assert authority["authority_version"] == 9
     assert authority["authority_base_sha"] == "6c08ecd92a2c5166c1585be426e1ed437309a910"
     assert authority["status"] == "blocked_no_run"
     assert authority["shared_preparation_binding"] == {
@@ -236,7 +236,7 @@ def test_selected_candidate_is_exact_ck07_cohort_and_runtime_stays_blocked() -> 
         "role": "source",
     }
     assert candidate["binding"] == (
-        "only the byte-exact 66c015de/2125d127/a4163ffb cohort may enter "
+        "only the byte-exact 66c015de/c922b59f/5e9cb014 cohort may enter "
         "worker_prequalification after this authority merges and exact-main verifies"
     )
     assert authority["run_token"]["status"] == "unspent_unavailable"
@@ -504,6 +504,22 @@ def test_corrected_launcher_safety_contract_is_exact() -> None:
             "construction_validation_or_finalization_failure_is_failed_after_launch_"
             "never_completed"
         ),
+        "child_pre_release_failure": (
+            "every_pre_release_child_failure_routes_to_os._exit_71"
+        ),
+        "child_wait_signal_handling": (
+            "SIGINT_SIGTERM_ignored_while_waiting_for_parent_release"
+        ),
+        "parent_cleanup_pid_guard": (
+            "reject_pid_less_than_or_equal_to_zero_before_kill_wait_or_reap"
+        ),
+        "atomic_ledger_update": (
+            "unique_same_directory_mkstemp_close_and_unlink_on_every_failed_or_"
+            "interrupted_write_fsync_replace_or_post_replace_path"
+        ),
+        "atomic_failure_state": (
+            "durable_failed_after_launch_token_consumed_no_retry_no_temp_residue"
+        ),
         "parent_signal_handling": (
             "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_"
             "and_restored_after_wait"
@@ -571,7 +587,7 @@ def test_process_exclusion_launch_token_and_evidence_capture_are_required() -> N
         "refund": False,
         "prior_identities_reused": False,
         "concurrent_processes_allowed": False,
-        "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/2125d127/a4163ffb candidate cohort, and all gates pass",
+        "eligibility": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/c922b59f/5e9cb014 candidate cohort, and all gates pass",
         "first_successful_launch": "exactly one first successful child launch may consume the still-unspent token; this is not a retry, restart, or replacement of a launched process",
         "old_candidate_reuse": "forbidden",
     }
@@ -656,6 +672,31 @@ def test_no_retry_semantics_and_candidate_blocker_are_explicit() -> None:
             "receipt-construction-false-completed",
             ("launch_contract", "launcher_safety", "receipt_failure_state"),
             "completed",
+        ),
+        (
+            "child-pre-release-return",
+            ("launch_contract", "launcher_safety", "child_pre_release_failure"),
+            "exception_returns_to_parent_path",
+        ),
+        (
+            "child-wait-signals-actionable",
+            ("launch_contract", "launcher_safety", "child_wait_signal_handling"),
+            "signals_actionable_while_waiting",
+        ),
+        (
+            "nonpositive-child-pid",
+            ("launch_contract", "launcher_safety", "parent_cleanup_pid_guard"),
+            "pid_zero_allowed",
+        ),
+        (
+            "fixed-atomic-temp",
+            ("launch_contract", "launcher_safety", "atomic_ledger_update"),
+            "fixed_temp_without_cleanup",
+        ),
+        (
+            "atomic-failure-retry",
+            ("launch_contract", "launcher_safety", "atomic_failure_state"),
+            "retry_or_temp_residue_allowed",
         ),
         (
             "parent-signals-not-installed",

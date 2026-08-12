@@ -231,6 +231,22 @@ def verify_launcher_safety_contract(authority: Mapping[str, Any]) -> None:
             "construction_validation_or_finalization_failure_is_failed_after_launch_"
             "never_completed"
         ),
+        "child_pre_release_failure": (
+            "every_pre_release_child_failure_routes_to_os._exit_71"
+        ),
+        "child_wait_signal_handling": (
+            "SIGINT_SIGTERM_ignored_while_waiting_for_parent_release"
+        ),
+        "parent_cleanup_pid_guard": (
+            "reject_pid_less_than_or_equal_to_zero_before_kill_wait_or_reap"
+        ),
+        "atomic_ledger_update": (
+            "unique_same_directory_mkstemp_close_and_unlink_on_every_failed_or_"
+            "interrupted_write_fsync_replace_or_post_replace_path"
+        ),
+        "atomic_failure_state": (
+            "durable_failed_after_launch_token_consumed_no_retry_no_temp_residue"
+        ),
         "parent_signal_handling": (
             "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_"
             "and_restored_after_wait"

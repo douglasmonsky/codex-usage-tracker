@@ -43,7 +43,7 @@ while reconciling their consumers with only the complete exact successor. The re
 CK-07R1 implementation/profile/evidence diff is read-only evidence;
 accepted R3A preparation `6689d61f…` remains historical, current R1B
 preparation `7d1831ff…` is the live predecessor, and only the exact
-`66c015de…` preparation plus `2125d127…` benchmark and `a4163ffb…` lifecycle
+`66c015de…` preparation plus `c922b59f…` benchmark and `5e9cb014…` lifecycle
 test may enter worker prequalification. Historical `d192c858…`, mixed cohorts,
 and every other digest fail closed; prior R3A candidate `e204e0da…` remains
 superseded and forbidden. The selected cohort does not claim runtime acceptance.
@@ -51,7 +51,10 @@ Linked evidence `36eb76ca…` and canonical fixture identities remain unchanged.
 The linked run-invocation authority is
 `docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json`;
 it adds no runtime implementation, freezes the corrected argv guard,
-720-second wrapper timeout, four-path non-overwriting preflight, and keeps the
+720-second wrapper timeout, four-path non-overwriting preflight, pre-release
+child `os._exit(71)` isolation with ignored wait signals, positive-PID cleanup,
+and unique same-directory temporary-ledger cleanup with durable consumed/no-retry
+terminal evidence, and keeps the
 retained candidate runtime-unqualified.
 
 **Produces:** A frozen entry-path contract, finite source/runtime state machine,
@@ -89,7 +92,7 @@ predecessor digest is
 `7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb` and the
 permitted-not-accepted retained successor digest is
 `66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea`
-only with benchmark `2125d127…` and lifecycle test `a4163ffb…`; historical
+only with benchmark `c922b59f…` and lifecycle test `5e9cb014…`; historical
 `d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1` is
 revoked and direct use fails closed; generic or different digest drift fails
 closed; linked evidence is

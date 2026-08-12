@@ -112,7 +112,7 @@ keep CK-07R1 `blocked_hold`
 The accepted source history retains R3A preparation `6689d61f…` as a
 historical predecessor and R1B/current exact-main preparation `7d1831ff…` as
 the live predecessor. The sole CK-07 worker-prequalification successor is the
-atomic `66c015de…` preparation, `2125d127…` benchmark, and `a4163ffb…`
+atomic `66c015de…` preparation, `c922b59f…` benchmark, and `5e9cb014…`
 lifecycle-test cohort derived from exact main `6c08ecd9`. Mixed or incomplete
 cohorts, prior candidate `e204e0da…`, and historical candidate `d192c858…`
 fail closed. PR #394 remains a stale failed
@@ -134,13 +134,18 @@ launch/output, or advance another successor. The one-run gate remains unspent
 and unavailable. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
 
-The V10 candidate must construct and validate the exact overlay/cohort-bound
+The V11 candidate must construct and validate the exact overlay/cohort-bound
 receipt and non-null stdout/stderr/output evidence before its first durable
 `completed` finalization. Evidence read/hash/parse/validation/finalization
 failures are terminal `failed_after_launch`. Temporary parent SIGINT/SIGTERM
 handlers route every wait interruption/error through bounded TERM/KILL/reap
-before terminal persistence. Interpreter identity is the lexical
-repository-worktree `.venv/bin/python` plus the matching lexical venv
+before terminal persistence. The fork child ignores SIGINT/SIGTERM while
+waiting for parent release and maps every pre-release failure to
+`os._exit(71)`; parent cleanup rejects nonpositive PIDs. Unique same-directory
+`mkstemp` ledger updates close and unlink on failed or interrupted
+write/fsync/replace/post-replace paths and retain durable consumed/no-retry
+`failed_after_launch` evidence without temporary residue. Interpreter identity
+is the lexical repository-worktree `.venv/bin/python` plus the matching lexical venv
 `sys.prefix`; base interpreters, symlink/resolved equivalence, wrong-worktree
 venvs, and prefix mismatch are rejected.
 
