@@ -124,6 +124,21 @@ def test_overlay_schema_rejects_status_token_launch_scope_and_safety_weakening()
         lambda value: value["launcher_safety"].__setitem__(
             "receipt_failure_state", "completed"
         ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "parent_signal_handling", "not_installed"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "wait_interruption_cleanup", "persist_without_reap"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "signal_cleanup_mask", "signals_remain_actionable"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "evidence_completion_ordering", "nullable_hashes_allowed"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
+            "evidence_failure_state", "launched_consumed"
+        ),
         lambda value: value["launcher_safety"]["interpreter_identity"].__setitem__(
             "executable", "resolved_equivalent_python_allowed"
         ),

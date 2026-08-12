@@ -239,7 +239,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest["conditional_ready"] == [
         {
             "condition": (
-                "exact 66c015de/98aac35d/7914d993 successor authority merges and exact-main "
+                "exact 66c015de/2125d127/a4163ffb successor authority merges and exact-main "
                 "verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 "
                 "with the atomic cohort; no replacement, launch, token consumption, or downstream task"
             ),
@@ -1040,8 +1040,8 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     validator = Draft202012Validator(schema)
     validator.validate(authority)
 
-    assert authority["schema"] == "codex-usage-tracker.lifecycle-source-digest-authority.v8"
-    assert authority["authority_version"] == 8
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-source-digest-authority.v9"
+    assert authority["authority_version"] == 9
     assert authority["authority_base_sha"] == "6c08ecd92a2c5166c1585be426e1ed437309a910"
     assert authority["status"] == "blocked_hold"
     assert authority["predecessor"]["sha256"] == (
@@ -1065,12 +1065,12 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
             },
             {
                 "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-                "sha256": "98aac35d01c0e4ec6cd18b296807d1b67864db38353874d372efec3e470ec9bc",
+                "sha256": "2125d127fc2f7978f12b9655ac678fbd05f5db8b4fec2c478ca693e5779f1b97",
                 "role": "benchmark",
             },
             {
                 "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-                "sha256": "7914d993286249e449b46c4f5ba0f344aeab9dc0e9eee0f5d3aeb4e917cb730f",
+                "sha256": "a4163ffbc121d101a40c6e304d9593e10ff0857beaf542df8f82236bb1f861c6",
                 "role": "lifecycle_test",
             },
         ],

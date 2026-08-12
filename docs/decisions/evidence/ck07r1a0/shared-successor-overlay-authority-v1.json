@@ -30,18 +30,18 @@
   ],
   "ck07_authorities": [
     {
-      "id": "lifecycle-source-digest-v8",
+      "id": "lifecycle-source-digest-v9",
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
-      "sha256": "8c244b1afae072468ea8a91da12a9a2d1b65728d01da25e5924441b6f84d27e3",
+      "sha256": "18e497a76676aa8997bc7d16da9da9f4f13fa0a97e02097f8e9dd8b67cdaabb3",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
-      "schema_sha256": "4e4ebe429f624ce0b2e3236c97ea56c0231f5c9481b446906bd4eee494d55683"
+      "schema_sha256": "00968ffa7f146b8e9a4ce06517b1327d420f5586a61cc967f9abd0921b8c344e"
     },
     {
-      "id": "lifecycle-run-invocation-v7",
+      "id": "lifecycle-run-invocation-v8",
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
-      "sha256": "b850a063878c15234083c8e9e7fc1502d633691c391506b76a92b07a77ebbea1",
+      "sha256": "eaccc1d8d55d004a4a051351c2f3e69b5e5798cfbc273d4ab6c7982015186a3d",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
-      "schema_sha256": "c7d9d2518816c15bcf5e93fec241aeaa8d719d433fd7f91f0873ad7b1aa21c78"
+      "schema_sha256": "f0de24878de81038efba2285a454a9b90a67b35f2383e8515743e66e306cdaaa"
     }
   ],
   "states": {
@@ -75,12 +75,12 @@
         },
         {
           "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-          "sha256": "98aac35d01c0e4ec6cd18b296807d1b67864db38353874d372efec3e470ec9bc",
+          "sha256": "2125d127fc2f7978f12b9655ac678fbd05f5db8b4fec2c478ca693e5779f1b97",
           "presence": "required"
         },
         {
           "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-          "sha256": "7914d993286249e449b46c4f5ba0f344aeab9dc0e9eee0f5d3aeb4e917cb730f",
+          "sha256": "a4163ffbc121d101a40c6e304d9593e10ff0857beaf542df8f82236bb1f861c6",
           "presence": "required"
         }
       ],
@@ -112,6 +112,11 @@
     "receipt_binding": "must_equal_exact_overlay_verification_result_and_three_artifact_cohort",
     "receipt_completion_ordering": "construct_exact_overlay_bound_receipt_then_validate_then_first_durable_completed_finalization",
     "receipt_failure_state": "construction_validation_or_finalization_failure_is_failed_after_launch_never_completed",
+    "parent_signal_handling": "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_and_restored_after_wait",
+    "wait_interruption_cleanup": "every_wait_exception_or_parent_signal_requires_bounded_SIGTERM_then_SIGKILL_then_reap_before_terminal_failure",
+    "signal_cleanup_mask": "SIGINT_SIGTERM_ignored_during_bounded_child_cleanup",
+    "evidence_completion_ordering": "required_non_null_stdout_stderr_output_read_hash_parse_validate_before_first_durable_completed_finalization",
+    "evidence_failure_state": "missing_read_hash_parse_validation_or_finalization_failure_is_failed_after_launch_never_completed",
     "interpreter_identity": {
       "executable": "lexical_repository_worktree_.venv/bin/python_required",
       "sys_prefix": "lexical_repository_worktree_.venv_required",
@@ -197,7 +202,7 @@
     "present any extra dirty or CK-QG1-allowed path in combined preflight",
     "claim post_single_run or final_accepted",
     "claim runtime acceptance, launch authorization, or token consumption",
-    "weaken launcher overlay, receipt construction, validation, completion ordering, failure classification, interpreter identity, or timeout binding",
+    "weaken launcher overlay, receipt or evidence construction, validation, completion ordering, signal handling, wait cleanup, failure classification, interpreter identity, or timeout binding",
     "fabricate a receipt or any output path",
     "weaken the exact authority or preflight scope"
   ]

@@ -32,8 +32,8 @@ historical; and the linked finite source/runtime authorities remain
 preparation `6689d61f…` remains a historical predecessor and accepted
 R1B/current exact-main preparation `7d1831ff…` is the live predecessor. The
 existing worker's fresh exact-main `6c08ecd9` reapplication derived the sole
-candidate cohort: preparation `66c015de…`, benchmark `98aac35d…`, and lifecycle
-test `7914d993…`. Historical `d192c858…`, mixed or incomplete cohorts, and
+candidate cohort: preparation `66c015de…`, benchmark `2125d127…`, and lifecycle
+test `a4163ffb…`. Historical `d192c858…`, mixed or incomplete cohorts, and
 every other digest fail closed. PR #394 head
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` is a stale failed
 read-only witness and is not refreshed, rerun, or merged.
@@ -41,7 +41,7 @@ read-only witness and is not refreshed, rerun, or merged.
 **Owned files/interfaces:** Lifecycle preparation implementation, focused
 publication tests, profile/benchmark, and linked CK-07 evidence amendment;
 the current authority binds predecessor preparation `7d1831ff…` to the atomic
-`66c015de…` / `98aac35d…` / `7914d993…` successor cohort, linked evidence
+`66c015de…` / `2125d127…` / `a4163ffb…` successor cohort, linked evidence
 `36eb76ca…`, and the 720-second wrapper timeout without executing the worker.
 The successor is permitted-not-accepted and launch remains unauthorized.
 The versioned [shared successor overlay](../../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
@@ -91,13 +91,15 @@ process. Receipt
 absence before dispatch is not a blocker; receipt absence or invalidity at
 successor acceptance remains fail-closed.
 
-The V9 candidate must construct and validate the fully overlay/cohort-bound
-receipt before its first durable `completed` finalization. Construction,
-validation, or finalization failure is terminal `failed_after_launch`, never
-false `completed`. Launch identity requires the lexical repository-worktree
-`.venv/bin/python` plus matching lexical venv `sys.prefix`; base interpreters,
-symlink/resolved equivalence, wrong-worktree venvs, and prefix mismatch are
-rejected before side effects.
+The V10 candidate must construct and validate the fully overlay/cohort-bound
+receipt and non-null stdout/stderr/output evidence before its first durable
+`completed` finalization. Evidence read/hash/parse/validation/finalization
+failure is terminal `failed_after_launch`, never false `completed`. Temporary
+parent SIGINT/SIGTERM handlers route every wait interruption/error through
+bounded TERM/KILL/reap before terminal persistence. Launch identity requires the
+lexical repository-worktree `.venv/bin/python` plus matching lexical venv
+`sys.prefix`; base interpreters, symlink/resolved equivalence, wrong-worktree
+venvs, and prefix mismatch are rejected before side effects.
 
 **Failure/rollback:** Retain the profile and create one narrow follow-up for a
 new dominant blocker; never weaken the gate.

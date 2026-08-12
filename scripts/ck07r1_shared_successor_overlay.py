@@ -231,6 +231,25 @@ def verify_launcher_safety_contract(authority: Mapping[str, Any]) -> None:
             "construction_validation_or_finalization_failure_is_failed_after_launch_"
             "never_completed"
         ),
+        "parent_signal_handling": (
+            "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_"
+            "and_restored_after_wait"
+        ),
+        "wait_interruption_cleanup": (
+            "every_wait_exception_or_parent_signal_requires_bounded_SIGTERM_then_"
+            "SIGKILL_then_reap_before_terminal_failure"
+        ),
+        "signal_cleanup_mask": (
+            "SIGINT_SIGTERM_ignored_during_bounded_child_cleanup"
+        ),
+        "evidence_completion_ordering": (
+            "required_non_null_stdout_stderr_output_read_hash_parse_validate_before_"
+            "first_durable_completed_finalization"
+        ),
+        "evidence_failure_state": (
+            "missing_read_hash_parse_validation_or_finalization_failure_is_failed_"
+            "after_launch_never_completed"
+        ),
         "interpreter_identity": {
             "executable": "lexical_repository_worktree_.venv/bin/python_required",
             "sys_prefix": "lexical_repository_worktree_.venv_required",

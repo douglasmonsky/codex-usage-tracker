@@ -96,7 +96,7 @@ updated, rerun, or merged. The planner-valid lifecycle receipt is an
 acceptance output of the existing CK-07R1 worker. The coordinator recorded the
 preserved incident disposition and the worker derived the exact candidate
 cohort from exact main `6c08ecd9`: preparation `66c015de…`, benchmark
-`98aac35d…`, and lifecycle test `7914d993…`. That cohort remains
+`2125d127…`, and lifecycle test `a4163ffb…`. That cohort remains
 permitted-not-accepted and cannot enter `worker_prequalification` until this
 authority transition merges and exact-main verifies.
 The versioned [shared successor overlay](../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
@@ -122,7 +122,7 @@ Conditional Ready pending merge and exact-main verification of the exact
 successor authority. Until then its current authority state is
 `authority_main` at preparation `7d1831ff…` and no worker may resume. After
 that handoff only the existing stopped worker may resume with the complete
-`66c015de…` / `98aac35d…` / `7914d993…` cohort. Historical accepted R3A
+`66c015de…` / `2125d127…` / `a4163ffb…` cohort. Historical accepted R3A
 `6689d61f…`, revoked `d192c858…`, mixed cohorts, and every other digest are
 predecessor-only or fail-closed and cannot enter `worker_prequalification`.
 The worker may enter `worker_prequalification` only with the exact selected
@@ -136,13 +136,16 @@ authority supersedes earlier CK-07R1 wording that says to resume, refresh, or
 rerun PR #394; those retained references are historical provenance and do not
 authorize action.
 
-The exact V9 launcher contract constructs and validates the fully
-overlay/cohort-bound receipt before any first durable `completed` finalization.
-Receipt construction, validation, or finalization failure is terminal
-`failed_after_launch`, never false `completed`. It also requires the lexical
-repository-worktree `.venv/bin/python` and matching lexical venv `sys.prefix`;
-base interpreters, symlink/resolved equivalence, wrong-worktree venvs, and prefix
-mismatch fail closed.
+The exact V10 launcher contract constructs and validates the fully
+overlay/cohort-bound receipt and non-null stdout/stderr/output evidence before
+any first durable `completed` finalization. Evidence
+read/hash/parse/validation/finalization failure is terminal
+`failed_after_launch`, never false `completed`. Temporary parent SIGINT/SIGTERM
+handlers route every wait interruption/error through bounded TERM/KILL/reap
+before terminal persistence. It also requires the lexical repository-worktree
+`.venv/bin/python` and matching lexical venv `sys.prefix`; base interpreters,
+symlink/resolved equivalence, wrong-worktree venvs, and prefix mismatch fail
+closed.
 
 ## Delegation law
 
@@ -239,7 +242,7 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "completed": ["CK-08R0", "CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R1", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
   "ready": [],
   "conditional_ready": [{
-    "condition": "exact 66c015de/98aac35d/7914d993 successor authority merges and exact-main verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 with the atomic cohort; no replacement, launch, token consumption, or downstream task",
+    "condition": "exact 66c015de/2125d127/a4163ffb successor authority merges and exact-main verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 with the atomic cohort; no replacement, launch, token consumption, or downstream task",
     "tasks": ["CK-07R1"]
   }],
   "blocked": [],

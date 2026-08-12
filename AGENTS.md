@@ -42,19 +42,22 @@ QG1 PR #392 passed hosted CI, squash-merged, and was exact-main verified at
 the exact hosted Python 3.14 lifecycle-tail blocker; the linked CK-07R1A0
 authorities, including argv correction, are merged through `479cbdb`.
 Coordinator disposition and clean exact-main reapplication from `6c08ecd9`
-derived the exact `66c015de…` / `98aac35d…` / `7914d993…` candidate cohort.
+derived the exact `66c015de…` / `2125d127…` / `a4163ffb…` candidate cohort.
 The versioned
 [`shared-successor-overlay-authority-v1`](docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
 preserves accepted CK-08R1B, CK-08R1, and CK-QG1 bytes while admitting only
 that complete cohort as CK-07 `worker_prequalification`.
 The existing CK-07R1 worker remains stopped until that authority transition is
 merged and exact-main verified; no launch or token use is authorized. The
-candidate must construct and validate its exact overlay-bound receipt before the
-first durable `completed` finalization; construction, validation, or
-finalization failure is terminal `failed_after_launch`. Its interpreter must be
-the lexical repository-worktree `.venv/bin/python` with matching lexical venv
-`sys.prefix`; base interpreters, resolved/symlink equivalence, wrong-worktree
-venvs, and prefix mismatch fail closed. PR #394 remains stale failed read-only.
+candidate must construct and validate its exact overlay-bound receipt and
+non-null stdout/stderr/output evidence before the first durable `completed`
+finalization; any evidence read/hash/parse/validation/finalization failure is
+terminal `failed_after_launch`. Temporary parent SIGINT/SIGTERM handlers must
+route every wait interruption/error through bounded TERM/KILL/reap before
+terminal failure persistence. Its interpreter must be the lexical
+repository-worktree `.venv/bin/python` with matching lexical venv `sys.prefix`;
+base interpreters, resolved/symlink equivalence, wrong-worktree venvs, and prefix
+mismatch fail closed. PR #394 remains stale failed read-only.
 Retained R3 evidence proved the EvidenceService outer query
 physically unbounded; CK-08R3A owns that isolated fix and R3 awaits its
 accepted, merged, exact-main-verified result.
