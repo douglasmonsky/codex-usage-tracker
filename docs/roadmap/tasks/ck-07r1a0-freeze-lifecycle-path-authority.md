@@ -43,7 +43,7 @@ while reconciling their consumers with only the complete exact successor. The re
 CK-07R1 implementation/profile/evidence diff is read-only evidence;
 accepted R3A preparation `6689d61f…` remains historical, current R1B
 preparation `7d1831ff…` is the live predecessor, and only the exact
-`66c015de…` preparation plus `1c7e1ea7…` benchmark and `a8de9667…` lifecycle
+`66c015de…` preparation plus `f108dbb4…` benchmark and `4c514889…` lifecycle
 test may enter worker prequalification. Historical `d192c858…`, mixed cohorts,
 and every other digest fail closed; prior R3A candidate `e204e0da…` remains
 superseded and forbidden. The selected cohort does not claim runtime acceptance.
@@ -56,7 +56,10 @@ child `os._exit(71)` isolation with ignored wait signals, positive-PID cleanup,
 and unique same-directory temporary-ledger cleanup with durable consumed/no-retry
 terminal evidence. Temporary parent signal handlers remain installed through
 bounded reap, evidence, receipt, and terminal persistence and restore only
-after the terminal-state attempt. The authority keeps the
+after the terminal-state attempt. Every terminal fallback persistence call
+masks SIGINT/SIGTERM with the existing ignore guard, restores the prior
+temporary handlers afterward, and leaves the outer original-handler
+restoration last. The authority keeps the
 retained candidate runtime-unqualified.
 
 **Produces:** A frozen entry-path contract, finite source/runtime state machine,
@@ -94,7 +97,7 @@ predecessor digest is
 `7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb` and the
 permitted-not-accepted retained successor digest is
 `66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea`
-only with benchmark `1c7e1ea7…` and lifecycle test `a8de9667…`; historical
+only with benchmark `f108dbb4…` and lifecycle test `4c514889…`; historical
 `d192c858b48e44b5aa7a7e39ef524e5ec2f08085655fe485639f5e875a727aa1` is
 revoked and direct use fails closed; generic or different digest drift fails
 closed; linked evidence is

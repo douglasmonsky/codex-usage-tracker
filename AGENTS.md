@@ -42,7 +42,7 @@ QG1 PR #392 passed hosted CI, squash-merged, and was exact-main verified at
 the exact hosted Python 3.14 lifecycle-tail blocker; the linked CK-07R1A0
 authorities, including argv correction, are merged through `479cbdb`.
 Coordinator disposition and clean exact-main reapplication from `6c08ecd9`
-derived the exact `66c015de…` / `1c7e1ea7…` / `a8de9667…` candidate cohort.
+derived the exact `66c015de…` / `f108dbb4…` / `4c514889…` candidate cohort.
 The versioned
 [`shared-successor-overlay-authority-v1`](docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
 preserves accepted CK-08R1B, CK-08R1, and CK-QG1 bytes while admitting only
@@ -56,7 +56,10 @@ terminal `failed_after_launch`. Temporary parent SIGINT/SIGTERM handlers must
 route every wait interruption/error through bounded TERM/KILL/reap before
 terminal failure persistence and remain installed through evidence, receipt,
 and terminal ledger finalization; originals restore only after the terminal
-state attempt. The fork child ignores SIGINT/SIGTERM while
+state attempt. Every terminal fallback persistence call masks SIGINT/SIGTERM
+with the existing ignore guard and restores the prior temporary handlers
+afterward; the outer final restoration of original handlers remains last. The
+fork child ignores SIGINT/SIGTERM while
 waiting for parent release and routes every pre-release failure to
 `os._exit(71)`; parent cleanup rejects nonpositive PIDs. Ledger updates use a
 unique same-directory `mkstemp`, close and unlink every failed or interrupted

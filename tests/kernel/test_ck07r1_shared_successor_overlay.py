@@ -153,6 +153,9 @@ def test_overlay_schema_rejects_status_token_launch_scope_and_safety_weakening()
             "signal_cleanup_mask", "signals_remain_actionable"
         ),
         lambda value: value["launcher_safety"].__setitem__(
+            "terminal_fallback_signal_mask", "signals_remain_actionable"
+        ),
+        lambda value: value["launcher_safety"].__setitem__(
             "evidence_completion_ordering", "nullable_hashes_allowed"
         ),
         lambda value: value["launcher_safety"].__setitem__(

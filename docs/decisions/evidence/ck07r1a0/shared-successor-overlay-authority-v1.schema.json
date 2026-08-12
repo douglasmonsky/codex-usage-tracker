@@ -66,18 +66,18 @@
     "ck07_authorities": {
       "const": [
         {
-          "id": "lifecycle-source-digest-v11",
+          "id": "lifecycle-source-digest-v12",
           "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
-          "sha256": "74768468a00cf37d3908b196f6c1f6577c95bf037957500a05493fd93b92e875",
+          "sha256": "7cc998fb29cad3a7b87e95026df5fb2195684c064628885cab7cc0a781d0bb74",
           "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
-          "schema_sha256": "69e887566838a3fc2e6f85483da848aa90556861f84817e817d66d950c97b676"
+          "schema_sha256": "6bf00ce49082be581783c33ce7247a29eb9b63515d6a5af209dccd82d28d685b"
         },
         {
-          "id": "lifecycle-run-invocation-v10",
+          "id": "lifecycle-run-invocation-v11",
           "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
-          "sha256": "c64b9b540bfce6bab615d1707dd6c648e4f07b7e97e56349ac80be2020a4b4b6",
+          "sha256": "437b05c7dfa23ff8efb3038c19e6a0f2524ac45e2fa25f910af40023aad7b8cd",
           "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
-          "schema_sha256": "0cd157c48e0dc0c2867b6c5de89c7075f49ba22940a6f84a408b9e3c110b6e57"
+          "schema_sha256": "ba0d47358aba2f1d66c5b699e2ecd89b2378d082b7bbbfb777fc806329c7e7d4"
         }
       ]
     },
@@ -123,12 +123,12 @@
               },
               {
                 "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-                "sha256": "1c7e1ea7168e916d856ea2eaab5f97a3e06cf2dc6d16665dbd441f7bb3f84fe5",
+                "sha256": "f108dbb45d7586a15eb370c94fc124268a249f2f6f1ee97e7b8b28a3874b737c",
                 "presence": "required"
               },
               {
                 "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-                "sha256": "a8de96673b55a8015b865f1b0f80f1cc1bad4148b4118b56590d2de6636bb94b",
+                "sha256": "4c51488988397e0ccaf40266a4f68bb1d6d342e4be1db36dd1cf36ab63aa335a",
                 "presence": "required"
               }
             ],
@@ -194,6 +194,7 @@
         "parent_signal_handling": "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_held_through_bounded_reap_evidence_receipt_and_terminal_ledger_persistence_then_restored",
         "wait_interruption_cleanup": "every_wait_exception_or_parent_signal_requires_bounded_SIGTERM_then_SIGKILL_then_reap_before_terminal_failure",
         "signal_cleanup_mask": "SIGINT_SIGTERM_ignored_during_bounded_child_cleanup",
+        "terminal_fallback_signal_mask": "SIGINT_SIGTERM_ignored_during_every_terminal_fallback_persistence_then_prior_temporary_handlers_restored",
         "evidence_completion_ordering": "required_non_null_stdout_stderr_output_read_hash_parse_validate_before_first_durable_completed_finalization",
         "evidence_failure_state": "missing_read_hash_parse_validation_or_finalization_failure_is_failed_after_launch_never_completed",
         "interpreter_identity": {

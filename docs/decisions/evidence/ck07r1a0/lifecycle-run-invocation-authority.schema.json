@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-run-invocation-authority-v10.schema.json",
+  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-run-invocation-authority-v11.schema.json",
   "title": "CK-07R1A0 finite lifecycle source/runtime authority",
   "type": "object",
   "additionalProperties": false,
@@ -29,10 +29,10 @@
   ],
   "properties": {
     "schema": {
-      "const": "codex-usage-tracker.lifecycle-run-invocation-authority.v10"
+      "const": "codex-usage-tracker.lifecycle-run-invocation-authority.v11"
     },
     "authority_version": {
-      "const": 10
+      "const": 11
     },
     "owner": {
       "const": "CK-07R1A0"
@@ -99,10 +99,10 @@
           ],
           "properties": {
             "benchmark_sha256": {
-              "const": "1c7e1ea7168e916d856ea2eaab5f97a3e06cf2dc6d16665dbd441f7bb3f84fe5"
+              "const": "f108dbb45d7586a15eb370c94fc124268a249f2f6f1ee97e7b8b28a3874b737c"
             },
             "lifecycle_test_sha256": {
-              "const": "a8de96673b55a8015b865f1b0f80f1cc1bad4148b4118b56590d2de6636bb94b"
+              "const": "4c51488988397e0ccaf40266a4f68bb1d6d342e4be1db36dd1cf36ab63aa335a"
             }
           }
         },
@@ -367,7 +367,7 @@
               "requires": [
                 "this authority is merged and exact-main verified",
                 "the existing worker resumes only the preserved exact candidate worktree",
-                "the worker presents the byte-exact 66c015de/1c7e1ea7/a8de9667 cohort over the 7d1831ff predecessor",
+                "the worker presents the byte-exact 66c015de/f108dbb4/4c514889 cohort over the 7d1831ff predecessor",
                 "runtime_acceptance remains not_claimed",
                 "authority-integrity and prelaunch gates pass",
                 "maximum_new_end_to_end_runs remains 1 and unspent_unavailable",
@@ -526,12 +526,12 @@
             },
             {
               "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-              "sha256": "1c7e1ea7168e916d856ea2eaab5f97a3e06cf2dc6d16665dbd441f7bb3f84fe5",
+              "sha256": "f108dbb45d7586a15eb370c94fc124268a249f2f6f1ee97e7b8b28a3874b737c",
               "role": "benchmark"
             },
             {
               "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-              "sha256": "a8de96673b55a8015b865f1b0f80f1cc1bad4148b4118b56590d2de6636bb94b",
+              "sha256": "4c51488988397e0ccaf40266a4f68bb1d6d342e4be1db36dd1cf36ab63aa335a",
               "role": "lifecycle_test"
             },
             {
@@ -542,7 +542,7 @@
           ]
         },
         "binding": {
-          "const": "only the byte-exact 66c015de/1c7e1ea7/a8de9667 cohort may enter worker_prequalification after this authority merges and exact-main verifies"
+          "const": "only the byte-exact 66c015de/f108dbb4/4c514889 cohort may enter worker_prequalification after this authority merges and exact-main verifies"
         },
         "worker_revalidation_required": {
           "const": true
@@ -595,13 +595,13 @@
               "const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json"
             },
             "sha256": {
-              "const": "74768468a00cf37d3908b196f6c1f6577c95bf037957500a05493fd93b92e875"
+              "const": "7cc998fb29cad3a7b87e95026df5fb2195684c064628885cab7cc0a781d0bb74"
             },
             "schema_path": {
               "const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json"
             },
             "schema_sha256": {
-              "const": "69e887566838a3fc2e6f85483da848aa90556861f84817e817d66d950c97b676"
+              "const": "6bf00ce49082be581783c33ce7247a29eb9b63515d6a5af209dccd82d28d685b"
             }
           }
         }
@@ -681,6 +681,7 @@
             "parent_signal_handling": "temporary_SIGINT_SIGTERM_handlers_installed_before_child_observation_held_through_bounded_reap_evidence_receipt_and_terminal_ledger_persistence_then_restored",
             "wait_interruption_cleanup": "every_wait_exception_or_parent_signal_requires_bounded_SIGTERM_then_SIGKILL_then_reap_before_terminal_failure",
             "signal_cleanup_mask": "SIGINT_SIGTERM_ignored_during_bounded_child_cleanup",
+            "terminal_fallback_signal_mask": "SIGINT_SIGTERM_ignored_during_every_terminal_fallback_persistence_then_prior_temporary_handlers_restored",
             "evidence_completion_ordering": "required_non_null_stdout_stderr_output_read_hash_parse_validate_before_first_durable_completed_finalization",
             "evidence_failure_state": "missing_read_hash_parse_validation_or_finalization_failure_is_failed_after_launch_never_completed",
             "interpreter_identity": {
@@ -1285,7 +1286,7 @@
           "const": false
         },
         "eligibility": {
-          "const": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/1c7e1ea7/a8de9667 candidate cohort, and all gates pass"
+          "const": "only after this authority merges and exact-main verifies, the stopped existing worker resumes only the preserved exact 66c015de/f108dbb4/4c514889 candidate cohort, and all gates pass"
         },
         "first_successful_launch": {
           "const": "exactly one first successful child launch may consume the still-unspent token; this is not a retry, restart, or replacement of a launched process"

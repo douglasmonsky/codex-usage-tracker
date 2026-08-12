@@ -312,6 +312,10 @@ def verify_launcher_safety_contract(authority: Mapping[str, Any]) -> None:
         "signal_cleanup_mask": (
             "SIGINT_SIGTERM_ignored_during_bounded_child_cleanup"
         ),
+        "terminal_fallback_signal_mask": (
+            "SIGINT_SIGTERM_ignored_during_every_terminal_fallback_persistence_"
+            "then_prior_temporary_handlers_restored"
+        ),
         "evidence_completion_ordering": (
             "required_non_null_stdout_stderr_output_read_hash_parse_validate_before_"
             "first_durable_completed_finalization"

@@ -32,8 +32,8 @@ historical; and the linked finite source/runtime authorities remain
 preparation `6689d61f…` remains a historical predecessor and accepted
 R1B/current exact-main preparation `7d1831ff…` is the live predecessor. The
 existing worker's fresh exact-main `6c08ecd9` reapplication derived the sole
-candidate cohort: preparation `66c015de…`, benchmark `1c7e1ea7…`, and lifecycle
-test `a8de9667…`. Historical `d192c858…`, mixed or incomplete cohorts, and
+candidate cohort: preparation `66c015de…`, benchmark `f108dbb4…`, and lifecycle
+test `4c514889…`. Historical `d192c858…`, mixed or incomplete cohorts, and
 every other digest fail closed. PR #394 head
 `98a9b5b82951d136644a5fe5f8a70d320131ba08` is a stale failed
 read-only witness and is not refreshed, rerun, or merged.
@@ -41,7 +41,7 @@ read-only witness and is not refreshed, rerun, or merged.
 **Owned files/interfaces:** Lifecycle preparation implementation, focused
 publication tests, profile/benchmark, and linked CK-07 evidence amendment;
 the current authority binds predecessor preparation `7d1831ff…` to the atomic
-`66c015de…` / `1c7e1ea7…` / `a8de9667…` successor cohort, linked evidence
+`66c015de…` / `f108dbb4…` / `4c514889…` successor cohort, linked evidence
 `36eb76ca…`, and the 720-second wrapper timeout without executing the worker.
 The successor is permitted-not-accepted and launch remains unauthorized.
 The versioned [shared successor overlay](../../decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
@@ -98,7 +98,10 @@ failure is terminal `failed_after_launch`, never false `completed`. Temporary
 parent SIGINT/SIGTERM handlers route every wait interruption/error through
 bounded TERM/KILL/reap before terminal persistence and remain installed
 through evidence, receipt, and terminal ledger finalization; originals restore
-only after the terminal-state attempt. The launch contract
+only after the terminal-state attempt. Every terminal fallback persistence
+call masks SIGINT/SIGTERM with the existing ignore guard and restores the prior
+temporary handlers afterward; the outer final restoration of original
+handlers remains last. The launch contract
 requires the fork child to ignore SIGINT/SIGTERM while waiting for parent release and route
 every pre-release failure to `os._exit(71)`; parent cleanup rejects nonpositive
 PIDs. Unique same-directory `mkstemp` ledger updates close and unlink on every

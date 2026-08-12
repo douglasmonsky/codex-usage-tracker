@@ -239,7 +239,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest["conditional_ready"] == [
         {
             "condition": (
-                "exact 66c015de/1c7e1ea7/a8de9667 successor authority merges and exact-main "
+                "exact 66c015de/f108dbb4/4c514889 successor authority merges and exact-main "
                 "verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 "
                 "with the atomic cohort; no replacement, launch, token consumption, or downstream task"
             ),
@@ -1040,8 +1040,8 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
     validator = Draft202012Validator(schema)
     validator.validate(authority)
 
-    assert authority["schema"] == "codex-usage-tracker.lifecycle-source-digest-authority.v11"
-    assert authority["authority_version"] == 11
+    assert authority["schema"] == "codex-usage-tracker.lifecycle-source-digest-authority.v12"
+    assert authority["authority_version"] == 12
     assert authority["authority_base_sha"] == "6c08ecd92a2c5166c1585be426e1ed437309a910"
     assert authority["status"] == "blocked_hold"
     assert authority["predecessor"]["sha256"] == (
@@ -1065,12 +1065,12 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
             },
             {
                 "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-                "sha256": "1c7e1ea7168e916d856ea2eaab5f97a3e06cf2dc6d16665dbd441f7bb3f84fe5",
+                "sha256": "f108dbb45d7586a15eb370c94fc124268a249f2f6f1ee97e7b8b28a3874b737c",
                 "role": "benchmark",
             },
             {
                 "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-                "sha256": "a8de96673b55a8015b865f1b0f80f1cc1bad4148b4118b56590d2de6636bb94b",
+                "sha256": "4c51488988397e0ccaf40266a4f68bb1d6d342e4be1db36dd1cf36ab63aa335a",
                 "role": "lifecycle_test",
             },
         ],

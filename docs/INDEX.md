@@ -112,7 +112,7 @@ keep CK-07R1 `blocked_hold`
 The accepted source history retains R3A preparation `6689d61f…` as a
 historical predecessor and R1B/current exact-main preparation `7d1831ff…` as
 the live predecessor. The sole CK-07 worker-prequalification successor is the
-atomic `66c015de…` preparation, `1c7e1ea7…` benchmark, and `a8de9667…`
+atomic `66c015de…` preparation, `f108dbb4…` benchmark, and `4c514889…`
 lifecycle-test cohort derived from exact main `6c08ecd9`. Mixed or incomplete
 cohorts, prior candidate `e204e0da…`, and historical candidate `d192c858…`
 fail closed. PR #394 remains a stale failed
@@ -141,7 +141,10 @@ failures are terminal `failed_after_launch`. Temporary parent SIGINT/SIGTERM
 handlers route every wait interruption/error through bounded TERM/KILL/reap
 before terminal persistence and remain installed through evidence, receipt,
 and terminal ledger finalization; originals restore only after the terminal
-state attempt. The fork child ignores SIGINT/SIGTERM while
+state attempt. Every terminal fallback persistence call masks SIGINT/SIGTERM
+with the existing ignore guard and restores the prior temporary handlers
+afterward; the outer final restoration of original handlers remains last. The
+fork child ignores SIGINT/SIGTERM while
 waiting for parent release and maps every pre-release failure to
 `os._exit(71)`; parent cleanup rejects nonpositive PIDs. Unique same-directory
 `mkstemp` ledger updates close and unlink on failed or interrupted
