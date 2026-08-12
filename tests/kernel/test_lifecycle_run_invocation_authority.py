@@ -47,6 +47,17 @@ def test_run_invocation_authority_validates_and_is_strict() -> None:
     assert schema["additionalProperties"] is False
 
 
+def test_preserved_authority_path_bytes_are_exact() -> None:
+    for record in _authority()["preserved_authorities"].values():
+        for path_key, digest_key in (
+            ("path", "sha256"),
+            ("schema_path", "schema_sha256"),
+        ):
+            path = _ROOT / record[path_key]
+            assert path.is_file()
+            assert hashlib.sha256(path.read_bytes()).hexdigest() == record[digest_key]
+
+
 def test_command_cwd_interpreter_environment_and_output_are_exact() -> None:
     launch = _authority()["launch_contract"]
     assert launch["repository_relative_command"] == [

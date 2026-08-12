@@ -39,9 +39,9 @@
     {
       "id": "lifecycle-run-invocation-v9",
       "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
-      "sha256": "7500c965698e6c8784b74c9ee01dfe9db7dbbbef8e1ab5a9bfd2a1b8f7211d89",
+      "sha256": "5a216f497c8f24e69655b58b9a93e71407dbff8ce462b20519d10df4fb3580df",
       "schema_path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
-      "schema_sha256": "70542bcbc8bfd484b0297c617cde65dbcea1d41d914d12bdb54aa9cefad833d2"
+      "schema_sha256": "cdf9e7ed6662adfef7c4fa2695928a8d98b9e1f9965a8f9fb02333d05c317004"
     }
   ],
   "states": {

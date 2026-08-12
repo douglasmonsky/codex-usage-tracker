@@ -18,6 +18,7 @@ from scripts.ck07r1_shared_successor_overlay import (
     overlay_changed_path_allowance,
     sha256_path,
     verify_bound_authority_bytes,
+    verify_exact_committed_delta,
     verify_exact_worktree_delta,
     verify_launcher_safety_contract,
     verify_shared_successor_overlay,
@@ -222,6 +223,36 @@ def test_overlay_requires_exact_all_or_none_git_delta() -> None:
             "worker_prequalification",
             observed=candidate
             | {"docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json"},
+        )
+
+
+def test_overlay_requires_exact_committed_authority_delta() -> None:
+    authority = load_overlay()
+    expected = set(authority["scope"]["authority_write_scope"])
+
+    verify_exact_committed_delta(
+        authority,
+        observed=expected,
+        base_is_ancestor=True,
+    )
+    with pytest.raises(SharedSuccessorOverlayError, match="not an ancestor"):
+        verify_exact_committed_delta(
+            authority,
+            observed=expected,
+            base_is_ancestor=False,
+        )
+    with pytest.raises(SharedSuccessorOverlayError, match="missing="):
+        verify_exact_committed_delta(
+            authority,
+            observed=expected - {next(iter(expected))},
+            base_is_ancestor=True,
+        )
+    with pytest.raises(SharedSuccessorOverlayError, match="extra="):
+        verify_exact_committed_delta(
+            authority,
+            observed=expected
+            | {"src/codex_usage_tracker/agent_kernel/publication/writer.py"},
+            base_is_ancestor=True,
         )
 
 

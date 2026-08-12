@@ -213,6 +213,59 @@ def verify_exact_worktree_delta(
         )
 
 
+def verify_exact_committed_delta(
+    authority: Mapping[str, Any],
+    root: Path = ROOT,
+    *,
+    observed: set[str] | None = None,
+    base_is_ancestor: bool | None = None,
+) -> None:
+    """Reject any committed path outside the exact versioned authority scope."""
+
+    base = authority.get("authority_base_sha")
+    scope = authority.get("scope")
+    if not isinstance(base, str) or len(base) != 40:
+        raise SharedSuccessorOverlayError("authority base SHA is malformed")
+    if not isinstance(scope, Mapping):
+        raise SharedSuccessorOverlayError("overlay scope missing")
+    authority_paths = scope.get("authority_write_scope")
+    if not isinstance(authority_paths, list) or not all(
+        isinstance(path, str) for path in authority_paths
+    ):
+        raise SharedSuccessorOverlayError("authority write scope malformed")
+
+    if base_is_ancestor is None:
+        try:
+            result = subprocess.run(
+                ("git", "merge-base", "--is-ancestor", base, "HEAD"),
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as exc:
+            raise SharedSuccessorOverlayError(
+                "cannot verify authority base ancestry"
+            ) from exc
+        base_is_ancestor = result.returncode == 0
+    if not base_is_ancestor:
+        raise SharedSuccessorOverlayError("authority base is not an ancestor of HEAD")
+
+    actual = (
+        _git_paths(root, "diff", "--name-only", "--no-renames", f"{base}...HEAD")
+        if observed is None
+        else set(observed)
+    )
+    expected = set(authority_paths)
+    if actual != expected:
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        raise SharedSuccessorOverlayError(
+            f"exact committed authority delta mismatch; missing={missing!r}; "
+            f"extra={extra!r}"
+        )
+
+
 def verify_launcher_safety_contract(authority: Mapping[str, Any]) -> None:
     """Pin the corrected candidate's non-consuming launcher semantics."""
 
@@ -294,6 +347,7 @@ def verify_shared_successor_overlay(
     authority = load_overlay(root)
     verify_bound_authority_bytes(authority, root)
     verify_launcher_safety_contract(authority)
+    verify_exact_committed_delta(authority, root)
     state = classify_observed_state(
         authority,
         observed_candidate_artifacts(authority, root),

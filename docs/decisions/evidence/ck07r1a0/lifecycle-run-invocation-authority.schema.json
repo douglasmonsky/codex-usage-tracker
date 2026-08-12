@@ -595,13 +595,13 @@
               "const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json"
             },
             "sha256": {
-              "const": "18e497a76676aa8997bc7d16da9da9f4f13fa0a97e02097f8e9dd8b67cdaabb3"
+              "const": "db92ebf1a24fcbfbc6efb6acadedea24155d37c1dbae8bf67cba1ea530ffd9ca"
             },
             "schema_path": {
               "const": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json"
             },
             "schema_sha256": {
-              "const": "00968ffa7f146b8e9a4ce06517b1327d420f5586a61cc967f9abd0921b8c344e"
+              "const": "d7724b92fac1e7823bfcd6c5c5ce068cee94d14ac97435444ef3614fa6cd4edc"
             }
           }
         }
