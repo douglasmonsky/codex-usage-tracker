@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/douglasmonsky-codex-usage-tracker-badge.png)](https://mseep.ai/app/douglasmonsky-codex-usage-tracker)
+
 # Codex Usage Tracker
 
 [![PyPI](https://img.shields.io/pypi/v/codex-usage-tracking)](https://pypi.org/project/codex-usage-tracking/)
