@@ -816,6 +816,7 @@ def test_ck07r1_prelaunch_recovery_additions_are_explicit_and_bounded() -> None:
     assert {
         "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json",
         "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.schema.json",
+        "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
         "scripts/ck07r1_prelaunch_recovery.py",
         "scripts/qualify_ck08r1_answer_truth.py",
         "tests/agent_kernel/test_ck08r1_answer_requalification.py",

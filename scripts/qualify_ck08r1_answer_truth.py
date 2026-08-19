@@ -51,10 +51,10 @@ from scripts.ck07r1_prelaunch_recovery import (  # noqa: E402
     verify_bound_authority_bytes as verify_ck07r1_recovery_authority_bytes,
 )
 from scripts.ck07r1_prelaunch_recovery import (  # noqa: E402
-    verify_exact_authority_delta as verify_ck07r1_recovery_authority_delta,
+    verify_combined_preflight as verify_ck07r1_recovery_combined_preflight,
 )
 from scripts.ck07r1_prelaunch_recovery import (  # noqa: E402
-    verify_prelaunch_recovery,
+    verify_exact_authority_delta as verify_ck07r1_recovery_authority_delta,
 )
 from scripts.ck07r1_shared_successor_overlay import (  # noqa: E402
     PREPARATION_PATH as CK07R1_PREPARATION_PATH,
@@ -150,7 +150,6 @@ def _current_ck07r1_overlay() -> tuple[dict[str, Any], str]:
 
     recovery = load_ck07r1_recovery_authority(ROOT)
     verify_ck07r1_recovery_authority_bytes(recovery, ROOT)
-    verify_ck07r1_recovery_authority_delta(recovery, ROOT)
     overlay = _json(
         ROOT / "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json"
     )
@@ -162,11 +161,10 @@ def _current_ck07r1_overlay() -> tuple[dict[str, Any], str]:
     )
     observed = sha256_file(ROOT / CK07R1_PREPARATION_PATH)
     if observed == predecessor:
+        verify_ck07r1_recovery_authority_delta(recovery, ROOT)
         return overlay, "authority_main"
     if observed == successor:
-        _, state = verify_prelaunch_recovery(ROOT)
-        if state != "prelaunch_recovery_verified":
-            raise QualificationError("CK-07R1 recovery state is not verified")
+        verify_ck07r1_recovery_combined_preflight(ROOT, ROOT)
         return overlay, "worker_prequalification"
     raise QualificationError("CK-07R1 preparation state is outside the recovery authority")
 

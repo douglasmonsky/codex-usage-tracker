@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
+from scripts.ck07r1_prelaunch_recovery import verify_combined_preflight
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DOCS = _REPO_ROOT / "docs"
 _AUTHORITY_PATHS = (
@@ -84,6 +86,32 @@ def _read(path: str) -> str:
 
 def _json(path: str):
     return json.loads(_read(path))
+
+
+def _assert_ck07_selected_or_recovery_cohort(
+    selected_successor: dict,
+) -> None:
+    expected = {
+        item["path"]: item["sha256"]
+        for item in selected_successor["artifacts"]
+    }
+    actual = {
+        path: hashlib.sha256((_REPO_ROOT / path).read_bytes()).hexdigest()
+        for path in expected
+    }
+    if actual == expected:
+        return
+
+    recovery = _json(
+        "docs/decisions/evidence/ck07r1a0/"
+        "lifecycle-prelaunch-recovery-authority-v1.json"
+    )
+    recovery_expected = {
+        item["path"]: item["sha256"]
+        for item in recovery["candidate_cohort"]
+    }
+    assert actual == recovery_expected
+    verify_combined_preflight(_REPO_ROOT, _REPO_ROOT)
 
 
 def _portable_selected_support_hashes() -> dict[str, str]:
@@ -503,12 +531,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
                         expected.add(_ck08r1b_selected_hashes()[required["path"]])
                     assert hashlib.sha256(required_path.read_bytes()).hexdigest() in expected
             elif actual == ck07_selected["sha256"]:
-                for required in ck07_selected["artifacts"]:
-                    required_path = _REPO_ROOT / required["path"]
-                    assert required_path.is_file()
-                    assert (
-                        hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
-                    )
+                _assert_ck07_selected_or_recovery_cohort(ck07_selected)
         elif artifact["path"] in {
             "config/agent-kernel/formula-contract-v1.json",
             "config/agent-kernel/plan-operand-contract-v1.json",
@@ -1109,10 +1132,9 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
         authority["selected_successor"]["sha256"],
     }
     if actual_source == authority["selected_successor"]["sha256"]:
-        for required in authority["selected_successor"]["artifacts"]:
-            required_path = _REPO_ROOT / required["path"]
-            assert required_path.is_file()
-            assert hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
+        _assert_ck07_selected_or_recovery_cohort(
+            authority["selected_successor"]
+        )
 
     mutations = [
         ("selected_successor", "sha256", "0" * 64),

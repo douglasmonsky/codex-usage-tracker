@@ -12,7 +12,7 @@ from scripts.ck07r1_prelaunch_recovery import (
     AUTHORITY_PATH as RECOVERY_AUTHORITY_PATH,
 )
 from scripts.ck07r1_prelaunch_recovery import (
-    verify_prelaunch_recovery,
+    verify_combined_preflight,
 )
 from scripts.ck07r1_shared_successor_overlay import (
     CONSUMING_AUTHORITY_PATH,
@@ -55,8 +55,7 @@ def test_overlay_is_exact_and_live_state_is_authorized() -> None:
             raise
         recovery_ledger = ROOT / "output/ck07r1/lifecycle-requalification-v1.launch-token.json"
         if recovery_ledger.is_file():
-            recovery, recovery_state = verify_prelaunch_recovery(ROOT)
-            assert recovery_state == "prelaunch_recovery_verified"
+            recovery = verify_combined_preflight(ROOT, ROOT)
             assert recovery["recovery_transition"]["old_shared_overlay"] == (
                 "immutable_historical_predecessor_evidence"
             )

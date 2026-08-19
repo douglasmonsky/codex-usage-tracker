@@ -275,6 +275,28 @@ def verify_new_paths_absent(authority: Mapping[str, Any], candidate_root: Path) 
         raise PrelaunchRecoveryError(f"recovery launch path already exists: {sorted(present)}")
 
 
+def verify_combined_preflight(
+    authority_root: Path,
+    candidate_root: Path,
+) -> dict[str, Any]:
+    authority = load_authority(authority_root)
+    same_root = authority_root.absolute() == candidate_root.absolute()
+    candidate_delta = set(
+        authority["scope"]["combined_preflight_candidate_scope"]
+    )
+    verify_bound_authority_bytes(authority, authority_root)
+    verify_exact_authority_delta(
+        authority,
+        authority_root,
+        allowed_worktree_delta=candidate_delta if same_root else None,
+    )
+    verify_candidate_cohort(authority, candidate_root)
+    verify_exact_candidate_delta(authority, candidate_root)
+    verify_preserved_failure_ledger(authority, candidate_root)
+    verify_new_paths_absent(authority, candidate_root)
+    return authority
+
+
 def verify_current_exact_main(root: Path) -> str:
     head = _git(root, "rev-parse", "HEAD")
     tracking = _git(root, "rev-parse", "refs/remotes/origin/main")
@@ -313,6 +335,13 @@ def verify_pre_side_effect_recovery(root: Path) -> dict[str, Any]:
     verify_frozen_candidate_root(authority, root)
     verify_bound_authority_bytes(authority, root)
     verify_current_exact_main(root)
+    verify_exact_authority_delta(
+        authority,
+        root,
+        allowed_worktree_delta=set(
+            authority["scope"]["combined_preflight_candidate_scope"]
+        ),
+    )
     available = verify_minimum_capacity(root)
     verify_candidate_cohort(authority, root)
     verify_exact_candidate_delta(authority, root)
