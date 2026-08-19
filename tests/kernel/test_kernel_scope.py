@@ -835,7 +835,9 @@ def test_ck07r1_terminal_failure_correction_additions_are_explicit_and_bounded()
         "output/ck07r1/lifecycle-requalification-v2.stdout.txt",
         "scripts/ck07r1_terminal_failure_correction.py",
         "scripts/qualify_ck08r1_answer_truth.py",
+        "tests/kernel/test_ck07r1_shared_successor_overlay.py",
         "tests/kernel/test_ck07r1_terminal_failure_correction_authority.py",
+        "tests/kernel/test_lifecycle_run_invocation_authority.py",
     } == CK07R1_TERMINAL_FAILURE_CORRECTION_AUTHORITY_ADDITIONS
 
 
