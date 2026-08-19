@@ -110,12 +110,12 @@
     },
     {
       "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-      "sha256": "e8de2aab10c065fc4e5b4667e3db7f4058f9261ca731af25aec06ffab7c20565",
+      "sha256": "37cb7330494675b2211f31ab419b4105d23f5c71856a546f735304883f25ba8e",
       "role": "corrected_launcher"
     },
     {
       "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-      "sha256": "d49e959bf65602472a5d60dc9b2239f840aab5c5050544fa1df545a2e5246d7e",
+      "sha256": "47659f999ae765d6f09472eb7db67814c60ec8bd0fccbd258fda1654e22e2854",
       "role": "corrected_launcher_tests"
     }
   ],
