@@ -10,6 +10,12 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from scripts.ck07r1_prelaunch_recovery import verify_combined_preflight
+from scripts.ck07r1_terminal_failure_correction import (
+    load_authority as load_terminal_correction_authority,
+)
+from scripts.ck07r1_terminal_failure_correction import (
+    verify_combined as verify_terminal_correction_combined,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DOCS = _REPO_ROOT / "docs"
@@ -111,6 +117,7 @@ def _assert_ck07_selected_or_recovery_cohort(
         for item in recovery["candidate_cohort"]
     }
     if actual == recovery_expected:
+        verify_combined_preflight(_REPO_ROOT, _REPO_ROOT)
         return
 
     terminal = _json(
@@ -122,7 +129,10 @@ def _assert_ck07_selected_or_recovery_cohort(
         for item in terminal["corrected_candidate_cohort"]
     }
     assert actual == terminal_expected
-    verify_combined_preflight(_REPO_ROOT, _REPO_ROOT)
+    verify_terminal_correction_combined(
+        load_terminal_correction_authority(_REPO_ROOT),
+        _REPO_ROOT,
+    )
 
 
 def _portable_selected_support_hashes() -> dict[str, str]:
