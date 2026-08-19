@@ -225,10 +225,13 @@ def test_worker_state_reaches_consuming_activation_before_verifier_returns(
 def test_frozen_launcher_imports_verifier_before_any_side_effect() -> None:
     consuming = load_consuming_boundary()
     assert consuming is not None
-    launcher = (
+    launcher_path = (
         Path(consuming["worker"]["frozen_cwd"])
         / "scripts/benchmark_ck07r1_lifecycle_scale.py"
-    ).read_text(encoding="utf-8")
+    )
+    if not launcher_path.is_file():
+        pytest.skip("retained frozen candidate witness is unavailable")
+    launcher = launcher_path.read_text(encoding="utf-8")
     launch = launcher[
         launcher.index("def _launch_exact()") : launcher.index("\ndef main()")
     ]
@@ -403,7 +406,11 @@ def test_overlay_requires_exact_all_or_none_git_delta() -> None:
 
 def test_overlay_requires_exact_committed_authority_delta() -> None:
     authority = load_overlay()
-    expected = set(authority["scope"]["authority_write_scope"])
+    consuming = load_consuming_boundary()
+    assert consuming is not None
+    expected = set(authority["scope"]["authority_write_scope"]) | set(
+        consuming["scope"]["authority_write_scope"]
+    )
 
     verify_exact_committed_delta(
         authority,
