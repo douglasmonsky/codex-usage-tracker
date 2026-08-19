@@ -1,0 +1,137 @@
+{
+  "schema": "codex-usage-tracker.ck07r1-lifecycle-terminal-failure-clean-commit-authority.v1",
+  "version": 1,
+  "task": "CK-07R1",
+  "status": "permitted_not_accepted",
+  "authority_base_sha": "652f2166b58b9ee0d719348a769901577d11e6fd",
+  "authority_base_tree_sha": "cc148aa820962c084655017e404cce54430313bd",
+  "source_authority": [
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-correction-authority-v1.json",
+      "sha256": "7752565abd5c5f27a852b8a8814ea1b7afde03d967de46419856eae85583f97b"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-correction-authority-v1.schema.json",
+      "sha256": "f4affab070de6aa1ed54cfc648051b7b6398bd57011fed8d942309894714744e"
+    }
+  ],
+  "implementation_transition": {
+    "pull_request": 448,
+    "base_sha": "652f2166b58b9ee0d719348a769901577d11e6fd",
+    "head_sha": "927aa06f7c4c88319cc30247343c40db8e9b817e",
+    "paths": [
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "role": "unchanged_preparation_source",
+        "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea"
+      },
+      {
+        "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+        "role": "corrected_planner_path_benchmark",
+        "sha256": "8f4900b1ecc841fe04f6cd1232c3741efef105e8b997c7fd15cc61b5d8d14cc1"
+      },
+      {
+        "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+        "role": "corrected_planner_path_tests",
+        "sha256": "8364c4387b8e588cb18f420805d47e48241da22d6fb793e838a522cc7fb29e33"
+      },
+      {
+        "path": "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+        "role": "immutable_v1_terminal_ledger",
+        "sha256": "5c2b42eca6a3e54cf4163226bc55f3c75aa35112c4ed0342c11f4e39cb9922be"
+      },
+      {
+        "path": "output/ck07r1/lifecycle-requalification-v2.launch-token.json",
+        "role": "immutable_v2_terminal_ledger",
+        "sha256": "570e27824ee04a51aa4012adb461bd4aebb00b61541f2477fd9e1665854325a2"
+      },
+      {
+        "path": "output/ck07r1/lifecycle-requalification-v2.stderr.txt",
+        "role": "immutable_v2_terminal_stderr",
+        "sha256": "4cf4b10fd04f20a190e4ac41898d25b9295b3dc9d7addead8a81edd27b3aca2f"
+      },
+      {
+        "path": "output/ck07r1/lifecycle-requalification-v2.stdout.txt",
+        "role": "immutable_v2_terminal_stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "representations": {
+      "dirty_prepublication": {
+        "head_tree": "authority_base_tree",
+        "worktree_delta": "exact_candidate_scope",
+        "committed_delta": "none"
+      },
+      "clean_pr_head": {
+        "head": "exact_bound_implementation_head",
+        "worktree_delta": "empty",
+        "committed_delta": "exact_candidate_scope"
+      },
+      "clean_integrated": {
+        "base": "exact_authority_base",
+        "worktree_delta": "empty",
+        "committed_delta": "exact_authority_scope_plus_candidate_scope",
+        "source_identity": "bound_pr_head_or_exact_tree_equivalent_squash"
+      }
+    }
+  },
+  "decision": {
+    "root_cause": "clean_committed_ci_representation_was_not_modeled",
+    "dirty_prepublication_remains_valid": true,
+    "clean_committed_transition_permitted": true,
+    "implementation_acceptance": "not_claimed",
+    "runtime_acceptance": "not_claimed",
+    "new_command_invocations_permitted": 0,
+    "launch_authorized": false,
+    "token_consumed": true,
+    "token_refund": false,
+    "retry": "none",
+    "restart": "none",
+    "replacement": "none",
+    "receipt_fabrication": "forbidden",
+    "post_single_run": "unavailable_without_complete_planner_valid_receipt",
+    "final_accepted": "unavailable"
+  },
+  "scope": {
+    "authority_write_scope": [
+      "docs/INDEX.md",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.json",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.schema.json",
+      "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+      "docs/roadmap/TASK_PACKETS.md",
+      "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
+      "scripts/check_kernel_scope.py",
+      "scripts/ck07r1_terminal_failure_correction.py",
+      "tests/kernel/test_ck07r1_shared_successor_overlay.py",
+      "tests/kernel/test_ck07r1_terminal_failure_correction_authority.py",
+      "tests/kernel/test_documentation_authority.py",
+      "tests/kernel/test_kernel_scope.py"
+    ],
+    "candidate_scope": [
+      "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+      "output/ck07r1/lifecycle-requalification-v2.launch-token.json",
+      "output/ck07r1/lifecycle-requalification-v2.stderr.txt",
+      "output/ck07r1/lifecycle-requalification-v2.stdout.txt",
+      "scripts/benchmark_ck07r1_lifecycle_scale.py",
+      "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "tests/agent_kernel/publication/test_lifecycle_scale.py"
+    ],
+    "forbidden": [
+      "mixed_partial_or_extra_candidate_delta",
+      "wrong_authority_base_or_tree",
+      "wrong_implementation_head_or_candidate_bytes",
+      "v1_authority_rewrite",
+      "terminal_evidence_mutation",
+      "qualification_command_invocation",
+      "child_or_fork",
+      "token_refund_or_new_invocation",
+      "retry_restart_or_replacement",
+      "receipt_fabrication",
+      "implementation_files_in_authority_pr",
+      "PR_394_mutation",
+      "live_or_real_data",
+      "downstream_dispatch",
+      "cleanup_or_witness_loss"
+    ]
+  }
+}

@@ -890,6 +890,13 @@ CK07R1_TERMINAL_FAILURE_CORRECTION_AUTHORITY_ADDITIONS = frozenset(
     }
 )
 
+CK07R1_TERMINAL_CLEAN_COMMIT_AUTHORITY_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.schema.json",
+    }
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -969,6 +976,7 @@ INTEGRATION_ADDITIONS = (
     | CK07R1_CONSUMING_BOUNDARY_AUTHORITY_ADDITIONS
     | CK07R1_PRELAUNCH_RECOVERY_AUTHORITY_ADDITIONS
     | CK07R1_TERMINAL_FAILURE_CORRECTION_AUTHORITY_ADDITIONS
+    | CK07R1_TERMINAL_CLEAN_COMMIT_AUTHORITY_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | {
         "config/agent-kernel/maintainability-baseline-v1.json",

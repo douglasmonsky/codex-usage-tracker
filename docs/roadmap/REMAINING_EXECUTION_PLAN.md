@@ -206,6 +206,14 @@ the token, authorize any launch, fabricate a receipt, or make
 corrective implementation prequalification because the existing
 receipt-required runtime acceptance contract remains unsatisfied; CK-08R4,
 CK-08RG, and CK-09 remain blocked pending an explicit future roadmap decision.
+The linked
+[clean-committed transition authority](../decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.json)
+keeps the v1 authority immutable while binding PR #448 base `652f2166…`,
+source head `927aa06f…`, and the exact seven-path cohort. The same bytes may be
+represented only as an all-or-none dirty prepublication delta over the exact
+authority-main tree or as a clean committed PR/integrated delta with exact
+base, scope, and hashes. Neither representation reopens the consumed run or
+changes the existing blocked state.
 
 The exact V11 launcher contract constructs and validates the fully
 overlay/cohort-bound receipt and non-null stdout/stderr/output evidence before

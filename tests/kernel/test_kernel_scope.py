@@ -23,6 +23,7 @@ from scripts.check_kernel_scope import (
     CK07R1_PRELAUNCH_RECOVERY_AUTHORITY_ADDITIONS,
     CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS,
     CK07R1_SHARED_OVERLAY_AUTHORITY_ADDITIONS,
+    CK07R1_TERMINAL_CLEAN_COMMIT_AUTHORITY_ADDITIONS,
     CK07R1_TERMINAL_FAILURE_CORRECTION_AUTHORITY_ADDITIONS,
     CK07R1A0_AUTHORITY_ADDITIONS,
     CK08_PREREQUISITE_BLOCKER_ADDITIONS,
@@ -705,6 +706,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS
         | CK07R1_PRELAUNCH_RECOVERY_AUTHORITY_ADDITIONS
         | CK07R1_TERMINAL_FAILURE_CORRECTION_AUTHORITY_ADDITIONS
+        | CK07R1_TERMINAL_CLEAN_COMMIT_AUTHORITY_ADDITIONS
         | CK08_PREREQUISITE_BLOCKER_ADDITIONS
         | {
             "config/agent-kernel/maintainability-baseline-v1.json",
@@ -839,6 +841,13 @@ def test_ck07r1_terminal_failure_correction_additions_are_explicit_and_bounded()
         "tests/kernel/test_ck07r1_terminal_failure_correction_authority.py",
         "tests/kernel/test_lifecycle_run_invocation_authority.py",
     } == CK07R1_TERMINAL_FAILURE_CORRECTION_AUTHORITY_ADDITIONS
+
+
+def test_ck07r1_terminal_clean_commit_additions_are_explicit_and_bounded() -> None:
+    assert {
+        "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.schema.json",
+    } == CK07R1_TERMINAL_CLEAN_COMMIT_AUTHORITY_ADDITIONS
 
 
 def test_kernel_skeleton_imports_without_legacy_runtime() -> None:

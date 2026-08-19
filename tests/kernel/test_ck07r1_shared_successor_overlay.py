@@ -38,6 +38,11 @@ from scripts.ck07r1_terminal_failure_correction import (
     AUTHORITY_PATH as TERMINAL_AUTHORITY_PATH,
 )
 from scripts.ck07r1_terminal_failure_correction import (
+    CLEAN_COMMIT_AUTHORITY_PATH,
+    load_clean_commit_authority,
+    verify_clean_candidate_transition,
+)
+from scripts.ck07r1_terminal_failure_correction import (
     load_authority as load_terminal_authority,
 )
 from scripts.ck07r1_terminal_failure_correction import (
@@ -493,8 +498,29 @@ def test_overlay_scope_and_launcher_contract_are_exact() -> None:
         verify_launcher_safety_contract(weakened)
 
     weakened = deepcopy(authority)
-    weakened["launcher_safety"]["interpreter_identity"]["symlink_or_resolved_equivalence"] = (
-        "accepted"
-    )
+    weakened["launcher_safety"]["interpreter_identity"][
+        "symlink_or_resolved_equivalence"
+    ] = "accepted"
     with pytest.raises(SharedSuccessorOverlayError, match="safety"):
         verify_launcher_safety_contract(weakened)
+
+
+def test_terminal_clean_commit_bridge_preserves_worker_prequalification_only() -> None:
+    assert (ROOT / CLEAN_COMMIT_AUTHORITY_PATH).is_file()
+    authority = load_clean_commit_authority(ROOT)
+    candidate = set(authority["scope"]["candidate_scope"])
+    representation = verify_clean_candidate_transition(
+        authority,
+        ROOT,
+        observed_head=authority["implementation_transition"]["head_sha"],
+        observed_head_tree="candidate-tree",
+        observed_worktree=set(),
+        observed_committed_delta=candidate,
+        base_is_ancestor=True,
+    )
+    assert representation == "clean_pr_head"
+    assert authority["status"] == "permitted_not_accepted"
+    assert authority["decision"]["implementation_acceptance"] == "not_claimed"
+    assert authority["decision"]["runtime_acceptance"] == "not_claimed"
+    assert authority["decision"]["new_command_invocations_permitted"] == 0
+    assert authority["decision"]["token_consumed"] is True
