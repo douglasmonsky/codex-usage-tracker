@@ -73,10 +73,6 @@
     {
       "path": "src/codex_usage_tracker/agent_kernel/publication/planner.py",
       "sha256": "204790ad86b99eedd4fd72c51b1c50dd07e0fe19284db809f9b990d689299148"
-    },
-    {
-      "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
-      "sha256": "7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb"
     }
   ],
   "failed_candidate_cohort": [

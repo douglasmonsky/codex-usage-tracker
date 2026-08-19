@@ -110,15 +110,11 @@
           "path": "scripts/ck07r1_prelaunch_recovery.py",
           "sha256": "a3f6376f9f1328b5ccce3d8b16486b87cefe4d2b6c783a4e2a706e71142b1fc4"
         },
-        {
-          "path": "src/codex_usage_tracker/agent_kernel/publication/planner.py",
-          "sha256": "204790ad86b99eedd4fd72c51b1c50dd07e0fe19284db809f9b990d689299148"
-        },
-        {
-          "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
-          "sha256": "7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb"
-        }
-      ]
+            {
+              "path": "src/codex_usage_tracker/agent_kernel/publication/planner.py",
+              "sha256": "204790ad86b99eedd4fd72c51b1c50dd07e0fe19284db809f9b990d689299148"
+            }
+          ]
     },
     "failed_candidate_cohort": {
       "const": [

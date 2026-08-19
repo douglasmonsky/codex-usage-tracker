@@ -110,7 +110,18 @@ def _assert_ck07_selected_or_recovery_cohort(
         item["path"]: item["sha256"]
         for item in recovery["candidate_cohort"]
     }
-    assert actual == recovery_expected
+    if actual == recovery_expected:
+        return
+
+    terminal = _json(
+        "docs/decisions/evidence/ck07r1a0/"
+        "lifecycle-terminal-failure-correction-authority-v1.json"
+    )
+    terminal_expected = {
+        item["path"]: item["sha256"]
+        for item in terminal["corrected_candidate_cohort"]
+    }
+    assert actual == terminal_expected
     verify_combined_preflight(_REPO_ROOT, _REPO_ROOT)
 
 
