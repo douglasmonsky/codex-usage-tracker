@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
+import scripts.ck07r1_terminal_failure_correction as terminal_module
 from scripts.ck07r1_terminal_failure_correction import (
     AUTHORITY_PATH,
     SCHEMA_PATH,
@@ -59,9 +60,7 @@ def _synthetic_candidate(authority: dict[str, Any], root: Path) -> None:
         },
         "launch": {
             "matching_processes": [],
-            "prelaunch_recovery": {
-                "candidate_cohort": authority["failed_candidate_cohort"]
-            },
+            "prelaunch_recovery": {"candidate_cohort": authority["failed_candidate_cohort"]},
         },
         "failure": {"stage": "evidence_collection"},
     }
@@ -99,9 +98,7 @@ def test_terminal_correction_schema_is_versioned_strict_and_exact() -> None:
     Draft202012Validator.check_schema(schema)
     Draft202012Validator(schema).validate(authority)
     assert authority["schema"].endswith(".v1")
-    assert authority["authority_base_sha"] == (
-        "77cb03cb3dd6bcf5608249056cb3470bc7fee3d8"
-    )
+    assert authority["authority_base_sha"] == ("77cb03cb3dd6bcf5608249056cb3470bc7fee3d8")
     assert authority["status"] == "permitted_not_accepted"
 
 
@@ -142,9 +139,7 @@ def test_terminal_evidence_rewrite_fails_closed(
 def test_terminal_output_or_receipt_fabrication_fails_closed(tmp_path: Path) -> None:
     authority = deepcopy(_authority())
     _synthetic_candidate(authority, tmp_path)
-    forbidden = (
-        tmp_path / authority["terminal_evidence"]["required_absent_paths"][0]
-    )
+    forbidden = tmp_path / authority["terminal_evidence"]["required_absent_paths"][0]
     forbidden.write_text("fabricated\n", encoding="utf-8")
     with pytest.raises(TerminalCorrectionError, match="forbidden terminal artifact"):
         verify_terminal_evidence(authority, tmp_path)
@@ -181,6 +176,72 @@ def test_authority_delta_is_exact_and_excludes_implementation() -> None:
             ROOT,
             observed=expected | {"scripts/benchmark_ck07r1_lifecycle_scale.py"},
         )
+    with pytest.raises(TerminalCorrectionError, match="not an ancestor"):
+        verify_exact_authority_delta(
+            authority,
+            ROOT,
+            observed=expected,
+            base_is_ancestor=False,
+        )
+
+
+def test_combined_verifies_authority_binding_before_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = _authority()
+    expected_delta = set(authority["scope"]["combined_candidate_scope"])
+    calls: list[tuple[str, object]] = []
+
+    monkeypatch.setattr(
+        terminal_module,
+        "verify_immutable_authority_bytes",
+        lambda _authority, _root: calls.append(("immutable", None)),
+    )
+
+    def _authority_delta(
+        _authority: dict[str, Any],
+        _root: Path,
+        *,
+        observed: set[str] | None = None,
+        allowed_worktree_delta: set[str] | None = None,
+        base_is_ancestor: bool | None = None,
+    ) -> None:
+        assert observed is None
+        assert base_is_ancestor is None
+        calls.append(("authority_delta", allowed_worktree_delta))
+
+    monkeypatch.setattr(
+        terminal_module,
+        "verify_exact_authority_delta",
+        _authority_delta,
+    )
+    monkeypatch.setattr(
+        terminal_module,
+        "verify_exact_candidate_delta",
+        lambda _authority, _root: calls.append(("candidate_delta", None)),
+    )
+    monkeypatch.setattr(
+        terminal_module,
+        "verify_corrected_cohort",
+        lambda _authority, _root: calls.append(("cohort", None)),
+    )
+    monkeypatch.setattr(
+        terminal_module,
+        "verify_terminal_evidence",
+        lambda _authority, _root: calls.append(("evidence", None)),
+    )
+    monkeypatch.setattr(
+        terminal_module,
+        "verify_planner_reproduction",
+        lambda _authority, _root: calls.append(("planner", None)),
+    )
+
+    terminal_module.verify_combined(authority, ROOT)
+    assert calls[:3] == [
+        ("immutable", None),
+        ("authority_delta", expected_delta),
+        ("candidate_delta", None),
+    ]
 
 
 def test_planner_reproduction_binds_correct_large_classification_and_boundary() -> None:
@@ -224,9 +285,7 @@ def test_schema_rejects_token_scope_planner_and_acceptance_weakening() -> None:
     schema = json.loads((ROOT / SCHEMA_PATH).read_text(encoding="utf-8"))
     mutations = [
         lambda value: value["decision"].__setitem__("launch_authorized", True),
-        lambda value: value["decision"].__setitem__(
-            "new_command_invocations_permitted", 1
-        ),
+        lambda value: value["decision"].__setitem__("new_command_invocations_permitted", 1),
         lambda value: value["decision"].__setitem__("final_accepted", "available"),
         lambda value: value["run_token"].__setitem__("token_consumed", False),
         lambda value: value["run_token"].__setitem__("non_refundable", False),

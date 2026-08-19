@@ -14,8 +14,7 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 AUTHORITY_PATH = Path(
-    "docs/decisions/evidence/ck07r1a0/"
-    "lifecycle-terminal-failure-correction-authority-v1.json"
+    "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-correction-authority-v1.json"
 )
 SCHEMA_PATH = Path(
     "docs/decisions/evidence/ck07r1a0/"
@@ -67,9 +66,7 @@ def _git(root: Path, *args: str) -> str:
         text=True,
     )
     if result.returncode != 0:
-        raise TerminalCorrectionError(
-            f"git {' '.join(args)} failed: {result.stderr.strip()}"
-        )
+        raise TerminalCorrectionError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
     return result.stdout.strip()
 
 
@@ -110,10 +107,22 @@ def verify_exact_authority_delta(
     *,
     observed: set[str] | None = None,
     allowed_worktree_delta: set[str] | None = None,
+    base_is_ancestor: bool | None = None,
 ) -> None:
     expected = set(authority["scope"]["authority_write_scope"])
+    base = str(authority["authority_base_sha"])
+    if base_is_ancestor is None:
+        ancestor = subprocess.run(
+            ("git", "merge-base", "--is-ancestor", base, "HEAD"),
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        base_is_ancestor = ancestor.returncode == 0
+    if not base_is_ancestor:
+        raise TerminalCorrectionError("authority base is not an ancestor of HEAD")
     if observed is None:
-        base = str(authority["authority_base_sha"])
         head = _git(root, "rev-parse", "HEAD")
         worktree = _status_paths(root)
         if head == base:
@@ -239,12 +248,9 @@ def verify_terminal_evidence(
         "exception_type": stderr.get("exception_type"),
         "failure": stderr.get("failure"),
         "selected_fragment": (
-            f"selected_records={reproduction['selected_records']}"
-            in str(stderr.get("message"))
+            f"selected_records={reproduction['selected_records']}" in str(stderr.get("message"))
         ),
-        "reason_fragment": (
-            "limit_exceeded:selected_records" in str(stderr.get("message"))
-        ),
+        "reason_fragment": ("limit_exceeded:selected_records" in str(stderr.get("message"))),
     } != {
         "exception_type": "AssertionError",
         "failure": "child_exception",
@@ -322,6 +328,13 @@ print(json.dumps(rows, sort_keys=True, separators=(",", ":")))
 
 
 def verify_combined(authority: Mapping[str, Any], root: Path) -> dict[str, Any]:
+    candidate_delta = set(authority["scope"]["combined_candidate_scope"])
+    verify_immutable_authority_bytes(authority, root)
+    verify_exact_authority_delta(
+        authority,
+        root,
+        allowed_worktree_delta=candidate_delta,
+    )
     verify_exact_candidate_delta(authority, root)
     verify_corrected_cohort(authority, root)
     verify_terminal_evidence(authority, root)
