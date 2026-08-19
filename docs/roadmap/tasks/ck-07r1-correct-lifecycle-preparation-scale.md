@@ -1,7 +1,8 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** `blocked_hold`; the exact successor cohort is selected but remains
-unlaunched and unavailable until its authority merges and exact-main verifies
+**Status:** `blocked_hold` until the v1 consuming-boundary authority
+squash-merges and exact-main verifies; then `ready_one_shot` for the bound
+existing worker only, while implementation/runtime remain unaccepted
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -9,8 +10,12 @@ unlaunched and unavailable until its authority merges and exact-main verifies
 
 **Accounting:** [TASK_PACKETS.md](../TASK_PACKETS.md)
 
-**Run authority:** The linked run-invocation authority remains blocked/no-run
-and preserves the one-shot launch contract.
+**Run authority:** The linked run-invocation authority remains immutable and
+preserves the one-shot launch contract. The versioned
+[consuming-boundary authority](../../decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.json)
+alone permits the bound existing worker to cross from exact
+`worker_prequalification` to `launch_authorized_once` after authority merge and
+exact-main verification.
 
 **Central plan:** [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md)
 
@@ -56,13 +61,22 @@ database postconditions.
 
 **Consumer seam:** Preparation to `PublicationWriter` to read-only publication.
 
-**Parallelism:** Resume only the existing stopped CK-07R1 worker after the
-exact successor authority merges and exact-main verifies, using only the
-preserved exact candidate worktree and complete selected cohort. Historical
+**Parallelism:** Resume only existing worker
+`019fbfe2-8fe4-7de2-9264-d58572366727` after the consuming-boundary authority
+merges and exact-main verifies, using frozen cwd
+`/Users/Monsky/Developer/Codex/2026-08-11/codex-usage-tracker-ck07r1-corrected-shared-overlay-exact-main-6c08ecd9`
+and only the complete selected cohort. Historical
 `d192c858…` cannot be reapplied directly.
-Never rebase, stash,
-reset, clean, delete, overwrite, or mutate the witness; do not create a
-replacement worker task. The planner-valid receipt is produced by that worker
+Worker ownership is a normative coordinator/orchestration binding to that
+exact existing Codex task plus recomputed repository evidence. It is not a
+runtime-authenticated identity; the launcher must not accept or claim a
+cryptographic or self-asserted per-task credential.
+Never rebase, stash, reset, clean, delete, overwrite, or mutate the historical
+V9/V10 witnesses. After the authority merge only, the separate frozen launch
+lane must fetch and fast-forward only from prequalification base `67bb1a…` to
+the exact merged main while preserving and recomputing the exact three dirty
+candidate bytes. Any non-fast-forward transition or byte drift fails closed.
+Do not create a replacement worker task. The planner-valid receipt is produced by that worker
 and is required for acceptance, not for authority completion; other corrective
 locks stay disjoint and no downstream packet becomes Ready here.
 
@@ -78,7 +92,20 @@ standard/production fixtures, five unprofiled samples, 30-day/all-time gates,
 the finite state transitions and real non-launching subprocess argv guard; no
 E2E or benchmark run in the authority reconciliation.
 
-**Acceptance:** Work is linear in observations plus prior transitions and all
+**Acceptance:** Immediately before the one command, the worker must revalidate
+the exact authority bytes and three-path Git delta, lexical worktree
+`.venv/bin/python` plus matching `sys.prefix`, exact cwd/argv/environment,
+capacity at or above 10 GiB, `matching_processes=[]`, all four frozen artifact
+paths absent, the unconsumed token, and synthetic fixture identity. Any miss
+fails closed without launch or artifact creation. If every gate passes, exactly
+one successfully observed child PID/argv/cwd/owner/handshake consumes the
+non-refundable token. No retry, restart, replacement, live/real data, or
+fabricated receipt is permitted. The launcher-imported shared verifier enforces
+the consuming authority before ledger/fork and requires candidate
+`HEAD == refs/remotes/origin/main == live ls-remote origin/main`; the authority
+feature branch and the stale `67bb1a…` HEAD cannot satisfy that activation.
+The prequalification base must remain an ancestor of exact merged main. Work is linear in observations
+plus prior transitions and all
 publication-valid scale gates pass through the CK-07R1A0 reachable path and
 the frozen CK-07R1A0 run-invocation contract. The existing worker must
 revalidate the exact predecessor-to-successor digest
@@ -87,9 +114,8 @@ planner-valid receipt, and consume at most one new end-to-end run. The still-
 unspent `maximum_new_end_to_end_runs=1` token can fund exactly one first
 successful child launch only after the authority merge/exact-main gate and all
 worker gates pass; this is not a retry, restart, or replacement of a launched
-process. Receipt
-absence before dispatch is not a blocker; receipt absence or invalidity at
-successor acceptance remains fail-closed.
+process. Receipt absence before dispatch is required; receipt absence or
+invalidity at successor acceptance remains fail-closed.
 
 The V11 candidate must construct and validate the fully overlay/cohort-bound
 receipt and non-null stdout/stderr/output evidence before its first durable
@@ -111,6 +137,12 @@ Interpreter identity requires the lexical repository-worktree
 `.venv/bin/python` plus matching lexical venv
 `sys.prefix`; base interpreters, symlink/resolved equivalence, wrong-worktree
 venvs, and prefix mismatch are rejected before side effects.
+
+The hosted Console gate retains Chromium dependency and browser coverage. It
+pins the canonical HTTPS Ubuntu archive before Playwright installs system
+dependencies, bounds the Chromium install step at 10 minutes, and bounds the
+complete Console job at 20 minutes. A mirror stall therefore fails closed
+instead of hanging or bypassing Console evidence.
 
 **Failure/rollback:** Retain the profile and create one narrow follow-up for a
 new dominant blocker; never weaken the gate.

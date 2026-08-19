@@ -7,17 +7,22 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
+import scripts.ck07r1_shared_successor_overlay as overlay_module
 from scripts.ck07r1_shared_successor_overlay import (
+    CONSUMING_AUTHORITY_PATH,
     ROOT,
     SCHEMA_PATH,
     SharedSuccessorOverlayError,
     classify_observed_state,
     expected_worktree_delta,
+    load_consuming_boundary,
     load_overlay,
     observed_candidate_artifacts,
     overlay_changed_path_allowance,
     sha256_path,
     verify_bound_authority_bytes,
+    verify_consuming_boundary_activation,
+    verify_current_exact_main,
     verify_exact_committed_delta,
     verify_exact_worktree_delta,
     verify_launcher_safety_contract,
@@ -65,7 +70,174 @@ def test_overlay_is_exact_and_live_state_is_authorized() -> None:
         "data_policy": "synthetic_only",
     }
     state_key = "predecessor" if state == "authority_main" else "successor"
-    assert observed_candidate_artifacts(authority) == _state_observed(authority, state_key)
+    assert observed_candidate_artifacts(authority) == _state_observed(
+        authority, state_key
+    )
+
+
+def test_complete_consuming_boundary_is_the_only_additive_authority_delta() -> None:
+    overlay = load_overlay()
+    consuming = load_consuming_boundary()
+    assert consuming is not None
+    scope = set(consuming["scope"]["authority_write_scope"])
+    predecessor_scope = set(overlay["scope"]["authority_write_scope"])
+
+    verify_exact_worktree_delta(
+        overlay, "authority_main", observed=scope
+    )
+    verify_exact_committed_delta(
+        overlay,
+        observed=predecessor_scope | scope,
+        base_is_ancestor=True,
+    )
+    for changed in (
+        scope - {next(iter(scope))},
+        scope | {"src/codex_usage_tracker/agent_kernel/publication/writer.py"},
+    ):
+        with pytest.raises(SharedSuccessorOverlayError, match="Git delta mismatch"):
+            verify_exact_worktree_delta(
+                overlay, "authority_main", observed=changed
+            )
+
+
+def test_partial_consuming_boundary_pair_fails_closed(tmp_path: Path) -> None:
+    path = tmp_path / CONSUMING_AUTHORITY_PATH
+    path.parent.mkdir(parents=True)
+    path.write_text("{}\n", encoding="utf-8")
+    with pytest.raises(SharedSuccessorOverlayError, match="partial"):
+        load_consuming_boundary(tmp_path)
+
+
+def test_consuming_activation_requires_exact_main_cwd_capacity_and_cohort() -> None:
+    overlay = load_overlay()
+    consuming = load_consuming_boundary()
+    assert consuming is not None
+    frozen_root = Path(consuming["worker"]["frozen_cwd"])
+    exact_main = "a" * 40
+
+    verify_consuming_boundary_activation(
+        overlay,
+        consuming,
+        frozen_root,
+        observed_head=exact_main,
+        observed_tracking_main=exact_main,
+        observed_remote_main=exact_main,
+        observed_capacity_bytes=10 * 1024**3,
+        observed_base_is_ancestor=True,
+    )
+    with pytest.raises(SharedSuccessorOverlayError, match="fresh exact"):
+        verify_current_exact_main(
+            frozen_root,
+            observed_head=exact_main,
+            observed_tracking_main=exact_main,
+            observed_remote_main="b" * 40,
+        )
+    with pytest.raises(SharedSuccessorOverlayError, match="frozen cwd"):
+        verify_consuming_boundary_activation(
+            overlay,
+            consuming,
+            Path("/wrong/worktree"),
+            observed_head=exact_main,
+            observed_tracking_main=exact_main,
+            observed_remote_main=exact_main,
+            observed_capacity_bytes=10 * 1024**3,
+            observed_base_is_ancestor=True,
+        )
+    with pytest.raises(SharedSuccessorOverlayError, match="capacity"):
+        verify_consuming_boundary_activation(
+            overlay,
+            consuming,
+            frozen_root,
+            observed_head=exact_main,
+            observed_tracking_main=exact_main,
+            observed_remote_main=exact_main,
+            observed_capacity_bytes=10 * 1024**3 - 1,
+            observed_base_is_ancestor=True,
+        )
+    with pytest.raises(SharedSuccessorOverlayError, match="not an ancestor"):
+        verify_consuming_boundary_activation(
+            overlay,
+            consuming,
+            frozen_root,
+            observed_head=exact_main,
+            observed_tracking_main=exact_main,
+            observed_remote_main=exact_main,
+            observed_capacity_bytes=10 * 1024**3,
+            observed_base_is_ancestor=False,
+        )
+    changed = deepcopy(consuming)
+    changed["worker"]["runtime_identity_claim"] = "self_asserted"
+    with pytest.raises(SharedSuccessorOverlayError, match="orchestration policy"):
+        verify_consuming_boundary_activation(
+            overlay,
+            changed,
+            frozen_root,
+            observed_head=exact_main,
+            observed_tracking_main=exact_main,
+            observed_remote_main=exact_main,
+            observed_capacity_bytes=10 * 1024**3,
+            observed_base_is_ancestor=True,
+        )
+
+
+def test_worker_state_reaches_consuming_activation_before_verifier_returns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    overlay = load_overlay()
+    consuming = load_consuming_boundary()
+    assert consuming is not None
+    calls: list[str] = []
+    monkeypatch.setattr(overlay_module, "load_overlay", lambda root: overlay)
+    monkeypatch.setattr(
+        overlay_module, "verify_bound_authority_bytes", lambda *_: None
+    )
+    monkeypatch.setattr(
+        overlay_module, "verify_launcher_safety_contract", lambda *_: None
+    )
+    monkeypatch.setattr(
+        overlay_module, "verify_exact_committed_delta", lambda *_: None
+    )
+    monkeypatch.setattr(
+        overlay_module, "observed_candidate_artifacts", lambda *_: {}
+    )
+    monkeypatch.setattr(
+        overlay_module,
+        "classify_observed_state",
+        lambda *_: "worker_prequalification",
+    )
+    monkeypatch.setattr(
+        overlay_module, "verify_exact_worktree_delta", lambda *_: None
+    )
+    monkeypatch.setattr(
+        overlay_module, "load_consuming_boundary", lambda *_: consuming
+    )
+    monkeypatch.setattr(
+        overlay_module,
+        "verify_consuming_boundary_activation",
+        lambda *_: calls.append("consuming_activation"),
+    )
+
+    _, state = overlay_module.verify_shared_successor_overlay(Path("/synthetic"))
+    assert state == "worker_prequalification"
+    assert calls == ["consuming_activation"]
+
+
+def test_frozen_launcher_imports_verifier_before_any_side_effect() -> None:
+    consuming = load_consuming_boundary()
+    assert consuming is not None
+    launcher_path = (
+        Path(consuming["worker"]["frozen_cwd"])
+        / "scripts/benchmark_ck07r1_lifecycle_scale.py"
+    )
+    if not launcher_path.is_file():
+        pytest.skip("retained frozen candidate witness is unavailable")
+    launcher = launcher_path.read_text(encoding="utf-8")
+    launch = launcher[
+        launcher.index("def _launch_exact()") : launcher.index("\ndef main()")
+    ]
+    assert "verifier.verify_shared_successor_overlay(root)" in launcher
+    assert launch.index("_verify_overlay_cohort()") < launch.index("os.pipe()")
+    assert launch.index("_verify_overlay_cohort()") < launch.index("os.fork()")
 
 
 def test_overlay_admits_only_the_complete_exact_successor() -> None:
@@ -234,7 +406,11 @@ def test_overlay_requires_exact_all_or_none_git_delta() -> None:
 
 def test_overlay_requires_exact_committed_authority_delta() -> None:
     authority = load_overlay()
-    expected = set(authority["scope"]["authority_write_scope"])
+    consuming = load_consuming_boundary()
+    assert consuming is not None
+    expected = set(authority["scope"]["authority_write_scope"]) | set(
+        consuming["scope"]["authority_write_scope"]
+    )
 
     verify_exact_committed_delta(
         authority,

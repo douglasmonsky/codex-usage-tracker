@@ -79,6 +79,41 @@ task before its prerequisites are merged and exact-main verified. Update the
 task status, master ledger, measurements, deviations, and residual risks in
 the same change that completes a task.
 
+## Standing Repository Authorization
+
+No additional user approval is required for roadmap-authorized,
+repository-scoped actions when merged repository authority and the immediate
+preflight authorize the action. Agents should proceed end to end through
+fresh worktrees and branches, dependency or bootstrap work, source, test,
+documentation, schema, authority, and accounting edits, local validation,
+bounded reviewers, commits, branch pushes, ordinary GitHub pull-request
+creation or updates, hosted CI, squash merges, exact-main verification,
+machine-DAG transitions, and synthetic qualification runs and artifacts. This
+standing authorization includes a one-shot token-consuming synthetic run when
+the merged authority and immediate preflight authorize that exact run.
+
+Continue from handoff to handoff without pausing merely for repeated approval.
+Use engineering discretion for bounded implementation, integration, and policy
+corrections, and carry them through the repository's normal authority-PR,
+review, CI, merge, and exact-main verification path.
+
+Worker identity is a normative coordinator/orchestration binding enforced by
+Codex thread controls and exact repository evidence. The coordinator's use of
+the exact existing task is the authoritative worker-ownership proof. Do not
+claim cryptographic per-task authentication or require a trusted per-task
+credential that Codex Desktop does not provide; runtime self-assertion is not
+worker authentication, and repeated user approval is not required.
+
+Standing authorization does not waive fail-closed gates, exact identities and
+scopes, synthetic-only and privacy restrictions, one-shot no-refund/no-retry
+semantics, review/CI/merge requirements, or cleanup safety. It does not
+authorize force-pushes, direct pushes to `main`, destructive cleanup or
+deletion, loss of dirty or uncommitted evidence, credentials or secrets, paid
+resources, package publishing or release tags, public-visibility changes
+outside ordinary GitHub pull requests, real or live Codex data, production
+operations, or bypassing repository failures. Those actions remain separately
+constrained.
+
 ## Cross-packet semantic continuity
 
 A packet is connected to its prerequisites by executable semantics, not only
