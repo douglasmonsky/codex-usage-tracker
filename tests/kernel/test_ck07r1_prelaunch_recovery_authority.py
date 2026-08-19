@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
+import scripts.ck07r1_prelaunch_recovery as recovery
 from scripts.ck07r1_prelaunch_recovery import (
     AUTHORITY_PATH,
     MINIMUM_CAPACITY_BYTES,
@@ -186,6 +187,50 @@ def test_recovery_authority_delta_is_exact() -> None:
     ):
         with pytest.raises(PrelaunchRecoveryError, match="authority Git delta"):
             verify_exact_authority_delta(authority, ROOT, observed=changed)
+
+
+def test_committed_authority_allows_only_exact_combined_worktree_delta(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = _authority()
+    expected_authority = set(authority["scope"]["authority_write_scope"])
+    expected_candidate = set(
+        authority["scope"]["combined_preflight_candidate_scope"]
+    )
+    head = "a" * 40
+    base = authority["authority_base_sha"]
+
+    def fake_git(root: Path, *args: str) -> str:
+        assert root == ROOT
+        if args == ("rev-parse", "HEAD"):
+            return head
+        if args == ("diff", "--name-only", f"{base}..{head}", "--"):
+            return "\n".join(sorted(expected_authority))
+        raise AssertionError(args)
+
+    monkeypatch.setattr(recovery, "_git", fake_git)
+    monkeypatch.setattr(
+        recovery,
+        "_status_paths",
+        lambda root: expected_candidate if root == ROOT else set(),
+    )
+    verify_exact_authority_delta(
+        authority,
+        ROOT,
+        allowed_worktree_delta=expected_candidate,
+    )
+
+    with pytest.raises(
+        PrelaunchRecoveryError,
+        match="authority worktree delta must be exact",
+    ):
+        verify_exact_authority_delta(
+            authority,
+            ROOT,
+            allowed_worktree_delta=expected_candidate - {
+                "scripts/benchmark_ck07r1_lifecycle_scale.py"
+            },
+        )
 
 
 def test_recovery_uses_new_noncolliding_paths_and_same_token() -> None:

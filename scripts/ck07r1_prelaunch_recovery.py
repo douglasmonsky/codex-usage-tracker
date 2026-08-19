@@ -146,26 +146,33 @@ def verify_exact_authority_delta(
     authority_root: Path,
     *,
     observed: set[str] | None = None,
+    allowed_worktree_delta: set[str] | None = None,
 ) -> None:
     expected = set(authority["scope"]["authority_write_scope"])
     if observed is None:
         base = str(authority["authority_base_sha"])
-        tracked = {
-            line
-            for line in _git(authority_root, "diff", "--name-only", base, "--").splitlines()
-            if line
-        }
-        untracked = {
-            line
-            for line in _git(
-                authority_root,
-                "ls-files",
-                "--others",
-                "--exclude-standard",
-            ).splitlines()
-            if line
-        }
-        actual = tracked | untracked
+        head = _git(authority_root, "rev-parse", "HEAD")
+        worktree = _status_paths(authority_root)
+        if head == base:
+            actual = worktree
+        else:
+            actual = {
+                line
+                for line in _git(
+                    authority_root,
+                    "diff",
+                    "--name-only",
+                    f"{base}..{head}",
+                    "--",
+                ).splitlines()
+                if line
+            }
+            permitted = allowed_worktree_delta or set()
+            if worktree != permitted:
+                raise PrelaunchRecoveryError(
+                    "authority worktree delta must be exact: "
+                    f"expected={sorted(permitted)} actual={sorted(worktree)}"
+                )
     else:
         actual = observed
     if actual != expected:
@@ -415,8 +422,22 @@ def _main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     authority_root = args.authority_root.absolute()
     authority = load_authority(authority_root)
+    candidate_root = (
+        args.candidate_root.absolute()
+        if args.candidate_root is not None
+        else None
+    )
+    allowed_worktree_delta = None
+    if args.command == "combined" and candidate_root == authority_root:
+        allowed_worktree_delta = set(
+            authority["scope"]["combined_preflight_candidate_scope"]
+        )
     verify_bound_authority_bytes(authority, authority_root)
-    verify_exact_authority_delta(authority, authority_root)
+    verify_exact_authority_delta(
+        authority,
+        authority_root,
+        allowed_worktree_delta=allowed_worktree_delta,
+    )
     result: dict[str, Any] = {
         "authority_schema": authority["schema"],
         "authority_status": authority["status"],
@@ -425,9 +446,8 @@ def _main(argv: Sequence[str] | None = None) -> int:
         "verification": "passed",
     }
     if args.command == "combined":
-        if args.candidate_root is None:
+        if candidate_root is None:
             parser.error("--candidate-root is required for combined")
-        candidate_root = args.candidate_root.absolute()
         verify_candidate_cohort(authority, candidate_root)
         verify_exact_candidate_delta(authority, candidate_root)
         verify_preserved_failure_ledger(authority, candidate_root)
