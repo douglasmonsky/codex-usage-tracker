@@ -129,7 +129,10 @@ qualification launch with the complete `66c015de…` / `f108dbb4…` /
 `4c514889…` cohort. That ownership is enforced normatively by the coordinator
 resuming the exact existing Codex task and recomputing repository evidence; it
 is not a runtime-authenticated identity and the launcher must not claim a
-cryptographic per-task credential. Historical accepted R3A
+cryptographic per-task credential. The hosted Console gate retains Chromium
+dependency/browser coverage, pins the canonical HTTPS Ubuntu archive, and
+fails closed under bounded install/job timeouts rather than accepting a
+stalled or skipped Console result. Historical accepted R3A
 `6689d61f…`, revoked `d192c858…`, mixed cohorts, and every other digest are
 predecessor-only or fail-closed and cannot enter `worker_prequalification`.
 The worker may enter `worker_prequalification` only with the exact selected

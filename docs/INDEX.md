@@ -137,7 +137,10 @@ qualification command from the bound cwd. The token remains
 `unspent_unavailable` until all immediate prelaunch checks pass and is consumed
 only at the first exact child PID/argv/cwd/owner/handshake. It is
 non-refundable, with no retry, restart, replacement, live data, PR #394
-mutation, or downstream readiness. The authority task itself does not launch,
+mutation, or downstream readiness. Its hosted Console gate keeps Chromium
+coverage while pinning the canonical HTTPS Ubuntu archive and bounding both
+browser installation and the complete job; a mirror stall fails closed and
+cannot be treated as hosted-green. The authority task itself does not launch,
 consume the token, or create output, ledger, stdout, stderr, or receipt. The
 frozen launcher imports the shared verifier before ledger/fork; its
 `worker_prequalification` path requires the complete consuming authority,

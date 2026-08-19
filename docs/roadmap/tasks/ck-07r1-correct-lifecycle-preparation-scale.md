@@ -138,6 +138,12 @@ Interpreter identity requires the lexical repository-worktree
 `sys.prefix`; base interpreters, symlink/resolved equivalence, wrong-worktree
 venvs, and prefix mismatch are rejected before side effects.
 
+The hosted Console gate retains Chromium dependency and browser coverage. It
+pins the canonical HTTPS Ubuntu archive before Playwright installs system
+dependencies, bounds the Chromium install step at 10 minutes, and bounds the
+complete Console job at 20 minutes. A mirror stall therefore fails closed
+instead of hanging or bypassing Console evidence.
+
 **Failure/rollback:** Retain the profile and create one narrow follow-up for a
 new dominant blocker; never weaken the gate.
 

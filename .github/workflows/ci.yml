@@ -87,6 +87,7 @@ jobs:
   console:
     name: Focused Evidence Console
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -103,6 +104,13 @@ jobs:
         run: |
           python -m pip install ".[dev]"
           npm ci --ignore-scripts
+      - name: Pin Ubuntu archive for browser dependencies
+        run: |
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu' \
+            | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+      - name: Install Chromium
+        timeout-minutes: 10
+        run: |
           npx playwright install --with-deps chromium
       - name: Verify deterministic Console
         run: |

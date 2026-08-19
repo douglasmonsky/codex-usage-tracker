@@ -61,6 +61,10 @@
     {
       "path": "scripts/ck07r1_shared_successor_overlay.py",
       "sha256": "f3745ec07bf47ee15f50969132f315aec61d407c745f6c63694e9910a88c5768"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "f25ea89fb207b2d7a9ff1c18953865ef91cb73cfe23796f545d304a40cc8959c"
     }
   ],
   "candidate_cohort": [
@@ -160,6 +164,7 @@
   },
   "scope": {
     "authority_write_scope": [
+      ".github/workflows/ci.yml",
       "AGENTS.md",
       "docs/INDEX.md",
       "docs/decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.json",

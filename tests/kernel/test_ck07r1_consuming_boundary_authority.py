@@ -86,6 +86,19 @@ def test_consuming_boundary_preserves_every_bound_authority_byte() -> None:
     verify_bound_authority_bytes(_authority(), ROOT)
 
 
+def test_consuming_boundary_binds_bounded_console_browser_install() -> None:
+    authority = _authority()
+    workflow_path = ".github/workflows/ci.yml"
+    workflow = (ROOT / workflow_path).read_text(encoding="utf-8")
+
+    assert workflow_path in authority["scope"]["authority_write_scope"]
+    assert "name: Focused Evidence Console\n    runs-on: ubuntu-latest\n    timeout-minutes: 20" in workflow
+    assert "name: Pin Ubuntu archive for browser dependencies" in workflow
+    assert "https://archive.ubuntu.com/ubuntu" in workflow
+    assert "name: Install Chromium\n        timeout-minutes: 10" in workflow
+    assert "npx playwright install --with-deps chromium" in workflow
+
+
 def test_consuming_boundary_binds_only_exact_atomic_candidate() -> None:
     authority = _authority()
     assert [record["sha256"] for record in authority["candidate_cohort"]] == [
