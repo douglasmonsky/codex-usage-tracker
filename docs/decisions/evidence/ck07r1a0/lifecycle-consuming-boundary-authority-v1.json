@@ -1,0 +1,195 @@
+{
+  "schema": "codex-usage-tracker.ck07r1-lifecycle-consuming-boundary-authority.v1",
+  "authority_version": 1,
+  "owner": "CK-07R1A0",
+  "authority_base_sha": "67bb1a36255b05634ee18c615e57cb01dbe0ebda",
+  "status": "permitted_not_accepted",
+  "approval": {
+    "decision": "authorize_exactly_one_synthetic_qualification_launch_after_this_authority_merges_and_exact_main_verifies",
+    "implementation_acceptance": "not_claimed",
+    "runtime_acceptance": "not_claimed",
+    "live_or_real_data": "forbidden",
+    "pr394": "stale_read_only",
+    "downstream": "CK-08R4_CK-08RG_CK-09_blocked_until_post_run_implementation_acceptance_and_accounting_merge"
+  },
+  "governance": {
+    "standing_authorization_path": "AGENTS.md",
+    "repository_actions": "no_additional_user_approval_when_merged_repository_authority_and_immediate_preflight_authorize",
+    "worker_identity": "normative_coordinator_orchestration_binding_to_exact_existing_thread_and_repository_evidence",
+    "runtime_attestation": "not_required_not_claimed_and_no_cryptographic_per_task_credential_available",
+    "excluded_actions": "remain_separately_constrained_by_AGENTS_and_repository_authority"
+  },
+  "worker": {
+    "thread_id": "019fbfe2-8fe4-7de2-9264-d58572366727",
+    "prequalification_base_sha": "67bb1a36255b05634ee18c615e57cb01dbe0ebda",
+    "retained_witness_base_sha": "6c08ecd92a2c5166c1585be426e1ed437309a910",
+    "frozen_cwd": "/Users/Monsky/Developer/Codex/2026-08-11/codex-usage-tracker-ck07r1-corrected-shared-overlay-exact-main-6c08ecd9",
+    "identity_enforcement": "normative_coordinator_orchestration_binding_not_runtime_authentication",
+    "ownership_proof": "coordinator_resumes_exact_existing_Codex_thread_and_recomputes_exact_repository_evidence",
+    "runtime_identity_claim": "none",
+    "replacement_worker": "forbidden"
+  },
+  "immutable_authorities": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "b835817af3a0e12dbce7560a2d639e1e6d207dc75b0a85892804623280700e8b"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
+      "sha256": "437b05c7dfa23ff8efb3038c19e6a0f2524ac45e2fa25f910af40023aad7b8cd"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
+      "sha256": "ba0d47358aba2f1d66c5b699e2ecd89b2378d082b7bbbfb777fc806329c7e7d4"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
+      "sha256": "7cc998fb29cad3a7b87e95026df5fb2195684c064628885cab7cc0a781d0bb74"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
+      "sha256": "6bf00ce49082be581783c33ce7247a29eb9b63515d6a5af209dccd82d28d685b"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json",
+      "sha256": "73071209d42dbf65130fd307a69a0a3e76eceb65161e90baaf271321a6a81b8d"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.schema.json",
+      "sha256": "943117da4e3d82624ad2cd4656092d2a7aa86266d5d30f7bca2b07f15c9ed86b"
+    },
+    {
+      "path": "scripts/ck07r1_shared_successor_overlay.py",
+      "sha256": "f3745ec07bf47ee15f50969132f315aec61d407c745f6c63694e9910a88c5768"
+    }
+  ],
+  "candidate_cohort": [
+    {
+      "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea"
+    },
+    {
+      "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+      "sha256": "f108dbb45d7586a15eb370c94fc124268a249f2f6f1ee97e7b8b28a3874b737c"
+    },
+    {
+      "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+      "sha256": "4c51488988397e0ccaf40266a4f68bb1d6d342e4be1db36dd1cf36ab63aa335a"
+    }
+  ],
+  "transition": {
+    "from": "worker_prequalification",
+    "to": "launch_authorized_once",
+    "launch_authorized": true,
+    "activation": "only_after_this_authority_pr_is_squash_merged_hosted_green_and_the_exact_merged_main_is_locally_verified",
+    "candidate_head_transition": "after_merge_fetch_then_non_destructive_fast_forward_only_from_prequalification_base_to_exact_merged_main_while_preserving_and_recomputing_the_exact_three_dirty_candidate_bytes",
+    "runtime_acceptance": "not_claimed",
+    "post_single_run": "unavailable_until_exact_launcher_receipt_and_evidence_validate",
+    "final_accepted": "unavailable_until_post_run_worker_merge_and_exact_main_verification"
+  },
+  "launch_contract": {
+    "argv": [
+      ".venv/bin/python",
+      "scripts/benchmark_ck07r1_lifecycle_scale.py",
+      "--profile",
+      "all",
+      "--samples",
+      "5",
+      "--output",
+      "output/ck07r1/lifecycle-requalification-v1.json"
+    ],
+    "cwd": "/Users/Monsky/Developer/Codex/2026-08-11/codex-usage-tracker-ck07r1-corrected-shared-overlay-exact-main-6c08ecd9",
+    "environment": {
+      "required": {
+        "LC_ALL": "C.UTF-8",
+        "PYTHONHASHSEED": "0",
+        "PYTHONUNBUFFERED": "1",
+        "TZ": "UTC"
+      },
+      "forbidden": [
+        "PYTHONPATH",
+        "CODEX_HOME",
+        "real Codex log or database paths"
+      ],
+      "data_policy": "synthetic_fixtures_only"
+    },
+    "exclusive_paths": {
+      "output": "output/ck07r1/lifecycle-requalification-v1.json",
+      "ledger": "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+      "stdout": "output/ck07r1/lifecycle-requalification-v1.stdout.txt",
+      "stderr": "output/ck07r1/lifecycle-requalification-v1.stderr.txt"
+    }
+  },
+  "run_token": {
+    "id": "ck07r1-all-profile-e2e-1",
+    "maximum_new_end_to_end_runs": 1,
+    "prelaunch_status": "unspent_unavailable",
+    "token_consumed": false,
+    "consumption": "successful_process_launch_only_after_exact_child_pid_argv_cwd_owner_and_handshake_verification",
+    "refund": false,
+    "retry": "none",
+    "restart": "none",
+    "replacement": "none",
+    "duplicate_launch": "forbidden"
+  },
+  "immediate_prelaunch_gates": {
+    "authority_integrity": "all_bound_authority_bytes_and_this_v1_schema_validate_candidate_HEAD_equals_fetched_and_live_origin_main_and_prequalification_base_is_ancestor",
+    "candidate": "exact_complete_three_path_cohort_with_no_missing_extra_mixed_or_other_digest",
+    "git_delta": "exactly_the_three_candidate_paths_and_no_other_dirty_or_untracked_path",
+    "worker": "normative_coordinator_binding_to_exact_existing_thread_not_runtime_authenticated",
+    "cwd": "exact_frozen_physical_cwd",
+    "argv": "exact_frozen_repository_relative_command",
+    "environment": "exact_required_values_and_no_forbidden_values",
+    "interpreter": "lexical_frozen_cwd_.venv/bin/python_and_matching_venv_sys_prefix",
+    "capacity": "disk_available_bytes_at_or_above_10737418240",
+    "processes": "matching_processes_empty_for_exact_argv_cwd_and_current_owner",
+    "paths": "output_parent_exists_and_all_four_frozen_paths_absent",
+    "fixture": "merged_run_authority_exact_synthetic_fixture_identity_only",
+    "receipt": "absent_before_launch_and_fabrication_forbidden",
+    "timing": "all_gates_pass_immediately_before_the_single_command"
+  },
+  "failure_policy": {
+    "prelaunch": "fail_closed_without_launch_token_consumption_or_artifact_creation",
+    "after_successful_launch": "retain_first_terminal_result_and_consumed_token_with_no_retry_restart_or_replacement",
+    "fabricated_receipt": "reject",
+    "mixed_or_partial_authority": "reject",
+    "low_capacity": "reject",
+    "process_collision": "reject",
+    "preexisting_output": "reject",
+    "non_fast_forward_or_candidate_byte_drift": "reject"
+  },
+  "scope": {
+    "authority_write_scope": [
+      "AGENTS.md",
+      "docs/INDEX.md",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.json",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.schema.json",
+      "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+      "docs/roadmap/TASK_PACKETS.md",
+      "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
+      "scripts/check_kernel_scope.py",
+      "scripts/ck07r1_shared_successor_overlay.py",
+      "scripts/ck07r1_consuming_boundary.py",
+      "tests/kernel/test_ck07r1_consuming_boundary_authority.py",
+      "tests/kernel/test_ck07r1_shared_successor_overlay.py",
+      "tests/kernel/test_documentation_authority.py",
+      "tests/kernel/test_kernel_scope.py"
+    ],
+    "combined_preflight_candidate_scope": [
+      "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "scripts/benchmark_ck07r1_lifecycle_scale.py",
+      "tests/agent_kernel/publication/test_lifecycle_scale.py"
+    ],
+    "forbidden": [
+      "candidate_or_support_bytes_in_the_authority_pr",
+      "generated_output_ledger_stdout_stderr_or_receipt",
+      "token_consumption_or_child_launch_in_the_authority_task",
+      "implementation_or_runtime_acceptance",
+      "PR_394_mutation",
+      "CK-08R4_CK-08RG_or_CK-09_readiness",
+      "live_or_real_data",
+      "retry_restart_replacement_or_worker_substitution",
+      "cryptographic_or_self_asserted_runtime_worker_authentication"
+    ]
+  }
+}

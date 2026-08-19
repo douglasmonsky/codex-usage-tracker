@@ -117,20 +117,41 @@ preserved `prelaunch_failed` launch-token ledger, with
 no retry. The witness remains read-only. The incident does not authorize a
 launch or replacement worker.
 The first sample, 720-second wrapper timeout, all five underlying budgets,
-one-run ceiling, and every fail-closed rule remain binding. CK-07R1 is
-Conditional Ready pending merge and exact-main verification of the exact
-successor authority. Until then its current authority state is
-`authority_main` at preparation `7d1831ff…` and no worker may resume. After
-that handoff only the existing stopped worker may resume with the complete
-`66c015de…` / `f108dbb4…` / `4c514889…` cohort. Historical accepted R3A
+one-run ceiling, and every fail-closed rule remain binding. The versioned
+[consuming-boundary authority](../decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.json)
+is the only transition from the already-proven exact
+`worker_prequalification` state to `launch_authorized_once`. It activates only
+after its single hosted-green authority PR is squash-merged and the exact
+merged main is locally verified. Until then no worker may launch. After that
+handoff only existing worker `019fbfe2-8fe4-7de2-9264-d58572366727` may use
+the frozen cwd and exact command to perform exactly one synthetic
+qualification launch with the complete `66c015de…` / `f108dbb4…` /
+`4c514889…` cohort. That ownership is enforced normatively by the coordinator
+resuming the exact existing Codex task and recomputing repository evidence; it
+is not a runtime-authenticated identity and the launcher must not claim a
+cryptographic per-task credential. Historical accepted R3A
 `6689d61f…`, revoked `d192c858…`, mixed cohorts, and every other digest are
 predecessor-only or fail-closed and cannot enter `worker_prequalification`.
 The worker may enter `worker_prequalification` only with the exact selected
 cohort, `post_single_run` only with a complete planner-valid receipt and bound
 dynamic evidence identity, and `final_accepted` only after worker merge and
-exact-main verification. The still-unspent one-run token may fund exactly one first
-successful child launch after all gates pass; this is not a retry, restart, or
-replacement of a launched process. Earlier wording that says to resume, refresh, or rerun PR #394 is
+exact-main verification. The still-unspent one-run token remains
+`unspent_unavailable` until every immediate prelaunch gate passes. It may then
+be consumed only by the first successfully observed exact child launch and
+handshake; it is non-refundable and authorizes no retry, restart, or
+replacement. All four frozen artifact paths must be absent before launch, and
+any prelaunch failure remains non-consuming. The frozen launcher imports the
+shared-successor verifier before ledger creation or fork; on
+`worker_prequalification`, that verifier requires the complete consuming
+authority, frozen cwd, capacity at or above 10 GiB, and candidate
+`HEAD == refs/remotes/origin/main == live ls-remote origin/main`. Hosted-green
+squash merge remains the repository merge control. The frozen launch lane
+must then fetch and fast-forward only from prequalification base `67bb1a…` to
+the exact merged main, preserving and recomputing the exact three dirty cohort
+bytes before preflight. Reset, rebase, stash, a non-fast-forward transition,
+or any cohort-byte change fails closed; historical V9/V10 witnesses remain
+immutable. Earlier wording that says to
+resume, refresh, or rerun PR #394 is
 historical provenance and does not authorize action. This source-digest
 authority supersedes earlier CK-07R1 wording that says to resume, refresh, or
 rerun PR #394; those retained references are historical provenance and do not
@@ -244,7 +265,7 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "continuation_policy": "reuse_existing_task_for_same_packet",
   "authority_policy": "new_task_only_for_new_policy_or_contract_decision",
   "handoff_policy": "proactive_parent_handoff_from_repository_verified_state",
-  "identity_policy": "exact_main_and_repository_paths_receiver_recomputes_digests",
+  "identity_policy": "worker_ownership_is_normative_coordinator_thread_binding_plus_exact_repository_evidence_not_runtime_authentication",
   "one_shot_policy": "real_non_consuming_preflight_before_authorized_attempt",
   "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
@@ -252,7 +273,7 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "completed": ["CK-08R0", "CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R1", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
   "ready": [],
   "conditional_ready": [{
-    "condition": "exact 66c015de/f108dbb4/4c514889 successor authority merges and exact-main verifies; resume only existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 with the atomic cohort; no replacement, launch, token consumption, or downstream task",
+    "condition": "v1 consuming-boundary authority merges and exact-main verifies; coordinator resumes exact existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 with the atomic 66c015de/f108dbb4/4c514889 cohort; exactly one synthetic qualification launch may proceed under immediate preflight; no replacement or downstream task",
     "tasks": ["CK-07R1"]
   }],
   "blocked": [],

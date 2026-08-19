@@ -128,10 +128,32 @@ versioned
 [`shared-successor-overlay-authority-v1`](decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
 is the only additive consumer bridge: accepted CK-08R1B v1, CK-08R1 evidence,
 and CK-QG1 authority bytes remain exact, and the overlay grants neither
-implementation acceptance nor launch authority. This
-authority task does not resume the worker, consume the run token, authorize
-launch/output, or advance another successor. The one-run gate remains unspent
-and unavailable. The central authority is
+implementation acceptance nor launch authority. The separate versioned
+[`lifecycle-consuming-boundary-authority-v1`](decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.json)
+preserves those bytes and, only after its hosted-green squash merge and
+exact-main verification, authorizes existing worker
+`019fbfe2-8fe4-7de2-9264-d58572366727` to issue exactly one frozen synthetic
+qualification command from the bound cwd. The token remains
+`unspent_unavailable` until all immediate prelaunch checks pass and is consumed
+only at the first exact child PID/argv/cwd/owner/handshake. It is
+non-refundable, with no retry, restart, replacement, live data, PR #394
+mutation, or downstream readiness. The authority task itself does not launch,
+consume the token, or create output, ledger, stdout, stderr, or receipt. The
+frozen launcher imports the shared verifier before ledger/fork; its
+`worker_prequalification` path requires the complete consuming authority,
+frozen cwd, capacity at or above 10 GiB, and candidate
+`HEAD == fetched origin/main == live origin/main`, so a feature branch or stale
+main fails before side effects. After authority merge, the frozen launch lane
+must fetch and fast-forward only from the `67bb1a…` prequalification base to
+that exact merged main while preserving and recomputing all three dirty
+candidate bytes; reset, rebase, stash, or any byte drift fails closed.
+Historical V9/V10 witnesses remain untouched. Worker ownership is a normative coordinator
+binding to that exact existing Codex task and recomputed repository evidence,
+not runtime or cryptographic per-task authentication. The launcher neither
+accepts nor claims a self-asserted worker credential. The root
+[`AGENTS.md`](../AGENTS.md) standing authorization permits the coordinator and
+worker to continue through this repository workflow without repeated user
+approval while every exact fail-closed gate remains binding. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
 
 The V11 candidate must construct and validate the exact overlay/cohort-bound
