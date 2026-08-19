@@ -69,7 +69,7 @@ def test_overlay_is_exact_and_live_state_is_authorized() -> None:
         if (ROOT / TERMINAL_AUTHORITY_PATH).is_file():
             terminal_authority = load_terminal_authority(ROOT)
             corrected_preparation = terminal_authority["corrected_candidate_cohort"][0]
-            if sha256_path(ROOT / corrected_preparation["path"]) == corrected_preparation["sha256"]:
+            if sha256_path(ROOT, corrected_preparation["path"]) == corrected_preparation["sha256"]:
                 terminal = verify_terminal_combined(terminal_authority, ROOT)
                 assert terminal == {
                     "candidate_paths": 7,
@@ -82,7 +82,7 @@ def test_overlay_is_exact_and_live_state_is_authorized() -> None:
                 verify_terminal_authority_delta(terminal_authority, ROOT)
                 overlay = load_overlay(ROOT)
                 assert (
-                    sha256_path(ROOT / corrected_preparation["path"])
+                    sha256_path(ROOT, corrected_preparation["path"])
                     == (overlay["states"]["predecessor"]["artifacts"][0]["sha256"])
                 )
             return
