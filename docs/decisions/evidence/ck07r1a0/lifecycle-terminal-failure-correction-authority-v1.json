@@ -87,12 +87,12 @@
     },
     {
       "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
-      "role": "failed_benchmark",
+      "role": "corrected_launcher",
       "sha256": "37cb7330494675b2211f31ab419b4105d23f5c71856a546f735304883f25ba8e"
     },
     {
       "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
-      "role": "failed_benchmark_tests",
+      "role": "corrected_launcher_tests",
       "sha256": "47659f999ae765d6f09472eb7db67814c60ec8bd0fccbd258fda1654e22e2854"
     }
   ],
