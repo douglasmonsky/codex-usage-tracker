@@ -1,8 +1,8 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** `blocked_hold` until the v1 consuming-boundary authority
-squash-merges and exact-main verifies; then `ready_one_shot` for the bound
-existing worker only, while implementation/runtime remain unaccepted
+**Status:** `blocked_hold` after the terminal v1 `prelaunch_failed` invocation;
+only the versioned prelaunch-recovery authority may restore `ready_one_shot`
+for the bound existing worker, while implementation/runtime remain unaccepted
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -15,7 +15,11 @@ preserves the one-shot launch contract. The versioned
 [consuming-boundary authority](../../decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.json)
 alone permits the bound existing worker to cross from exact
 `worker_prequalification` to `launch_authorized_once` after authority merge and
-exact-main verification.
+exact-main verification. The first invocation then stopped before successful
+child observation. The additive
+[prelaunch-recovery authority](../../decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json)
+alone can authorize one corrected v2 invocation after preserving that terminal
+ledger and proving the token remains unspent.
 
 **Central plan:** [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md)
 
@@ -61,6 +65,18 @@ database postconditions.
 
 **Consumer seam:** Preparation to `PublicationWriter` to read-only publication.
 
+**Preserved prelaunch failure:** The exact v1 ledger at
+`output/ck07r1/lifecycle-requalification-v1.launch-token.json` has SHA-256
+`5c2b42eca6a3e54cf4163226bc55f3c75aa35112c4ed0342c11f4e39cb9922be`,
+state `prelaunch_failed`, stage `child_start_handshake`, and
+`token_consumed=false`. No child was successfully observed or released and no
+runtime output, stdout, stderr, or receipt exists. The v1 invocation and path
+set are terminal and immutable. A corrected invocation is not a launched
+process retry, restart, replacement, or refund; it is the one remaining
+opportunity to observe the token-funded first successful child. It must use
+the exact `lifecycle-requalification-v2` output, ledger, stdout, and stderr
+paths and the exact corrected cohort bound by the recovery authority.
+
 **Parallelism:** Resume only existing worker
 `019fbfe2-8fe4-7de2-9264-d58572366727` after the consuming-boundary authority
 merges and exact-main verifies, using frozen cwd
@@ -93,9 +109,10 @@ the finite state transitions and real non-launching subprocess argv guard; no
 E2E or benchmark run in the authority reconciliation.
 
 **Acceptance:** Immediately before the one command, the worker must revalidate
-the exact authority bytes and three-path Git delta, lexical worktree
+the exact recovery authority bytes, the corrected three-path source cohort,
+the preserved v1 ledger as the sole fourth dirty path, lexical worktree
 `.venv/bin/python` plus matching `sys.prefix`, exact cwd/argv/environment,
-capacity at or above 10 GiB, `matching_processes=[]`, all four frozen artifact
+capacity at or above 10 GiB, `matching_processes=[]`, all four new v2 artifact
 paths absent, the unconsumed token, and synthetic fixture identity. Any miss
 fails closed without launch or artifact creation. If every gate passes, exactly
 one successfully observed child PID/argv/cwd/owner/handshake consumes the
@@ -145,7 +162,8 @@ complete Console job at 20 minutes. A mirror stall therefore fails closed
 instead of hanging or bypassing Console evidence.
 
 **Failure/rollback:** Retain the profile and create one narrow follow-up for a
-new dominant blocker; never weaken the gate.
+new dominant blocker; never weaken the gate. The preserved v1 ledger is never
+deleted, moved, rewritten, or reclassified.
 
 **Handoff:** Evidence digest, profiles, retained first hosted failure, PR #394
 CI, exact-main result, and CK-08R4 input.

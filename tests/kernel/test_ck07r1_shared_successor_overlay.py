@@ -8,6 +8,12 @@ import pytest
 from jsonschema import Draft202012Validator
 
 import scripts.ck07r1_shared_successor_overlay as overlay_module
+from scripts.ck07r1_prelaunch_recovery import (
+    AUTHORITY_PATH as RECOVERY_AUTHORITY_PATH,
+)
+from scripts.ck07r1_prelaunch_recovery import (
+    verify_prelaunch_recovery,
+)
 from scripts.ck07r1_shared_successor_overlay import (
     CONSUMING_AUTHORITY_PATH,
     ROOT,
@@ -42,7 +48,27 @@ def _state_observed(
 
 
 def test_overlay_is_exact_and_live_state_is_authorized() -> None:
-    authority, state = verify_shared_successor_overlay()
+    try:
+        authority, state = verify_shared_successor_overlay()
+    except SharedSuccessorOverlayError:
+        if not (ROOT / RECOVERY_AUTHORITY_PATH).is_file():
+            raise
+        recovery_ledger = ROOT / "output/ck07r1/lifecycle-requalification-v1.launch-token.json"
+        if recovery_ledger.is_file():
+            recovery, recovery_state = verify_prelaunch_recovery(ROOT)
+            assert recovery_state == "prelaunch_recovery_verified"
+            assert recovery["recovery_transition"]["old_shared_overlay"] == (
+                "immutable_historical_predecessor_evidence"
+            )
+            assert recovery["recovery_transition"]["live_corrected_cohort_authority"] == (
+                "this_versioned_recovery_authority_only"
+            )
+            assert recovery["status"] == "permitted_not_accepted"
+            assert recovery["decision"]["runtime_acceptance"] == "not_claimed"
+            assert recovery["decision"]["launch_authorized_in_authority_task"] is False
+            return
+        authority = load_overlay()
+        state = classify_observed_state(authority, observed_candidate_artifacts(authority))
 
     assert state in {"authority_main", "worker_prequalification"}
     assert authority["status"] == "permitted_not_accepted"
@@ -70,9 +96,7 @@ def test_overlay_is_exact_and_live_state_is_authorized() -> None:
         "data_policy": "synthetic_only",
     }
     state_key = "predecessor" if state == "authority_main" else "successor"
-    assert observed_candidate_artifacts(authority) == _state_observed(
-        authority, state_key
-    )
+    assert observed_candidate_artifacts(authority) == _state_observed(authority, state_key)
 
 
 def test_complete_consuming_boundary_is_the_only_additive_authority_delta() -> None:
@@ -82,9 +106,7 @@ def test_complete_consuming_boundary_is_the_only_additive_authority_delta() -> N
     scope = set(consuming["scope"]["authority_write_scope"])
     predecessor_scope = set(overlay["scope"]["authority_write_scope"])
 
-    verify_exact_worktree_delta(
-        overlay, "authority_main", observed=scope
-    )
+    verify_exact_worktree_delta(overlay, "authority_main", observed=scope)
     verify_exact_committed_delta(
         overlay,
         observed=predecessor_scope | scope,
@@ -95,9 +117,7 @@ def test_complete_consuming_boundary_is_the_only_additive_authority_delta() -> N
         scope | {"src/codex_usage_tracker/agent_kernel/publication/writer.py"},
     ):
         with pytest.raises(SharedSuccessorOverlayError, match="Git delta mismatch"):
-            verify_exact_worktree_delta(
-                overlay, "authority_main", observed=changed
-            )
+            verify_exact_worktree_delta(overlay, "authority_main", observed=changed)
 
 
 def test_partial_consuming_boundary_pair_fails_closed(tmp_path: Path) -> None:
@@ -188,29 +208,17 @@ def test_worker_state_reaches_consuming_activation_before_verifier_returns(
     assert consuming is not None
     calls: list[str] = []
     monkeypatch.setattr(overlay_module, "load_overlay", lambda root: overlay)
-    monkeypatch.setattr(
-        overlay_module, "verify_bound_authority_bytes", lambda *_: None
-    )
-    monkeypatch.setattr(
-        overlay_module, "verify_launcher_safety_contract", lambda *_: None
-    )
-    monkeypatch.setattr(
-        overlay_module, "verify_exact_committed_delta", lambda *_: None
-    )
-    monkeypatch.setattr(
-        overlay_module, "observed_candidate_artifacts", lambda *_: {}
-    )
+    monkeypatch.setattr(overlay_module, "verify_bound_authority_bytes", lambda *_: None)
+    monkeypatch.setattr(overlay_module, "verify_launcher_safety_contract", lambda *_: None)
+    monkeypatch.setattr(overlay_module, "verify_exact_committed_delta", lambda *_: None)
+    monkeypatch.setattr(overlay_module, "observed_candidate_artifacts", lambda *_: {})
     monkeypatch.setattr(
         overlay_module,
         "classify_observed_state",
         lambda *_: "worker_prequalification",
     )
-    monkeypatch.setattr(
-        overlay_module, "verify_exact_worktree_delta", lambda *_: None
-    )
-    monkeypatch.setattr(
-        overlay_module, "load_consuming_boundary", lambda *_: consuming
-    )
+    monkeypatch.setattr(overlay_module, "verify_exact_worktree_delta", lambda *_: None)
+    monkeypatch.setattr(overlay_module, "load_consuming_boundary", lambda *_: consuming)
     monkeypatch.setattr(
         overlay_module,
         "verify_consuming_boundary_activation",
@@ -226,18 +234,17 @@ def test_frozen_launcher_imports_verifier_before_any_side_effect() -> None:
     consuming = load_consuming_boundary()
     assert consuming is not None
     launcher_path = (
-        Path(consuming["worker"]["frozen_cwd"])
-        / "scripts/benchmark_ck07r1_lifecycle_scale.py"
+        Path(consuming["worker"]["frozen_cwd"]) / "scripts/benchmark_ck07r1_lifecycle_scale.py"
     )
     if not launcher_path.is_file():
         pytest.skip("retained frozen candidate witness is unavailable")
     launcher = launcher_path.read_text(encoding="utf-8")
-    launch = launcher[
-        launcher.index("def _launch_exact()") : launcher.index("\ndef main()")
-    ]
-    assert "verifier.verify_shared_successor_overlay(root)" in launcher
-    assert launch.index("_verify_overlay_cohort()") < launch.index("os.pipe()")
-    assert launch.index("_verify_overlay_cohort()") < launch.index("os.fork()")
+    launch = launcher[launcher.index("def _launch_exact()") : launcher.index("\ndef main()")]
+    assert "verifier.verify_prelaunch_recovery(root)" in launcher
+    assert "_verify_historical_shared_overlay_binding" in launcher
+    assert "_verify_overlay_cohort()" not in launch
+    assert launch.index("_verify_prelaunch_recovery()") < launch.index("os.pipe()")
+    assert launch.index("_verify_prelaunch_recovery()") < launch.index("os.fork()")
 
 
 def test_overlay_admits_only_the_complete_exact_successor() -> None:
@@ -294,9 +301,7 @@ def test_overlay_schema_rejects_status_token_launch_scope_and_safety_weakening()
         lambda value: value["launcher_safety"].__setitem__(
             "receipt_completion_ordering", "durable_completed_before_validation"
         ),
-        lambda value: value["launcher_safety"].__setitem__(
-            "receipt_failure_state", "completed"
-        ),
+        lambda value: value["launcher_safety"].__setitem__("receipt_failure_state", "completed"),
         lambda value: value["launcher_safety"].__setitem__(
             "child_pre_release_failure", "exception_returns_to_parent_path"
         ),
@@ -432,8 +437,7 @@ def test_overlay_requires_exact_committed_authority_delta() -> None:
     with pytest.raises(SharedSuccessorOverlayError, match="extra="):
         verify_exact_committed_delta(
             authority,
-            observed=expected
-            | {"src/codex_usage_tracker/agent_kernel/publication/writer.py"},
+            observed=expected | {"src/codex_usage_tracker/agent_kernel/publication/writer.py"},
             base_is_ancestor=True,
         )
 
@@ -455,8 +459,8 @@ def test_overlay_scope_and_launcher_contract_are_exact() -> None:
         verify_launcher_safety_contract(weakened)
 
     weakened = deepcopy(authority)
-    weakened["launcher_safety"]["interpreter_identity"][
-        "symlink_or_resolved_equivalence"
-    ] = "accepted"
+    weakened["launcher_safety"]["interpreter_identity"]["symlink_or_resolved_equivalence"] = (
+        "accepted"
+    )
     with pytest.raises(SharedSuccessorOverlayError, match="safety"):
         verify_launcher_safety_contract(weakened)

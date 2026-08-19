@@ -78,6 +78,10 @@ def test_authority_identities_and_both_lane_closures_are_recomputed(
     assert identities["dependency_shas"] == collected["dependency_shas"]
     assert identities["authority_digests"] == collected["authority_digests"]
     assert identities["r1b_selected_paths"] == 23
+    assert identities["ck07r1_overlay_state"] in {
+        "authority_main",
+        "worker_prequalification",
+    }
 
     lanes = collected["lanes"]
     assert isinstance(lanes, list)

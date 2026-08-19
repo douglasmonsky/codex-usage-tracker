@@ -863,6 +863,17 @@ CK07R1_CONSUMING_BOUNDARY_AUTHORITY_ADDITIONS = frozenset(
     }
 )
 
+CK07R1_PRELAUNCH_RECOVERY_AUTHORITY_ADDITIONS = frozenset(
+    {
+        "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.schema.json",
+        "scripts/ck07r1_prelaunch_recovery.py",
+        "scripts/qualify_ck08r1_answer_truth.py",
+        "tests/agent_kernel/test_ck08r1_answer_requalification.py",
+        "tests/kernel/test_ck07r1_prelaunch_recovery_authority.py",
+    }
+)
+
 CK08_PREREQUISITE_BLOCKER_ADDITIONS = frozenset(
     {
         "docs/decisions/evidence/ck08/fact-backed-oracle-prerequisite-gap.json",
@@ -940,6 +951,7 @@ INTEGRATION_ADDITIONS = (
     | CK07R1_LIFECYCLE_SCOPE_ADDITIONS
     | CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS
     | CK07R1_CONSUMING_BOUNDARY_AUTHORITY_ADDITIONS
+    | CK07R1_PRELAUNCH_RECOVERY_AUTHORITY_ADDITIONS
     | CK08_PREREQUISITE_BLOCKER_ADDITIONS
     | {
         "config/agent-kernel/maintainability-baseline-v1.json",
@@ -979,9 +991,7 @@ def active_paths(repo_root: Path) -> set[str]:
     }
 
 
-def authority_changed_path_failures(
-    changed_paths: set[str], allowed_paths: set[str]
-) -> list[str]:
+def authority_changed_path_failures(changed_paths: set[str], allowed_paths: set[str]) -> list[str]:
     """Reject any changed path outside a machine-bound authority scope."""
 
     return [

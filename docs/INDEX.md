@@ -159,6 +159,24 @@ worker to continue through this repository workflow without repeated user
 approval while every exact fail-closed gate remains binding. The central authority is
 [REMAINING_EXECUTION_PLAN.md](roadmap/REMAINING_EXECUTION_PLAN.md).
 
+The first v1 consuming-boundary command invocation terminated at
+`child_start_handshake` before token persistence or child release. Its sole
+durable artifact is the immutable
+`output/ck07r1/lifecycle-requalification-v1.launch-token.json` ledger with
+SHA-256 `5c2b42eca6a3e54cf4163226bc55f3c75aa35112c4ed0342c11f4e39cb9922be`,
+state `prelaunch_failed`, and `token_consumed=false`; no verified child,
+runtime output, stdout, stderr, or receipt exists. The versioned
+[`lifecycle-prelaunch-recovery-authority-v1`](decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json)
+is the only corrective path. It preserves the v1 ledger byte-for-byte and
+permits the same worker to make one new command invocation only after the
+portable parent/child process-snapshot correction, exact corrected cohort,
+authority merge, exact-main verification, and immediate gates all pass. This
+is not a retry, restart, replacement, or refund of a launched process because
+zero successful child launches were observed and the original one-run token
+remains `unspent_unavailable`. The recovery command uses only the non-colliding
+`lifecycle-requalification-v2` output, ledger, stdout, and stderr paths; the
+v1 invocation and ledger are terminal and can never be reused or overwritten.
+
 The V11 candidate must construct and validate the exact overlay/cohort-bound
 receipt and non-null stdout/stderr/output evidence before its first durable
 `completed` finalization. Evidence read/hash/parse/validation/finalization
