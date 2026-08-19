@@ -34,6 +34,21 @@ from scripts.ck07r1_shared_successor_overlay import (
     verify_launcher_safety_contract,
     verify_shared_successor_overlay,
 )
+from scripts.ck07r1_terminal_failure_correction import (
+    AUTHORITY_PATH as TERMINAL_AUTHORITY_PATH,
+)
+from scripts.ck07r1_terminal_failure_correction import (
+    load_authority as load_terminal_authority,
+)
+from scripts.ck07r1_terminal_failure_correction import (
+    verify_combined as verify_terminal_combined,
+)
+from scripts.ck07r1_terminal_failure_correction import (
+    verify_exact_authority_delta as verify_terminal_authority_delta,
+)
+from scripts.ck07r1_terminal_failure_correction import (
+    verify_immutable_authority_bytes as verify_terminal_authority_bytes,
+)
 
 
 def _state_observed(
@@ -51,6 +66,26 @@ def test_overlay_is_exact_and_live_state_is_authorized() -> None:
     try:
         authority, state = verify_shared_successor_overlay()
     except SharedSuccessorOverlayError:
+        if (ROOT / TERMINAL_AUTHORITY_PATH).is_file():
+            terminal_authority = load_terminal_authority(ROOT)
+            corrected_preparation = terminal_authority["corrected_candidate_cohort"][0]
+            if sha256_path(ROOT, corrected_preparation["path"]) == corrected_preparation["sha256"]:
+                terminal = verify_terminal_combined(terminal_authority, ROOT)
+                assert terminal == {
+                    "candidate_paths": 7,
+                    "new_run_permitted": False,
+                    "runtime_acceptance": "not_claimed",
+                    "token_consumed": True,
+                }
+            else:
+                verify_terminal_authority_bytes(terminal_authority, ROOT)
+                verify_terminal_authority_delta(terminal_authority, ROOT)
+                overlay = load_overlay(ROOT)
+                assert (
+                    sha256_path(ROOT, corrected_preparation["path"])
+                    == (overlay["states"]["predecessor"]["artifacts"][0]["sha256"])
+                )
+            return
         if not (ROOT / RECOVERY_AUTHORITY_PATH).is_file():
             raise
         recovery_ledger = ROOT / "output/ck07r1/lifecycle-requalification-v1.launch-token.json"

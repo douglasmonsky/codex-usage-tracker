@@ -13,6 +13,15 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from scripts.check_kernel_scope import CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS
+from scripts.ck07r1_terminal_failure_correction import (
+    AUTHORITY_PATH as TERMINAL_CORRECTION_AUTHORITY_PATH,
+)
+from scripts.ck07r1_terminal_failure_correction import (
+    load_authority as load_terminal_correction_authority,
+)
+from scripts.ck07r1_terminal_failure_correction import (
+    verify_combined as verify_terminal_correction_combined,
+)
 
 _ROOT = Path(__file__).resolve().parents[2]
 _AUTHORITY_PATH = _ROOT / "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json"
@@ -111,6 +120,22 @@ def test_corrected_argv_guard_accepts_exact_candidate_in_real_non_launching_subp
         pytest.skip("the retained candidate is unavailable until the worker reapplies it")
     candidate_sha256 = hashlib.sha256(candidate.read_bytes()).hexdigest()
     expected_v1_sha256 = authority["selected_candidate"]["artifacts"][1]["sha256"]
+    terminal_path = _ROOT / TERMINAL_CORRECTION_AUTHORITY_PATH
+    if terminal_path.is_file():
+        terminal = load_terminal_correction_authority(_ROOT)
+        expected_terminal_sha256 = next(
+            item["sha256"]
+            for item in terminal["corrected_candidate_cohort"]
+            if item["path"] == str(relative_candidate)
+        )
+        if candidate_sha256 == expected_terminal_sha256:
+            assert verify_terminal_correction_combined(terminal, _ROOT) == {
+                "candidate_paths": 7,
+                "new_run_permitted": False,
+                "runtime_acceptance": "not_claimed",
+                "token_consumed": True,
+            }
+            return
     recovery_path = (
         _ROOT / "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json"
     )

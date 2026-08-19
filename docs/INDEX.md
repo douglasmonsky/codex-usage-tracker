@@ -177,6 +177,29 @@ remains `unspent_unavailable`. The recovery command uses only the non-colliding
 `lifecycle-requalification-v2` output, ledger, stdout, and stderr paths; the
 v1 invocation and ledger are terminal and can never be reused or overwritten.
 
+The sole v2 invocation is also terminal. Child PID `20482` was verified before
+the one-run token was consumed at `2026-08-19T19:44:55Z`; the child then exited
+70 and the launcher durably recorded `failed_after_launch`. The immutable v2
+ledger SHA-256 is
+`570e27824ee04a51aa4012adb461bd4aebb00b61541f2477fd9e1665854325a2`;
+stderr SHA-256 is
+`4cf4b10fd04f20a190e4ac41898d25b9295b3dc9d7addead8a81edd27b3aca2f`;
+stdout is the empty-file SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Output and receipt are absent. The first child failure proves that the frozen
+benchmark incorrectly required `APPEND_SAFE_SMALL`: the accepted planner
+correctly selected `APPEND_SAFE_LARGE` for 1,369 selected records against the
+unchanged 32-record small-tail ceiling. The additive versioned terminal-failure correction authority,
+[`lifecycle-terminal-failure-correction-authority-v1`](decisions/evidence/ck07r1a0/lifecycle-terminal-failure-correction-authority-v1.json)
+binds both terminal ledgers, the consumed non-refundable token, the exact
+planner reproduction, and the only permitted two-file benchmark/test
+correction. It authorizes no invocation, retry, restart, replacement, refund,
+receipt fabrication, `post_single_run`, `final_accepted`, or downstream
+readiness. A corrected implementation may be reviewed and prequalified only
+through deterministic synthetic non-consuming evidence; the existing
+receipt-required runtime acceptance gate remains unsatisfied and CK-07R1,
+CK-08R4, CK-08RG, and CK-09 remain blocked pending a separate roadmap decision.
+
 The V11 candidate must construct and validate the exact overlay/cohort-bound
 receipt and non-null stdout/stderr/output evidence before its first durable
 `completed` finalization. Evidence read/hash/parse/validation/finalization

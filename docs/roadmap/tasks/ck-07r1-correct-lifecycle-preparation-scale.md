@@ -1,8 +1,9 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** `blocked_hold` after the terminal v1 `prelaunch_failed` invocation;
-only the versioned prelaunch-recovery authority may restore `ready_one_shot`
-for the bound existing worker, while implementation/runtime remain unaccepted
+**Status:** `terminal_failed_no_rerun` after the sole v2 child launch consumed
+the non-refundable token and durably recorded `failed_after_launch`; only
+deterministic non-consuming corrective implementation prequalification remains,
+while runtime acceptance and downstream readiness are unavailable
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -19,7 +20,10 @@ exact-main verification. The first invocation then stopped before successful
 child observation. The additive
 [prelaunch-recovery authority](../../decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json)
 alone can authorize one corrected v2 invocation after preserving that terminal
-ledger and proving the token remains unspent.
+ledger and proving the token remains unspent. That invocation has now occurred
+and is terminal; the additive
+[terminal-failure correction authority](../../decisions/evidence/ck07r1a0/lifecycle-terminal-failure-correction-authority-v1.json)
+authorizes no run and only binds a deterministic benchmark/test correction.
 
 **Central plan:** [REMAINING_EXECUTION_PLAN.md](../REMAINING_EXECUTION_PLAN.md)
 
@@ -77,6 +81,34 @@ opportunity to observe the token-funded first successful child. It must use
 the exact `lifecycle-requalification-v2` output, ledger, stdout, and stderr
 paths and the exact corrected cohort bound by the recovery authority.
 
+**Preserved terminal v2 failure:** The one permitted v2 invocation was made
+exactly once. Child PID `20482` passed the exact handshake and consumed the
+non-refundable token at `2026-08-19T19:44:55Z`, then exited 70. The immutable
+v2 ledger SHA-256
+`570e27824ee04a51aa4012adb461bd4aebb00b61541f2477fd9e1665854325a2`
+records `failed_after_launch` and `token_consumed=true`; stderr SHA-256
+`4cf4b10fd04f20a190e4ac41898d25b9295b3dc9d7addead8a81edd27b3aca2f`
+records the exact child assertion; stdout is empty with SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`;
+output and receipt are absent. No retry, restart, replacement, refund, or
+second invocation exists or can be authorized.
+
+The deterministic root cause is a benchmark defect, not a production planner
+defect. The accepted `TailLimits.selected_records` ceiling is 32. The frozen
+standard workload yields 1,369 selected records and 11,214,848 expected WAL
+bytes, so the production planner must select `APPEND_SAFE_LARGE` with
+`limit_exceeded:selected_records`. Production chunks additionally exceed the
+WAL bound. The benchmark incorrectly asserted `APPEND_SAFE_SMALL` for every
+chunk and therefore never exercised the selected large-artifact path.
+
+The terminal-failure correction authority permits the same worker to correct
+only the benchmark and its lifecycle test. Every chunk must preserve the exact
+`plan_refresh` result: small plans use the pointer-coordinated short writer;
+large plans use the production-reachable isolated-artifact build, validation,
+durable promotion, recovery, rollback, and prior-readability path. Tail limits,
+production planner/preparation behavior, accepted authority bytes, both
+terminal ledgers, and all run artifacts remain immutable.
+
 **Parallelism:** Resume only existing worker
 `019fbfe2-8fe4-7de2-9264-d58572366727` after the consuming-boundary authority
 merges and exact-main verifies, using frozen cwd
@@ -108,7 +140,7 @@ standard/production fixtures, five unprofiled samples, 30-day/all-time gates,
 the finite state transitions and real non-launching subprocess argv guard; no
 E2E or benchmark run in the authority reconciliation.
 
-**Acceptance:** Immediately before the one command, the worker must revalidate
+**Acceptance:** Historical v2 launch — immediately before the one command, the worker must revalidate
 the exact recovery authority bytes, the corrected three-path source cohort,
 the preserved v1 ledger as the sole fourth dirty path, lexical worktree
 `.venv/bin/python` plus matching `sys.prefix`, exact cwd/argv/environment,
@@ -133,6 +165,17 @@ successful child launch only after the authority merge/exact-main gate and all
 worker gates pass; this is not a retry, restart, or replacement of a launched
 process. Receipt absence before dispatch is required; receipt absence or
 invalidity at successor acceptance remains fail-closed.
+
+**Post-terminal corrective acceptance:** The corrected two-file cohort may
+enter only `corrective_implementation_prequalified` after exact unit-level
+planner reproduction, 32/33 boundary tests, large-artifact promotion and
+rollback/readability tests, independent lifecycle-fold equivalence, exact
+small/large plan preservation, focused and full repository gates, one bounded
+reviewer, hosted Console/Python 3.10/3.14, squash merge of the authority-only
+packet, and fresh exact-main verification. This state is not runtime
+qualification and cannot transition to `post_single_run` or `final_accepted`;
+the existing complete-receipt requirement remains unsatisfied. No command
+invocation or run artifact creation is part of this correction.
 
 The V11 candidate must construct and validate the fully overlay/cohort-bound
 receipt and non-null stdout/stderr/output evidence before its first durable
@@ -162,8 +205,12 @@ complete Console job at 20 minutes. A mirror stall therefore fails closed
 instead of hanging or bypassing Console evidence.
 
 **Failure/rollback:** Retain the profile and create one narrow follow-up for a
-new dominant blocker; never weaken the gate. The preserved v1 ledger is never
-deleted, moved, rewritten, or reclassified.
+new dominant blocker; never weaken the gate. The preserved v1 and v2 ledgers,
+v2 stdout/stderr, absent output/receipt state, child identity, token
+consumption, and terminal classifications are never deleted, moved, rewritten,
+or reclassified. A separate explicit roadmap decision is required to resolve
+the receipt-required acceptance dead end; no implementation or authority
+correction may infer another run.
 
 **Handoff:** Evidence digest, profiles, retained first hosted failure, PR #394
 CI, exact-main result, and CK-08R4 input.
