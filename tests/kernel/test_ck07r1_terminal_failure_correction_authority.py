@@ -154,6 +154,46 @@ def test_clean_commit_authority_delta_is_exact() -> None:
         )
 
 
+def test_exact_authority_delta_admits_only_exact_clean_integrated_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = _authority()
+    clean_commit = _clean_commit_authority()
+    calls: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        terminal_module,
+        "load_clean_commit_authority",
+        lambda _root: clean_commit,
+    )
+    monkeypatch.setattr(
+        terminal_module,
+        "verify_clean_commit_authority_bytes",
+        lambda _authority, _root: calls.append(("authority_bytes", None)),
+    )
+    monkeypatch.setattr(
+        terminal_module,
+        "_clean_candidate_bytes_exact",
+        lambda _authority, _root: True,
+    )
+    monkeypatch.setattr(
+        terminal_module,
+        "verify_clean_candidate_transition",
+        lambda _authority, _root: "clean_integrated",
+    )
+    monkeypatch.setattr(
+        terminal_module,
+        "verify_clean_commit_authority_delta",
+        lambda _authority, _root, **kwargs: calls.append(
+            ("authority_delta", kwargs["include_committed_candidate"])
+        ),
+    )
+    terminal_module.verify_exact_authority_delta(authority, ROOT)
+    assert calls == [
+        ("authority_bytes", None),
+        ("authority_delta", True),
+    ]
+
+
 def test_candidate_representation_accepts_exact_dirty_and_clean_states() -> None:
     authority = _clean_commit_authority()
     candidate = set(authority["scope"]["candidate_scope"])

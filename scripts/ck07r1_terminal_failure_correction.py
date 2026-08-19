@@ -144,6 +144,27 @@ def verify_clean_commit_authority_bytes(
             )
 
 
+def _clean_candidate_bytes_exact(
+    authority: Mapping[str, Any], root: Path
+) -> bool:
+    return all(
+        (root / record["path"]).is_file()
+        and _sha256(root / record["path"]) == record["sha256"]
+        for record in authority["implementation_transition"]["paths"]
+    )
+
+
+def verify_clean_candidate_bytes(
+    authority: Mapping[str, Any], root: Path
+) -> None:
+    for record in authority["implementation_transition"]["paths"]:
+        candidate = root / record["path"]
+        if not candidate.is_file() or _sha256(candidate) != record["sha256"]:
+            raise TerminalCorrectionError(
+                f"clean committed candidate byte identity mismatch: {record['path']}"
+            )
+
+
 def verify_clean_commit_authority_delta(
     authority: Mapping[str, Any],
     root: Path,
@@ -268,7 +289,15 @@ def verify_exact_authority_delta(
     ):
         clean_commit = load_clean_commit_authority(root)
         verify_clean_commit_authority_bytes(clean_commit, root)
-        verify_clean_commit_authority_delta(clean_commit, root)
+        include_committed_candidate = False
+        if _clean_candidate_bytes_exact(clean_commit, root):
+            representation = verify_clean_candidate_transition(clean_commit, root)
+            include_committed_candidate = representation == "clean_integrated"
+        verify_clean_commit_authority_delta(
+            clean_commit,
+            root,
+            include_committed_candidate=include_committed_candidate,
+        )
         return
     expected = set(authority["scope"]["authority_write_scope"])
     base = str(authority["authority_base_sha"])
@@ -510,16 +539,7 @@ def verify_combined(
         else:
             verify_clean_commit_authority_delta(clean_commit, clean_commit_root)
             representation = verify_clean_candidate_transition(clean_commit, root)
-        expected_paths = {
-            record["path"]: record["sha256"]
-            for record in clean_commit["implementation_transition"]["paths"]
-        }
-        for path, digest in expected_paths.items():
-            candidate = root / path
-            if not candidate.is_file() or _sha256(candidate) != digest:
-                raise TerminalCorrectionError(
-                    f"clean committed candidate byte identity mismatch: {path}"
-                )
+        verify_clean_candidate_bytes(clean_commit, root)
     else:
         candidate_delta = set(authority["scope"]["combined_candidate_scope"])
         verify_immutable_authority_bytes(authority, root)
