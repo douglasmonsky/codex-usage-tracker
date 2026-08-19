@@ -141,7 +141,7 @@ def _git_last_touch(relative: str) -> str:
     return result
 
 
-def _current_ck07r1_overlay() -> tuple[dict[str, Any], str]:
+def current_ck07r1_overlay() -> tuple[dict[str, Any], str]:
     """Select the immutable v1 overlay or its exact versioned recovery bridge."""
 
     recovery_path = ROOT / CK07R1_RECOVERY_AUTHORITY_PATH
@@ -172,7 +172,7 @@ def _current_ck07r1_overlay() -> tuple[dict[str, Any], str]:
 def recompute_authority_identities() -> dict[str, Any]:
     """Recompute all R1A/B/C identities from committed authority paths."""
 
-    overlay, overlay_state = _current_ck07r1_overlay()
+    overlay, overlay_state = current_ck07r1_overlay()
     overlay_predecessor = overlay["states"]["predecessor"]["artifacts"][0]["sha256"]
     overlay_successor = overlay["states"]["successor"]["artifacts"][0]["sha256"]
     authority = _json(JOIN_AUTHORITY)

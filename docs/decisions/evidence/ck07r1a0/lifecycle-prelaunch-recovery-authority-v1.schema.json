@@ -225,6 +225,8 @@
         "tests/agent_kernel/test_ck08r1_answer_requalification.py",
         "tests/kernel/test_ck07r1_prelaunch_recovery_authority.py",
         "tests/kernel/test_ck07r1_shared_successor_overlay.py",
+        "tests/kernel/test_ck08r1b_answer_semantics_join_authority.py",
+        "tests/kernel/test_ckqg1_maintainability_baseline_authority.py",
         "tests/kernel/test_documentation_authority.py",
         "tests/kernel/test_kernel_scope.py",
         "tests/kernel/test_lifecycle_run_invocation_authority.py"
