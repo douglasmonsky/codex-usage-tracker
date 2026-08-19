@@ -1,0 +1,243 @@
+{
+  "schema": "codex-usage-tracker.ck07r1-lifecycle-terminal-failure-correction.v1",
+  "version": 1,
+  "task": "CK-07R1",
+  "status": "permitted_not_accepted",
+  "authority_base_sha": "77cb03cb3dd6bcf5608249056cb3470bc7fee3d8",
+  "worker": {
+    "thread_id": "019fbfe2-8fe4-7de2-9264-d58572366727",
+    "ownership": "normative_coordinator_orchestration_binding",
+    "replacement_worker": "forbidden"
+  },
+  "decision": {
+    "root_cause": "benchmark_unconditionally_required_append_safe_small_for_planner_selected_large_work",
+    "production_planner": "correct_and_immutable",
+    "production_preparation": "unchanged_selected_successor",
+    "corrective_implementation": "two_file_benchmark_and_owned_test_only",
+    "corrective_state": "corrective_implementation_prequalified",
+    "runtime_acceptance": "not_claimed",
+    "post_single_run": "unavailable_without_complete_planner_valid_receipt",
+    "final_accepted": "unavailable",
+    "new_command_invocations_permitted": 0,
+    "launch_authorized": false,
+    "token_refund": false,
+    "retry": "none",
+    "restart": "none",
+    "replacement": "none",
+    "receipt_fabrication": "forbidden",
+    "downstream": "CK-08R4_CK-08RG_CK-09_blocked_pending_separate_roadmap_decision"
+  },
+  "run_token": {
+    "id": "ck07r1-all-profile-e2e-1",
+    "maximum_new_end_to_end_runs": 1,
+    "successful_launches_observed": 1,
+    "token_status": "consumed",
+    "token_consumed": true,
+    "token_consumed_at_utc": "2026-08-19T19:44:55Z",
+    "non_refundable": true,
+    "remaining_invocations": 0
+  },
+  "immutable_authorities": [
+    {
+      "path": "docs/decisions/evidence/ck07/publication-refresh-recovery-evidence.json",
+      "sha256": "36eb76ca286b3448037857b701caab9371afc704a22bc479523149e70aca41eb"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
+      "sha256": "437b05c7dfa23ff8efb3038c19e6a0f2524ac45e2fa25f910af40023aad7b8cd"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
+      "sha256": "ba0d47358aba2f1d66c5b699e2ecd89b2378d082b7bbbfb777fc806329c7e7d4"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.json",
+      "sha256": "bb8541e4071453b2b5e97821060c2d87c17acbe8b5e800732db0d92836dd9809"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.schema.json",
+      "sha256": "e7231eefdb6268877303fd1bbfeb202f8baf8f68b6c648d60e5e2b185348cf21"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json",
+      "sha256": "95c420350e2e820fb192526493501b10ea9bc0e64424c683a345aaa9f3e5d500"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.schema.json",
+      "sha256": "8996b460d178ed6211caefe8ff8505c8ee75e49799555f7f8ad7204dceb6c1ef"
+    },
+    {
+      "path": "scripts/ck07r1_prelaunch_recovery.py",
+      "sha256": "a3f6376f9f1328b5ccce3d8b16486b87cefe4d2b6c783a4e2a706e71142b1fc4"
+    },
+    {
+      "path": "src/codex_usage_tracker/agent_kernel/publication/planner.py",
+      "sha256": "204790ad86b99eedd4fd72c51b1c50dd07e0fe19284db809f9b990d689299148"
+    },
+    {
+      "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "sha256": "7d1831ff5229e8e2a9819f0bd155d116ad97c3c3579bfa0444f791fe81e81feb"
+    }
+  ],
+  "failed_candidate_cohort": [
+    {
+      "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "role": "preparation_source",
+      "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea"
+    },
+    {
+      "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+      "role": "failed_benchmark",
+      "sha256": "37cb7330494675b2211f31ab419b4105d23f5c71856a546f735304883f25ba8e"
+    },
+    {
+      "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+      "role": "failed_benchmark_tests",
+      "sha256": "47659f999ae765d6f09472eb7db67814c60ec8bd0fccbd258fda1654e22e2854"
+    }
+  ],
+  "corrected_candidate_cohort": [
+    {
+      "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "role": "unchanged_preparation_source",
+      "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea"
+    },
+    {
+      "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+      "role": "corrected_planner_path_benchmark",
+      "sha256": "8f4900b1ecc841fe04f6cd1232c3741efef105e8b997c7fd15cc61b5d8d14cc1"
+    },
+    {
+      "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+      "role": "corrected_planner_path_tests",
+      "sha256": "8364c4387b8e588cb18f420805d47e48241da22d6fb793e838a522cc7fb29e33"
+    }
+  ],
+  "terminal_evidence": {
+    "v1_ledger": {
+      "path": "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+      "sha256": "5c2b42eca6a3e54cf4163226bc55f3c75aa35112c4ed0342c11f4e39cb9922be"
+    },
+    "v2_ledger": {
+      "path": "output/ck07r1/lifecycle-requalification-v2.launch-token.json",
+      "sha256": "570e27824ee04a51aa4012adb461bd4aebb00b61541f2477fd9e1665854325a2"
+    },
+    "v2_stderr": {
+      "path": "output/ck07r1/lifecycle-requalification-v2.stderr.txt",
+      "sha256": "4cf4b10fd04f20a190e4ac41898d25b9295b3dc9d7addead8a81edd27b3aca2f"
+    },
+    "v2_stdout": {
+      "path": "output/ck07r1/lifecycle-requalification-v2.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "required_absent_paths": [
+      "output/ck07r1/lifecycle-requalification-v2.json",
+      "output/ck07r1/lifecycle-requalification-v2.receipt.json"
+    ],
+    "terminal_state": "failed_after_launch",
+    "child_exit_code": 70,
+    "failure_stage": "evidence_collection",
+    "matching_processes": [],
+    "temporary_residue": []
+  },
+  "planner_reproduction": {
+    "tail_limits": {
+      "selected_bytes": 8388608,
+      "selected_records": 32,
+      "observations": 12000,
+      "occurrences": 12000,
+      "affected_sessions": 2000,
+      "affected_turns": 4000,
+      "affected_resources": 4000,
+      "affected_allowance_cycles": 512,
+      "dirty_keys": 16000,
+      "projection_rows": 16000,
+      "expected_wal_bytes": 16777216,
+      "planning_staleness_us": 5000000,
+      "model_call_tail_rows": 32000
+    },
+    "standard_30_day": {
+      "operation_class": "append_safe_large",
+      "reasons": [
+        "limit_exceeded:selected_records"
+      ],
+      "selected_records": 1369,
+      "expected_wal_bytes": 11214848,
+      "observations": 1369
+    },
+    "production_first_chunk": {
+      "operation_class": "append_safe_large",
+      "reasons": [
+        "limit_exceeded:selected_records",
+        "limit_exceeded:expected_wal_bytes"
+      ],
+      "selected_records": 8000,
+      "expected_wal_bytes": 65536000,
+      "observations": 8000
+    },
+    "boundary": {
+      "record_32": "append_safe_small",
+      "record_33": "append_safe_large_limit_exceeded_selected_records"
+    },
+    "method": "unit_level_synthetic_plan_refresh_only_no_qualification_command"
+  },
+  "corrective_contract": {
+    "small_path": "exact_planner_object_to_pointer_coordinated_short_writer",
+    "large_path": "exact_planner_object_to_isolated_artifact_build_validation_durable_promotion_recovery_and_rollback",
+    "plan_substitution": "forbidden",
+    "operation_downcast": "forbidden",
+    "tail_limit_change": "forbidden",
+    "planner_or_preparation_change": "forbidden",
+    "independent_truth": "lifecycle_fold_oracle_and_committed_database_postconditions",
+    "required_validation": [
+      "standard_1369_record_large_classification",
+      "production_selected_record_and_wal_large_classification",
+      "32_33_record_boundary",
+      "small_and_large_plan_identity_through_selected_writer_path",
+      "large_artifact_promotion_rollback_and_prior_readability",
+      "lifecycle_identity_and_fold_equivalence",
+      "focused_and_full_repository_gates",
+      "one_bounded_reviewer",
+      "hosted_console_python_3_10_python_3_14",
+      "fresh_exact_main_authority_verification"
+    ]
+  },
+  "scope": {
+    "authority_write_scope": [
+      "docs/INDEX.md",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-correction-authority-v1.json",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-correction-authority-v1.schema.json",
+      "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+      "docs/roadmap/TASK_PACKETS.md",
+      "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
+      "scripts/check_kernel_scope.py",
+      "scripts/ck07r1_terminal_failure_correction.py",
+      "scripts/qualify_ck08r1_answer_truth.py",
+      "tests/kernel/test_ck07r1_terminal_failure_correction_authority.py",
+      "tests/kernel/test_documentation_authority.py",
+      "tests/kernel/test_kernel_scope.py"
+    ],
+    "combined_candidate_scope": [
+      "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+      "output/ck07r1/lifecycle-requalification-v2.launch-token.json",
+      "output/ck07r1/lifecycle-requalification-v2.stderr.txt",
+      "output/ck07r1/lifecycle-requalification-v2.stdout.txt",
+      "scripts/benchmark_ck07r1_lifecycle_scale.py",
+      "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "tests/agent_kernel/publication/test_lifecycle_scale.py"
+    ],
+    "forbidden": [
+      "qualification_command_invocation",
+      "child_or_fork",
+      "token_or_run_artifact_mutation",
+      "retry_restart_replacement_or_refund",
+      "receipt_fabrication",
+      "production_planner_or_preparation_change",
+      "implementation_files_in_authority_pr",
+      "PR_394_mutation",
+      "live_or_real_data",
+      "downstream_dispatch",
+      "cleanup_or_witness_loss"
+    ]
+  }
+}

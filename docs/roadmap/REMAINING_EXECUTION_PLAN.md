@@ -186,6 +186,27 @@ authority and evidence byte while selecting this recovery bridge only when
 its exact versioned authority exists; predecessor-only and exact complete
 successor states remain explicit, and mixed or partial states fail closed.
 
+The v2 recovery opportunity has now been consumed and is terminal. Exact child
+PID `20482` passed the handshake and consumed the non-refundable token at
+`2026-08-19T19:44:55Z`; the child exited 70 before producing output or a
+receipt. The immutable v2 ledger
+`570e27824ee04a51aa4012adb461bd4aebb00b61541f2477fd9e1665854325a2`
+records `failed_after_launch`, `token_consumed=true`, and no retry, restart, or
+replacement. Its stderr
+`4cf4b10fd04f20a190e4ac41898d25b9295b3dc9d7addead8a81edd27b3aca2f`
+shows that the reachable planner correctly selected `APPEND_SAFE_LARGE` for
+1,369 selected records while the benchmark incorrectly required
+`APPEND_SAFE_SMALL`; the accepted small-tail ceiling remains 32 records.
+The versioned [terminal-failure correction authority](../decisions/evidence/ck07r1a0/lifecycle-terminal-failure-correction-authority-v1.json)
+permits the same worker to correct only the benchmark and its owned lifecycle
+test, with exact planner-selected small/large paths and deterministic
+synthetic non-consuming evidence. It does not reopen either command, refund
+the token, authorize any launch, fabricate a receipt, or make
+`post_single_run` or `final_accepted` reachable. CK-07R1 is blocked after the
+corrective implementation prequalification because the existing
+receipt-required runtime acceptance contract remains unsatisfied; CK-08R4,
+CK-08RG, and CK-09 remain blocked pending an explicit future roadmap decision.
+
 The exact V11 launcher contract constructs and validates the fully
 overlay/cohort-bound receipt and non-null stdout/stderr/output evidence before
 any first durable `completed` finalization. Evidence
@@ -301,11 +322,11 @@ conditions in the table and child files; they are not unconditional DAG edges.
  },
   "completed": ["CK-08R0", "CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R1", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
   "ready": [],
-  "conditional_ready": [{
-    "condition": "prelaunch-recovery authority preserves the exact terminal v1 ledger, binds the corrected cohort and non-colliding v2 paths, merges and exact-main verifies; coordinator resumes exact existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; one corrected synthetic invocation may seek the first successful child launch under immediate preflight; no retry of a launched process, replacement, or downstream task",
+  "conditional_ready": [],
+  "blocked": [{
+    "condition": "the terminal CK-07R1 v2 failed_after_launch state consumed the sole token; deterministic corrective evidence cannot satisfy receipt-required runtime acceptance without a separate roadmap decision",
     "tasks": ["CK-07R1"]
   }],
-  "blocked": [],
   "tasks": [
     {"id": "CK-08R0", "file": "tasks/ck-08r0-freeze-corrective-contracts.md", "dependencies": []},
     {"id": "CK-08R1A", "file": "tasks/ck-08r1a-freeze-answer-semantics.md", "dependencies": ["CK-08R0"]},

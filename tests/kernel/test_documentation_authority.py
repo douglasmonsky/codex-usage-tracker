@@ -234,8 +234,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
         "blocked_policy": "spawn_none_and_report_to_orchestrator",
     }
-    conditional_ready = {"CK-07R1"}
-    blocked: set[str] = set()
+    conditional_ready: set[str] = set()
+    blocked = {"CK-07R1"}
     assert manifest["completed"] == [
         "CK-08R0",
         "CK-08R1A",
@@ -261,20 +261,17 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     )
     ready: set[str] = set()
     assert manifest["ready"] == []
-    assert manifest["conditional_ready"] == [
+    assert manifest["conditional_ready"] == []
+    assert manifest["blocked"] == [
         {
             "condition": (
-                "prelaunch-recovery authority preserves the exact terminal v1 ledger, binds "
-                "the corrected cohort and non-colliding v2 paths, merges and exact-main "
-                "verifies; coordinator resumes exact existing worker "
-                "019fbfe2-8fe4-7de2-9264-d58572366727; one corrected synthetic invocation "
-                "may seek the first successful child launch under immediate preflight; no "
-                "retry of a launched process, replacement, or downstream task"
+                "the terminal CK-07R1 v2 failed_after_launch state consumed the sole "
+                "token; deterministic corrective evidence cannot satisfy receipt-required "
+                "runtime acceptance without a separate roadmap decision"
             ),
             "tasks": ["CK-07R1"],
-        },
+        }
     ]
-    assert manifest["blocked"] == []
     parent_section = ledger.split("## Parent packets", 1)[1].split(
         "## Remaining delegated child tasks", 1
     )[0]
@@ -291,7 +288,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     remaining_delegable = len(manifest["tasks"]) - len(manifest["completed"])
     assert remaining_delegable == 37
     assert f"Remaining delegable child tasks: **{remaining_delegable}**" in ledger
-    assert "Blocked child tasks: **36" in ledger
+    assert "Blocked child tasks: **37" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
         f"Conditional-ready child tasks: **{sum(len(item['tasks']) for item in manifest['conditional_ready'])}"
@@ -413,7 +410,10 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         elif packet_id in ready:
             assert "**Status:** Ready" in body
         elif packet_id in blocked:
-            assert "**Status:** Blocked" in body
+            if packet_id == "CK-07R1":
+                assert "**Status:** `terminal_failed_no_rerun`" in body
+            else:
+                assert "**Status:** Blocked" in body
         elif packet_id in {
             "CK-08R0",
             "CK-08R1A",
@@ -902,7 +902,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
         "**Status:** Completed on merge — PR #392 hosted-green, squash-merged at\n"
         "`68050b93`, and exact-main verified"
     ) in ckqg1
-    assert "**Status:** `blocked_hold`" in ck07r1
+    assert "**Status:** `terminal_failed_no_rerun`" in ck07r1
     assert "720-second wrapper timeout" in ck07r1a0
     assert "revoked, never authoritative, and never used" in ck07r1a0
 
@@ -1274,7 +1274,8 @@ def test_ck07r1_consuming_boundary_is_documented_without_downstream_readiness() 
         ]["downstream"]
     )
     assert "Ready child tasks: **0**" in accounting
-    assert "Conditional-ready child tasks: **1 — CK-07R1" in accounting
+    assert "Conditional-ready child tasks: **0**" in accounting
+    assert "Blocked child tasks: **37 — CK-07R1 is terminal" in accounting
     assert "## Standing Repository Authorization" in agents
     assert "No additional user approval is required" in agents
     assert "normative coordinator/orchestration binding" in agents
@@ -1305,3 +1306,26 @@ def test_ck07r1_prelaunch_recovery_is_documented_fail_closed() -> None:
     assert authority["run_token"]["successful_launches_observed"] == 0
     assert authority["decision"]["new_invocation_is_launched_process_retry"] is False
     assert authority["decision"]["launch_authorized_in_authority_task"] is False
+
+
+def test_ck07r1_terminal_failure_correction_is_documented_no_rerun() -> None:
+    index = _read("docs/INDEX.md")
+    central = _read("docs/roadmap/REMAINING_EXECUTION_PLAN.md")
+    accounting = _read("docs/roadmap/TASK_PACKETS.md")
+    packet = _read("docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md")
+    authority = _json(
+        "docs/decisions/evidence/ck07r1a0/"
+        "lifecycle-terminal-failure-correction-authority-v1.json"
+    )
+    for body in (index, central, accounting, packet):
+        assert "terminal-failure correction authority" in body
+        assert "failed_after_launch" in body
+    for body in (index, central, packet):
+        assert "570e27824ee04a51aa4012adb461bd4aebb00b61541f2477fd9e1665854325a2" in body
+        assert "APPEND_SAFE_LARGE" in body
+        assert "1,369" in body
+        assert "32" in body
+    assert authority["run_token"]["token_consumed"] is True
+    assert authority["run_token"]["remaining_invocations"] == 0
+    assert authority["decision"]["launch_authorized"] is False
+    assert authority["decision"]["final_accepted"] == "unavailable"
