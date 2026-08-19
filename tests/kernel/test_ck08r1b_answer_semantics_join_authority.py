@@ -10,8 +10,8 @@ from jsonschema import Draft202012Validator
 
 from scripts.ck07r1_shared_successor_overlay import (
     PREPARATION_PATH,
-    verify_shared_successor_overlay,
 )
+from scripts.qualify_ck08r1_answer_truth import current_ck07r1_overlay
 
 ROOT = Path(__file__).resolve().parents[2]
 AUTHORITY_PATH = (
@@ -272,7 +272,7 @@ def test_successor_cohort_is_all_or_none_and_rejects_unbound_bytes() -> None:
     files = authority["selected_successor_cohort"]["files"]
     assert isinstance(files, list)
     observed = {item["path"]: _sha256(item["path"]) for item in files}
-    overlay, overlay_state = verify_shared_successor_overlay(ROOT)
+    overlay, overlay_state = current_ck07r1_overlay()
     bound_observed = dict(observed)
     if overlay_state == "worker_prequalification":
         preparation = next(item for item in files if item["path"] == PREPARATION_PATH)

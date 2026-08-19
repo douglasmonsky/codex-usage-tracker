@@ -11,8 +11,8 @@ from jsonschema import Draft202012Validator
 from scripts.check_kernel_scope import authority_changed_path_failures
 from scripts.ck07r1_shared_successor_overlay import (
     overlay_changed_path_allowance,
-    verify_shared_successor_overlay,
 )
+from scripts.qualify_ck08r1_answer_truth import current_ck07r1_overlay
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _AUTHORITY_PATH = "docs/decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json"
@@ -166,7 +166,7 @@ def test_ckqg1_authority_is_exact_and_binds_the_selected_successor() -> None:
     ]
     changed_paths = _changed_paths(authority["authority_base_sha"])
     allowed_paths = set(scope["authority_write_scope"])
-    overlay, overlay_state = verify_shared_successor_overlay(_REPO_ROOT)
+    overlay, overlay_state = current_ck07r1_overlay()
     overlay_paths = overlay_changed_path_allowance(overlay, overlay_state)
     ckqg1_changed_paths = changed_paths - overlay_paths
     assert ckqg1_changed_paths <= allowed_paths

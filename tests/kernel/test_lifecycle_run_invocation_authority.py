@@ -109,28 +109,41 @@ def test_corrected_argv_guard_accepts_exact_candidate_in_real_non_launching_subp
     )
     if candidate is None:
         pytest.skip("the retained candidate is unavailable until the worker reapplies it")
-    assert (
-        hashlib.sha256(candidate.read_bytes()).hexdigest()
-        == authority["selected_candidate"]["artifacts"][1]["sha256"]
+    candidate_sha256 = hashlib.sha256(candidate.read_bytes()).hexdigest()
+    expected_v1_sha256 = authority["selected_candidate"]["artifacts"][1]["sha256"]
+    recovery_path = (
+        _ROOT / "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json"
     )
+    if candidate_sha256 == expected_v1_sha256:
+        frozen_args = [
+            "--profile",
+            "all",
+            "--samples",
+            "5",
+            "--output",
+            "output/ck07r1/lifecycle-requalification-v1.json",
+        ]
+        exact_paths = [
+            _ROOT / "output/ck07r1/lifecycle-requalification-v1.json",
+            _ROOT / "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+            _ROOT / "output/ck07r1/lifecycle-requalification-v1.stdout.txt",
+            _ROOT / "output/ck07r1/lifecycle-requalification-v1.stderr.txt",
+        ]
+    else:
+        recovery = json.loads(recovery_path.read_text(encoding="utf-8"))
+        expected_recovery_sha256 = next(
+            item["sha256"]
+            for item in recovery["candidate_cohort"]
+            if item["path"] == str(relative_candidate)
+        )
+        assert candidate_sha256 == expected_recovery_sha256
+        frozen_args = recovery["launch_contract"]["argv"][2:]
+        exact_paths = [
+            _ROOT / relative for relative in recovery["launch_contract"]["exclusive_paths"].values()
+        ]
     candidate_copy = tmp_path / relative_candidate
     candidate_copy.parent.mkdir(parents=True)
     candidate_copy.write_bytes(candidate.read_bytes())
-
-    frozen_args = [
-        "--profile",
-        "all",
-        "--samples",
-        "5",
-        "--output",
-        "output/ck07r1/lifecycle-requalification-v1.json",
-    ]
-    exact_paths = [
-        _ROOT / "output/ck07r1/lifecycle-requalification-v1.json",
-        _ROOT / "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
-        _ROOT / "output/ck07r1/lifecycle-requalification-v1.stdout.txt",
-        _ROOT / "output/ck07r1/lifecycle-requalification-v1.stderr.txt",
-    ]
     assert all(not path.exists() for path in exact_paths)
 
     wrapper = """
@@ -512,15 +525,10 @@ def test_corrected_launcher_safety_contract_is_exact() -> None:
             "completed_finalization"
         ),
         "receipt_failure_state": (
-            "construction_validation_or_finalization_failure_is_failed_after_launch_"
-            "never_completed"
+            "construction_validation_or_finalization_failure_is_failed_after_launch_never_completed"
         ),
-        "child_pre_release_failure": (
-            "every_pre_release_child_failure_routes_to_os._exit_71"
-        ),
-        "child_wait_signal_handling": (
-            "SIGINT_SIGTERM_ignored_while_waiting_for_parent_release"
-        ),
+        "child_pre_release_failure": ("every_pre_release_child_failure_routes_to_os._exit_71"),
+        "child_wait_signal_handling": ("SIGINT_SIGTERM_ignored_while_waiting_for_parent_release"),
         "parent_cleanup_pid_guard": (
             "reject_pid_less_than_or_equal_to_zero_before_kill_wait_or_reap"
         ),
@@ -540,9 +548,7 @@ def test_corrected_launcher_safety_contract_is_exact() -> None:
             "every_wait_exception_or_parent_signal_requires_bounded_SIGTERM_then_"
             "SIGKILL_then_reap_before_terminal_failure"
         ),
-        "signal_cleanup_mask": (
-            "SIGINT_SIGTERM_ignored_during_bounded_child_cleanup"
-        ),
+        "signal_cleanup_mask": ("SIGINT_SIGTERM_ignored_during_bounded_child_cleanup"),
         "terminal_fallback_signal_mask": (
             "SIGINT_SIGTERM_ignored_during_every_terminal_fallback_persistence_"
             "then_prior_temporary_handlers_restored"

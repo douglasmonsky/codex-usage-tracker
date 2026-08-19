@@ -160,6 +160,32 @@ authority supersedes earlier CK-07R1 wording that says to resume, refresh, or
 rerun PR #394; those retained references are historical provenance and do not
 authorize action.
 
+The exact-main v1 consuming invocation is now a second preserved prelaunch
+incident: after all immediate gates passed, macOS represented the forked
+Python process with the app-bundle executable rather than the lexical venv
+symlink target, so the exact child snapshot was not recognized. The command
+terminated after `6.518352` seconds at `child_start_handshake`, exit 1, with
+the sole durable v1 ledger SHA-256
+`5c2b42eca6a3e54cf4163226bc55f3c75aa35112c4ed0342c11f4e39cb9922be`.
+That ledger is terminal `prelaunch_failed`, `token_consumed=false`, and
+`unspent_unavailable`; no verified child, release, runtime output, stdout,
+stderr, or receipt exists. It is immutable and its command/path set cannot be
+reused. The additive
+[prelaunch-recovery authority](../decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json)
+may admit one corrected v2 invocation by the same worker only after it binds
+the exact corrected cohort, parent/child process-snapshot semantics, preserved
+ledger bytes, non-colliding v2 paths, authority merge, exact-main, and every
+immediate gate. Because no successful child launch occurred, this is the first
+remaining token-funded successful-launch opportunity, not a retry, restart,
+replacement, or refund of a launched process.
+The non-colliding files are the exact
+`output/ck07r1/lifecycle-requalification-v2` output, launch-token ledger,
+stdout, and stderr paths.
+Current CK-08R1 requalification consumers preserve every accepted CK-08
+authority and evidence byte while selecting this recovery bridge only when
+its exact versioned authority exists; predecessor-only and exact complete
+successor states remain explicit, and mixed or partial states fail closed.
+
 The exact V11 launcher contract constructs and validates the fully
 overlay/cohort-bound receipt and non-null stdout/stderr/output evidence before
 any first durable `completed` finalization. Evidence
@@ -276,7 +302,7 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "completed": ["CK-08R0", "CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R1", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
   "ready": [],
   "conditional_ready": [{
-    "condition": "v1 consuming-boundary authority merges and exact-main verifies; coordinator resumes exact existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 with the atomic 66c015de/f108dbb4/4c514889 cohort; exactly one synthetic qualification launch may proceed under immediate preflight; no replacement or downstream task",
+    "condition": "prelaunch-recovery authority preserves the exact terminal v1 ledger, binds the corrected cohort and non-colliding v2 paths, merges and exact-main verifies; coordinator resumes exact existing worker 019fbfe2-8fe4-7de2-9264-d58572366727; one corrected synthetic invocation may seek the first successful child launch under immediate preflight; no retry of a launched process, replacement, or downstream task",
     "tasks": ["CK-07R1"]
   }],
   "blocked": [],

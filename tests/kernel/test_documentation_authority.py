@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
+from scripts.ck07r1_prelaunch_recovery import verify_combined_preflight
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DOCS = _REPO_ROOT / "docs"
 _AUTHORITY_PATHS = (
@@ -86,6 +88,32 @@ def _json(path: str):
     return json.loads(_read(path))
 
 
+def _assert_ck07_selected_or_recovery_cohort(
+    selected_successor: dict,
+) -> None:
+    expected = {
+        item["path"]: item["sha256"]
+        for item in selected_successor["artifacts"]
+    }
+    actual = {
+        path: hashlib.sha256((_REPO_ROOT / path).read_bytes()).hexdigest()
+        for path in expected
+    }
+    if actual == expected:
+        return
+
+    recovery = _json(
+        "docs/decisions/evidence/ck07r1a0/"
+        "lifecycle-prelaunch-recovery-authority-v1.json"
+    )
+    recovery_expected = {
+        item["path"]: item["sha256"]
+        for item in recovery["candidate_cohort"]
+    }
+    assert actual == recovery_expected
+    verify_combined_preflight(_REPO_ROOT, _REPO_ROOT)
+
+
 def _portable_selected_support_hashes() -> dict[str, str]:
     authority = _json(
         "docs/decisions/evidence/ck08r3a/portable-plan-branch-ownership-authority.json"
@@ -96,12 +124,9 @@ def _portable_selected_support_hashes() -> dict[str, str]:
 
 
 def _ck08r1b_selected_hashes() -> dict[str, str]:
-    authority = _json(
-        "docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.json"
-    )
+    authority = _json("docs/decisions/evidence/ck08r1b/answer-semantics-join-authority.json")
     return {
-        item["path"]: item["sha256"]
-        for item in authority["selected_successor_cohort"]["files"]
+        item["path"]: item["sha256"] for item in authority["selected_successor_cohort"]["files"]
     }
 
 
@@ -239,11 +264,12 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert manifest["conditional_ready"] == [
         {
             "condition": (
-                "v1 consuming-boundary authority merges and exact-main verifies; coordinator "
-                "resumes exact existing worker 019fbfe2-8fe4-7de2-9264-d58572366727 with "
-                "the atomic 66c015de/f108dbb4/4c514889 cohort; exactly one synthetic "
-                "qualification launch may proceed under immediate preflight; no replacement "
-                "or downstream task"
+                "prelaunch-recovery authority preserves the exact terminal v1 ledger, binds "
+                "the corrected cohort and non-colliding v2 paths, merges and exact-main "
+                "verifies; coordinator resumes exact existing worker "
+                "019fbfe2-8fe4-7de2-9264-d58572366727; one corrected synthetic invocation "
+                "may seek the first successful child launch under immediate preflight; no "
+                "retry of a launched process, replacement, or downstream task"
             ),
             "tasks": ["CK-07R1"],
         },
@@ -253,9 +279,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "## Remaining delegated child tasks", 1
     )[0]
     parent_rows = [
-        line
-        for line in parent_section.splitlines()
-        if line.startswith("- [") and "**CK-" in line
+        line for line in parent_section.splitlines() if line.startswith("- [") and "**CK-" in line
     ]
     parent_completed = sum(line.startswith("- [x]") for line in parent_rows)
     assert len(parent_rows) == 22
@@ -507,10 +531,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
                         expected.add(_ck08r1b_selected_hashes()[required["path"]])
                     assert hashlib.sha256(required_path.read_bytes()).hexdigest() in expected
             elif actual == ck07_selected["sha256"]:
-                for required in ck07_selected["artifacts"]:
-                    required_path = _REPO_ROOT / required["path"]
-                    assert required_path.is_file()
-                    assert hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
+                _assert_ck07_selected_or_recovery_cohort(ck07_selected)
         elif artifact["path"] in {
             "config/agent-kernel/formula-contract-v1.json",
             "config/agent-kernel/plan-operand-contract-v1.json",
@@ -1111,10 +1132,9 @@ def test_ck07r1a0_source_digest_authority_is_exact_and_fail_closed() -> None:
         authority["selected_successor"]["sha256"],
     }
     if actual_source == authority["selected_successor"]["sha256"]:
-        for required in authority["selected_successor"]["artifacts"]:
-            required_path = _REPO_ROOT / required["path"]
-            assert required_path.is_file()
-            assert hashlib.sha256(required_path.read_bytes()).hexdigest() == required["sha256"]
+        _assert_ck07_selected_or_recovery_cohort(
+            authority["selected_successor"]
+        )
 
     mutations = [
         ("selected_successor", "sha256", "0" * 64),
@@ -1228,27 +1248,31 @@ def test_obsolete_planning_framework_is_absent_from_active_authority() -> None:
         not any(marker in path.read_text(encoding="utf-8") for marker in resolved_pull_request_refs)
         for path in active_paths
     )
+
+
 def test_ck07r1_consuming_boundary_is_documented_without_downstream_readiness() -> None:
     agents = _read("AGENTS.md")
     index = _read("docs/INDEX.md")
     central = _read("docs/roadmap/REMAINING_EXECUTION_PLAN.md")
     accounting = _read("docs/roadmap/TASK_PACKETS.md")
-    packet = _read(
-        "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md"
-    )
+    packet = _read("docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md")
 
-    for body in (index, central, accounting, packet):
+    for body in (index, central, packet):
         assert "lifecycle-consuming-boundary-authority-v1" in body or (
             "consuming-boundary authority" in body
         )
+    for body in (index, central, accounting, packet):
+        assert "prelaunch-recovery" in body
     assert "019fbfe2-8fe4-7de2-9264-d58572366727" in central
     assert "019fbfe2-8fe4-7de2-9264-d58572366727" in packet
     assert "launch_authorized_once" in central
     assert "launch_authorized_once" in packet
-    assert "CK-08R4_CK-08RG_CK-09_blocked" in _json(
-        "docs/decisions/evidence/ck07r1a0/"
-        "lifecycle-consuming-boundary-authority-v1.json"
-    )["approval"]["downstream"]
+    assert (
+        "CK-08R4_CK-08RG_CK-09_blocked"
+        in _json("docs/decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.json")[
+            "approval"
+        ]["downstream"]
+    )
     assert "Ready child tasks: **0**" in accounting
     assert "Conditional-ready child tasks: **1 — CK-07R1" in accounting
     assert "## Standing Repository Authorization" in agents
@@ -1261,3 +1285,23 @@ def test_ck07r1_consuming_boundary_is_documented_without_downstream_readiness() 
         assert "cryptographic" in body
         assert "fast-forward" in body
         assert "67bb1a" in body
+
+
+def test_ck07r1_prelaunch_recovery_is_documented_fail_closed() -> None:
+    index = _read("docs/INDEX.md")
+    central = _read("docs/roadmap/REMAINING_EXECUTION_PLAN.md")
+    accounting = _read("docs/roadmap/TASK_PACKETS.md")
+    packet = _read("docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md")
+    authority = _json(
+        "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json"
+    )
+    for body in (index, central, accounting, packet):
+        assert "prelaunch-recovery" in body
+    for body in (index, central, packet):
+        assert "5c2b42eca6a3e54cf4163226bc55f3c75aa35112c4ed0342c11f4e39cb9922be" in body
+        assert "prelaunch_failed" in body
+        assert "lifecycle-requalification-v2" in body
+    assert authority["run_token"]["token_consumed"] is False
+    assert authority["run_token"]["successful_launches_observed"] == 0
+    assert authority["decision"]["new_invocation_is_launched_process_retry"] is False
+    assert authority["decision"]["launch_authorized_in_authority_task"] is False

@@ -1,0 +1,268 @@
+{
+  "$id": "https://codex-usage-tracker.invalid/schemas/lifecycle-prelaunch-recovery-authority-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "const": {
+    "authority_base_sha": "213b5d280dac58d11d71511c21aac58f61227fd3",
+    "authority_version": 1,
+    "candidate_cohort": [
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "role": "preparation_source",
+        "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea"
+      },
+      {
+        "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+        "role": "corrected_launcher",
+        "sha256": "37cb7330494675b2211f31ab419b4105d23f5c71856a546f735304883f25ba8e"
+      },
+      {
+        "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+        "role": "corrected_launcher_tests",
+        "sha256": "47659f999ae765d6f09472eb7db67814c60ec8bd0fccbd258fda1654e22e2854"
+      }
+    ],
+    "decision": {
+      "downstream": "CK-08R4_CK-08RG_CK-09_blocked",
+      "implementation_acceptance": "not_claimed",
+      "launch_authorized_in_authority_task": false,
+      "new_invocation_is_launched_process_retry": false,
+      "policy": "one corrected v2 command invocation may seek the first successfully observed child launch only after this authority is merged, exact-main verified, and every immediate gate passes",
+      "pr394": "stale_read_only",
+      "prior_invocation_is_terminal": true,
+      "refund_claimed": false,
+      "runtime_acceptance": "not_claimed"
+    },
+    "diagnostic_evidence": {
+      "cwd": "/Users/Monsky/Developer/Codex/2026-08-11/codex-usage-tracker-ck07r1-corrected-shared-overlay-exact-main-6c08ecd9",
+      "dummy_parent_pid": 79490,
+      "dummy_pid": 79500,
+      "finding": "macOS_process_argv0_representation_differs_from_lexical_venv_interpreter_for_fork_without_exec",
+      "lexical_interpreter": "/Users/Monsky/Developer/Codex/2026-08-11/codex-usage-tracker-ck07r1-corrected-shared-overlay-exact-main-6c08ecd9/.venv/bin/python",
+      "method": "non_consuming_dummy_blocked_fork_child",
+      "observed_process_executable": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+      "owner": "Monsky",
+      "qualification_command_invoked": false,
+      "resolved_interpreter": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14"
+    },
+    "failure_policy": {
+      "after_successful_child_handshake": "token_consumed_non_refundable_and_terminal_failed_after_launch_on_any_failure",
+      "before_successful_child_handshake": "fail_closed_without_token_consumption_or_child_release",
+      "receipt_fabrication": "forbidden",
+      "replacement": "none",
+      "restart": "none",
+      "retry": "none",
+      "v1_ledger_rewrite": "forbidden"
+    },
+    "handshake_contract": {
+      "ambiguous_or_extra_match": "fail_closed",
+      "argv_rule": "macos_python_app_bundle_or_lexical_venv_interpreter_representation_with_exact_script_and_flags_tail",
+      "child_process_creation": "fork_without_exec_before_release",
+      "child_signature_rule": "exact_equality_to_the_verified_parent_platform_process_command_signature",
+      "lexical_interpreter_and_sys_prefix_gate": "unchanged_required",
+      "pre_fork_parent_snapshot_required": true,
+      "release_before_complete_proof": "forbidden",
+      "required_child_fields": [
+        "pid",
+        "parent_pid",
+        "owner",
+        "cwd",
+        "platform_process_command_signature"
+      ]
+    },
+    "immediate_gates": {
+      "authority_integrity": "exact",
+      "candidate_cohort": "exact_complete",
+      "candidate_delta": "exact_four_paths_including_preserved_v1_ledger",
+      "capacity_bytes_minimum": 10737418240,
+      "command_boundary": "real_non_consuming_preflight_required",
+      "cwd_argv_environment": "exact",
+      "fixture": "synthetic_only",
+      "interpreter": "lexical_worktree_venv_and_matching_sys_prefix",
+      "main": "head_equals_fetched_origin_main_equals_live_origin_main",
+      "matching_processes": [],
+      "token": "unspent_unavailable_and_not_consumed",
+      "v2_paths": "all_absent"
+    },
+    "immutable_authorities": [
+      {
+        "path": "AGENTS.md",
+        "sha256": "b835817af3a0e12dbce7560a2d639e1e6d207dc75b0a85892804623280700e8b"
+      },
+      {
+        "path": "docs/decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.json",
+        "sha256": "bb8541e4071453b2b5e97821060c2d87c17acbe8b5e800732db0d92836dd9809"
+      },
+      {
+        "path": "docs/decisions/evidence/ck07r1a0/lifecycle-consuming-boundary-authority-v1.schema.json",
+        "sha256": "e7231eefdb6268877303fd1bbfeb202f8baf8f68b6c648d60e5e2b185348cf21"
+      },
+      {
+        "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.json",
+        "sha256": "437b05c7dfa23ff8efb3038c19e6a0f2524ac45e2fa25f910af40023aad7b8cd"
+      },
+      {
+        "path": "docs/decisions/evidence/ck07r1a0/lifecycle-run-invocation-authority.schema.json",
+        "sha256": "ba0d47358aba2f1d66c5b699e2ecd89b2378d082b7bbbfb777fc806329c7e7d4"
+      },
+      {
+        "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.json",
+        "sha256": "7cc998fb29cad3a7b87e95026df5fb2195684c064628885cab7cc0a781d0bb74"
+      },
+      {
+        "path": "docs/decisions/evidence/ck07r1a0/lifecycle-source-digest-authority.schema.json",
+        "sha256": "6bf00ce49082be581783c33ce7247a29eb9b63515d6a5af209dccd82d28d685b"
+      },
+      {
+        "path": "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json",
+        "sha256": "73071209d42dbf65130fd307a69a0a3e76eceb65161e90baaf271321a6a81b8d"
+      },
+      {
+        "path": "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.schema.json",
+        "sha256": "943117da4e3d82624ad2cd4656092d2a7aa86266d5d30f7bca2b07f15c9ed86b"
+      },
+      {
+        "path": "scripts/ck07r1_shared_successor_overlay.py",
+        "sha256": "f3745ec07bf47ee15f50969132f315aec61d407c745f6c63694e9910a88c5768"
+      }
+    ],
+    "launch_contract": {
+      "argv": [
+        ".venv/bin/python",
+        "scripts/benchmark_ck07r1_lifecycle_scale.py",
+        "--profile",
+        "all",
+        "--samples",
+        "5",
+        "--output",
+        "output/ck07r1/lifecycle-requalification-v2.json"
+      ],
+      "cwd": "/Users/Monsky/Developer/Codex/2026-08-11/codex-usage-tracker-ck07r1-corrected-shared-overlay-exact-main-6c08ecd9",
+      "environment": {
+        "forbidden": [
+          "PYTHONPATH",
+          "CODEX_HOME"
+        ],
+        "required": {
+          "LC_ALL": "C.UTF-8",
+          "PYTHONHASHSEED": "0",
+          "PYTHONUNBUFFERED": "1",
+          "TZ": "UTC"
+        }
+      },
+      "exclusive_paths": {
+        "ledger": "output/ck07r1/lifecycle-requalification-v2.launch-token.json",
+        "output": "output/ck07r1/lifecycle-requalification-v2.json",
+        "stderr": "output/ck07r1/lifecycle-requalification-v2.stderr.txt",
+        "stdout": "output/ck07r1/lifecycle-requalification-v2.stdout.txt"
+      },
+      "live_or_real_data": false,
+      "synthetic_fixture_only": true
+    },
+    "preserved_failure_lineage": {
+      "child_released": false,
+      "elapsed_seconds": 6.518352,
+      "exclusive_paths": {
+        "ledger": "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+        "output": "output/ck07r1/lifecycle-requalification-v1.json",
+        "stderr": "output/ck07r1/lifecycle-requalification-v1.stderr.txt",
+        "stdout": "output/ck07r1/lifecycle-requalification-v1.stdout.txt"
+      },
+      "exit_code": 1,
+      "failure_message": "child-start handshake did not prove exact PID/argv/cwd/owner",
+      "failure_stage": "child_start_handshake",
+      "ledger_path": "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+      "ledger_schema": "codex-usage-tracker.lifecycle-run-ledger.v1",
+      "ledger_sha256": "5c2b42eca6a3e54cf4163226bc55f3c75aa35112c4ed0342c11f4e39cb9922be",
+      "state": "prelaunch_failed",
+      "successful_launches_observed": 0,
+      "terminal_immutable": true,
+      "verified_child": false
+    },
+    "preserved_v1_ledger": {
+      "matching_processes": [],
+      "path": "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+      "sha256": "5c2b42eca6a3e54cf4163226bc55f3c75aa35112c4ed0342c11f4e39cb9922be",
+      "state": "prelaunch_failed",
+      "token_consumed": false,
+      "token_status": "unspent_unavailable"
+    },
+    "recovery_transition": {
+      "first_successful_child_launch_remaining": true,
+      "from": "terminal_prelaunch_failed_v1",
+      "launched_process_retry": false,
+      "live_corrected_cohort_authority": "this_versioned_recovery_authority_only",
+      "old_shared_overlay": "immutable_historical_predecessor_evidence",
+      "refund": false,
+      "replacement": false,
+      "restart": false,
+      "to": "ready_one_shot_v2_after_merge_exact_main_and_immediate_gates"
+    },
+    "run_token": {
+      "consumption": "first_successfully_observed_exact_child_launch_and_handshake",
+      "id": "ck07r1-all-profile-e2e-1",
+      "maximum_new_end_to_end_runs": 1,
+      "new_recovery_invocations_permitted": 1,
+      "refund": false,
+      "replacement": "none",
+      "restart": "none",
+      "retry": "none",
+      "status": "unspent_unavailable",
+      "successful_launches_observed": 0,
+      "token_consumed": false
+    },
+    "schema": "codex-usage-tracker.ck07r1-lifecycle-prelaunch-recovery.v1",
+    "scope": {
+      "authority_write_scope": [
+        "docs/INDEX.md",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.schema.json",
+        "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+        "docs/roadmap/TASK_PACKETS.md",
+        "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
+        "scripts/check_kernel_scope.py",
+        "scripts/ck07r1_prelaunch_recovery.py",
+        "scripts/qualify_ck08r1_answer_truth.py",
+        "tests/agent_kernel/test_ck08r1_answer_requalification.py",
+        "tests/kernel/test_ck07r1_prelaunch_recovery_authority.py",
+        "tests/kernel/test_ck07r1_shared_successor_overlay.py",
+        "tests/kernel/test_ck08r1b_answer_semantics_join_authority.py",
+        "tests/kernel/test_ckqg1_maintainability_baseline_authority.py",
+        "tests/kernel/test_documentation_authority.py",
+        "tests/kernel/test_kernel_scope.py",
+        "tests/kernel/test_lifecycle_run_invocation_authority.py"
+      ],
+      "combined_preflight_candidate_scope": [
+        "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+        "scripts/benchmark_ck07r1_lifecycle_scale.py",
+        "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "tests/agent_kernel/publication/test_lifecycle_scale.py"
+      ],
+      "forbidden": [
+        "candidate_implementation_files_in_authority_pr",
+        "generated_v2_runtime_artifacts",
+        "launch_or_child_in_authority_task",
+        "token_consumption_in_authority_task",
+        "v1_ledger_mutation",
+        "pr394_mutation",
+        "downstream_dispatch",
+        "live_or_real_data",
+        "cleanup"
+      ]
+    },
+    "status": "permitted_not_accepted",
+    "v2_paths": {
+      "ledger": "output/ck07r1/lifecycle-requalification-v2.launch-token.json",
+      "output": "output/ck07r1/lifecycle-requalification-v2.json",
+      "stderr": "output/ck07r1/lifecycle-requalification-v2.stderr.txt",
+      "stdout": "output/ck07r1/lifecycle-requalification-v2.stdout.txt"
+    },
+    "worker": {
+      "frozen_cwd": "/Users/Monsky/Developer/Codex/2026-08-11/codex-usage-tracker-ck07r1-corrected-shared-overlay-exact-main-6c08ecd9",
+      "ownership": "coordinator_orchestration_binding_to_exact_existing_thread",
+      "replacement_worker": "forbidden",
+      "thread_id": "019fbfe2-8fe4-7de2-9264-d58572366727"
+    }
+  },
+  "description": "Exact versioned recovery decision preserving the terminal v1 prelaunch failure and admitting only one corrected v2 invocation for the first successful child launch.",
+  "title": "CK-07R1 lifecycle prelaunch recovery authority v1"
+}

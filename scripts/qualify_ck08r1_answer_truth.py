@@ -41,6 +41,21 @@ from codex_usage_tracker.agent_kernel.query.service import (  # noqa: E402
     QueryService,
     QueryServiceError,
 )
+from scripts.ck07r1_prelaunch_recovery import (  # noqa: E402
+    AUTHORITY_PATH as CK07R1_RECOVERY_AUTHORITY_PATH,
+)
+from scripts.ck07r1_prelaunch_recovery import (  # noqa: E402
+    load_authority as load_ck07r1_recovery_authority,
+)
+from scripts.ck07r1_prelaunch_recovery import (  # noqa: E402
+    verify_bound_authority_bytes as verify_ck07r1_recovery_authority_bytes,
+)
+from scripts.ck07r1_prelaunch_recovery import (  # noqa: E402
+    verify_combined_preflight as verify_ck07r1_recovery_combined_preflight,
+)
+from scripts.ck07r1_prelaunch_recovery import (  # noqa: E402
+    verify_exact_authority_delta as verify_ck07r1_recovery_authority_delta,
+)
 from scripts.ck07r1_shared_successor_overlay import (  # noqa: E402
     PREPARATION_PATH as CK07R1_PREPARATION_PATH,
 )
@@ -126,10 +141,38 @@ def _git_last_touch(relative: str) -> str:
     return result
 
 
+def current_ck07r1_overlay() -> tuple[dict[str, Any], str]:
+    """Select the immutable v1 overlay or its exact versioned recovery bridge."""
+
+    recovery_path = ROOT / CK07R1_RECOVERY_AUTHORITY_PATH
+    if not recovery_path.is_file():
+        return verify_shared_successor_overlay(ROOT)
+
+    recovery = load_ck07r1_recovery_authority(ROOT)
+    verify_ck07r1_recovery_authority_bytes(recovery, ROOT)
+    overlay = _json(
+        ROOT / "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json"
+    )
+    predecessor = overlay["states"]["predecessor"]["artifacts"][0]["sha256"]
+    successor = next(
+        item["sha256"]
+        for item in recovery["candidate_cohort"]
+        if item["path"] == CK07R1_PREPARATION_PATH
+    )
+    observed = sha256_file(ROOT / CK07R1_PREPARATION_PATH)
+    if observed == predecessor:
+        verify_ck07r1_recovery_authority_delta(recovery, ROOT)
+        return overlay, "authority_main"
+    if observed == successor:
+        verify_ck07r1_recovery_combined_preflight(ROOT, ROOT)
+        return overlay, "worker_prequalification"
+    raise QualificationError("CK-07R1 preparation state is outside the recovery authority")
+
+
 def recompute_authority_identities() -> dict[str, Any]:
     """Recompute all R1A/B/C identities from committed authority paths."""
 
-    overlay, overlay_state = verify_shared_successor_overlay(ROOT)
+    overlay, overlay_state = current_ck07r1_overlay()
     overlay_predecessor = overlay["states"]["predecessor"]["artifacts"][0]["sha256"]
     overlay_successor = overlay["states"]["successor"]["artifacts"][0]["sha256"]
     authority = _json(JOIN_AUTHORITY)
