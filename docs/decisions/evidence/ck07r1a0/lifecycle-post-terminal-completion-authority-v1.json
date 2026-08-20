@@ -1,0 +1,294 @@
+{
+  "schema": "codex-usage-tracker.ck07r1-lifecycle-post-terminal-completion.v1",
+  "version": 1,
+  "task": "CK-07R1",
+  "status": "roadmap_transition_authorized",
+  "authority_base_sha": "1d0466b1b2992b48c5272dc4598606eeaea4dae2",
+  "authority_base_tree_sha": "d1b06f0927ae660f9e09d642bb1ef79a04413b5f",
+  "source_authorities": [
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-correction-authority-v1.json",
+      "sha256": "7752565abd5c5f27a852b8a8814ea1b7afde03d967de46419856eae85583f97b"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-correction-authority-v1.schema.json",
+      "sha256": "f4affab070de6aa1ed54cfc648051b7b6398bd57011fed8d942309894714744e"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.json",
+      "sha256": "badda5361f66944eb4972c061103435d55c6d59c2797ce7db8f34c70662d1e02"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.schema.json",
+      "sha256": "0819f90addbacccc2d45a467cce134a4a8112bd836cbfe2cbe9702b163ace03b"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v2.json",
+      "sha256": "e0cb34fdd2c45216f34ec9f5d6f55aa04b67d9811243ef1a1e032ac5b01f709c"
+    },
+    {
+      "path": "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v2.schema.json",
+      "sha256": "7b29d882fe57bcbfe35035d84a33d1a116c5f564b994219dbb9380f28dc6fd15"
+    }
+  ],
+  "historical_successor_bindings": [
+    {
+      "path": "AGENTS.md",
+      "predecessor_sha256": "b835817af3a0e12dbce7560a2d639e1e6d207dc75b0a85892804623280700e8b",
+      "successor_sha256": "302e3f9c9d3fa281a3b8f070dd6970cd2571e8cce044396e7414288929bfd8d6"
+    }
+  ],
+  "integrated_cohort": {
+    "exact_main_sha": "1d0466b1b2992b48c5272dc4598606eeaea4dae2",
+    "exact_main_tree_sha": "d1b06f0927ae660f9e09d642bb1ef79a04413b5f",
+    "paths": [
+      {
+        "path": "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+        "role": "corrected_preparation",
+        "sha256": "66c015de949a6c380bd49964cb6c48c30dee64ecb14074b480837c44024328ea"
+      },
+      {
+        "path": "scripts/benchmark_ck07r1_lifecycle_scale.py",
+        "role": "planner_selected_small_large_benchmark",
+        "sha256": "8f4900b1ecc841fe04f6cd1232c3741efef105e8b997c7fd15cc61b5d8d14cc1"
+      },
+      {
+        "path": "tests/agent_kernel/publication/test_lifecycle_scale.py",
+        "role": "planner_selected_small_large_tests",
+        "sha256": "8364c4387b8e588cb18f420805d47e48241da22d6fb793e838a522cc7fb29e33"
+      },
+      {
+        "path": "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+        "role": "immutable_v1_prelaunch_failed_ledger",
+        "sha256": "5c2b42eca6a3e54cf4163226bc55f3c75aa35112c4ed0342c11f4e39cb9922be"
+      },
+      {
+        "path": "output/ck07r1/lifecycle-requalification-v2.launch-token.json",
+        "role": "immutable_v2_failed_after_launch_ledger",
+        "sha256": "570e27824ee04a51aa4012adb461bd4aebb00b61541f2477fd9e1665854325a2"
+      },
+      {
+        "path": "output/ck07r1/lifecycle-requalification-v2.stdout.txt",
+        "role": "immutable_v2_empty_stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "output/ck07r1/lifecycle-requalification-v2.stderr.txt",
+        "role": "immutable_v2_failure_stderr",
+        "sha256": "4cf4b10fd04f20a190e4ac41898d25b9295b3dc9d7addead8a81edd27b3aca2f"
+      }
+    ]
+  },
+  "terminal_history": {
+    "v1": {
+      "state": "prelaunch_failed",
+      "token_consumed": false,
+      "token_status": "unspent_unavailable",
+      "successful_launches_observed": 0
+    },
+    "v2": {
+      "state": "failed_after_launch",
+      "token_consumed": true,
+      "token_status": "consumed",
+      "token_consumed_at_utc": "2026-08-19T19:44:55Z",
+      "successful_launches_observed": 1,
+      "child_pid": 20482,
+      "child_exit_code": 70,
+      "failure_stage": "evidence_collection"
+    },
+    "required_absent_paths": [
+      "output/ck07r1/lifecycle-requalification-v1.json",
+      "output/ck07r1/lifecycle-requalification-v1.receipt.json",
+      "output/ck07r1/lifecycle-requalification-v1.stdout.txt",
+      "output/ck07r1/lifecycle-requalification-v1.stderr.txt",
+      "output/ck07r1/lifecycle-requalification-v2.json",
+      "output/ck07r1/lifecycle-requalification-v2.receipt.json"
+    ],
+    "maximum_new_end_to_end_runs": 1,
+    "remaining_invocations": 0,
+    "token_refund": false,
+    "retry": "none",
+    "restart": "none",
+    "replacement": "none"
+  },
+  "publication_evidence": {
+    "terminal_correction_authority": {
+      "pull_request": 447,
+      "base_sha": "77cb03cb3dd6bcf5608249056cb3470bc7fee3d8",
+      "head_sha": "4e43c941ba6dc1aaebe7ca6fa45a1a4b01e1f2dd",
+      "head_tree_sha": "cc148aa820962c084655017e404cce54430313bd",
+      "merge_sha": "652f2166b58b9ee0d719348a769901577d11e6fd",
+      "merge_tree_sha": "cc148aa820962c084655017e404cce54430313bd",
+      "ci_run": 32302049140,
+      "required_jobs": [
+        "Focused Evidence Console",
+        "Kernel phase and package isolation (3.10)",
+        "Kernel phase and package isolation (3.14)"
+      ],
+      "conclusion": "success"
+    },
+    "clean_commit_authority": {
+      "pull_request": 450,
+      "base_sha": "487e0b7138d638d7cfb1d91627e5a6ebda743699",
+      "head_sha": "b9f2b5d44c9f0fae89d36b9d73f9d155bc5179df",
+      "head_tree_sha": "df23bca16785de590ad809646acd6e169ea14a13",
+      "merge_sha": "0897ecc85977deb078abaf1729e2771a7573af58",
+      "merge_tree_sha": "df23bca16785de590ad809646acd6e169ea14a13",
+      "ci_run": 32401646264,
+      "required_jobs": [
+        "Focused Evidence Console",
+        "Kernel phase and package isolation (3.10)",
+        "Kernel phase and package isolation (3.14)"
+      ],
+      "conclusion": "success"
+    },
+    "corrected_implementation": {
+      "pull_request": 448,
+      "base_sha": "0897ecc85977deb078abaf1729e2771a7573af58",
+      "head_sha": "0fb5e6edbfb891970fe452e981148784b2f1b4c4",
+      "head_tree_sha": "d1b06f0927ae660f9e09d642bb1ef79a04413b5f",
+      "merge_sha": "1d0466b1b2992b48c5272dc4598606eeaea4dae2",
+      "merge_tree_sha": "d1b06f0927ae660f9e09d642bb1ef79a04413b5f",
+      "ci_run": 32402374087,
+      "required_jobs": [
+        "Focused Evidence Console",
+        "Kernel phase and package isolation (3.10)",
+        "Kernel phase and package isolation (3.14)"
+      ],
+      "conclusion": "success"
+    }
+  },
+  "deterministic_acceptance_evidence": {
+    "planner_result": {
+      "standard_selected_records": 1369,
+      "standard_expected_wal_bytes": 11214848,
+      "standard_operation_class": "append_safe_large",
+      "standard_reasons": [
+        "limit_exceeded:selected_records"
+      ],
+      "small_tail_ceiling_records": 32,
+      "record_32_operation_class": "append_safe_small",
+      "record_33_operation_class": "append_safe_large"
+    },
+    "path_proof": [
+      "exact_plan_refresh_result_preserved",
+      "small_pointer_writer_validated",
+      "large_isolated_artifact_build_validated",
+      "large_artifact_durable_promotion_validated",
+      "large_artifact_recovery_and_rollback_validated",
+      "prior_publication_readability_validated",
+      "independent_lifecycle_fold_equivalence_validated"
+    ],
+    "local_validation": {
+      "authority_consumers_passed": 99,
+      "focused_passed": 204,
+      "broader_passed": 312,
+      "full_passed": 1581,
+      "full_skipped": 1,
+      "performance_invariants_passed": 13,
+      "just_vc": "passed",
+      "sdist_bytes": 916639,
+      "wheel_bytes": 388537
+    },
+    "implementation_review": {
+      "reviewers": 1,
+      "accepted_findings": 0,
+      "result": "clean"
+    }
+  },
+  "decision": {
+    "completion_basis": "deterministic_post_terminal_merged_evidence",
+    "corrective_implementation_state": "accepted_for_CK-07R1_roadmap_dependency",
+    "roadmap_dependency_completion": "authorized_on_authority_PR_merge_and_fresh_exact_main_verification",
+    "runtime_acceptance": "not_claimed",
+    "planner_valid_receipt": "absent",
+    "receipt_fabrication": "forbidden",
+    "post_single_run": "unavailable",
+    "final_accepted": "unavailable",
+    "failed_after_launch_reclassified": false,
+    "new_command_invocations_permitted": 0,
+    "launch_authorized": false,
+    "token_consumed": true,
+    "token_refund": false,
+    "retry": "none",
+    "restart": "none",
+    "replacement": "none",
+    "production_semantics_changed_by_authority": false
+  },
+  "roadmap_transition": {
+    "from": "terminal_failed_no_rerun_corrective_implementation_prequalified",
+    "to": "completed_post_terminal_deterministic_evidence",
+    "activation": "authority_PR_hosted_green_squash_merged_and_fresh_exact_main_verified",
+    "completed": [
+      "CK-07R1"
+    ],
+    "new_ready": [
+      "CK-08R4"
+    ],
+    "still_blocked": [
+      "CK-08RG",
+      "CK-09"
+    ]
+  },
+  "residual_risks": [
+    "no_planner_valid_end_to_end_receipt_exists_for_the_corrected_implementation",
+    "the_failed_v2_run_proved_launch_and_initial_planner_reachability_but_not_successful_end_to_end_completion",
+    "CK-08R4_must_measure_current_merged_publication_behavior_and_must_not_claim_CK-07R1_runtime_acceptance"
+  ],
+  "required_transition_gates": [
+    "exact_authority_schema_and_source_bytes",
+    "exact_integrated_seven_path_cohort",
+    "immutable_v1_v2_terminal_evidence_and_required_absence",
+    "focused_authority_and_roadmap_consumers",
+    "full_and_package_validation",
+    "privacy_secret_and_diff_checks",
+    "one_bounded_independent_reviewer",
+    "hosted_console_python_3_10_python_3_14",
+    "squash_merge",
+    "fresh_exact_main_verification"
+  ],
+  "scope": {
+    "authority_write_scope": [
+      "AGENTS.md",
+      "docs/INDEX.md",
+      "docs/architecture/QUERY_EVIDENCE_PROJECTION_CONTRACTS.md",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.json",
+      "docs/decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.schema.json",
+      "docs/quality/QUALIFICATION_PLAN.md",
+      "docs/roadmap/REMAINING_EXECUTION_PLAN.md",
+      "docs/roadmap/TASK_PACKETS.md",
+      "docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md",
+      "docs/roadmap/tasks/ck-08r4-reclassify-physical-plans.md",
+      "scripts/check_kernel_scope.py",
+      "scripts/ck07r1_post_terminal_completion.py",
+      "scripts/ck07r1_terminal_failure_correction.py",
+      "tests/kernel/test_ck07r1_post_terminal_completion_authority.py",
+      "tests/kernel/test_ck07r1_terminal_failure_correction_authority.py",
+      "tests/kernel/test_documentation_authority.py",
+      "tests/kernel/test_kernel_scope.py"
+    ],
+    "immutable_integrated_scope": [
+      "output/ck07r1/lifecycle-requalification-v1.launch-token.json",
+      "output/ck07r1/lifecycle-requalification-v2.launch-token.json",
+      "output/ck07r1/lifecycle-requalification-v2.stderr.txt",
+      "output/ck07r1/lifecycle-requalification-v2.stdout.txt",
+      "scripts/benchmark_ck07r1_lifecycle_scale.py",
+      "src/codex_usage_tracker/agent_kernel/publication/preparation.py",
+      "tests/agent_kernel/publication/test_lifecycle_scale.py"
+    ],
+    "forbidden": [
+      "qualification_command_invocation",
+      "child_or_fork",
+      "token_or_terminal_artifact_mutation",
+      "retry_restart_replacement_or_refund",
+      "failed_after_launch_reclassification",
+      "receipt_or_output_fabrication",
+      "runtime_acceptance_claim",
+      "production_implementation_change",
+      "PR_394_mutation",
+      "CK-08RG_or_CK-09_readiness",
+      "live_or_real_data",
+      "cleanup_or_witness_loss"
+    ]
+  }
+}

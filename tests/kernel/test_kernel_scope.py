@@ -20,6 +20,7 @@ from scripts.check_kernel_scope import (
     CK07E_INDEPENDENT_FACT_ADAPTER_ADDITIONS,
     CK07R1_CONSUMING_BOUNDARY_AUTHORITY_ADDITIONS,
     CK07R1_LIFECYCLE_SCOPE_ADDITIONS,
+    CK07R1_POST_TERMINAL_COMPLETION_AUTHORITY_ADDITIONS,
     CK07R1_PRELAUNCH_RECOVERY_AUTHORITY_ADDITIONS,
     CK07R1_RUN_INVOCATION_AUTHORITY_ADDITIONS,
     CK07R1_SHARED_OVERLAY_AUTHORITY_ADDITIONS,
@@ -707,6 +708,7 @@ def test_k6_additions_are_explicit_and_bounded() -> None:
         | CK07R1_PRELAUNCH_RECOVERY_AUTHORITY_ADDITIONS
         | CK07R1_TERMINAL_FAILURE_CORRECTION_AUTHORITY_ADDITIONS
         | CK07R1_TERMINAL_CLEAN_COMMIT_AUTHORITY_ADDITIONS
+        | CK07R1_POST_TERMINAL_COMPLETION_AUTHORITY_ADDITIONS
         | CK08_PREREQUISITE_BLOCKER_ADDITIONS
         | {
             "config/agent-kernel/maintainability-baseline-v1.json",
@@ -850,6 +852,15 @@ def test_ck07r1_terminal_clean_commit_additions_are_explicit_and_bounded() -> No
         "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v2.json",
         "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v2.schema.json",
     } == CK07R1_TERMINAL_CLEAN_COMMIT_AUTHORITY_ADDITIONS
+
+
+def test_ck07r1_post_terminal_completion_additions_are_explicit_and_bounded() -> None:
+    assert {
+        "docs/decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.schema.json",
+        "scripts/ck07r1_post_terminal_completion.py",
+        "tests/kernel/test_ck07r1_post_terminal_completion_authority.py",
+    } == CK07R1_POST_TERMINAL_COMPLETION_AUTHORITY_ADDITIONS
 
 
 def test_kernel_skeleton_imports_without_legacy_runtime() -> None:

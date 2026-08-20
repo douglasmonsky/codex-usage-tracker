@@ -30,7 +30,8 @@ CK-08R1's schema-valid
 records 80/80 rows, grades, order, evidence, provenance, null semantics,
 closure, grading isolation, and mutation proof. PR #439 passed hosted CI,
 squash-merged, and was exact-main verified at `0832b854`; CK-08R1 is complete.
-CK-08R4 remains blocked on CK-07R1. Independent
+CK-08R4 is Ready through CK-07R1's post-terminal roadmap dependency
+completion. Independent
 truth now consumes [`answer-semantics.v1`](../config/agent-kernel/answer-semantics-v1.json);
 The linked [CK-08R3A schema/publication requalification authority](decisions/evidence/ck08r3a/schema-publication-requalification-authority.json)
 binds the resulting 57-index schema digest, synthetic publication fixture
@@ -224,7 +225,23 @@ missing, extra, partial, wrong-workflow, wrong-lineage, and wrong-candidate
 states fail closed. It adds no network install, qualification invocation,
 launch, refund, retry, receipt, runtime acceptance, or downstream authority.
 
-The V11 candidate must construct and validate the exact overlay/cohort-bound
+PR #448 subsequently passed hosted Console and Python 3.10/3.14, squash-merged
+the exact seven-path correction/evidence cohort, and was fresh exact-main
+verified at `1d0466b1b2992b48c5272dc4598606eeaea4dae2`. The additive
+[`lifecycle-post-terminal-completion-authority-v1`](decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.json)
+is the separate roadmap decision reserved by the terminal-failure authority.
+It accepts the merged deterministic small/large planner, publication,
+recovery, full/package, review, hosted, and exact-main evidence only as
+CK-07R1 dependency completion. The immutable v2 run remains
+`failed_after_launch`, the token remains consumed/non-refundable,
+`runtime_acceptance=not_claimed`, planner-valid receipt/output remain absent,
+and `post_single_run` and `final_accepted` remain unavailable. No command,
+artifact mutation, receipt fabrication, refund, retry, restart, replacement,
+or production-semantic change is authorized. After this authority transition
+is hosted-green, squash-merged, and fresh exact-main verified, CK-08R4 is the
+sole Ready successor; CK-08RG and CK-09 remain blocked.
+
+The historical V11 launcher contract required construction and validation of the exact overlay/cohort-bound
 receipt and non-null stdout/stderr/output evidence before its first durable
 `completed` finalization. Evidence read/hash/parse/validation/finalization
 failures are terminal `failed_after_launch`. Temporary parent SIGINT/SIGTERM
@@ -242,15 +259,15 @@ write/fsync/replace/post-replace paths and retain durable consumed/no-retry
 `failed_after_launch` evidence without temporary residue. Interpreter identity
 is the lexical repository-worktree `.venv/bin/python` plus the matching lexical venv
 `sys.prefix`; base interpreters, symlink/resolved equivalence, wrong-worktree
-venvs, and prefix mismatch are rejected.
+venvs, and prefix mismatch are rejected. That contract cannot authorize
+another invocation after the consumed terminal v2 run.
 
-The finite source/runtime state machine is currently `authority_main`: the live
-predecessor may remain on authority main, while only the exact selected
-successor may enter worker prequalification. `post_single_run` is unavailable
-without a complete planner-valid receipt bound to its exact dynamic receipt and
-evidence identity, and `final_accepted` additionally requires the worker PR to
-be squash-merged and exact-main verified. No state transition claims runtime
-qualification in this authority.
+The finite source/runtime state machine remains terminal at
+`failed_after_launch`: `post_single_run` is unavailable without a complete
+planner-valid receipt bound to its exact dynamic evidence identity, and
+`final_accepted` remains unavailable. The separate roadmap dependency state is
+`completed_post_terminal_deterministic_evidence`; it does not claim or imply
+runtime qualification.
 
 ## Authority set
 

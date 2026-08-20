@@ -36,6 +36,9 @@ CLEAN_COMMIT_CI_SCHEMA_PATH = Path(
     "docs/decisions/evidence/ck07r1a0/"
     "lifecycle-terminal-failure-clean-commit-authority-v2.schema.json"
 )
+POST_TERMINAL_AUTHORITY_PATH = Path(
+    "docs/decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.json"
+)
 
 
 class TerminalCorrectionError(RuntimeError):
@@ -231,16 +234,43 @@ def bound_authority_digest_matches(
     actual = _sha256(path)
     if actual == expected:
         return True
-    if not (root / CLEAN_COMMIT_CI_AUTHORITY_PATH).is_file():
-        return False
-    authority = load_clean_commit_ci_authority(root)
-    verify_clean_commit_ci_authority_bytes(authority, root)
-    return any(
-        record["path"] == relative
-        and record["before_sha256"] == expected
-        and record["sha256"] == actual
-        for record in authority["superseded_immutable_paths"]
-    )
+    if (root / POST_TERMINAL_AUTHORITY_PATH).is_file():
+        from scripts.ck07r1_post_terminal_completion import (
+            load_authority as load_post_terminal_authority,
+        )
+        from scripts.ck07r1_post_terminal_completion import (
+            verify_all as verify_post_terminal,
+        )
+
+        post_terminal = load_post_terminal_authority(root)
+        verify_post_terminal(post_terminal, root)
+        bindings = {
+            str(record["path"]): record
+            for record in post_terminal["historical_successor_bindings"]
+        }
+        binding = bindings.get(relative)
+        if binding is not None:
+            return bool(
+                binding["predecessor_sha256"] == expected
+                and binding["successor_sha256"] == actual
+                and _git_blob_sha256(
+                    root,
+                    str(post_terminal["authority_base_sha"]),
+                    relative,
+                )
+                == expected
+            )
+    if (root / CLEAN_COMMIT_CI_AUTHORITY_PATH).is_file():
+        authority = load_clean_commit_ci_authority(root)
+        verify_clean_commit_ci_authority_bytes(authority, root)
+        if any(
+            record["path"] == relative
+            and record["before_sha256"] == expected
+            and record["sha256"] == actual
+            for record in authority["superseded_immutable_paths"]
+        ):
+            return True
+    return False
 
 
 def verify_clean_commit_ci_authority_delta(
@@ -495,6 +525,20 @@ def verify_exact_authority_delta(
     allowed_worktree_delta: set[str] | None = None,
     base_is_ancestor: bool | None = None,
 ) -> None:
+    if (
+        observed is None
+        and allowed_worktree_delta is None
+        and (root / POST_TERMINAL_AUTHORITY_PATH).is_file()
+    ):
+        from scripts.ck07r1_post_terminal_completion import (
+            load_authority as load_post_terminal_authority,
+        )
+        from scripts.ck07r1_post_terminal_completion import (
+            verify_all as verify_post_terminal,
+        )
+
+        verify_post_terminal(load_post_terminal_authority(root), root)
+        return
     if (
         observed is None
         and allowed_worktree_delta is None
@@ -757,6 +801,24 @@ def verify_combined(
     *,
     authority_root: Path | None = None,
 ) -> dict[str, Any]:
+    if (root / POST_TERMINAL_AUTHORITY_PATH).is_file():
+        from scripts.ck07r1_post_terminal_completion import (
+            load_authority as load_post_terminal_authority,
+        )
+        from scripts.ck07r1_post_terminal_completion import (
+            verify_all as verify_post_terminal,
+        )
+
+        verify_post_terminal(load_post_terminal_authority(root), root)
+        verify_corrected_cohort(authority, root)
+        verify_terminal_evidence(authority, root)
+        verify_planner_reproduction(authority, root)
+        return {
+            "candidate_paths": len(authority["scope"]["combined_candidate_scope"]),
+            "new_run_permitted": False,
+            "runtime_acceptance": "not_claimed",
+            "token_consumed": True,
+        }
     clean_commit_root = authority_root or root
     clean_commit_path = clean_commit_root / CLEAN_COMMIT_AUTHORITY_PATH
     clean_commit_ci_path = clean_commit_root / CLEAN_COMMIT_CI_AUTHORITY_PATH

@@ -1,6 +1,6 @@
 # CK-08R4 — Reclassify physical named plans
 
-**Status:** Blocked on CK-08R1 and CK-07R1; CK-08R2 and CK-08R3 are complete
+**Status:** Ready; CK-08R1/R2/R3 and CK-07R1 are complete
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -20,7 +20,10 @@ write-amplifying projections.
 
 **Controls:** CK-08R0 benchmark-v2 schema and all completed corrective evidence.
 
-**Dependencies:** CK-08R1/R2/R3 and CK-07R1 merged and exact-main verified.
+**Dependencies:** CK-08R1/R2/R3 are merged and exact-main verified. CK-07R1
+is complete for roadmap dependency through its versioned post-terminal
+deterministic-evidence authority. Its v2 run remains `failed_after_launch`,
+`runtime_acceptance=not_claimed`, and planner-valid receipt absent.
 
 **Owned files/interfaces:** Benchmark/collector v2, scale evidence v2,
 projection-admission record, affected packet claims; no projections.
@@ -47,7 +50,10 @@ stage-separated p95, direct/evidence/projection classes, admission rules,
 
 **Acceptance:** Every plan is measured and classified as direct-page,
 evidence-page, or projection-required; every proposed projection satisfies all
-admission rules.
+admission rules. Measurements must use current merged publication behavior and
+must preserve the CK-07R1 residual risk rather than claiming runtime acceptance
+or a receipt. CK-08RG and CK-09 remain blocked until this packet is
+hosted-green, squash-merged, and fresh exact-main verified.
 
 **Failure/rollback:** Any unmeasured/unbounded plan keeps CK-09 blocked.
 

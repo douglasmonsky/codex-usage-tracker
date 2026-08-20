@@ -1,9 +1,10 @@
 # CK-07R1 — Correct lifecycle preparation scale
 
-**Status:** `terminal_failed_no_rerun` after the sole v2 child launch consumed
-the non-refundable token and durably recorded `failed_after_launch`; only
-deterministic non-consuming corrective implementation prequalification remains,
-while runtime acceptance and downstream readiness are unavailable
+**Status:** `completed_post_terminal_deterministic_evidence` for roadmap
+dependency only; the sole v2 child launch remains immutable
+`failed_after_launch`, its token remains consumed/non-refundable,
+`runtime_acceptance=not_claimed`, planner-valid receipt/output remain absent,
+and `post_single_run`/`final_accepted` remain unavailable
 
 **Parent:** Corrective prerequisite for CK-09
 
@@ -125,24 +126,30 @@ follow-up authority scope or exact follow-up-plus-seven integrated state. It
 does not reopen the consumed token or authorize a command, launch, retry,
 replacement, refund, receipt, runtime acceptance, or downstream work.
 
-**Parallelism:** Resume only existing worker
-`019fbfe2-8fe4-7de2-9264-d58572366727` after the consuming-boundary authority
-merges and exact-main verifies, using frozen cwd
-`/Users/Monsky/Developer/Codex/2026-08-11/codex-usage-tracker-ck07r1-corrected-shared-overlay-exact-main-6c08ecd9`
-and only the complete selected cohort. Historical
-`d192c858…` cannot be reapplied directly.
-Worker ownership is a normative coordinator/orchestration binding to that
-exact existing Codex task plus recomputed repository evidence. It is not a
-runtime-authenticated identity; the launcher must not accept or claim a
-cryptographic or self-asserted per-task credential.
-Never rebase, stash, reset, clean, delete, overwrite, or mutate the historical
-V9/V10 witnesses. After the authority merge only, the separate frozen launch
-lane must fetch and fast-forward only from prequalification base `67bb1a…` to
-the exact merged main while preserving and recomputing the exact three dirty
-candidate bytes. Any non-fast-forward transition or byte drift fails closed.
-Do not create a replacement worker task. The planner-valid receipt is produced by that worker
-and is required for acceptance, not for authority completion; other corrective
-locks stay disjoint and no downstream packet becomes Ready here.
+The additive
+[post-terminal completion authority](../../decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.json)
+is the separate roadmap decision reserved by this terminal state. It binds
+exact PR #447/#450/#448 lineage, hosted Console/Python 3.10/3.14, exact merged
+main `1d0466b1b2992b48c5272dc4598606eeaea4dae2`, the exact seven-path
+implementation/evidence cohort, deterministic planner reproduction,
+small/large publication-path validation, promotion/recovery/rollback and
+prior-readability proof, independent fold equivalence, full/package checks,
+and the clean implementation review. That evidence accepts the corrected
+implementation only for CK-07R1 roadmap dependency completion. It does not
+claim runtime acceptance, satisfy or fabricate the missing receipt, reclassify
+the failed run, or change production semantics. CK-08R4 is the sole Ready
+successor and must independently measure current merged publication behavior;
+CK-08RG and CK-09 remain blocked.
+
+**Parallelism:** CK-07R1 is closed. Do not resume the worker, command, or
+historical launch lane. Preserve existing worker
+`019fbfe2-8fe4-7de2-9264-d58572366727`, frozen cwd, V9/V10 witnesses, v1/v2
+terminal evidence, PR #394, and exact repository history read-only. No
+replacement task, retry, restart, refund, or further invocation is permitted.
+Historical worker ownership remains the normative coordinator/orchestration
+binding; it was never cryptographic runtime authentication. The prior
+fast-forward-only launch lineage from `67bb1a…` is retained as historical
+evidence and cannot be reactivated.
 
 **Non-goals:** Writer/pointer/schema redesign, facts, projections, or budget
 waivers.
@@ -156,44 +163,29 @@ standard/production fixtures, five unprofiled samples, 30-day/all-time gates,
 the finite state transitions and real non-launching subprocess argv guard; no
 E2E or benchmark run in the authority reconciliation.
 
-**Acceptance:** Historical v2 launch — immediately before the one command, the worker must revalidate
-the exact recovery authority bytes, the corrected three-path source cohort,
-the preserved v1 ledger as the sole fourth dirty path, lexical worktree
-`.venv/bin/python` plus matching `sys.prefix`, exact cwd/argv/environment,
-capacity at or above 10 GiB, `matching_processes=[]`, all four new v2 artifact
-paths absent, the unconsumed token, and synthetic fixture identity. Any miss
-fails closed without launch or artifact creation. If every gate passes, exactly
-one successfully observed child PID/argv/cwd/owner/handshake consumes the
-non-refundable token. No retry, restart, replacement, live/real data, or
-fabricated receipt is permitted. The launcher-imported shared verifier enforces
-the consuming authority before ledger/fork and requires candidate
-`HEAD == refs/remotes/origin/main == live ls-remote origin/main`; the authority
-feature branch and the stale `67bb1a…` HEAD cannot satisfy that activation.
-The prequalification base must remain an ancestor of exact merged main. Work is linear in observations
-plus prior transitions and all
-publication-valid scale gates pass through the CK-07R1A0 reachable path and
-the frozen CK-07R1A0 run-invocation contract. The existing worker must
-revalidate the exact predecessor-to-successor digest
-transition, bind every frozen path and prior identity, produce the
-planner-valid receipt, and consume at most one new end-to-end run. The still-
-unspent `maximum_new_end_to_end_runs=1` token can fund exactly one first
-successful child launch only after the authority merge/exact-main gate and all
-worker gates pass; this is not a retry, restart, or replacement of a launched
-process. Receipt absence before dispatch is required; receipt absence or
-invalidity at successor acceptance remains fail-closed.
+**Acceptance:** Historical consuming acceptance required exact recovery
+authority bytes, cohort, preserved v1 ledger, lexical worktree interpreter and
+`sys.prefix`, cwd/argv/environment, capacity, process/output absence, token,
+and synthetic fixture identity before one child handshake could consume the
+non-refundable token. That handshake occurred and the token was consumed. The
+child then terminated `failed_after_launch`; therefore every launch condition
+is historical-only and can never authorize another command.
 
-**Post-terminal corrective acceptance:** The corrected two-file cohort may
-enter only `corrective_implementation_prequalified` after exact unit-level
+**Post-terminal corrective acceptance:** The corrected two-file cohort entered
+`corrective_implementation_prequalified` after exact unit-level
 planner reproduction, 32/33 boundary tests, large-artifact promotion and
 rollback/readability tests, independent lifecycle-fold equivalence, exact
 small/large plan preservation, focused and full repository gates, one bounded
 reviewer, hosted Console/Python 3.10/3.14, squash merge of the authority-only
-packet, and fresh exact-main verification. This state is not runtime
-qualification and cannot transition to `post_single_run` or `final_accepted`;
-the existing complete-receipt requirement remains unsatisfied. No command
-invocation or run artifact creation is part of this correction.
+packet, and fresh exact-main verification. PR #448 then merged the exact
+implementation/evidence cohort and passed the same hosted matrix. The separate
+post-terminal authority accepts that deterministic evidence as
+`completed_post_terminal_deterministic_evidence` for dependency accounting,
+not as runtime qualification. `post_single_run` and `final_accepted` remain
+unavailable and the complete-receipt requirement remains unsatisfied. No
+command invocation or run artifact creation is part of this completion.
 
-The V11 candidate must construct and validate the fully overlay/cohort-bound
+The historical V11 launcher contract required construction and validation of the fully overlay/cohort-bound
 receipt and non-null stdout/stderr/output evidence before its first durable
 `completed` finalization. Evidence read/hash/parse/validation/finalization
 failure is terminal `failed_after_launch`, never false `completed`. Temporary
@@ -212,7 +204,8 @@ consumed/no-retry `failed_after_launch` evidence without temporary residue.
 Interpreter identity requires the lexical repository-worktree
 `.venv/bin/python` plus matching lexical venv
 `sys.prefix`; base interpreters, symlink/resolved equivalence, wrong-worktree
-venvs, and prefix mismatch are rejected before side effects.
+venvs, and prefix mismatch were rejected before side effects. No part of that
+contract can authorize a new invocation after the consumed terminal run.
 
 The hosted Console gate retains Chromium dependency and browser coverage. It
 pins the canonical HTTPS Ubuntu archive before Playwright installs system
@@ -224,9 +217,9 @@ instead of hanging or bypassing Console evidence.
 new dominant blocker; never weaken the gate. The preserved v1 and v2 ledgers,
 v2 stdout/stderr, absent output/receipt state, child identity, token
 consumption, and terminal classifications are never deleted, moved, rewritten,
-or reclassified. A separate explicit roadmap decision is required to resolve
-the receipt-required acceptance dead end; no implementation or authority
-correction may infer another run.
+or reclassified. The separate roadmap decision resolves dependency accounting
+only; no implementation or authority correction may infer another run or
+runtime acceptance.
 
 **Handoff:** Evidence digest, profiles, retained first hosted failure, PR #394
 CI, exact-main result, and CK-08R4 input.
