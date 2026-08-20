@@ -555,7 +555,6 @@ def verify_combined(
     verify_planner_reproduction(authority, root)
     return {
         "candidate_paths": len(authority["scope"]["combined_candidate_scope"]),
-        "candidate_representation": representation,
         "new_run_permitted": False,
         "runtime_acceptance": "not_claimed",
         "token_consumed": True,
