@@ -212,6 +212,18 @@ runtime acceptance and
 does not authorize a command, launch, token refund, retry, restart,
 replacement, receipt, or downstream transition.
 
+The additive versioned
+[`lifecycle-terminal-failure-clean-commit-authority-v2`](decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v2.json)
+preserves both clean-commit v1 authority files byte-for-byte and closes the
+clean-hosted-checkout environment seam exposed by PR #448. It binds the one
+exact workflow change that creates the matrix interpreter's repository-local
+`.venv` with `python -m venv --system-site-packages .venv` after the existing
+tooling install and before verification. The v2 verifier admits only the exact
+18-path authority delta or exact 18-plus-seven clean integrated transition;
+missing, extra, partial, wrong-workflow, wrong-lineage, and wrong-candidate
+states fail closed. It adds no network install, qualification invocation,
+launch, refund, retry, receipt, runtime acceptance, or downstream authority.
+
 The V11 candidate must construct and validate the exact overlay/cohort-bound
 receipt and non-null stdout/stderr/output evidence before its first durable
 `completed` finalization. Evidence read/hash/parse/validation/finalization

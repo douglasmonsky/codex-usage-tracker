@@ -86,6 +86,18 @@ def test_consuming_boundary_preserves_every_bound_authority_byte() -> None:
     verify_bound_authority_bytes(_authority(), ROOT)
 
 
+def test_consuming_boundary_accepts_only_versioned_ci_workflow_successor() -> None:
+    authority = _authority()
+    record = next(
+        item
+        for item in authority["immutable_authorities"]
+        if item["path"] == ".github/workflows/ci.yml"
+    )
+    actual = hashlib.sha256((ROOT / record["path"]).read_bytes()).hexdigest()
+    assert actual != record["sha256"]
+    verify_bound_authority_bytes(authority, ROOT)
+
+
 def test_consuming_boundary_binds_bounded_console_browser_install() -> None:
     authority = _authority()
     workflow_path = ".github/workflows/ci.yml"

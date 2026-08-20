@@ -130,6 +130,18 @@ def test_recovery_authority_preserves_every_predecessor_byte() -> None:
     verify_bound_authority_bytes(_authority(), ROOT)
 
 
+def test_recovery_accepts_only_versioned_shared_overlay_successor() -> None:
+    authority = _authority()
+    record = next(
+        item
+        for item in authority["immutable_authorities"]
+        if item["path"] == "scripts/ck07r1_shared_successor_overlay.py"
+    )
+    actual = hashlib.sha256((ROOT / record["path"]).read_bytes()).hexdigest()
+    assert actual != record["sha256"]
+    verify_bound_authority_bytes(authority, ROOT)
+
+
 def test_recovery_authority_binds_exact_candidate_and_terminal_ledger(
     tmp_path: Path,
 ) -> None:

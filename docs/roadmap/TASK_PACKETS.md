@@ -124,6 +124,13 @@ locks are unchanged.
 - [ ] **CK-16-03 — Build once and qualify release candidate** · Blocked on docs/selected optional work · [packet](tasks/ck-16-03-build-once-qualify-release-candidate.md)
 - [ ] **CK-16-04 — Publish and verify public artifacts** · Blocked on CK-16-03 and approval · [packet](tasks/ck-16-04-publish-verify-public-artifacts.md)
 
+### CK-07R1 hosted CI authority supplement
+
+The [clean-committed CI authority v2](../decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v2.json)
+binds the exact repository-local hosted `.venv` seam for PR #448 without
+reopening the consumed run, authorizing a retry, or changing receipt-based
+acceptance and downstream holds.
+
 ## Critical path
 
 `CK-00 → CK-01 → CK-02 → CK-03 → CK-04 → CK-05 → CK-06 → CK-07 → CK-07B

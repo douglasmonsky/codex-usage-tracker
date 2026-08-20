@@ -16,6 +16,7 @@ from scripts.ck07r1_prelaunch_recovery import (
 )
 from scripts.ck07r1_shared_successor_overlay import (
     CONSUMING_AUTHORITY_PATH,
+    CONSUMING_SCHEMA_PATH,
     ROOT,
     SCHEMA_PATH,
     SharedSuccessorOverlayError,
@@ -39,7 +40,9 @@ from scripts.ck07r1_terminal_failure_correction import (
 )
 from scripts.ck07r1_terminal_failure_correction import (
     CLEAN_COMMIT_AUTHORITY_PATH,
+    CLEAN_COMMIT_CI_AUTHORITY_PATH,
     load_clean_commit_authority,
+    load_clean_commit_ci_authority,
     verify_clean_candidate_transition,
 )
 from scripts.ck07r1_terminal_failure_correction import (
@@ -159,11 +162,37 @@ def test_complete_consuming_boundary_is_the_only_additive_authority_delta() -> N
             verify_exact_worktree_delta(overlay, "authority_main", observed=changed)
 
 
+def test_shared_overlay_accepts_only_versioned_ci_workflow_successor() -> None:
+    consuming = load_consuming_boundary()
+    assert consuming is not None
+    record = next(
+        item
+        for item in consuming["immutable_authorities"]
+        if item["path"] == ".github/workflows/ci.yml"
+    )
+    assert sha256_path(ROOT, record["path"]) != record["sha256"]
+
+
 def test_partial_consuming_boundary_pair_fails_closed(tmp_path: Path) -> None:
     path = tmp_path / CONSUMING_AUTHORITY_PATH
     path.parent.mkdir(parents=True)
     path.write_text("{}\n", encoding="utf-8")
     with pytest.raises(SharedSuccessorOverlayError, match="partial"):
+        load_consuming_boundary(tmp_path)
+
+
+def test_consuming_boundary_rejects_drifted_bound_authority(tmp_path: Path) -> None:
+    for relative in (CONSUMING_AUTHORITY_PATH, CONSUMING_SCHEMA_PATH):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / relative).read_bytes())
+    agents = tmp_path / "AGENTS.md"
+    agents.write_bytes((ROOT / "AGENTS.md").read_bytes() + b"\n# drift\n")
+
+    with pytest.raises(
+        SharedSuccessorOverlayError,
+        match="consuming-boundary bound bytes drifted: AGENTS.md",
+    ):
         load_consuming_boundary(tmp_path)
 
 
@@ -486,10 +515,14 @@ def test_overlay_scope_and_launcher_contract_are_exact() -> None:
     predecessor = overlay_changed_path_allowance(authority, "authority_main")
     successor = overlay_changed_path_allowance(authority, "worker_prequalification")
     candidate = set(authority["scope"]["combined_preflight_candidate_scope"])
+    clean_commit_ci = load_clean_commit_ci_authority(ROOT)
+    clean_commit_ci_scope = set(clean_commit_ci["scope"]["authority_write_scope"])
 
     assert successor == predecessor | candidate
+    assert clean_commit_ci_scope <= predecessor
     assert candidate.isdisjoint(predecessor)
     assert "src/codex_usage_tracker/agent_kernel/publication/writer.py" not in successor
+    assert str(CLEAN_COMMIT_CI_AUTHORITY_PATH) in predecessor
     verify_launcher_safety_contract(authority)
 
     weakened = deepcopy(authority)

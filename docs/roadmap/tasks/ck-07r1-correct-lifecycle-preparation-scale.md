@@ -115,6 +115,16 @@ durable promotion, recovery, rollback, and prior-readability path. Tail limits,
 production planner/preparation behavior, accepted authority bytes, both
 terminal ledgers, and all run artifacts remain immutable.
 
+The additive [clean-committed CI authority v2](../../decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v2.json)
+preserves both v1 bridge files byte-for-byte and binds the exact hosted workflow
+correction required by accepted lexical `.venv/bin/python` and matching
+`sys.prefix` consumers. It creates `.venv` from the already-selected Python
+3.10 or 3.14 matrix interpreter after the existing development install and
+before verification, adds no network dependency step, and admits only the exact
+follow-up authority scope or exact follow-up-plus-seven integrated state. It
+does not reopen the consumed token or authorize a command, launch, retry,
+replacement, refund, receipt, runtime acceptance, or downstream work.
+
 **Parallelism:** Resume only existing worker
 `019fbfe2-8fe4-7de2-9264-d58572366727` after the consuming-boundary authority
 merges and exact-main verifies, using frozen cwd

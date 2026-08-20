@@ -847,6 +847,8 @@ def test_ck07r1_terminal_clean_commit_additions_are_explicit_and_bounded() -> No
     assert {
         "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.json",
         "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.schema.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v2.json",
+        "docs/decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v2.schema.json",
     } == CK07R1_TERMINAL_CLEAN_COMMIT_AUTHORITY_ADDITIONS
 
 

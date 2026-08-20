@@ -215,6 +215,14 @@ authority-main tree or as a clean committed PR/integrated delta with exact
 base, scope, and hashes. Neither representation reopens the consumed run or
 changes the existing blocked state.
 
+The additive [clean-committed CI authority v2](../decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v2.json)
+preserves the v1 bridge bytes and binds the clean hosted matrix's
+repository-local `.venv` creation before verification. It recognizes only the
+exact 18-path follow-up authority delta and exact 18-plus-seven integrated
+PR #448 state. This deterministic environment correction does not authorize a
+qualification command, another child, token action, retry, receipt,
+implementation acceptance, or downstream readiness.
+
 The exact V11 launcher contract constructs and validates the fully
 overlay/cohort-bound receipt and non-null stdout/stderr/output evidence before
 any first durable `completed` finalization. Evidence

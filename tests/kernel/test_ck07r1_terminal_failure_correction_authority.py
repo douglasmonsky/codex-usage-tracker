@@ -13,14 +13,20 @@ import scripts.ck07r1_terminal_failure_correction as terminal_module
 from scripts.ck07r1_terminal_failure_correction import (
     AUTHORITY_PATH,
     CLEAN_COMMIT_AUTHORITY_PATH,
+    CLEAN_COMMIT_CI_AUTHORITY_PATH,
+    CLEAN_COMMIT_CI_SCHEMA_PATH,
     CLEAN_COMMIT_SCHEMA_PATH,
     SCHEMA_PATH,
     TerminalCorrectionError,
     load_authority,
     load_clean_commit_authority,
+    load_clean_commit_ci_authority,
     verify_clean_candidate_transition,
     verify_clean_commit_authority_bytes,
     verify_clean_commit_authority_delta,
+    verify_clean_commit_ci_authority_bytes,
+    verify_clean_commit_ci_authority_delta,
+    verify_clean_commit_ci_transition,
     verify_corrected_cohort,
     verify_exact_authority_delta,
     verify_exact_candidate_delta,
@@ -37,6 +43,10 @@ def _authority() -> dict[str, Any]:
 
 def _clean_commit_authority() -> dict[str, Any]:
     return load_clean_commit_authority(ROOT)
+
+
+def _clean_commit_ci_authority() -> dict[str, Any]:
+    return load_clean_commit_ci_authority(ROOT)
 
 
 def _write(path: Path, value: bytes) -> str:
@@ -158,8 +168,14 @@ def test_exact_authority_delta_admits_only_exact_clean_integrated_candidate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     authority = _authority()
+    clean_commit_ci = _clean_commit_ci_authority()
     clean_commit = _clean_commit_authority()
     calls: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        terminal_module,
+        "load_clean_commit_ci_authority",
+        lambda _root: clean_commit_ci,
+    )
     monkeypatch.setattr(
         terminal_module,
         "load_clean_commit_authority",
@@ -167,7 +183,7 @@ def test_exact_authority_delta_admits_only_exact_clean_integrated_candidate(
     )
     monkeypatch.setattr(
         terminal_module,
-        "verify_clean_commit_authority_bytes",
+        "verify_clean_commit_ci_authority_bytes",
         lambda _authority, _root: calls.append(("authority_bytes", None)),
     )
     monkeypatch.setattr(
@@ -177,14 +193,14 @@ def test_exact_authority_delta_admits_only_exact_clean_integrated_candidate(
     )
     monkeypatch.setattr(
         terminal_module,
-        "verify_clean_candidate_transition",
-        lambda _authority, _root: "clean_integrated",
+        "verify_clean_commit_ci_transition",
+        lambda _authority, _v1, _root: "clean_integrated",
     )
     monkeypatch.setattr(
         terminal_module,
-        "verify_clean_commit_authority_delta",
+        "verify_clean_commit_ci_authority_delta",
         lambda _authority, _root, **kwargs: calls.append(
-            ("authority_delta", kwargs["include_committed_candidate"])
+            ("authority_delta", kwargs["include_candidate"])
         ),
     )
     terminal_module.verify_exact_authority_delta(authority, ROOT)
@@ -370,9 +386,15 @@ def test_combined_verifies_authority_binding_before_candidate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     authority = _authority()
+    clean_commit_ci = _clean_commit_ci_authority()
     clean_commit = _clean_commit_authority()
     calls: list[str] = []
 
+    monkeypatch.setattr(
+        terminal_module,
+        "load_clean_commit_ci_authority",
+        lambda _root: clean_commit_ci,
+    )
     monkeypatch.setattr(
         terminal_module,
         "load_clean_commit_authority",
@@ -380,18 +402,18 @@ def test_combined_verifies_authority_binding_before_candidate(
     )
     monkeypatch.setattr(
         terminal_module,
-        "verify_clean_commit_authority_bytes",
+        "verify_clean_commit_ci_authority_bytes",
         lambda _authority, _root: calls.append("authority_bytes"),
     )
     monkeypatch.setattr(
         terminal_module,
-        "verify_clean_candidate_transition",
-        lambda _authority, _root: calls.append("candidate_transition")
+        "verify_clean_commit_ci_transition",
+        lambda _authority, _v1, _root: calls.append("candidate_transition")
         or "clean_integrated",
     )
     monkeypatch.setattr(
         terminal_module,
-        "verify_clean_commit_authority_delta",
+        "verify_clean_commit_ci_authority_delta",
         lambda _authority, _root, **_kwargs: calls.append("authority_delta"),
     )
     monkeypatch.setattr(
@@ -524,3 +546,121 @@ def test_clean_commit_schema_rejects_lineage_scope_and_no_run_weakening() -> Non
 
 def test_clean_commit_authority_file_name_is_versioned() -> None:
     assert Path(CLEAN_COMMIT_AUTHORITY_PATH).name.endswith("-v1.json")
+
+
+def test_clean_commit_ci_authority_is_versioned_strict_and_preserves_v1() -> None:
+    authority = _clean_commit_ci_authority()
+    schema = json.loads(
+        (ROOT / CLEAN_COMMIT_CI_SCHEMA_PATH).read_text(encoding="utf-8")
+    )
+    Draft202012Validator.check_schema(schema)
+    Draft202012Validator(schema).validate(authority)
+    assert authority["schema"].endswith(".v2")
+    assert authority["authority_base_sha"] == (
+        "487e0b7138d638d7cfb1d91627e5a6ebda743699"
+    )
+    assert authority["implementation_transition"]["source_head_sha"] == (
+        "927aa06f7c4c88319cc30247343c40db8e9b817e"
+    )
+    assert authority["status"] == "permitted_not_accepted"
+    verify_clean_commit_ci_authority_bytes(authority, ROOT)
+
+
+def test_clean_commit_ci_authority_delta_and_candidate_states_are_exact() -> None:
+    authority = _clean_commit_ci_authority()
+    v1 = _clean_commit_authority()
+    authority_scope = set(authority["scope"]["authority_write_scope"])
+    candidate_scope = set(authority["scope"]["candidate_scope"])
+
+    verify_clean_commit_ci_authority_delta(
+        authority,
+        ROOT,
+        observed_committed=authority_scope,
+        base_is_ancestor=True,
+    )
+    assert (
+        verify_clean_commit_ci_transition(
+            authority,
+            v1,
+            ROOT,
+            observed_committed=authority_scope,
+            observed_worktree=candidate_scope,
+            base_is_ancestor=True,
+            verify_bytes=False,
+        )
+        == "dirty_prepublication"
+    )
+    assert (
+        verify_clean_commit_ci_transition(
+            authority,
+            v1,
+            ROOT,
+            observed_committed=authority_scope | candidate_scope,
+            observed_worktree=set(),
+            base_is_ancestor=True,
+            verify_bytes=False,
+        )
+        == "clean_integrated"
+    )
+
+    for committed, worktree in (
+        (authority_scope - {".github/workflows/ci.yml"}, set()),
+        (authority_scope | {"extra.txt"}, set()),
+        (authority_scope | candidate_scope, {"extra.txt"}),
+        (authority_scope, candidate_scope - {next(iter(candidate_scope))}),
+    ):
+        with pytest.raises(TerminalCorrectionError):
+            verify_clean_commit_ci_transition(
+                authority,
+                v1,
+                ROOT,
+                observed_committed=committed,
+                observed_worktree=worktree,
+                base_is_ancestor=True,
+                verify_bytes=False,
+            )
+    with pytest.raises(TerminalCorrectionError, match="not an ancestor"):
+        verify_clean_commit_ci_transition(
+            authority,
+            v1,
+            ROOT,
+            observed_committed=authority_scope | candidate_scope,
+            base_is_ancestor=False,
+            verify_bytes=False,
+        )
+
+
+def test_clean_commit_ci_schema_rejects_scope_and_no_run_weakening() -> None:
+    authority = _clean_commit_ci_authority()
+    schema = json.loads(
+        (ROOT / CLEAN_COMMIT_CI_SCHEMA_PATH).read_text(encoding="utf-8")
+    )
+    mutations = (
+        lambda value: value["source_authority"][0].__setitem__("sha256", "0" * 64),
+        lambda value: value["ci_environment_transition"].__setitem__(
+            "command", ["python", "-m", "venv", ".venv"]
+        ),
+        lambda value: value["ci_environment_transition"].__setitem__(
+            "sha256", "1" * 64
+        ),
+        lambda value: value["scope"]["authority_write_scope"].remove(
+            ".github/workflows/ci.yml"
+        ),
+        lambda value: value["scope"]["candidate_scope"].pop(),
+        lambda value: value["decision"].__setitem__(
+            "new_command_invocations_permitted", 1
+        ),
+        lambda value: value["decision"].__setitem__("launch_authorized", True),
+        lambda value: value["decision"].__setitem__("token_consumed", False),
+        lambda value: value["decision"].__setitem__(
+            "runtime_acceptance", "claimed"
+        ),
+    )
+    for mutate in mutations:
+        changed = deepcopy(authority)
+        mutate(changed)
+        assert list(Draft202012Validator(schema).iter_errors(changed))
+
+
+def test_clean_commit_ci_authority_file_name_is_versioned() -> None:
+    assert Path(CLEAN_COMMIT_CI_AUTHORITY_PATH).name.endswith("-v2.json")

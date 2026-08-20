@@ -28,6 +28,14 @@ CLEAN_COMMIT_SCHEMA_PATH = Path(
     "docs/decisions/evidence/ck07r1a0/"
     "lifecycle-terminal-failure-clean-commit-authority-v1.schema.json"
 )
+CLEAN_COMMIT_CI_AUTHORITY_PATH = Path(
+    "docs/decisions/evidence/ck07r1a0/"
+    "lifecycle-terminal-failure-clean-commit-authority-v2.json"
+)
+CLEAN_COMMIT_CI_SCHEMA_PATH = Path(
+    "docs/decisions/evidence/ck07r1a0/"
+    "lifecycle-terminal-failure-clean-commit-authority-v2.schema.json"
+)
 
 
 class TerminalCorrectionError(RuntimeError):
@@ -74,6 +82,19 @@ def load_clean_commit_authority(root: Path) -> dict[str, Any]:
     except Exception as exc:
         raise TerminalCorrectionError(
             f"terminal clean-commit authority/schema validation failed: {exc}"
+        ) from exc
+    return authority
+
+
+def load_clean_commit_ci_authority(root: Path) -> dict[str, Any]:
+    authority = _load_json(root / CLEAN_COMMIT_CI_AUTHORITY_PATH)
+    schema = _load_json(root / CLEAN_COMMIT_CI_SCHEMA_PATH)
+    try:
+        Draft202012Validator.check_schema(schema)
+        Draft202012Validator(schema).validate(authority)
+    except Exception as exc:
+        raise TerminalCorrectionError(
+            f"clean-commit CI authority/schema validation failed: {exc}"
         ) from exc
     return authority
 
@@ -131,6 +152,198 @@ def _is_ancestor(root: Path, ancestor: str, descendant: str = "HEAD") -> bool:
         text=True,
     )
     return result.returncode == 0
+
+
+def _git_blob_sha256(root: Path, revision: str, relative: str) -> str:
+    result = subprocess.run(
+        ("git", "show", f"{revision}:{relative}"),
+        cwd=root,
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise TerminalCorrectionError(
+            f"cannot read exact Git blob {revision}:{relative}"
+        )
+    return hashlib.sha256(result.stdout).hexdigest()
+
+
+def verify_clean_commit_ci_authority_bytes(
+    authority: Mapping[str, Any], root: Path
+) -> None:
+    for record in authority["source_authority"]:
+        path = root / record["path"]
+        if not path.is_file() or _sha256(path) != record["sha256"]:
+            raise TerminalCorrectionError(
+                f"clean-commit CI source authority byte identity mismatch: "
+                f"{record['path']}"
+            )
+    for record in authority["superseded_immutable_paths"]:
+        relative = str(record["path"])
+        path = root / relative
+        if not path.is_file() or _sha256(path) != record["sha256"]:
+            raise TerminalCorrectionError(
+                f"clean-commit CI successor byte identity mismatch: {relative}"
+            )
+        if (
+            _git_blob_sha256(
+                root, str(authority["authority_base_sha"]), relative
+            )
+            != record["before_sha256"]
+        ):
+            raise TerminalCorrectionError(
+                f"clean-commit CI predecessor byte identity mismatch: {relative}"
+            )
+    transition = authority["ci_environment_transition"]
+    workflow_path = str(transition["workflow_path"])
+    workflow = root / workflow_path
+    if not workflow.is_file() or _sha256(workflow) != transition["sha256"]:
+        raise TerminalCorrectionError("clean-commit CI workflow byte identity mismatch")
+    if (
+        _git_blob_sha256(
+            root, str(authority["authority_base_sha"]), workflow_path
+        )
+        != transition["before_sha256"]
+    ):
+        raise TerminalCorrectionError(
+            "clean-commit CI predecessor workflow byte identity mismatch"
+        )
+    text = workflow.read_text(encoding="utf-8")
+    command = "python -m venv --system-site-packages .venv"
+    if text.count(command) != 1:
+        raise TerminalCorrectionError("clean-commit CI venv command must be exact")
+    if not (
+        text.index('python -m pip install ".[dev]"')
+        < text.index(command)
+        < text.index("- name: Verify kernel phase")
+    ):
+        raise TerminalCorrectionError(
+            "clean-commit CI venv command must precede verification"
+        )
+
+
+def bound_authority_digest_matches(
+    root: Path, relative: str, expected: str
+) -> bool:
+    path = root / relative
+    if not path.is_file():
+        return False
+    actual = _sha256(path)
+    if actual == expected:
+        return True
+    if not (root / CLEAN_COMMIT_CI_AUTHORITY_PATH).is_file():
+        return False
+    authority = load_clean_commit_ci_authority(root)
+    verify_clean_commit_ci_authority_bytes(authority, root)
+    return any(
+        record["path"] == relative
+        and record["before_sha256"] == expected
+        and record["sha256"] == actual
+        for record in authority["superseded_immutable_paths"]
+    )
+
+
+def verify_clean_commit_ci_authority_delta(
+    authority: Mapping[str, Any],
+    root: Path,
+    *,
+    include_candidate: bool = False,
+    observed_committed: set[str] | None = None,
+    observed_worktree: set[str] | None = None,
+    base_is_ancestor: bool | None = None,
+) -> None:
+    base = str(authority["authority_base_sha"])
+    if base_is_ancestor is None:
+        base_is_ancestor = _is_ancestor(root, base)
+    if not base_is_ancestor:
+        raise TerminalCorrectionError(
+            "clean-commit CI authority base is not an ancestor of HEAD"
+        )
+    authority_scope = set(authority["scope"]["authority_write_scope"])
+    candidate_scope = set(authority["scope"]["candidate_scope"])
+    expected_committed = authority_scope | (
+        candidate_scope if include_candidate else set()
+    )
+    if observed_committed is None:
+        head = _git(root, "rev-parse", "HEAD")
+        worktree = _status_paths(root)
+        if head == base:
+            committed = set()
+            expected_worktree = expected_committed
+            expected_committed_actual = set()
+        else:
+            committed = {
+                line
+                for line in _git(
+                    root, "diff", "--name-only", f"{base}..{head}", "--"
+                ).splitlines()
+                if line
+            }
+            expected_worktree = set()
+            expected_committed_actual = expected_committed
+    else:
+        committed = observed_committed
+        worktree = observed_worktree or set()
+        expected_worktree = set()
+        expected_committed_actual = expected_committed
+    if committed != expected_committed_actual:
+        raise TerminalCorrectionError(
+            "clean-commit CI committed delta must be exact: "
+            f"expected={sorted(expected_committed)} actual={sorted(committed)}"
+        )
+    if worktree != expected_worktree:
+        raise TerminalCorrectionError(
+            "clean-commit CI worktree delta must be exact: "
+            f"expected={sorted(expected_worktree)} actual={sorted(worktree)}"
+        )
+
+
+def verify_clean_commit_ci_transition(
+    authority: Mapping[str, Any],
+    v1_authority: Mapping[str, Any],
+    root: Path,
+    *,
+    observed_committed: set[str] | None = None,
+    observed_worktree: set[str] | None = None,
+    base_is_ancestor: bool | None = None,
+    verify_bytes: bool = True,
+) -> str:
+    if verify_bytes:
+        verify_clean_candidate_bytes(v1_authority, root)
+    base = str(authority["authority_base_sha"])
+    if base_is_ancestor is None:
+        base_is_ancestor = _is_ancestor(root, base)
+    if not base_is_ancestor:
+        raise TerminalCorrectionError(
+            "clean-commit CI candidate base is not an ancestor of HEAD"
+        )
+    authority_scope = set(authority["scope"]["authority_write_scope"])
+    candidate_scope = set(authority["scope"]["candidate_scope"])
+    if observed_committed is None:
+        head = _git(root, "rev-parse", "HEAD")
+        committed = {
+            line
+            for line in _git(
+                root, "diff", "--name-only", f"{base}..{head}", "--"
+            ).splitlines()
+            if line
+        }
+        worktree = _status_paths(root)
+    else:
+        committed = observed_committed
+        worktree = observed_worktree or set()
+    if committed == authority_scope and worktree == candidate_scope:
+        return "dirty_prepublication"
+    if committed == authority_scope | candidate_scope and not worktree:
+        return "clean_integrated"
+    raise TerminalCorrectionError(
+        "clean-commit CI candidate lineage/delta must be exact: "
+        f"expected_dirty_committed={sorted(authority_scope)} "
+        f"expected_dirty_worktree={sorted(candidate_scope)} "
+        f"expected_integrated={sorted(authority_scope | candidate_scope)} "
+        f"actual_committed={sorted(committed)} "
+        f"actual_worktree={sorted(worktree)}"
+    )
 
 
 def verify_clean_commit_authority_bytes(
@@ -285,6 +498,26 @@ def verify_exact_authority_delta(
     if (
         observed is None
         and allowed_worktree_delta is None
+        and (root / CLEAN_COMMIT_CI_AUTHORITY_PATH).is_file()
+    ):
+        clean_commit_ci = load_clean_commit_ci_authority(root)
+        clean_commit_v1 = load_clean_commit_authority(root)
+        verify_clean_commit_ci_authority_bytes(clean_commit_ci, root)
+        include_committed_candidate = False
+        if _clean_candidate_bytes_exact(clean_commit_v1, root):
+            representation = verify_clean_commit_ci_transition(
+                clean_commit_ci, clean_commit_v1, root
+            )
+            include_committed_candidate = representation == "clean_integrated"
+        verify_clean_commit_ci_authority_delta(
+            clean_commit_ci,
+            root,
+            include_candidate=include_committed_candidate,
+        )
+        return
+    if (
+        observed is None
+        and allowed_worktree_delta is None
         and (root / CLEAN_COMMIT_AUTHORITY_PATH).is_file()
     ):
         clean_commit = load_clean_commit_authority(root)
@@ -355,8 +588,9 @@ def verify_exact_candidate_delta(
 
 def verify_immutable_authority_bytes(authority: Mapping[str, Any], root: Path) -> None:
     for record in authority["immutable_authorities"]:
-        path = root / record["path"]
-        if not path.is_file() or _sha256(path) != record["sha256"]:
+        if not bound_authority_digest_matches(
+            root, str(record["path"]), str(record["sha256"])
+        ):
             raise TerminalCorrectionError(
                 f"immutable authority byte identity mismatch: {record['path']}"
             )
@@ -525,7 +759,28 @@ def verify_combined(
 ) -> dict[str, Any]:
     clean_commit_root = authority_root or root
     clean_commit_path = clean_commit_root / CLEAN_COMMIT_AUTHORITY_PATH
-    if clean_commit_path.is_file():
+    clean_commit_ci_path = clean_commit_root / CLEAN_COMMIT_CI_AUTHORITY_PATH
+    if clean_commit_ci_path.is_file():
+        clean_commit_ci = load_clean_commit_ci_authority(clean_commit_root)
+        clean_commit = load_clean_commit_authority(clean_commit_root)
+        verify_clean_commit_ci_authority_bytes(clean_commit_ci, clean_commit_root)
+        same_root = clean_commit_root == root
+        if same_root:
+            representation = verify_clean_commit_ci_transition(
+                clean_commit_ci, clean_commit, root
+            )
+            verify_clean_commit_ci_authority_delta(
+                clean_commit_ci,
+                clean_commit_root,
+                include_candidate=representation == "clean_integrated",
+            )
+        else:
+            verify_clean_commit_ci_authority_delta(
+                clean_commit_ci, clean_commit_root
+            )
+            representation = verify_clean_candidate_transition(clean_commit, root)
+            verify_clean_candidate_bytes(clean_commit, root)
+    elif clean_commit_path.is_file():
         clean_commit = load_clean_commit_authority(clean_commit_root)
         verify_clean_commit_authority_bytes(clean_commit, clean_commit_root)
         same_root = clean_commit_root == root
@@ -571,11 +826,12 @@ def _main(argv: Sequence[str] | None = None) -> int:
     authority = load_authority(authority_root)
     verify_immutable_authority_bytes(authority, authority_root)
     verify_exact_authority_delta(authority, authority_root)
-    clean_commit = (
-        load_clean_commit_authority(authority_root)
-        if (authority_root / CLEAN_COMMIT_AUTHORITY_PATH).is_file()
-        else None
-    )
+    if (authority_root / CLEAN_COMMIT_CI_AUTHORITY_PATH).is_file():
+        clean_commit = load_clean_commit_ci_authority(authority_root)
+    elif (authority_root / CLEAN_COMMIT_AUTHORITY_PATH).is_file():
+        clean_commit = load_clean_commit_authority(authority_root)
+    else:
+        clean_commit = None
     result: dict[str, Any] = {
         "authority_paths": len(
             clean_commit["scope"]["authority_write_scope"]
