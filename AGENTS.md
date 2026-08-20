@@ -33,8 +33,9 @@ corrective proof. CK-08R0 froze `corrective-gates-v1`; CK-08R2 is complete and
 CK-09 remains blocked. CK-08R1A froze corrected answer meaning and recursive
 closure; R1C is accepted at exact main `fb0c578`, and R1B is accepted at exact
 main `9e9332b3`. Final R1 requalification passed hosted CI in PR #439,
-squash-merged, and was exact-main verified at `0832b854`; no packet is Ready
-while CK-07R1 remains conditional.
+squash-merged, and was exact-main verified at `0832b854`. CK-07R1's separate
+post-terminal roadmap completion makes CK-08R4 the sole Ready packet while
+CK-08RG and CK-09 remain blocked.
 CK-QG1A removed the two R2 page-executor complexity findings without changing
 behavior or the frozen baseline and is accepted at exact main `30983d4`;
 QG1 PR #392 passed hosted CI, squash-merged, and was exact-main verified at
@@ -47,27 +48,19 @@ The versioned
 [`shared-successor-overlay-authority-v1`](docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json)
 preserves accepted CK-08R1B, CK-08R1, and CK-QG1 bytes while admitting only
 that complete cohort as CK-07 `worker_prequalification`.
-The existing CK-07R1 worker remains stopped until that authority transition is
-merged and exact-main verified; no launch or token use is authorized. The
-candidate must construct and validate its exact overlay-bound receipt and
-non-null stdout/stderr/output evidence before the first durable `completed`
-finalization; any evidence read/hash/parse/validation/finalization failure is
-terminal `failed_after_launch`. Temporary parent SIGINT/SIGTERM handlers must
-route every wait interruption/error through bounded TERM/KILL/reap before
-terminal failure persistence and remain installed through evidence, receipt,
-and terminal ledger finalization; originals restore only after the terminal
-state attempt. Every terminal fallback persistence call masks SIGINT/SIGTERM
-with the existing ignore guard and restores the prior temporary handlers
-afterward; the outer final restoration of original handlers remains last. The
-fork child ignores SIGINT/SIGTERM while
-waiting for parent release and routes every pre-release failure to
-`os._exit(71)`; parent cleanup rejects nonpositive PIDs. Ledger updates use a
-unique same-directory `mkstemp`, close and unlink every failed or interrupted
-path, and persist durable consumed/no-retry `failed_after_launch` evidence
-without temporary residue. Its interpreter must be the lexical
-repository-worktree `.venv/bin/python` with matching lexical venv `sys.prefix`;
-base interpreters, resolved/symlink equivalence, wrong-worktree venvs, and prefix
-mismatch fail closed. PR #394 remains stale failed read-only.
+The sole CK-07R1 v2 launch is terminal `failed_after_launch`; its token is
+consumed and non-refundable, no planner-valid receipt or output exists, and no
+retry, restart, replacement, or further invocation is permitted. PR #448
+merged the exact deterministic planner-selected small/large correction and
+immutable v1/v2 terminal evidence at exact main `1d0466b1`. The additive
+[`lifecycle-post-terminal-completion-authority-v1`](docs/decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.json)
+accepts that merged deterministic evidence only for CK-07R1 roadmap dependency
+completion. It permanently records `runtime_acceptance=not_claimed`,
+planner-valid receipt absent, `post_single_run` unavailable, and
+`final_accepted` unavailable. It neither reclassifies the failed run nor
+changes production semantics. CK-08R4 must independently measure current
+merged publication behavior and must not claim the missing CK-07R1 runtime
+acceptance. PR #394 remains stale failed read-only.
 Retained R3 evidence proved the EvidenceService outer query
 physically unbounded; CK-08R3A owns that isolated fix and R3 awaits its
 accepted, merged, exact-main-verified result.

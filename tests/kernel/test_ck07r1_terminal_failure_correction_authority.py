@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
+import scripts.ck07r1_post_terminal_completion as post_terminal_module
 import scripts.ck07r1_terminal_failure_correction as terminal_module
 from scripts.ck07r1_terminal_failure_correction import (
     AUTHORITY_PATH,
@@ -203,11 +204,43 @@ def test_exact_authority_delta_admits_only_exact_clean_integrated_candidate(
             ("authority_delta", kwargs["include_candidate"])
         ),
     )
+    monkeypatch.setattr(
+        post_terminal_module,
+        "load_authority",
+        lambda _root: calls.append(("post_authority", None)) or {},
+    )
+    monkeypatch.setattr(
+        post_terminal_module,
+        "verify_all",
+        lambda _authority, _root: calls.append(("post_verification", None)),
+    )
     terminal_module.verify_exact_authority_delta(authority, ROOT)
     assert calls == [
-        ("authority_bytes", None),
-        ("authority_delta", True),
+        ("post_authority", None),
+        ("post_verification", None),
     ]
+
+
+def test_post_terminal_historical_successor_rejects_current_byte_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binding = post_terminal_module.load_authority(ROOT)["historical_successor_bindings"][0]
+    assert terminal_module.bound_authority_digest_matches(
+        ROOT,
+        binding["path"],
+        binding["predecessor_sha256"],
+    )
+    sha256 = terminal_module._sha256
+    monkeypatch.setattr(
+        terminal_module,
+        "_sha256",
+        lambda path: "f" * 64 if path == ROOT / binding["path"] else sha256(path),
+    )
+    assert not terminal_module.bound_authority_digest_matches(
+        ROOT,
+        binding["path"],
+        binding["predecessor_sha256"],
+    )
 
 
 def test_candidate_representation_accepts_exact_dirty_and_clean_states() -> None:
@@ -431,6 +464,16 @@ def test_combined_verifies_authority_binding_before_candidate(
         "verify_planner_reproduction",
         lambda _authority, _root: calls.append("planner"),
     )
+    monkeypatch.setattr(
+        post_terminal_module,
+        "load_authority",
+        lambda _root: calls.append("post_authority") or {},
+    )
+    monkeypatch.setattr(
+        post_terminal_module,
+        "verify_all",
+        lambda _authority, _root: calls.append("post_verification"),
+    )
     monkeypatch.setattr(terminal_module, "_sha256", lambda _path: next(
         record["sha256"]
         for record in clean_commit["implementation_transition"]["paths"]
@@ -440,9 +483,9 @@ def test_combined_verifies_authority_binding_before_candidate(
 
     terminal_module.verify_combined(authority, ROOT)
     assert calls[:3] == [
-        "authority_bytes",
-        "candidate_transition",
-        "authority_delta",
+        "post_authority",
+        "post_verification",
+        "cohort",
     ]
 
 

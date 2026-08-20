@@ -115,8 +115,11 @@ consumer is accepted at exact main
 [R1B join authority](../decisions/evidence/ck08r1b/answer-semantics-join-authority.json)
 bound the shared query/evidence/grading seams accepted through PR #430 and
 exact-main `9e9332b3`. Final R1 replayed both accepted consumers, passed hosted
-CI in PR #439, squash-merged, and was exact-main verified at `0832b854`; no
-packet is Ready while CK-07R1 remains conditional. Cursor serialization still
+CI in PR #439, squash-merged, and was exact-main verified at `0832b854`.
+CK-07R1's post-terminal deterministic-evidence roadmap completion makes
+CK-08R4 the sole Ready packet; CK-08R4 must preserve
+`runtime_acceptance=not_claimed` and independently measure current merged
+publication behavior. Cursor serialization still
 binds its version, request digest,
 plan, publication, and order; malformed, tampered, stale, replacement, and
 mismatched bindings fail closed.

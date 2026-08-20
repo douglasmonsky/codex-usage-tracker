@@ -9,6 +9,10 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 
+from scripts.ck07r1_post_terminal_completion import (
+    load_authority as load_post_terminal_authority,
+)
+from scripts.ck07r1_post_terminal_completion import verify_all as verify_post_terminal
 from scripts.ck07r1_prelaunch_recovery import verify_combined_preflight
 from scripts.ck07r1_terminal_failure_correction import (
     load_authority as load_terminal_correction_authority,
@@ -129,6 +133,13 @@ def _assert_ck07_selected_or_recovery_cohort(
         for item in terminal["corrected_candidate_cohort"]
     }
     assert actual == terminal_expected
+    post_terminal_path = (
+        _REPO_ROOT / "docs/decisions/evidence/ck07r1a0/"
+        "lifecycle-post-terminal-completion-authority-v1.json"
+    )
+    if post_terminal_path.is_file():
+        verify_post_terminal(load_post_terminal_authority(_REPO_ROOT), _REPO_ROOT)
+        return
     verify_terminal_correction_combined(
         load_terminal_correction_authority(_REPO_ROOT),
         _REPO_ROOT,
@@ -256,7 +267,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "blocked_policy": "spawn_none_and_report_to_orchestrator",
     }
     conditional_ready: set[str] = set()
-    blocked = {"CK-07R1"}
+    blocked: set[str] = set()
     assert manifest["completed"] == [
         "CK-08R0",
         "CK-08R1A",
@@ -271,6 +282,7 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         "CK-QG1",
         "CK-07R1A",
         "CK-07R1A0",
+        "CK-07R1",
     ]
     qg1a_authority = _json(
         "docs/decisions/evidence/ckqg1a0/page-executor-source-supersession-authority.json"
@@ -280,19 +292,10 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
         hashlib.sha256(qg1a_source.read_bytes()).hexdigest()
         == (qg1a_authority["selected_successor"]["sha256"])
     )
-    ready: set[str] = set()
-    assert manifest["ready"] == []
+    ready = {"CK-08R4"}
+    assert manifest["ready"] == ["CK-08R4"]
     assert manifest["conditional_ready"] == []
-    assert manifest["blocked"] == [
-        {
-            "condition": (
-                "the terminal CK-07R1 v2 failed_after_launch state consumed the sole "
-                "token; deterministic corrective evidence cannot satisfy receipt-required "
-                "runtime acceptance without a separate roadmap decision"
-            ),
-            "tasks": ["CK-07R1"],
-        }
-    ]
+    assert manifest["blocked"] == []
     parent_section = ledger.split("## Parent packets", 1)[1].split(
         "## Remaining delegated child tasks", 1
     )[0]
@@ -305,11 +308,11 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
     assert f"Completed packets: **{parent_completed} / {len(parent_rows)}**" in ledger
     assert f"Not started: **{len(parent_rows) - parent_completed}**" in ledger
     assert f"Critical-path completion: **{parent_completed} / 21**" in ledger
-    assert "Completed corrective child tasks: **13" in ledger
+    assert "Completed corrective child tasks: **14" in ledger
     remaining_delegable = len(manifest["tasks"]) - len(manifest["completed"])
-    assert remaining_delegable == 37
+    assert remaining_delegable == 36
     assert f"Remaining delegable child tasks: **{remaining_delegable}**" in ledger
-    assert "Blocked child tasks: **37" in ledger
+    assert "Blocked child tasks: **35" in ledger
     assert f"Ready child tasks: **{len(manifest['ready'])}" in ledger
     assert (
         f"Conditional-ready child tasks: **{sum(len(item['tasks']) for item in manifest['conditional_ready'])}"
@@ -435,6 +438,8 @@ def test_remaining_execution_plan_is_complete_acyclic_and_fail_closed() -> None:
                 assert "**Status:** `terminal_failed_no_rerun`" in body
             else:
                 assert "**Status:** Blocked" in body
+        elif packet_id == "CK-07R1":
+            assert "**Status:** `completed_post_terminal_deterministic_evidence`" in body
         elif packet_id in {
             "CK-08R0",
             "CK-08R1A",
@@ -923,7 +928,7 @@ def test_corrective_seam_packet_is_critical_path_authority() -> None:
         "**Status:** Completed on merge — PR #392 hosted-green, squash-merged at\n"
         "`68050b93`, and exact-main verified"
     ) in ckqg1
-    assert "**Status:** `terminal_failed_no_rerun`" in ck07r1
+    assert "**Status:** `completed_post_terminal_deterministic_evidence`" in ck07r1
     assert "720-second wrapper timeout" in ck07r1a0
     assert "revoked, never authoritative, and never used" in ck07r1a0
 
@@ -1294,9 +1299,9 @@ def test_ck07r1_consuming_boundary_is_documented_without_downstream_readiness() 
             "approval"
         ]["downstream"]
     )
-    assert "Ready child tasks: **0**" in accounting
+    assert "Ready child tasks: **1 — CK-08R4**" in accounting
     assert "Conditional-ready child tasks: **0**" in accounting
-    assert "Blocked child tasks: **37 — CK-07R1 is terminal" in accounting
+    assert "Blocked child tasks: **35 — CK-08RG/CK-09" in accounting
     assert "## Standing Repository Authorization" in agents
     assert "No additional user approval is required" in agents
     assert "normative coordinator/orchestration binding" in agents
@@ -1394,3 +1399,36 @@ def test_ck07r1_terminal_clean_commit_ci_v2_is_documented_fail_closed() -> None:
     assert authority["decision"]["new_command_invocations_permitted"] == 0
     assert authority["decision"]["launch_authorized"] is False
     assert authority["decision"]["token_consumed"] is True
+
+
+def test_ck07r1_post_terminal_completion_is_documented_without_runtime_claim() -> None:
+    bodies = (
+        _read("AGENTS.md"),
+        _read("docs/INDEX.md"),
+        _read("docs/architecture/QUERY_EVIDENCE_PROJECTION_CONTRACTS.md"),
+        _read("docs/quality/QUALIFICATION_PLAN.md"),
+        _read("docs/roadmap/REMAINING_EXECUTION_PLAN.md"),
+        _read("docs/roadmap/TASK_PACKETS.md"),
+        _read("docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md"),
+        _read("docs/roadmap/tasks/ck-08r4-reclassify-physical-plans.md"),
+    )
+    authority = _json(
+        "docs/decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.json"
+    )
+    for body in bodies:
+        assert "CK-08R4" in body
+    for body in bodies[:7]:
+        assert "runtime_acceptance=not_claimed" in body
+    for body in bodies[:2] + bodies[4:7]:
+        assert "post-terminal" in body
+    decision = authority["decision"]
+    transition = authority["roadmap_transition"]
+    assert decision["runtime_acceptance"] == "not_claimed"
+    assert decision["planner_valid_receipt"] == "absent"
+    assert decision["final_accepted"] == "unavailable"
+    assert decision["new_command_invocations_permitted"] == 0
+    assert decision["launch_authorized"] is False
+    assert decision["token_consumed"] is True
+    assert transition["completed"] == ["CK-07R1"]
+    assert transition["new_ready"] == ["CK-08R4"]
+    assert transition["still_blocked"] == ["CK-08RG", "CK-09"]

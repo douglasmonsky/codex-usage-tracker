@@ -28,7 +28,8 @@ all 196 selector/view/direction outcomes per profile, typed seven-part truth,
 late-event, truncation, cursor, and query-only contracts. PR #425 passed hosted
 Python 3.10/3.14 and Console, squash-merged at
 `0fad272b3205614fb254398c9c9dc0a56d5ba7cd`, and was exact-main verified.
-CK-08R3 and CK-08R1 are complete; CK-08R4 remains blocked on CK-07R1.
+CK-08R3 and CK-08R1 are complete. CK-07R1 is complete through its separate
+post-terminal deterministic-evidence roadmap transition, so CK-08R4 is Ready.
 Retained CK-08R1 work reached
 80/80 parity by copying unsupported Q-REV-03/Q-WF-02 semantics; R1A now freezes
 their meaning and closure. R1C is accepted at exact main
@@ -67,8 +68,8 @@ provenance equality for equal-coordinate idempotency, and resolves
 current-batch relations by the six-part authority order before logical
 identity with one emitted winner. PR #430 passed hosted CI, squash-merged, and
 was exact-main verified at `9e9332b3ae2be78cedb581ff8f76149ad76f4440`.
-R1B and R1 are complete. No successor becomes Ready while CK-07R1 remains
-conditional.
+R1B and R1 are complete. CK-08R4 is the sole Ready successor after CK-07R1's
+post-terminal roadmap dependency completion.
 CK-QG1A removed R2's two page-executor C/B/B violations
 without changing behavior or the frozen maintainability baseline and is
 accepted at exact main `30983d4b5005e7e2a507757c76a3c05ab56281e6`.
@@ -82,8 +83,8 @@ binds current main `dd771073` writer `13da341f…` to reviewed PR #430 writer
 `d163e6c5…` with the unchanged `fda777e2…` baseline and identical normalized
 findings. CK-08R1B is accepted at `9e9332b3`; CK-08R1's serialized
 production-versus-independent answer-truth requalification is accepted through
-PR #439 and exact-main `0832b854`. CK-08R4 remains blocked on CK-07R1, and
-CK-08RG remains blocked on CK-08R4.
+PR #439 and exact-main `0832b854`. CK-08R4 is Ready; CK-08RG remains blocked
+on CK-08R4.
 CK-07R1A is accepted, merged, and exact-main verified at
 `4d8074952f679877f2b4fbb3e89c51015e96a197`; CK-07R1A0 was accepted at
 `519b503aa3b23019033b6481687c08b23fc6c31e`; its linked
@@ -202,10 +203,9 @@ permits the same worker to correct only the benchmark and its owned lifecycle
 test, with exact planner-selected small/large paths and deterministic
 synthetic non-consuming evidence. It does not reopen either command, refund
 the token, authorize any launch, fabricate a receipt, or make
-`post_single_run` or `final_accepted` reachable. CK-07R1 is blocked after the
-corrective implementation prequalification because the existing
-receipt-required runtime acceptance contract remains unsatisfied; CK-08R4,
-CK-08RG, and CK-09 remain blocked pending an explicit future roadmap decision.
+`post_single_run` or `final_accepted` reachable. It left CK-07R1 blocked after
+corrective implementation prequalification pending the separate roadmap
+decision now recorded below.
 The linked
 [clean-committed transition authority](../decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.json)
 keeps the v1 authority immutable while binding PR #448 base `652f2166…`,
@@ -222,6 +222,24 @@ exact 18-path follow-up authority delta and exact 18-plus-seven integrated
 PR #448 state. This deterministic environment correction does not authorize a
 qualification command, another child, token action, retry, receipt,
 implementation acceptance, or downstream readiness.
+
+PR #448 then passed hosted Console and Python 3.10/3.14, squash-merged its
+exact seven-path correction/evidence cohort, and was fresh exact-main verified
+at `1d0466b1b2992b48c5272dc4598606eeaea4dae2`. The additive
+[post-terminal completion authority](../decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.json)
+is the explicit roadmap decision reserved by the terminal-failure authority.
+It accepts exact merged deterministic planner reproduction, small/large
+writer-path validation, promotion/recovery/rollback/readability proof,
+independent fold equivalence, full/package checks, one clean implementation
+review, hosted CI, and exact-main identity only for CK-07R1 dependency
+completion. The v2 run remains `failed_after_launch`; the token remains
+consumed and non-refundable; planner-valid receipt and output remain absent;
+`runtime_acceptance=not_claimed`; and `post_single_run` and `final_accepted`
+remain unavailable. No launch, retry, restart, replacement, refund, artifact
+mutation, receipt fabrication, failed-run reclassification, or production
+semantic change is authorized. CK-08R4 is the sole Ready packet and must
+independently measure current merged publication behavior without claiming
+the missing CK-07R1 runtime acceptance. CK-08RG and CK-09 remain blocked.
 
 The exact V11 launcher contract constructs and validates the fully
 overlay/cohort-bound receipt and non-null stdout/stderr/output evidence before
@@ -336,13 +354,10 @@ conditions in the table and child files; they are not unconditional DAG edges.
   "recovery_exit_policy": "return_to_convergence_after_integrity_restored",
   "blocked_policy": "spawn_none_and_report_to_orchestrator"
  },
-  "completed": ["CK-08R0", "CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R1", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0"],
-  "ready": [],
+  "completed": ["CK-08R0", "CK-08R1A", "CK-08R1B", "CK-08R1C", "CK-08R1", "CK-08R2", "CK-08R3A", "CK-08R3", "CK-QG1A0", "CK-QG1A", "CK-QG1", "CK-07R1A", "CK-07R1A0", "CK-07R1"],
+  "ready": ["CK-08R4"],
   "conditional_ready": [],
-  "blocked": [{
-    "condition": "the terminal CK-07R1 v2 failed_after_launch state consumed the sole token; deterministic corrective evidence cannot satisfy receipt-required runtime acceptance without a separate roadmap decision",
-    "tasks": ["CK-07R1"]
-  }],
+  "blocked": [],
   "tasks": [
     {"id": "CK-08R0", "file": "tasks/ck-08r0-freeze-corrective-contracts.md", "dependencies": []},
     {"id": "CK-08R1A", "file": "tasks/ck-08r1a-freeze-answer-semantics.md", "dependencies": ["CK-08R0"]},

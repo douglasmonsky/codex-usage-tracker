@@ -12,11 +12,11 @@ parents are accounting umbrellas.
 - Not started: **8**
 - Critical-path completion: **14 / 21**
 - Optional packets: **CK-15**
-- Completed corrective child tasks: **13 — CK-08R0, CK-08R1A, CK-08R1B, CK-08R1C, CK-08R1, CK-08R2, CK-08R3A, CK-08R3, CK-QG1A0, CK-QG1A, CK-QG1, CK-07R1A, CK-07R1A0**
-- Remaining delegable child tasks: **37**
-- Ready child tasks: **0**
+- Completed corrective child tasks: **14 — CK-08R0, CK-08R1A, CK-08R1B, CK-08R1C, CK-08R1, CK-08R2, CK-08R3A, CK-08R3, CK-QG1A0, CK-QG1A, CK-QG1, CK-07R1A, CK-07R1A0, CK-07R1**
+- Remaining delegable child tasks: **36**
+- Ready child tasks: **1 — CK-08R4**
 - Conditional-ready child tasks: **0**
-- Blocked child tasks: **37 — CK-07R1 is terminal after its consumed v2 failure; CK-08R4/CK-08RG/CK-09 and downstream remain blocked**
+- Blocked child tasks: **35 — CK-08RG/CK-09 and downstream remain blocked; CK-08R4 is the sole Ready packet**
 - Orchestration mode: **convergence — one coordinator, one existing task per active packet, at most one shared-authority task**
 - Continuation policy: **reuse the active packet task for ordinary corrections; create a task only for a newly Ready distinct packet or a genuinely new authority decision**
 - Handoff policy: **tasks proactively message the parent; no polling or wait-only tasks**
@@ -52,9 +52,9 @@ parents are accounting umbrellas.
 Readiness is controlled by
 [the machine DAG](REMAINING_EXECUTION_PLAN.md). R1C and R1B are accepted after
 R1A; R1 is complete on merge with a schema-valid 80/80 two-lane
-requalification artifact. No successor is Ready while CK-07R1 remains
-conditional. CK-QG1 is accepted and exact-main verified; other corrective
-locks are unchanged.
+requalification artifact. CK-07R1's post-terminal deterministic-evidence
+roadmap completion makes CK-08R4 the sole Ready successor. CK-QG1 is accepted
+and exact-main verified; other corrective locks are unchanged.
 
 ### Corrective gates
 
@@ -69,10 +69,10 @@ locks are unchanged.
 - [x] **CK-08R3 — Qualify evidence service scale** · PR #425 hosted-green and squash-merged at `0fad272b`; both frozen synthetic profiles accepted and exact-main verified · [packet](tasks/ck-08r3-qualify-evidence-scale.md)
 - [x] **CK-07R1A — Correct hosted lifecycle tail** · Accepted/merged at `4d807495`; exact-main verified · [packet](tasks/ck-07r1a-correct-hosted-lifecycle-tail.md)
 - [x] **CK-07R1A0 — Freeze lifecycle planner/recovery path authority** · Path, finite source/runtime, run-invocation authority, and argv-correction authority merged through `479cbdb`; retained witnesses remain read-only · [packet](tasks/ck-07r1a0-freeze-lifecycle-path-authority.md)
-- [ ] **CK-07R1 — Correct lifecycle preparation scale** · Blocked after the prelaunch-recovery-authorized sole v2 child handshake consumed the non-refundable token and terminated `failed_after_launch`; the versioned [terminal-failure correction authority](../decisions/evidence/ck07r1a0/lifecycle-terminal-failure-correction-authority-v1.json) permits only deterministic non-consuming benchmark/test correction prequalification, while its [clean-committed transition bridge](../decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.json) binds exact PR #448 dirty and clean representations without authorizing another run or receipt-based acceptance; PR #394 remains read-only · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
+- [x] **CK-07R1 — Correct lifecycle preparation scale** · Completed for roadmap dependency through the versioned [post-terminal completion authority](../decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.json), exact merged deterministic planner/publication evidence, and immutable consumed-token failure history; `runtime_acceptance=not_claimed`, planner-valid receipt absent, `post_single_run`/`final_accepted` unavailable, no rerun, and PR #394 remains read-only · [packet](tasks/ck-07r1-correct-lifecycle-preparation-scale.md)
 - [x] **CK-QG1A — Correct page-executor complexity** · PR #408 merged/exact-main `30983d4`; authorized successor `9e80c867…` accepted without behavior or baseline change · [packet](tasks/ck-qg1a-correct-page-executor-complexity.md)
 - [x] **CK-QG1 — Enforce replacement-kernel maintainability** · PR #392 hosted-green, squash-merged at `68050b93`, exact-main verified, and its [v2 writer transition authority](../decisions/evidence/ckqg1/maintainability-baseline-transition-authority.json) is linked for the reviewed PR #430 successor · [packet](tasks/ck-qg1-enforce-agent-kernel-maintainability.md)
-- [ ] **CK-08R4 — Reclassify physical named plans** · Blocked on CK-07R1; CK-08R1/R2/R3 are complete · [packet](tasks/ck-08r4-reclassify-physical-plans.md)
+- [ ] **CK-08R4 — Reclassify physical named plans** · Ready; CK-08R1/R2/R3 and CK-07R1 are complete · [packet](tasks/ck-08r4-reclassify-physical-plans.md)
 - [ ] **CK-08RG — Authorize CK-09 resumption** · Blocked on CK-08R4; CK-QG1 is complete · [packet](tasks/ck-08rg-authorize-ck09-resumption.md)
 
 ### CK-09 children
@@ -130,6 +130,27 @@ The [clean-committed CI authority v2](../decisions/evidence/ck07r1a0/lifecycle-t
 binds the exact repository-local hosted `.venv` seam for PR #448 without
 reopening the consumed run, authorizing a retry, or changing receipt-based
 acceptance and downstream holds.
+
+### CK-07R1 post-terminal roadmap completion
+
+The [post-terminal completion authority](../decisions/evidence/ck07r1a0/lifecycle-post-terminal-completion-authority-v1.json)
+binds exact PR #447/#450/#448 lineage, hosted CI, merged exact-main tree, the
+seven immutable implementation/evidence paths, deterministic planner and
+small/large publication-path validation, full/package evidence, and the clean
+implementation review. It completes only the CK-07R1 roadmap dependency while
+permanently preserving `failed_after_launch`, token consumed/non-refundable,
+`runtime_acceptance=not_claimed`, absent planner-valid receipt/output, and
+unavailable `post_single_run`/`final_accepted`. It authorizes no command or
+artifact mutation. CK-08R4 is the sole Ready successor; CK-08RG and CK-09
+remain blocked.
+
+Historical lineage remains explicit: the prelaunch-recovery authority
+preserves v1 `prelaunch_failed`; the terminal-failure correction authority
+binds the v2 `failed_after_launch` root cause and no-rerun correction; and the
+clean-committed transition plus
+`lifecycle-terminal-failure-clean-commit-authority-v2` bind PR #448's clean
+publication representations. None of those historical transitions is
+rewritten or reactivated.
 
 ## Critical path
 
