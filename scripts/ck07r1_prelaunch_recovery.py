@@ -20,6 +20,11 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from scripts.ck07r1_terminal_failure_correction import (
+    TerminalCorrectionError,
+    bound_authority_digest_matches,
+)
+
 AUTHORITY_PATH = Path(
     "docs/decisions/evidence/ck07r1a0/lifecycle-prelaunch-recovery-authority-v1.json"
 )
@@ -77,9 +82,14 @@ def verify_bound_authority_bytes(authority: Mapping[str, Any], root: Path) -> No
         expected = record.get("sha256")
         if not isinstance(relative, str) or not isinstance(expected, str):
             raise PrelaunchRecoveryError("immutable authority identity is malformed")
-        path = root / relative
-        if not path.is_file() or _sha256(path) != expected:
-            raise PrelaunchRecoveryError(f"immutable authority byte identity mismatch: {relative}")
+        try:
+            matches = bound_authority_digest_matches(root, relative, expected)
+        except TerminalCorrectionError as exc:
+            raise PrelaunchRecoveryError(str(exc)) from exc
+        if not matches:
+            raise PrelaunchRecoveryError(
+                f"immutable authority byte identity mismatch: {relative}"
+            )
 
 
 def _git(root: Path, *args: str) -> str:

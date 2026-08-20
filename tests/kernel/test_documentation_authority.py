@@ -1373,3 +1373,24 @@ def test_ck07r1_terminal_clean_commit_bridge_is_documented_fail_closed() -> None
     assert authority["decision"]["new_command_invocations_permitted"] == 0
     assert authority["decision"]["launch_authorized"] is False
     assert authority["decision"]["token_consumed"] is True
+
+
+def test_ck07r1_terminal_clean_commit_ci_v2_is_documented_fail_closed() -> None:
+    bodies = (
+        _read("docs/INDEX.md"),
+        _read("docs/roadmap/REMAINING_EXECUTION_PLAN.md"),
+        _read("docs/roadmap/TASK_PACKETS.md"),
+        _read("docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md"),
+    )
+    authority = _json(
+        "docs/decisions/evidence/ck07r1a0/"
+        "lifecycle-terminal-failure-clean-commit-authority-v2.json"
+    )
+    for body in bodies:
+        assert "lifecycle-terminal-failure-clean-commit-authority-v2" in body
+        assert "PR #448" in body
+        assert ".venv" in body
+    assert authority["decision"]["v1_authority_bytes_preserved"] is True
+    assert authority["decision"]["new_command_invocations_permitted"] == 0
+    assert authority["decision"]["launch_authorized"] is False
+    assert authority["decision"]["token_consumed"] is True
