@@ -15,6 +15,38 @@ import {
 
 const API = "/api/kernel/v1";
 const TABLE_PAGE_SIZE = 10;
+const LIVE_CACHE_PREFIX = "kernel-live-v1:";
+const LANGUAGE_STORAGE_KEY = "kernel-console-language";
+const ZH_CN = Object.freeze({
+  "Live kernel": "实时概览", "Usage as it lands": "本机用量概览",
+  "Guided exploration": "引导查询", "Ask the fact store": "查询本机事实",
+  "Exact evidence": "精确证据", "Follow the record": "追溯记录",
+  "Allowance facts": "额度事实", "Capacity and limits": "容量与限制",
+  "Local operation": "本机运行", "Settings": "设置",
+  "Calls": "调用次数", "Total tokens": "总 Token", "Cache reuse": "缓存复用率",
+  "Cost and credits": "成本与 credits", "Four-class token mix": "Token 构成",
+  "Current committed view": "当前已提交视图", "Recent token bands": "近期每日 Token",
+  "Highest-token threads": "Token 用量最高的任务", "Runtime": "运行状态",
+  "Browser behavior": "浏览器行为", "Privacy boundary": "隐私边界",
+  "Watch for committed generations": "监听新的数据代次", "Language": "语言",
+  "English": "English", "Simplified Chinese": "简体中文",
+  "Skip to workspace": "跳到主要内容", "Local evidence kernel": "本机数据内核",
+  "Local data only": "仅本机数据", "Live": "实时概览", "Explore": "查询",
+  "Limits": "额度", "Connecting…": "正在连接…", "Committed snapshot": "已提交快照",
+  "Loading local index…": "正在读取本机索引…", "Checking freshness": "正在检查新鲜度",
+  "Dataset": "数据集", "Operation": "操作", "Group by": "分组维度",
+  "Measures": "统计指标", "Row limit": "行数上限", "Evidence": "证据",
+  "Open": "查看", "Refresh data": "刷新数据", "Starting…": "正在启动…",
+  "Uncached input": "未缓存输入", "Cached input": "缓存输入",
+  "Reasoning": "推理", "Output": "输出",
+  "No matching facts in this committed generation.": "当前已提交数据代次中没有匹配记录。",
+  "Load detailed views": "加载详细视图", "Detailed views are loaded on demand to keep the initial summary fast.": "为加快首屏，趋势和任务排行改为按需加载。",
+  "Live updates paused after a repeated snapshot gap; refresh the page after the next committed generation.": "连续两次快照间隙后已暂停实时监听；下次提交数据代次后请刷新页面。",
+});
+
+function t(value) {
+  return state.language === "zh-CN" ? ZH_CN[value] || value : value;
+}
 const EXPLORE_DEFAULT_REQUESTS = Object.freeze([
   {
     dataset: "calls",
@@ -87,6 +119,8 @@ const state = {
   selector: "",
   eventSource: null,
   seenPublications: new Set(),
+  language: localStorage.getItem(LANGUAGE_STORAGE_KEY) === "zh-CN" ? "zh-CN" : "en",
+  snapshotRecoveryAttempted: false,
 };
 let tableSequence = 0;
 
@@ -103,7 +137,7 @@ function element(tag, options = {}, children = []) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(options)) {
     if (key === "className") node.className = value;
-    else if (key === "text") node.textContent = String(value);
+    else if (key === "text") node.textContent = t(String(value));
     else if (key === "dataset") Object.assign(node.dataset, value);
     else node.setAttribute(key, String(value));
   }
@@ -491,128 +525,135 @@ function tableFor(rows, includeEvidence = false, options = {}) {
   return wrapper;
 }
 
+function liveCacheKey() {
+  return Number.isInteger(state.status?.generation)
+    ? `${LIVE_CACHE_PREFIX}${state.status.generation}`
+    : null;
+}
+
+function applyLanguage() {
+  document.documentElement.lang = state.language;
+  document.querySelectorAll("[data-i18n]").forEach((node) => {
+    const key = node.getAttribute("data-i18n");
+    if (key) node.textContent = t(key);
+  });
+}
+
+function readLiveCache() {
+  const key = liveCacheKey();
+  if (!key) return null;
+  try {
+    const cached = JSON.parse(localStorage.getItem(key) || "null");
+    return cached?.summary ? cached : null;
+  } catch {
+    localStorage.removeItem(key);
+    return null;
+  }
+}
+
+function writeLiveCache(payload) {
+  const key = liveCacheKey();
+  if (!key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(payload));
+  } catch {
+    // Keep the live view usable when browser storage is unavailable.
+  }
+}
+
+async function requestLiveSummary() {
+  const payload = await request("/query", {
+    method: "POST",
+    body: JSON.stringify({ requests: [{
+      dataset: "calls", operation: "aggregate", dimensions: [],
+      measures: ["calls", "uncached_input_tokens", "cached_input_tokens", "reasoning_tokens", "output_tokens", "total_tokens", "configured_cost_usd", "estimated_credits"],
+      limit: 1,
+    }] }),
+  });
+  return payload.results[0];
+}
+
+async function requestLiveDetails() {
+  const payload = await request("/query", {
+    method: "POST",
+    body: JSON.stringify({ requests: [
+      { dataset: "calls", operation: "aggregate", dimensions: [], measures: ["calls", "uncached_input_tokens", "cached_input_tokens", "reasoning_tokens", "output_tokens", "total_tokens", "configured_cost_usd", "estimated_credits"], limit: 1 },
+      { dataset: "calls", operation: "share", dimensions: ["thread"], measures: ["calls", "uncached_input_tokens", "cached_input_tokens", "reasoning_tokens", "output_tokens", "total_tokens", "configured_cost_usd", "estimated_credits"], order_by: "total_tokens", descending: true, limit: 25 },
+      { dataset: "calls", operation: "time_series", dimensions: ["time_day"], measures: ["uncached_input_tokens", "cached_input_tokens", "reasoning_tokens", "output_tokens", "total_tokens", "configured_cost_usd", "estimated_credits"], order_by: "time_day", descending: true, limit: 14 },
+    ] }),
+  });
+  return { leaders: payload.results[1], timeline: payload.results[2] };
+}
+
+function liveDetailSections(leaders, timeline) {
+  return [
+    element("section", { className: "card", style: "margin-top:1rem" }, [
+      element("h2", { text: "Recent token bands" }),
+      element("p", { className: "result-meta", text: "Daily foundational facts by uncached input, cached input, reasoning, and output." }),
+      tokenTimelineChart(timeline.rows),
+      tableFor(timeline.rows, false, { label: "Recent token bands", compactTokens: true }),
+      element("p", { className: "result-meta", text: pricingCoverageSummary(timeline) }),
+    ]),
+    element("section", { className: "card", style: "margin-top:1rem" }, [
+      element("h2", { text: "Highest-token threads" }),
+      element("p", { className: "result-meta", text: pricingCoverageSummary(leaders) }),
+      tableFor(leaders.rows, true, {
+        label: "Highest-token threads", compactTokens: true, technicalColumns: ["thread"],
+        hiddenColumns: ["share_calls", "share_uncached_input_tokens", "share_cached_input_tokens", "share_reasoning_tokens", "share_output_tokens", "share_configured_cost_usd", "share_estimated_credits"],
+      }),
+    ]),
+  ];
+}
+
+function renderLivePayload(payload) {
+  const { summary, leaders, timeline } = payload;
+  workspace.replaceChildren(heading("live"), metrics(summary.rows[0] || {}, summary));
+  workspace.append(element("div", { className: "section-grid" }, [
+    element("section", { className: "card", "aria-labelledby": "token-mix-title" }, [
+      element("h2", { id: "token-mix-title", text: "Four-class token mix" }), tokenBars(summary.rows[0] || {}),
+    ]),
+    element("section", { className: "card" }, [
+      element("h2", { text: "Current committed view" }),
+      element("p", { text: "These cards read the existing index. Opening this page never starts or extends a refresh." }),
+      element("div", { className: "result-meta", text: `Generation ${summary.generation} · ${formatNumber(summary.rows[0]?.calls)} calls · ${formatNumber(summary.elapsed_ms)} ms` }),
+    ]),
+  ]));
+  if (leaders && timeline) {
+    workspace.append(...liveDetailSections(leaders, timeline));
+    return;
+  }
+  const button = element("button", { className: "button secondary", type: "button", text: "Load detailed views" });
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const details = await requestLiveDetails();
+      const complete = { summary, ...details };
+      writeLiveCache(complete);
+      renderLivePayload(complete);
+    } catch (error) {
+      button.disabled = false;
+      toast(error.message);
+    }
+  });
+  workspace.append(element("section", { className: "card", style: "margin-top:1rem" }, [
+    element("h2", { text: "Load detailed views" }),
+    element("p", { className: "result-meta", text: "Detailed views are loaded on demand to keep the initial summary fast." }),
+    button,
+  ]));
+}
+
 async function renderLive() {
   workspace.replaceChildren(heading("live"), loadingMetrics());
   if (!state.status?.generation) {
     workspace.append(element("div", { className: "card empty", text: "Build the first local generation with Refresh data. Existing sessions are not read until you ask." }));
     return;
   }
+  const cached = readLiveCache();
+  if (cached) return renderLivePayload(cached);
   try {
-    const payload = await request("/query", {
-      method: "POST",
-      body: JSON.stringify({
-        requests: [
-          {
-            dataset: "calls",
-            operation: "aggregate",
-            dimensions: [],
-            measures: [
-              "calls",
-              "uncached_input_tokens",
-              "cached_input_tokens",
-              "reasoning_tokens",
-              "output_tokens",
-              "total_tokens",
-              "configured_cost_usd",
-              "estimated_credits",
-            ],
-            limit: 1,
-          },
-          {
-            dataset: "calls",
-            operation: "share",
-            dimensions: ["thread"],
-            measures: [
-              "calls",
-              "uncached_input_tokens",
-              "cached_input_tokens",
-              "reasoning_tokens",
-              "output_tokens",
-              "total_tokens",
-              "configured_cost_usd",
-              "estimated_credits",
-            ],
-            order_by: "total_tokens",
-            descending: true,
-            limit: 25,
-          },
-          {
-            dataset: "calls",
-            operation: "time_series",
-            dimensions: ["time_day"],
-            measures: [
-              "uncached_input_tokens",
-              "cached_input_tokens",
-              "reasoning_tokens",
-              "output_tokens",
-              "total_tokens",
-              "configured_cost_usd",
-              "estimated_credits",
-            ],
-            order_by: "time_day",
-            descending: true,
-            limit: 14,
-          },
-        ],
-      }),
-    });
-    const summary = payload.results[0];
-    const leaders = payload.results[1];
-    const timeline = payload.results[2];
-    workspace.replaceChildren(
-      heading("live"),
-      metrics(summary.rows[0] || {}, summary),
-    );
-    workspace.append(element("div", { className: "section-grid" }, [
-      element("section", { className: "card", "aria-labelledby": "token-mix-title" }, [
-        element("h2", { id: "token-mix-title", text: "Four-class token mix" }),
-        tokenBars(summary.rows[0] || {}),
-      ]),
-      element("section", { className: "card" }, [
-        element("h2", { text: "Current committed view" }),
-        element("p", {
-          text: "These cards read the existing index. Opening this page never starts or extends a refresh.",
-        }),
-        element("div", {
-          className: "result-meta",
-          text: `Generation ${summary.generation} · ${formatNumber(summary.rows[0]?.calls)} calls · ${formatNumber(summary.elapsed_ms)} ms`,
-        }),
-      ]),
-    ]));
-    workspace.append(element("section", { className: "card", style: "margin-top:1rem" }, [
-      element("h2", { text: "Recent token bands" }),
-      element("p", { className: "result-meta", text: "Daily foundational facts by uncached input, cached input, reasoning, and output." }),
-      tokenTimelineChart(timeline.rows),
-      tableFor(timeline.rows, false, {
-        label: "Recent token bands",
-        compactTokens: true,
-      }),
-      element("p", {
-        className: "result-meta",
-        text: pricingCoverageSummary(timeline),
-      }),
-    ]));
-    workspace.append(element("section", { className: "card", style: "margin-top:1rem" }, [
-      element("h2", { text: "Highest-token threads" }),
-      element("p", {
-        className: "result-meta",
-        text: pricingCoverageSummary(leaders),
-      }),
-      tableFor(leaders.rows, true, {
-        label: "Highest-token threads",
-        compactTokens: true,
-        technicalColumns: ["thread"],
-        hiddenColumns: [
-          "share_calls",
-          "share_uncached_input_tokens",
-          "share_cached_input_tokens",
-          "share_reasoning_tokens",
-          "share_output_tokens",
-          "share_configured_cost_usd",
-          "share_estimated_credits",
-        ],
-      }),
-    ]));
+    const payload = { summary: await requestLiveSummary(), leaders: null, timeline: null };
+    writeLiveCache(payload);
+    renderLivePayload(payload);
   } catch (error) {
     workspace.replaceChildren(heading("live"), errorPanel(error, renderLive));
   }
@@ -1206,12 +1247,12 @@ function dateTimeValue(value) {
 function selectField(labelText, name, options, selected) {
   const control = element("select", { name, id: name });
   options.forEach((option) => control.append(element("option", { value: option, text: option, ...(option === selected ? { selected: "" } : {}) })));
-  return { control, wrapper: element("label", { for: name }, [document.createTextNode(labelText), control]) };
+  return { control, wrapper: element("label", { for: name }, [document.createTextNode(t(labelText)), control]) };
 }
 
 function inputField(labelText, name, value, type = "text") {
   const control = element("input", { name, id: name, value, type });
-  return { control, wrapper: element("label", { for: name }, [document.createTextNode(labelText), control]) };
+  return { control, wrapper: element("label", { for: name }, [document.createTextNode(t(labelText)), control]) };
 }
 
 function replaceOptions(control, options, selected) {
@@ -1398,6 +1439,15 @@ async function renderLimits() {
 }
 
 function renderSettings() {
+  const language = selectField("Language", "language", ["en", "zh-CN"], state.language);
+  language.control.querySelector('option[value="en"]').textContent = t("English");
+  language.control.querySelector('option[value="zh-CN"]').textContent = t("Simplified Chinese");
+  language.control.addEventListener("change", () => {
+    state.language = language.control.value;
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, state.language);
+    applyLanguage();
+    renderSettings();
+  });
   workspace.replaceChildren(
     heading("settings"),
     element("section", { className: "card" }, [
@@ -1418,6 +1468,7 @@ function renderSettings() {
     ]),
     element("section", { className: "card", style: "margin-top:1rem" }, [
       element("h2", { text: "Browser behavior" }),
+      language.wrapper,
       toggleRow(),
       element("p", { className: "callout", text: "Refresh is explicit. Opening or reopening this console only reads the last committed snapshot; it never rebuilds the database." }),
     ]),
@@ -1442,6 +1493,7 @@ function toggleRow() {
   const checkbox = element("input", { type: "checkbox", id: "live-toggle", ...(enabled ? { checked: "" } : {}) });
   checkbox.addEventListener("change", () => {
     localStorage.setItem("kernel-live-enabled", String(checkbox.checked));
+    if (checkbox.checked) state.snapshotRecoveryAttempted = false;
     connectLive();
   });
   return element("label", { for: "live-toggle" }, [
@@ -1503,6 +1555,7 @@ function connectLive() {
     const key = publicationKey(payload);
     if (state.seenPublications.has(key)) return;
     state.seenPublications.add(key);
+    state.snapshotRecoveryAttempted = false;
     await refreshStatus();
     await renderCurrentRoute();
     toast(`Generation ${payload.generation} is ready.`);
@@ -1512,6 +1565,11 @@ function connectLive() {
     source.close();
     state.eventSource = null;
     await refreshStatus();
+    if (state.snapshotRecoveryAttempted) {
+      toast("Live updates paused after a repeated snapshot gap; refresh the page after the next committed generation.");
+      return;
+    }
+    state.snapshotRecoveryAttempted = true;
     await renderCurrentRoute();
     if (!state.eventSource) connectLive();
   });
@@ -1548,6 +1606,7 @@ menuToggle.addEventListener("click", () => {
 refreshButton.addEventListener("click", startRefresh);
 
 async function boot() {
+  applyLanguage();
   parseRoute();
   setCurrentNavigation();
   try {
