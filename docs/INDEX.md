@@ -199,6 +199,18 @@ readiness. A corrected implementation may be reviewed and prequalified only
 through deterministic synthetic non-consuming evidence; the existing
 receipt-required runtime acceptance gate remains unsatisfied and CK-07R1,
 CK-08R4, CK-08RG, and CK-09 remain blocked pending a separate roadmap decision.
+The additive versioned
+[`lifecycle-terminal-failure-clean-commit-authority-v1`](decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.json)
+preserves the terminal-failure v1 authority byte-for-byte and binds PR #448
+base `652f2166…`, source head `927aa06f…`, and its exact seven candidate and
+terminal-evidence paths. It admits either the exact all-or-none dirty
+prepublication representation over the byte-identical authority-main tree or
+the exact clean committed PR/integrated representation. Mixed, partial, extra,
+wrong-base, wrong-tree, wrong-head, or wrong-byte states fail closed. This
+clean-committed transition representation bridge grants no implementation or
+runtime acceptance and
+does not authorize a command, launch, token refund, retry, restart,
+replacement, receipt, or downstream transition.
 
 The V11 candidate must construct and validate the exact overlay/cohort-bound
 receipt and non-null stdout/stderr/output evidence before its first durable

@@ -102,7 +102,13 @@ WAL bound. The benchmark incorrectly asserted `APPEND_SAFE_SMALL` for every
 chunk and therefore never exercised the selected large-artifact path.
 
 The terminal-failure correction authority permits the same worker to correct
-only the benchmark and its lifecycle test. Every chunk must preserve the exact
+only the benchmark and its lifecycle test. The additive
+[clean-committed transition authority](../../decisions/evidence/ck07r1a0/lifecycle-terminal-failure-clean-commit-authority-v1.json)
+preserves the v1 authority bytes and binds exact PR #448 base `652f2166…`,
+source head `927aa06f…`, and seven-path scope. It accepts only the exact dirty
+all-or-none prepublication representation or the exact clean committed
+PR/integrated representation; mixed, partial, extra, wrong-lineage, and
+wrong-byte states remain forbidden. Every chunk must preserve the exact
 `plan_refresh` result: small plans use the pointer-coordinated short writer;
 large plans use the production-reachable isolated-artifact build, validation,
 durable promotion, recovery, rollback, and prior-readability path. Tail limits,
