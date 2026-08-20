@@ -354,15 +354,23 @@ def _initialize_content_database(path: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     staging = target.with_name(f".{target.name}.building-{os.getpid()}")
     try:
-        with sqlite3.connect(staging) as connection:
+        connection = sqlite3.connect(staging)
+        try:
             connection.execute(f"PRAGMA application_id = {CONTENT_APPLICATION_ID}")
             connection.execute(f"PRAGMA user_version = {CONTENT_SCHEMA_VERSION}")
             connection.execute("PRAGMA foreign_keys = ON")
             connection.executescript(_SCHEMA_SQL)
+            connection.commit()
+        finally:
+            connection.close()
         staging.chmod(0o600)
         os.replace(staging, target)
-        with sqlite3.connect(target) as connection:
+        connection = sqlite3.connect(target)
+        try:
             connection.execute("PRAGMA journal_mode = WAL")
+            connection.commit()
+        finally:
+            connection.close()
         target.chmod(0o600)
     finally:
         staging.unlink(missing_ok=True)
