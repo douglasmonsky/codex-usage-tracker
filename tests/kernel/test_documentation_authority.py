@@ -1350,3 +1350,26 @@ def test_ck07r1_terminal_failure_correction_is_documented_no_rerun() -> None:
     assert authority["run_token"]["remaining_invocations"] == 0
     assert authority["decision"]["launch_authorized"] is False
     assert authority["decision"]["final_accepted"] == "unavailable"
+
+
+def test_ck07r1_terminal_clean_commit_bridge_is_documented_fail_closed() -> None:
+    index = _read("docs/INDEX.md")
+    central = _read("docs/roadmap/REMAINING_EXECUTION_PLAN.md")
+    accounting = _read("docs/roadmap/TASK_PACKETS.md")
+    packet = _read("docs/roadmap/tasks/ck-07r1-correct-lifecycle-preparation-scale.md")
+    authority = _json(
+        "docs/decisions/evidence/ck07r1a0/"
+        "lifecycle-terminal-failure-clean-commit-authority-v1.json"
+    )
+    for body in (index, central, accounting, packet):
+        assert "clean-committed transition" in body
+        assert "PR #448" in body
+    assert authority["implementation_transition"]["base_sha"] == (
+        "652f2166b58b9ee0d719348a769901577d11e6fd"
+    )
+    assert authority["implementation_transition"]["head_sha"] == (
+        "927aa06f7c4c88319cc30247343c40db8e9b817e"
+    )
+    assert authority["decision"]["new_command_invocations_permitted"] == 0
+    assert authority["decision"]["launch_authorized"] is False
+    assert authority["decision"]["token_consumed"] is True
