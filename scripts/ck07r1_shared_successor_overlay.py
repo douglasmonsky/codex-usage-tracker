@@ -12,6 +12,14 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from scripts.ck07r1_terminal_failure_correction import (
+    CLEAN_COMMIT_CI_AUTHORITY_PATH,
+    TerminalCorrectionError,
+    bound_authority_digest_matches,
+    load_clean_commit_ci_authority,
+    verify_clean_commit_ci_authority_bytes,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 AUTHORITY_PATH = "docs/decisions/evidence/ck07r1a0/shared-successor-overlay-authority-v1.json"
 SCHEMA_PATH = AUTHORITY_PATH.removesuffix(".json") + ".schema.json"
@@ -78,7 +86,11 @@ def load_consuming_boundary(root: Path = ROOT) -> dict[str, Any] | None:
             raise SharedSuccessorOverlayError(
                 "consuming-boundary identity malformed"
             )
-        if sha256_path(root, relative) != expected:
+        try:
+            matches = bound_authority_digest_matches(root, relative, expected)
+        except TerminalCorrectionError as exc:
+            raise SharedSuccessorOverlayError(str(exc)) from exc
+        if not matches:
             raise SharedSuccessorOverlayError(
                 f"consuming-boundary bound bytes drifted: {relative}"
             )
@@ -593,6 +605,14 @@ def overlay_changed_path_allowance(
 
     allowed = set(authority_paths)
     allowed.update(_consuming_authority_scope(load_consuming_boundary(root)))
+    clean_commit_ci_path = root / CLEAN_COMMIT_CI_AUTHORITY_PATH
+    if clean_commit_ci_path.is_file():
+        try:
+            clean_commit_ci = load_clean_commit_ci_authority(root)
+            verify_clean_commit_ci_authority_bytes(clean_commit_ci, root)
+        except TerminalCorrectionError as exc:
+            raise SharedSuccessorOverlayError(str(exc)) from exc
+        allowed.update(clean_commit_ci["scope"]["authority_write_scope"])
     if state == "worker_prequalification":
         allowed.update(expected_worktree_delta(authority, state))
     elif state != "authority_main":

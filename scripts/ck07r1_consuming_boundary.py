@@ -18,6 +18,11 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from scripts.ck07r1_terminal_failure_correction import (
+    TerminalCorrectionError,
+    bound_authority_digest_matches,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 AUTHORITY_PATH = (
     "docs/decisions/evidence/ck07r1a0/"
@@ -104,11 +109,12 @@ def verify_bound_authority_bytes(
         expected = record.get("sha256")
         if not isinstance(relative, str) or not isinstance(expected, str):
             raise ConsumingBoundaryError("immutable authority identity malformed")
-        actual = _sha256(root / relative)
-        if actual != expected:
-            raise ConsumingBoundaryError(
-                f"bound authority bytes drifted: {relative}"
-            )
+        try:
+            matches = bound_authority_digest_matches(root, relative, expected)
+        except TerminalCorrectionError as exc:
+            raise ConsumingBoundaryError(str(exc)) from exc
+        if not matches:
+            raise ConsumingBoundaryError(f"bound authority bytes drifted: {relative}")
 
 
 def verify_candidate_cohort(
