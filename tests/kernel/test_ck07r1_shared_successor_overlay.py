@@ -16,6 +16,7 @@ from scripts.ck07r1_prelaunch_recovery import (
 )
 from scripts.ck07r1_shared_successor_overlay import (
     CONSUMING_AUTHORITY_PATH,
+    CONSUMING_SCHEMA_PATH,
     ROOT,
     SCHEMA_PATH,
     SharedSuccessorOverlayError,
@@ -177,6 +178,21 @@ def test_partial_consuming_boundary_pair_fails_closed(tmp_path: Path) -> None:
     path.parent.mkdir(parents=True)
     path.write_text("{}\n", encoding="utf-8")
     with pytest.raises(SharedSuccessorOverlayError, match="partial"):
+        load_consuming_boundary(tmp_path)
+
+
+def test_consuming_boundary_rejects_drifted_bound_authority(tmp_path: Path) -> None:
+    for relative in (CONSUMING_AUTHORITY_PATH, CONSUMING_SCHEMA_PATH):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / relative).read_bytes())
+    agents = tmp_path / "AGENTS.md"
+    agents.write_bytes((ROOT / "AGENTS.md").read_bytes() + b"\n# drift\n")
+
+    with pytest.raises(
+        SharedSuccessorOverlayError,
+        match="consuming-boundary bound bytes drifted: AGENTS.md",
+    ):
         load_consuming_boundary(tmp_path)
 
 

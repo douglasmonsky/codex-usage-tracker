@@ -86,14 +86,14 @@ def load_consuming_boundary(root: Path = ROOT) -> dict[str, Any] | None:
             raise SharedSuccessorOverlayError(
                 "consuming-boundary identity malformed"
             )
-            try:
-                matches = bound_authority_digest_matches(root, relative, expected)
-            except TerminalCorrectionError as exc:
-                raise SharedSuccessorOverlayError(str(exc)) from exc
-            if not matches:
-                raise SharedSuccessorOverlayError(
-                    f"consuming-boundary bound bytes drifted: {relative}"
-                )
+        try:
+            matches = bound_authority_digest_matches(root, relative, expected)
+        except TerminalCorrectionError as exc:
+            raise SharedSuccessorOverlayError(str(exc)) from exc
+        if not matches:
+            raise SharedSuccessorOverlayError(
+                f"consuming-boundary bound bytes drifted: {relative}"
+            )
     return authority
 
 
