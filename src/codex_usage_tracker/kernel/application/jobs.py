@@ -88,6 +88,7 @@ class JobReader:
                 f"SELECT * FROM refresh_runs {clause}",
                 parameters,
             ).fetchone()
+        connection.close()
         return _snapshot(row, include_result=include_result) if row else None
 
 

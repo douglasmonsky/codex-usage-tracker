@@ -197,6 +197,7 @@ def initialize_operational_database(path: Path) -> Path:
             connection.execute(f"PRAGMA user_version = {OPERATIONAL_SCHEMA_VERSION}")
             connection.executescript(_OPERATIONAL_SQL)
             connection.execute("INSERT INTO cutover_control(singleton, state) VALUES (1, 'absent')")
+        connection.close()
         staging.chmod(0o600)
         _validate_operational(staging)
         os.replace(staging, target)
@@ -1281,6 +1282,7 @@ def _migrate_operational(path: Path) -> None:
         )
 
 
+    connection.close()
 def _control_from_row(row: sqlite3.Row) -> CutoverControl:
     return CutoverControl(
         state=CutoverState(row["state"]),

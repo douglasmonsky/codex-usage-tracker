@@ -359,6 +359,7 @@ def _initialize_content_database(path: Path) -> None:
             connection.execute(f"PRAGMA user_version = {CONTENT_SCHEMA_VERSION}")
             connection.execute("PRAGMA foreign_keys = ON")
             connection.executescript(_SCHEMA_SQL)
+        connection.close()
         staging.chmod(0o600)
         os.replace(staging, target)
         with sqlite3.connect(target) as connection:
@@ -424,6 +425,7 @@ def _source_targets(
                 "SELECT source_id, source_location FROM source_registry"
             )
         }
+    operational.close()
     return tuple(
         {
             **dict(row),

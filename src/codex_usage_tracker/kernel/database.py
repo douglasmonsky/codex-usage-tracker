@@ -44,6 +44,7 @@ def initialize_analytical_database(
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("PRAGMA journal_mode = DELETE")
             create_schema(connection)
+        connection.close()
         _owner_only(staging)
         failures = validate_analytical_database(staging)
         if failures:
@@ -185,6 +186,7 @@ def validate_analytical_database(path: Path) -> list[str]:
                 failures.append(f"analytical quick_check failed: {integrity}")
             if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
                 failures.append("analytical foreign-key check failed")
+        connection.close()
     except sqlite3.DatabaseError as exc:
         failures.append(f"analytical database is unreadable: {exc}")
     return failures
@@ -283,6 +285,7 @@ def analytical_schema_version(path: Path) -> int | None:
     try:
         with sqlite3.connect(f"{target.as_uri()}?mode=ro", uri=True) as connection:
             return int(connection.execute("PRAGMA user_version").fetchone()[0])
+        connection.close()
     except sqlite3.DatabaseError as exc:
         raise ValueError("analytical database schema header is unreadable") from exc
 

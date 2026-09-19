@@ -584,6 +584,7 @@ class KernelIngestor:
             registered = connection.execute(
                 "SELECT source_id, source_location FROM source_registry"
             ).fetchall()
+        connection.close()
         source_by_location = {
             str(location): str(source_id) for source_id, location in registered
         }
@@ -1058,6 +1059,7 @@ class KernelIngestor:
         if index_backfill:
             with sqlite3.connect(staging) as connection:
                 create_missing_secondary_indexes(connection)
+            connection.close()
         return staging, True, incremental_rollup_safe
 
     def _active_collision_requires_isolation(
@@ -1245,6 +1247,7 @@ def _tool_turn_index_ready(path: Path) -> bool:
         )
 
 
+    connection.close()
 def _clone_checkpointed_database(source: Path, destination: Path) -> bool:
     """Use a filesystem snapshot only while the validated main file is stable."""
 
@@ -1255,6 +1258,7 @@ def _clone_checkpointed_database(source: Path, destination: Path) -> bool:
             checkpointed = not wal.exists() or wal.stat().st_size == 0
             cloned = checkpointed and _copy_on_write_clone(source, destination)
             guard.execute("ROLLBACK")
+        guard.close()
         if not cloned:
             destination.unlink(missing_ok=True)
             return False
