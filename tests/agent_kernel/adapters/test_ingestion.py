@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from pathlib import Path
 
 from codex_usage_tracker.agent_kernel.adapters.codex_jsonl import parser
@@ -206,3 +208,37 @@ def test_worker_failure_emits_the_next_terminal_batch_without_deadlock(monkeypat
     assert [batch.batch_index for batch in batches] == [0, 1]
     assert batches[-1].done is True
     assert batches[-1].diagnostics[0].code == "worker_failure"
+
+
+def test_queue_capacity_one_does_not_deadlock_parallel_sources() -> None:
+    plans = select_sources(discover_inventory(ROOT, manifest=MANIFEST), max_bytes=1 << 40)
+    selected = tuple(plan for plan in plans if plan.inventory.selected)[:2]
+    outcome: list[ParseBatch] = []
+
+    runner = threading.Thread(
+        target=lambda: outcome.extend(
+            parser.parse_sources(selected, workers=2, batch_size=1, queue_capacity=1)
+        ),
+        daemon=True,
+    )
+    runner.start()
+    runner.join(timeout=3.0)
+
+    assert not runner.is_alive()
+    assert sum(batch.done for batch in outcome) == 2
+
+
+def test_closing_parser_releases_its_worker_threads() -> None:
+    plans = select_sources(discover_inventory(ROOT, manifest=MANIFEST), max_bytes=1 << 40)
+    selected = tuple(plan for plan in plans if plan.inventory.selected)[:2]
+    batches = parser.parse_sources(selected, workers=2, batch_size=1, queue_capacity=1)
+
+    next(batches)
+    batches.close()
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline and any(
+        thread.name.startswith("codex-adapter-") for thread in threading.enumerate()
+    ):
+        time.sleep(0.01)
+
+    assert not any(thread.name.startswith("codex-adapter-") for thread in threading.enumerate())

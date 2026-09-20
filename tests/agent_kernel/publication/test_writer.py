@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from dataclasses import replace
 from pathlib import Path
@@ -1093,7 +1094,8 @@ def test_initial_history_build_isolated_artifact_is_durable(
         expected_manifest_sha256=request.artifact_manifest_sha256,
     )
 
-    assert candidate.path.stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":
+        assert candidate.path.stat().st_mode & 0o777 == 0o600
     validation = validate_artifact_path(
         candidate.path,
         expected_publication_id=request.publication_id,

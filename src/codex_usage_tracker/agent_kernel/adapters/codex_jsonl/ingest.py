@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import resource
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..._platform import peak_rss_bytes
 from ..contracts import IngestMetrics, SourceCursor
 from .canonicalize import ProposedChangeSet, build_change_set
 from .discovery import discover_inventory, select_sources
@@ -22,8 +22,7 @@ class IngestResult:
 
 
 def _peak_rss_bytes() -> int:
-    value = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
-    return value if __import__("sys").platform == "darwin" else value * 1024
+    return peak_rss_bytes()
 
 
 def ingest(

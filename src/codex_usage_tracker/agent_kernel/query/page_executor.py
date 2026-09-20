@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import json
-import resource
 import sqlite3
-import sys
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
+from .._platform import peak_rss_bytes
 from ..domain.plan_operands import PlanRequest
 from .compiler import request_digest as plan_request_digest
 from .contracts import MAX_PAGE_LIMIT, canonical_json_bytes, canonical_json_value
@@ -370,8 +369,7 @@ _BINDERS = MappingProxyType(
 
 
 def _rss_bytes() -> int:
-    rss = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
-    return rss if sys.platform == "darwin" else rss * 1024
+    return peak_rss_bytes()
 
 
 def _explain(

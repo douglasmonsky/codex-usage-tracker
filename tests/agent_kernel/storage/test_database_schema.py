@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from codex_usage_tracker.agent_kernel.storage import database as database_module
+from codex_usage_tracker.agent_kernel.storage import paths as paths_module
 from codex_usage_tracker.agent_kernel.storage.database import (
     DatabaseContractError,
     DatabaseIdentityError,
@@ -493,7 +495,8 @@ def test_connection_modes_checks_and_database_size(tmp_path: Path) -> None:
     database = tmp_path / "analytical.sqlite3"
     writer = initialize_analytical(database)
     try:
-        assert stat.S_IMODE(database.stat().st_mode) == 0o600
+        if os.name != "nt":
+            assert stat.S_IMODE(database.stat().st_mode) == 0o600
         assert _pragma(writer, "page_size") == 4096
         assert str(_pragma(writer, "journal_mode")).lower() == "wal"
         assert _pragma(writer, "synchronous") == 1
@@ -537,7 +540,8 @@ def test_builder_mode_is_isolated_and_owner_only(tmp_path: Path) -> None:
         assert _pragma(builder, "journal_mode") == "off"
         assert _pragma(builder, "synchronous") == 0
         assert _pragma(builder, "foreign_keys") == 1
-        assert stat.S_IMODE(database.stat().st_mode) == 0o600
+        if os.name != "nt":
+            assert stat.S_IMODE(database.stat().st_mode) == 0o600
     finally:
         builder.close()
 
@@ -613,47 +617,69 @@ def test_predecessor_schema_is_rejected_before_any_application_use(
     assert current_metadata.read_bytes() == current_before
 
 
-def test_cache_paths_fail_closed_on_unsafe_existing_paths(tmp_path: Path) -> None:
+def test_cache_paths_fail_closed_on_unsafe_existing_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     resolved = agent_kernel_cache_path(tmp_path)
     assert resolved.name == ANALYTICAL_CACHE_FILENAME
-    assert stat.S_IMODE(resolved.parent.stat().st_mode) == 0o700
+    if os.name != "nt":
+        assert stat.S_IMODE(resolved.parent.stat().st_mode) == 0o700
 
     permissive = tmp_path / "permissive"
     permissive.mkdir(mode=0o755)
-    with pytest.raises(OwnerOnlyPathError):
-        ensure_owner_only_directory(permissive)
+    if os.name == "nt":
+        assert ensure_owner_only_directory(permissive) == permissive
+    else:
+        with pytest.raises(OwnerOnlyPathError):
+            ensure_owner_only_directory(permissive)
 
     target = tmp_path / "target"
     target.mkdir(mode=0o700)
     link = tmp_path / "link"
-    link.symlink_to(target, target_is_directory=True)
-    with pytest.raises(OwnerOnlyPathError):
-        ensure_owner_only_directory(link)
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError:
+        symlinks_available = False
+    else:
+        symlinks_available = True
+        with pytest.raises(OwnerOnlyPathError):
+            ensure_owner_only_directory(link)
 
     database = tmp_path / "unsafe.sqlite3"
     database.write_bytes(b"not sqlite")
     database.chmod(0o644)
-    with pytest.raises(DatabaseContractError):
-        open_writer(database)
+    if os.name == "nt":
+        with monkeypatch.context() as context:
+            context.setattr(database_module, "is_owner_only_file", lambda _path: False)
+            with pytest.raises(DatabaseContractError):
+                open_writer(database)
+    else:
+        with pytest.raises(DatabaseContractError):
+            open_writer(database)
 
     safe_database = tmp_path / "safe.sqlite3"
     initialize_analytical(safe_database).close()
-    database_link = tmp_path / "database-link.sqlite3"
-    database_link.symlink_to(safe_database)
-    with pytest.raises(DatabaseContractError):
-        open_writer(database_link)
+    if symlinks_available:
+        database_link = tmp_path / "database-link.sqlite3"
+        database_link.symlink_to(safe_database)
+        with pytest.raises(DatabaseContractError):
+            open_writer(database_link)
 
-    sidecar_target = tmp_path / "sidecar-target"
-    sidecar_target.write_bytes(b"untouched")
-    Path(f"{safe_database}-wal").symlink_to(sidecar_target)
-    with pytest.raises(DatabaseContractError):
-        open_writer(safe_database)
-    assert sidecar_target.read_bytes() == b"untouched"
+        sidecar_target = tmp_path / "sidecar-target"
+        sidecar_target.write_bytes(b"untouched")
+        Path(f"{safe_database}-wal").symlink_to(sidecar_target)
+        with pytest.raises(DatabaseContractError):
+            open_writer(safe_database)
+        assert sidecar_target.read_bytes() == b"untouched"
 
 
 def test_cache_directory_owner_is_enforced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     directory = tmp_path / "owner"
     directory.mkdir(mode=0o700)
-    monkeypatch.setattr(os, "getuid", lambda: directory.stat().st_uid + 1)
+    if os.name == "nt":
+        monkeypatch.setattr(paths_module, "is_owner_only_directory", lambda _path: False)
+    else:
+        monkeypatch.setattr(os, "getuid", lambda: directory.stat().st_uid + 1)
     with pytest.raises(OwnerOnlyPathError):
         ensure_owner_only_directory(directory)
