@@ -77,7 +77,11 @@ def _replacement_plan(plan: SourcePlan, classification: CursorClassification) ->
     manifestation_key = max(1, int.from_bytes(digest[:8], "big") & ((1 << 63) - 1))
     manifestation_id = semantic_id(
         "source-manifestation",
-        [plan.inventory.manifestation_id, plan.inventory.content_revision, classification.outcome.value],
+        [
+            plan.inventory.manifestation_id,
+            plan.inventory.content_revision,
+            classification.outcome.value,
+        ],
     )
     return replace(
         plan,
@@ -85,7 +89,9 @@ def _replacement_plan(plan: SourcePlan, classification: CursorClassification) ->
             plan.inventory,
             manifestation_id=manifestation_id,
             manifestation_key=manifestation_key,
-            state=SourceState.REPLACED if classification.outcome is CursorOutcome.REPLACED else SourceState.TRUNCATED,
+            state=SourceState.REPLACED
+            if classification.outcome is CursorOutcome.REPLACED
+            else SourceState.TRUNCATED,
         ),
     )
 
@@ -111,7 +117,9 @@ def iter_source_batches(
             done=True,
             cursor=cursor,
             classification=CursorClassification(
-                outcome=CursorOutcome.MISSING if plan.path is None else CursorOutcome.MALFORMED_RANGE,
+                outcome=CursorOutcome.MISSING
+                if plan.path is None
+                else CursorOutcome.MALFORMED_RANGE,
                 reason="source is not selected or not materialized",
             ),
         )
@@ -138,7 +146,11 @@ def iter_source_batches(
             classification=classification,
         )
         return
-    start_offset = cursor.byte_offset if cursor is not None and classification.outcome.value == "append_safe" else 0
+    start_offset = (
+        cursor.byte_offset
+        if cursor is not None and classification.outcome.value == "append_safe"
+        else 0
+    )
     start_ordinal = cursor.record_ordinal if cursor is not None and start_offset else 0
     observations: list[AdapterObservation] = []
     diagnostics: list[ParseDiagnostic] = []
@@ -148,7 +160,9 @@ def iter_source_batches(
     complete_end = start_offset
     latest_source_order = cursor.latest_source_order if cursor is not None and start_offset else 0
     last_complete_end = complete_end
-    for framed in iter_complete_records(plan.path, start_offset=start_offset, start_ordinal=start_ordinal):
+    for framed in iter_complete_records(
+        plan.path, start_offset=start_offset, start_ordinal=start_ordinal
+    ):
         records_seen += 1
         batch_records += 1
         complete_end = framed.byte_end
@@ -159,17 +173,31 @@ def iter_source_batches(
             record = json.loads(decoded)
             if not isinstance(record, dict):
                 raise NormalizationError("JSONL record must be an object")
-            observation = normalize_record(record, source_range, source_rank=plan.inventory.source_rank, late_cutoff_us=late_cutoff_us)
+            observation = normalize_record(
+                record,
+                source_range,
+                source_rank=plan.inventory.source_rank,
+                late_cutoff_us=late_cutoff_us,
+            )
             assert_body_free(observation)
             observations.append(observation)
             for related in related_observations(observation):
                 assert_body_free(related)
                 observations.append(related)
             latest_source_order = observation.source_order
-        except (UnicodeDecodeError, json.JSONDecodeError, NormalizationError, TypeError, ValueError) as error:
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            NormalizationError,
+            TypeError,
+            ValueError,
+        ) as error:
             diagnostics.append(
                 ParseDiagnostic(
-                    code="malformed_range" if not isinstance(error, NormalizationError) or "unknown record kind" not in str(error) else "unknown_record_kind",
+                    code="malformed_range"
+                    if not isinstance(error, NormalizationError)
+                    or "unknown record kind" not in str(error)
+                    else "unknown_record_kind",
                     source_range=source_range,
                     detail=type(error).__name__,
                 )
@@ -216,7 +244,8 @@ def iter_source_batches(
         plan.path,
         inventory=active_plan.inventory,
         byte_offset=last_complete_end,
-        record_ordinal=(cursor.record_ordinal if cursor is not None and start_offset else 0) + records_seen,
+        record_ordinal=(cursor.record_ordinal if cursor is not None and start_offset else 0)
+        + records_seen,
         latest_source_order=latest_source_order,
         parser_version=PARSER_VERSION,
         adapter_version=ADAPTER_VERSION,
@@ -250,7 +279,9 @@ def parse_source(
     next_cursor = cursor
     classification: CursorClassification | None = None
     complete_end = 0
-    for batch in iter_source_batches(plan, batch_size=batch_size, cursor=cursor, late_cutoff_us=late_cutoff_us):
+    for batch in iter_source_batches(
+        plan, batch_size=batch_size, cursor=cursor, late_cutoff_us=late_cutoff_us
+    ):
         observations.extend(batch.observations)
         diagnostics.extend(batch.diagnostics)
         records_seen = max(records_seen, batch.records_seen)
@@ -293,29 +324,61 @@ def parse_sources(
         raise ValueError("workers must be one of the bounded 1/2/4/8-compatible range")
     if batch_size <= 0:
         raise ValueError("batch_size must be positive")
-    selected = tuple(sorted((plan for plan in plans if plan.inventory.selected), key=lambda item: item.inventory.source_rank))
+    selected = tuple(
+        sorted(
+            (plan for plan in plans if plan.inventory.selected),
+            key=lambda item: item.inventory.source_rank,
+        )
+    )
     if queue_capacity is None:
         queue_capacity = max(1, workers * 2)
     if queue_capacity <= 0:
         raise ValueError("queue_capacity must be positive")
     work_queue: queue.Queue[SourcePlan | None] = queue.Queue(maxsize=max(1, workers))
     output_queue: queue.Queue[tuple[int, ParseBatch | None]] = queue.Queue(maxsize=queue_capacity)
-    reorder_slots = threading.BoundedSemaphore(queue_capacity)
-    source_slots = {
-        plan.inventory.source_rank: threading.BoundedSemaphore(1)
-        for plan in selected
-    }
+    source_slots = {plan.inventory.source_rank: threading.BoundedSemaphore(1) for plan in selected}
     thread_count = min(workers, max(1, len(selected)))
+    cancelled = threading.Event()
+
+    def put_work(item: SourcePlan | None) -> bool:
+        while not cancelled.is_set():
+            try:
+                work_queue.put(item, timeout=0.05)
+                return True
+            except queue.Full:
+                continue
+        return False
+
+    def emit(source_rank: int, batch: ParseBatch) -> bool:
+        source_slot = source_slots[source_rank]
+        while not cancelled.is_set():
+            if source_slot.acquire(timeout=0.05):
+                break
+        else:
+            return False
+        while not cancelled.is_set():
+            try:
+                output_queue.put((source_rank, batch), timeout=0.05)
+                return True
+            except queue.Full:
+                continue
+        source_slot.release()
+        return False
 
     def feed() -> None:
         for plan in selected:
-            work_queue.put(plan)
+            if not put_work(plan):
+                return
         for _ in range(thread_count):
-            work_queue.put(None)
+            if not put_work(None):
+                return
 
     def worker() -> None:
-        while True:
-            plan = work_queue.get()
+        while not cancelled.is_set():
+            try:
+                plan = work_queue.get(timeout=0.05)
+            except queue.Empty:
+                continue
             try:
                 if plan is None:
                     return
@@ -328,41 +391,40 @@ def parse_sources(
                         cursor=cursor,
                         late_cutoff_us=late_cutoff_us,
                     ):
-                        source_slots[plan.inventory.source_rank].acquire()
-                        reorder_slots.acquire()
-                        output_queue.put((plan.inventory.source_rank, batch))
+                        if not emit(plan.inventory.source_rank, batch):
+                            return
                         next_batch_index = max(next_batch_index, batch.batch_index + 1)
                 except Exception as error:
-                    source_slots[plan.inventory.source_rank].acquire()
-                    reorder_slots.acquire()
-                    output_queue.put(
-                        (
-                            plan.inventory.source_rank,
-                            ParseBatch(
-                                source_rank=plan.inventory.source_rank,
-                                batch_index=next_batch_index,
-                                observations=(),
-                                diagnostics=(
-                                    ParseDiagnostic(
-                                        code="worker_failure",
-                                        source_range=None,
-                                        detail=type(error).__name__,
-                                    ),
-                                ),
-                                records_seen=0,
-                                complete_end=0 if cursor is None else cursor.byte_offset,
-                                latest_source_order=0 if cursor is None else cursor.latest_source_order,
-                                done=True,
-                                cursor=cursor,
-                                classification=CursorClassification(CursorOutcome.MALFORMED_RANGE, "worker failed"),
+                    failure = ParseBatch(
+                        source_rank=plan.inventory.source_rank,
+                        batch_index=next_batch_index,
+                        observations=(),
+                        diagnostics=(
+                            ParseDiagnostic(
+                                code="worker_failure",
+                                source_range=None,
+                                detail=type(error).__name__,
                             ),
-                        )
+                        ),
+                        records_seen=0,
+                        complete_end=0 if cursor is None else cursor.byte_offset,
+                        latest_source_order=0 if cursor is None else cursor.latest_source_order,
+                        done=True,
+                        cursor=cursor,
+                        classification=CursorClassification(
+                            CursorOutcome.MALFORMED_RANGE,
+                            "worker failed",
+                        ),
                     )
+                    emit(plan.inventory.source_rank, failure)
             finally:
                 work_queue.task_done()
 
     feeder = threading.Thread(target=feed, name="codex-adapter-feeder", daemon=True)
-    threads = [threading.Thread(target=worker, name=f"codex-adapter-worker-{index}", daemon=True) for index in range(thread_count)]
+    threads = [
+        threading.Thread(target=worker, name=f"codex-adapter-worker-{index}", daemon=True)
+        for index in range(thread_count)
+    ]
     feeder.start()
     for thread in threads:
         thread.start()
@@ -378,13 +440,16 @@ def parse_sources(
             if batch is None:
                 continue
             buffered[(source_rank, batch.batch_index)] = batch
-            while expected_rank_index < len(selected) and (
-                selected[expected_rank_index].inventory.source_rank,
-                expected_batch_index,
-            ) in buffered:
+            while (
+                expected_rank_index < len(selected)
+                and (
+                    selected[expected_rank_index].inventory.source_rank,
+                    expected_batch_index,
+                )
+                in buffered
+            ):
                 key = (selected[expected_rank_index].inventory.source_rank, expected_batch_index)
                 ready = buffered.pop(key)
-                reorder_slots.release()
                 source_slots[ready.source_rank].release()
                 yield ready
                 if ready.done:
@@ -397,5 +462,9 @@ def parse_sources(
         for thread in threads:
             thread.join()
     finally:
+        cancelled.set()
+        feeder.join(timeout=1.0)
+        for thread in threads:
+            thread.join(timeout=1.0)
         if metrics_sink is not None:
             metrics_sink.append({"max_queue_depth": max_depth, "selected_sources": len(selected)})

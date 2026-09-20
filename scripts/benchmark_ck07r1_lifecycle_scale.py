@@ -18,7 +18,6 @@ import json
 import math
 import os
 import platform
-import resource
 import shlex
 import shutil
 import signal
@@ -33,6 +32,24 @@ from dataclasses import fields, is_dataclass, replace
 from pathlib import Path
 from typing import Any
 
+try:
+    import resource
+except ModuleNotFoundError:
+    from types import SimpleNamespace
+
+    from codex_usage_tracker.agent_kernel._platform import peak_rss_bytes
+
+    class _ResourceCompat:
+        RUSAGE_SELF = 0
+        struct_rusage = SimpleNamespace
+
+        @staticmethod
+        def getrusage(_who: int) -> SimpleNamespace:
+            return SimpleNamespace(ru_maxrss=peak_rss_bytes())
+
+    resource = _ResourceCompat()
+
+from codex_usage_tracker.agent_kernel._platform import fsync_directory
 from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.canonicalize import (
     AdapterAccounting,
     ProposedChangeSet,
@@ -351,11 +368,7 @@ def _atomic_json_update(path: Path, value: dict[str, Any]) -> None:
         os.close(temporary_fd)
         temporary_fd = -1
         os.replace(temporary, path)
-        directory = os.open(path.parent, os.O_RDONLY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        fsync_directory(path.parent)
     finally:
         if temporary_fd != -1:
             with contextlib.suppress(BaseException):

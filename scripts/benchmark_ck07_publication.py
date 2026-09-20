@@ -13,7 +13,6 @@ import argparse
 import contextlib
 import json
 import math
-import resource
 import sqlite3
 import statistics
 import tempfile
@@ -22,6 +21,22 @@ import time
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
+
+try:
+    import resource
+except ModuleNotFoundError:
+    from types import SimpleNamespace
+
+    from codex_usage_tracker.agent_kernel._platform import peak_rss_bytes
+
+    class _ResourceCompat:
+        RUSAGE_SELF = 0
+
+        @staticmethod
+        def getrusage(_who: int) -> SimpleNamespace:
+            return SimpleNamespace(ru_maxrss=peak_rss_bytes())
+
+    resource = _ResourceCompat()
 
 from codex_usage_tracker.agent_kernel.adapters.codex_jsonl.canonicalize import (
     ProposedChangeSet,

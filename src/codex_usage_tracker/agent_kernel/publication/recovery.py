@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import stat
 import tempfile
 from collections.abc import Callable, Iterable
 from contextlib import suppress
@@ -26,6 +25,13 @@ from codex_usage_tracker.agent_kernel.storage.operational import (
     RecoveryIntentState,
     WorkerIdentity,
     WorkerProbe,
+)
+
+from .._platform import (
+    fsync_directory,
+    fsync_file,
+    is_owner_only_directory,
+    is_owner_only_file,
 )
 
 POINTER_FILENAME = "active-artifact-pointer-v1.json"
@@ -238,12 +244,7 @@ def parse_pointer(payload: bytes) -> PointerDocument:
 def _verify_owner_directory(path: Path) -> None:
     if path.is_symlink():
         raise PointerValidationError("pointer directory cannot be a symlink")
-    info = path.stat()
-    if (
-        not stat.S_ISDIR(info.st_mode)
-        or info.st_uid != os.getuid()
-        or stat.S_IMODE(info.st_mode) != 0o700
-    ):
+    if not is_owner_only_directory(path):
         raise PointerValidationError("pointer directory must be owner-owned with mode 0700")
 
 
@@ -252,10 +253,7 @@ def read_pointer(path: Path) -> PointerDocument:
     _verify_owner_directory(path.parent)
     if path.is_symlink():
         raise PointerValidationError("artifact pointer cannot be a symlink")
-    info = path.stat()
-    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
-        raise PointerValidationError("artifact pointer must be an owner-owned regular file")
-    if stat.S_IMODE(info.st_mode) != 0o600:
+    if not is_owner_only_file(path):
         raise PointerValidationError("artifact pointer permissions must be 0600")
     return parse_pointer(path.read_bytes())
 
@@ -263,10 +261,7 @@ def read_pointer(path: Path) -> PointerDocument:
 def _verify_owner_artifact(path: Path) -> None:
     if path.is_symlink():
         raise PointerValidationError(f"artifact cannot be a symlink: {path.name}")
-    info = path.stat()
-    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
-        raise PointerValidationError(f"artifact must be an owner-owned regular file: {path.name}")
-    if stat.S_IMODE(info.st_mode) != 0o600:
+    if not is_owner_only_file(path):
         raise PointerValidationError(f"artifact permissions must be 0600: {path.name}")
 
 
@@ -279,17 +274,8 @@ def _file_sha256(path: Path) -> str:
 
 
 def _fsync_file_and_directory(path: Path) -> None:
-    descriptor = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-    directory_descriptor = os.open(path.parent, flags)
-    try:
-        os.fsync(directory_descriptor)
-    finally:
-        os.close(directory_descriptor)
+    fsync_file(path)
+    fsync_directory(path.parent)
 
 
 def _validate_file_digest(owner_directory: Path, artifact: PointerArtifact) -> Path:
@@ -316,7 +302,8 @@ def write_pointer_durable(
     )
     temporary_path = Path(temporary_name)
     try:
-        os.fchmod(descriptor, 0o600)
+        if hasattr(os, "fchmod"):
+            os.fchmod(descriptor, 0o600)
         with os.fdopen(descriptor, "wb") as handle:
             handle.write(pointer.canonical_bytes())
             handle.flush()
@@ -326,12 +313,7 @@ def write_pointer_durable(
         os.replace(temporary_path, path)
         if fault is not None:
             fault("after_pointer_replace")
-        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-        directory_descriptor = os.open(directory, flags)
-        try:
-            os.fsync(directory_descriptor)
-        finally:
-            os.close(directory_descriptor)
+        fsync_directory(directory)
         if fault is not None:
             fault("after_directory_fsync")
     finally:
@@ -761,12 +743,7 @@ def cleanup_owned_artifacts(
         if fault is not None:
             fault("after_cleanup_unlink")
     if removed:
-        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-        directory_descriptor = os.open(owner_directory, flags)
-        try:
-            os.fsync(directory_descriptor)
-        finally:
-            os.close(directory_descriptor)
+        fsync_directory(owner_directory)
         if fault is not None:
             fault("after_cleanup_directory_fsync")
     return tuple(removed)

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import os
 import sqlite3
-import stat
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
 
+from .._platform import is_owner_only_file
 from .schema import (
     ANALYTICAL_DATABASE_IDENTITY,
     OPERATIONAL_DATABASE_IDENTITY,
@@ -40,13 +40,8 @@ class DatabaseValidationError(DatabaseContractError):
 def _verify_owner_only_file(path: Path) -> None:
     if path.is_symlink():
         raise DatabaseContractError(f"database path must not be a symlink: {path}")
-    info = path.lstat()
-    if not stat.S_ISREG(info.st_mode):
-        raise DatabaseContractError(f"database path must be a regular file: {path}")
-    if info.st_uid != os.getuid():
-        raise DatabaseContractError(f"database is not owned by this user: {path}")
-    if stat.S_IMODE(info.st_mode) != 0o600:
-        raise DatabaseContractError(f"database permissions must be 0600: {path}")
+    if not is_owner_only_file(path):
+        raise DatabaseContractError(f"database path must be an owner-only regular file: {path}")
 
 
 def _verify_owner_only_sidecars(path: Path) -> None:

@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from codex_usage_tracker.agent_kernel.publication import recovery as recovery_module
 from codex_usage_tracker.agent_kernel.publication.planner import (
     OperationClass as PlannerOperationClass,
 )
@@ -349,16 +350,22 @@ def test_pointer_json_is_canonical_and_durable(tmp_path: Path) -> None:
 
     assert read_pointer(pointer_path) == pointer
     assert parse_pointer(pointer.canonical_bytes()) == pointer
-    assert pointer_path.stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":
+        assert pointer_path.stat().st_mode & 0o777 == 0o600
     assert not tuple(tmp_path.glob("*.tmp"))
 
 
-def test_pointer_read_rejects_non_owner_only_directory(tmp_path: Path) -> None:
+def test_pointer_read_rejects_non_owner_only_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     tmp_path.chmod(0o700)
     active = _artifact(tmp_path, "artifact.sqlite3", b"artifact", "publication-1")
     pointer_path = tmp_path / "active-artifact-pointer-v1.json"
     write_pointer_durable(pointer_path, PointerDocument(active, 1, None, 1))
     tmp_path.chmod(0o755)
+    if os.name == "nt":
+        monkeypatch.setattr(recovery_module, "is_owner_only_directory", lambda _path: False)
     with pytest.raises(PointerValidationError, match="owner-owned with mode 0700"):
         read_pointer(pointer_path)
 

@@ -5,14 +5,13 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import os
 import sqlite3
-import stat
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .._platform import fsync_directory, fsync_file, is_owner_only_directory
 from ..domain.identity import semantic_id
 from ..storage.database import (
     DatabaseValidation,
@@ -206,12 +205,7 @@ def build_isolated_artifact(
     """
 
     directory = Path(directory)
-    info = directory.lstat()
-    if (
-        not stat.S_ISDIR(info.st_mode)
-        or info.st_uid != os.getuid()
-        or stat.S_IMODE(info.st_mode) != 0o700
-    ):
+    if not is_owner_only_directory(directory):
         raise PublicationValidationError("artifact directory must be owner-only 0700")
     artifact_name = isolated_artifact_name(operation_id)
     path = directory / artifact_name
@@ -240,16 +234,8 @@ def build_isolated_artifact(
             raise PublicationValidationError("candidate artifact WAL checkpoint remained busy")
         connection.close()
         connection = None
-        descriptor = os.open(path, os.O_RDONLY)
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-        directory_descriptor = os.open(directory, os.O_RDONLY)
-        try:
-            os.fsync(directory_descriptor)
-        finally:
-            os.close(directory_descriptor)
+        fsync_file(path)
+        fsync_directory(directory)
         digest = file_sha256(path)
         validate_artifact_path(
             path,

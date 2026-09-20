@@ -415,9 +415,6 @@ def test_atomic_json_update_cleans_temps_on_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     path = tmp_path / "ledger.json"
-    real_fsync = benchmark.os.fsync
-    fsync_calls = 0
-
     if failure_kind in {"write", "interrupt"}:
         def fail_write(_fd: int, _data: bytes) -> int:
             if failure_kind == "interrupt":
@@ -440,14 +437,13 @@ def test_atomic_json_update_cleans_temps_on_failure(
             ),
         )
     else:
-        def fail_directory_fsync(fd: int) -> None:
-            nonlocal fsync_calls
-            fsync_calls += 1
-            if fsync_calls == 2:
-                raise OSError("synthetic directory fsync failure")
-            real_fsync(fd)
-
-        monkeypatch.setattr(benchmark.os, "fsync", fail_directory_fsync)
+        monkeypatch.setattr(
+            benchmark,
+            "fsync_directory",
+            lambda _path: (_ for _ in ()).throw(
+                OSError("synthetic directory fsync failure")
+            ),
+        )
 
     with pytest.raises(expected_exception):
         benchmark._atomic_json_update(path, {"state": failure_kind})

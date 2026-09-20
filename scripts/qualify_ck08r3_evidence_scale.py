@@ -16,7 +16,6 @@ import hashlib
 import heapq
 import json
 import platform
-import resource
 import sqlite3
 import sys
 import tempfile
@@ -25,9 +24,28 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+try:
+    import resource
+except ModuleNotFoundError:
+    resource = None
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+if resource is None:
+    from types import SimpleNamespace
+
+    from codex_usage_tracker.agent_kernel._platform import peak_rss_bytes
+
+    class _ResourceCompat:
+        RUSAGE_SELF = 0
+
+        @staticmethod
+        def getrusage(_who: int) -> SimpleNamespace:
+            return SimpleNamespace(ru_maxrss=peak_rss_bytes())
+
+    resource = _ResourceCompat()
 
 import codex_usage_tracker.agent_kernel.evidence.service as evidence_service  # noqa: E402
 from codex_usage_tracker.agent_kernel.evidence.cursors import (  # noqa: E402

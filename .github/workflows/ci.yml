@@ -18,6 +18,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  windows-agent-kernel:
+    name: Windows agent-kernel smoke
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install agent-kernel tooling
+        run: python -m pip install ".[dev]"
+      - name: Verify Windows portability seams
+        run: |
+          python -m pytest -p no:tach tests/agent_kernel/adapters/test_ingestion.py -k "worker_failure or queue_capacity_one or closing_parser"
+          python -m pytest -p no:tach tests/agent_kernel/storage tests/agent_kernel/query/test_page_executor.py
+          python -m pytest -p no:tach tests/agent_kernel/publication/test_performance.py
+          python -m ruff check src/codex_usage_tracker/agent_kernel scripts/benchmark_ck07_publication.py
+
   kernel:
     name: Kernel phase and package isolation
     runs-on: ubuntu-latest
